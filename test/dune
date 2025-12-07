@@ -1,0 +1,18 @@
+(test
+ (name unit_tests)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules unit_tests)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name tui_flow_tests)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou.core
+  lambda-term)
+ (modules tui_flow_tests)
+ (instrumentation
+  (backend bisect_ppx)))
