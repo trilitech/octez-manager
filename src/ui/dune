@@ -1,0 +1,16 @@
+(include_subdirs unqualified)
+
+(library
+ (name octez_manager_ui)
+ (public_name octez-manager.ui)
+ (libraries
+  octez_manager_lib
+  miaou
+  miaou.core
+  miaou.widgets.display
+  miaou.widgets.input
+  miaou.widgets.layout
+  lwt
+  lambda-term)
+ (preprocess
+  (pps ppx_deriving.show)))
