@@ -323,6 +323,28 @@ let parse_port addr =
       try Some (int_of_string (String.trim port_str)) with _ -> None)
   | _ -> None
 
+let data_dir_nonempty path =
+  let trimmed = String.trim path in
+  if trimmed = "" then false
+  else
+    try
+      if not (Sys.is_directory trimmed) then false
+      else
+        Sys.readdir trimmed
+        |> Array.to_list
+        |> List.filter (fun e -> e <> "." && e <> "..")
+        |> function [] -> false | _ -> true
+    with _ -> false
+
+let pad_with_right cols left right =
+  if right = "" then left
+  else
+    let space =
+      let raw = cols - String.length left - String.length right in
+      if raw < 1 then 1 else raw
+    in
+    left ^ String.make space ' ' ^ right
+
 let ports_from_states states =
   let rpc_ports =
     states
@@ -803,6 +825,11 @@ let view s ~focus:_ ~size =
     | `Url u -> u
     | `Tzinit sel -> Printf.sprintf "tzinit · %s (%s)" sel.label sel.kind_slug
   in
+  let data_dir_risky =
+    match f.preserve_data with
+    | `Keep -> false
+    | _ -> data_dir_nonempty f.data_dir
+  in
   (* Validation helpers *)
   let is_nonempty s = String.trim s <> "" in
   let valid_instance =
@@ -920,7 +947,22 @@ let view s ~focus:_ ~size =
       in
       Widgets.bg 160 (Widgets.fg 15 (Widgets.bold msg))
   in
-  let header = [Widgets.title_highlight " Install Node "; status_banner] in
+  let warning_banner =
+    if data_dir_risky then
+      let msg =
+        Printf.sprintf
+          " ⚠ Data dir not empty: %s (install may overwrite existing data) "
+          f.data_dir
+      in
+      Widgets.bg 220 (Widgets.fg 0 (Widgets.bold msg))
+    else ""
+  in
+  let title_line = Widgets.title_highlight " Install Node " in
+  let header_line =
+    if warning_banner = "" then status_banner
+    else pad_with_right size.LTerm_geom.cols status_banner warning_banner
+  in
+  let header = [title_line; header_line] in
   let footer =
     [Widgets.dim "↑/↓ navigate, Enter to edit, ? node flags, Esc back"]
   in
