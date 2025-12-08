@@ -60,6 +60,7 @@ let create_node_flow ~on_success =
                         logging_mode = Logging_mode.Journald;
                         extra_args = [];
                         auto_enable = true;
+                        preserve_data = false;
                         bootstrap;
                       }
                     in

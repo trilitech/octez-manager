@@ -38,27 +38,41 @@ type form_state = {
   start_now : bool;
   snapshot : snapshot_selection;
   extra_args : string;
+  preserve_data : [ `Auto | `Keep | `Refresh ];
 }
 
-type state = {form : form_state; cursor : int; next_page : string option}
+type state = {
+  form : form_state;
+  cursor : int;
+  next_page : string option;
+  service_states : Data.Service_state.t list;
+}
 
 type msg = unit
 
+let default_service_user () =
+  if Common.is_root () then "octez"
+  else
+    match Unix.getpwuid (Unix.geteuid ()) with
+    | pw when String.trim pw.Unix.pw_name <> "" -> pw.Unix.pw_name
+    | _ -> "octez"
+
 let default_form =
   {
-    instance_name = "";
+    instance_name = "node";
     network = "mainnet";
     history_mode = "rolling";
     data_dir = "";
     app_bin_dir = "/usr/bin";
     rpc_addr = "127.0.0.1:8732";
     p2p_addr = "0.0.0.0:9732";
-    service_user = "octez";
+    service_user = default_service_user ();
     logging = `File;
     enable_on_boot = true;
     start_now = true;
     snapshot = `None;
     extra_args = "";
+    preserve_data = `Auto;
   }
 
 let form_ref = ref default_form
@@ -205,30 +219,32 @@ let move s delta =
   let cursor = max 0 (min max_cursor (s.cursor + delta)) in
   {s with cursor}
 
-let get_registered_ports () =
-  match Data.load_service_states () with
-  | states ->
-      let parse_port addr =
-        match String.split_on_char ':' addr with
-        | [_; port_str] -> (
-            try Some (int_of_string (String.trim port_str)) with _ -> None)
-        | _ -> None
-      in
-      let rpc_ports =
-        states
-        |> List.filter_map (fun (s : Data.Service_state.t) ->
-            match s.service.Service.role with
-            | "node" -> parse_port s.service.Service.rpc_addr
-            | _ -> None)
-      in
-      let p2p_ports =
-        states
-        |> List.filter_map (fun (s : Data.Service_state.t) ->
-            match s.service.Service.role with
-            | "node" -> parse_port s.service.Service.net_addr
-            | _ -> None)
-      in
-      (rpc_ports, p2p_ports)
+let parse_port addr =
+  match String.split_on_char ':' addr with
+  | [_; port_str] -> (
+      try Some (int_of_string (String.trim port_str)) with _ -> None)
+  | _ -> None
+
+let ports_from_states states =
+  let rpc_ports =
+    states
+    |> List.filter_map (fun (s : Data.Service_state.t) ->
+           match s.service.Service.role with
+           | "node" -> parse_port s.service.Service.rpc_addr
+           | _ -> None)
+  in
+  let p2p_ports =
+    states
+    |> List.filter_map (fun (s : Data.Service_state.t) ->
+           match s.service.Service.role with
+           | "node" -> parse_port s.service.Service.net_addr
+           | _ -> None)
+  in
+  (rpc_ports, p2p_ports)
+
+let get_registered_ports ?states () =
+  let states = match states with Some s -> s | None -> Data.load_service_states () in
+  ports_from_states states
 
 let ensure_ports_initialized () =
   let rpc_ports, p2p_ports = get_registered_ports () in
@@ -260,13 +276,52 @@ let ensure_ports_initialized () =
   ensure current.p2p_addr ~default_host:"0.0.0.0" ~start_port:9732 (fun value ->
       update_form_ref (fun f -> {f with p2p_addr = value}))
 
+let ensure_service_user_initialized () =
+  let current = !form_ref in
+  if String.trim current.service_user = "" then
+    update_form_ref (fun f -> {f with service_user = default_service_user ()})
+
+let effective_data_dir (f : form_state) =
+  if String.trim f.data_dir = "" then Common.default_data_dir f.instance_name
+  else f.data_dir
+
+let dir_nonempty path =
+  let trimmed = String.trim path in
+  if trimmed = "" then false
+  else
+    try
+      let st = Unix.stat trimmed in
+      st.Unix.st_kind = Unix.S_DIR
+      &&
+      let entries = Sys.readdir trimmed in
+      Array.exists (fun e -> e <> "." && e <> "..") entries
+    with Unix.Unix_error _ | Sys_error _ -> false
+
+let normalized s = String.lowercase_ascii (String.trim s)
+
+let service_user_valid ~user =
+  if Common.is_root () then true
+  else Result.is_ok (System_user.validate_user_for_service ~user)
+
+let instance_in_use ?states name =
+  let target = normalized name in
+  let states = match states with Some s -> s | None -> Data.load_service_states () in
+  target <> ""
+  && List.exists
+       (fun (s : Data.Service_state.t) ->
+         String.equal target (normalized s.service.Service.instance))
+       states
+
 let init () =
+  ensure_service_user_initialized () ;
   ensure_ports_initialized () ;
-  {form = !form_ref; cursor = 0; next_page = None}
+  let service_states = Data.load_service_states () in
+  {form = !form_ref; cursor = 0; next_page = None; service_states}
 
 let update s _ = s
 
 let refresh s =
+  ensure_service_user_initialized () ;
   ensure_ports_initialized () ;
   let s = {s with form = !form_ref} in
   match Context.consume_navigation () with
@@ -301,6 +356,7 @@ let edit_field s =
                 data_dir =
                   (if f.data_dir = "" then Common.default_data_dir v
                    else f.data_dir);
+                preserve_data = `Auto;
               }))
         () ;
       s
@@ -344,7 +400,8 @@ let edit_field s =
       prompt_text_modal
         ~title:"Data Directory"
         ~initial:!form_ref.data_dir
-        ~on_submit:(fun v -> update_form_ref (fun f -> {f with data_dir = v}))
+        ~on_submit:(fun v ->
+          update_form_ref (fun f -> {f with data_dir = v; preserve_data = `Auto}))
         () ;
       s
   | 4 ->
@@ -358,7 +415,7 @@ let edit_field s =
       s
   | 5 ->
       (* RPC Address *)
-      let rpc_ports, p2p_ports = get_registered_ports () in
+      let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
       let avoid = rpc_ports @ p2p_ports in
       prompt_validated_text_modal
         ~title:"RPC Address (host:port)"
@@ -385,7 +442,7 @@ let edit_field s =
       s
   | 6 ->
       (* P2P Address *)
-      let rpc_ports, p2p_ports = get_registered_ports () in
+      let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
       let avoid = rpc_ports @ p2p_ports in
       prompt_validated_text_modal
         ~title:"P2P Address (host:port)"
@@ -496,62 +553,99 @@ let edit_field s =
       if f.instance_name = "" then (
         show_error ~title:"Error" "Instance name is required." ;
         s)
+      else if instance_in_use ~states:s.service_states f.instance_name then (
+        show_error ~title:"Error" "Instance name already exists." ;
+        s)
+      else if (not (Common.is_root ()))
+              && Result.is_error
+                   (System_user.validate_user_for_service
+                      ~user:f.service_user) then (
+        show_error
+          ~title:"Error"
+          "Service user does not exist and cannot be created (run as root or choose an existing user)." ;
+        s)
       else
-        let history_mode =
-          match History_mode.of_string f.history_mode with
-          | Ok m -> m
-          | Error _ -> History_mode.Rolling (* Default fallback *)
+        let data_dir = effective_data_dir f in
+        let needs_choice = dir_nonempty data_dir && f.preserve_data = `Auto in
+        let run_install ~preserve_data =
+          update_form_ref (fun f -> {f with data_dir; preserve_data}) ;
+          let f = !form_ref in
+          let history_mode =
+            match History_mode.of_string f.history_mode with
+            | Ok m -> m
+            | Error _ -> History_mode.Rolling (* Default fallback *)
+          in
+          let logging_mode =
+            match f.logging with
+            | `Journald -> Logging_mode.Journald
+            | `File ->
+                let dir =
+                  Common.default_log_dir ~role:"node" ~instance:f.instance_name
+                in
+                let path = Filename.concat dir "node.log" in
+                Logging_mode.File {path; rotate = true}
+          in
+          let bootstrap =
+            match f.snapshot with
+            | `None -> Genesis
+            | `Url u -> Snapshot {src = Some u; kind = None}
+            | `Tzinit choice ->
+                Snapshot {src = None; kind = Some choice.kind_slug}
+          in
+          let extra_args =
+            if f.extra_args = "" then []
+            else
+              String.split_on_char ' ' f.extra_args
+              |> List.filter (fun s -> s <> "")
+          in
+          let req : Installer_types.node_request =
+            {
+              instance = f.instance_name;
+              network = f.network;
+              history_mode;
+              data_dir = (if f.data_dir = "" then Some data_dir else Some data_dir);
+              rpc_addr = f.rpc_addr;
+              net_addr = f.p2p_addr;
+              service_user = f.service_user;
+              app_bin_dir = f.app_bin_dir;
+              logging_mode;
+              extra_args;
+              auto_enable = f.enable_on_boot;
+              bootstrap;
+              preserve_data = (preserve_data = `Keep);
+            }
+          in
+          let res =
+            let* () =
+              if Common.is_root () then
+                System_user.ensure_service_account ~name:f.service_user
+              else Ok ()
+            in
+            let* (module I) = require_package_manager () in
+            I.install_node req
+          in
+          match res with
+          | Ok _ ->
+              Context.mark_instances_dirty () ;
+              Context.navigate "instances" ;
+              s
+          | Error (`Msg e) ->
+              show_error ~title:"Installation Failed" e ;
+              s
         in
-        let logging_mode =
-          match f.logging with
-          | `Journald -> Logging_mode.Journald
-          | `File ->
-              let dir =
-                Common.default_log_dir ~role:"node" ~instance:f.instance_name
-              in
-              let path = Filename.concat dir "node.log" in
-              Logging_mode.File {path; rotate = true}
-        in
-        let bootstrap =
-          match f.snapshot with
-          | `None -> Genesis
-          | `Url u -> Snapshot {src = Some u; kind = None}
-          | `Tzinit choice ->
-              Snapshot {src = None; kind = Some choice.kind_slug}
-        in
-        let extra_args =
-          if f.extra_args = "" then []
-          else
-            String.split_on_char ' ' f.extra_args
-            |> List.filter (fun s -> s <> "")
-        in
-        let req =
-          {
-            instance = f.instance_name;
-            network = f.network;
-            history_mode;
-            data_dir = (if f.data_dir = "" then None else Some f.data_dir);
-            rpc_addr = f.rpc_addr;
-            net_addr = f.p2p_addr;
-            service_user = f.service_user;
-            app_bin_dir = f.app_bin_dir;
-            logging_mode;
-            extra_args;
-            auto_enable = f.enable_on_boot;
-            bootstrap;
-          }
-        in
-        let res =
-          let* (module I) = require_package_manager () in
-          I.install_node req
-        in
-        match res with
-        | Ok _ ->
-            Context.mark_instances_dirty () ;
-            {s with next_page = Some "instances"}
-        | Error (`Msg e) ->
-            show_error ~title:"Installation Failed" e ;
-            s)
+        if needs_choice then (
+          open_choice_modal
+            ~title:"Data directory exists"
+            ~items:[`Refresh; `Keep]
+            ~to_string:(function
+              | `Refresh -> "Refresh (wipe and import)"
+              | `Keep -> "Keep existing data")
+            ~on_select:(function
+              | `Refresh -> ignore (run_install ~preserve_data:`Refresh)
+              | `Keep -> ignore (run_install ~preserve_data:`Keep)) ;
+          s)
+        else
+          run_install ~preserve_data:f.preserve_data)
   | _ -> s
 
 let handle_modal_key s key ~size:_ =
@@ -583,13 +677,20 @@ let view s ~focus:_ ~size =
   in
   (* Validation helpers *)
   let is_nonempty s = String.trim s <> "" in
+  let valid_instance =
+    is_nonempty f.instance_name
+    && not (instance_in_use ~states:s.service_states f.instance_name)
+  in
+  let valid_service_user =
+    is_nonempty f.service_user && service_user_valid ~user:f.service_user
+  in
   let valid_rpc =
     match parse_host_port f.rpc_addr with
     | None -> false
     | Some (_host, port) ->
         if port < 1024 || port > 65535 then false
         else
-          let rpc_ports, p2p_ports = get_registered_ports () in
+          let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
           let avoid = rpc_ports @ p2p_ports in
           not (List.mem port avoid || is_port_in_use port)
   in
@@ -599,7 +700,7 @@ let view s ~focus:_ ~size =
     | Some (_host, port) ->
         if port < 1024 || port > 65535 then false
         else
-          let rpc_ports, p2p_ports = get_registered_ports () in
+          let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
           let avoid = rpc_ports @ p2p_ports in
           not (List.mem port avoid || is_port_in_use port)
   in
@@ -611,22 +712,22 @@ let view s ~focus:_ ~size =
     | `Tzinit _ -> true
   in
   let all_ok =
-    is_nonempty f.instance_name
+    valid_instance
     && is_nonempty f.network && is_nonempty f.history_mode
     && is_nonempty f.data_dir && valid_app_bin_dir && valid_rpc && valid_p2p
-    && is_nonempty f.service_user && valid_snapshot
+    && valid_service_user && valid_snapshot
   in
   let status ok = if ok then "✓" else "✗" in
   let items =
     [
-      ("Instance Name", f.instance_name, is_nonempty f.instance_name);
+      ("Instance Name", f.instance_name, valid_instance);
       ("Network", network_value, is_nonempty f.network);
       ("History Mode", f.history_mode, is_nonempty f.history_mode);
       ("Data Dir", f.data_dir, is_nonempty f.data_dir);
       ("App Bin Dir", f.app_bin_dir, valid_app_bin_dir);
       ("RPC Address", f.rpc_addr, valid_rpc);
       ("P2P Address", f.p2p_addr, valid_p2p);
-      ("Service User", f.service_user, is_nonempty f.service_user);
+      ("Service User", f.service_user, valid_service_user);
       ( "Logging",
         (match f.logging with `File -> "File" | `Journald -> "Journald"),
         true );
@@ -672,7 +773,7 @@ let view s ~focus:_ ~size =
           (not valid_app_bin_dir, "App Bin Dir");
           (not valid_rpc, "RPC Address");
           (not valid_p2p, "P2P Address");
-          (not (is_nonempty f.service_user), "Service User");
+          (not valid_service_user, "Service User");
           (not valid_snapshot, "Snapshot");
         ]
         |> List.filter fst |> List.map snd

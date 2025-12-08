@@ -14,7 +14,11 @@ let open_text_modal ~title ~lines =
 
     let view s ~focus ~size =
       let rows = max 1 (size.LTerm_geom.rows - 4) in
-      let cols = max 1 (size.LTerm_geom.cols - 4) in
+      (* Clamp columns so rendered content never exceeds the modal's inner width *)
+      let cols =
+        let inner = max 1 (size.LTerm_geom.cols - 2) in
+        min inner 72
+      in
       Pager.render ~win:rows ~cols s ~focus
 
     let move s _ = s
@@ -64,7 +68,8 @@ let open_text_modal ~title ~lines =
     let has_modal _ = true
   end in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = None; dim_background = true}
+    (* Limit modal width so header/separator stay on a single line *)
+    {title; left = None; max_width = Some 76; dim_background = true}
   in
   Miaou.Core.Modal_manager.push_default
     (module Modal)
@@ -281,8 +286,37 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
     ~on_result:(function Some text -> on_submit text | None -> ())
     ()
 
+let wrap_text ~width s =
+  let wrap_line s =
+    let len = String.length s in
+    if len <= width then [s]
+    else
+      let rec aux start =
+        if start >= len then []
+        else
+          let remaining = len - start in
+          if remaining <= width then [String.sub s start remaining]
+          else
+            let limit = start + width in
+            let end_ =
+              try
+                let last_space = String.rindex_from s limit ' ' in
+                if last_space > start then last_space else limit
+              with _ -> limit
+            in
+            let sub = String.sub s start (end_ - start) in
+            let next_start =
+              if end_ < len && s.[end_] = ' ' then end_ + 1 else end_
+            in
+            sub :: aux next_start
+      in
+      aux 0
+  in
+  String.split_on_char '\n' s |> List.map wrap_line |> List.flatten
+
 let show_success ~title message =
   open_text_modal ~title ~lines:["Success"; ""; message]
 
 let show_error ~title message =
-  open_text_modal ~title ~lines:["Error"; ""; message]
+  let lines = wrap_text ~width:50 message in
+  open_text_modal ~title ~lines:(["Error"; ""] @ lines)

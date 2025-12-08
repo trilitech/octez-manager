@@ -553,6 +553,18 @@ let install_node (request : node_request) =
       ~role:"node"
       ~logging_mode:request.logging_mode
   in
+  let data_dir_nonempty =
+    let trimmed = String.trim data_dir in
+    if trimmed = "" || not (Sys.file_exists trimmed) then false
+    else
+      try
+        let st = Unix.stat trimmed in
+        st.Unix.st_kind = Unix.S_DIR
+        &&
+        let entries = Sys.readdir trimmed in
+        Array.exists (fun e -> e <> "." && e <> "..") entries
+      with Unix.Unix_error _ | Sys_error _ -> false
+  in
   let* snapshot_plan = snapshot_plan_of_request request in
   let snapshot_meta = snapshot_metadata_of_plan snapshot_plan in
   let* () = System_user.ensure_service_account ~name:request.service_user in
@@ -580,6 +592,11 @@ let install_node (request : node_request) =
     if Common.is_root () then (request.service_user, request.service_user)
     else Common.current_user_group_names ()
   in
+  let* () =
+    if data_dir_nonempty && not request.preserve_data then
+      Common.remove_tree data_dir
+    else Ok ()
+  in
   let* () = ensure_directories ~owner ~group [data_dir] in
   let* () = ensure_logging_base_directory ~owner ~group logging_mode in
   let* () = ensure_runtime_log_directory ~owner ~group logging_mode in
@@ -590,7 +607,10 @@ let install_node (request : node_request) =
       ~network:request.network
       ~history_mode:request.history_mode
   in
-  let* () = perform_bootstrap ~plan:snapshot_plan ~request ~data_dir in
+  let* () =
+    if request.preserve_data then Ok ()
+    else perform_bootstrap ~plan:snapshot_plan ~request ~data_dir
+  in
   let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
   let service =
     Service.make

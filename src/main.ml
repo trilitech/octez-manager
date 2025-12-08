@@ -380,6 +380,7 @@ let install_node_cmd =
                 auto_enable = not no_enable;
                 logging_mode;
                 bootstrap;
+                preserve_data = false;
               }
             in
             match Installer.install_node req with

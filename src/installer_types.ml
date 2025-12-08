@@ -15,6 +15,7 @@ type node_request = {
   extra_args : string list;
   auto_enable : bool;
   bootstrap : bootstrap;
+  preserve_data : bool;
 }
 
 type daemon_request = {

@@ -157,7 +157,7 @@ let sort_services =
 let sample_node_request ?data_dir ?(bootstrap = Genesis)
     ?(history_mode = History_mode.Rolling)
     ?(logging_mode = Logging_mode.Journald) ?(extra_args = [])
-    ?(auto_enable = false) () : node_request =
+    ?(auto_enable = false) ?(preserve_data = false) () : node_request =
   {
     instance = "alpha";
     network = "https://teztnets.com/seoulnet";
@@ -171,6 +171,7 @@ let sample_node_request ?data_dir ?(bootstrap = Genesis)
     extra_args;
     auto_enable;
     bootstrap;
+    preserve_data;
   }
 
 let service_make_populates_fields () =
