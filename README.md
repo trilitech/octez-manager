@@ -101,6 +101,8 @@ The UI is designed for efficiency with a list-first approach:
 
 - **Instances (Home)**: A unified list of all managed services.
   - **Install**: Select "Install new instance" (or press `c`) to launch a wizard for Nodes, Bakers, and more.
+    - Networks are pulled from teztnets.com so the dropdown always lists the current aliases and human-friendly names.
+    - Snapshot choices are hydrated from snapshots.tzinit.org; picking one records the tzinit slug so refresh/import operations can reuse it.
   - **Manage**: Press `Enter` on any instance to access actions: Start, Stop, Restart, View Logs, Refresh Snapshot, or Purge.
   - **Filter**: Press `f` to cycle through roles (Node, Baker, etc.).
   - **Bulk Actions**: Press `b` to apply actions to all filtered instances.
