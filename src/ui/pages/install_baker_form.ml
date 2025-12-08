@@ -1,3 +1,10 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(*****************************************************************************)
+
 module Widgets = Miaou_widgets_display.Widgets
 module Table_widget = Miaou_widgets_display.Table_widget
 module Keys = Miaou.Core.Keys
