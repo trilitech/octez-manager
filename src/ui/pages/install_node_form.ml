@@ -150,22 +150,6 @@ let snapshot_choice_label = function
 
 let update_form_ref f = form_ref := f !form_ref
 
-let init () = {form = !form_ref; cursor = 0; next_page = None}
-
-let update s _ = s
-
-let refresh s =
-  let s = {s with form = !form_ref} in
-  match Context.consume_navigation () with
-  | Some p -> {s with next_page = Some p}
-  | None -> {s with next_page = None}
-
-let move s delta =
-  let max_cursor = 13 in
-  (* Number of fields + confirm *)
-  let cursor = max 0 (min max_cursor (s.cursor + delta)) in
-  {s with cursor}
-
 let parse_host_port (s : string) : (string * int) option =
   match String.split_on_char ':' s with
   | [host; port] -> (
@@ -196,6 +180,12 @@ let next_free_port ~start ~avoid =
   in
   loop start
 
+let move s delta =
+  let max_cursor = 13 in
+  (* Number of fields + confirm *)
+  let cursor = max 0 (min max_cursor (s.cursor + delta)) in
+  {s with cursor}
+
 let get_registered_ports () =
   match Data.load_service_states () with
   | states ->
@@ -220,6 +210,49 @@ let get_registered_ports () =
             | _ -> None)
       in
       (rpc_ports, p2p_ports)
+
+let ensure_ports_initialized () =
+  let rpc_ports, p2p_ports = get_registered_ports () in
+  let avoid = ref (rpc_ports @ p2p_ports) in
+  let ensure current ~default_host ~start_port setter =
+    let needs_new =
+      match parse_host_port current with
+      | Some (_host, port) ->
+          port < 1024 || port > 65535 || List.mem port !avoid
+          || is_port_in_use port
+      | None -> true
+    in
+    if needs_new then (
+      let port = next_free_port ~start:start_port ~avoid:!avoid in
+      setter (Printf.sprintf "%s:%d" default_host port) ;
+      avoid := port :: !avoid)
+    else
+      match parse_host_port current with
+      | Some (_host, port) -> avoid := port :: !avoid
+      | None -> ()
+  in
+  let current = !form_ref in
+  ensure
+    current.rpc_addr
+    ~default_host:"127.0.0.1"
+    ~start_port:8732
+    (fun value -> update_form_ref (fun f -> {f with rpc_addr = value})) ;
+  let current = !form_ref in
+  ensure current.p2p_addr ~default_host:"0.0.0.0" ~start_port:9732 (fun value ->
+      update_form_ref (fun f -> {f with p2p_addr = value}))
+
+let init () =
+  ensure_ports_initialized () ;
+  {form = !form_ref; cursor = 0; next_page = None}
+
+let update s _ = s
+
+let refresh s =
+  ensure_ports_initialized () ;
+  let s = {s with form = !form_ref} in
+  match Context.consume_navigation () with
+  | Some p -> {s with next_page = Some p}
+  | None -> {s with next_page = None}
 
 let require_package_manager () =
   match
