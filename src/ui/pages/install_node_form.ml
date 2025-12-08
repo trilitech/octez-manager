@@ -38,7 +38,7 @@ type form_state = {
   start_now : bool;
   snapshot : snapshot_selection;
   extra_args : string;
-  preserve_data : [ `Auto | `Keep | `Refresh ];
+  preserve_data : [`Auto | `Keep | `Refresh];
 }
 
 type state = {
@@ -63,7 +63,7 @@ let default_form =
     network = "mainnet";
     history_mode = "rolling";
     data_dir = "";
-    app_bin_dir = "/usr/bin";
+    app_bin_dir = "/home/mathias/dev/tezos/tezos";
     rpc_addr = "127.0.0.1:8732";
     p2p_addr = "0.0.0.0:9732";
     service_user = default_service_user ();
@@ -229,21 +229,23 @@ let ports_from_states states =
   let rpc_ports =
     states
     |> List.filter_map (fun (s : Data.Service_state.t) ->
-           match s.service.Service.role with
-           | "node" -> parse_port s.service.Service.rpc_addr
-           | _ -> None)
+        match s.service.Service.role with
+        | "node" -> parse_port s.service.Service.rpc_addr
+        | _ -> None)
   in
   let p2p_ports =
     states
     |> List.filter_map (fun (s : Data.Service_state.t) ->
-           match s.service.Service.role with
-           | "node" -> parse_port s.service.Service.net_addr
-           | _ -> None)
+        match s.service.Service.role with
+        | "node" -> parse_port s.service.Service.net_addr
+        | _ -> None)
   in
   (rpc_ports, p2p_ports)
 
 let get_registered_ports ?states () =
-  let states = match states with Some s -> s | None -> Data.load_service_states () in
+  let states =
+    match states with Some s -> s | None -> Data.load_service_states ()
+  in
   ports_from_states states
 
 let ensure_ports_initialized () =
@@ -305,12 +307,82 @@ let service_user_valid ~user =
 
 let instance_in_use ?states name =
   let target = normalized name in
-  let states = match states with Some s -> s | None -> Data.load_service_states () in
+  let states =
+    match states with Some s -> s | None -> Data.load_service_states ()
+  in
   target <> ""
   && List.exists
        (fun (s : Data.Service_state.t) ->
          String.equal target (normalized s.service.Service.instance))
        states
+
+let append_extra_args tokens =
+  if tokens = [] then ()
+  else
+    let current = !form_ref in
+    let existing =
+      if String.trim current.extra_args = "" then []
+      else
+        String.split_on_char ' ' current.extra_args
+        |> List.filter (fun s -> String.trim s <> "")
+    in
+    let merged = existing @ tokens in
+    update_form_ref (fun f -> {f with extra_args = String.concat " " merged})
+
+let open_binary_help s =
+  let app_bin_dir = String.trim s.form.app_bin_dir in
+  if app_bin_dir = "" then (
+    Modal_helpers.show_error ~title:"Node Flags" "Octez bin directory is empty" ;
+    s)
+  else
+    let binary = Filename.concat app_bin_dir "octez-node" in
+    match Binary_help_explorer.load_options ~binary with
+    | Error (`Msg msg) ->
+        Modal_helpers.show_error ~title:"Node Flags" msg ;
+        s
+    | Ok opts ->
+        Modal_helpers.open_choice_modal_with_hint
+          ~title:"Node Flags"
+          ~items:opts
+          ~to_string:(fun o -> String.concat ", " o.Binary_help_explorer.names)
+          ~describe:(fun o ->
+            let cleaned_doc =
+              o.Binary_help_explorer.doc |> String.split_on_char '\n'
+              |> List.map String.trim
+              |> List.filter (fun l -> l <> "")
+              |> String.concat " "
+            in
+            if cleaned_doc = "" then ["No description available."]
+            else Binary_help_explorer.wrap_text ~width:68 cleaned_doc)
+          ~hint:(fun o ->
+            let title = String.concat ", " o.Binary_help_explorer.names in
+            let doc = String.trim o.Binary_help_explorer.doc in
+            let cleaned_doc =
+              doc |> String.split_on_char '\n' |> List.map String.trim
+              |> List.filter (fun l -> l <> "")
+              |> String.concat " "
+            in
+            let arg_line =
+              match o.Binary_help_explorer.arg with
+              | Some arg when String.trim arg <> "" ->
+                  [Printf.sprintf "Arg: %s" (String.trim arg)]
+              | _ -> []
+            in
+            let body =
+              if cleaned_doc = "" then
+                ["No description available for this flag."]
+              else Binary_help_explorer.wrap_text ~width:68 cleaned_doc
+            in
+            let summary =
+              ("Flag: " ^ String.concat ", " o.Binary_help_explorer.names)
+              :: arg_line
+              @ [""] @ body
+            in
+            Modal_helpers.open_text_modal ~title ~lines:summary)
+          ~on_select:(fun o ->
+            let flag = Binary_help_explorer.primary_name o.names in
+            append_extra_args [flag]) ;
+        s
 
 let init () =
   ensure_service_user_initialized () ;
@@ -401,7 +473,8 @@ let edit_field s =
         ~title:"Data Directory"
         ~initial:!form_ref.data_dir
         ~on_submit:(fun v ->
-          update_form_ref (fun f -> {f with data_dir = v; preserve_data = `Auto}))
+          update_form_ref (fun f ->
+              {f with data_dir = v; preserve_data = `Auto}))
         () ;
       s
   | 4 ->
@@ -415,7 +488,9 @@ let edit_field s =
       s
   | 5 ->
       (* RPC Address *)
-      let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
+      let rpc_ports, p2p_ports =
+        get_registered_ports ~states:s.service_states ()
+      in
       let avoid = rpc_ports @ p2p_ports in
       prompt_validated_text_modal
         ~title:"RPC Address (host:port)"
@@ -442,7 +517,9 @@ let edit_field s =
       s
   | 6 ->
       (* P2P Address *)
-      let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
+      let rpc_ports, p2p_ports =
+        get_registered_ports ~states:s.service_states ()
+      in
       let avoid = rpc_ports @ p2p_ports in
       prompt_validated_text_modal
         ~title:"P2P Address (host:port)"
@@ -539,14 +616,9 @@ let edit_field s =
                 })) ;
       s
   | 12 ->
-      (* Extra Args *)
-      prompt_text_modal
-        ~title:"Extra Args"
-        ~initial:!form_ref.extra_args
-        ~on_submit:(fun v -> update_form_ref (fun f -> {f with extra_args = v}))
-        () ;
-      s
-  | 13 -> (
+      (* Extra Args -> open flag explorer *)
+      open_binary_help s
+  | 13 ->
       (* Confirm *)
       (* Trigger install *)
       let f = !form_ref in
@@ -556,13 +628,15 @@ let edit_field s =
       else if instance_in_use ~states:s.service_states f.instance_name then (
         show_error ~title:"Error" "Instance name already exists." ;
         s)
-      else if (not (Common.is_root ()))
-              && Result.is_error
-                   (System_user.validate_user_for_service
-                      ~user:f.service_user) then (
+      else if
+        (not (Common.is_root ()))
+        && Result.is_error
+             (System_user.validate_user_for_service ~user:f.service_user)
+      then (
         show_error
           ~title:"Error"
-          "Service user does not exist and cannot be created (run as root or choose an existing user)." ;
+          "Service user does not exist and cannot be created (run as root or \
+           choose an existing user)." ;
         s)
       else
         let data_dir = effective_data_dir f in
@@ -603,7 +677,8 @@ let edit_field s =
               instance = f.instance_name;
               network = f.network;
               history_mode;
-              data_dir = (if f.data_dir = "" then Some data_dir else Some data_dir);
+              data_dir =
+                (if f.data_dir = "" then Some data_dir else Some data_dir);
               rpc_addr = f.rpc_addr;
               net_addr = f.p2p_addr;
               service_user = f.service_user;
@@ -612,7 +687,7 @@ let edit_field s =
               extra_args;
               auto_enable = f.enable_on_boot;
               bootstrap;
-              preserve_data = (preserve_data = `Keep);
+              preserve_data = preserve_data = `Keep;
             }
           in
           let res =
@@ -644,8 +719,7 @@ let edit_field s =
               | `Refresh -> ignore (run_install ~preserve_data:`Refresh)
               | `Keep -> ignore (run_install ~preserve_data:`Keep)) ;
           s)
-        else
-          run_install ~preserve_data:f.preserve_data)
+        else run_install ~preserve_data:f.preserve_data
   | _ -> s
 
 let handle_modal_key s key ~size:_ =
@@ -661,6 +735,7 @@ let handle_key s key ~size:_ =
     | Some (Keys.Char "Esc") -> {s with next_page = Some "__BACK__"}
     | Some Keys.Up -> move s (-1)
     | Some Keys.Down -> move s 1
+    | Some (Keys.Char "?") -> open_binary_help s |> refresh
     | Some Keys.Enter -> edit_field s |> refresh
     | _ -> s
 
@@ -690,7 +765,9 @@ let view s ~focus:_ ~size =
     | Some (_host, port) ->
         if port < 1024 || port > 65535 then false
         else
-          let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
+          let rpc_ports, p2p_ports =
+            get_registered_ports ~states:s.service_states ()
+          in
           let avoid = rpc_ports @ p2p_ports in
           not (List.mem port avoid || is_port_in_use port)
   in
@@ -700,7 +777,9 @@ let view s ~focus:_ ~size =
     | Some (_host, port) ->
         if port < 1024 || port > 65535 then false
         else
-          let rpc_ports, p2p_ports = get_registered_ports ~states:s.service_states () in
+          let rpc_ports, p2p_ports =
+            get_registered_ports ~states:s.service_states ()
+          in
           let avoid = rpc_ports @ p2p_ports in
           not (List.mem port avoid || is_port_in_use port)
   in
@@ -712,8 +791,7 @@ let view s ~focus:_ ~size =
     | `Tzinit _ -> true
   in
   let all_ok =
-    valid_instance
-    && is_nonempty f.network && is_nonempty f.history_mode
+    valid_instance && is_nonempty f.network && is_nonempty f.history_mode
     && is_nonempty f.data_dir && valid_app_bin_dir && valid_rpc && valid_p2p
     && valid_service_user && valid_snapshot
   in
@@ -792,7 +870,9 @@ let view s ~focus:_ ~size =
   let header =
     [Widgets.title_highlight " Install Node "; ""; status_banner; ""]
   in
-  let footer = [Widgets.dim "↑/↓ navigate, Enter to edit, Esc back"] in
+  let footer =
+    [Widgets.dim "↑/↓ navigate, Enter to edit, ? node flags, Esc back"]
+  in
   Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
       Table_widget.Table.render table)
 
@@ -826,6 +906,7 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
       ("Up", (fun s -> move s (-1)), "up");
       ("Down", (fun s -> move s 1), "down");
       ("Enter", (fun s -> enter s), "open");
+      ("?", open_binary_help, "node flags");
     ]
 
   let view = view

@@ -7,6 +7,15 @@ val open_choice_modal :
   on_select:('a -> unit) ->
   unit
 
+val open_choice_modal_with_hint :
+  title:string ->
+  items:'a list ->
+  to_string:('a -> string) ->
+  hint:('a -> unit) ->
+  describe:('a -> string list) ->
+  on_select:('a -> unit) ->
+  unit
+
 val prompt_text_modal :
   ?title:string ->
   ?width:int ->

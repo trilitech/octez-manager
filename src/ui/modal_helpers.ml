@@ -1,6 +1,7 @@
 module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
+module Widgets = Miaou_widgets_display.Widgets
 
 let open_text_modal ~title ~lines =
   let module Modal = struct
@@ -150,6 +151,132 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
           | Some choice -> on_select choice
           | None -> ())
       | `Cancel -> ())
+
+let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
+    ~to_string ~hint ~describe ~on_select =
+  let describe_fn = describe in
+  (* Helper to update the Miaou Help_hint based on selected item *)
+  let update_help_hint s =
+    let doc_lines =
+      match Select_widget.get_selection s with
+      | Some choice -> describe_fn choice
+      | None -> ( match items with hd :: _ -> describe_fn hd | [] -> [])
+    in
+    let long_text =
+      match doc_lines with
+      | [] -> None
+      | lines -> Some (String.concat "\n" lines)
+    in
+    Miaou.Core.Help_hint.set long_text
+  in
+  let module Modal = struct
+    type state = choice Select_widget.t
+
+    type msg = unit
+
+    let init () = failwith "choice modal init provided by caller"
+
+    let update s _ = s
+
+    let view s ~focus ~size =
+      (* Update Help_hint whenever rendering so ? shows current selection's doc *)
+      update_help_hint s ;
+      Select_widget.render_with_size s ~focus ~size
+
+    let move s _ = s
+
+    let refresh s = s
+
+    let enter s = s
+
+    let service_select s _ = s
+
+    let service_cycle s _ = s
+
+    let back s = s
+
+    let keymap s =
+      let doc_lines =
+        match Select_widget.get_selection s with
+        | Some choice -> describe_fn choice
+        | None -> ( match items with hd :: _ -> describe_fn hd | [] -> [])
+      in
+      let doc_entries =
+        doc_lines
+        |> List.filter (fun l -> String.trim l <> "")
+        |> List.mapi (fun idx line ->
+            (Printf.sprintf "doc%d" (idx + 1), (fun s -> s), line))
+      in
+      (* Keep keymap mostly for displaying help; handlers are no-op to avoid
+         interfering with handle_modal_key. *)
+      [
+        ("Enter", (fun s -> s), "Select");
+        ("Up", (fun s -> s), "Up");
+        ("Down", (fun s -> s), "Down");
+        ("PageUp", (fun s -> s), "Page up");
+        ("PageDown", (fun s -> s), "Page down");
+        ("Home", (fun s -> s), "Top");
+        ("End", (fun s -> s), "Bottom");
+        ("?", (fun s -> s), "Show description");
+      ]
+      @ doc_entries
+
+    let handle_modal_key s key ~size:_ =
+      let mapped =
+        match Miaou.Core.Keys.of_string key with
+        | Some Miaou.Core.Keys.Up -> "Up"
+        | Some Miaou.Core.Keys.Down -> "Down"
+        | Some (Miaou.Core.Keys.Char "k") -> "Up"
+        | Some (Miaou.Core.Keys.Char "j") -> "Down"
+        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
+        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
+        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
+        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.Enter -> "Enter"
+        | Some (Miaou.Core.Keys.Char "?") -> "Hint"
+        | Some (Miaou.Core.Keys.Char "Esc")
+        | Some (Miaou.Core.Keys.Char "Escape")
+        | Some (Miaou.Core.Keys.Char "q") ->
+            "Esc"
+        | _ -> key
+      in
+      let key = if mapped = "?" then "Hint" else mapped in
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        s)
+      else if key = "Hint" then (
+        (match Select_widget.get_selection s with
+        | Some choice -> hint choice
+        | None -> ( match items with hd :: _ -> hint hd | [] -> ())) ;
+        s)
+      else if key = "Esc" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        s)
+      else Select_widget.handle_key s ~key
+
+    let handle_key = handle_modal_key
+
+    let next_page _ = None
+
+    let has_modal _ = true
+  end in
+  let widget = Select_widget.open_centered ~title ~items ~to_string () in
+  (* Set initial Help_hint for the default selection *)
+  update_help_hint widget ;
+  let ui : Miaou.Core.Modal_manager.ui =
+    {title; left = None; max_width = Some 80; dim_background = true}
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:widget
+    ~ui
+    ~on_close:(fun state -> function
+      | `Commit -> (
+          Miaou.Core.Help_hint.clear () ;
+          match Select_widget.get_selection state with
+          | Some choice -> on_select choice
+          | None -> ())
+      | `Cancel -> Miaou.Core.Help_hint.clear ())
 
 let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
   let module Modal = struct

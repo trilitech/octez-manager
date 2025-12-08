@@ -1,5 +1,6 @@
 open Octez_manager_lib
 open Installer_types
+module Binary_help_explorer = Octez_manager_ui.Binary_help_explorer
 
 let option_string = Alcotest.(option string)
 
@@ -470,6 +471,355 @@ let installer_strip_and_detect_uris () =
     "strip"
     (Some "/tmp/foo")
     (Installer.For_tests.strip_file_uri "file:///tmp/foo")
+
+let octez_node_run_help_plain =
+  {|
+NAME
+     octez-node-run - Run the Tezos node
+
+SYNOPSIS
+     octez-node run [OPTION]...
+
+DESCRIPTION
+     The run command is meant to run the Tezos node. Most of its command
+     line arguments corresponds to config file entries, and will have
+     priority over the latter if used.
+
+P2P OPTIONS
+     --advertised-net-port=PORT
+       The alternative TCP port at which this instance can be reached.
+       This instance does not actually binds to it. The port may be used
+       by a NAT server to forward connections to the instance listenning
+       port.
+
+     --binary-chunks-size=NUM
+       Size limit (in kB) of binary blocks that are sent to other peers.
+
+     --bootstrap-threshold=NUM
+       [DEPRECATED: use synchronisation-threshold instead] The number of
+       peers to synchronize with before declaring the node bootstrapped.
+
+     --connections=NUM
+       Sets min_connections, expected_connections, max_connections to NUM
+       / 2, NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 *
+       NUM unless it is already defined on the command line. Sets
+       synchronisation_threshold to max(NUM / 4, 2) unless it is already
+       defined on the command line.
+
+     --disable-mempool
+       If set to [true], the node will not participate in the propagation
+       of pending operations (mempool). Default value is [false]. It can
+       be used to decrease the memory and computation footprints of the
+       node.
+
+     --disable-p2p-maintenance
+       Disable the p2p maintenance. This option should be used for
+       testing purposes only. The node will not try to establish or close
+       connections by itself. It will accept incoming connections, and
+       outgoing connection can be initiated by using the RPC 'POST
+       /network/connections'.
+
+     --disable-p2p-swap
+       Disable p2p connection swaps. This option should be used for
+       testing purposes only. The node will neither try to initiate a
+       swap of connections with one of its neighbor nor answer to a swap
+       request.
+
+     --discovery-addr=ADDR:PORT
+       The UDP address and port used for local peer discovery.
+
+     --enable-testchain
+       DEPRECATED. If set to [true], the node will spawn a testchain
+       during the protocol's testing voting period. Default value is
+       [false]. It will increase the node storage usage and computation
+       by additionally validating the test network blocks.
+
+     --expected-pow=FLOAT
+       Expected level of proof-of-work for peers identity.
+
+     --max-download-speed=NUM
+       The maximum number of bytes read per second.
+
+     --max-upload-speed=NUM
+       The maximum number of bytes sent per second.
+
+     --net-addr=ADDR:PORT
+       The URL at which this instance can be reached.
+
+     --no-bootstrap-peers
+       Ignore the peers found in the config file (or the hard-coded
+       bootstrap peers in the absence of config file).
+
+     --peer=ADDR:PORT[#ID]
+       A peer to bootstrap the network from. Can be used several times to
+       add several peers. Optionally, the expected identity of the peer
+       can be given using the b58 hash format of its public key.
+
+     --peer-table-size=NUM
+       Maximum size of internal peer tables, used to store metadata/logs
+       about a peer or about a to-be-authenticated host:port couple.
+
+     --private-mode
+       Only open outgoing/accept incoming connections to/from peers
+       listed in 'bootstrap-peers' or provided with '--peer' option.
+
+     --sync-latency=NUM
+       [latency] is the time interval (in seconds) used to determine if a
+       peer is synchronized with a chain. For instance, a peer whose
+       known head has a timestamp T is considered synchronized if T >=
+       now - max_latency. This parameter's default value was set with the
+       chain's current protocol's baking rate in mind (and some allowance
+       for network latency).
+
+     --synchronisation-threshold=NUM
+       Set the number of peers with whom a chain synchronization must be
+       completed to bootstrap the node
+
+RPC OPTIONS
+     --allow-all-rpc=ADDR:PORT
+       Apply allow-all policy to a given RPC listening address rather
+       than the safe default.
+
+     --cors-header=HEADER
+       Header reported by Access-Control-Allow-Headers reported during
+       CORS preflighting; may be used multiple times
+
+     --cors-origin=ORIGIN
+       CORS origin allowed by the RPC server via
+       Access-Control-Allow-Origin; may be used multiple times
+
+     --disable-context-pruning
+       Disables the storage maintenance of the context
+
+     --enable-http-cache-headers
+       Enables HTTP cache headers in the RPC response
+
+     --external-rpc-addr=ADDR:PORT
+       The URL at which this external RPC server instance can be reached.
+
+     --max-active-rpc-connections=NUM (absent=100)
+       Sets the maximum number of active connections per RPC server.
+
+     --media-type=MEDIATYPE (absent=any)
+       Set the media-types supported by the server.
+
+     --rpc-addr=ADDR:PORT
+       The URL at which this RPC server instance can be reached. Note
+       that: as a local RPC server is handled by the node itself, calling
+       computational intensive RPCs can affect the performances of the
+       node.
+
+     --rpc-tls=crt,key
+       Enable TLS for this RPC server with the provided certificate and
+       key.
+
+     --storage-maintenance-delay=VAL
+       Configures the storage maintenance delays
+
+MISC OPTIONS
+     --allow-yes-crypto
+       Allow usage of yes cryptography. This is used conjointly with the
+       `TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING` environment
+       variable. To actually enable yes crypto this option must be used
+       and the environment variable must be set to `true`. If only the
+       environment variable is set, the node will refuse to start.
+
+     --config-file=FILE
+       The main configuration file.
+
+     -d DIR, --data-dir=DIR (absent TEZOS_NODE_DIR env)
+       The directory where the Tezos node will store all its data. Parent
+       directories are created if necessary.
+
+     --disable-config-validation
+       Disable the node configuration validation.
+
+     --force-history-mode-switch
+       Forces the switch of history modes when a different history mode
+       is found between the written configuration and the given history
+       mode. Warning: this option will modify the storage irremediably.
+       Please refer to the Tezos node documentation for more details.
+
+     --history-mode=<mode>
+       Set the mode for the chain's data history storage. Possible values
+       are archive, full (default), full:N, rolling, rolling:N. Archive
+       mode retains all data since the genesis block. Full mode only
+       maintains block headers and operations allowing replaying the
+       chain since the genesis if wanted. Rolling mode retains only the
+       most recent data and deletes the rest. For both Full and Rolling
+       modes, it is possible to adjust the number of cycles to preserve
+       by using the :N annotation. The default number of preserved cycles
+       is 1. The value experimental-rolling is deprecated but is
+       equivalent to rolling which should be used instead.
+
+     --log-coloring=VAL
+       Enable or disable light coloring in default stdout logs. Coloring
+       is enabled by default.
+
+     --log-output=OUTPUT
+       Log output. Either stdout, stderr, syslog:<facility> or a file
+       path.
+
+     --metadata-size-limit=<limit-in-bytes>
+       Size limit (in bytes) for operation's metadata to be stored on
+       disk. Default limit is 10000000 bytes. Use unlimited to disregard
+       this limit.
+
+     --metrics-addr=ADDR:PORT or :PORT (by default ADDR is localhost and
+     PORT is 9932)
+       Port on which to provide metrics over HTTP.
+
+     --network=NETWORK
+       Select which network to run. Possible values are: sandbox,
+       mainnet, ghostnet. Default is mainnet. You can also specify custom
+       networks by passing a path to a file containing the custom network
+       configuration, or by passing a URL from which such a file can be
+       downloaded. If you have a file named after a built-in network, you
+       can prefix its name with './' so that the node treats it as a
+       file. Otherwise it will be treated as a proper name of the
+       built-in network. With commands other than 'config init',
+       specifying this option causes the node to fail if the
+       configuration implies another network.
+
+     --sandbox=FILE.json
+       Run the daemon in sandbox mode. P2P to non-localhost addresses are
+       disabled, and constants of the economic protocol can be altered
+       with a JSON file which overrides the genesis_parameters field of
+       the network configuration (e.g. scripts/sandbox.json). IMPORTANT:
+       Using sandbox mode affects the node state and subsequent runs of
+       Tezos node must also use sandbox mode. In order to run the node in
+       normal mode afterwards, a full reset must be performed (by
+       removing the node's data directory).
+
+     --singleprocess
+       When enabled, it deactivates block validation using an external
+       process. Thus, the validation procedure is done in the same
+       process as the node and might not be responding when doing
+       extensive I/Os.
+
+     --target=<block_hash>,<level>
+       When asked to take a block as a target, the daemon will only
+       accept the chains that contains that block and those that might
+       reach it.
+
+     -v  Increase log level. Using -v is equivalent to using
+       TEZOS_LOG='* -> info', and -vv is equivalent to using
+       TEZOS_LOG='* -> debug'.
+
+DEBUG
+     The environment variable TEZOS_LOG is used to fine-tune what is going
+     to be logged. The syntax is TEZOS_LOG='<section> -> <level> [ ;
+     ...]' where section is one of block.validation
+     brassaia.brassaia_pack.inode brassaia.brassaia_pack.unix.file_manager
+     brassaia.brassaia_pack.unix.pack_store brassaia.object_graph
+     brassaia.tree config crypto dal.cryptobox db_network_reader
+     external_rpc-process-watchdog external_rpc-process-watchdog.process
+     external_rpc-process-watchdog_hypervisor external_validation
+     external_validator external_validator.process
+     external_validator_hypervisor external_watchdog gc_setup
+     internal_event_unix key_value_store lib_p2p.lib_p2p.p2p_maintenance
+     lib_p2p.p2p.welcome lib_p2p.p2p_conn lib_p2p.p2p_discovery.answer
+     lib_p2p.p2p_discovery.sender lib_p2p.p2p_io_scheduler.read
+     lib_p2p.p2p_io_scheduler.write node node.config.validation
+     node.context.disk node.context_brassaia.disk node.context_ops
+     node.data_version node.distributed_db node.distributed_db.p2p_reader
+     node.distributed_db.requester node.duo_context node.identity
+     node.injection_directory node.main node.protocol node.protocol_store
+     node.reconstruction node.requester.scheduler node.shutdown
+     node.snapshots node.state node.storage_consistency node.store
+     node.validator node.validator.bootstrap_pipeline p2p p2p-node p2p.conn
+     p2p.connect_handler p2p.discovery p2p.fd p2p.io-scheduler
+     p2p.maintenance p2p.pool p2p.protocol p2p.socket p2p.socket.reader
+     p2p.socket.writer p2p.welcome prevalidator prevalidator_classification
+     protocol_cache protocol_updater proxy.context rpc.process
+     rpc_middleware rpc_server sequential_block_validator task validation
+     validator.block validator.chain validator.peer and level is one of
+     fatal, error, warn, notice, info or debug. A * can be used as a
+     wildcard in sections, i.e. node* -> debug. The rules are matched
+     left to right, therefore the leftmost rule is highest priority .
+
+COMMON OPTIONS
+     --help[=FMT] (default=auto)
+       Show this help in format FMT. The value FMT must be one of auto,
+       pager, groff or plain. With auto, the format is pager or plain
+       whenever the TERM env var is dumb or undefined.
+
+     --version
+       Show version information.
+
+EXIT STATUS
+     octez-node run exits with:
+
+     0   on success.
+
+     123 on indiscriminate errors reported on standard error.
+
+     124 on command line parsing errors.
+
+     125 on unexpected internal errors (bugs).
+
+ENVIRONMENT
+     These environment variables affect the execution of octez-node run:
+
+     TEZOS_NODE_DIR
+       The directory where the Tezos node will store all its data. Parent
+       directories are created if necessary.
+
+EXAMPLES
+     Run in sandbox mode listening to RPC commands at localhost port 8732
+       octez-node run
+       --sandbox=src/proto_alpha/parameters/sandbox-parameters.json
+       --data-dir /custom/data/dir --rpc-addr localhost:8732
+
+     Run a node that accepts network connections
+       octez-node run
+
+BUGS
+     Check bug reports at https://gitlab.com/tezos/tezos/issues.
+
+SEE ALSO
+     octez-node(1)
+|}
+
+let binary_help_parses_options () =
+  let opts =
+    Binary_help_explorer.For_tests.parse_help octez_node_run_help_plain
+  in
+  Alcotest.(check int) "option count" 49 (List.length opts) ;
+  let find name =
+    match
+      List.find_opt
+        (fun o -> List.exists (( = ) name) o.Binary_help_explorer.names)
+        opts
+    with
+    | Some o -> o
+    | None -> Alcotest.failf "option %s not found" name
+  in
+  let advertised = find "--advertised-net-port=PORT" in
+  Alcotest.(check (option string)) "advertised arg" None advertised.arg ;
+  Alcotest.(check bool)
+    "advertised doc"
+    true
+    (string_contains ~needle:"instance can be reached" advertised.doc) ;
+  let rpc_addr = find "--rpc-addr=ADDR:PORT" in
+  Alcotest.(check bool)
+    "rpc doc"
+    true
+    (string_contains
+       ~needle:"The URL at which this RPC server instance can be reached"
+       rpc_addr.doc) ;
+  let data_dir = find "--data-dir=DIR" in
+  Alcotest.(check bool)
+    "data dir alias captured"
+    true
+    (List.exists (( = ) "-d") data_dir.Binary_help_explorer.names) ;
+  let history_mode = find "--history-mode=<mode>" in
+  Alcotest.(check bool)
+    "history mode doc"
+    true
+    (string_contains
+       ~needle:"Set the mode for the chain's data history storage"
+       history_mode.doc)
 
 let service_json_roundtrip () =
   let logging_mode =
@@ -1535,6 +1885,10 @@ let () =
             "strip + detect"
             `Quick
             installer_strip_and_detect_uris;
+          Alcotest.test_case
+            "binary help parses"
+            `Quick
+            binary_help_parses_options;
         ] );
       ( "service.core",
         [
