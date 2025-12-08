@@ -564,9 +564,6 @@ let view s ~focus:_ ~size =
     && valid_p2p && is_nonempty f.service_user && valid_snapshot
   in
   let status ok = if ok then "✓" else "✗" in
-  let highlight_cell ok text =
-    if ok then text else Widgets.bg 208 (Widgets.fg 15 (Widgets.bold text))
-  in
   let items =
     [
       ("Instance Name", f.instance_name, is_nonempty f.instance_name);
@@ -590,9 +587,8 @@ let view s ~focus:_ ~size =
   let rows =
     List.map
       (fun (label, value, ok) ->
-        ( highlight_cell ok label,
-          highlight_cell ok value,
-          highlight_cell ok (status ok) ))
+        let value = if ok then value else Widgets.fg 214 (Widgets.bold value) in
+        (label, value, status ok))
       items
   in
   let columns =
