@@ -180,6 +180,18 @@ let next_free_port ~start ~avoid =
   in
   loop start
 
+let has_octez_node_binary dir =
+  let trimmed = String.trim dir in
+  if trimmed = "" then false
+  else
+    let candidate = Filename.concat trimmed "octez-node" in
+    Sys.file_exists candidate
+    &&
+      try
+        Unix.access candidate [Unix.X_OK] ;
+        true
+      with Unix.Unix_error _ -> false
+
 let move s delta =
   let max_cursor = 13 in
   (* Number of fields + confirm *)
@@ -584,6 +596,7 @@ let view s ~focus:_ ~size =
           let avoid = rpc_ports @ p2p_ports in
           not (List.mem port avoid || is_port_in_use port)
   in
+  let valid_app_bin_dir = has_octez_node_binary f.app_bin_dir in
   let valid_snapshot =
     match f.snapshot with
     | `None -> true
@@ -593,8 +606,8 @@ let view s ~focus:_ ~size =
   let all_ok =
     is_nonempty f.instance_name
     && is_nonempty f.network && is_nonempty f.history_mode
-    && is_nonempty f.data_dir && is_nonempty f.app_bin_dir && valid_rpc
-    && valid_p2p && is_nonempty f.service_user && valid_snapshot
+    && is_nonempty f.data_dir && valid_app_bin_dir && valid_rpc && valid_p2p
+    && is_nonempty f.service_user && valid_snapshot
   in
   let status ok = if ok then "✓" else "✗" in
   let items =
@@ -603,7 +616,7 @@ let view s ~focus:_ ~size =
       ("Network", network_value, is_nonempty f.network);
       ("History Mode", f.history_mode, is_nonempty f.history_mode);
       ("Data Dir", f.data_dir, is_nonempty f.data_dir);
-      ("App Bin Dir", f.app_bin_dir, is_nonempty f.app_bin_dir);
+      ("App Bin Dir", f.app_bin_dir, valid_app_bin_dir);
       ("RPC Address", f.rpc_addr, valid_rpc);
       ("P2P Address", f.p2p_addr, valid_p2p);
       ("Service User", f.service_user, is_nonempty f.service_user);
@@ -649,7 +662,7 @@ let view s ~focus:_ ~size =
           (not (is_nonempty f.network), "Network");
           (not (is_nonempty f.history_mode), "History Mode");
           (not (is_nonempty f.data_dir), "Data Dir");
-          (not (is_nonempty f.app_bin_dir), "App Bin Dir");
+          (not valid_app_bin_dir, "App Bin Dir");
           (not valid_rpc, "RPC Address");
           (not valid_p2p, "P2P Address");
           (not (is_nonempty f.service_user), "Service User");
