@@ -187,11 +187,17 @@ let register_logger ~log ~logfile_path =
 
 let register_palette () =
   let module Palette = Miaou_interfaces.Palette in
+  let module W = Miaou_widgets_display.Widgets in
   let id x = x in
   let gradient _ ~total_visible:_ ~start_pos:_ s = s in
+  (* 256-color codes matching octez_setup palette *)
+  let c_tezos_blue = 27 in
+  let c_tezos_blue_dark = 24 in
+  let c_white = 15 in
+  let c_steel = 245 in
   let palette : Palette.t =
     {
-      fg_primary = id;
+      fg_primary = W.fg c_tezos_blue;
       fg_secondary = id;
       fg_muted = id;
       bg_primary = id;
@@ -201,17 +207,17 @@ let register_palette () =
       bg_slate = id;
       fg_steel = id;
       bg_steel = id;
-      fg_white = id;
+      fg_white = W.fg c_white;
       bg_white = id;
       purple_gradient = id;
       purple_gradient_at = gradient;
       purple_gradient_line = (fun _ s -> s);
-      fg_success = id;
+      fg_success = W.fg c_tezos_blue;
       fg_error = id;
-      selection_bg = id;
-      selection_fg = id;
-      fixed_region_bg = id;
-      header_bg = id;
+      selection_bg = W.bg c_tezos_blue_dark;
+      selection_fg = W.fg c_white;
+      fixed_region_bg = W.bg c_steel;
+      header_bg = W.bg c_steel;
     }
   in
   Palette.set palette
