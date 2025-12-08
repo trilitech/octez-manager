@@ -16,6 +16,16 @@ val prompt_text_modal :
   unit ->
   unit
 
+val prompt_validated_text_modal :
+  ?title:string ->
+  ?width:int ->
+  ?initial:string ->
+  ?placeholder:string option ->
+  validator:(string -> (unit, string) result) ->
+  on_submit:(string -> unit) ->
+  unit ->
+  unit
+
 val show_success : title:string -> string -> unit
 
 val show_error : title:string -> string -> unit

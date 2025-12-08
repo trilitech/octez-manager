@@ -211,6 +211,76 @@ let confirm_modal ?title ~message ~on_result () =
     ~to_string:(function true -> "Yes" | false -> "No")
     ~on_select:on_result
 
+let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
+    ~validator ~on_submit () =
+  let module Modal = struct
+    type state = unit Miaou_widgets_input.Validated_textbox_widget.t
+
+    type msg = unit
+
+    let init () = failwith "validated textbox modal init provided by caller"
+
+    let update s _ = s
+
+    let view s ~focus ~size:_ =
+      Miaou_widgets_input.Validated_textbox_widget.render s ~focus
+
+    let move s _ = s
+
+    let refresh s = s
+
+    let enter s = s
+
+    let service_select s _ = s
+
+    let service_cycle s _ = s
+
+    let back s = s
+
+    let keymap _ = []
+
+    let handle_modal_key s key ~size:_ =
+      if key = "Enter" then
+        if Miaou_widgets_input.Validated_textbox_widget.is_valid s then (
+          Miaou.Core.Modal_manager.close_top `Commit ;
+          s)
+        else s
+      else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        s)
+      else Miaou_widgets_input.Validated_textbox_widget.handle_key s ~key
+
+    let handle_key = handle_modal_key
+
+    let next_page _ = None
+
+    let has_modal _ = true
+  end in
+  (* Adapt validator from (string -> (unit, string) result) to Miaou's validation_result *)
+  let miaou_validator text =
+    match validator text with
+    | Ok () -> Miaou_widgets_input.Validated_textbox_widget.Valid ()
+    | Error msg -> Miaou_widgets_input.Validated_textbox_widget.Invalid msg
+  in
+  let widget =
+    Miaou_widgets_input.Validated_textbox_widget.open_centered
+      ?title
+      ~width
+      ?initial
+      ?placeholder
+      ~validator:miaou_validator
+      ()
+  in
+  let modal_title = Option.value ~default:"Input" title in
+  Miaou.Core.Modal_manager.prompt
+    (module Modal)
+    ~init:widget
+    ~title:modal_title
+    ~extract:(fun state ->
+      Some (Miaou_widgets_input.Validated_textbox_widget.value state))
+    ~on_result:(function Some text -> on_submit text | None -> ())
+    ()
+
 let show_success ~title message =
   open_text_modal ~title ~lines:["Success"; ""; message]
 
