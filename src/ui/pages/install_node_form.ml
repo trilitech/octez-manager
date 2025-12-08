@@ -331,58 +331,10 @@ let append_extra_args tokens =
 
 let open_binary_help s =
   let app_bin_dir = String.trim s.form.app_bin_dir in
-  if app_bin_dir = "" then (
-    Modal_helpers.show_error ~title:"Node Flags" "Octez bin directory is empty" ;
-    s)
-  else
-    let binary = Filename.concat app_bin_dir "octez-node" in
-    match Binary_help_explorer.load_options ~binary with
-    | Error (`Msg msg) ->
-        Modal_helpers.show_error ~title:"Node Flags" msg ;
-        s
-    | Ok opts ->
-        Modal_helpers.open_choice_modal_with_hint
-          ~title:"Node Flags"
-          ~items:opts
-          ~to_string:(fun o -> String.concat ", " o.Binary_help_explorer.names)
-          ~describe:(fun o ->
-            let cleaned_doc =
-              o.Binary_help_explorer.doc |> String.split_on_char '\n'
-              |> List.map String.trim
-              |> List.filter (fun l -> l <> "")
-              |> String.concat " "
-            in
-            if cleaned_doc = "" then ["No description available."]
-            else Binary_help_explorer.wrap_text ~width:68 cleaned_doc)
-          ~hint:(fun o ->
-            let title = String.concat ", " o.Binary_help_explorer.names in
-            let doc = String.trim o.Binary_help_explorer.doc in
-            let cleaned_doc =
-              doc |> String.split_on_char '\n' |> List.map String.trim
-              |> List.filter (fun l -> l <> "")
-              |> String.concat " "
-            in
-            let arg_line =
-              match o.Binary_help_explorer.arg with
-              | Some arg when String.trim arg <> "" ->
-                  [Printf.sprintf "Arg: %s" (String.trim arg)]
-              | _ -> []
-            in
-            let body =
-              if cleaned_doc = "" then
-                ["No description available for this flag."]
-              else Binary_help_explorer.wrap_text ~width:68 cleaned_doc
-            in
-            let summary =
-              ("Flag: " ^ String.concat ", " o.Binary_help_explorer.names)
-              :: arg_line
-              @ [""] @ body
-            in
-            Modal_helpers.open_text_modal ~title ~lines:summary)
-          ~on_select:(fun o ->
-            let flag = Binary_help_explorer.primary_name o.names in
-            append_extra_args [flag]) ;
-        s
+  Binary_help_explorer.open_node_run_help ~app_bin_dir ~on_apply:(fun tokens ->
+      let arg_str = String.concat " " tokens in
+      update_form_ref (fun f -> {f with extra_args = arg_str})) ;
+  s
 
 let init () =
   ensure_service_user_initialized () ;

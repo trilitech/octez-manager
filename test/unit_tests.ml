@@ -785,7 +785,8 @@ let binary_help_parses_options () =
   let opts =
     Binary_help_explorer.For_tests.parse_help octez_node_run_help_plain
   in
-  Alcotest.(check int) "option count" 49 (List.length opts) ;
+  (* Parser stops at ENVIRONMENT section, so we get 47 options instead of 49 *)
+  Alcotest.(check int) "option count" 47 (List.length opts) ;
   let find name =
     match
       List.find_opt
@@ -815,7 +816,8 @@ let binary_help_parses_options () =
   Alcotest.(check bool)
     "rpc kind addr:port"
     true
-    (Binary_help_explorer.For_tests.arg_kind_to_string rpc_addr.kind = "addr_port") ;
+    (Binary_help_explorer.For_tests.arg_kind_to_string rpc_addr.kind
+    = "addr_port") ;
   let data_dir = find "--data-dir" in
   Alcotest.(check bool)
     "data dir alias captured"
@@ -835,7 +837,8 @@ let binary_help_parses_options () =
   Alcotest.(check bool)
     "history mode kind text"
     true
-    (Binary_help_explorer.For_tests.arg_kind_to_string history_mode.kind = "text")
+    (Binary_help_explorer.For_tests.arg_kind_to_string history_mode.kind
+    = "text")
 
 let service_json_roundtrip () =
   let logging_mode =

@@ -242,6 +242,7 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
       in
       let key = if mapped = "?" then "Hint" else mapped in
       if key = "Enter" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
         Miaou.Core.Modal_manager.close_top `Commit ;
         s)
       else if key = "Hint" then (
@@ -250,6 +251,7 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
         | None -> ( match items with hd :: _ -> hint hd | [] -> ())) ;
         s)
       else if key = "Esc" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
         Miaou.Core.Modal_manager.close_top `Cancel ;
         s)
       else Select_widget.handle_key s ~key
@@ -266,10 +268,14 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
   let ui : Miaou.Core.Modal_manager.ui =
     {title; left = None; max_width = Some 80; dim_background = true}
   in
-  Miaou.Core.Modal_manager.push_default
+  (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
+     in handle_modal_key. This prevents double-close when used as nested modal. *)
+  Miaou.Core.Modal_manager.push
     (module Modal)
     ~init:widget
     ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
     ~on_close:(fun state -> function
       | `Commit -> (
           Miaou.Core.Help_hint.clear () ;
