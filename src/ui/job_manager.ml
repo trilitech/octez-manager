@@ -1,4 +1,5 @@
 open Rresult
+module Bg = Background_runner
 
 type status = Pending | Running | Succeeded | Failed of string
 
@@ -29,20 +30,14 @@ let submit ~description action =
     }
   in
   jobs := job :: !jobs ;
-  let thread =
-    Lwt_preemptive.detach
-      (fun () ->
-        try action () with exn -> Error (`Msg (Printexc.to_string exn)))
-      ()
-  in
-  Lwt.async (fun () ->
-      let open Lwt.Infix in
-      thread >>= fun result ->
+  Bg.submit_blocking (fun () ->
+      let result =
+        try action () with exn -> Error (`Msg (Printexc.to_string exn))
+      in
       job.finished_at <- Some (Unix.gettimeofday ()) ;
-      (match result with
+      match result with
       | Ok () -> job.status <- Succeeded
-      | Error (`Msg e) -> job.status <- Failed e) ;
-      Lwt.return_unit)
+      | Error (`Msg e) -> job.status <- Failed e)
 
 let list () = !jobs
 

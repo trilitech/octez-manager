@@ -180,8 +180,7 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
       match doc_lines with
       | [] -> None
       | lines ->
-          Some
-            (Printf.sprintf "### %s\n\n%s" title (String.concat "\n" lines))
+          Some (Printf.sprintf "### %s\n\n%s" title (String.concat "\n" lines))
     in
     set_markdown_hint ?short:short_text ?long:long_text ()
   in

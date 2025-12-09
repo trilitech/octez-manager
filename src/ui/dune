@@ -10,7 +10,9 @@
   miaou.widgets.display
   miaou.widgets.input
   miaou.widgets.layout
-  lwt
-  lambda-term)
+  miaou.driver.term
+  lambda-term
+  eio
+  eio_main)
  (preprocess
   (pps ppx_deriving.show)))

@@ -206,7 +206,21 @@ let ensure_tree_owner ~owner ~group path =
 
 let download_file ~url ~dest_path =
   append_debug_log (Printf.sprintf "DOWNLOAD %s -> %s" url dest_path) ;
-  run ["curl"; "-fSL"; url; "-o"; dest_path]
+  (* Connection timeout 30s, speed limit 100KB/s for at least 60s before abort *)
+  run
+    [
+      "curl";
+      "-fSL";
+      "--connect-timeout";
+      "30";
+      "--speed-limit";
+      "102400";
+      "--speed-time";
+      "60";
+      url;
+      "-o";
+      dest_path;
+    ]
 
 let remove_path path =
   if Sys.file_exists path then try Sys.remove path with Sys_error _ -> ()

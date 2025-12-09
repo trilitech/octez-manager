@@ -32,16 +32,27 @@ let find_page_or_default name default_name =
       | None -> Error (`Msg "Instances page missing from registry"))
 
 let run ?page ?(log = false) ?logfile () =
+  let quit_requested = ref false in
+  let handle_break _ =
+    quit_requested := true ;
+    raise_notrace Exit
+  in
+  Sys.catch_break true ;
+  Sys.set_signal Sys.sigint (Sys.Signal_handle handle_break) ;
+  Sys.set_signal Sys.sigterm (Sys.Signal_handle handle_break) ;
   Capabilities.register () ;
   register_pages () ;
   Runtime.initialize ~log ?logfile () ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
-    let* current_page = find_page_or_default current_name Instances.name in
-    match Miaou.Core.Lambda_term_driver.run current_page with
-    | `Quit -> Ok ()
-    | `SwitchTo "__BACK__" -> (
-        match history with [] -> Ok () | prev :: rest -> loop rest prev)
-    | `SwitchTo next_page -> loop (current_name :: history) next_page
+    if !quit_requested then Ok ()
+    else
+      let* current_page = find_page_or_default current_name Instances.name in
+      match Miaou_driver_term.Lambda_term_driver.run current_page with
+      | `Quit -> Ok ()
+      | `SwitchTo "__EXIT__" -> Ok ()
+      | `SwitchTo "__BACK__" -> (
+          match history with [] -> Ok () | prev :: rest -> loop rest prev)
+      | `SwitchTo next_page -> loop (current_name :: history) next_page
   in
-  loop [] start_name
+  try loop [] start_name with Exit | Sys.Break -> Ok ()

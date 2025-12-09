@@ -230,5 +230,6 @@ let initialize ?(log = false) ?logfile () =
   if not !initialized then (
     register_system () ;
     register_palette () ;
+    Rpc_scheduler.start () ;
     initialized := true) ;
   register_logger ~log ~logfile_path:logfile

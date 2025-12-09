@@ -111,8 +111,10 @@ let create_baker_flow ~services ~on_success =
                     node_instance = Some parent_node;
                     node_data_dir = None;
                     node_endpoint = None;
+                    node_mode = `Auto;
                     base_dir = None;
                     delegates;
+                    dal_endpoint = None;
                     extra_args = [];
                     service_user = "octez";
                     app_bin_dir = "/usr/bin";

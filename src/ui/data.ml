@@ -1,6 +1,7 @@
 open Rresult
 open Octez_manager_lib
 open Manager_interfaces
+module Bg = Background_runner
 
 module Service_state = struct
   type status = Running | Stopped | Unknown of string
@@ -57,12 +58,50 @@ let fetch_status ?(detail = false) service =
   in
   Service_state.{service; enabled; active; status; status_text}
 
+let fetch_statuses ?detail services =
+  let safe_fetch ?detail svc =
+    try fetch_status ?detail svc
+    with exn ->
+      Service_state.
+        {
+          service = svc;
+          enabled = None;
+          active = None;
+          status = Unknown (Printexc.to_string exn);
+          status_text = None;
+        }
+  in
+  List.map (safe_fetch ?detail) services
+
 let load_service_states ?detail () =
   let module SM =
     (val Miaou_interfaces.Capability.require Service_manager_capability.key)
   in
   match SM.list () with
-  | Ok services -> List.map (fetch_status ?detail) services
+  | Ok services ->
+      let states = fetch_statuses ?detail services in
+      let now = Unix.gettimeofday () in
+      List.iter
+        (fun st ->
+          let svc = st.Service_state.service in
+          if String.equal svc.Service.role "node" then
+            match Rpc_metrics.get ~instance:svc.instance with
+            | None ->
+                Rpc_metrics.set
+                  ~instance:svc.instance
+                  {
+                    Rpc_metrics.chain_id = None;
+                    head_level = None;
+                    bootstrapped = None;
+                    last_rpc_refresh = Some now;
+                    node_version = None;
+                    data_size = None;
+                    proto = None;
+                    last_error = None;
+                  }
+            | Some _ -> ())
+        states ;
+      states
   | Error (`Msg msg) ->
       prerr_endline (Printf.sprintf "Failed to read registry: %s" msg) ;
       []
