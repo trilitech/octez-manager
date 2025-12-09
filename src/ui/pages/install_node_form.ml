@@ -106,8 +106,19 @@ let get_network_infos () =
   if !network_cache <> [] then Ok !network_cache
   else
     let* infos = fetch_network_infos () in
-    network_cache := infos ;
-    Ok infos
+    let normalize s = String.lowercase_ascii (String.trim s) in
+    let seen = Hashtbl.create 31 in
+    let deduped =
+      infos
+      |> List.filter (fun (i : Teztnets.network_info) ->
+          let key = normalize i.network_url in
+          if Hashtbl.mem seen key then false
+          else (
+            Hashtbl.add seen key () ;
+            true))
+    in
+    network_cache := deduped ;
+    Ok deduped
 
 let normalize_string s = String.lowercase_ascii (String.trim s)
 
@@ -233,55 +244,64 @@ let field_hint (f : form_state) cursor : string option * string option =
   in
   match cursor with
   | 0 ->
-      mk "Instance Name"
+      mk
+        "Instance Name"
         (Printf.sprintf
            "Unique label (e.g., `%s`); used in service names and data/log \
             directories. Must be unique per host."
            f.instance_name)
   | 1 ->
-      mk "Network"
+      mk
+        "Network"
         (Printf.sprintf
            "Target Tezos network (e.g., `%s`). Mainnet/ghostnet are preloaded; \
             custom URLs work if they expose bootstrap peers."
            f.network)
   | 2 ->
-      mk "History Mode"
+      mk
+        "History Mode"
         (Printf.sprintf
            "Rolling (light) vs full/archive (heavier). Must match any snapshot \
             you import. Current: `%s`."
            f.history_mode)
   | 3 ->
-      mk "Data Dir"
+      mk
+        "Data Dir"
         (Printf.sprintf
-           "Where chain data lives (e.g., /var/lib/octez/node-<name>). Current: \
-            `%s`. Existing dirs trigger refresh/keep prompt."
+           "Where chain data lives (e.g., /var/lib/octez/node-<name>). \
+            Current: `%s`. Existing dirs trigger refresh/keep prompt."
            f.data_dir)
   | 4 ->
-      mk "App Bin Dir"
+      mk
+        "App Bin Dir"
         (Printf.sprintf
            "Directory containing octez binaries; expects `octez-node` inside. \
             Current: `%s`."
            f.app_bin_dir)
   | 5 ->
-      mk "RPC Address"
+      mk
+        "RPC Address"
         (Printf.sprintf
            "Host:port for RPC (default 127.0.0.1:8732). Must be free. Current: \
             `%s`."
            f.rpc_addr)
   | 6 ->
-      mk "P2P Address"
+      mk
+        "P2P Address"
         (Printf.sprintf
            "Host:port to accept peers (default 0.0.0.0:9732). Port must be \
             free. Current: `%s`."
            f.p2p_addr)
   | 7 ->
-      mk "Service User"
+      mk
+        "Service User"
         (Printf.sprintf
            "Account running the service (current: `%s`). If root and missing, \
             installer will create it."
            f.service_user)
   | 8 ->
-      mk "Logging"
+      mk
+        "Logging"
         (Printf.sprintf
            "`File` writes node.log under the instance log dir; `Journald` uses \
             systemd journal. Current: `%s`."
@@ -289,11 +309,12 @@ let field_hint (f : form_state) cursor : string option * string option =
   | 9 -> mk "Enable on Boot" "Runs `systemctl enable` so the node auto-starts."
   | 10 -> mk "Start Now" "Start the node service immediately after install."
   | 11 ->
-      mk "Snapshot"
+      mk
+        "Snapshot"
         (match f.snapshot with
         | `None ->
-            "Bootstrap from genesis. Importing a snapshot speeds sync; pick one \
-             matching the history mode."
+            "Bootstrap from genesis. Importing a snapshot speeds sync; pick \
+             one matching the history mode."
         | `Url u ->
             Printf.sprintf
               "Custom snapshot URL: `%s`. Ensure it matches the network and \
@@ -302,13 +323,17 @@ let field_hint (f : form_state) cursor : string option * string option =
         | `Tzinit sel ->
             Printf.sprintf
               "tzinit preset: %s (%s). Matches %s history mode."
-              sel.label sel.kind_slug sel.kind_slug)
+              sel.label
+              sel.kind_slug
+              sel.kind_slug)
   | 12 ->
-      mk "Extra Args"
+      mk
+        "Extra Args"
         "Additional `octez-node run` flags. Press ? to browse supported \
          options; leave blank for defaults."
   | 13 ->
-      mk "Confirm & Install"
+      mk
+        "Confirm & Install"
         "Runs the installer with current values. All required fields must be \
          valid before proceeding."
   | _ -> (None, None)
@@ -323,6 +348,25 @@ let parse_port addr =
       try Some (int_of_string (String.trim port_str)) with _ -> None)
   | _ -> None
 
+let data_dir_in_use ~states path =
+  let trimmed = String.trim path in
+  if trimmed = "" then false
+  else
+    List.exists
+      (fun (st : Data.Service_state.t) ->
+        String.equal (String.trim st.service.Service.data_dir) trimmed)
+      states
+
+let data_dir_conflict_instance ~states path =
+  let trimmed = String.trim path in
+  if trimmed = "" then None
+  else
+    states
+    |> List.find_map (fun (st : Data.Service_state.t) ->
+        let svc_dir = String.trim st.service.Service.data_dir in
+        if String.equal svc_dir trimmed then Some st.service.Service.instance
+        else None)
+
 let data_dir_nonempty path =
   let trimmed = String.trim path in
   if trimmed = "" then false
@@ -330,10 +374,11 @@ let data_dir_nonempty path =
     try
       if not (Sys.is_directory trimmed) then false
       else
-        Sys.readdir trimmed
-        |> Array.to_list
+        Sys.readdir trimmed |> Array.to_list
         |> List.filter (fun e -> e <> "." && e <> "..")
-        |> function [] -> false | _ -> true
+        |> function
+        | [] -> false
+        | _ -> true
     with _ -> false
 
 let pad_with_right cols left right =
@@ -541,9 +586,15 @@ let edit_field s =
       s
   | 3 ->
       (* Data Dir *)
-      prompt_text_modal
+      prompt_validated_text_modal
         ~title:"Data Directory"
         ~initial:!form_ref.data_dir
+        ~validator:(fun v ->
+          let trimmed = String.trim v in
+          if trimmed = "" then Error "Data directory cannot be empty"
+          else if data_dir_in_use ~states:s.service_states trimmed then
+            Error "This data directory is already used by a registered instance"
+          else Ok ())
         ~on_submit:(fun v ->
           update_form_ref (fun f ->
               {f with data_dir = v; preserve_data = `Auto}))
@@ -701,6 +752,26 @@ let edit_field s =
         show_error ~title:"Error" "Instance name already exists." ;
         s)
       else if
+        data_dir_conflict_instance ~states:s.service_states f.data_dir
+        |> Option.is_some
+      then (
+        let conflict =
+          data_dir_conflict_instance ~states:s.service_states f.data_dir
+        in
+        let msg =
+          match conflict with
+          | Some inst ->
+              Printf.sprintf
+                "Data directory is already used by instance '%s'. Remove or \
+                 change that instance before installing."
+                inst
+          | None ->
+              "Data directory is already used by another instance. Remove it \
+               first or pick a new path."
+        in
+        show_error ~title:"Error" msg ;
+        s)
+      else if
         (not (Common.is_root ()))
         && Result.is_error
              (System_user.validate_user_for_service ~user:f.service_user)
@@ -839,6 +910,7 @@ let view s ~focus:_ ~size =
   let valid_service_user =
     is_nonempty f.service_user && service_user_valid ~user:f.service_user
   in
+  let data_dir_conflict = data_dir_in_use ~states:s.service_states f.data_dir in
   let valid_rpc =
     match parse_host_port f.rpc_addr with
     | None -> false
@@ -872,8 +944,8 @@ let view s ~focus:_ ~size =
   in
   let all_ok =
     valid_instance && is_nonempty f.network && is_nonempty f.history_mode
-    && is_nonempty f.data_dir && valid_app_bin_dir && valid_rpc && valid_p2p
-    && valid_service_user && valid_snapshot
+    && is_nonempty f.data_dir && (not data_dir_conflict) && valid_app_bin_dir
+    && valid_rpc && valid_p2p && valid_service_user && valid_snapshot
   in
   let status ok = if ok then "✓" else "✗" in
   let items =
@@ -881,7 +953,7 @@ let view s ~focus:_ ~size =
       ("Instance Name", f.instance_name, valid_instance);
       ("Network", network_value, is_nonempty f.network);
       ("History Mode", f.history_mode, is_nonempty f.history_mode);
-      ("Data Dir", f.data_dir, is_nonempty f.data_dir);
+      ("Data Dir", f.data_dir, is_nonempty f.data_dir && not data_dir_conflict);
       ("App Bin Dir", f.app_bin_dir, valid_app_bin_dir);
       ("RPC Address", f.rpc_addr, valid_rpc);
       ("P2P Address", f.p2p_addr, valid_p2p);
@@ -927,7 +999,7 @@ let view s ~focus:_ ~size =
           (not (is_nonempty f.instance_name), "Instance Name");
           (not (is_nonempty f.network), "Network");
           (not (is_nonempty f.history_mode), "History Mode");
-          (not (is_nonempty f.data_dir), "Data Dir");
+          ((not (is_nonempty f.data_dir)) || data_dir_conflict, "Data Dir");
           (not valid_app_bin_dir, "App Bin Dir");
           (not valid_rpc, "RPC Address");
           (not valid_p2p, "P2P Address");
@@ -948,7 +1020,14 @@ let view s ~focus:_ ~size =
       Widgets.bg 160 (Widgets.fg 15 (Widgets.bold msg))
   in
   let warning_banner =
-    if data_dir_risky then
+    if data_dir_conflict then
+      let msg =
+        Printf.sprintf
+          " ⚠ Data dir already used by another instance: %s "
+          f.data_dir
+      in
+      Widgets.bg 220 (Widgets.fg 0 (Widgets.bold msg))
+    else if data_dir_risky then
       let msg =
         Printf.sprintf
           " ⚠ Data dir not empty: %s (install may overwrite existing data) "
