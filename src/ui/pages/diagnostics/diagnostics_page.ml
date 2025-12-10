@@ -74,7 +74,11 @@ let enter s = s
 
 let service_select s _ = s
 
-let service_cycle s _ = s
+let service_cycle s _ = 
+  (* Auto-refresh sparkline and services *)
+  let bg_depth = Metrics.get_bg_queue_depth () in
+  Sparkline.push s.bg_queue_spark (float_of_int bg_depth) ;
+  {s with services = Data.load_service_states ()}
 
 let back s = {s with next_page = Some "__BACK__"}
 
@@ -257,6 +261,11 @@ let view s ~focus:_ ~size =
     (* Render Latency Chart *)
     let render_chart = Charts.render_latency_chart samples ~width:chart_width ~height:10 in
     String.split_on_char '\n' render_chart |> List.iter add ;
+    add "" ;
+    
+    (* Key-to-Render Chart *)
+    let key_chart = Charts.render_key_to_render_chart samples ~width:chart_width ~height:10 in
+    String.split_on_char '\n' key_chart |> List.iter add ;
     add "" ;
     
     (* Summary *)
