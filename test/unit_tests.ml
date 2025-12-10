@@ -158,7 +158,8 @@ let sort_services =
 let sample_node_request ?data_dir ?(bootstrap = Genesis)
     ?(history_mode = History_mode.Rolling)
     ?(logging_mode = Logging_mode.Journald) ?(extra_args = [])
-    ?(auto_enable = false) ?(preserve_data = false) () : node_request =
+    ?(auto_enable = false) ?(preserve_data = false) ?(snapshot_no_check = false)
+    () : node_request =
   {
     instance = "alpha";
     network = "https://teztnets.com/seoulnet";
@@ -173,6 +174,7 @@ let sample_node_request ?data_dir ?(bootstrap = Genesis)
     auto_enable;
     bootstrap;
     preserve_data;
+    snapshot_no_check;
   }
 
 let service_make_populates_fields () =
@@ -434,18 +436,32 @@ let installer_snapshot_plan_tzinit () =
       | Error (`Msg msg) -> Alcotest.failf "tzinit plan error: %s" msg)
 
 let installer_snapshot_metadata_variants () =
-  let no_meta = Installer.For_tests.snapshot_metadata_of_plan No_snapshot in
+  let no_meta =
+    Installer.For_tests.snapshot_metadata_of_plan ~no_check:false No_snapshot
+  in
   Alcotest.(check bool) "no auto" false no_meta.auto ;
   let direct_meta =
     Installer.For_tests.snapshot_metadata_of_plan
+      ~no_check:false
       (Direct_snapshot {uri = "https://example"})
   in
   Alcotest.(check (option string))
     "uri stored"
     (Some "https://example")
     direct_meta.uri ;
+  Alcotest.(check bool) "no_check false by default" false direct_meta.no_check ;
+  let direct_meta_no_check =
+    Installer.For_tests.snapshot_metadata_of_plan
+      ~no_check:true
+      (Direct_snapshot {uri = "https://example"})
+  in
+  Alcotest.(check bool)
+    "no_check true when set"
+    true
+    direct_meta_no_check.no_check ;
   let tzinit_meta =
     Installer.For_tests.snapshot_metadata_of_plan
+      ~no_check:false
       (Tzinit_snapshot
          {
            download_url = "https://example";
@@ -456,7 +472,25 @@ let installer_snapshot_metadata_variants () =
   Alcotest.(check (option string))
     "network slug"
     (Some "seoulnet")
-    tzinit_meta.network_slug
+    tzinit_meta.network_slug ;
+  Alcotest.(check bool)
+    "no_check false for tzinit"
+    false
+    tzinit_meta.no_check ;
+  let tzinit_meta_no_check =
+    Installer.For_tests.snapshot_metadata_of_plan
+      ~no_check:true
+      (Tzinit_snapshot
+         {
+           download_url = "https://example";
+           network_slug = "seoulnet";
+           kind_slug = "rolling";
+         })
+  in
+  Alcotest.(check bool)
+    "no_check true for tzinit when set"
+    true
+    tzinit_meta_no_check.no_check
 
 let snapshot_base = "https://snapshots.tzinit.org"
 
