@@ -132,7 +132,8 @@ let schedule_refresh ?detail () =
 let load_service_states ?detail () =
   match detail with
   | Some true -> refresh_cache ~detail:true ()
-  | _ ->
+  | Some false -> refresh_cache ~detail:false ()
+  | None ->
       let cached = Atomic.get cache in
       let now = Unix.gettimeofday () in
       let age = now -. Atomic.get last_refresh in
