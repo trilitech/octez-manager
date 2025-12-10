@@ -1,7 +1,6 @@
 _build/
 .install/
 *.install
-*.opam
 *.merlin
 *.swp
 .envrc

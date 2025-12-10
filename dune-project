@@ -1,6 +1,6 @@
 (lang dune 3.13)
 (name octez-manager)
-(generate_opam_files false)
+(generate_opam_files true)
 
 (package
  (name octez-manager)
@@ -14,6 +14,17 @@
   yojson
   bos
   miaou
+  eio
+  eio_main
+  cohttp-eio
+  tls-eio
+  tls
+  ca-certs
+  domain-name
+  mirage-crypto-rng
+  uri
+  lambda-term
+  (ppx_deriving :build)
   (alcotest :with-test)
   (bisect_ppx :with-test))
  (license MIT)
