@@ -16,6 +16,7 @@ type node_request = {
   auto_enable : bool;
   bootstrap : bootstrap;
   preserve_data : bool;
+  snapshot_no_check : bool;
 }
 
 type daemon_request = {
