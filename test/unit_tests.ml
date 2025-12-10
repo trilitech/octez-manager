@@ -1965,6 +1965,15 @@ let systemd_dropin_extra_paths () =
                    ~needle:("ReadWritePaths=" ^ extra_path)
                    dropin_body))))
 
+let systemd_disable_nonexistent_logrotate_timer () =
+  with_fake_xdg (fun _env ->
+      with_systemctl_stub (fun () ->
+          (* This test verifies that disabling logrotate units when they don't exist
+             doesn't cause errors. This is the scenario when removing an unknown instance. *)
+          Systemd.For_tests.disable_user_logrotate_timer () ;
+          (* If we get here without exceptions or errors, the test passes *)
+          ()))
+
 let system_user_validate_missing () =
   match
     System_user.validate_user_for_service ~user:"__missing_octez_user__"
@@ -2419,6 +2428,10 @@ let () =
             `Quick
             systemd_install_dropin_and_service_commands;
           Alcotest.test_case "extra paths" `Quick systemd_dropin_extra_paths;
+          Alcotest.test_case
+            "disable nonexistent logrotate"
+            `Quick
+            systemd_disable_nonexistent_logrotate_timer;
         ] );
       ( "system_user",
         [

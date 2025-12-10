@@ -738,4 +738,6 @@ module For_tests = struct
       ()
 
   let render_logging_lines = render_logging_lines
+
+  let disable_user_logrotate_timer = disable_user_logrotate_timer
 end
