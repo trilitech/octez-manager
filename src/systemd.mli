@@ -59,4 +59,6 @@ module For_tests : sig
     string
 
   val render_logging_lines : Logging_mode.t -> string list
+
+  val disable_user_logrotate_timer : unit -> unit
 end
