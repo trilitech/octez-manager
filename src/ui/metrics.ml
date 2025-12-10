@@ -92,6 +92,22 @@ module Service_map = Map.Make (String)
 
 type service_status = Active | Inactive
 
+(** Snapshot of all metrics at a point in time *)
+type metrics_snapshot = {
+  timestamp : float;
+  bg_queue_depth : int;
+  bg_queue_max : int;
+  services_active : int;
+  services_total : int;
+  render_p50 : float option;
+  render_p90 : float option;
+  render_p99 : float option;
+  key_to_render_p50 : float option;
+  key_to_render_p90 : float option;
+  bg_wait_p50 : float option;
+  bg_wait_p90 : float option;
+}
+
 type state = {
   mutable enabled : bool;
   mutable render_hist : histogram Page_map.t;
@@ -104,9 +120,29 @@ type state = {
   mutable last_input_ts : float option;
   mutable server_addr : string option;
   mutable server_port : int option;
+  (* Historical recording *)
+  mutable recording_enabled : bool;
+  mutable recording_duration : int;
+  mutable snapshots : metrics_snapshot array;
+  mutable snapshots_next : int;
+  mutable snapshots_count : int;
 }
 
 let state =
+  let empty_snapshot = {
+    timestamp = 0.;
+    bg_queue_depth = 0;
+    bg_queue_max = 0;
+    services_active = 0;
+    services_total = 0;
+    render_p50 = None;
+    render_p90 = None;
+    render_p99 = None;
+    key_to_render_p50 = None;
+    key_to_render_p90 = None;
+    bg_wait_p50 = None;
+    bg_wait_p90 = None;
+  } in
   {
     enabled = false;
     render_hist = Page_map.empty;
@@ -119,6 +155,11 @@ let state =
     last_input_ts = None;
     server_addr = None;
     server_port = None;
+    recording_enabled = false;
+    recording_duration = 60;
+    snapshots = Array.make 60 empty_snapshot;
+    snapshots_next = 0;
+    snapshots_count = 0;
   }
 
 let is_enabled () = state.enabled
@@ -366,3 +407,128 @@ let maybe_start_from_env () =
       | Error (`Msg msg) ->
           prerr_endline
             (Printf.sprintf "metrics server disabled: %s (%s)" msg raw))
+
+(** Recording / Historical Snapshots *)
+
+let take_snapshot () =
+  Mutex.protect state.lock (fun () ->
+      (* Compute percentiles from histograms *)
+      let all_renders =
+        Page_map.fold
+          (fun _page hist acc -> Array.append acc (ring_values hist.ring))
+          state.render_hist
+          [||]
+      in
+      let render_p50 = percentile all_renders 0.5 in
+      let render_p90 = percentile all_renders 0.9 in
+      let render_p99 = percentile all_renders 0.99 in
+      
+      let key_vals = ring_values state.key_to_render.ring in
+      let key_to_render_p50 = percentile key_vals 0.5 in
+      let key_to_render_p90 = percentile key_vals 0.9 in
+      
+      let bg_vals = ring_values state.bg_wait.ring in
+      let bg_wait_p50 = percentile bg_vals 0.5 in
+      let bg_wait_p90 = percentile bg_vals 0.9 in
+      
+      let services_active =
+        Service_map.fold
+          (fun _name status acc ->
+            match status with Active -> acc + 1 | Inactive -> acc)
+          state.service_statuses
+          0
+      in
+      let services_total = Service_map.cardinal state.service_statuses in
+      
+      {
+        timestamp = Unix.gettimeofday ();
+        bg_queue_depth = state.bg_queue_depth;
+        bg_queue_max = state.bg_queue_max;
+        services_active;
+        services_total;
+        render_p50;
+        render_p90;
+        render_p99;
+        key_to_render_p50;
+        key_to_render_p90;
+        bg_wait_p50;
+        bg_wait_p90;
+      })
+
+let add_snapshot snapshot =
+  Mutex.protect state.lock (fun () ->
+      state.snapshots.(state.snapshots_next) <- snapshot ;
+      state.snapshots_next <- (state.snapshots_next + 1) mod Array.length state.snapshots ;
+      state.snapshots_count <- min (state.snapshots_count + 1) (Array.length state.snapshots))
+
+let get_snapshots () =
+  Mutex.protect state.lock (fun () ->
+      if state.snapshots_count = 0 then []
+      else
+        let result = ref [] in
+        let start_idx =
+          (state.snapshots_next + Array.length state.snapshots - state.snapshots_count)
+          mod Array.length state.snapshots
+        in
+        for i = 0 to state.snapshots_count - 1 do
+          let idx = (start_idx + i) mod Array.length state.snapshots in
+          result := state.snapshots.(idx) :: !result
+        done ;
+        List.rev !result)
+
+let set_recording_duration samples =
+  Mutex.protect state.lock (fun () ->
+      if samples <> state.recording_duration then (
+        let empty_snapshot = {
+          timestamp = 0.;
+          bg_queue_depth = 0;
+          bg_queue_max = 0;
+          services_active = 0;
+          services_total = 0;
+          render_p50 = None;
+          render_p90 = None;
+          render_p99 = None;
+          key_to_render_p50 = None;
+          key_to_render_p90 = None;
+          bg_wait_p50 = None;
+          bg_wait_p90 = None;
+        } in
+        let new_snapshots = Array.make samples empty_snapshot in
+        (* Copy existing snapshots *)
+        let copy_count = min state.snapshots_count samples in
+        for i = 0 to copy_count - 1 do
+          let src_idx =
+            (state.snapshots_next + state.snapshots_count - copy_count + i)
+            mod Array.length state.snapshots
+          in
+          new_snapshots.(i) <- state.snapshots.(src_idx)
+        done ;
+        state.snapshots <- new_snapshots ;
+        state.snapshots_next <- copy_count mod samples ;
+        state.snapshots_count <- copy_count ;
+        state.recording_duration <- samples))
+
+let clear_snapshots () =
+  Mutex.protect state.lock (fun () ->
+      state.snapshots_next <- 0 ;
+      state.snapshots_count <- 0)
+
+let recording_loop () =
+  while state.recording_enabled do
+    let snapshot = take_snapshot () in
+    add_snapshot snapshot ;
+    Unix.sleepf 5.0
+  done
+
+let start_recording () =
+  if not state.recording_enabled then (
+    state.recording_enabled <- true ;
+    clear_snapshots () ;
+    ignore (Domain.spawn recording_loop))
+
+let stop_recording () =
+  state.recording_enabled <- false
+
+let is_recording () = state.recording_enabled
+
+let get_recording_duration () = state.recording_duration

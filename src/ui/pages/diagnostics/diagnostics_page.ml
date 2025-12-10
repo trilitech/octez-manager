@@ -79,12 +79,12 @@ let service_cycle s _ = s
 let back s = {s with next_page = Some "__BACK__"}
 
 let toggle_recorder s =
-  if Metrics_recorder.is_enabled () then (
-    Metrics_recorder.stop () ;
+  if Metrics.is_recording () then (
+    Metrics.stop_recording () ;
     Context.toast_info "Metrics recorder stopped" ;
     s)
   else (
-    Metrics_recorder.start () ;
+    Metrics.start_recording () ;
     Context.toast_success "Metrics recorder started" ;
     s)
 
@@ -115,22 +115,19 @@ let edit_metrics_addr s =
 
 let change_duration s =
   let open Modal_helpers in
-  let current = Metrics_recorder.get_duration () in
-  let items = Metrics_recorder.all_durations in
-  let to_string d =
-    let str = Metrics_recorder.duration_to_string d in
-    if d = current then str ^ " (current)" else str
+  let durations = [(12, "1 minute"); (60, "5 minutes"); (180, "15 minutes")] in
+  let current = Metrics.get_recording_duration () in
+  let items = durations in
+  let to_string (samples, label) =
+    if samples = current then label ^ " (current)" else label
   in
   open_choice_modal
     ~title:"Recording Duration"
     ~items
     ~to_string
-    ~on_select:(fun dur ->
-        Metrics_recorder.set_duration dur ;
-        Context.toast_info
-          (Printf.sprintf
-             "Recording duration set to %s"
-             (Metrics_recorder.duration_to_string dur))) ;
+    ~on_select:(fun (samples, label) ->
+        Metrics.set_recording_duration samples ;
+        Context.toast_info (Printf.sprintf "Recording duration set to %s" label)) ;
   s
 
 let keymap _ =
@@ -209,16 +206,20 @@ let view s ~focus:_ ~size =
   add "" ;
   add (Widgets.bold "Metrics Recorder") ;
   add "" ;
-  let recorder_enabled = Metrics_recorder.is_enabled () in
+  let recorder_enabled = Metrics.is_recording () in
   let recorder_icon =
     if recorder_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
   in
   let recorder_status =
     if recorder_enabled then "recording" else "stopped"
   in
+  let duration_samples = Metrics.get_recording_duration () in
   let duration_str =
-    Metrics_recorder.duration_to_short_string
-      (Metrics_recorder.get_duration ())
+    match duration_samples with
+    | 12 -> "1m"
+    | 60 -> "5m"
+    | 180 -> "15m"
+    | n -> Printf.sprintf "%ds" (n * 5)
   in
   add
     (Printf.sprintf
@@ -229,11 +230,11 @@ let view s ~focus:_ ~size =
   add (Widgets.dim "  (press 'R' to start/stop recording)") ;
 
   (* Historical Charts *)
-  if recorder_enabled || Metrics_recorder.get_samples () <> [] then (
+  if recorder_enabled || Metrics.get_snapshots () <> [] then (
     add "" ;
     add (Widgets.bold "Historical Metrics") ;
     add "" ;
-    let samples = Metrics_recorder.get_samples () in
+    let samples = Metrics.get_snapshots () in
     let chart_width = min 70 (size.LTerm_geom.cols - 4) in
     
     (* BG Queue Chart *)
@@ -246,9 +247,13 @@ let view s ~focus:_ ~size =
     add svc_chart ;
     add "" ;
     
+    (* Render Latency Chart *)
+    let render_chart = Charts.render_latency_chart samples ~width:chart_width ~height:10 in
+    add render_chart ;
+    add "" ;
+    
     (* Summary Bars *)
-    let stats = Metrics_recorder.get_stats () in
-    let summary = Charts.render_summary_bars stats ~width:chart_width ~height:8 in
+    let summary = Charts.render_summary_bars samples ~width:chart_width ~height:8 in
     add summary) ;
 
   add "" ;
