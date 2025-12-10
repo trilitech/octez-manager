@@ -9,6 +9,7 @@ module Widgets = Miaou_widgets_display.Widgets
 module Table_widget = Miaou_widgets_display.Table_widget
 module Keys = Miaou.Core.Keys
 module Bg = Background_runner
+module Str_map = Map.Make (String)
 open Octez_manager_lib
 open Installer_types
 open Rresult
@@ -180,9 +181,17 @@ let snapshot_entries_from_cache slug =
       if Unix.gettimeofday () -. ts > snapshot_cache_ttl then
         schedule_snapshot_fetch slug ;
       Some entries
-  | None ->
-      schedule_snapshot_fetch slug ;
-      None
+  | None -> None
+
+let ensure_snapshot_entries slug =
+  match snapshot_entries_from_cache slug with
+  | Some entries -> Ok entries
+  | None -> (
+      match fetch_snapshot_list slug with
+      | Ok entries ->
+          cache_snapshot slug entries ;
+          Ok entries
+      | Error msg -> Error msg)
 
 let prefetch_snapshot_list network =
   match Snapshots.slug_of_network network with
@@ -198,9 +207,9 @@ let get_snapshot_entries network =
         Error
           (Printf.sprintf "Unable to derive a tzinit slug from '%s'." trimmed)
   | Some slug -> (
-      match snapshot_entries_from_cache slug with
-      | Some entries -> Ok (slug, entries)
-      | None -> Error "Loading snapshot list…")
+      match ensure_snapshot_entries slug with
+      | Ok entries -> Ok (slug, entries)
+      | Error msg -> Error msg)
 
 type snapshot_choice =
   | Snapshot_none
@@ -419,28 +428,30 @@ let history_snapshot_conflict ~history_mode ~snapshot ~network =
   | `None | `Url _ -> false (* Can't validate these *)
   | `Tzinit tz -> (
       (* Look up the snapshot entry to get its history mode *)
-      match get_snapshot_entries network with
-      | Ok (_slug, entries) -> (
-          let entry_opt =
-            List.find_opt
-              (fun (e : Snapshots.entry) ->
-                e.network = tz.network_slug && e.slug = tz.kind_slug)
-              entries
-          in
-          match entry_opt with
-          | Some entry -> (
-              match entry.history_mode with
-              | Some snap_mode when String.trim snap_mode <> "" ->
-                  (match History_mode.of_string history_mode with
-                  | Ok requested ->
-                      not
-                        (Installer.For_tests.history_mode_matches
-                           ~requested
-                           ~snapshot_mode:snap_mode)
-                  | Error _ -> true)
-              | _ -> false (* No history mode metadata *))
-          | None -> false (* Entry not found *))
-      | Error _ -> false (* Can't fetch entries *))
+      match Snapshots.slug_of_network network with
+      | None -> false
+      | Some slug -> (
+          match snapshot_entries_from_cache slug with
+          | None -> false (* Cache not ready *)
+          | Some entries -> (
+              match
+                List.find_opt
+                  (fun (e : Snapshots.entry) ->
+                    e.network = tz.network_slug && e.slug = tz.kind_slug)
+                  entries
+              with
+              | None -> false (* Entry not found *)
+              | Some entry -> (
+                  match entry.history_mode with
+                  | Some snap_mode when String.trim snap_mode <> "" -> (
+                      match History_mode.of_string history_mode with
+                      | Ok requested ->
+                          not
+                            (Installer.For_tests.history_mode_matches
+                               ~requested
+                               ~snapshot_mode:snap_mode)
+                      | Error _ -> true)
+                  | _ -> false (* No history mode metadata *)))))
 
 let pad_with_right cols left right =
   if right = "" then left
@@ -981,7 +992,9 @@ let view s ~focus:_ ~size =
          ~snapshot:f.snapshot
          ~network:f.network
   in
-  let valid_history_mode = is_nonempty f.history_mode && not has_history_conflict in
+  let valid_history_mode =
+    is_nonempty f.history_mode && not has_history_conflict
+  in
   let valid_rpc =
     match parse_host_port f.rpc_addr with
     | None -> false
@@ -1009,9 +1022,9 @@ let view s ~focus:_ ~size =
   let valid_app_bin_dir = has_octez_node_binary f.app_bin_dir in
   let valid_snapshot =
     (match f.snapshot with
-    | `None -> true
-    | `Url u -> is_nonempty u
-    | `Tzinit _ -> true)
+      | `None -> true
+      | `Url u -> is_nonempty u
+      | `Tzinit _ -> true)
     && not has_history_conflict
   in
   let all_ok =
@@ -1070,19 +1083,18 @@ let view s ~focus:_ ~size =
         [
           (not (is_nonempty f.instance_name), "Instance Name");
           (not (is_nonempty f.network), "Network");
-           ( (not valid_history_mode),
-             (if has_history_conflict then
-                "History Mode (conflicts with snapshot)"
-              else "History Mode") );
+          ( not valid_history_mode,
+            if has_history_conflict then
+              "History Mode (conflicts with snapshot)"
+            else "History Mode" );
           ((not (is_nonempty f.data_dir)) || data_dir_conflict, "Data Dir");
           (not valid_app_bin_dir, "App Bin Dir");
           (not valid_rpc, "RPC Address");
           (not valid_p2p, "P2P Address");
           (not valid_service_user, "Service User");
-           ( not valid_snapshot,
-             (if has_history_conflict then
-                "Snapshot (history mode mismatch)"
-              else "Snapshot") );
+          ( not valid_snapshot,
+            if has_history_conflict then "Snapshot (history mode mismatch)"
+            else "Snapshot" );
         ]
         |> List.filter fst |> List.map snd
       in
