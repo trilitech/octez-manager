@@ -745,6 +745,10 @@ let create_menu_modal state =
             "This service creation is not yet implemented via UI.") ;
   state
 
+let go_to_diagnostics state =
+  Context.navigate Diagnostics.name ;
+  state
+
 let activate_selection s =
   if s.selected = 0 then create_menu_modal s
   else
@@ -783,6 +787,7 @@ struct
       ("b", bulk_action_modal, "Bulk actions");
       ("r", refresh_modal, "Refresh snapshot");
       ("R", refresh_modal, "Refresh snapshot");
+      ("d", go_to_diagnostics, "Diagnostics");
     ]
 
   let header s =

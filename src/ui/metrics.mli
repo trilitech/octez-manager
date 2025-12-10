@@ -20,5 +20,17 @@ val record_bg_dequeue : queued_depth:int -> wait_ms:float -> unit
 (** Record service status for monitoring. *)
 val record_service_status : service:string -> is_active:bool -> unit
 
+(** Get current background queue depth. *)
+val get_bg_queue_depth : unit -> int
+
+(** Get maximum background queue depth seen. *)
+val get_bg_queue_max : unit -> int
+
+(** Get all service statuses. Returns list of (service_name, status) pairs. *)
+val get_service_statuses : unit -> (string * bool) list
+
+(** Check if metrics collection is enabled. *)
+val is_enabled : unit -> bool
+
 (** Enable metrics server if [OCTEZ_MANAGER_METRICS_ADDR] is set. *)
 val maybe_start_from_env : unit -> unit

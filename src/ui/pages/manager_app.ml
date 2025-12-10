@@ -14,7 +14,8 @@ let register_pages () =
   Instances.register () ;
   Instance_details.register () ;
   Install_node_form.register () ;
-  Install_baker_form.register ()
+  Install_baker_form.register () ;
+  Diagnostics.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in
