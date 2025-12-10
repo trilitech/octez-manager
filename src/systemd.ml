@@ -492,8 +492,11 @@ let ensure_user_logrotate_timer ~owner ~group ~logrotate_bin =
 let disable_user_logrotate_timer () =
   let timer = user_logrotate_unit ^ ".timer" in
   let service = user_logrotate_unit ^ ".service" in
-  ignore (run_systemctl ["disable"; "--now"; timer]) ;
-  ignore (run_systemctl ["disable"; "--now"; service]) ;
+  (* Only attempt to disable units if their files exist to avoid spurious errors *)
+  if Sys.file_exists (user_logrotate_timer_path ()) then
+    ignore (run_systemctl ["disable"; "--now"; timer]) ;
+  if Sys.file_exists (user_logrotate_service_path ()) then
+    ignore (run_systemctl ["disable"; "--now"; service]) ;
   ignore (run_systemctl_timeout ["daemon-reload"]) ;
   ()
 
