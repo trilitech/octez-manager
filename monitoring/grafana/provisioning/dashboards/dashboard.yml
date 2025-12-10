@@ -1,17 +1,11 @@
 apiVersion: 1
-datasources:
-  - name: Prometheus
-    uid: prometheus
-    type: prometheus
-    access: proxy
-    url: http://prometheus:9090
-    isDefault: true
 dashboardProviders:
-  - name: defaults
+  - name: 'default'
     orgId: 1
-    folder: "Octez Manager"
+    folder: ''
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
+    editable: true
+    allowUiUpdates: true
     options:
-      path: /var/lib/grafana/dashboards
+      path: /etc/grafana/dashboards
