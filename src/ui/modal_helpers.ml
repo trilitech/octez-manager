@@ -489,6 +489,7 @@ let show_menu_modal () =
       ("Instances", "instances");
       ("Install node", "install_node_form");
       ("Install baker", "install_baker_form");
+      ("Install DAL node", "install_dal_form");
     ]
   in
   open_choice_modal

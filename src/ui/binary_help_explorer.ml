@@ -1014,6 +1014,42 @@ let open_baker_run_help ~app_bin_dir ~mode ~on_apply =
         open_modal ~title ~options:filtered ~on_apply
     | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
 
+let load_dal_options ~binary =
+  let cache_key = Printf.sprintf "%s:dal" binary in
+  match Hashtbl.find_opt cache cache_key with
+  | Some opts -> Ok opts
+  | None -> (
+      match run_help_cmd binary ["run"; "dal"; "--help"] with
+      | Error (`Msg msg) -> Error (`Msg ("dal-node help: " ^ msg))
+      | Ok output ->
+          let opts = parse_help_node (strip_ansi output) in
+          if opts = [] then
+            Error (`Msg "dal-node: no options parsed from help output")
+          else (
+            Hashtbl.replace cache cache_key opts ;
+            Ok opts))
+
+let excluded_dal_options =
+  ["--help"; "-help"; "--version"; "--data-dir"; "--endpoint"]
+
+let open_dal_run_help ~app_bin_dir ~on_apply =
+  let app_bin_dir = String.trim app_bin_dir in
+  let title = "DAL Flags" in
+  if app_bin_dir = "" then
+    Modal_helpers.show_error ~title "Octez bin directory is empty"
+  else
+    let binary = Filename.concat app_bin_dir "octez-baker" in
+    match load_dal_options ~binary with
+    | Ok options ->
+        let filtered =
+          List.filter
+            (fun opt ->
+              not (is_excluded_option opt ~excluded:excluded_dal_options))
+            options
+        in
+        open_modal ~title ~options:filtered ~on_apply
+    | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
+
 module For_tests = struct
   let parse_help = parse_help_node
 
