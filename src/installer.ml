@@ -619,6 +619,9 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       e
 
 let install_node (request : node_request) =
+  let* resolved_network =
+    Teztnets.resolve_network_for_octez_node request.network
+  in
   let data_dir = normalize_data_dir request.instance request.data_dir in
   let logging_mode =
     prepare_logging
@@ -655,7 +658,7 @@ let install_node (request : node_request) =
   in
   let run_args =
     build_run_args
-      ~network:request.network
+      ~network:resolved_network
       ~history_mode:request.history_mode
       ~rpc_addr:request.rpc_addr
       ~net_addr:request.net_addr
@@ -679,7 +682,7 @@ let install_node (request : node_request) =
     ensure_node_config
       ~app_bin_dir:request.app_bin_dir
       ~data_dir
-      ~network:request.network
+      ~network:resolved_network
       ~history_mode:request.history_mode
   in
   let* () =

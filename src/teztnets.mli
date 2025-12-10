@@ -20,6 +20,11 @@ val list_networks :
 
 val fallback_pairs : (string * string) list
 
+val resolve_network_for_octez_node :
+  ?fetch:(unit -> (network_info list, [> Rresult.R.msg]) result) ->
+  string ->
+  (string, [> Rresult.R.msg]) result
+
 module For_tests : sig
   val fetch_json_with :
     via_eio:(unit -> (string, Rresult.R.msg) result) ->
