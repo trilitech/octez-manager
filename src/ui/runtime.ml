@@ -231,5 +231,6 @@ let initialize ?(log = false) ?logfile () =
     register_system () ;
     register_palette () ;
     Rpc_scheduler.start () ;
+    Metrics.maybe_start_from_env () ;
     initialized := true) ;
   register_logger ~log ~logfile_path:logfile

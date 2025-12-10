@@ -941,10 +941,12 @@ let edit_field s =
   | _ -> s
 
 let handle_modal_key s key ~size:_ =
+  Metrics.mark_input_event () ;
   Miaou.Core.Modal_manager.handle_key key ;
   refresh s
 
 let handle_key s key ~size:_ =
+  Metrics.mark_input_event () ;
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
     refresh s)
@@ -960,184 +962,199 @@ let handle_key s key ~size:_ =
     | _ -> s
 
 let view s ~focus:_ ~size =
-  apply_field_hint s ;
-  let f = s.form in
-  let network_value =
-    if !network_cache = [] then f.network else network_display_name f.network
-  in
-  let snapshot_str =
-    match f.snapshot with
-    | `None -> "None"
-    | `Url u -> u
-    | `Tzinit sel -> Printf.sprintf "tzinit · %s (%s)" sel.label sel.kind_slug
-  in
-  let data_dir_risky =
-    match f.preserve_data with
-    | `Keep -> false
-    | _ -> data_dir_nonempty f.data_dir
-  in
-  (* Validation helpers *)
-  let is_nonempty s = String.trim s <> "" in
-  let valid_instance =
-    is_nonempty f.instance_name
-    && not (instance_in_use ~states:s.service_states f.instance_name)
-  in
-  let valid_service_user =
-    is_nonempty f.service_user && service_user_valid ~user:f.service_user
-  in
-  let data_dir_conflict = data_dir_in_use ~states:s.service_states f.data_dir in
-  let has_history_conflict =
-    is_nonempty f.history_mode
-    && history_snapshot_conflict
-         ~history_mode:f.history_mode
-         ~snapshot:f.snapshot
-         ~network:f.network
-  in
-  let valid_history_mode =
-    is_nonempty f.history_mode && not has_history_conflict
-  in
-  let valid_rpc =
-    match parse_host_port f.rpc_addr with
-    | None -> false
-    | Some (_host, port) ->
-        if port < 1024 || port > 65535 then false
-        else
-          let rpc_ports, p2p_ports =
-            get_registered_ports ~states:s.service_states ()
-          in
-          let avoid = rpc_ports @ p2p_ports in
-          not (List.mem port avoid || is_port_in_use port)
-  in
-  let valid_p2p =
-    match parse_host_port f.p2p_addr with
-    | None -> false
-    | Some (_host, port) ->
-        if port < 1024 || port > 65535 then false
-        else
-          let rpc_ports, p2p_ports =
-            get_registered_ports ~states:s.service_states ()
-          in
-          let avoid = rpc_ports @ p2p_ports in
-          not (List.mem port avoid || is_port_in_use port)
-  in
-  let valid_app_bin_dir = has_octez_node_binary f.app_bin_dir in
-  let valid_snapshot =
-    (match f.snapshot with
-      | `None -> true
-      | `Url u -> is_nonempty u
-      | `Tzinit _ -> true)
-    && not has_history_conflict
-  in
-  let all_ok =
-    valid_instance && is_nonempty f.network && valid_history_mode
-    && is_nonempty f.data_dir && (not data_dir_conflict) && valid_app_bin_dir
-    && valid_rpc && valid_p2p && valid_service_user && valid_snapshot
-  in
-  let status ok = if ok then "✓" else "✗" in
-  let items =
-    [
-      ("Instance Name", f.instance_name, valid_instance);
-      ("Network", network_value, is_nonempty f.network);
-      ("History Mode", f.history_mode, valid_history_mode);
-      ("Data Dir", f.data_dir, is_nonempty f.data_dir && not data_dir_conflict);
-      ("App Bin Dir", f.app_bin_dir, valid_app_bin_dir);
-      ("RPC Address", f.rpc_addr, valid_rpc);
-      ("P2P Address", f.p2p_addr, valid_p2p);
-      ("Service User", f.service_user, valid_service_user);
-      ( "Logging",
-        (match f.logging with `File -> "File" | `Journald -> "Journald"),
-        true );
-      ("Enable on Boot", string_of_bool f.enable_on_boot, true);
-      ("Start Now", string_of_bool f.start_now, true);
-      ("Snapshot", snapshot_str, valid_snapshot);
-      ("Extra Args", f.extra_args, true);
-      ("Confirm & Install", (if all_ok then "Ready" else "Incomplete"), all_ok);
-    ]
-  in
-  let rows =
-    List.map
-      (fun (label, value, ok) ->
-        let value = if ok then value else Widgets.fg 214 (Widgets.bold value) in
-        (label, value, status ok))
-      items
-  in
-  let columns =
-    [
-      {
-        Miaou_widgets_display.Table_widget.Table.header = "Parameter";
-        to_string = (fun (l, _, _) -> l);
-      };
-      {header = "Value"; to_string = (fun (_, v, _) -> v)};
-      {header = "S"; to_string = (fun (_, _, s) -> s)};
-    ]
-  in
-  let table =
-    Table_widget.Table.create ~cols:size.LTerm_geom.cols ~columns ~rows ()
-  in
-  let table = Table_widget.Table.move_cursor table s.cursor in
-  (* Add overall form status banner *)
-  let status_banner =
-    if all_ok then
-      Widgets.bg 22 (Widgets.fg 15 " ✓ Form is valid - ready to install! ")
-    else
-      let invalid_fields =
+  Metrics.record_render ~page:name (fun () ->
+      apply_field_hint s ;
+      let f = s.form in
+      let network_value =
+        if !network_cache = [] then f.network
+        else network_display_name f.network
+      in
+      let snapshot_str =
+        match f.snapshot with
+        | `None -> "None"
+        | `Url u -> u
+        | `Tzinit sel ->
+            Printf.sprintf "tzinit · %s (%s)" sel.label sel.kind_slug
+      in
+      let data_dir_risky =
+        match f.preserve_data with
+        | `Keep -> false
+        | _ -> data_dir_nonempty f.data_dir
+      in
+      (* Validation helpers *)
+      let is_nonempty s = String.trim s <> "" in
+      let valid_instance =
+        is_nonempty f.instance_name
+        && not (instance_in_use ~states:s.service_states f.instance_name)
+      in
+      let valid_service_user =
+        is_nonempty f.service_user && service_user_valid ~user:f.service_user
+      in
+      let data_dir_conflict =
+        data_dir_in_use ~states:s.service_states f.data_dir
+      in
+      let has_history_conflict =
+        is_nonempty f.history_mode
+        && history_snapshot_conflict
+             ~history_mode:f.history_mode
+             ~snapshot:f.snapshot
+             ~network:f.network
+      in
+      let valid_history_mode =
+        is_nonempty f.history_mode && not has_history_conflict
+      in
+      let valid_rpc =
+        match parse_host_port f.rpc_addr with
+        | None -> false
+        | Some (_host, port) ->
+            if port < 1024 || port > 65535 then false
+            else
+              let rpc_ports, p2p_ports =
+                get_registered_ports ~states:s.service_states ()
+              in
+              let avoid = rpc_ports @ p2p_ports in
+              not (List.mem port avoid || is_port_in_use port)
+      in
+      let valid_p2p =
+        match parse_host_port f.p2p_addr with
+        | None -> false
+        | Some (_host, port) ->
+            if port < 1024 || port > 65535 then false
+            else
+              let rpc_ports, p2p_ports =
+                get_registered_ports ~states:s.service_states ()
+              in
+              let avoid = rpc_ports @ p2p_ports in
+              not (List.mem port avoid || is_port_in_use port)
+      in
+      let valid_app_bin_dir = has_octez_node_binary f.app_bin_dir in
+      let valid_snapshot =
+        (match f.snapshot with
+          | `None -> true
+          | `Url u -> is_nonempty u
+          | `Tzinit _ -> true)
+        && not has_history_conflict
+      in
+      let all_ok =
+        valid_instance && is_nonempty f.network && valid_history_mode
+        && is_nonempty f.data_dir && (not data_dir_conflict)
+        && valid_app_bin_dir && valid_rpc && valid_p2p && valid_service_user
+        && valid_snapshot
+      in
+      let status ok = if ok then "✓" else "✗" in
+      let items =
         [
-          (not (is_nonempty f.instance_name), "Instance Name");
-          (not (is_nonempty f.network), "Network");
-          ( not valid_history_mode,
-            if has_history_conflict then
-              "History Mode (conflicts with snapshot)"
-            else "History Mode" );
-          ((not (is_nonempty f.data_dir)) || data_dir_conflict, "Data Dir");
-          (not valid_app_bin_dir, "App Bin Dir");
-          (not valid_rpc, "RPC Address");
-          (not valid_p2p, "P2P Address");
-          (not valid_service_user, "Service User");
-          ( not valid_snapshot,
-            if has_history_conflict then "Snapshot (history mode mismatch)"
-            else "Snapshot" );
+          ("Instance Name", f.instance_name, valid_instance);
+          ("Network", network_value, is_nonempty f.network);
+          ("History Mode", f.history_mode, valid_history_mode);
+          ( "Data Dir",
+            f.data_dir,
+            is_nonempty f.data_dir && not data_dir_conflict );
+          ("App Bin Dir", f.app_bin_dir, valid_app_bin_dir);
+          ("RPC Address", f.rpc_addr, valid_rpc);
+          ("P2P Address", f.p2p_addr, valid_p2p);
+          ("Service User", f.service_user, valid_service_user);
+          ( "Logging",
+            (match f.logging with `File -> "File" | `Journald -> "Journald"),
+            true );
+          ("Enable on Boot", string_of_bool f.enable_on_boot, true);
+          ("Start Now", string_of_bool f.start_now, true);
+          ("Snapshot", snapshot_str, valid_snapshot);
+          ("Extra Args", f.extra_args, true);
+          ( "Confirm & Install",
+            (if all_ok then "Ready" else "Incomplete"),
+            all_ok );
         ]
-        |> List.filter fst |> List.map snd
       in
-      let count = List.length invalid_fields in
-      let msg =
-        if count = 0 then " ✓ Form is valid - ready to install! "
+      let rows =
+        List.map
+          (fun (label, value, ok) ->
+            let value =
+              if ok then value else Widgets.fg 214 (Widgets.bold value)
+            in
+            (label, value, status ok))
+          items
+      in
+      let columns =
+        [
+          {
+            Miaou_widgets_display.Table_widget.Table.header = "Parameter";
+            to_string = (fun (l, _, _) -> l);
+          };
+          {header = "Value"; to_string = (fun (_, v, _) -> v)};
+          {header = "S"; to_string = (fun (_, _, s) -> s)};
+        ]
+      in
+      let table =
+        Table_widget.Table.create ~cols:size.LTerm_geom.cols ~columns ~rows ()
+      in
+      let table = Table_widget.Table.move_cursor table s.cursor in
+      (* Add overall form status banner *)
+      let status_banner =
+        if all_ok then
+          Widgets.bg 22 (Widgets.fg 15 " ✓ Form is valid - ready to install! ")
         else
-          Printf.sprintf
-            " ⚠ Form incomplete: %d field%s need attention "
-            count
-            (if count > 1 then "s" else "")
+          let invalid_fields =
+            [
+              (not (is_nonempty f.instance_name), "Instance Name");
+              (not (is_nonempty f.network), "Network");
+              ( not valid_history_mode,
+                if has_history_conflict then
+                  "History Mode (conflicts with snapshot)"
+                else "History Mode" );
+              ((not (is_nonempty f.data_dir)) || data_dir_conflict, "Data Dir");
+              (not valid_app_bin_dir, "App Bin Dir");
+              (not valid_rpc, "RPC Address");
+              (not valid_p2p, "P2P Address");
+              (not valid_service_user, "Service User");
+              ( not valid_snapshot,
+                if has_history_conflict then "Snapshot (history mode mismatch)"
+                else "Snapshot" );
+            ]
+            |> List.filter fst |> List.map snd
+          in
+          let count = List.length invalid_fields in
+          let msg =
+            if count = 0 then " ✓ Form is valid - ready to install! "
+            else
+              Printf.sprintf
+                " ⚠ Form incomplete: %d field%s need attention "
+                count
+                (if count > 1 then "s" else "")
+          in
+          Widgets.bg 160 (Widgets.fg 15 (Widgets.bold msg))
       in
-      Widgets.bg 160 (Widgets.fg 15 (Widgets.bold msg))
-  in
-  let warning_banner =
-    if data_dir_conflict then
-      let msg =
-        Printf.sprintf
-          " ⚠ Data dir already used by another instance: %s "
-          f.data_dir
+      let warning_banner =
+        if data_dir_conflict then
+          let msg =
+            Printf.sprintf
+              " ⚠ Data dir already used by another instance: %s "
+              f.data_dir
+          in
+          Widgets.bg 220 (Widgets.fg 0 (Widgets.bold msg))
+        else if data_dir_risky then
+          let msg =
+            Printf.sprintf
+              " ⚠ Data dir not empty: %s (install may overwrite existing data) "
+              f.data_dir
+          in
+          Widgets.bg 220 (Widgets.fg 0 (Widgets.bold msg))
+        else ""
       in
-      Widgets.bg 220 (Widgets.fg 0 (Widgets.bold msg))
-    else if data_dir_risky then
-      let msg =
-        Printf.sprintf
-          " ⚠ Data dir not empty: %s (install may overwrite existing data) "
-          f.data_dir
+      let title_line = Widgets.title_highlight " Install Node " in
+      let header_line =
+        if warning_banner = "" then status_banner
+        else pad_with_right size.LTerm_geom.cols status_banner warning_banner
       in
-      Widgets.bg 220 (Widgets.fg 0 (Widgets.bold msg))
-    else ""
-  in
-  let title_line = Widgets.title_highlight " Install Node " in
-  let header_line =
-    if warning_banner = "" then status_banner
-    else pad_with_right size.LTerm_geom.cols status_banner warning_banner
-  in
-  let header = [title_line; header_line] in
-  let footer =
-    [Widgets.dim "↑/↓ navigate, Enter to edit, ? node flags, Esc back"]
-  in
-  Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
-      Table_widget.Table.render table)
+      let header = [title_line; header_line] in
+      let footer =
+        [Widgets.dim "↑/↓ navigate, Enter to edit, ? node flags, Esc back"]
+      in
+      Miaou_widgets_layout.Vsection.render
+        ~size
+        ~header
+        ~footer
+        ~child:(fun _ -> Table_widget.Table.render table))
 
 let next_page s = s.next_page
 
