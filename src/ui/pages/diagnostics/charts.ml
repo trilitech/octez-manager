@@ -16,15 +16,23 @@ module Widgets = Miaou_widgets_display.Widgets
 let trim_chart_padding chart_str =
   String.split_on_char '\n' chart_str
   |> List.map (fun line ->
-      (* Remove trailing spaces *)
+      (* Remove trailing spaces and box-drawing characters *)
       let len = String.length line in
       let rec find_end i =
         if i < 0 then 0
-        else if line.[i] = ' ' then find_end (i - 1)
-        else i + 1
+        else if i >= len then i
+        else
+          (* Check for space or UTF-8 box-drawing char (─ = 0xE2 0x94 0x80) *)
+          let c = Char.code line.[i] in
+          if c = 32 (* space *) then find_end (i - 1)
+          else if c = 0xE2 && i + 2 < len &&
+                  Char.code line.[i+1] = 0x94 &&
+                  Char.code line.[i+2] = 0x80 then
+            find_end (i - 3) (* skip 3-byte UTF-8 char *)
+          else i + 1
       in
       let end_pos = find_end (len - 1) in
-      String.sub line 0 end_pos)
+      if end_pos <= 0 then "" else String.sub line 0 end_pos)
   |> String.concat "\n"
 
 let render_bg_queue_chart samples ~width ~height =
@@ -150,8 +158,32 @@ let render_latency_chart samples ~width ~height =
           ~title:"Render Latency (ms) - p50/p90/p99"
           ()
       in
-      Line_chart.render chart ~show_axes:true ~show_grid:false ()
-      |> trim_chart_padding
+      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false () in
+      let chart_str = trim_chart_padding chart_str in
+      
+      (* Add summary with latest percentiles *)
+      let last_sample = List.hd (List.rev samples) in
+      let p50_str = match last_sample.Metrics.render_p50 with
+        | Some v -> Printf.sprintf "%.1fms" v
+        | None -> "N/A"
+      in
+      let p90_str = match last_sample.Metrics.render_p90 with
+        | Some v -> Printf.sprintf "%.1fms" v
+        | None -> "N/A"
+      in
+      let p99_str = match last_sample.Metrics.render_p99 with
+        | Some v -> Printf.sprintf "%.1fms" v
+        | None -> "N/A"
+      in
+      Printf.sprintf
+        "%s\n%s %s  %s %s  %s %s"
+        chart_str
+        (Widgets.fg 10 "p50:")
+        (Widgets.bold p50_str)
+        (Widgets.fg 11 "p90:")
+        (Widgets.bold p90_str)
+        (Widgets.fg 9 "p99:")
+        (Widgets.bold p99_str)
 
 let render_summary_bars samples ~width ~height =
   if samples = [] then
