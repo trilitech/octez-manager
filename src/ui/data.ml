@@ -25,6 +25,15 @@ module Summary = struct
   type t = {total : int; running : int; stopped : int; unknown : int}
 end
 
+let cache : Service_state.t list Atomic.t = Atomic.make []
+let last_refresh = Atomic.make 0.0
+let refresh_inflight = Atomic.make false
+let cache_ttl_secs = 5.0
+
+let set_cache states =
+  Atomic.set cache states ;
+  Atomic.set last_refresh (Unix.gettimeofday ())
+
 let parse_enabled_response resp =
   let trimmed = String.lowercase_ascii (String.trim resp) in
   match trimmed with
@@ -73,7 +82,7 @@ let fetch_statuses ?detail services =
   in
   List.map (safe_fetch ?detail) services
 
-let load_service_states ?detail () =
+let refresh_cache ?detail () =
   let module SM =
     (val Miaou_interfaces.Capability.require Service_manager_capability.key)
   in
@@ -102,10 +111,32 @@ let load_service_states ?detail () =
                   }
             | Some _ -> ())
         states ;
+      set_cache states ;
       states
   | Error (`Msg msg) ->
       prerr_endline (Printf.sprintf "Failed to read registry: %s" msg) ;
+      set_cache [] ;
       []
+
+let schedule_refresh ?detail () =
+  if Atomic.compare_and_set refresh_inflight false true then
+    Bg.submit_blocking (fun () ->
+        Fun.protect
+          ~finally:(fun () -> Atomic.set refresh_inflight false)
+          (fun () -> ignore (refresh_cache ?detail ())))
+
+let load_service_states ?detail () =
+  match detail with
+  | Some true -> refresh_cache ~detail:true ()
+  | _ ->
+      let cached = Atomic.get cache in
+      let now = Unix.gettimeofday () in
+      let age = now -. Atomic.get last_refresh in
+      if cached = [] && not (Atomic.get refresh_inflight) then
+        refresh_cache ?detail ()
+      else (
+        if age > cache_ttl_secs then schedule_refresh ?detail () ;
+        cached)
 
 let summarize states =
   let open Service_state in
