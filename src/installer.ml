@@ -80,6 +80,14 @@ let strip_file_uri s =
     Some (String.sub s prefix_len (String.length s - prefix_len))
   else None
 
+let history_mode_matches ~requested ~snapshot_mode =
+  let requested_str = History_mode.to_string requested in
+  let requested_lower = String.lowercase_ascii requested_str in
+  let snapshot_lower =
+    String.lowercase_ascii (String.trim snapshot_mode)
+  in
+  requested_lower = snapshot_lower
+
 let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
   let* network_slug =
     match Snapshots.slug_of_network network with
@@ -118,13 +126,37 @@ let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
         network
         network
   | Some entry -> (
-      match entry.download_url with
-      | Some url -> Ok {download_url = String.trim url; network_slug; kind_slug}
-      | None ->
-          R.error_msgf
-            "Snapshot kind '%s' for %s exposes no HTTPS download on tzinit."
-            entry.label
-            network)
+      match entry.history_mode with
+      | Some snapshot_mode when String.trim snapshot_mode <> "" ->
+          if not (history_mode_matches ~requested:history_mode ~snapshot_mode)
+          then
+            R.error_msgf
+              "Snapshot '%s' has history mode '%s' but requested history mode \
+               is '%s'. Please select a snapshot with the correct history mode \
+               or change your history mode selection to match."
+              entry.label
+              snapshot_mode
+              (History_mode.to_string history_mode)
+          else (
+            match entry.download_url with
+            | Some url ->
+                Ok {download_url = String.trim url; network_slug; kind_slug}
+            | None ->
+                R.error_msgf
+                  "Snapshot kind '%s' for %s exposes no HTTPS download on \
+                   tzinit."
+                  entry.label
+                  network)
+      | Some _ | None -> (
+          (* If history mode is not available in metadata, proceed with caution *)
+          match entry.download_url with
+          | Some url ->
+              Ok {download_url = String.trim url; network_slug; kind_slug}
+          | None ->
+              R.error_msgf
+                "Snapshot kind '%s' for %s exposes no HTTPS download on tzinit."
+                entry.label
+                network))
 
 type snapshot_file = {path : string; cleanup : bool}
 
@@ -1143,4 +1175,8 @@ module For_tests = struct
   let is_http_url = is_http_url
 
   let is_file_uri = is_file_uri
+
+  let resolve_snapshot_download = resolve_snapshot_download
+
+  let history_mode_matches = history_mode_matches
 end

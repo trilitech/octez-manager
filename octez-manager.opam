@@ -45,4 +45,3 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://gitlab.com/mbourgoin/octez-manager.git"
