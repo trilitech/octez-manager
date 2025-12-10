@@ -131,7 +131,8 @@ module For_tests : sig
   val snapshot_plan_of_request :
     node_request -> (snapshot_plan, [`Msg of string]) result
 
-  val snapshot_metadata_of_plan : snapshot_plan -> snapshot_metadata
+  val snapshot_metadata_of_plan :
+    no_check:bool -> snapshot_plan -> snapshot_metadata
 
   val strip_file_uri : string -> string option
 
