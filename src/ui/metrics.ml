@@ -479,6 +479,9 @@ let get_snapshots () =
 let set_recording_duration samples =
   Mutex.protect state.lock (fun () ->
       if samples <> state.recording_duration then (
+        let old_size = Array.length state.snapshots in
+        let old_count = state.snapshots_count in
+        
         let empty_snapshot = {
           timestamp = 0.;
           bg_queue_depth = 0;
@@ -494,15 +497,15 @@ let set_recording_duration samples =
           bg_wait_p90 = None;
         } in
         let new_snapshots = Array.make samples empty_snapshot in
-        (* Copy existing snapshots *)
-        let copy_count = min state.snapshots_count samples in
+        
+        (* Preserve data: copy as many snapshots as will fit *)
+        let copy_count = min old_count samples in
         for i = 0 to copy_count - 1 do
-          let src_idx =
-            (state.snapshots_next + state.snapshots_count - copy_count + i)
-            mod Array.length state.snapshots
-          in
+          (* Calculate source index: get the most recent copy_count items from the ring *)
+          let src_idx = (state.snapshots_next + old_size - copy_count + i) mod old_size in
           new_snapshots.(i) <- state.snapshots.(src_idx)
         done ;
+        
         state.snapshots <- new_snapshots ;
         state.snapshots_next <- copy_count mod samples ;
         state.snapshots_count <- copy_count ;
