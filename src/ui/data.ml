@@ -98,6 +98,7 @@ let load_service_states ?detail () =
                     data_size = None;
                     proto = None;
                     last_error = None;
+                    last_block_time = None;
                   }
             | Some _ -> ())
         states ;

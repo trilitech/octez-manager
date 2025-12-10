@@ -527,6 +527,7 @@ let refresh_modal state =
                   data_size = None;
                   proto = None;
                   last_error = None;
+                  last_block_time = None;
                 } ;
               Context.mark_instances_dirty () ;
               (* Stop RPC monitor while refreshing to avoid stale connections *)
