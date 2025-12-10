@@ -159,9 +159,9 @@ let view s ~focus:_ ~size =
   let add line = lines := line :: !lines in
 
   (* Service Status Section *)
-  add (Widgets.bold "Service Status") ;
+  add (Widgets.fg 14 (Widgets.bold "━━━ Service Status ━━━")) ;
   add "" ;
-  if s.services = [] then add "  No services registered"
+  if s.services = [] then add (Widgets.dim "  No services registered")
   else
     List.iter
       (fun (st : Data.Service_state.t) ->
@@ -177,7 +177,7 @@ let view s ~focus:_ ~size =
             "  %s %-20s  %s  %s"
             (Widgets.fg status_color status_icon)
             (Widgets.bold svc.Service.instance)
-            (Widgets.dim svc.Service.role)
+            (Widgets.fg 8 svc.Service.role)
             (Widgets.dim
                (Printf.sprintf
                   "net:%s mode:%s"
@@ -188,7 +188,7 @@ let view s ~focus:_ ~size =
       s.services ;
 
   add "" ;
-  add (Widgets.bold "Real-Time Metrics") ;
+  add (Widgets.fg 12 (Widgets.bold "━━━ Real-Time Metrics ━━━")) ;
   add "" ;
 
   (* Sparkline *)
@@ -204,14 +204,14 @@ let view s ~focus:_ ~size =
         else Widgets.fg 10 "✓ idle")) ;
 
   add "" ;
-  add (Widgets.bold "Metrics Recorder") ;
+  add (Widgets.fg 11 (Widgets.bold "━━━ Metrics Recorder ━━━")) ;
   add "" ;
   let recorder_enabled = Metrics.is_recording () in
   let recorder_icon =
     if recorder_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
   in
   let recorder_status =
-    if recorder_enabled then "recording" else "stopped"
+    if recorder_enabled then Widgets.fg 10 "recording" else Widgets.fg 8 "stopped"
   in
   let duration_samples = Metrics.get_recording_duration () in
   let duration_str =
@@ -223,58 +223,59 @@ let view s ~focus:_ ~size =
   in
   add
     (Printf.sprintf
-       "  Status: %s %s (duration: %s, press 'd' to change)"
+       "  %s %s %s %s"
+       (Widgets.fg 12 "Status:")
        recorder_icon
        recorder_status
-       duration_str) ;
+       (Widgets.dim (Printf.sprintf "(duration: %s, press 'd' to change)" duration_str))) ;
   add (Widgets.dim "  (press 'R' to start/stop recording)") ;
 
   (* Historical Charts *)
   if recorder_enabled || Metrics.get_snapshots () <> [] then (
     add "" ;
-    add (Widgets.bold "Historical Metrics") ;
+    add (Widgets.fg 13 (Widgets.bold "━━━ Historical Metrics ━━━")) ;
     add "" ;
     let samples = Metrics.get_snapshots () in
     let chart_width = min 70 (size.LTerm_geom.cols - 4) in
     
     (* BG Queue Chart *)
     let bg_chart = Charts.render_bg_queue_chart samples ~width:chart_width ~height:10 in
-    add bg_chart ;
+    String.split_on_char '\n' bg_chart |> List.iter add ;
     add "" ;
     
     (* Service Status Chart *)
     let svc_chart = Charts.render_service_status_chart samples ~width:chart_width ~height:10 in
-    add svc_chart ;
+    String.split_on_char '\n' svc_chart |> List.iter add ;
     add "" ;
     
     (* Render Latency Chart *)
     let render_chart = Charts.render_latency_chart samples ~width:chart_width ~height:10 in
-    add render_chart ;
+    String.split_on_char '\n' render_chart |> List.iter add ;
     add "" ;
     
     (* Summary Bars *)
     let summary = Charts.render_summary_bars samples ~width:chart_width ~height:8 in
-    add summary) ;
+    String.split_on_char '\n' summary |> List.iter add) ;
 
   add "" ;
-  add (Widgets.bold "Metrics Server Configuration") ;
+  add (Widgets.fg 14 (Widgets.bold "━━━ Metrics Server Configuration ━━━")) ;
   add "" ;
   let metrics_enabled = Metrics.is_enabled () in
   let status_icon =
     if metrics_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
   in
-  let status_text = if metrics_enabled then "enabled" else "disabled" in
-  add (Printf.sprintf "  Status: %s %s" status_icon status_text) ;
+  let status_text = if metrics_enabled then Widgets.fg 10 "enabled" else Widgets.fg 8 "disabled" in
+  add (Printf.sprintf "  %s %s %s" (Widgets.fg 12 "Status:") status_icon status_text) ;
   (match Metrics.get_server_info () with
    | Some (addr, port) ->
-       add (Printf.sprintf "  Endpoint: http://%s:%d/metrics" addr port) ;
+       add (Printf.sprintf "  %s %s" (Widgets.fg 12 "Endpoint:") (Widgets.fg 14 (Printf.sprintf "http://%s:%d/metrics" addr port))) ;
        add (Widgets.dim "  (server is running)")
    | None ->
-       add (Printf.sprintf "  Address: %s" !metrics_addr_ref) ;
+       add (Printf.sprintf "  %s %s" (Widgets.fg 12 "Address:") !metrics_addr_ref) ;
        add (Widgets.dim "  (press 'm' to start, 'a' to edit address)")) ;
 
   add "" ;
-  add (Widgets.bold "System Information") ;
+  add (Widgets.fg 12 (Widgets.bold "━━━ System Information ━━━")) ;
   add "" ;
   add
     (Printf.sprintf
