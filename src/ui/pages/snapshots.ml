@@ -127,7 +127,7 @@ let next_page s = s.next_page
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
-module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
+module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state
 
   type nonrec msg = msg
@@ -160,6 +160,10 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   let has_modal = has_modal
 end
+
+module Page = Monitored_page.Make(Page_Impl)(struct
+  let page_name = "snapshots"
+end)
 
 let page : Miaou.Core.Registry.page =
   (module Page : Miaou.Core.Tui_page.PAGE_SIG)

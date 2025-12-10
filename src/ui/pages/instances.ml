@@ -756,7 +756,7 @@ let activate_selection s =
     | Some _ -> instance_actions_modal s
     | None -> s
 
-module Page :
+module Page_Impl :
   Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg =
 struct
   type nonrec state = state
@@ -890,6 +890,10 @@ struct
 
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 end
+
+module Page = Monitored_page.Make(Page_Impl)(struct
+  let page_name = "instances"
+end)
 
 let page : Miaou.Core.Registry.page =
   (module Page : Miaou.Core.Tui_page.PAGE_SIG)
