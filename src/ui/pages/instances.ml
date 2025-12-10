@@ -166,6 +166,7 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
         chain_id;
         proto;
         last_error;
+        last_block_time;
         _;
       } ->
       let error_prefix =
@@ -187,6 +188,19 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
         | None, None, Some true -> Widgets.green "synced"
         | None, None, Some false -> Widgets.yellow "syncing"
         | None, None, None -> Widgets.dim (Context.render_spinner "")
+      in
+      let staleness =
+        match last_block_time with
+        | None -> Widgets.dim ""
+        | Some ts ->
+            let age = Unix.gettimeofday () -. ts in
+            let label =
+              if age >= 120. then Widgets.red (Printf.sprintf "Δ %.0fs" age)
+              else if age >= 30. then
+                Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
+              else Widgets.green (Printf.sprintf "Δ %.0fs" age)
+            in
+            label
       in
       let age =
         if stopped then Widgets.dim ""
@@ -224,7 +238,14 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
             if stopped then Widgets.dim s else s
       in
       let lvl_s = if stopped then Widgets.dim lvl else lvl in
-      Printf.sprintf "%s · %s · %s · %s %s" boot lvl_s proto_s chain_s age
+      Printf.sprintf
+        "%s · %s · %s · %s · %s %s"
+        boot
+        lvl_s
+        proto_s
+        chain_s
+        staleness
+        age
 
 let network_short (n : string) =
   match Snapshots.slug_of_network n with Some slug -> slug | None -> n
