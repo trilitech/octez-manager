@@ -7,6 +7,7 @@
 
 module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
+module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Keys = Miaou.Core.Keys
 open Octez_manager_lib
 
@@ -14,17 +15,26 @@ let name = "diagnostics"
 
 type state = {
   services : Data.Service_state.t list;
+  bg_queue_spark : Sparkline.t;
   next_page : string option;
 }
 
 type msg = unit
 
 let init () =
-  {services = Data.load_service_states (); next_page = None}
+  {
+    services = Data.load_service_states ();
+    bg_queue_spark = Sparkline.create ~width:40 ~max_points:60 ();
+    next_page = None;
+  }
 
 let update s _ = s
 
-let refresh s = {s with services = Data.load_service_states ()}
+let refresh s =
+  (* Update sparklines with current metrics *)
+  let bg_depth = Metrics.get_bg_queue_depth () in
+  Sparkline.push s.bg_queue_spark (float_of_int bg_depth) ;
+  {s with services = Data.load_service_states ()}
 
 let move s _ = s
 
@@ -37,29 +47,6 @@ let service_cycle s _ = s
 let back s = {s with next_page = Some "__BACK__"}
 
 let keymap _ = [("Esc", back, "Back"); ("r", refresh, "Refresh")]
-
-(* Helper to render a sparkline from an array of values *)
-let sparkline values width =
-  if Array.length values = 0 then String.make width ' '
-  else
-    let min_v = Array.fold_left Float.min Float.infinity values in
-    let max_v = Array.fold_left Float.max Float.neg_infinity values in
-    let range = max_v -. min_v in
-    let bars = [|" "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█"|] in
-    let buf = Buffer.create width in
-    for i = 0 to min (width - 1) (Array.length values - 1) do
-      let v = values.(i) in
-      let normalized =
-        if range = 0. then 0.5 else (v -. min_v) /. range
-      in
-      let idx =
-        int_of_float (normalized *. float_of_int (Array.length bars - 1))
-        |> max 0
-        |> min (Array.length bars - 1)
-      in
-      Buffer.add_string buf bars.(idx)
-    done ;
-    Buffer.contents buf
 
 (* Format a metric value with units *)
 let format_metric value unit_str =
@@ -116,19 +103,29 @@ let view s ~focus:_ ~size =
   let bg_depth = Metrics.get_bg_queue_depth () in
   let bg_max = Metrics.get_bg_queue_max () in
   
+  (* Render background queue sparkline *)
+  let bg_spark_line =
+    if not (Sparkline.is_empty s.bg_queue_spark) then
+      "  BG Queue (60s): "
+      ^ Sparkline.render_with_label
+          s.bg_queue_spark
+          ~label:""
+          ~focus:false
+          ~thresholds:[{Sparkline.value = 3.0; color = "11"}]
+          ()
+    else "  BG Queue (60s): " ^ Widgets.dim "[collecting data...]"
+  in
+  add bg_spark_line ;
   add
     (Printf.sprintf
-       "  Background Queue: %d/%d  %s"
+       "  Current: %d/%d  %s"
        bg_depth
        bg_max
        (if bg_depth > 0 then Widgets.fg 11 "⚠ tasks pending"
         else Widgets.fg 10 "✓ idle")) ;
 
-  (* Render time metrics - would need to expose these from Metrics module *)
-  (* For now, show placeholder *)
   add "" ;
-  add (Widgets.dim "  Render latency (p50/p90/p99): [needs metrics exposure]") ;
-  add (Widgets.dim "  Key→render latency: [needs metrics exposure]") ;
+  add (Widgets.dim "  Tip: Metrics update on each refresh (press 'r')") ;
 
   add "" ;
   add (Widgets.bold "System Information") ;
