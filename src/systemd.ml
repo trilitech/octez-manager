@@ -711,12 +711,11 @@ let remove_refresh_timer ~instance =
         (Filename.concat (Common.xdg_config_home ()) "systemd/user")
         (service_name ^ ".timer")
   in
-  if Sys.file_exists timer_path then
-    let _ = run_systemctl ["disable"; "--now"; timer_name] in
-    () ;
+  if Sys.file_exists timer_path then (
+    ignore (run_systemctl ["disable"; "--now"; timer_name])) ;
   Common.remove_path service_path ;
   Common.remove_path timer_path ;
-  let _ = run_systemctl_timeout ["daemon-reload"] in
+  ignore (run_systemctl_timeout ["daemon-reload"]) ;
   ()
 
 module For_tests = struct
