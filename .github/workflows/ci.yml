@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    branches: [main, mb/ci-deps-pipeline]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '**/*.md'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    env:
+      OPAMYES: "true"
+      # Use SSH-based URL (git@github.com:...) to avoid exposing credentials in logs
+      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
+      DUNE_CACHE: "enabled"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          # Pinning to OCaml 5.1.1 for reproducible builds. If a newer patch release is compatible, consider updating.
+          ocaml-compiler: 5.1.1
+          opam-depext: true
+          cache: true
+          opam-repositories: |
+            default: https://opam.ocaml.org
+
+      - name: Cache dune
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/dune
+          key: ${{ runner.os }}-dune-${{ hashFiles('dune-project', 'Makefile', 'octez-manager.opam', '**/dune') }}
+          restore-keys: |
+            ${{ runner.os }}-dune-
+
+      - name: Cache opam download cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/opam
+          key: ${{ runner.os }}-opam-cache-${{ hashFiles('octez-manager.opam', '**/*.opam') }}
+          restore-keys: |
+            ${{ runner.os }}-opam-cache-
+
+      - name: Install dependencies
+        run: |
+          if [ -z "$MIAOU_GIT_URL" ]; then
+            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
+            echo "Configure it in repository Settings > Secrets and variables > Actions" >&2
+            echo "Set MIAOU_GIT_URL to point to the private miaou repository URL." >&2
+            exit 1
+          fi
+          make deps-ci
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test
