@@ -1,79 +1,115 @@
 {
-  "title": "Octez Manager UI",
+  "id": null,
   "uid": "octez-ui",
+  "title": "Octez Manager UI",
   "schemaVersion": 36,
   "version": 1,
+  "tags": ["octez", "metrics"],
   "timezone": "browser",
+  "refresh": "5s",
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "links": [],
   "panels": [
     {
       "type": "stat",
       "title": "Render p90 (ms)",
       "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
+          "refId": "A",
           "expr": "octez_manager_ui_render_duration_ms{quantile=\"0.90\"}",
           "legendFormat": "{{page}}"
         }
       ],
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal"}
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none"
+      }
     },
     {
       "type": "stat",
       "title": "Key→Render p90 (ms)",
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
+          "refId": "A",
           "expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.90\"}",
           "legendFormat": "p90"
         }
       ],
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal"}
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none"
+      }
     },
     {
       "type": "stat",
       "title": "BG Queue Depth",
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
-        {"expr": "octez_manager_bg_queue_depth", "legendFormat": "depth"}
+        {"refId": "A", "expr": "octez_manager_bg_queue_depth", "legendFormat": "depth"}
       ],
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal"}
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none"
+      }
     },
     {
       "type": "timeseries",
       "title": "Render p50/p90/p99 (ms)",
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
-        {"expr": "octez_manager_ui_render_duration_ms{quantile=\"0.50\"}", "legendFormat": "p50 {{page}}"},
-        {"expr": "octez_manager_ui_render_duration_ms{quantile=\"0.90\"}", "legendFormat": "p90 {{page}}"},
-        {"expr": "octez_manager_ui_render_duration_ms{quantile=\"0.99\"}", "legendFormat": "p99 {{page}}"}
-      ]
+        {"refId": "A", "expr": "octez_manager_ui_render_duration_ms{quantile=\"0.50\"}", "legendFormat": "p50 {{page}}"},
+        {"refId": "B", "expr": "octez_manager_ui_render_duration_ms{quantile=\"0.90\"}", "legendFormat": "p90 {{page}}"},
+        {"refId": "C", "expr": "octez_manager_ui_render_duration_ms{quantile=\"0.99\"}", "legendFormat": "p99 {{page}}"}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
     },
     {
       "type": "timeseries",
       "title": "Key→Render Latency (ms)",
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
-        {"expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.50\"}", "legendFormat": "p50"},
-        {"expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.90\"}", "legendFormat": "p90"},
-        {"expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.99\"}", "legendFormat": "p99"}
-      ]
+        {"refId": "A", "expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.50\"}", "legendFormat": "p50"},
+        {"refId": "B", "expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.90\"}", "legendFormat": "p90"},
+        {"refId": "C", "expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.99\"}", "legendFormat": "p99"}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
     },
     {
       "type": "timeseries",
       "title": "Background Wait (ms)",
       "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
-        {"expr": "octez_manager_bg_wait_ms{quantile=\"0.90\"}", "legendFormat": "p90"},
-        {"expr": "octez_manager_bg_wait_ms{quantile=\"0.99\"}", "legendFormat": "p99"}
-      ]
+        {"refId": "A", "expr": "octez_manager_bg_wait_ms{quantile=\"0.90\"}", "legendFormat": "p90"},
+        {"refId": "B", "expr": "octez_manager_bg_wait_ms{quantile=\"0.99\"}", "legendFormat": "p99"}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
     },
     {
       "type": "timeseries",
-      "title": "Render Count (per scrape)",
+      "title": "Render Count",
       "gridPos": {"h": 6, "w": 12, "x": 12, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
-        {"expr": "octez_manager_ui_render_duration_ms_count", "legendFormat": "count {{page}}"}
-      ]
+        {"refId": "A", "expr": "octez_manager_ui_render_duration_ms_count", "legendFormat": "count {{page}}"}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
     }
   ]
 }
