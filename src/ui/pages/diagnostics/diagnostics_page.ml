@@ -237,7 +237,12 @@ let view s ~focus:_ ~size =
     add (Widgets.fg 13 (Widgets.bold "━━━ Historical Metrics ━━━")) ;
     add "" ;
     let samples = Metrics.get_snapshots () in
-    let chart_width = min 70 (size.LTerm_geom.cols - 4) in
+    
+    if samples = [] then (
+      add (Widgets.dim "  Collecting data... (wait ~5 seconds)") ;
+      add (Widgets.dim "  Charts will appear once samples are recorded"))
+    else (
+      let chart_width = min 70 (size.LTerm_geom.cols - 4) in
     
     (* BG Queue Chart *)
     let bg_chart = Charts.render_bg_queue_chart samples ~width:chart_width ~height:10 in
@@ -254,9 +259,9 @@ let view s ~focus:_ ~size =
     String.split_on_char '\n' render_chart |> List.iter add ;
     add "" ;
     
-    (* Summary Bars *)
+    (* Summary *)
     let summary = Charts.render_summary_bars samples ~width:chart_width ~height:8 in
-    String.split_on_char '\n' summary |> List.iter add) ;
+    String.split_on_char '\n' summary |> List.iter add)) ;
 
   add "" ;
   add (Widgets.fg 14 (Widgets.bold "━━━ Metrics Server Configuration ━━━")) ;
