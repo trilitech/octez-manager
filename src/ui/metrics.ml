@@ -482,34 +482,57 @@ let set_recording_duration samples =
         let old_size = Array.length state.snapshots in
         let old_count = state.snapshots_count in
         
-        let empty_snapshot = {
-          timestamp = 0.;
-          bg_queue_depth = 0;
-          bg_queue_max = 0;
-          services_active = 0;
-          services_total = 0;
-          render_p50 = None;
-          render_p90 = None;
-          render_p99 = None;
-          key_to_render_p50 = None;
-          key_to_render_p90 = None;
-          bg_wait_p50 = None;
-          bg_wait_p90 = None;
-        } in
-        let new_snapshots = Array.make samples empty_snapshot in
-        
-        (* Preserve data: copy as many snapshots as will fit *)
+        (* Preserve data: copy as many real snapshots as will fit *)
         let copy_count = min old_count samples in
-        for i = 0 to copy_count - 1 do
-          (* Calculate source index: get the most recent copy_count items from the ring *)
-          let src_idx = (state.snapshots_next + old_size - copy_count + i) mod old_size in
-          new_snapshots.(i) <- state.snapshots.(src_idx)
-        done ;
         
-        state.snapshots <- new_snapshots ;
-        state.snapshots_next <- copy_count mod samples ;
-        state.snapshots_count <- copy_count ;
-        state.recording_duration <- samples))
+        if copy_count = 0 then
+          (* No existing data to preserve, just resize *)
+          let empty_snapshot = {
+            timestamp = 0.;
+            bg_queue_depth = 0;
+            bg_queue_max = 0;
+            services_active = 0;
+            services_total = 0;
+            render_p50 = None;
+            render_p90 = None;
+            render_p99 = None;
+            key_to_render_p50 = None;
+            key_to_render_p90 = None;
+            bg_wait_p50 = None;
+            bg_wait_p90 = None;
+          } in
+          state.snapshots <- Array.make samples empty_snapshot ;
+          state.snapshots_next <- 0 ;
+          state.snapshots_count <- 0 ;
+          state.recording_duration <- samples
+        else (
+          (* Create new buffer and copy the most recent snapshots *)
+          let empty_snapshot = {
+            timestamp = 0.;
+            bg_queue_depth = 0;
+            bg_queue_max = 0;
+            services_active = 0;
+            services_total = 0;
+            render_p50 = None;
+            render_p90 = None;
+            render_p99 = None;
+            key_to_render_p50 = None;
+            key_to_render_p90 = None;
+            bg_wait_p50 = None;
+            bg_wait_p90 = None;
+          } in
+          let new_snapshots = Array.make samples empty_snapshot in
+          
+          (* Copy the most recent copy_count snapshots to the start of new buffer *)
+          for i = 0 to copy_count - 1 do
+            let src_idx = (state.snapshots_next + old_size - copy_count + i) mod old_size in
+            new_snapshots.(i) <- state.snapshots.(src_idx)
+          done ;
+          
+          state.snapshots <- new_snapshots ;
+          state.snapshots_next <- copy_count mod samples ;
+          state.snapshots_count <- copy_count ;
+          state.recording_duration <- samples)))
 
 let clear_snapshots () =
   Mutex.protect state.lock (fun () ->
