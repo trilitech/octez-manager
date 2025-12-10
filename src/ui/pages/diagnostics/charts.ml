@@ -10,6 +10,22 @@
 module Line_chart = Miaou_widgets_display.Line_chart_widget
 module Bar_chart = Miaou_widgets_display.Bar_chart_widget
 module Sparkline = Miaou_widgets_display.Sparkline_widget
+module Widgets = Miaou_widgets_display.Widgets
+
+(* Helper to trim trailing padding from chart lines *)
+let trim_chart_padding chart_str =
+  String.split_on_char '\n' chart_str
+  |> List.map (fun line ->
+      (* Remove trailing spaces *)
+      let len = String.length line in
+      let rec find_end i =
+        if i < 0 then 0
+        else if line.[i] = ' ' then find_end (i - 1)
+        else i + 1
+      in
+      let end_pos = find_end (len - 1) in
+      String.sub line 0 end_pos)
+  |> String.concat "\n"
 
 let render_bg_queue_chart samples ~width ~height =
   if samples = [] then
@@ -30,7 +46,28 @@ let render_bg_queue_chart samples ~width ~height =
         ~title:"Background Queue Depth Over Time"
         ()
     in
-    Line_chart.render chart ~show_axes:true ~show_grid:false ()
+    let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false () in
+    let chart_str = trim_chart_padding chart_str in
+    
+    (* Add summary *)
+    let depths = List.map (fun s -> s.Metrics.bg_queue_depth) samples in
+    let max_depth = List.fold_left max 0 depths in
+    let avg_depth = 
+      (List.fold_left (+) 0 depths |> float_of_int) /. float_of_int (List.length depths)
+    in
+    let last_depth = List.hd (List.rev depths) in
+    let summary =
+      Printf.sprintf
+        "%s\n%s %s  %s %s  %s %s"
+        chart_str
+        (Widgets.fg 12 "Current:")
+        (Widgets.bold (string_of_int last_depth))
+        (Widgets.fg 12 "Avg:")
+        (Printf.sprintf "%.1f" avg_depth)
+        (Widgets.fg 12 "Max:")
+        (Widgets.bold (string_of_int max_depth))
+    in
+    summary
 
 let render_service_status_chart samples ~width ~height =
   if samples = [] then
@@ -61,6 +98,7 @@ let render_service_status_chart samples ~width ~height =
         ()
     in
     Line_chart.render chart ~show_axes:true ~show_grid:false ()
+    |> trim_chart_padding
 
 let render_latency_chart samples ~width ~height =
   if samples = [] then
@@ -113,6 +151,7 @@ let render_latency_chart samples ~width ~height =
           ()
       in
       Line_chart.render chart ~show_axes:true ~show_grid:false ()
+      |> trim_chart_padding
 
 let render_summary_bars samples ~width ~height =
   if samples = [] then
@@ -138,6 +177,7 @@ let render_summary_bars samples ~width ~height =
         ()
     in
     Bar_chart.render chart ~show_values:true ()
+    |> trim_chart_padding
 
 let render_bg_queue_sparkline spark =
   if Sparkline.is_empty spark then
