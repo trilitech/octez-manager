@@ -440,6 +440,11 @@ let installer_snapshot_metadata_variants () =
     Installer.For_tests.snapshot_metadata_of_plan ~no_check:false No_snapshot
   in
   Alcotest.(check bool) "no auto" false no_meta.auto ;
+  Alcotest.(check bool) "no_check propagates for No_snapshot" false no_meta.no_check ;
+  let no_meta_with_check =
+    Installer.For_tests.snapshot_metadata_of_plan ~no_check:true No_snapshot
+  in
+  Alcotest.(check bool) "no_check true for No_snapshot when set" true no_meta_with_check.no_check ;
   let direct_meta =
     Installer.For_tests.snapshot_metadata_of_plan
       ~no_check:false
