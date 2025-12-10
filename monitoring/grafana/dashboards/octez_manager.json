@@ -1,0 +1,79 @@
+{
+  "title": "Octez Manager UI",
+  "uid": "octez-ui",
+  "schemaVersion": 36,
+  "version": 1,
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Render p90 (ms)",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "octez_manager_ui_render_duration_ms{quantile=\"0.90\"}",
+          "legendFormat": "{{page}}"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal"}
+    },
+    {
+      "type": "stat",
+      "title": "Key→Render p90 (ms)",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.90\"}",
+          "legendFormat": "p90"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal"}
+    },
+    {
+      "type": "stat",
+      "title": "BG Queue Depth",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "octez_manager_bg_queue_depth", "legendFormat": "depth"}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Render p50/p90/p99 (ms)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {"expr": "octez_manager_ui_render_duration_ms{quantile=\"0.50\"}", "legendFormat": "p50 {{page}}"},
+        {"expr": "octez_manager_ui_render_duration_ms{quantile=\"0.90\"}", "legendFormat": "p90 {{page}}"},
+        {"expr": "octez_manager_ui_render_duration_ms{quantile=\"0.99\"}", "legendFormat": "p99 {{page}}"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Key→Render Latency (ms)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {"expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.50\"}", "legendFormat": "p50"},
+        {"expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.90\"}", "legendFormat": "p90"},
+        {"expr": "octez_manager_ui_key_to_render_ms{quantile=\"0.99\"}", "legendFormat": "p99"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Background Wait (ms)",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+      "targets": [
+        {"expr": "octez_manager_bg_wait_ms{quantile=\"0.90\"}", "legendFormat": "p90"},
+        {"expr": "octez_manager_bg_wait_ms{quantile=\"0.99\"}", "legendFormat": "p99"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Render Count (per scrape)",
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 12},
+      "targets": [
+        {"expr": "octez_manager_ui_render_duration_ms_count", "legendFormat": "count {{page}}"}
+      ]
+    }
+  ]
+}
