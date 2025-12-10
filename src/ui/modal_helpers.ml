@@ -468,3 +468,31 @@ let show_success ~title message =
 let show_error ~title message =
   let lines = wrap_text ~width:50 message in
   open_text_modal ~title ~lines:(["Error"; ""] @ lines)
+
+let show_help_modal () =
+  let lines =
+    [
+      "Global shortcuts:";
+      "  s  - Settings";
+      "  m  - Menu";
+      "  h/?- Help";
+      "  Esc/q - Close modals";
+      "";
+      "Page-specific keys remain available when no modal is open.";
+    ]
+  in
+  open_text_modal ~title:"Help" ~lines
+
+let show_menu_modal () =
+  let items =
+    [
+      ("Instances", "instances");
+      ("Install node", "install_node_form");
+      ("Install baker", "install_baker_form");
+    ]
+  in
+  open_choice_modal
+    ~title:"Menu"
+    ~items
+    ~to_string:(fun (label, _) -> label)
+    ~on_select:(fun (_, target) -> Context.navigate target)

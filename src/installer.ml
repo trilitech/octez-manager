@@ -126,6 +126,8 @@ let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
             entry.label
             network)
 
+type snapshot_file = {path : string; cleanup : bool}
+
 let download_snapshot_to_tmp src =
   let tmp = Filename.temp_file "octez-manager.snapshot" ".snap" in
   match Common.download_file ~url:src ~dest_path:tmp with
@@ -194,6 +196,21 @@ let import_snapshot ~app_bin_dir ~data_dir ~snapshot_path ~no_check =
   in
   Common.run args
 
+let materialize_snapshot_plan ~plan : (snapshot_file option, R.msg) result =
+  match plan with
+  | No_snapshot -> Ok None
+  | Direct_snapshot {uri} ->
+      prepare_snapshot_source uri |> Result.map Option.some
+  | Tzinit_snapshot res ->
+      download_snapshot_to_tmp res.download_url |> Result.map Option.some
+
+let import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check =
+  import_snapshot
+    ~app_bin_dir
+    ~data_dir
+    ~snapshot_path:snapshot_file.path
+    ~no_check
+
 let perform_snapshot_plan ~plan ~app_bin_dir ~data_dir ~no_check =
   match plan with
   | No_snapshot -> Ok ()
@@ -203,22 +220,14 @@ let perform_snapshot_plan ~plan ~app_bin_dir ~data_dir ~no_check =
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
         (fun () ->
-          import_snapshot
-            ~app_bin_dir
-            ~data_dir
-            ~snapshot_path:snapshot_file.path
-            ~no_check)
+          import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check)
   | Tzinit_snapshot res ->
       let* snapshot_file = download_snapshot_to_tmp res.download_url in
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
         (fun () ->
-          import_snapshot
-            ~app_bin_dir
-            ~data_dir
-            ~snapshot_path:snapshot_file.path
-            ~no_check)
+          import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check)
 
 let perform_bootstrap ~plan ~(request : node_request) ~data_dir =
   perform_snapshot_plan
@@ -474,6 +483,7 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       ~snapshot_kind_override:snapshot_kind
   in
   let no_check_flag = no_check || service.snapshot_no_check in
+  let* snapshot_file_opt = materialize_snapshot_plan ~plan in
   let identity_path = Filename.concat service.data_dir "identity.json" in
   let log_path =
     match service.logging_mode with
@@ -505,39 +515,51 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
   let* was_active = Systemd.is_active ~role:"node" ~instance:service.instance in
   let* () = Systemd.stop ~role:"node" ~instance:service.instance in
   let result =
-    let* () = Common.remove_tree service.data_dir in
-    let* () = ensure_directories ~owner ~group [service.data_dir] in
-    let* () =
-      ensure_logging_base_directory ~owner ~group service.logging_mode
-    in
-    let* () = ensure_runtime_log_directory ~owner ~group service.logging_mode in
-    let* () =
-      ensure_node_config
-        ~app_bin_dir:service.app_bin_dir
-        ~data_dir:service.data_dir
-        ~network:service.network
-        ~history_mode:service.history_mode
-    in
-    let* () =
-      perform_snapshot_plan
-        ~plan
-        ~app_bin_dir:service.app_bin_dir
-        ~data_dir:service.data_dir
-        ~no_check:no_check_flag
-    in
-    let* () = restore_once () in
-    let* () =
-      reown_runtime_paths
-        ~owner
-        ~group
-        ~paths:[service.data_dir]
-        ~logging_mode:service.logging_mode
-    in
-    let* () =
-      if was_active then Systemd.start ~role:"node" ~instance:service.instance
-      else Ok ()
-    in
-    Ok ()
+    Fun.protect
+      ~finally:(fun () ->
+        match snapshot_file_opt with
+        | Some file when file.cleanup -> Common.remove_path file.path
+        | _ -> ())
+      (fun () ->
+        let* () = Common.remove_tree service.data_dir in
+        let* () = ensure_directories ~owner ~group [service.data_dir] in
+        let* () =
+          ensure_logging_base_directory ~owner ~group service.logging_mode
+        in
+        let* () =
+          ensure_runtime_log_directory ~owner ~group service.logging_mode
+        in
+        let* () =
+          ensure_node_config
+            ~app_bin_dir:service.app_bin_dir
+            ~data_dir:service.data_dir
+            ~network:service.network
+            ~history_mode:service.history_mode
+        in
+        let* () =
+          match snapshot_file_opt with
+          | None -> Ok ()
+          | Some snapshot_file ->
+              import_snapshot_file
+                ~app_bin_dir:service.app_bin_dir
+                ~data_dir:service.data_dir
+                ~snapshot_file
+                ~no_check:no_check_flag
+        in
+        let* () = restore_once () in
+        let* () =
+          reown_runtime_paths
+            ~owner
+            ~group
+            ~paths:[service.data_dir]
+            ~logging_mode:service.logging_mode
+        in
+        let* () =
+          if was_active then
+            Systemd.start ~role:"node" ~instance:service.instance
+          else Ok ()
+        in
+        Ok ())
   in
   match result with
   | Ok () -> Ok ()

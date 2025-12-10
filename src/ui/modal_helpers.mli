@@ -41,3 +41,7 @@ val show_error : title:string -> string -> unit
 
 val confirm_modal :
   ?title:string -> message:string -> on_result:(bool -> unit) -> unit -> unit
+
+val show_help_modal : unit -> unit
+
+val show_menu_modal : unit -> unit
