@@ -62,6 +62,8 @@ let clamp_selection filtered idx =
 
 let load_services () = Data.load_service_states ()
 
+let load_services_fresh () = Data.load_service_states ~detail:false ()
+
 let init_state filter =
   let services = load_services () in
   let filtered = apply_filter filter services in
@@ -75,7 +77,7 @@ let init_state filter =
   }
 
 let force_refresh state =
-  let services = load_services () in
+  let services = load_services_fresh () in
   let filtered = apply_filter state.filter services in
   let selected = clamp_selection filtered state.selected in
   {state with services; filtered; selected; last_updated = Unix.gettimeofday ()}
