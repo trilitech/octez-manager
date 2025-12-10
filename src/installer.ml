@@ -208,7 +208,7 @@ let snapshot_plan_of_request request =
             ~snapshot_kind:kind
           |> Result.map (fun res -> Tzinit_snapshot res))
 
-let snapshot_metadata_of_plan = function
+let snapshot_metadata_of_plan ~no_check = function
   | No_snapshot ->
       {
         auto = false;
@@ -223,7 +223,7 @@ let snapshot_metadata_of_plan = function
         uri = Some uri;
         network_slug = None;
         kind_slug = None;
-        no_check = false;
+        no_check;
       }
   | Tzinit_snapshot res ->
       {
@@ -231,7 +231,7 @@ let snapshot_metadata_of_plan = function
         uri = None;
         network_slug = Some res.network_slug;
         kind_slug = Some res.kind_slug;
-        no_check = false;
+        no_check;
       }
 
 let import_snapshot ~app_bin_dir ~data_dir ~snapshot_path ~no_check =
@@ -284,7 +284,7 @@ let perform_bootstrap ~plan ~(request : node_request) ~data_dir =
     ~plan
     ~app_bin_dir:request.app_bin_dir
     ~data_dir
-    ~no_check:false
+    ~no_check:request.snapshot_no_check
 
 let ensure_node_config ~app_bin_dir ~data_dir ~network ~history_mode =
   let config_path = Filename.concat data_dir "config.json" in
@@ -639,7 +639,9 @@ let install_node (request : node_request) =
       with Unix.Unix_error _ | Sys_error _ -> false
   in
   let* snapshot_plan = snapshot_plan_of_request request in
-  let snapshot_meta = snapshot_metadata_of_plan snapshot_plan in
+  let snapshot_meta =
+    snapshot_metadata_of_plan ~no_check:request.snapshot_no_check snapshot_plan
+  in
   let* () = System_user.ensure_service_account ~name:request.service_user in
   let* () =
     if Common.is_root () then

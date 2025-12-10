@@ -283,13 +283,19 @@ let install_node_cmd =
     Arg.(
       value & opt (some string) None & info ["snapshot-kind"] ~doc ~docv:"KIND")
   in
+  let snapshot_no_check =
+    let doc =
+      "Pass --no-check to octez-node snapshot import during bootstrap."
+    in
+    Arg.(value & flag & info ["snapshot-no-check"] ~doc)
+  in
   let auto_enable =
     let doc = "Disable automatic systemctl enable --now." in
     Arg.(value & flag & info ["no-enable"] ~doc)
   in
   let make instance_opt network_opt history_mode_opt data_dir rpc_addr net_addr
       service_user app_bin_dir extra_args snapshot_flag snapshot_uri
-      snapshot_kind no_enable logging_mode =
+      snapshot_kind snapshot_no_check no_enable logging_mode =
     let normalize_opt_string = function
       | Some s ->
           let trimmed = String.trim s in
@@ -381,6 +387,7 @@ let install_node_cmd =
                 logging_mode;
                 bootstrap;
                 preserve_data = false;
+                snapshot_no_check;
               }
             in
             match Installer.install_node req with
@@ -397,8 +404,8 @@ let install_node_cmd =
       ret
         (const make $ instance $ network $ history_mode_opt_term $ data_dir
        $ rpc_addr $ net_addr $ service_user $ app_bin_dir $ extra_args
-       $ snapshot_flag $ snapshot_uri $ snapshot_kind $ auto_enable
-       $ logging_mode_term))
+       $ snapshot_flag $ snapshot_uri $ snapshot_kind $ snapshot_no_check
+       $ auto_enable $ logging_mode_term))
   in
   let info =
     Cmd.info "install-node" ~doc:"Install an octez-node systemd instance"
