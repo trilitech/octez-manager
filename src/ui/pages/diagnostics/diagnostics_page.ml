@@ -155,6 +155,7 @@ let footer =
   ]
 
 let view s ~focus:_ ~size =
+  Metrics.record_render ~page:name (fun () ->
   let lines = ref [] in
   let add line = lines := line :: !lines in
 
@@ -328,7 +329,7 @@ let view s ~focus:_ ~size =
     ~size
     ~header:header_with_scroll
     ~footer
-    ~child:(fun _ -> body)
+    ~child:(fun _ -> body))
 
 let handle_modal_key s key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
