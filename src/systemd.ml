@@ -697,6 +697,7 @@ let install_refresh_timer ~instance ~frequency ~cmd ~user =
 let remove_refresh_timer ~instance =
   let service_name = refresh_unit_name instance in
   let timer_name = service_name ^ ".timer" in
+  let service_unit_name = service_name ^ ".service" in
   let service_path =
     if Common.is_root () then
       Printf.sprintf "/etc/systemd/system/%s.service" service_name
@@ -713,9 +714,11 @@ let remove_refresh_timer ~instance =
         (Filename.concat (Common.xdg_config_home ()) "systemd/user")
         (service_name ^ ".timer")
   in
-  (* Only attempt to disable timer if it exists to avoid spurious errors *)
+  (* Only attempt to disable units if their files exist to avoid spurious errors *)
   if Sys.file_exists timer_path then
     ignore (run_systemctl ["disable"; "--now"; timer_name]) ;
+  if Sys.file_exists service_path then
+    ignore (run_systemctl ["disable"; "--now"; service_unit_name]) ;
   Common.remove_path service_path ;
   Common.remove_path timer_path ;
   let _ = run_systemctl_timeout ["daemon-reload"] in
