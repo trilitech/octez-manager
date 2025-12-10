@@ -215,7 +215,7 @@ let snapshot_metadata_of_plan ~no_check = function
         uri = None;
         network_slug = None;
         kind_slug = None;
-        no_check = false;
+        no_check;
       }
   | Direct_snapshot {uri} ->
       {
