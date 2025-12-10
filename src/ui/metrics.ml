@@ -199,9 +199,8 @@ let record_render_duration_ms ~page duration_ms =
     ignore hist
 
 let mark_input_event () =
-  if is_enabled () then
-    Mutex.protect state.lock (fun () ->
-        state.last_input_ts <- Some (Unix.gettimeofday ()))
+  Mutex.protect state.lock (fun () ->
+      state.last_input_ts <- Some (Unix.gettimeofday ()))
 
 let consume_key_to_render now =
   Mutex.protect state.lock (fun () ->
@@ -212,35 +211,31 @@ let consume_key_to_render now =
           Some (now -. ts))
 
 let record_render ~page (render : unit -> 'a) : 'a =
-  if not (is_enabled ()) then render ()
-  else
-    let start = Unix.gettimeofday () in
-    Fun.protect
-      ~finally:(fun () ->
-        let finish = Unix.gettimeofday () in
-        let duration_ms = (finish -. start) *. 1000. in
-        record_render_duration_ms ~page duration_ms ;
-        match consume_key_to_render finish with
-        | Some lag -> hist_add state.key_to_render (lag *. 1000.)
-        | None -> ())
-      render
+  (* Always track render metrics in the UI, regardless of server state *)
+  let start = Unix.gettimeofday () in
+  Fun.protect
+    ~finally:(fun () ->
+      let finish = Unix.gettimeofday () in
+      let duration_ms = (finish -. start) *. 1000. in
+      record_render_duration_ms ~page duration_ms ;
+      match consume_key_to_render finish with
+      | Some lag -> hist_add state.key_to_render (lag *. 1000.)
+      | None -> ())
+    render
 
 let record_bg_enqueue ~queued_depth =
-  if is_enabled () then
-    Mutex.protect state.lock (fun () ->
-        state.bg_queue_depth <- queued_depth ;
-        state.bg_queue_max <- max state.bg_queue_max queued_depth)
+  Mutex.protect state.lock (fun () ->
+      state.bg_queue_depth <- queued_depth ;
+      state.bg_queue_max <- max state.bg_queue_max queued_depth)
 
 let record_bg_dequeue ~queued_depth ~wait_ms =
-  if is_enabled () then (
-    Mutex.protect state.lock (fun () -> state.bg_queue_depth <- queued_depth) ;
-    if wait_ms >= 0. then hist_add state.bg_wait wait_ms)
+  Mutex.protect state.lock (fun () -> state.bg_queue_depth <- queued_depth) ;
+  if wait_ms >= 0. then hist_add state.bg_wait wait_ms
 
 let record_service_status ~service ~is_active =
-  if is_enabled () then
-    Mutex.protect state.lock (fun () ->
-        let status = if is_active then Active else Inactive in
-        state.service_statuses <- Service_map.add service status state.service_statuses)
+  Mutex.protect state.lock (fun () ->
+      let status = if is_active then Active else Inactive in
+      state.service_statuses <- Service_map.add service status state.service_statuses)
 
 let metrics_text () =
   let lines = Buffer.create 1024 in
