@@ -138,4 +138,13 @@ module For_tests : sig
   val is_http_url : string -> bool
 
   val is_file_uri : string -> bool
+
+  val resolve_snapshot_download :
+    network:string ->
+    history_mode:History_mode.t ->
+    snapshot_kind:string option ->
+    (snapshot_resolution, [`Msg of string]) result
+
+  val history_mode_matches :
+    requested:History_mode.t -> snapshot_mode:string -> bool
 end

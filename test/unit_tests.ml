@@ -458,6 +458,20 @@ let installer_snapshot_metadata_variants () =
     (Some "seoulnet")
     tzinit_meta.network_slug
 
+let snapshot_base = "https://snapshots.tzinit.org"
+
+let snapshot_url network slug =
+  Printf.sprintf "%s/%s/%s.html" snapshot_base network slug
+
+let metadata_html ?(with_code = false) entries =
+  let body =
+    entries
+    |> List.map (fun (k, v) -> Printf.sprintf "<b>%s</b>: %s" k v)
+    |> String.concat "\n"
+  in
+  if with_code then Printf.sprintf "<pre><code>%s</code></pre>" body
+  else Printf.sprintf "<pre>%s</pre>" body
+
 let installer_strip_and_detect_uris () =
   Alcotest.(check bool)
     "http detection"
@@ -471,6 +485,76 @@ let installer_strip_and_detect_uris () =
     "strip"
     (Some "/tmp/foo")
     (Installer.For_tests.strip_file_uri "file:///tmp/foo")
+
+let installer_history_mode_matches () =
+  Alcotest.(check bool)
+    "rolling matches"
+    true
+    (Installer.For_tests.history_mode_matches
+       ~requested:History_mode.Rolling
+       ~snapshot_mode:"rolling") ;
+  Alcotest.(check bool)
+    "full matches case-insensitive"
+    true
+    (Installer.For_tests.history_mode_matches
+       ~requested:History_mode.Full
+       ~snapshot_mode:"Full") ;
+  Alcotest.(check bool)
+    "mismatch detected"
+    false
+    (Installer.For_tests.history_mode_matches
+       ~requested:History_mode.Rolling
+       ~snapshot_mode:"full")
+
+let installer_snapshot_history_mode_mismatch () =
+  let html =
+    metadata_html
+      [("History mode", "full"); ("HTTPS", "https://example/full.snap")]
+  in
+  let fetch url =
+    if String.ends_with ~suffix:"/mainnet/rolling.html" url then
+      Ok (200, html)
+    else Ok (404, "missing")
+  in
+  Snapshots.For_tests.with_fetch fetch (fun () ->
+      match
+        Installer.For_tests.resolve_snapshot_download
+          ~network:"mainnet"
+          ~history_mode:History_mode.Rolling
+          ~snapshot_kind:(Some "rolling")
+      with
+      | Error (`Msg msg) ->
+          Alcotest.(check bool)
+            "error mentions mismatch"
+            true
+            (string_contains ~needle:"history mode" msg
+            && string_contains ~needle:"rolling" msg
+            && string_contains ~needle:"full" msg)
+      | Ok _ -> Alcotest.fail "should reject history mode mismatch")
+
+let installer_snapshot_history_mode_match () =
+  let html =
+    metadata_html
+      [("History mode", "rolling"); ("HTTPS", "https://example/rolling.snap")]
+  in
+  let fetch url =
+    if String.ends_with ~suffix:"/mainnet/rolling.html" url then
+      Ok (200, html)
+    else Ok (404, "missing")
+  in
+  Snapshots.For_tests.with_fetch fetch (fun () ->
+      match
+        Installer.For_tests.resolve_snapshot_download
+          ~network:"mainnet"
+          ~history_mode:History_mode.Rolling
+          ~snapshot_kind:(Some "rolling")
+      with
+      | Ok res ->
+          Alcotest.(check string)
+            "download url"
+            "https://example/rolling.snap"
+            res.download_url
+      | Error (`Msg msg) -> Alcotest.failf "should accept matching mode: %s" msg)
 
 let octez_node_run_help_plain =
   {|
@@ -1154,21 +1238,7 @@ let common_run_as_self () =
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "run_as error: %s" msg
 
-let snapshot_base = "https://snapshots.tzinit.org"
-
 let snapshot_root = snapshot_base ^ "/"
-
-let snapshot_url network slug =
-  Printf.sprintf "%s/%s/%s.html" snapshot_base network slug
-
-let metadata_html ?(with_code = false) entries =
-  let body =
-    entries
-    |> List.map (fun (k, v) -> Printf.sprintf "<b>%s</b>: %s" k v)
-    |> String.concat "\n"
-  in
-  if with_code then Printf.sprintf "<pre><code>%s</code></pre>" body
-  else Printf.sprintf "<pre>%s</pre>" body
 
 let snapshots_fetch_entry_success () =
   let html =
@@ -2272,6 +2342,18 @@ let () =
             "strip + detect"
             `Quick
             installer_strip_and_detect_uris;
+          Alcotest.test_case
+            "history mode matches"
+            `Quick
+            installer_history_mode_matches;
+          Alcotest.test_case
+            "snapshot history mode mismatch"
+            `Quick
+            installer_snapshot_history_mode_mismatch;
+          Alcotest.test_case
+            "snapshot history mode match"
+            `Quick
+            installer_snapshot_history_mode_match;
           Alcotest.test_case
             "binary help parses"
             `Quick
