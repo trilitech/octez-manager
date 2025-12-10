@@ -860,6 +860,7 @@ let edit_field s =
               auto_enable = f.enable_on_boot;
               bootstrap;
               preserve_data = preserve_data = `Keep;
+              snapshot_no_check = false;
             }
           in
           let res =
