@@ -144,9 +144,9 @@ let render_latency_chart samples ~width ~height =
     else
       let series =
         [
-          Line_chart.{label = "p50"; points = p50_points; color = None};
-          Line_chart.{label = "p90"; points = p90_points; color = None};
-          Line_chart.{label = "p99"; points = p99_points; color = None};
+          Line_chart.{label = "p50"; points = p50_points; color = Some "10"};
+          Line_chart.{label = "p90"; points = p90_points; color = Some "11"};
+          Line_chart.{label = "p99"; points = p99_points; color = Some "9"};
         ]
         |> List.filter (fun (s : Line_chart.series) -> s.Line_chart.points <> [])
       in
@@ -158,7 +158,12 @@ let render_latency_chart samples ~width ~height =
           ~title:"Render Latency (ms) - p50/p90/p99"
           ()
       in
-      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false () in
+      let thresholds = [
+        Line_chart.{value = 0.0; color = "10"};   (* Green for fast *)
+        Line_chart.{value = 16.0; color = "11"};  (* Yellow for 30fps+ *)
+        Line_chart.{value = 33.0; color = "9"};   (* Red for slow *)
+      ] in
+      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false ~thresholds () in
       let chart_str = trim_chart_padding chart_str in
       
       (* Add summary with latest percentiles *)
@@ -212,8 +217,8 @@ let render_key_to_render_chart samples ~width ~height =
     else
       let series =
         [
-          Line_chart.{label = "p50"; points = p50_points; color = None};
-          Line_chart.{label = "p90"; points = p90_points; color = None};
+          Line_chart.{label = "p50"; points = p50_points; color = Some "14"};
+          Line_chart.{label = "p90"; points = p90_points; color = Some "13"};
         ]
         |> List.filter (fun (s : Line_chart.series) -> s.Line_chart.points <> [])
       in
