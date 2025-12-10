@@ -1059,10 +1059,13 @@ let remove_service ~delete_data_dir ~instance ~role =
 let purge_service ~instance ~role =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | None -> remove_service ~delete_data_dir:true ~instance ~role
+  | None ->
+      Systemd.remove_refresh_timer ~instance ;
+      remove_service ~delete_data_dir:true ~instance ~role
   | Some svc ->
       let* () = remove_service ~delete_data_dir:true ~instance ~role in
       let* () = remove_logging_artifacts svc.logging_mode in
+      Systemd.remove_refresh_timer ~instance ;
       let* remaining = Service_registry.list () in
       if
         should_drop_service_user
