@@ -43,3 +43,43 @@ val parse_addr : string -> (string * int, [> `Msg of string]) result
 
 (** Enable metrics server if [OCTEZ_MANAGER_METRICS_ADDR] is set. *)
 val maybe_start_from_env : unit -> unit
+
+(** Snapshot of all metrics at a point in time *)
+type metrics_snapshot = {
+  timestamp : float;
+  bg_queue_depth : int;
+  bg_queue_max : int;
+  services_active : int;
+  services_total : int;
+  render_p50 : float option;
+  render_p90 : float option;
+  render_p99 : float option;
+  key_to_render_p50 : float option;
+  key_to_render_p90 : float option;
+  bg_wait_p50 : float option;
+  bg_wait_p90 : float option;
+}
+
+(** Take a snapshot of current metrics state *)
+val take_snapshot : unit -> metrics_snapshot
+
+(** Get all recorded snapshots in chronological order *)
+val get_snapshots : unit -> metrics_snapshot list
+
+(** Start background recording (samples every 5 seconds) *)
+val start_recording : unit -> unit
+
+(** Stop background recording *)
+val stop_recording : unit -> unit
+
+(** Check if recording is active *)
+val is_recording : unit -> bool
+
+(** Set recording duration (number of samples to keep) *)
+val set_recording_duration : int -> unit
+
+(** Get current recording duration *)
+val get_recording_duration : unit -> int
+
+(** Clear all recorded snapshots *)
+val clear_snapshots : unit -> unit
