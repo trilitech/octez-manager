@@ -8,6 +8,7 @@
 module Widgets = Miaou_widgets_display.Widgets
 module Table_widget = Miaou_widgets_display.Table_widget
 module Keys = Miaou.Core.Keys
+module Bg = Background_runner
 open Octez_manager_lib
 open Installer_types
 open Rresult
@@ -79,7 +80,12 @@ let form_ref = ref default_form
 
 let network_cache : Teztnets.network_info list ref = ref []
 
-let snapshot_cache : (string, Snapshots.entry list) Hashtbl.t = Hashtbl.create 7
+let snapshot_cache : (string, Snapshots.entry list * float) Hashtbl.t =
+  Hashtbl.create 7
+
+let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
+
+let snapshot_cache_ttl = 300. (* seconds *)
 
 let of_rresult = function Ok v -> Ok v | Error (`Msg msg) -> Error msg
 
@@ -152,6 +158,37 @@ let fetch_snapshot_list slug =
       | Error _ -> fallback ())
   | None -> fallback ()
 
+let cache_snapshot slug entries =
+  Hashtbl.replace snapshot_cache slug (entries, Unix.gettimeofday ())
+
+let schedule_snapshot_fetch slug =
+  if not (Hashtbl.mem snapshot_inflight slug) then (
+    Hashtbl.add snapshot_inflight slug () ;
+    Bg.submit_blocking (fun () ->
+        Fun.protect
+          ~finally:(fun () -> Hashtbl.remove snapshot_inflight slug)
+          (fun () ->
+            match fetch_snapshot_list slug with
+            | Ok entries -> cache_snapshot slug entries
+            | Error msg ->
+                prerr_endline
+                  (Printf.sprintf "snapshot fetch failed for %s: %s" slug msg))))
+
+let snapshot_entries_from_cache slug =
+  match Hashtbl.find_opt snapshot_cache slug with
+  | Some (entries, ts) ->
+      if Unix.gettimeofday () -. ts > snapshot_cache_ttl then
+        schedule_snapshot_fetch slug ;
+      Some entries
+  | None ->
+      schedule_snapshot_fetch slug ;
+      None
+
+let prefetch_snapshot_list network =
+  match Snapshots.slug_of_network network with
+  | Some slug -> schedule_snapshot_fetch slug
+  | None -> ()
+
 let get_snapshot_entries network =
   match Snapshots.slug_of_network network with
   | None ->
@@ -161,14 +198,9 @@ let get_snapshot_entries network =
         Error
           (Printf.sprintf "Unable to derive a tzinit slug from '%s'." trimmed)
   | Some slug -> (
-      match Hashtbl.find_opt snapshot_cache slug with
+      match snapshot_entries_from_cache slug with
       | Some entries -> Ok (slug, entries)
-      | None -> (
-          match fetch_snapshot_list slug with
-          | Ok entries ->
-              Hashtbl.replace snapshot_cache slug entries ;
-              Ok (slug, entries)
-          | Error msg -> Error msg))
+      | None -> Error "Loading snapshot list…")
 
 type snapshot_choice =
   | Snapshot_none
@@ -533,6 +565,7 @@ let open_binary_help s =
 let init () =
   ensure_service_user_initialized () ;
   ensure_ports_initialized () ;
+  prefetch_snapshot_list !form_ref.network ;
   let service_states = Data.load_service_states () in
   {form = !form_ref; cursor = 0; next_page = None; service_states}
 
@@ -601,7 +634,8 @@ let edit_field s =
             ~to_string:format_network_choice
             ~on_select:(fun info ->
               update_form_ref (fun f ->
-                  {f with network = info.network_url; snapshot = `None})) ;
+                  {f with network = info.network_url; snapshot = `None}) ;
+              prefetch_snapshot_list info.network_url) ;
           s)
   | 2 ->
       (* History Mode *)
@@ -738,7 +772,7 @@ let edit_field s =
           | Ok (_slug, entries) ->
               base_choices @ List.map (fun e -> Snapshot_entry e) entries
           | Error msg ->
-              show_error ~title:"Snapshots" msg ;
+              Context.toast_info msg ;
               base_choices
       in
       open_choice_modal
