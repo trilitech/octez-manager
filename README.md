@@ -48,7 +48,8 @@ full:50, etc.) for a given network. When running `install-node`, pass
 `--snapshot` (or just `--snapshot-kind`) plus an optional
 `--snapshot-uri` if you want to import a specific file; otherwise the
 installer fetches the HTTPS URL advertised by tzinit for the selected
-variant. Archive history mode still requires a manual data directory
+variant. Use `--snapshot-no-check` to skip validation during snapshot
+import at bootstrap time. Archive history mode still requires a manual data directory
 bootstrap. Later on you can refresh an existing node with the same (or a
 new) snapshot via `octez-manager snapshots import --instance <name>` plus
 optional `--snapshot-uri`, `--snapshot-kind`, `--network`, and
