@@ -49,6 +49,12 @@ val run_as : user:string -> string list -> (unit, [> `Msg of string]) result
 val download_file :
   url:string -> dest_path:string -> (unit, [> `Msg of string]) result
 
+val download_file_with_progress :
+  url:string ->
+  dest_path:string ->
+  on_progress:(int -> int option -> unit) ->
+  (unit, [> `Msg of string]) result
+
 val sh_quote : string -> string
 
 val cmd_to_string : string list -> string

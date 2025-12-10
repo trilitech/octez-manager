@@ -128,15 +128,31 @@ let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
 
 type snapshot_file = {path : string; cleanup : bool}
 
-let download_snapshot_to_tmp src =
+type snapshot_progress = {
+  on_download_progress : (int -> int option -> unit) option;
+}
+
+let download_snapshot_to_tmp ?progress src =
   let tmp = Filename.temp_file "octez-manager.snapshot" ".snap" in
-  match Common.download_file ~url:src ~dest_path:tmp with
+  let res =
+    match progress with
+    | Some {on_download_progress} ->
+        Common.download_file_with_progress
+          ~url:src
+          ~dest_path:tmp
+          ~on_progress:(fun pct _ ->
+            match on_download_progress with
+            | Some f -> f pct (Some 100)
+            | None -> ())
+    | None -> Common.download_file ~url:src ~dest_path:tmp
+  in
+  match res with
   | Ok () -> Ok {path = tmp; cleanup = true}
   | Error _ as e ->
       Common.remove_path tmp ;
       e
 
-let prepare_snapshot_source src =
+let prepare_snapshot_source ?progress src =
   let trimmed = String.trim src in
   if trimmed = "" then R.error_msg "Snapshot URI is empty"
   else
@@ -145,7 +161,7 @@ let prepare_snapshot_source src =
     | None when not (is_http_url trimmed) ->
         if Sys.file_exists trimmed then Ok {path = trimmed; cleanup = false}
         else R.error_msgf "Snapshot file %s does not exist" trimmed
-    | _ -> download_snapshot_to_tmp trimmed
+    | _ -> download_snapshot_to_tmp ?progress trimmed
 
 let snapshot_plan_of_request request =
   match request.bootstrap with
@@ -196,13 +212,15 @@ let import_snapshot ~app_bin_dir ~data_dir ~snapshot_path ~no_check =
   in
   Common.run args
 
-let materialize_snapshot_plan ~plan : (snapshot_file option, R.msg) result =
+let materialize_snapshot_plan ?progress ~plan () :
+    (snapshot_file option, R.msg) result =
   match plan with
   | No_snapshot -> Ok None
   | Direct_snapshot {uri} ->
-      prepare_snapshot_source uri |> Result.map Option.some
+      prepare_snapshot_source ?progress uri |> Result.map Option.some
   | Tzinit_snapshot res ->
-      download_snapshot_to_tmp res.download_url |> Result.map Option.some
+      download_snapshot_to_tmp ?progress res.download_url
+      |> Result.map Option.some
 
 let import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check =
   import_snapshot
@@ -469,7 +487,7 @@ let import_snapshot_for_instance ~(instance : string) ?snapshot_uri
   Ok ()
 
 let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
-    ?snapshot_kind ?network ?history_mode ~no_check () =
+    ?snapshot_kind ?network ?history_mode ?on_download_progress ~no_check () =
   let* service = lookup_node_service instance in
   let history_mode =
     match history_mode with Some hm -> hm | None -> service.history_mode
@@ -483,7 +501,8 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       ~snapshot_kind_override:snapshot_kind
   in
   let no_check_flag = no_check || service.snapshot_no_check in
-  let* snapshot_file_opt = materialize_snapshot_plan ~plan in
+  let progress = {on_download_progress} in
+  let* snapshot_file_opt = materialize_snapshot_plan ~progress ~plan () in
   let identity_path = Filename.concat service.data_dir "identity.json" in
   let log_path =
     match service.logging_mode with

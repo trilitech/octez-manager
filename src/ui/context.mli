@@ -27,3 +27,12 @@ val render_toasts : cols:int -> string
 val tick_spinner : unit -> unit
 
 val render_spinner : string -> string
+
+(** Progress bar for long-running tasks *)
+val progress_start : label:string -> estimate_secs:float -> width:int -> unit
+
+val progress_finish : unit -> unit
+
+val progress_set : ?label:string -> progress:float -> unit -> unit
+
+val render_progress : cols:int -> string

@@ -91,6 +91,12 @@ let poll_boot (svc : Service.t) now =
         m.Rpc_metrics.chain_id
     | _ -> Rpc.rpc_chain_id svc
   in
+  let last_block_time =
+    match existing with
+    | Some m when Option.is_some m.Rpc_metrics.last_block_time ->
+        m.Rpc_metrics.last_block_time
+    | _ -> None
+  in
   Metrics.set
     ~instance:svc.Service.instance
     {
@@ -102,6 +108,7 @@ let poll_boot (svc : Service.t) now =
       data_size = None;
       proto;
       last_error;
+      last_block_time;
     } ;
   Context.mark_instances_dirty ()
 
@@ -160,6 +167,7 @@ let start_head_monitor (svc : Service.t) =
               data_size = None;
               proto;
               last_error;
+              last_block_time = Some now;
             } ;
           Context.mark_instances_dirty ())
     in

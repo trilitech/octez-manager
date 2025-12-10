@@ -222,6 +222,64 @@ let download_file ~url ~dest_path =
       dest_path;
     ]
 
+(* Streaming download progress using curl progress meter. We parse percent from
+   stderr lines; when parsing fails we still complete without progress ticks. *)
+let download_file_with_progress ~url ~dest_path ~on_progress =
+  append_debug_log (Printf.sprintf "DOWNLOAD_PROGRESS %s -> %s" url dest_path) ;
+  let cmd =
+    [
+      "curl";
+      "-fSL";
+      "--connect-timeout";
+      "30";
+      "--speed-limit";
+      "102400";
+      "--speed-time";
+      "60";
+      "--progress-meter";
+      url;
+      "-o";
+      dest_path;
+    ]
+  in
+  let ic, oc, ec = Unix.open_process_full (cmd_to_string cmd) [||] in
+  close_out oc ;
+  let buffer = Buffer.create 128 in
+  let input_char_opt ch = try Some (input_char ch) with End_of_file -> None in
+  let rec loop () =
+    match input_char_opt ec with
+    | None -> ()
+    | Some c ->
+        if c = '\r' || c = '\n' then (
+          let line = Buffer.contents buffer in
+          Buffer.clear buffer ;
+          (* curl progress lines often start with percent. *)
+          (try
+             let trimmed = String.trim line in
+             if String.length trimmed > 0 then
+               let tokens = String.split_on_char ' ' trimmed in
+               match tokens |> List.filter (fun s -> String.trim s <> "") with
+               | pct_str :: _ ->
+                   let pct =
+                     int_of_string_opt pct_str |> Option.value ~default:0
+                   in
+                   let pct = max 0 (min 100 pct) in
+                   on_progress pct (Some 100)
+               | _ -> ()
+           with _ -> ()) ;
+          loop ())
+        else (
+          Buffer.add_char buffer c ;
+          loop ())
+  in
+  loop () ;
+  close_in_noerr ic ;
+  close_in_noerr ec ;
+  match Unix.close_process_full (ic, oc, ec) with
+  | Unix.WEXITED 0 -> Ok ()
+  | Unix.WEXITED _ | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
+      R.error_msgf "curl download failed for %s" url
+
 let remove_path path =
   if Sys.file_exists path then try Sys.remove path with Sys_error _ -> ()
 

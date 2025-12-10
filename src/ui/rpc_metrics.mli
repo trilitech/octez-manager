@@ -7,6 +7,7 @@ type rpc_metrics = {
   data_size : string option;
   proto : string option;
   last_error : string option;
+  last_block_time : float option;
 }
 
 val set : instance:string -> rpc_metrics -> unit

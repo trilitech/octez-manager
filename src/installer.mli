@@ -1,5 +1,7 @@
 open Installer_types
 
+[@@@warning "-32"]
+
 val install_node : node_request -> (Service.t, [`Msg of string]) result
 
 val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
@@ -66,6 +68,27 @@ val add_authorized_key :
   instance:string ->
   key:string ->
   name:string option ->
+  (unit, [`Msg of string]) result
+
+val import_snapshot_for_instance :
+  instance:string ->
+  ?snapshot_uri:string ->
+  ?snapshot_kind:string ->
+  ?network:string ->
+  ?history_mode:History_mode.t ->
+  no_check:bool ->
+  unit ->
+  (unit, [`Msg of string]) result
+
+val refresh_instance_from_snapshot :
+  instance:string ->
+  ?snapshot_uri:string ->
+  ?snapshot_kind:string ->
+  ?network:string ->
+  ?history_mode:History_mode.t ->
+  ?on_download_progress:(int -> int option -> unit) ->
+  no_check:bool ->
+  unit ->
   (unit, [`Msg of string]) result
 
 module For_tests : sig

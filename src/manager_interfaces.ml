@@ -63,6 +63,7 @@ module type Tezos_node_manager = sig
     ?snapshot_kind:string ->
     ?network:string ->
     ?history_mode:History_mode.t ->
+    ?on_download_progress:(int -> int option -> unit) ->
     no_check:bool ->
     unit ->
     (unit, [`Msg of string]) result

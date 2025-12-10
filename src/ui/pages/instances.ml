@@ -166,6 +166,7 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
         chain_id;
         proto;
         last_error;
+        last_block_time;
         _;
       } ->
       let error_prefix =
@@ -187,6 +188,19 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
         | None, None, Some true -> Widgets.green "synced"
         | None, None, Some false -> Widgets.yellow "syncing"
         | None, None, None -> Widgets.dim (Context.render_spinner "")
+      in
+      let staleness =
+        match last_block_time with
+        | None -> Widgets.dim ""
+        | Some ts ->
+            let age = Unix.gettimeofday () -. ts in
+            let label =
+              if age >= 120. then Widgets.red (Printf.sprintf "Δ %.0fs" age)
+              else if age >= 30. then
+                Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
+              else Widgets.green (Printf.sprintf "Δ %.0fs" age)
+            in
+            label
       in
       let age =
         if stopped then Widgets.dim ""
@@ -224,7 +238,14 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
             if stopped then Widgets.dim s else s
       in
       let lvl_s = if stopped then Widgets.dim lvl else lvl in
-      Printf.sprintf "%s · %s · %s · %s %s" boot lvl_s proto_s chain_s age
+      Printf.sprintf
+        "%s · %s · %s · %s · %s %s"
+        boot
+        lvl_s
+        proto_s
+        chain_s
+        staleness
+        age
 
 let network_short (n : string) =
   match Snapshots.slug_of_network n with Some slug -> slug | None -> n
@@ -317,12 +338,14 @@ let run_unit_action ~verb ~instance action =
       Modal_helpers.show_error ~title msg
 
 (* Long-running actions (snapshot refresh) run asynchronously via Job_manager *)
-let run_async_action ~verb ~instance action =
+let run_async_action ?on_complete ~verb ~instance action =
   let description =
     Printf.sprintf "%s %s" (String.capitalize_ascii verb) instance
   in
   Context.toast_info (Printf.sprintf "%s: starting %s..." instance verb) ;
-  Job_manager.submit ~description (fun () ->
+  Job_manager.submit
+    ~description
+    (fun () ->
       match action () with
       | Ok () ->
           Context.toast_success (Printf.sprintf "%s: %s done" instance verb) ;
@@ -336,6 +359,12 @@ let run_async_action ~verb ~instance action =
             msg ;
           Context.mark_instances_dirty () ;
           Error (`Msg msg))
+    ~on_complete:(function
+      | Job_manager.Succeeded -> (
+          match on_complete with Some f -> f () | None -> ())
+      | Job_manager.Failed _ -> (
+          match on_complete with Some f -> f () | None -> ())
+      | _ -> ())
 
 let require_installer () =
   match
@@ -489,58 +518,78 @@ let view_logs state =
                 state)))
 
 let refresh_modal state =
-  with_service state (fun svc_state ->
-      let svc = svc_state.Service_state.service in
-      Modal_helpers.open_choice_modal
-        ~title:(Printf.sprintf "Refresh snapshot · %s" svc.Service.instance)
-        ~items:[`Auto; `AutoNoCheck; `CustomUri]
-        ~to_string:(function
-          | `Auto -> "Auto (latest tzinit snapshot)"
-          | `AutoNoCheck -> "Auto (--no-check)"
-          | `CustomUri -> "Custom URI")
-        ~on_select:(fun choice ->
-          let instance = svc.Service.instance in
-          let run_refresh ?snapshot_uri ?(no_check = false) () =
-            let now = Unix.gettimeofday () in
-            Rpc_metrics.set
-              ~instance
-              {
-                Rpc_metrics.chain_id = None;
-                head_level = None;
-                bootstrapped = None;
-                last_rpc_refresh = Some now;
-                node_version = None;
-                data_size = None;
-                proto = None;
-                last_error = None;
-              } ;
-            Context.mark_instances_dirty () ;
-            (* Stop RPC monitor while refreshing to avoid stale connections *)
-            Rpc_scheduler.stop_head_monitor instance ;
-            run_async_action ~verb:"refresh" ~instance (fun () ->
-                let* (module NM) = require_tezos_node_manager () in
-                NM.refresh_instance_from_snapshot
-                  ~instance
-                  ?snapshot_uri
-                  ~no_check
-                  ())
-          in
-          match choice with
-          | `Auto -> run_refresh ()
-          | `AutoNoCheck -> run_refresh ~no_check:true ()
-          | `CustomUri ->
-              Modal_helpers.prompt_text_modal
-                ~title:"Snapshot URI"
-                ~placeholder:(Some "file:///path/to/snapshot or https://...")
-                ~on_submit:(fun text ->
-                  let trimmed = String.trim text in
-                  if trimmed = "" then
-                    Modal_helpers.show_error
-                      ~title:"Snapshot URI"
-                      "Snapshot URI cannot be empty"
-                  else run_refresh ~snapshot_uri:trimmed ())
-                ()) ;
-      state)
+  if state.filtered = [] then (
+    Modal_helpers.show_error
+      ~title:"Refresh snapshot"
+      "Select a service first (none matches the current filter)." ;
+    state)
+  else
+    with_service state (fun svc_state ->
+        let svc = svc_state.Service_state.service in
+        Modal_helpers.open_choice_modal
+          ~title:(Printf.sprintf "Refresh snapshot · %s" svc.Service.instance)
+          ~items:[`Auto; `AutoNoCheck; `CustomUri]
+          ~to_string:(function
+            | `Auto -> "Auto (latest tzinit snapshot)"
+            | `AutoNoCheck -> "Auto (--no-check)"
+            | `CustomUri -> "Custom URI")
+          ~on_select:(fun choice ->
+            let instance = svc.Service.instance in
+            let run_refresh ?snapshot_uri ?(no_check = false) () =
+              let now = Unix.gettimeofday () in
+              Rpc_metrics.set
+                ~instance
+                {
+                  Rpc_metrics.chain_id = None;
+                  head_level = None;
+                  bootstrapped = None;
+                  last_rpc_refresh = Some now;
+                  node_version = None;
+                  data_size = None;
+                  proto = None;
+                  last_error = None;
+                  last_block_time = None;
+                } ;
+              Context.mark_instances_dirty () ;
+              (* Stop RPC monitor while refreshing to avoid stale connections *)
+              Rpc_scheduler.stop_head_monitor instance ;
+              Context.progress_start
+                ~label:"Downloading snapshot"
+                ~estimate_secs:120.
+                ~width:48 ;
+              run_async_action
+                ~verb:"refresh"
+                ~instance
+                ~on_complete:(fun () -> Context.progress_finish ())
+                (fun () ->
+                  let* (module NM) = require_tezos_node_manager () in
+                  NM.refresh_instance_from_snapshot
+                    ~instance
+                    ?snapshot_uri
+                    ~no_check
+                    ~on_download_progress:(fun pct _ ->
+                      Context.progress_set
+                        ~label:"Downloading snapshot"
+                        ~progress:(float_of_int pct /. 100.)
+                        ())
+                    ())
+            in
+            match choice with
+            | `Auto -> run_refresh ()
+            | `AutoNoCheck -> run_refresh ~no_check:true ()
+            | `CustomUri ->
+                Modal_helpers.prompt_text_modal
+                  ~title:"Snapshot URI"
+                  ~placeholder:(Some "file:///path/to/snapshot or https://...")
+                  ~on_submit:(fun text ->
+                    let trimmed = String.trim text in
+                    if trimmed = "" then
+                      Modal_helpers.show_error
+                        ~title:"Snapshot URI"
+                        "Snapshot URI cannot be empty"
+                    else run_refresh ~snapshot_uri:trimmed ())
+                  ()) ;
+        state)
 
 let instance_actions_modal state =
   with_service state (fun svc_state ->
@@ -730,6 +779,7 @@ struct
       ("c", create_menu_modal, "Create service");
       ("f", cycle_filter, "Cycle filter");
       ("b", bulk_action_modal, "Bulk actions");
+      ("r", refresh_modal, "Refresh snapshot");
       ("R", refresh_modal, "Refresh snapshot");
     ]
 
@@ -748,7 +798,7 @@ struct
       Widgets.dim (summary_line s);
     ]
 
-  let footer =
+  let footer ~cols:_ =
     [
       Widgets.dim
         "Arrows: move  Enter: actions  c: create  f: filter  b: bulk  m: menu  \
@@ -759,14 +809,22 @@ struct
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
     Context.tick_toasts () ;
-    let body = String.concat "\n" (table_lines s) in
     let cols = size.LTerm_geom.cols in
+    let progress = Context.render_progress ~cols in
+    let body =
+      let base = String.concat "\n" (table_lines s) in
+      if String.trim progress = "" then base else progress ^ "\n" ^ base
+    in
     let toast_lines = Context.render_toasts ~cols in
     let body_with_toasts =
       if String.length toast_lines > 0 then body ^ "\n" ^ toast_lines else body
     in
-    Vsection.render ~size ~header:(header s) ~footer ~child:(fun _ ->
-        body_with_toasts)
+    let footer_lines = footer ~cols in
+    Vsection.render
+      ~size
+      ~header:(header s)
+      ~footer:footer_lines
+      ~child:(fun _ -> body_with_toasts)
 
   let check_navigation s =
     match Context.consume_navigation () with
@@ -810,7 +868,7 @@ struct
         | Some (Keys.Char "f") -> cycle_filter s
         | Some (Keys.Char "b") -> bulk_action_modal s
         | Some (Keys.Char " ") -> force_refresh_cmd s
-        | Some (Keys.Char "r") -> force_refresh_cmd s
+        | Some (Keys.Char "r") -> refresh_modal s
         | Some (Keys.Char "R") -> refresh_modal s
         | Some (Keys.Char "Esc")
         | Some (Keys.Char "Escape")

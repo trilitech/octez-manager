@@ -16,7 +16,7 @@ let jobs : job list ref = ref []
 
 let next_id = ref 1
 
-let submit ~description action =
+let submit ?(on_complete = fun _ -> ()) ~description action =
   let id = !next_id in
   incr next_id ;
   let job =
@@ -36,8 +36,12 @@ let submit ~description action =
       in
       job.finished_at <- Some (Unix.gettimeofday ()) ;
       match result with
-      | Ok () -> job.status <- Succeeded
-      | Error (`Msg e) -> job.status <- Failed e)
+      | Ok () ->
+          job.status <- Succeeded ;
+          on_complete job.status
+      | Error (`Msg e) ->
+          job.status <- Failed e ;
+          on_complete job.status)
 
 let list () = !jobs
 
