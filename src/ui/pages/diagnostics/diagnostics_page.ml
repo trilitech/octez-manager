@@ -20,6 +20,7 @@ type state = {
   bg_queue_spark : Sparkline.t;
   scroll_offset : int;
   content_height : int;
+  last_visible_height : int;  (* Track terminal height *)
   next_page : string option;
 }
 
@@ -38,6 +39,7 @@ let init () =
     bg_queue_spark = Sparkline.create ~width:40 ~max_points:60 ();
     scroll_offset = 0;
     content_height = 0;
+    last_visible_height = 20;
     next_page = None;
   }
 
@@ -49,12 +51,22 @@ let refresh s =
   Sparkline.push s.bg_queue_spark (float_of_int bg_depth) ;
   {s with services = Data.load_service_states ()}
 
+(* Called to update content height - we'll calculate it in view and store via this hack *)
+let content_height_ref = ref 0
+
+let update_content_height s =
+  {s with content_height = !content_height_ref}
+
 let scroll_up s =
   {s with scroll_offset = max 0 (s.scroll_offset - 3)}
 
+let scroll_down_impl s ~max_height =
+  let max_scroll = max 0 (s.content_height - max_height) in
+  {s with scroll_offset = min max_scroll (s.scroll_offset + 3); last_visible_height = max_height}
+
+(* For keymap - uses last known visible height *)
 let scroll_down s =
-  let max_scroll = max 0 (s.content_height - 20) in
-  {s with scroll_offset = min max_scroll (s.scroll_offset + 3)}
+  scroll_down_impl s ~max_height:s.last_visible_height
 
 let move s _ = s
 
@@ -267,7 +279,7 @@ let view s ~focus:_ ~size =
 
   let all_lines = List.rev !lines in
   let content_height = List.length all_lines in
-  let s = {s with content_height} in
+  content_height_ref := content_height ;  (* Store for next state update *)
   
   (* Apply scrolling *)
   let visible_height = size.LTerm_geom.rows - 4 in (* account for header/footer *)
@@ -316,8 +328,10 @@ let handle_modal_key s key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
   s
 
-let handle_key s key ~size:_ =
+let handle_key s key ~size =
   Metrics.mark_input_event () ;
+  let s = update_content_height s in  (* Update with latest height from view *)
+  let s = {s with last_visible_height = size.LTerm_geom.rows - 4} in
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
     s)
