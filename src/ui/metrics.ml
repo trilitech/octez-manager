@@ -119,6 +119,17 @@ let state =
 
 let is_enabled () = state.enabled
 
+let get_bg_queue_depth () = state.bg_queue_depth
+
+let get_bg_queue_max () = state.bg_queue_max
+
+let get_service_statuses () =
+  Mutex.protect state.lock (fun () ->
+      Service_map.bindings state.service_statuses
+      |> List.map (fun (name, status) ->
+             let is_active = match status with Active -> true | Inactive -> false in
+             (name, is_active)))
+
 let record_render_duration_ms ~page duration_ms =
   if not (is_enabled ()) then ()
   else
