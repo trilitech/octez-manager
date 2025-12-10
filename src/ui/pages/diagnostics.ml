@@ -13,6 +13,9 @@ open Octez_manager_lib
 
 let name = "diagnostics"
 
+(* Persistent address state *)
+let metrics_addr_ref = ref "0.0.0.0:3010"
+
 type state = {
   services : Data.Service_state.t list;
   bg_queue_spark : Sparkline.t;
@@ -22,6 +25,13 @@ type state = {
 type msg = unit
 
 let init () =
+  (* Check if metrics is already running from env *)
+  (match Metrics.get_server_info () with
+   | Some (addr, port) -> metrics_addr_ref := Printf.sprintf "%s:%d" addr port
+   | None -> (
+       match Sys.getenv_opt "OCTEZ_MANAGER_METRICS_ADDR" with
+       | Some addr -> metrics_addr_ref := addr
+       | None -> ())) ;
   {
     services = Data.load_service_states ();
     bg_queue_spark = Sparkline.create ~width:40 ~max_points:60 ();
@@ -46,7 +56,39 @@ let service_cycle s _ = s
 
 let back s = {s with next_page = Some "__BACK__"}
 
-let keymap _ = [("Esc", back, "Back"); ("r", refresh, "Refresh")]
+let toggle_metrics s =
+  if Metrics.is_enabled () then (
+    (* Can't easily stop the server - just show message *)
+    Modal_helpers.show_error
+      ~title:"Metrics Server"
+      "Server cannot be stopped while running. Restart the app to disable." ;
+    s)
+  else
+    match Metrics.parse_addr !metrics_addr_ref with
+    | Ok (addr, port) ->
+        Metrics.start_server ~addr ~port ;
+        Context.toast_success
+          (Printf.sprintf "Metrics server started on %s:%d" addr port) ;
+        s
+    | Error (`Msg msg) ->
+        Modal_helpers.show_error ~title:"Invalid Address" msg ;
+        s
+
+let edit_metrics_addr s =
+  Modal_helpers.prompt_text_modal
+    ~title:"Metrics Server Address"
+    ~initial:!metrics_addr_ref
+    ~on_submit:(fun addr -> metrics_addr_ref := addr)
+    () ;
+  s
+
+let keymap _ =
+  [
+    ("Esc", back, "Back");
+    ("r", refresh, "Refresh");
+    ("m", toggle_metrics, "Toggle metrics");
+    ("a", edit_metrics_addr, "Edit address");
+  ]
 
 (* Format a metric value with units *)
 let format_metric value unit_str =
@@ -60,7 +102,7 @@ let header =
     Widgets.dim "Live system metrics and service status";
   ]
 
-let footer = [Widgets.dim "r: refresh  Esc: back"]
+let footer = [Widgets.dim "r: refresh  m: toggle metrics  a: edit addr  Esc: back"]
 
 let view s ~focus:_ ~size =
   let lines = ref [] in
@@ -125,27 +167,28 @@ let view s ~focus:_ ~size =
         else Widgets.fg 10 "✓ idle")) ;
 
   add "" ;
+  add (Widgets.bold "Metrics Server Configuration") ;
+  add "" ;
+  let metrics_enabled = Metrics.is_enabled () in
+  let status_icon = if metrics_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○" in
+  let status_text = if metrics_enabled then "enabled" else "disabled" in
+  add (Printf.sprintf "  Status: %s %s" status_icon status_text) ;
+  
+  (* Show current or configured address *)
+  (match Metrics.get_server_info () with
+   | Some (addr, port) ->
+       add (Printf.sprintf "  Endpoint: http://%s:%d/metrics" addr port) ;
+       add (Widgets.dim "  (server is running)")
+   | None ->
+       add (Printf.sprintf "  Address: %s" !metrics_addr_ref) ;
+       add (Widgets.dim "  (press 'm' to start, 'a' to edit address)")) ;
+
+  add "" ;
   add (Widgets.dim "  Tip: Metrics update on each refresh (press 'r')") ;
 
   add "" ;
   add (Widgets.bold "System Information") ;
   add "" ;
-  let metrics_enabled = Metrics.is_enabled () in
-  add
-    (Printf.sprintf
-       "  Metrics server: %s"
-       (if metrics_enabled then Widgets.fg 10 "enabled"
-        else Widgets.fg 8 "disabled")) ;
-  (if metrics_enabled then
-     match Sys.getenv_opt "OCTEZ_MANAGER_METRICS_ADDR" with
-     | Some addr ->
-         add (Printf.sprintf "  Metrics endpoint: http://%s/metrics" addr)
-     | None -> ()) ;
-
-  add "" ;
-  add
-    (Widgets.dim
-       "  Tip: Enable metrics server with OCTEZ_MANAGER_METRICS_ADDR=0.0.0.0:3010") ;
 
   let body = List.rev !lines |> String.concat "\n" in
   Vsection.render ~size ~header ~footer ~child:(fun _ -> body)
@@ -164,6 +207,8 @@ let handle_key s key ~size:_ =
     | Some (Keys.Char "Esc") | Some (Keys.Char "q") ->
         {s with next_page = Some "__BACK__"}
     | Some (Keys.Char "r") -> refresh s
+    | Some (Keys.Char "m") -> toggle_metrics s
+    | Some (Keys.Char "a") -> edit_metrics_addr s
     | _ -> s
 
 let next_page s = s.next_page

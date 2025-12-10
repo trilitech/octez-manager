@@ -32,5 +32,14 @@ val get_service_statuses : unit -> (string * bool) list
 (** Check if metrics collection is enabled. *)
 val is_enabled : unit -> bool
 
+(** Get current server info if running. Returns Some (addr, port) or None. *)
+val get_server_info : unit -> (string * int) option
+
+(** Start metrics server on specified address and port. *)
+val start_server : addr:string -> port:int -> unit
+
+(** Parse address string in format "host:port" or "port". *)
+val parse_addr : string -> (string * int, [> `Msg of string]) result
+
 (** Enable metrics server if [OCTEZ_MANAGER_METRICS_ADDR] is set. *)
 val maybe_start_from_env : unit -> unit

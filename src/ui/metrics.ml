@@ -102,6 +102,8 @@ type state = {
   mutable service_statuses : service_status Service_map.t;
   lock : Mutex.t;
   mutable last_input_ts : float option;
+  mutable server_addr : string option;
+  mutable server_port : int option;
 }
 
 let state =
@@ -115,9 +117,16 @@ let state =
     service_statuses = Service_map.empty;
     lock = Mutex.create ();
     last_input_ts = None;
+    server_addr = None;
+    server_port = None;
   }
 
 let is_enabled () = state.enabled
+
+let get_server_info () =
+  match (state.server_addr, state.server_port) with
+  | Some addr, Some port -> Some (addr, port)
+  | _ -> None
 
 let get_bg_queue_depth () = state.bg_queue_depth
 
@@ -334,11 +343,15 @@ let start_server ~addr ~port =
   if state.enabled then ()
   else (
     state.enabled <- true ;
+    state.server_addr <- Some addr ;
+    state.server_port <- Some port ;
     ignore
       (Domain.spawn (fun () ->
            try serve_forever ~addr ~port
            with exn ->
              state.enabled <- false ;
+             state.server_addr <- None ;
+             state.server_port <- None ;
              prerr_endline
                (Printf.sprintf
                   "metrics server stopped: %s"
