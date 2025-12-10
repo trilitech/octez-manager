@@ -144,9 +144,9 @@ let render_latency_chart samples ~width ~height =
     else
       let series =
         [
-          Line_chart.{label = "p50"; points = p50_points; color = Some "10"};
-          Line_chart.{label = "p90"; points = p90_points; color = Some "11"};
-          Line_chart.{label = "p99"; points = p99_points; color = Some "9"};
+          Line_chart.{label = "p50"; points = p50_points; color = None};
+          Line_chart.{label = "p90"; points = p90_points; color = None};
+          Line_chart.{label = "p99"; points = p99_points; color = None};
         ]
         |> List.filter (fun (s : Line_chart.series) -> s.Line_chart.points <> [])
       in
@@ -190,26 +190,36 @@ let render_summary_bars samples ~width ~height =
     Printf.sprintf "Summary (%dx%d)\n[No data available]" width height
   else
     let last = List.hd (List.rev samples) in
-    let data = [
-      ("BG Queue", float_of_int last.Metrics.bg_queue_depth, Some "12");
-      ("Active Svc", float_of_int last.services_active, Some "10");
-      ("Total Svc", float_of_int last.services_total, Some "8");
-    ] in
-    let data =
-      match last.render_p99 with
-      | Some p99 -> data @ [("Render p99", p99, Some "9")]
-      | None -> data
+    
+    (* Create a clearer summary focusing on key metrics *)
+    let lines = ref [] in
+    lines := (Widgets.fg 14 (Widgets.bold "━━━ Current Snapshot ━━━")) :: !lines;
+    lines := "" :: !lines;
+    
+    (* Services *)
+    lines := Printf.sprintf "  %s %s active / %s total"
+      (Widgets.fg 10 "Services:")
+      (Widgets.bold (string_of_int last.Metrics.services_active))
+      (string_of_int last.services_total) :: !lines;
+    
+    (* BG Queue *)
+    let bg_status = if last.bg_queue_depth = 0 then
+      Widgets.fg 10 "idle"
+    else
+      Widgets.fg 11 (Printf.sprintf "%d tasks" last.bg_queue_depth)
     in
-    let chart =
-      Bar_chart.create
-        ~width
-        ~height
-        ~data
-        ~title:"Current Metrics"
-        ()
-    in
-    Bar_chart.render chart ~show_values:true ()
-    |> trim_chart_padding
+    lines := Printf.sprintf "  %s %s" (Widgets.fg 12 "BG Queue:") bg_status :: !lines;
+    
+    (* Render Performance *)
+    (match last.render_p99 with
+    | Some p99 ->
+        let color = if p99 < 16.0 then 10 else if p99 < 33.0 then 11 else 9 in
+        lines := Printf.sprintf "  %s %s (p99)"
+          (Widgets.fg 12 "Render:")
+          (Widgets.fg color (Widgets.bold (Printf.sprintf "%.1fms" p99))) :: !lines
+    | None -> ());
+    
+    String.concat "\n" (List.rev !lines)
 
 let render_bg_queue_sparkline spark =
   if Sparkline.is_empty spark then
