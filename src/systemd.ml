@@ -715,8 +715,7 @@ let remove_refresh_timer ~instance =
   in
   (* Only attempt to disable timer if it exists to avoid spurious errors *)
   if Sys.file_exists timer_path then
-    let _ = run_systemctl ["disable"; "--now"; timer_name] in
-    () ;
+    ignore (run_systemctl ["disable"; "--now"; timer_name]) ;
   Common.remove_path service_path ;
   Common.remove_path timer_path ;
   let _ = run_systemctl_timeout ["daemon-reload"] in
