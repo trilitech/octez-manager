@@ -490,10 +490,13 @@ let ensure_user_logrotate_timer ~owner ~group ~logrotate_bin =
   run_systemctl ["enable"; "--now"; user_logrotate_unit ^ ".timer"]
 
 let disable_user_logrotate_timer () =
-  let timer = user_logrotate_unit ^ ".timer" in
-  ignore (run_systemctl ["disable"; "--now"; timer]) ;
-  ignore (run_systemctl_timeout ["daemon-reload"]) ;
-  ()
+  let timer_path = user_logrotate_timer_path () in
+  if Sys.file_exists timer_path then (
+    let timer = user_logrotate_unit ^ ".timer" in
+    ignore (run_systemctl ["disable"; "--now"; timer]) ;
+    ignore (run_systemctl_timeout ["daemon-reload"]) ;
+    ())
+  else ()
 
 let cleanup_user_logrotate_files () =
   disable_user_logrotate_timer () ;
@@ -692,7 +695,6 @@ let install_refresh_timer ~instance ~frequency ~cmd ~user =
 let remove_refresh_timer ~instance =
   let service_name = refresh_unit_name instance in
   let timer_name = service_name ^ ".timer" in
-  let _ = run_systemctl ["disable"; "--now"; timer_name] in
   let service_path =
     if Common.is_root () then
       Printf.sprintf "/etc/systemd/system/%s.service" service_name
@@ -709,6 +711,9 @@ let remove_refresh_timer ~instance =
         (Filename.concat (Common.xdg_config_home ()) "systemd/user")
         (service_name ^ ".timer")
   in
+  if Sys.file_exists timer_path then
+    let _ = run_systemctl ["disable"; "--now"; timer_name] in
+    () ;
   Common.remove_path service_path ;
   Common.remove_path timer_path ;
   let _ = run_systemctl_timeout ["daemon-reload"] in
