@@ -185,6 +185,67 @@ let render_latency_chart samples ~width ~height =
         (Widgets.fg 9 "p99:")
         (Widgets.bold p99_str)
 
+let render_key_to_render_chart samples ~width ~height =
+  if samples = [] then
+    Printf.sprintf "Key-to-Render Latency (%dx%d)\n[No data available]" width height
+  else
+    let p50_points =
+      List.mapi
+        (fun i (s : Metrics.metrics_snapshot) ->
+          match s.key_to_render_p50 with
+          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "14"}
+          | None -> None)
+        samples
+      |> List.filter_map (fun x -> x)
+    in
+    let p90_points =
+      List.mapi
+        (fun i (s : Metrics.metrics_snapshot) ->
+          match s.key_to_render_p90 with
+          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "13"}
+          | None -> None)
+        samples
+      |> List.filter_map (fun x -> x)
+    in
+    if p50_points = [] && p90_points = [] then
+      Printf.sprintf "Key-to-Render Latency (%dx%d)\n[No interaction data yet]" width height
+    else
+      let series =
+        [
+          Line_chart.{label = "p50"; points = p50_points; color = None};
+          Line_chart.{label = "p90"; points = p90_points; color = None};
+        ]
+        |> List.filter (fun (s : Line_chart.series) -> s.Line_chart.points <> [])
+      in
+      let chart =
+        Line_chart.create
+          ~width
+          ~height
+          ~series
+          ~title:"Key-to-Render Latency (ms) - Input Responsiveness"
+          ()
+      in
+      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false () in
+      let chart_str = trim_chart_padding chart_str in
+      
+      (* Add summary with latest percentiles *)
+      let last_sample = List.hd (List.rev samples) in
+      let p50_str = match last_sample.Metrics.key_to_render_p50 with
+        | Some v -> Printf.sprintf "%.1fms" v
+        | None -> "N/A"
+      in
+      let p90_str = match last_sample.Metrics.key_to_render_p90 with
+        | Some v -> Printf.sprintf "%.1fms" v
+        | None -> "N/A"
+      in
+      Printf.sprintf
+        "%s\n%s %s  %s %s"
+        chart_str
+        (Widgets.fg 14 "p50:")
+        (Widgets.bold p50_str)
+        (Widgets.fg 13 "p90:")
+        (Widgets.bold p90_str)
+
 let render_summary_bars samples ~width ~height =
   if samples = [] then
     Printf.sprintf "Summary (%dx%d)\n[No data available]" width height
