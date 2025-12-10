@@ -458,6 +458,20 @@ let installer_snapshot_metadata_variants () =
     (Some "seoulnet")
     tzinit_meta.network_slug
 
+let snapshot_base = "https://snapshots.tzinit.org"
+
+let snapshot_url network slug =
+  Printf.sprintf "%s/%s/%s.html" snapshot_base network slug
+
+let metadata_html ?(with_code = false) entries =
+  let body =
+    entries
+    |> List.map (fun (k, v) -> Printf.sprintf "<b>%s</b>: %s" k v)
+    |> String.concat "\n"
+  in
+  if with_code then Printf.sprintf "<pre><code>%s</code></pre>" body
+  else Printf.sprintf "<pre>%s</pre>" body
+
 let installer_strip_and_detect_uris () =
   Alcotest.(check bool)
     "http detection"
@@ -1224,21 +1238,7 @@ let common_run_as_self () =
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "run_as error: %s" msg
 
-let snapshot_base = "https://snapshots.tzinit.org"
-
 let snapshot_root = snapshot_base ^ "/"
-
-let snapshot_url network slug =
-  Printf.sprintf "%s/%s/%s.html" snapshot_base network slug
-
-let metadata_html ?(with_code = false) entries =
-  let body =
-    entries
-    |> List.map (fun (k, v) -> Printf.sprintf "<b>%s</b>: %s" k v)
-    |> String.concat "\n"
-  in
-  if with_code then Printf.sprintf "<pre><code>%s</code></pre>" body
-  else Printf.sprintf "<pre>%s</pre>" body
 
 let snapshots_fetch_entry_success () =
   let html =

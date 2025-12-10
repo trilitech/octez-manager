@@ -381,6 +381,35 @@ let data_dir_nonempty path =
         | _ -> true
     with _ -> false
 
+(* Check if history mode conflicts with selected snapshot *)
+let history_snapshot_conflict ~history_mode ~snapshot ~network =
+  match snapshot with
+  | `None | `Url _ -> false (* Can't validate these *)
+  | `Tzinit tz -> (
+      (* Look up the snapshot entry to get its history mode *)
+      match get_snapshot_entries network with
+      | Ok (_slug, entries) -> (
+          let entry_opt =
+            List.find_opt
+              (fun (e : Snapshots.entry) ->
+                e.network = tz.network_slug && e.slug = tz.kind_slug)
+              entries
+          in
+          match entry_opt with
+          | Some entry -> (
+              match entry.history_mode with
+              | Some snap_mode when String.trim snap_mode <> "" ->
+                  (match History_mode.of_string history_mode with
+                  | Ok requested ->
+                      not
+                        (Installer.For_tests.history_mode_matches
+                           ~requested
+                           ~snapshot_mode:snap_mode)
+                  | Error _ -> true)
+              | _ -> false (* No history mode metadata *))
+          | None -> false (* Entry not found *))
+      | Error _ -> false (* Can't fetch entries *))
+
 let pad_with_right cols left right =
   if right = "" then left
   else
@@ -911,6 +940,14 @@ let view s ~focus:_ ~size =
     is_nonempty f.service_user && service_user_valid ~user:f.service_user
   in
   let data_dir_conflict = data_dir_in_use ~states:s.service_states f.data_dir in
+  let has_history_conflict =
+    is_nonempty f.history_mode
+    && history_snapshot_conflict
+         ~history_mode:f.history_mode
+         ~snapshot:f.snapshot
+         ~network:f.network
+  in
+  let valid_history_mode = is_nonempty f.history_mode && not has_history_conflict in
   let valid_rpc =
     match parse_host_port f.rpc_addr with
     | None -> false
@@ -937,13 +974,14 @@ let view s ~focus:_ ~size =
   in
   let valid_app_bin_dir = has_octez_node_binary f.app_bin_dir in
   let valid_snapshot =
-    match f.snapshot with
+    (match f.snapshot with
     | `None -> true
     | `Url u -> is_nonempty u
-    | `Tzinit _ -> true
+    | `Tzinit _ -> true)
+    && not has_history_conflict
   in
   let all_ok =
-    valid_instance && is_nonempty f.network && is_nonempty f.history_mode
+    valid_instance && is_nonempty f.network && valid_history_mode
     && is_nonempty f.data_dir && (not data_dir_conflict) && valid_app_bin_dir
     && valid_rpc && valid_p2p && valid_service_user && valid_snapshot
   in
@@ -952,7 +990,7 @@ let view s ~focus:_ ~size =
     [
       ("Instance Name", f.instance_name, valid_instance);
       ("Network", network_value, is_nonempty f.network);
-      ("History Mode", f.history_mode, is_nonempty f.history_mode);
+      ("History Mode", f.history_mode, valid_history_mode);
       ("Data Dir", f.data_dir, is_nonempty f.data_dir && not data_dir_conflict);
       ("App Bin Dir", f.app_bin_dir, valid_app_bin_dir);
       ("RPC Address", f.rpc_addr, valid_rpc);
@@ -998,13 +1036,19 @@ let view s ~focus:_ ~size =
         [
           (not (is_nonempty f.instance_name), "Instance Name");
           (not (is_nonempty f.network), "Network");
-          (not (is_nonempty f.history_mode), "History Mode");
+           ( (not valid_history_mode),
+             (if has_history_conflict then
+                "History Mode (conflicts with snapshot)"
+              else "History Mode") );
           ((not (is_nonempty f.data_dir)) || data_dir_conflict, "Data Dir");
           (not valid_app_bin_dir, "App Bin Dir");
           (not valid_rpc, "RPC Address");
           (not valid_p2p, "P2P Address");
           (not valid_service_user, "Service User");
-          (not valid_snapshot, "Snapshot");
+           ( not valid_snapshot,
+             (if has_history_conflict then
+                "Snapshot (history mode mismatch)"
+              else "Snapshot") );
         ]
         |> List.filter fst |> List.map snd
       in
