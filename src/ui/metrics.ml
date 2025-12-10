@@ -181,22 +181,20 @@ let get_service_statuses () =
              (name, is_active)))
 
 let record_render_duration_ms ~page duration_ms =
-  if not (is_enabled ()) then ()
-  else
-    let hist =
-      Mutex.protect state.lock (fun () ->
-          let existing =
-            match Page_map.find_opt page state.render_hist with
-            | Some h -> h
-            | None ->
-                let h = make_histogram () in
-                state.render_hist <- Page_map.add page h state.render_hist ;
-                h
-          in
-          hist_add existing duration_ms ;
-          existing)
-    in
-    ignore hist
+  let hist =
+    Mutex.protect state.lock (fun () ->
+        let existing =
+          match Page_map.find_opt page state.render_hist with
+          | Some h -> h
+          | None ->
+              let h = make_histogram () in
+              state.render_hist <- Page_map.add page h state.render_hist ;
+              h
+        in
+        hist_add existing duration_ms ;
+        existing)
+  in
+  ignore hist
 
 let mark_input_event () =
   Mutex.protect state.lock (fun () ->
