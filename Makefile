@@ -1,8 +1,19 @@
-.PHONY: build test clean coverage
+.PHONY: deps deps-ci build test clean coverage
 
 OPAM_EXEC ?= opam exec --
 DUNE = $(OPAM_EXEC) dune
 BISECT = $(OPAM_EXEC) bisect-ppx-report
+
+deps:
+	opam update -y
+	opam install --deps-only --with-test --reuse-build -y .
+
+deps-ci:
+	@if [ -n "$$MIAOU_GIT_URL" ]; then \
+		echo "Pinning miaou from $$MIAOU_GIT_URL"; \
+		opam pin add -y miaou "$$MIAOU_GIT_URL" || { echo "ERROR: Failed to pin miaou package" >&2; exit 1; }; \
+	fi
+	$(MAKE) deps
 
 build:
 	$(DUNE) build
