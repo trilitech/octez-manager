@@ -42,10 +42,12 @@ let render_bg_queue_chart samples ~width ~height =
     let points =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
-          Line_chart.{x = float_of_int i; y = float_of_int s.bg_queue_depth; color = None})
+          let y = float_of_int s.bg_queue_depth in
+          let color = if y > 5.0 then Some "33" else Some "32" in (* yellow if busy, green if idle *)
+          Line_chart.{x = float_of_int i; y; color})
         samples
     in
-    let series = [Line_chart.{label = "Queue Depth"; points; color = Some "12"}] in
+    let series = [Line_chart.{label = "Queue Depth"; points; color = Some "36"}] in (* cyan series *)
     let chart =
       Line_chart.create
         ~width
@@ -84,18 +86,18 @@ let render_service_status_chart samples ~width ~height =
     let active_points =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
-          Line_chart.{x = float_of_int i; y = float_of_int s.services_active; color = Some "10"})
+          Line_chart.{x = float_of_int i; y = float_of_int s.services_active; color = Some "32"}) (* green *)
         samples
     in
     let total_points =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
-          Line_chart.{x = float_of_int i; y = float_of_int s.services_total; color = Some "8"})
+          Line_chart.{x = float_of_int i; y = float_of_int s.services_total; color = Some "90"}) (* gray *)
         samples
     in
     let series = [
-      Line_chart.{label = "Active"; points = active_points; color = Some "10"};
-      Line_chart.{label = "Total"; points = total_points; color = Some "8"};
+      Line_chart.{label = "Active"; points = active_points; color = Some "32"}; (* green *)
+      Line_chart.{label = "Total"; points = total_points; color = Some "90"}; (* gray *)
     ] in
     let chart =
       Line_chart.create
@@ -116,7 +118,7 @@ let render_latency_chart samples ~width ~height =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.render_p50 with
-          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "10"}
+          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "32"} (* green *)
           | None -> None)
         samples
       |> List.filter_map (fun x -> x)
@@ -125,7 +127,7 @@ let render_latency_chart samples ~width ~height =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.render_p90 with
-          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "11"}
+          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "33"} (* yellow *)
           | None -> None)
         samples
       |> List.filter_map (fun x -> x)
@@ -134,7 +136,7 @@ let render_latency_chart samples ~width ~height =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.render_p99 with
-          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "9"}
+          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "31"} (* red *)
           | None -> None)
         samples
       |> List.filter_map (fun x -> x)
@@ -144,9 +146,9 @@ let render_latency_chart samples ~width ~height =
     else
       let series =
         [
-          Line_chart.{label = "p50"; points = p50_points; color = Some "10"};
-          Line_chart.{label = "p90"; points = p90_points; color = Some "11"};
-          Line_chart.{label = "p99"; points = p99_points; color = Some "9"};
+          Line_chart.{label = "p50"; points = p50_points; color = Some "32"}; (* green *)
+          Line_chart.{label = "p90"; points = p90_points; color = Some "33"}; (* yellow *)
+          Line_chart.{label = "p99"; points = p99_points; color = Some "31"}; (* red *)
         ]
         |> List.filter (fun (s : Line_chart.series) -> s.Line_chart.points <> [])
       in
@@ -159,9 +161,9 @@ let render_latency_chart samples ~width ~height =
           ()
       in
       let thresholds = [
-        Line_chart.{value = 0.0; color = "10"};   (* Green for fast *)
-        Line_chart.{value = 16.0; color = "11"};  (* Yellow for 30fps+ *)
-        Line_chart.{value = 33.0; color = "9"};   (* Red for slow *)
+        Line_chart.{value = 0.0; color = "32"};   (* Green for fast *)
+        Line_chart.{value = 16.0; color = "33"};  (* Yellow for 30fps+ *)
+        Line_chart.{value = 33.0; color = "31"};  (* Red for slow *)
       ] in
       let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false ~thresholds () in
       let chart_str = trim_chart_padding chart_str in
@@ -198,7 +200,7 @@ let render_key_to_render_chart samples ~width ~height =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.key_to_render_p50 with
-          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "14"}
+          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "36"} (* cyan *)
           | None -> None)
         samples
       |> List.filter_map (fun x -> x)
@@ -207,7 +209,7 @@ let render_key_to_render_chart samples ~width ~height =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.key_to_render_p90 with
-          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "13"}
+          | Some v -> Some Line_chart.{x = float_of_int i; y = v; color = Some "35"} (* magenta *)
           | None -> None)
         samples
       |> List.filter_map (fun x -> x)
@@ -217,8 +219,8 @@ let render_key_to_render_chart samples ~width ~height =
     else
       let series =
         [
-          Line_chart.{label = "p50"; points = p50_points; color = Some "14"};
-          Line_chart.{label = "p90"; points = p90_points; color = Some "13"};
+          Line_chart.{label = "p50"; points = p50_points; color = Some "36"}; (* cyan *)
+          Line_chart.{label = "p90"; points = p90_points; color = Some "35"}; (* magenta *)
         ]
         |> List.filter (fun (s : Line_chart.series) -> s.Line_chart.points <> [])
       in
