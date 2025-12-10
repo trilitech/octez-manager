@@ -65,6 +65,10 @@ let fetch_status ?(detail = false) service =
       | Error (`Msg msg) -> Some msg
     else None
   in
+  let is_active =
+    match status with Service_state.Running -> true | _ -> false
+  in
+  Metrics.record_service_status ~service:instance ~is_active ;
   Service_state.{service; enabled; active; status; status_text}
 
 let fetch_statuses ?detail services =

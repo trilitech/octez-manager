@@ -17,5 +17,8 @@ val record_bg_enqueue : queued_depth:int -> unit
 (** Record wait time for a background task and queue depth after dequeue. *)
 val record_bg_dequeue : queued_depth:int -> wait_ms:float -> unit
 
+(** Record service status for monitoring. *)
+val record_service_status : service:string -> is_active:bool -> unit
+
 (** Enable metrics server if [OCTEZ_MANAGER_METRICS_ADDR] is set. *)
 val maybe_start_from_env : unit -> unit
