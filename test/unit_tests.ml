@@ -1673,6 +1673,96 @@ let teztnets_fetch_json_prefers_eio () =
   | Ok body -> Alcotest.(check string) "body" "{\"nets\":[1]}" body
   | Error (`Msg msg) -> Alcotest.failf "expected eio body: %s" msg
 
+let teztnets_resolve_network_builtin () =
+  let fetch () = Error (`Msg "should not fetch") in
+  match
+    Teztnets.resolve_network_for_octez_node ~fetch "mainnet"
+  with
+  | Ok net -> Alcotest.(check string) "mainnet builtin" "mainnet" net
+  | Error (`Msg msg) -> Alcotest.failf "mainnet should be builtin: %s" msg
+
+let teztnets_resolve_network_builtin_ghostnet () =
+  let fetch () = Error (`Msg "should not fetch") in
+  match
+    Teztnets.resolve_network_for_octez_node ~fetch "ghostnet"
+  with
+  | Ok net -> Alcotest.(check string) "ghostnet builtin" "ghostnet" net
+  | Error (`Msg msg) -> Alcotest.failf "ghostnet should be builtin: %s" msg
+
+let teztnets_resolve_network_builtin_case_insensitive () =
+  let fetch () = Error (`Msg "should not fetch") in
+  match
+    Teztnets.resolve_network_for_octez_node ~fetch "Mainnet"
+  with
+  | Ok net -> Alcotest.(check string) "Mainnet lowercased" "mainnet" net
+  | Error (`Msg msg) -> Alcotest.failf "Mainnet should be lowercased: %s" msg
+
+let teztnets_resolve_network_url_passthrough () =
+  let fetch () = Error (`Msg "should not fetch") in
+  let url = "https://teztnets.com/seoulnet" in
+  match Teztnets.resolve_network_for_octez_node ~fetch url with
+  | Ok net -> Alcotest.(check string) "URL passthrough" url net
+  | Error (`Msg msg) -> Alcotest.failf "URL should pass through: %s" msg
+
+let teztnets_resolve_network_alias_lowercase () =
+  let fetch () =
+    let json =
+      "{\n\
+      \  \"nets\": [\n\
+      \    {\"humanName\": \"Seoulnet\", \"networkJsonUrl\": \
+       \"https://teztnets.com/seoulnet\"},\n\
+      \    {\"slug\": \"ghostnet\"}\n\
+      \  ]\n\
+       }"
+    in
+    Teztnets.list_networks ~fetch:(fun () -> Ok json) ()
+  in
+  match Teztnets.resolve_network_for_octez_node ~fetch "seoulnet" with
+  | Ok net ->
+      Alcotest.(check string) "seoulnet resolved" "https://teztnets.com/seoulnet" net
+  | Error (`Msg msg) -> Alcotest.failf "seoulnet should resolve: %s" msg
+
+let teztnets_resolve_network_alias_mixed_case () =
+  let fetch () =
+    let json =
+      "{\n\
+      \  \"nets\": [\n\
+      \    {\"humanName\": \"Seoulnet\", \"networkJsonUrl\": \
+       \"https://teztnets.com/seoulnet\"},\n\
+      \    {\"slug\": \"ghostnet\"}\n\
+      \  ]\n\
+       }"
+    in
+    Teztnets.list_networks ~fetch:(fun () -> Ok json) ()
+  in
+  match Teztnets.resolve_network_for_octez_node ~fetch "Seoulnet" with
+  | Ok net ->
+      Alcotest.(check string) "Seoulnet resolved" "https://teztnets.com/seoulnet" net
+  | Error (`Msg msg) -> Alcotest.failf "Seoulnet should resolve: %s" msg
+
+let teztnets_resolve_network_alias_not_found () =
+  let fetch () =
+    let json = "{\"nets\": [{\"slug\": \"ghostnet\"}]}" in
+    Teztnets.list_networks ~fetch:(fun () -> Ok json) ()
+  in
+  match Teztnets.resolve_network_for_octez_node ~fetch "unknownnet" with
+  | Ok _net -> Alcotest.fail "unknownnet should not resolve"
+  | Error (`Msg msg) ->
+      Alcotest.(check bool)
+        "error mentions unknownnet"
+        true
+        (string_contains ~needle:"unknownnet" msg)
+
+let teztnets_resolve_network_empty_string () =
+  let fetch () = Error (`Msg "should not fetch") in
+  match Teztnets.resolve_network_for_octez_node ~fetch "" with
+  | Ok _net -> Alcotest.fail "empty string should fail"
+  | Error (`Msg msg) ->
+      Alcotest.(check bool)
+        "error mentions empty"
+        true
+        (string_contains ~needle:"empty" (String.lowercase_ascii msg))
+
 let service_registry_list_empty () =
   with_fake_xdg (fun _env ->
       let services = expect_ok (Service_registry.list ()) in
@@ -2320,6 +2410,38 @@ let () =
             "parse top-level list"
             `Quick
             teztnets_parse_top_level_list;
+          Alcotest.test_case
+            "resolve builtin mainnet"
+            `Quick
+            teztnets_resolve_network_builtin;
+          Alcotest.test_case
+            "resolve builtin ghostnet"
+            `Quick
+            teztnets_resolve_network_builtin_ghostnet;
+          Alcotest.test_case
+            "resolve builtin case insensitive"
+            `Quick
+            teztnets_resolve_network_builtin_case_insensitive;
+          Alcotest.test_case
+            "resolve URL passthrough"
+            `Quick
+            teztnets_resolve_network_url_passthrough;
+          Alcotest.test_case
+            "resolve alias lowercase"
+            `Quick
+            teztnets_resolve_network_alias_lowercase;
+          Alcotest.test_case
+            "resolve alias mixed case"
+            `Quick
+            teztnets_resolve_network_alias_mixed_case;
+          Alcotest.test_case
+            "resolve alias not found"
+            `Quick
+            teztnets_resolve_network_alias_not_found;
+          Alcotest.test_case
+            "resolve empty string"
+            `Quick
+            teztnets_resolve_network_empty_string;
         ] );
       ( "logging_mode",
         [

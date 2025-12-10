@@ -212,7 +212,7 @@ let fallback_networks =
     };
     {
       alias = "seoulnet";
-      network_url = "seoulnet";
+      network_url = "https://teztnets.com/seoulnet";
       human_name = Some "Seoulnet";
       description = Some "Testnet for Seoul protocol";
       faucet_url = Some "https://faucet.seoulnet.teztnets.com";
@@ -224,7 +224,7 @@ let fallback_networks =
     };
     {
       alias = "weeklynet";
-      network_url = "weeklynet";
+      network_url = "https://teztnets.com/weeklynet";
       human_name = Some "Weeklynet";
       description = Some "Weekly ephemeral testnet";
       faucet_url = None;
@@ -249,6 +249,45 @@ let fallback_pairs =
   List.map
     (fun n -> (Option.value ~default:n.alias n.human_name, n.network_url))
     fallback_networks
+
+let is_http_url s =
+  let trimmed = String.trim s |> String.lowercase_ascii in
+  String.starts_with ~prefix:"http://" trimmed
+  || String.starts_with ~prefix:"https://" trimmed
+
+let is_builtin_network s =
+  let lower = String.lowercase_ascii (String.trim s) in
+  lower = "mainnet" || lower = "ghostnet" || lower = "sandbox"
+
+let resolve_network_for_octez_node ?(fetch = list_networks) network :
+    (string, [> Rresult.R.msg]) result =
+  let trimmed = String.trim network in
+  if trimmed = "" then R.error_msg "Network cannot be empty"
+  else if is_http_url trimmed then Ok trimmed
+  else if is_builtin_network trimmed then Ok (String.lowercase_ascii trimmed)
+  else if Sys.file_exists trimmed then Ok trimmed
+  else
+    let lower_input = String.lowercase_ascii trimmed in
+    match fetch () with
+    | Ok infos -> (
+        let match_opt =
+          List.find_opt
+            (fun (n : network_info) ->
+              String.lowercase_ascii n.alias = lower_input
+              ||
+              match n.human_name with
+              | Some hn -> String.lowercase_ascii hn = lower_input
+              | None -> false)
+            infos
+        in
+        match match_opt with
+        | Some info -> Ok info.network_url
+        | None ->
+            R.error_msgf
+              "Network '%s' not recognized. Use 'list-available-networks' to see \
+               supported networks, or provide a URL or file path."
+              network)
+    | Error _ as e -> e
 
 module For_tests = struct
   let fetch_json_with :
