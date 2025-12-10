@@ -88,6 +88,9 @@ let hist_snapshot h =
   }
 
 module Page_map = Map.Make (String)
+module Service_map = Map.Make (String)
+
+type service_status = Active | Inactive
 
 type state = {
   mutable enabled : bool;
@@ -96,6 +99,7 @@ type state = {
   bg_wait : histogram;
   mutable bg_queue_depth : int;
   mutable bg_queue_max : int;
+  mutable service_statuses : service_status Service_map.t;
   lock : Mutex.t;
   mutable last_input_ts : float option;
 }
@@ -108,6 +112,7 @@ let state =
     bg_wait = make_histogram ();
     bg_queue_depth = 0;
     bg_queue_max = 0;
+    service_statuses = Service_map.empty;
     lock = Mutex.create ();
     last_input_ts = None;
   }
@@ -169,6 +174,12 @@ let record_bg_dequeue ~queued_depth ~wait_ms =
   if is_enabled () then (
     Mutex.protect state.lock (fun () -> state.bg_queue_depth <- queued_depth) ;
     if wait_ms >= 0. then hist_add state.bg_wait wait_ms)
+
+let record_service_status ~service ~is_active =
+  if is_enabled () then
+    Mutex.protect state.lock (fun () ->
+        let status = if is_active then Active else Inactive in
+        state.service_statuses <- Service_map.add service status state.service_statuses)
 
 let metrics_text () =
   let lines = Buffer.create 1024 in
@@ -234,13 +245,33 @@ let metrics_text () =
     (Printf.sprintf "octez_manager_ui_key_to_render_ms_count %d" key_snap.count) ;
   add (Printf.sprintf "octez_manager_ui_key_to_render_ms_sum %.3f" key_snap.sum) ;
   let bg_snap = hist_snapshot state.bg_wait in
-  emit_quantile "0.50" bg_snap.p50 ;
-  emit_quantile "0.90" bg_snap.p90 ;
-  emit_quantile "0.99" bg_snap.p99 ;
+  let emit_bg_quantile q v_opt =
+    match v_opt with
+    | None -> ()
+    | Some v ->
+        add
+          (Printf.sprintf
+             "octez_manager_bg_wait_ms{quantile=\"%s\"} %.3f"
+             q
+             v)
+  in
+  emit_bg_quantile "0.50" bg_snap.p50 ;
+  emit_bg_quantile "0.90" bg_snap.p90 ;
+  emit_bg_quantile "0.99" bg_snap.p99 ;
   add (Printf.sprintf "octez_manager_bg_wait_ms_count %d" bg_snap.count) ;
   add (Printf.sprintf "octez_manager_bg_wait_ms_sum %.3f" bg_snap.sum) ;
   add (Printf.sprintf "octez_manager_bg_queue_depth %d" state.bg_queue_depth) ;
   add (Printf.sprintf "octez_manager_bg_queue_depth_max %d" state.bg_queue_max) ;
+  Service_map.iter
+    (fun service status ->
+      let value = match status with Active -> 1 | Inactive -> 0 in
+      add
+        (Printf.sprintf
+           "octez_manager_service_status{service=\"%s\",state=\"%s\"} %d"
+           service
+           (match status with Active -> "active" | Inactive -> "inactive")
+           value))
+    state.service_statuses ;
   Buffer.contents lines
 
 let serve_forever ~addr ~port =
