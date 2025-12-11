@@ -66,3 +66,5 @@ val remove_tree : string -> (unit, [> `Msg of string]) result
 val copy_file : string -> string -> (unit, [> `Msg of string]) result
 
 val is_port_in_use : int -> bool
+
+val resolve_app_bin_dir : string option -> (string, string) result

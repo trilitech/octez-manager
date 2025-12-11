@@ -390,3 +390,17 @@ let is_port_in_use (port : int) : bool =
     with
     | Ok out -> String.trim out <> ""
     | Error _ -> false
+
+(* Resolve the app binary directory from an optional override or PATH. *)
+let resolve_app_bin_dir = function
+  | Some dir when String.trim dir <> "" ->
+      if Filename.is_relative dir then
+        Error (Format.sprintf "--app-bin-dir %S must be an absolute path" dir)
+      else Ok dir
+  | _ -> (
+      match which "octez-node" with
+      | Some path -> Ok (Filename.dirname path)
+      | None ->
+          Error
+            "Unable to locate octez-node in PATH. Install Octez binaries or \
+             pass --app-bin-dir")

@@ -89,15 +89,7 @@ let slurp_file path =
     ~finally:(fun () -> close_in_noerr ic)
     (fun () -> really_input_string ic (in_channel_length ic))
 
-let resolve_app_bin_dir = function
-  | Some dir when String.trim dir <> "" -> Ok dir
-  | _ -> (
-      match Common.which "octez-node" with
-      | Some path -> Ok (Filename.dirname path)
-      | None ->
-          Error
-            "Unable to locate octez-node in PATH. Install Octez binaries or \
-             pass --app-bin-dir")
+let resolve_app_bin_dir = Common.resolve_app_bin_dir
 
 let interactive_tty =
   lazy

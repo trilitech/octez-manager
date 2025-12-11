@@ -440,11 +440,17 @@ let installer_snapshot_metadata_variants () =
     Installer.For_tests.snapshot_metadata_of_plan ~no_check:false No_snapshot
   in
   Alcotest.(check bool) "no auto" false no_meta.auto ;
-  Alcotest.(check bool) "no_check propagates for No_snapshot" false no_meta.no_check ;
+  Alcotest.(check bool)
+    "no_check propagates for No_snapshot"
+    false
+    no_meta.no_check ;
   let no_meta_with_check =
     Installer.For_tests.snapshot_metadata_of_plan ~no_check:true No_snapshot
   in
-  Alcotest.(check bool) "no_check true for No_snapshot when set" true no_meta_with_check.no_check ;
+  Alcotest.(check bool)
+    "no_check true for No_snapshot when set"
+    true
+    no_meta_with_check.no_check ;
   let direct_meta =
     Installer.For_tests.snapshot_metadata_of_plan
       ~no_check:false
@@ -478,10 +484,7 @@ let installer_snapshot_metadata_variants () =
     "network slug"
     (Some "seoulnet")
     tzinit_meta.network_slug ;
-  Alcotest.(check bool)
-    "no_check false for tzinit"
-    false
-    tzinit_meta.no_check ;
+  Alcotest.(check bool) "no_check false for tzinit" false tzinit_meta.no_check ;
   let tzinit_meta_no_check =
     Installer.For_tests.snapshot_metadata_of_plan
       ~no_check:true
@@ -551,8 +554,7 @@ let installer_snapshot_history_mode_mismatch () =
       [("History mode", "full"); ("HTTPS", "https://example/full.snap")]
   in
   let fetch url =
-    if String.ends_with ~suffix:"/mainnet/rolling.html" url then
-      Ok (200, html)
+    if String.ends_with ~suffix:"/mainnet/rolling.html" url then Ok (200, html)
     else Ok (404, "missing")
   in
   Snapshots.For_tests.with_fetch fetch (fun () ->
@@ -577,8 +579,7 @@ let installer_snapshot_history_mode_match () =
       [("History mode", "rolling"); ("HTTPS", "https://example/rolling.snap")]
   in
   let fetch url =
-    if String.ends_with ~suffix:"/mainnet/rolling.html" url then
-      Ok (200, html)
+    if String.ends_with ~suffix:"/mainnet/rolling.html" url then Ok (200, html)
     else Ok (404, "missing")
   in
   Snapshots.For_tests.with_fetch fetch (fun () ->
@@ -1199,6 +1200,29 @@ let default_role_dir_custom () =
             expected
             (Common.default_role_dir "Baker" "alpha")))
 
+let resolve_app_bin_dir_tests () =
+  (* absolute path provided *)
+  (match Common.resolve_app_bin_dir (Some "/usr/local/bin") with
+  | Ok v -> Alcotest.(check string) "abs" "/usr/local/bin" v
+  | Error m -> Alcotest.failf "unexpected error: %s" m) ;
+  (* relative path provided should error *)
+  (match Common.resolve_app_bin_dir (Some "relative/bin") with
+  | Ok _ -> Alcotest.fail "relative path should be rejected"
+  | Error _ -> ()) ;
+  (* fallback to PATH *)
+  with_temp_dir (fun tmp ->
+      let bin = Filename.concat tmp "bin" in
+      Unix.mkdir bin 0o755 ;
+      let node = Filename.concat bin "octez-node" in
+      write_exec_file node "#!/bin/sh\nexit 0\n" ;
+      let previous = Sys.getenv_opt "PATH" |> Option.value ~default:"" in
+      let new_path = if previous = "" then bin else bin ^ ":" ^ previous in
+      with_env
+        [("PATH", Some new_path)]
+          match Common.resolve_app_bin_dir None with
+          | Ok v -> Alcotest.(check string) "from PATH" bin (Filename.dirname v)
+          | Error m -> Alcotest.failf "unexpected PATH error: %s" m))
+
 let ensure_dir_path_creates () =
   let owner, group = current_user_group () in
   with_temp_dir (fun base ->
@@ -1675,25 +1699,19 @@ let teztnets_fetch_json_prefers_eio () =
 
 let teztnets_resolve_network_builtin () =
   let fetch () = Error (`Msg "should not fetch") in
-  match
-    Teztnets.resolve_network_for_octez_node ~fetch "mainnet"
-  with
+  match Teztnets.resolve_network_for_octez_node ~fetch "mainnet" with
   | Ok net -> Alcotest.(check string) "mainnet builtin" "mainnet" net
   | Error (`Msg msg) -> Alcotest.failf "mainnet should be builtin: %s" msg
 
 let teztnets_resolve_network_builtin_ghostnet () =
   let fetch () = Error (`Msg "should not fetch") in
-  match
-    Teztnets.resolve_network_for_octez_node ~fetch "ghostnet"
-  with
+  match Teztnets.resolve_network_for_octez_node ~fetch "ghostnet" with
   | Ok net -> Alcotest.(check string) "ghostnet builtin" "ghostnet" net
   | Error (`Msg msg) -> Alcotest.failf "ghostnet should be builtin: %s" msg
 
 let teztnets_resolve_network_builtin_case_insensitive () =
   let fetch () = Error (`Msg "should not fetch") in
-  match
-    Teztnets.resolve_network_for_octez_node ~fetch "Mainnet"
-  with
+  match Teztnets.resolve_network_for_octez_node ~fetch "Mainnet" with
   | Ok net -> Alcotest.(check string) "Mainnet lowercased" "mainnet" net
   | Error (`Msg msg) -> Alcotest.failf "Mainnet should be lowercased: %s" msg
 
@@ -1719,7 +1737,10 @@ let teztnets_resolve_network_alias_lowercase () =
   in
   match Teztnets.resolve_network_for_octez_node ~fetch "seoulnet" with
   | Ok net ->
-      Alcotest.(check string) "seoulnet resolved" "https://teztnets.com/seoulnet" net
+      Alcotest.(check string)
+        "seoulnet resolved"
+        "https://teztnets.com/seoulnet"
+        net
   | Error (`Msg msg) -> Alcotest.failf "seoulnet should resolve: %s" msg
 
 let teztnets_resolve_network_alias_mixed_case () =
@@ -1737,7 +1758,10 @@ let teztnets_resolve_network_alias_mixed_case () =
   in
   match Teztnets.resolve_network_for_octez_node ~fetch "Seoulnet" with
   | Ok net ->
-      Alcotest.(check string) "Seoulnet resolved" "https://teztnets.com/seoulnet" net
+      Alcotest.(check string)
+        "Seoulnet resolved"
+        "https://teztnets.com/seoulnet"
+        net
   | Error (`Msg msg) -> Alcotest.failf "Seoulnet should resolve: %s" msg
 
 let teztnets_resolve_network_alias_not_found () =
@@ -2335,6 +2359,10 @@ let () =
         [
           Alcotest.test_case "sh_quote" `Quick sh_quote_tests;
           Alcotest.test_case "cmd_to_string" `Quick cmd_to_string_tests;
+          Alcotest.test_case
+            "resolve_app_bin_dir"
+            `Quick
+            resolve_app_bin_dir_tests;
           Alcotest.test_case "run helpers" `Quick common_run_helpers;
           Alcotest.test_case "run_as self" `Quick common_run_as_self;
         ] );
