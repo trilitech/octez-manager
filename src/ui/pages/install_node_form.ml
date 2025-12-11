@@ -924,11 +924,14 @@ let edit_field s =
           in
           (* Open the progress modal *)
           let modal_state = Install_progress_modal.open_modal ~has_snapshot () in
+          (* Track if installation succeeded *)
+          let install_succeeded = ref false in
           (* Run install in background with progress callbacks *)
           Bg.submit_blocking
             ~on_complete:(fun () ->
-              (* Close modal when done *)
-              Miaou.Core.Modal_manager.close_top `Commit)
+              (* Close modal when done (unless error handler already did) *)
+              if !install_succeeded then
+                Miaou.Core.Modal_manager.close_top `Commit)
             (fun () ->
               let on_download_progress pct _ =
                 Install_progress_modal.set_download_progress modal_state pct
@@ -947,6 +950,7 @@ let edit_field s =
               in
               match res with
               | Ok _ ->
+                  install_succeeded := true ;
                   Context.mark_instances_dirty () ;
                   Context.navigate "instances"
               | Error (`Msg e) ->
