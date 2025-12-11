@@ -1219,6 +1219,7 @@ let resolve_app_bin_dir_tests () =
       let new_path = if previous = "" then bin else bin ^ ":" ^ previous in
       with_env
         [("PATH", Some new_path)]
+        (fun () ->
           match Common.resolve_app_bin_dir None with
           | Ok v -> Alcotest.(check string) "from PATH" bin (Filename.dirname v)
           | Error m -> Alcotest.failf "unexpected PATH error: %s" m))

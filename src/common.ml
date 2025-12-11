@@ -395,7 +395,15 @@ let is_port_in_use (port : int) : bool =
 let resolve_app_bin_dir = function
   | Some dir when String.trim dir <> "" ->
       if Filename.is_relative dir then
-        Error (Format.sprintf "--app-bin-dir %S must be an absolute path" dir)
+        let cwd = try Sys.getcwd () with _ -> "." in
+        let abs = Filename.concat cwd dir in
+        if Sys.file_exists abs then Ok abs
+        else
+          Error
+            (Format.sprintf
+               "--app-bin-dir %S is relative and could not be resolved to %s"
+               dir
+               abs)
       else Ok dir
   | _ -> (
       match which "octez-node" with
