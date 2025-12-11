@@ -2,7 +2,11 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val install_node : node_request -> (Service.t, [`Msg of string]) result
+val install_node :
+  ?on_download_progress:(int -> int option -> unit) ->
+  ?on_step_complete:(string -> unit) ->
+  node_request ->
+  (Service.t, [`Msg of string]) result
 
 val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
 

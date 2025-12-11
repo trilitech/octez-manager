@@ -164,6 +164,11 @@ type snapshot_progress = {
   on_download_progress : (int -> int option -> unit) option;
 }
 
+type install_progress = {
+  on_download_progress : (int -> int option -> unit) option;
+  on_step_complete : (string -> unit) option;
+}
+
 let download_snapshot_to_tmp ?progress src =
   let tmp = Filename.temp_file "octez-manager.snapshot" ".snap" in
   let res =
@@ -261,26 +266,41 @@ let import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check =
     ~snapshot_path:snapshot_file.path
     ~no_check
 
-let perform_snapshot_plan ~plan ~app_bin_dir ~data_dir ~no_check =
+let perform_snapshot_plan ?progress ~plan ~app_bin_dir ~data_dir ~no_check =
   match plan with
   | No_snapshot -> Ok ()
   | Direct_snapshot {uri} ->
-      let* snapshot_file = prepare_snapshot_source uri in
+      Option.iter (fun p -> Option.iter (fun f -> f "download") p.on_step_complete) progress ;
+      let snapshot_progress =
+        match progress with
+        | Some {on_download_progress; _} -> Some {on_download_progress}
+        | None -> None
+      in
+      let* snapshot_file = prepare_snapshot_source ?progress:snapshot_progress uri in
+      Option.iter (fun p -> Option.iter (fun f -> f "import") p.on_step_complete) progress ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
         (fun () ->
           import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check)
   | Tzinit_snapshot res ->
-      let* snapshot_file = download_snapshot_to_tmp res.download_url in
+      Option.iter (fun p -> Option.iter (fun f -> f "download") p.on_step_complete) progress ;
+      let snapshot_progress =
+        match progress with
+        | Some {on_download_progress; _} -> Some {on_download_progress}
+        | None -> None
+      in
+      let* snapshot_file = download_snapshot_to_tmp ?progress:snapshot_progress res.download_url in
+      Option.iter (fun p -> Option.iter (fun f -> f "import") p.on_step_complete) progress ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
         (fun () ->
           import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check)
 
-let perform_bootstrap ~plan ~(request : node_request) ~data_dir =
+let perform_bootstrap ?progress ~plan ~(request : node_request) ~data_dir =
   perform_snapshot_plan
+    ?progress
     ~plan
     ~app_bin_dir:request.app_bin_dir
     ~data_dir
@@ -618,7 +638,7 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       let (_ : (unit, _) result) = restore_once () in
       e
 
-let install_node (request : node_request) =
+let install_node ?on_download_progress ?on_step_complete (request : node_request) =
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
   in
@@ -645,6 +665,7 @@ let install_node (request : node_request) =
   let snapshot_meta =
     snapshot_metadata_of_plan ~no_check:request.snapshot_no_check snapshot_plan
   in
+  Option.iter (fun f -> f "setup") on_step_complete ;
   let* () = System_user.ensure_service_account ~name:request.service_user in
   let* () =
     if Common.is_root () then
@@ -685,10 +706,16 @@ let install_node (request : node_request) =
       ~network:resolved_network
       ~history_mode:request.history_mode
   in
+  let progress =
+    match (on_download_progress, on_step_complete) with
+    | None, None -> None
+    | _ -> Some {on_download_progress; on_step_complete}
+  in
   let* () =
     if request.preserve_data then Ok ()
-    else perform_bootstrap ~plan:snapshot_plan ~request ~data_dir
+    else perform_bootstrap ?progress ~plan:snapshot_plan ~request ~data_dir
   in
+  Option.iter (fun f -> f "configure") on_step_complete ;
   let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
   let service =
     Service.make
