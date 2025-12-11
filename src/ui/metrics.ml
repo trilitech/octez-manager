@@ -387,6 +387,10 @@ let start_server ~addr ~port =
     state.enabled <- true ;
     state.server_addr <- Some addr ;
     state.server_port <- Some port ;
+    (* Use Thread.create instead of Domain.spawn for I/O-bound server:
+       - Unix.accept releases runtime lock while waiting for connections
+       - No CPU parallelism needed, just concurrent I/O
+       - Simpler than domains (no cross-domain mutex issues) *)
     ignore
       (Thread.create (fun () ->
            try serve_forever ~addr ~port
@@ -551,6 +555,9 @@ let start_recording () =
   if not state.recording_enabled then (
     state.recording_enabled <- true ;
     clear_snapshots () ;
+    (* Use Thread.create for periodic snapshots:
+       - Unix.sleepf releases runtime lock during 5s sleep
+       - No parallelism needed, just periodic execution *)
     ignore (Thread.create recording_loop ()))
 
 let stop_recording () =
