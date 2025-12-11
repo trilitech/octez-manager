@@ -181,8 +181,11 @@ let get_service_statuses () =
              (name, is_active)))
 
 let record_render_duration_ms ~page duration_ms =
-  let hist =
-    Mutex.protect state.lock (fun () ->
+  (* Try to record, but don't block if lock is busy - better to skip than lag *)
+  if Mutex.try_lock state.lock then
+    Fun.protect
+      ~finally:(fun () -> Mutex.unlock state.lock)
+      (fun () ->
         let existing =
           match Page_map.find_opt page state.render_hist with
           | Some h -> h
@@ -191,22 +194,27 @@ let record_render_duration_ms ~page duration_ms =
               state.render_hist <- Page_map.add page h state.render_hist ;
               h
         in
-        hist_add existing duration_ms ;
-        existing)
-  in
-  ignore hist
+        hist_add existing duration_ms)
 
 let mark_input_event () =
-  Mutex.protect state.lock (fun () ->
-      state.last_input_ts <- Some (Unix.gettimeofday ()))
+  (* Don't block on input events *)
+  if Mutex.try_lock state.lock then
+    Fun.protect
+      ~finally:(fun () -> Mutex.unlock state.lock)
+      (fun () -> state.last_input_ts <- Some (Unix.gettimeofday ()))
 
 let consume_key_to_render now =
-  Mutex.protect state.lock (fun () ->
-      match state.last_input_ts with
-      | None -> None
-      | Some ts ->
-          state.last_input_ts <- None ;
-          Some (now -. ts))
+  (* Try to consume, but don't block *)
+  if Mutex.try_lock state.lock then
+    Fun.protect
+      ~finally:(fun () -> Mutex.unlock state.lock)
+      (fun () ->
+        match state.last_input_ts with
+        | None -> None
+        | Some ts ->
+            state.last_input_ts <- None ;
+            Some (now -. ts))
+  else None
 
 let record_render ~page (render : unit -> 'a) : 'a =
   (* Always track render metrics in the UI, regardless of server state *)
