@@ -1087,6 +1087,45 @@ let instance_term =
             "Pass --no-check to octez-node snapshot import during \
              refresh-from-new-snapshot.")
   in
+  let run_action_on_all action role delete_data_dir =
+    match Service_registry.list () with
+    | Error (`Msg msg) -> cmdliner_error msg
+    | Ok services ->
+        let failures = ref [] in
+        List.iter
+          (fun svc ->
+            let instance = svc.S.instance in
+            let result =
+              match action with
+              | Start -> Installer.start_service ~instance ~role:svc.S.role
+              | Stop -> Installer.stop_service ~instance ~role:svc.S.role
+              | Restart -> Installer.restart_service ~instance ~role:svc.S.role
+              | Remove ->
+                  Installer.remove_service ~delete_data_dir ~instance ~role:svc.S.role
+              | Purge -> Installer.purge_service ~instance ~role:svc.S.role
+              | _ -> Error (`Msg "Action not supported for 'all' instances")
+            in
+            match result with
+            | Ok () -> Format.printf "✓ %s: %s@." instance (match action with
+                | Start -> "started"
+                | Stop -> "stopped"
+                | Restart -> "restarted"
+                | Remove -> "removed"
+                | Purge -> "purged"
+                | _ -> "")
+            | Error (`Msg msg) ->
+                Format.eprintf "✗ %s: %s@." instance msg ;
+                failures := (instance, msg) :: !failures)
+          services ;
+        if !failures = [] then `Ok ()
+        else
+          let error_summary =
+            Printf.sprintf
+              "%d instance(s) failed"
+              (List.length !failures)
+          in
+          cmdliner_error error_summary
+  in
   let run instance action role delete_data_dir snapshot_uri_override
       snapshot_kind_override snapshot_network_override
       snapshot_history_mode_override snapshot_no_check =
@@ -1096,6 +1135,14 @@ let instance_term =
         cmdliner_error
           "ACTION required \
            (start|stop|restart|remove|purge|show|show-service|refresh-from-new-snapshot)"
+    | Some "all", Some action -> (
+        match action with
+        | Start | Stop | Restart | Remove | Purge ->
+            run_action_on_all action role delete_data_dir
+        | Show | Show_service | Refresh_snapshot ->
+            cmdliner_error
+              "Action not supported for 'all' instances. Use a specific \
+               instance name.")
     | Some inst, Some action -> (
         match action with
         | Start -> run_result (Installer.start_service ~instance:inst ~role)
