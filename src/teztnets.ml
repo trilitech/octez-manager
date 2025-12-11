@@ -259,8 +259,10 @@ let is_builtin_network s =
   let lower = String.lowercase_ascii (String.trim s) in
   lower = "mainnet" || lower = "ghostnet" || lower = "sandbox"
 
-let resolve_network_for_octez_node ?(fetch = list_networks) network :
-    (string, [> Rresult.R.msg]) result =
+let resolve_network_for_octez_node :
+  ?fetch:(unit -> (network_info list, [> Rresult.R.msg]) result) ->
+  string -> (string, [> Rresult.R.msg]) result =
+ fun ?(fetch = (fun () -> (list_networks () : (network_info list, [> Rresult.R.msg]) result))) network ->
   let trimmed = String.trim network in
   if trimmed = "" then R.error_msg "Network cannot be empty"
   else if is_http_url trimmed then Ok trimmed
@@ -287,7 +289,7 @@ let resolve_network_for_octez_node ?(fetch = list_networks) network :
               "Network '%s' not recognized. Use 'list-available-networks' to see \
                supported networks, or provide a URL or file path."
               network)
-    | Error _ as e -> e
+    | Error (`Msg m) -> R.error_msg m
 
 module For_tests = struct
   let fetch_json_with :
