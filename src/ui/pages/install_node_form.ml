@@ -896,6 +896,7 @@ let edit_field s =
             | `Tzinit choice ->
                 Snapshot {src = None; kind = Some choice.kind_slug}
           in
+          let has_snapshot = bootstrap <> Genesis in
           let extra_args =
             if f.extra_args = "" then []
             else
@@ -921,23 +922,37 @@ let edit_field s =
               snapshot_no_check = false;
             }
           in
-          let res =
-            let* () =
-              if Common.is_root () then
-                System_user.ensure_service_account ~name:f.service_user
-              else Ok ()
-            in
-            let* (module I) = require_package_manager () in
-            I.install_node req
-          in
-          match res with
-          | Ok _ ->
-              Context.mark_instances_dirty () ;
-              Context.navigate "instances" ;
-              s
-          | Error (`Msg e) ->
-              show_error ~title:"Installation Failed" e ;
-              s
+          (* Open the progress modal *)
+          let modal_state = Install_progress_modal.open_modal ~has_snapshot () in
+          (* Run install in background with progress callbacks *)
+          Bg.submit_blocking
+            ~on_complete:(fun () ->
+              (* Close modal when done *)
+              Miaou.Core.Modal_manager.close_top `Commit)
+            (fun () ->
+              let on_download_progress pct _ =
+                Install_progress_modal.set_download_progress modal_state pct
+              in
+              let on_step_complete step =
+                Install_progress_modal.set_step_complete modal_state step
+              in
+              let res =
+                let* () =
+                  if Common.is_root () then
+                    System_user.ensure_service_account ~name:f.service_user
+                  else Ok ()
+                in
+                let* (module I) = require_package_manager () in
+                I.install_node ~on_download_progress ~on_step_complete req
+              in
+              match res with
+              | Ok _ ->
+                  Context.mark_instances_dirty () ;
+                  Context.navigate "instances"
+              | Error (`Msg e) ->
+                  Miaou.Core.Modal_manager.close_top `Cancel ;
+                  show_error ~title:"Installation Failed" e) ;
+          s
         in
         if needs_choice then (
           open_choice_modal
