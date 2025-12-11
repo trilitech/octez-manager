@@ -85,8 +85,17 @@ let view s ~focus:_ ~size =
         in
         Printf.sprintf "  %s %s" marker label)
   in
+  (* Get current step label for progress bar *)
+  let current_label =
+    if !(s.current_step) < Array.length s.steps then
+      s.steps.(!(s.current_step)).label
+    else if Array.length s.steps > 0 then s.steps.(Array.length s.steps - 1).label
+    else "Installing..."
+  in
   (* Render progress bar *)
-  let progress_widget = Progress_widget.open_inline ~width:48 ~label:"" () in
+  let progress_widget =
+    Progress_widget.open_inline ~width:48 ~label:current_label ()
+  in
   let progress_widget =
     Progress_widget.set_progress progress_widget !(s.progress)
   in
