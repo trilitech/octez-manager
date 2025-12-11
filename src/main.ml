@@ -90,7 +90,10 @@ let slurp_file path =
     (fun () -> really_input_string ic (in_channel_length ic))
 
 let resolve_app_bin_dir = function
-  | Some dir when String.trim dir <> "" -> Ok dir
+  | Some dir when String.trim dir <> "" -> (
+      match Common.make_absolute_path dir with
+      | Ok abs_path -> Ok abs_path
+      | Error (`Msg msg) -> Error msg)
   | _ -> (
       match Common.which "octez-node" with
       | Some path -> Ok (Filename.dirname path)
