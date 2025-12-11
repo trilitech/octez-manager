@@ -56,7 +56,7 @@ let render_bg_queue_chart samples ~width ~height =
         ~title:"Background Queue Depth Over Time"
         ()
     in
-    let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false () in
+    let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false ~mode:Line_chart.Braille () in
     let chart_str = trim_chart_padding chart_str in
     
     (* Add summary *)
@@ -107,7 +107,7 @@ let render_service_status_chart samples ~width ~height =
         ~title:"Service Status Over Time"
         ()
     in
-    Line_chart.render chart ~show_axes:true ~show_grid:false ()
+    Line_chart.render chart ~show_axes:true ~show_grid:false ~mode:Line_chart.Braille ()
     |> trim_chart_padding
 
 let render_latency_chart samples ~width ~height =
@@ -165,7 +165,7 @@ let render_latency_chart samples ~width ~height =
         Line_chart.{value = 16.0; color = "33"};  (* Yellow for 30fps+ *)
         Line_chart.{value = 33.0; color = "31"};  (* Red for slow *)
       ] in
-      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false ~thresholds () in
+      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false ~thresholds ~mode:Line_chart.Braille () in
       let chart_str = trim_chart_padding chart_str in
       
       (* Add summary with latest percentiles *)
@@ -232,7 +232,7 @@ let render_key_to_render_chart samples ~width ~height =
           ~title:"Key-to-Render Latency (ms) - Input Responsiveness"
           ()
       in
-      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false () in
+      let chart_str = Line_chart.render chart ~show_axes:true ~show_grid:false ~mode:Line_chart.Braille () in
       let chart_str = trim_chart_padding chart_str in
       
       (* Add summary with latest percentiles *)
