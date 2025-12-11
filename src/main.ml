@@ -322,7 +322,7 @@ let install_node_cmd =
               | None ->
                   if is_interactive () then
                     prompt_string_with_default
-                      "Network (mainnet/ghostnet or teztnets URL)"
+                      "Network (network name, e.g. mainnet)"
                       "mainnet"
                   else "mainnet"
             in
