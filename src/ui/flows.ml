@@ -62,6 +62,7 @@ let create_node_flow ~on_success =
                         auto_enable = true;
                         preserve_data = false;
                         bootstrap;
+                        snapshot_no_check = false;
                       }
                     in
                     let res =

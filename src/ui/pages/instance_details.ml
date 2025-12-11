@@ -200,6 +200,7 @@ let apply_node_update s update_fn =
           auto_enable = true;
           bootstrap = Genesis;
           preserve_data = false;
+          snapshot_no_check = false;
         }
       in
       let req = update_fn req in
