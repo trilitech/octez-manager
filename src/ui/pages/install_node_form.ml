@@ -1180,7 +1180,7 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   let back _ = failwith "not used"
 
-  let handled_keys () = Miaou.Core.Keys.[Up; Down; Enter; Char "?"]
+  let handled_keys () = Miaou.Core.Keys.[Up; Down; Enter]
 
   let keymap (_ : state) =
     [
