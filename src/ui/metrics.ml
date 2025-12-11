@@ -416,49 +416,59 @@ let maybe_start_from_env () =
 (** Recording / Historical Snapshots *)
 
 let take_snapshot () =
-  Mutex.protect state.lock (fun () ->
-      (* Compute percentiles from histograms *)
-      let all_renders =
-        Page_map.fold
-          (fun _page hist acc -> Array.append acc (ring_values hist.ring))
-          state.render_hist
-          [||]
-      in
-      let render_p50 = percentile all_renders 0.5 in
-      let render_p90 = percentile all_renders 0.9 in
-      let render_p99 = percentile all_renders 0.99 in
-      
-      let key_vals = ring_values state.key_to_render.ring in
-      let key_to_render_p50 = percentile key_vals 0.5 in
-      let key_to_render_p90 = percentile key_vals 0.9 in
-      
-      let bg_vals = ring_values state.bg_wait.ring in
-      let bg_wait_p50 = percentile bg_vals 0.5 in
-      let bg_wait_p90 = percentile bg_vals 0.9 in
-      
-      let services_active =
-        Service_map.fold
-          (fun _name status acc ->
-            match status with Active -> acc + 1 | Inactive -> acc)
-          state.service_statuses
-          0
-      in
-      let services_total = Service_map.cardinal state.service_statuses in
-      
-      {
-        timestamp = Unix.gettimeofday ();
-        bg_queue_depth = state.bg_queue_depth;
-        bg_queue_max = state.bg_queue_max;
-        services_active;
-        services_total;
-        render_p50;
-        render_p90;
-        render_p99;
-        key_to_render_p50;
-        key_to_render_p90;
-        bg_wait_p50;
-        bg_wait_p90;
-      })
+  (* CRITICAL: Hold lock only while copying data, NOT while computing percentiles!
+     Holding lock during percentile computation (which can take 10-50ms with large arrays)
+     blocks ALL page renders/key events, causing severe UI lag. *)
+  let (all_renders, key_vals, bg_vals, bg_depth, bg_max, svc_active, svc_total) =
+    Mutex.protect state.lock (fun () ->
+        (* Copy ring data (fast) *)
+        let all_renders =
+          Page_map.fold
+            (fun _page hist acc -> Array.append acc (ring_values hist.ring))
+            state.render_hist
+            [||]
+        in
+        let key_vals = ring_values state.key_to_render.ring in
+        let bg_vals = ring_values state.bg_wait.ring in
+        
+        let services_active =
+          Service_map.fold
+            (fun _name status acc ->
+              match status with Active -> acc + 1 | Inactive -> acc)
+            state.service_statuses
+            0
+        in
+        let services_total = Service_map.cardinal state.service_statuses in
+        
+        (all_renders, key_vals, bg_vals, state.bg_queue_depth, state.bg_queue_max,
+         services_active, services_total))
+  in
+  
+  (* Compute percentiles WITHOUT holding lock (allows UI to remain responsive) *)
+  let render_p50 = percentile all_renders 0.5 in
+  let render_p90 = percentile all_renders 0.9 in
+  let render_p99 = percentile all_renders 0.99 in
+  
+  let key_to_render_p50 = percentile key_vals 0.5 in
+  let key_to_render_p90 = percentile key_vals 0.9 in
+  
+  let bg_wait_p50 = percentile bg_vals 0.5 in
+  let bg_wait_p90 = percentile bg_vals 0.9 in
+  
+  {
+    timestamp = Unix.gettimeofday ();
+    bg_queue_depth = bg_depth;
+    bg_queue_max = bg_max;
+    services_active = svc_active;
+    services_total = svc_total;
+    render_p50;
+    render_p90;
+    render_p99;
+    key_to_render_p50;
+    key_to_render_p90;
+    bg_wait_p50;
+    bg_wait_p90;
+  }
 
 let add_snapshot snapshot =
   Mutex.protect state.lock (fun () ->
