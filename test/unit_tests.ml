@@ -1260,6 +1260,62 @@ let remove_tree_missing () =
       let () = expect_ok (Common.remove_tree missing) in
       Alcotest.(check bool) "still missing" false (Sys.file_exists missing))
 
+let make_absolute_path_already_absolute () =
+  let abs_path = "/usr/bin" in
+  match Common.make_absolute_path abs_path with
+  | Ok path -> Alcotest.(check string) "unchanged" abs_path path
+  | Error (`Msg msg) -> Alcotest.failf "absolute path failed: %s" msg
+
+let make_absolute_path_relative_current () =
+  with_temp_dir (fun base ->
+      let original_cwd = Sys.getcwd () in
+      Fun.protect
+        ~finally:(fun () -> Sys.chdir original_cwd)
+        (fun () ->
+          Sys.chdir base ;
+          let subdir = "testdir" in
+          Unix.mkdir subdir 0o755 ;
+          match Common.make_absolute_path subdir with
+          | Ok path ->
+              Alcotest.(check bool)
+                "is absolute"
+                true
+                (not (Filename.is_relative path)) ;
+              Alcotest.(check bool)
+                "contains testdir"
+                true
+                (String.ends_with ~suffix:"testdir" path)
+          | Error (`Msg msg) -> Alcotest.failf "relative path failed: %s" msg))
+
+let make_absolute_path_with_parent () =
+  with_temp_dir (fun base ->
+      let original_cwd = Sys.getcwd () in
+      Fun.protect
+        ~finally:(fun () -> Sys.chdir original_cwd)
+        (fun () ->
+          let subdir = Filename.concat base "subdir" in
+          Unix.mkdir subdir 0o755 ;
+          Sys.chdir subdir ;
+          match Common.make_absolute_path ".." with
+          | Ok path ->
+              Alcotest.(check bool)
+                "is absolute"
+                true
+                (not (Filename.is_relative path)) ;
+              (* The resolved path should be the base directory *)
+              Alcotest.(check string) "resolved to base" base path
+          | Error (`Msg msg) -> Alcotest.failf "../ path failed: %s" msg))
+
+let make_absolute_path_empty_string () =
+  match Common.make_absolute_path "" with
+  | Ok _ -> Alcotest.fail "empty string should fail"
+  | Error _ -> ()
+
+let make_absolute_path_whitespace_only () =
+  match Common.make_absolute_path "   " with
+  | Ok _ -> Alcotest.fail "whitespace-only string should fail"
+  | Error _ -> ()
+
 let common_run_helpers () =
   (match Common.run ["/bin/sh"; "-c"; "exit 0"] with
   | Ok () -> ()
@@ -2330,6 +2386,26 @@ let () =
           Alcotest.test_case "remove file" `Quick remove_tree_file;
           Alcotest.test_case "remove directory" `Quick remove_tree_directory;
           Alcotest.test_case "remove missing" `Quick remove_tree_missing;
+          Alcotest.test_case
+            "make_absolute_path absolute"
+            `Quick
+            make_absolute_path_already_absolute;
+          Alcotest.test_case
+            "make_absolute_path relative"
+            `Quick
+            make_absolute_path_relative_current;
+          Alcotest.test_case
+            "make_absolute_path parent"
+            `Quick
+            make_absolute_path_with_parent;
+          Alcotest.test_case
+            "make_absolute_path empty"
+            `Quick
+            make_absolute_path_empty_string;
+          Alcotest.test_case
+            "make_absolute_path whitespace"
+            `Quick
+            make_absolute_path_whitespace_only;
         ] );
       ( "common.cmd",
         [
