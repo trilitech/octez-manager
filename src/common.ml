@@ -104,6 +104,16 @@ let make_absolute_path path =
         arg
   else Ok normalized
 
+(* Strict check: only accept absolute paths (must start with '/') and do not
+   attempt to resolve relative paths. Use when caller must provide an absolute
+   path rather than a path relative to the current working directory. *)
+let ensure_absolute_path path =
+  let p = String.trim path in
+  if p = "" then Error (`Msg "Path cannot be empty")
+  else if String.length p > 0 && p.[0] = '/' then Ok p
+  else Error (`Msg "Path must be an absolute path (start with '/')")
+
+
 let ensure_dir_path ~owner ~group ~mode path =
   let rec mkdir_p p =
     if p = "/" || p = "." then ()

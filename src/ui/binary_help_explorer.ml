@@ -900,20 +900,21 @@ let is_excluded_option opt ~excluded =
 
 let open_node_run_help ~app_bin_dir ~on_apply =
   let app_bin_dir = String.trim app_bin_dir in
-  if app_bin_dir = "" then
-    Modal_helpers.show_error ~title:"Node Flags" "Octez bin directory is empty"
-  else
-    let binary = Filename.concat app_bin_dir "octez-node" in
-    match load_options ~binary with
-    | Ok options ->
-        let filtered =
-          List.filter
-            (fun opt ->
-              not (is_excluded_option opt ~excluded:excluded_node_options))
-            options
-        in
-        open_modal ~title:"Node Flags" ~options:filtered ~on_apply
-    | Error (`Msg msg) -> Modal_helpers.show_error ~title:"Node Flags" msg
+  match Common.ensure_absolute_path app_bin_dir with
+  | Error (`Msg msg) ->
+      Modal_helpers.show_error ~title:"Node Flags" ("Invalid bin directory: " ^ msg)
+  | Ok abs_dir ->
+      let binary = Filename.concat abs_dir "octez-node" in
+      match load_options ~binary with
+      | Ok options ->
+          let filtered =
+            List.filter
+              (fun opt ->
+                not (is_excluded_option opt ~excluded:excluded_node_options))
+              options
+          in
+          open_modal ~title:"Node Flags" ~options:filtered ~on_apply
+      | Error (`Msg msg) -> Modal_helpers.show_error ~title:"Node Flags" msg
 
 let excluded_baker_options =
   [
@@ -1005,20 +1006,20 @@ let open_baker_run_help ~app_bin_dir ~mode ~on_apply =
     | `Local -> "Baker Flags · Local Node"
     | `Remote -> "Baker Flags · Remote Node"
   in
-  if app_bin_dir = "" then
-    Modal_helpers.show_error ~title "Octez bin directory is empty"
-  else
-    let binary = Filename.concat app_bin_dir "octez-baker" in
-    match load_baker_options ~binary ~mode with
-    | Ok options ->
-        let filtered =
-          List.filter
-            (fun opt ->
-              not (is_excluded_option opt ~excluded:excluded_baker_options))
-            options
-        in
-        open_modal ~title ~options:filtered ~on_apply
-    | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
+  match Common.ensure_absolute_path app_bin_dir with
+  | Error (`Msg msg) -> Modal_helpers.show_error ~title ("Invalid bin directory: " ^ msg)
+  | Ok abs_dir ->
+      let binary = Filename.concat abs_dir "octez-baker" in
+      match load_baker_options ~binary ~mode with
+      | Ok options ->
+          let filtered =
+            List.filter
+              (fun opt ->
+                not (is_excluded_option opt ~excluded:excluded_baker_options))
+              options
+          in
+          open_modal ~title ~options:filtered ~on_apply
+      | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
 
 module For_tests = struct
   let parse_help = parse_help_node

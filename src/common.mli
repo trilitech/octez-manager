@@ -22,6 +22,8 @@ val which : string -> string option
 
 val make_absolute_path : string -> (string, [> `Msg of string]) result
 
+val ensure_absolute_path : string -> (string, [> `Msg of string]) result
+
 val ensure_dir_path :
   owner:string ->
   group:string ->
