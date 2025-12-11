@@ -90,6 +90,20 @@ let which prog =
   in
   loop search_paths
 
+let make_absolute_path path =
+  let normalized = String.trim path in
+  if normalized = "" then Error (`Msg "Path cannot be empty")
+  else if Filename.is_relative normalized then
+    try Ok (Unix.realpath normalized)
+    with Unix.Unix_error (err, fn, arg) ->
+      R.error_msgf
+        "Failed to resolve absolute path for '%s': %s(%s, %s)"
+        normalized
+        (Unix.error_message err)
+        fn
+        arg
+  else Ok normalized
+
 let ensure_dir_path ~owner ~group ~mode path =
   let rec mkdir_p p =
     if p = "/" || p = "." then ()
