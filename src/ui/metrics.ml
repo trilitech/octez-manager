@@ -22,7 +22,8 @@ let ring_values ring =
   else
     let arr = Array.make len 0. in
     let start =
-      (ring.next + Array.length ring.data - ring.count) mod ring.count
+      (ring.next + Array.length ring.data - ring.count)
+      mod Array.length ring.data
     in
     for i = 0 to len - 1 do
       let idx = (start + i) mod Array.length ring.data in
@@ -351,6 +352,8 @@ let serve_forever ~addr ~port =
   let response_body () = Mutex.protect state.lock (fun () -> metrics_text ()) in
   let rec loop () =
     let fd, _ = Unix.accept sock in
+    let buf = Bytes.create 4096 in
+    let _ = Unix.read fd buf 0 4096 in
     let body = response_body () in
     let resp =
       Printf.sprintf
