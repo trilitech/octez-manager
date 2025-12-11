@@ -90,6 +90,13 @@ let which prog =
   in
   loop search_paths
 
+let make_absolute_path path =
+  let trimmed = String.trim path in
+  if trimmed = "" then Error (`Msg "Path cannot be empty")
+  else if Filename.is_relative trimmed then
+    Ok (Filename.concat (Sys.getcwd ()) trimmed)
+  else Ok trimmed
+
 let ensure_dir_path ~owner ~group ~mode path =
   let rec mkdir_p p =
     if p = "/" || p = "." then ()

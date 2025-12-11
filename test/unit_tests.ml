@@ -2282,6 +2282,50 @@ let rpc_scheduler_respects_min_spacing () =
   let insts = List.map fst !executed |> List.rev in
   Alcotest.(check (list string)) "order" ["node1"; "node2"] insts
 
+let make_absolute_path_absolute_stays_same () =
+  match Common.make_absolute_path "/usr/bin" with
+  | Ok path -> Alcotest.(check string) "absolute unchanged" "/usr/bin" path
+  | Error (`Msg msg) -> Alcotest.failf "unexpected error: %s" msg
+
+let make_absolute_path_relative_converted () =
+  let result = Common.make_absolute_path "bin" in
+  match result with
+  | Ok path ->
+      Alcotest.(check bool)
+        "path is absolute"
+        true
+        (not (Filename.is_relative path)) ;
+      Alcotest.(check bool)
+        "path ends with bin"
+        true
+        (String.ends_with ~suffix:"bin" path)
+  | Error (`Msg msg) -> Alcotest.failf "unexpected error: %s" msg
+
+let make_absolute_path_dotdot_relative () =
+  let result = Common.make_absolute_path "../work/bin" in
+  match result with
+  | Ok path ->
+      Alcotest.(check bool)
+        "path is absolute"
+        true
+        (not (Filename.is_relative path)) ;
+      Alcotest.(check bool)
+        "path contains work/bin"
+        true
+        (String.ends_with ~suffix:"work/bin" path)
+  | Error (`Msg msg) -> Alcotest.failf "unexpected error: %s" msg
+
+let make_absolute_path_empty_error () =
+  match Common.make_absolute_path "" with
+  | Ok _ -> Alcotest.fail "empty path should fail"
+  | Error (`Msg msg) ->
+      Alcotest.(check bool) "error mentions empty" true (String.contains msg ' ')
+
+let make_absolute_path_whitespace_error () =
+  match Common.make_absolute_path "   " with
+  | Ok _ -> Alcotest.fail "whitespace-only path should fail"
+  | Error (`Msg _) -> ()
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -2318,6 +2362,26 @@ let () =
           Alcotest.test_case "xdg config" `Quick xdg_config_custom;
           Alcotest.test_case "data dir" `Quick default_data_dir_custom;
           Alcotest.test_case "role dir" `Quick default_role_dir_custom;
+        ] );
+      ( "common.path",
+        [
+          Alcotest.test_case
+            "absolute unchanged"
+            `Quick
+            make_absolute_path_absolute_stays_same;
+          Alcotest.test_case
+            "relative converted"
+            `Quick
+            make_absolute_path_relative_converted;
+          Alcotest.test_case
+            "dotdot relative"
+            `Quick
+            make_absolute_path_dotdot_relative;
+          Alcotest.test_case "empty error" `Quick make_absolute_path_empty_error;
+          Alcotest.test_case
+            "whitespace error"
+            `Quick
+            make_absolute_path_whitespace_error;
         ] );
       ( "common.fs",
         [
