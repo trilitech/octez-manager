@@ -26,6 +26,9 @@ type state = {
   max_log_lines : int;
 }
 
+(* Global modal state ref for updates from background thread *)
+let current_modal_state : state option ref = ref None
+
 type msg = unit
 
 let create_steps has_snapshot =
@@ -150,30 +153,34 @@ let has_modal _ = true
 
 (* Public API for updating progress *)
 let set_step_complete s step_id =
+  let state = match !current_modal_state with Some st -> st | None -> s in
   Array.iteri
     (fun i step ->
       if step.id = step_id then (
         step.status <- Complete ;
-        s.current_step := i + 1 ;
-        if i + 1 < Array.length s.steps then
-          s.steps.(i + 1).status <- InProgress ;
-        s.progress := float_of_int (i + 1) /. float_of_int (Array.length s.steps)))
-    s.steps
+        state.current_step := i + 1 ;
+        if i + 1 < Array.length state.steps then
+          state.steps.(i + 1).status <- InProgress ;
+        state.progress :=
+          float_of_int (i + 1) /. float_of_int (Array.length state.steps)))
+    state.steps
 
 let set_download_progress s pct =
+  let state = match !current_modal_state with Some st -> st | None -> s in
   (* Find download step and update it *)
   Array.iteri
     (fun i step ->
       if step.id = "download" && step.status = InProgress then
         let base = float_of_int i in
-        s.progress :=
+        state.progress :=
           (base +. (Float.of_int pct /. 100.0))
-          /. float_of_int (Array.length s.steps))
-    s.steps
+          /. float_of_int (Array.length state.steps))
+    state.steps
 
 let add_log_line s line =
+  let state = match !current_modal_state with Some st -> st | None -> s in
   let trimmed = String.trim line in
-  if trimmed <> "" then s.logs := trimmed :: !(s.logs)
+  if trimmed <> "" then state.logs := trimmed :: !(state.logs)
 
 (* Open the modal *)
 let open_modal ~has_snapshot () =
@@ -216,6 +223,8 @@ let open_modal ~has_snapshot () =
   (* Mark first step as in progress *)
   if Array.length modal_state.steps > 0 then
     modal_state.steps.(0).status <- InProgress ;
+  (* Store in global ref for background thread access *)
+  current_modal_state := Some modal_state ;
   let ui : Miaou.Core.Modal_manager.ui =
     {
       title = "Installing Node";
@@ -228,5 +237,5 @@ let open_modal ~has_snapshot () =
     (module Modal)
     ~init:modal_state
     ~ui
-    ~on_close:(fun _ _ -> ()) ;
+    ~on_close:(fun _ _ -> current_modal_state := None) ;
   modal_state
