@@ -86,6 +86,8 @@ let snapshot_cache : (string, Snapshots.entry list * float) Hashtbl.t =
 
 let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
+let snapshot_cache_lock = Mutex.create ()
+
 let snapshot_cache_ttl = 300. (* seconds *)
 
 let of_rresult = function Ok v -> Ok v | Error (`Msg msg) -> Error msg
@@ -160,28 +162,38 @@ let fetch_snapshot_list slug =
   | None -> fallback ()
 
 let cache_snapshot slug entries =
-  Hashtbl.replace snapshot_cache slug (entries, Unix.gettimeofday ())
+  Mutex.protect snapshot_cache_lock (fun () ->
+      Hashtbl.replace snapshot_cache slug (entries, Unix.gettimeofday ()))
 
 let schedule_snapshot_fetch slug =
-  if not (Hashtbl.mem snapshot_inflight slug) then (
-    Hashtbl.add snapshot_inflight slug () ;
+  let should_fetch =
+    Mutex.protect snapshot_cache_lock (fun () ->
+        if not (Hashtbl.mem snapshot_inflight slug) then (
+          Hashtbl.add snapshot_inflight slug () ;
+          true)
+        else false)
+  in
+  if should_fetch then
     Bg.submit_blocking (fun () ->
         Fun.protect
-          ~finally:(fun () -> Hashtbl.remove snapshot_inflight slug)
+          ~finally:(fun () ->
+            Mutex.protect snapshot_cache_lock (fun () ->
+                Hashtbl.remove snapshot_inflight slug))
           (fun () ->
             match fetch_snapshot_list slug with
             | Ok entries -> cache_snapshot slug entries
             | Error msg ->
                 prerr_endline
-                  (Printf.sprintf "snapshot fetch failed for %s: %s" slug msg))))
+                  (Printf.sprintf "snapshot fetch failed for %s: %s" slug msg)))
 
 let snapshot_entries_from_cache slug =
-  match Hashtbl.find_opt snapshot_cache slug with
-  | Some (entries, ts) ->
-      if Unix.gettimeofday () -. ts > snapshot_cache_ttl then
-        schedule_snapshot_fetch slug ;
-      Some entries
-  | None -> None
+  Mutex.protect snapshot_cache_lock (fun () ->
+      match Hashtbl.find_opt snapshot_cache slug with
+      | Some (entries, ts) ->
+          if Unix.gettimeofday () -. ts > snapshot_cache_ttl then
+            schedule_snapshot_fetch slug ;
+          Some entries
+      | None -> None)
 
 let ensure_snapshot_entries slug =
   match snapshot_entries_from_cache slug with
