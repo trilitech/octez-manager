@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-32"]
 module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys

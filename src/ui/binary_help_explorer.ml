@@ -1,3 +1,4 @@
+[@@@ocaml.warning "-32"]
 open Rresult
 open Octez_manager_lib
 module Keys = Miaou.Core.Keys

@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-32"]
 module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
@@ -46,7 +47,7 @@ let service_cycle s _ = s
 
 let back s = {s with next_page = Some "__BACK__"}
 
-let handled_keys () = Miaou.Core.Keys.[Escape]
+let handled_keys = Miaou.Core.Keys.[Char "Esc"]
 
 let keymap _ = [("Esc", back, "Back")]
 

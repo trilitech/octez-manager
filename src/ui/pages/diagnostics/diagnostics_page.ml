@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-32"]
 module Widgets = Miaou_widgets_display.Widgets
 module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Keys = Miaou.Core.Keys
@@ -134,9 +135,9 @@ let change_duration s =
         Context.toast_info (Printf.sprintf "Recording duration set to %s" label)) ;
   s
 
-let handled_keys () =
+let handled_keys =
   Miaou.Core.Keys.
-    [Escape; Char "r"; Char "m"; Char "a"; Char "R"; Char "d"; Up; Down]
+    [Char "Esc"; Char "r"; Char "m"; Char "a"; Char "R"; Char "d"; Up; Down]
 
 let keymap _ =
   [

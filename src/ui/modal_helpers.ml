@@ -1,3 +1,4 @@
+[@@@ocaml.warning "-32"]
 module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
@@ -45,7 +46,8 @@ let open_text_modal ~title ~lines =
 
     let keymap _ = []
 
-    let handled_keys () = []
+    let handled_keys = []
+    let _ = handled_keys
 
     let handle_modal_key s key ~size =
       let key =
