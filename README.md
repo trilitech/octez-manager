@@ -89,6 +89,14 @@ prints the recorded metadata while `show-service` invokes `systemctl` to
 display the full unit (with drop-ins), enablement state, and live status
 (use `--role` for non-node daemons).
 
+To apply an action to all instances at once, use `all` as the instance name:
+```
+dune exec -- octez-manager instance all purge
+```
+This works with `start`, `stop`, `restart`, `remove`, and `purge` actions.
+Actions like `show`, `show-service`, and `refresh-from-new-snapshot` require
+a specific instance name.
+
 ## Interactive UI
 
 Octez Manager includes a terminal user interface (TUI) powered by Miaou.
