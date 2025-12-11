@@ -388,7 +388,7 @@ let start_server ~addr ~port =
     state.server_addr <- Some addr ;
     state.server_port <- Some port ;
     ignore
-      (Domain.spawn (fun () ->
+      (Thread.create (fun () ->
            try serve_forever ~addr ~port
            with exn ->
              state.enabled <- false ;
@@ -397,7 +397,7 @@ let start_server ~addr ~port =
              prerr_endline
                (Printf.sprintf
                   "metrics server stopped: %s"
-                  (Printexc.to_string exn)))))
+                  (Printexc.to_string exn))) ()))
 
 let maybe_start_from_env () =
   match Sys.getenv_opt "OCTEZ_MANAGER_METRICS_ADDR" with
@@ -551,7 +551,7 @@ let start_recording () =
   if not state.recording_enabled then (
     state.recording_enabled <- true ;
     clear_snapshots () ;
-    ignore (Domain.spawn recording_loop))
+    ignore (Thread.create recording_loop ()))
 
 let stop_recording () =
   state.recording_enabled <- false
