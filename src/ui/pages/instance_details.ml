@@ -60,6 +60,8 @@ let service_cycle s _ = s
 
 let back s = {s with next_page = Some "__BACK__"}
 
+let handled_keys () = Miaou.Core.Keys.[Escape]
+
 let keymap _ = [("Esc", back, "Back")]
 
 let header s =
@@ -333,6 +335,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let back = back
 
   let keymap = keymap
+
+  let handled_keys = handled_keys
 
   let view = view
 

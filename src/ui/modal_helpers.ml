@@ -45,6 +45,8 @@ let open_text_modal ~title ~lines =
 
     let keymap _ = []
 
+    let handled_keys () = []
+
     let handle_modal_key s key ~size =
       let key =
         match Miaou.Core.Keys.of_string key with
@@ -113,6 +115,8 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
     let back s = s
 
     let keymap _ = []
+
+    let handled_keys () = []
 
     let handle_modal_key s key ~size:_ =
       let key =
@@ -236,6 +240,8 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
       ]
       @ doc_entries
 
+    let handled_keys () = []
+
     let handle_modal_key s key ~size:_ =
       let mapped =
         match Miaou.Core.Keys.of_string key with
@@ -325,6 +331,8 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
 
     let keymap _ = []
 
+    let handled_keys () = []
+
     let handle_modal_key s key ~size:_ =
       if key = "Enter" then (
         Miaou.Core.Modal_manager.close_top `Commit ;
@@ -391,6 +399,8 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
     let back s = s
 
     let keymap _ = []
+
+    let handled_keys () = []
 
     let handle_modal_key s key ~size:_ =
       if key = "Enter" then

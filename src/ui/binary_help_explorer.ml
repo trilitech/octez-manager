@@ -553,6 +553,8 @@ let open_modal ~title ~options ~on_apply =
 
         let keymap _ = []
 
+        let handled_keys () = []
+
         let handle_modal_key s key ~size:_ =
           let mapped =
             match Keys.of_string key with
@@ -778,6 +780,9 @@ let open_modal ~title ~options ~on_apply =
     let service_cycle s _ = s
 
     let back s = s
+
+    let handled_keys () =
+      Miaou.Core.Keys.[Up; Down; Enter; Char " "; Backspace; Char "s"; Char "?"]
 
     let keymap _ =
       [

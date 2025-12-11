@@ -43,5 +43,7 @@ end) : Miaou.Core.Tui_page.PAGE_SIG with type state = P.state and type msg = P.m
 
   let keymap = P.keymap
 
+  let handled_keys = P.handled_keys
+
   let has_modal = P.has_modal
 end

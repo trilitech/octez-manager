@@ -779,6 +779,9 @@ struct
 
   let back s = s
 
+  let handled_keys () =
+    Miaou.Core.Keys.[Enter; Char "c"; Char "f"; Char "b"; Char "r"; Char "R"; Char "d"]
+
   let keymap _ =
     [
       ("Enter", activate_selection, "Open");

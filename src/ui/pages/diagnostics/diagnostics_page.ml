@@ -134,6 +134,10 @@ let change_duration s =
         Context.toast_info (Printf.sprintf "Recording duration set to %s" label)) ;
   s
 
+let handled_keys () =
+  Miaou.Core.Keys.
+    [Escape; Char "r"; Char "m"; Char "a"; Char "R"; Char "d"; Up; Down]
+
 let keymap _ =
   [
     ("Esc", back, "Back");
@@ -397,6 +401,8 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
   let back = back
 
   let keymap = keymap
+
+  let handled_keys = handled_keys
 
   let view = view
 

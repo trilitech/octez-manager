@@ -885,6 +885,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   let back _ = failwith "not used"
 
+  let handled_keys () = Miaou.Core.Keys.[Up; Down; Enter; Char "?"]
+
   let keymap (_ : state) =
     [
       ("Up", (fun s -> move s (-1)), "up");
