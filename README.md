@@ -89,13 +89,12 @@ prints the recorded metadata while `show-service` invokes `systemctl` to
 display the full unit (with drop-ins), enablement state, and live status
 (use `--role` for non-node daemons).
 
-To apply an action to all instances at once, use `all` as the instance name:
+To purge all registered instances at once, use the dedicated command:
 ```
-dune exec -- octez-manager instance all purge
+dune exec -- octez-manager purge-all
 ```
-This works with `start`, `stop`, `restart`, `remove`, and `purge` actions.
-Actions like `show`, `show-service`, and `refresh-from-new-snapshot` require
-a specific instance name.
+This iterates through all services, purging each one and reporting on any
+failures.
 
 ## Interactive UI
 
