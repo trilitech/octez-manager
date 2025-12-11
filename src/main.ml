@@ -96,9 +96,8 @@ let resolve_app_bin_dir = function
       | Some path -> Ok (Filename.dirname path)
       | None ->
           Error
-            (`Msg
-              "Unable to locate octez-node in PATH. Install Octez binaries or \
-               pass --app-bin-dir"))
+            "Unable to locate octez-node in PATH. Install Octez binaries or \
+             pass --app-bin-dir")
 
 let interactive_tty =
   lazy
@@ -304,7 +303,7 @@ let install_node_cmd =
       | None -> None
     in
     match resolve_app_bin_dir app_bin_dir with
-    | Error (`Msg msg) -> cmdliner_error msg
+    | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
         let instance_result =
           match normalize_opt_string instance_opt with
@@ -481,7 +480,7 @@ let install_baker_cmd =
   let make instance node_instance node_data_dir node_endpoint base_dir network
       delegates extra_args service_user app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
-    | Error (`Msg msg) -> cmdliner_error msg
+    | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
         let req : baker_request =
           {
@@ -583,7 +582,7 @@ let install_accuser_cmd =
   let make instance network endpoint base_dir extra_args service_user
       app_bin_dir no_enable logging_mode data_dir_opt =
     match resolve_app_bin_dir app_bin_dir with
-    | Error (`Msg msg) -> cmdliner_error msg
+    | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
         let data_dir =
           match data_dir_opt with
@@ -739,7 +738,7 @@ let install_signer_cmd =
   let make instance network base_dir address port password_file authorize_specs
       no_auth service_user app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
-    | Error (`Msg msg) -> cmdliner_error msg
+    | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
         match parse_authorize authorize_specs with
         | Error (`Msg msg) -> cmdliner_error msg
@@ -843,7 +842,7 @@ let install_dal_node_cmd =
   let make instance network data_dir_opt rpc_addr extra_args service_user
       app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
-    | Error (`Msg msg) -> cmdliner_error msg
+    | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
         let data_dir =
           match data_dir_opt with
@@ -948,7 +947,7 @@ let install_smart_rollup_node_cmd =
   let make instance network data_dir_opt rpc_addr extra_args service_user
       app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
-    | Error (`Msg msg) -> cmdliner_error msg
+    | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
         let data_dir =
           match data_dir_opt with

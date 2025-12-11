@@ -1264,7 +1264,7 @@ let make_absolute_path_already_absolute () =
   let abs_path = "/usr/bin" in
   match Common.make_absolute_path abs_path with
   | Ok path -> Alcotest.(check string) "unchanged" abs_path path
-  | Error (`Msg msg) -> Alcotest.failf "absolute path failed: %s" msg
+  | Error msg -> Alcotest.failf "absolute path failed: %s" msg
 
 let make_absolute_path_relative_current () =
   with_temp_dir (fun base ->
@@ -1285,7 +1285,7 @@ let make_absolute_path_relative_current () =
                 "contains testdir"
                 true
                 (String.ends_with ~suffix:"testdir" path)
-          | Error (`Msg msg) -> Alcotest.failf "relative path failed: %s" msg))
+          | Error msg -> Alcotest.failf "relative path failed: %s" msg))
 
 let make_absolute_path_with_parent () =
   with_temp_dir (fun base ->
@@ -1304,7 +1304,7 @@ let make_absolute_path_with_parent () =
                 (not (Filename.is_relative path)) ;
               (* The resolved path should be the base directory *)
               Alcotest.(check string) "resolved to base" base path
-          | Error (`Msg msg) -> Alcotest.failf "../ path failed: %s" msg))
+          | Error msg -> Alcotest.failf "../ path failed: %s" msg))
 
 let make_absolute_path_empty_string () =
   match Common.make_absolute_path "" with

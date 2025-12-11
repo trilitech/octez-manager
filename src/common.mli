@@ -20,7 +20,7 @@ val default_log_dir : role:string -> instance:string -> string
 
 val which : string -> string option
 
-val make_absolute_path : string -> (string, [> `Msg of string]) result
+val make_absolute_path : string -> (string, string) result
 
 val ensure_dir_path :
   owner:string ->
