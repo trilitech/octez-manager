@@ -583,8 +583,9 @@ let init () =
 let update s _ = s
 
 let refresh s =
-  ensure_service_user_initialized () ;
-  ensure_ports_initialized () ;
+  (* NOTE: Do NOT call ensure_*_initialized here - they spawn subprocesses
+     (ss/lsof for port checks) which causes severe lag when scrolling.
+     Initialization is done once in init() instead. *)
   let s = {s with form = !form_ref} in
   match Context.consume_navigation () with
   | Some p -> {s with next_page = Some p}
