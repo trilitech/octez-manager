@@ -1131,15 +1131,15 @@ let instance_term =
                  ~no_check:snapshot_no_check
                  ())
         | Show -> (
-            match Service_registry.find ~instance:inst with
+            match Service_registry.find ~instance:inst ~role with
             | Ok (Some svc) ->
                 print_service_details svc ;
                 `Ok ()
             | Ok None ->
-                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                cmdliner_error (Printf.sprintf "Unknown instance '%s' (%s)" inst role)
             | Error (`Msg msg) -> cmdliner_error msg)
         | Show_service -> (
-            match Service_registry.find ~instance:inst with
+            match Service_registry.find ~instance:inst ~role with
             | Error (`Msg msg) -> cmdliner_error msg
             | Ok svc_opt ->
                 let role =

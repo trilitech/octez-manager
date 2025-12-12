@@ -25,16 +25,16 @@ type state = {
 
 type msg = unit
 
-let load_service instance =
-  match Service_registry.find ~instance with
+let load_service instance role =
+  match Service_registry.find ~instance ~role with
   | Ok (Some svc) -> Ok svc
-  | Ok None -> Error ("Instance not found: " ^ instance)
+  | Ok None -> Error (Printf.sprintf "Instance not found: %s (%s)" instance role)
   | Error (`Msg e) -> Error e
 
 let init () =
   match Context.take_pending_instance_detail () with
-  | Some instance -> (
-      match load_service instance with
+  | Some (instance, role) -> (
+      match load_service instance role with
       | Ok service ->
           {instance; service = Some service; error = None; next_page = None}
       | Error e -> {instance; service = None; error = Some e; next_page = None})
