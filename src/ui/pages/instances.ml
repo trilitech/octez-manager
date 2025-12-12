@@ -613,7 +613,7 @@ let instance_actions_modal state =
           let role = svc.Service.role in
           match choice with
           | `Details ->
-              Context.set_pending_instance_detail instance ;
+              Context.set_pending_instance_detail instance role ;
               Context.navigate Instance_details.name
           | `Start ->
               run_unit_action ~verb:"start" ~instance (fun () ->
