@@ -1042,29 +1042,24 @@ let restart_service ~instance ~role =
 
 let remove_service ~delete_data_dir ~instance ~role =
   let* svc_opt = Service_registry.find ~instance in
-  let role = match svc_opt with Some svc -> svc.role | None -> role in
-  let data_dir =
-    match svc_opt with Some svc -> Some svc.data_dir | None -> None
-  in
-  let* () =
-    match svc_opt with
-    | Some _ -> Systemd.disable ~role ~instance ~stop_now:true
-    | None -> Ok ()
-  in
-  Systemd.remove_dropin ~role ~instance ;
-  let* () =
-    match (delete_data_dir, data_dir) with
-    | true, Some dir -> Common.remove_tree dir
-    | _ -> Ok ()
-  in
-  let* () = Service_registry.remove ~instance in
-  let* services = Service_registry.list () in
-  Systemd.sync_logrotate (logrotate_specs_of services)
+  match svc_opt with
+  | None -> Error (`Msg (Printf.sprintf "Unknown instance '%s'" instance))
+  | Some svc ->
+      let role = svc.role in
+      let data_dir = svc.data_dir in
+      let* () = Systemd.disable ~role ~instance ~stop_now:true in
+      Systemd.remove_dropin ~role ~instance ;
+      let* () =
+        if delete_data_dir then Common.remove_tree data_dir else Ok ()
+      in
+      let* () = Service_registry.remove ~instance in
+      let* services = Service_registry.list () in
+      Systemd.sync_logrotate (logrotate_specs_of services)
 
 let purge_service ~instance ~role =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | None -> remove_service ~delete_data_dir:true ~instance ~role
+  | None -> Error (`Msg (Printf.sprintf "Unknown instance '%s'" instance))
   | Some svc ->
       let* () = remove_service ~delete_data_dir:true ~instance ~role in
       let* () = remove_logging_artifacts svc.logging_mode in

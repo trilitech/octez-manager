@@ -311,6 +311,26 @@ let installer_remove_logging_artifacts_journald () =
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "journald cleanup failed: %s" msg
 
+let installer_remove_service_missing () =
+  with_fake_xdg (fun _env ->
+      match Installer.remove_service ~delete_data_dir:false ~instance:"ghost" ~role:"node" with
+      | Ok () -> Alcotest.fail "remove should fail for missing instance"
+      | Error (`Msg msg) ->
+          Alcotest.(check bool)
+            "error mentions unknown instance"
+            true
+            (string_contains ~needle:"Unknown instance" msg))
+
+let installer_purge_service_missing () =
+  with_fake_xdg (fun _env ->
+      match Installer.purge_service ~instance:"ghost" ~role:"node" with
+      | Ok () -> Alcotest.fail "purge should fail for missing instance"
+      | Error (`Msg msg) ->
+          Alcotest.(check bool)
+            "error mentions unknown instance"
+            true
+            (string_contains ~needle:"Unknown instance" msg))
+
 let installer_should_drop_service_user () =
   let mk_service ~instance ~user =
     {(sample_service ()) with Service.instance; service_user = user}
@@ -2530,6 +2550,14 @@ let () =
             "remove log journald"
             `Quick
             installer_remove_logging_artifacts_journald;
+          Alcotest.test_case
+            "remove missing instance"
+            `Quick
+            installer_remove_service_missing;
+          Alcotest.test_case
+            "purge missing instance"
+            `Quick
+            installer_purge_service_missing;
           Alcotest.test_case
             "drop user heuristic"
             `Quick
