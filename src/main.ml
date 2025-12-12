@@ -420,7 +420,7 @@ let install_baker_cmd =
   let instance =
     let doc = "Instance name for the baker systemd unit." in
     Arg.(
-      required & opt (some string) None & info ["instance"] ~doc ~docv:"NAME")
+      value & opt (some string) None & info ["instance"; "i"] ~doc ~docv:"NAME")
   in
   let node_instance =
     let doc =
@@ -481,37 +481,54 @@ let install_baker_cmd =
       value & flag
       & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
   in
-  let make instance node_instance node_data_dir node_endpoint base_dir network
+  let make instance_opt node_instance node_data_dir node_endpoint base_dir network
       delegates extra_args service_user app_bin_dir no_enable logging_mode =
+    let normalize_opt_string = function
+      | Some s ->
+          let trimmed = String.trim s in
+          if String.equal trimmed "" then None else Some trimmed
+      | None -> None
+    in
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
-        let req : baker_request =
-          {
-            instance;
-            network;
-            node_instance;
-            node_data_dir;
-            node_endpoint;
-            node_mode = `Auto;
-            base_dir;
-            delegates;
-            dal_endpoint = None;
-            extra_args;
-            service_user;
-            app_bin_dir;
-            logging_mode;
-            auto_enable = not no_enable;
-          }
+        let instance_result =
+          match normalize_opt_string instance_opt with
+          | Some inst -> Ok inst
+          | None ->
+              if is_interactive () then
+                Ok (prompt_required_string "Instance name")
+              else Error "--instance/-i is required"
         in
-        match Installer.install_baker req with
-        | Ok service ->
-            Format.printf
-              "Installed %s (%s)\n"
-              service.S.instance
-              service.network ;
-            `Ok ()
-        | Error (`Msg msg) -> cmdliner_error msg)
+        match instance_result with
+        | Error msg -> cmdliner_error msg
+        | Ok instance -> (
+            let req : baker_request =
+              {
+                instance;
+                network;
+                node_instance;
+                node_data_dir;
+                node_endpoint;
+                node_mode = `Auto;
+                base_dir;
+                delegates;
+                dal_endpoint = None;
+                extra_args;
+                service_user;
+                app_bin_dir;
+                logging_mode;
+                auto_enable = not no_enable;
+              }
+            in
+            match Installer.install_baker req with
+            | Ok service ->
+                Format.printf
+                  "Installed %s (%s)\n"
+                  service.S.instance
+                  service.network ;
+                `Ok ()
+            | Error (`Msg msg) -> cmdliner_error msg))
   in
   let term =
     Term.(
