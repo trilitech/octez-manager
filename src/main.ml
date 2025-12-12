@@ -25,6 +25,7 @@ let pp_logging fmt = function
 
 let print_service_details svc =
   Format.printf "Instance      : %s@." svc.S.instance ;
+  Format.printf "Service name  : %s@." (Systemd.unit_name svc.role svc.instance) ;
   Format.printf "Role          : %s@." svc.role ;
   Format.printf "Network       : %s@." svc.network ;
   Format.printf "History mode  : %s@." (History_mode.to_string svc.history_mode) ;
