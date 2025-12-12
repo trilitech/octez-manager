@@ -85,8 +85,8 @@ let exec_line role =
        CMD=\"${APP_BIN_DIR}/octez-baker\"; CMD=\"$CMD --base-dir \
        \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
        \\\"${OCTEZ_NODE_ENDPOINT}\\\"\"; if [ \"$MODE\" = \"remote\" ]; then \
-       CMD=\"$CMD run with remote node \\\"${OCTEZ_NODE_ENDPOINT}\\\"\"; else \
-       CMD=\"$CMD run with local node \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; if [ -n \
+       CMD=\"$CMD run remotely\"; else CMD=\"$CMD run with local node \
+       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; if [ -n \
        \"${OCTEZ_DAL_ENDPOINT:-}\" ]; then CMD=\"$CMD --dal-node \
        \\\"${OCTEZ_DAL_ENDPOINT}\\\"\"; fi; exec $CMD \
        ${OCTEZ_BAKER_DELEGATES_ARGS:-} ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
@@ -735,4 +735,6 @@ module For_tests = struct
       ()
 
   let render_logging_lines = render_logging_lines
+
+  let exec_line = exec_line
 end
