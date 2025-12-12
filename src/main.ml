@@ -110,6 +110,12 @@ let interactive_tty =
 
 let is_interactive () = Lazy.force interactive_tty
 
+let normalize_opt_string = function
+  | Some s ->
+      let trimmed = String.trim s in
+      if String.equal trimmed "" then None else Some trimmed
+  | None -> None
+
 let prompt_input ?default question =
   if not (is_interactive ()) then None
   else
@@ -300,12 +306,6 @@ let install_node_cmd =
   let make instance_opt network_opt history_mode_opt data_dir rpc_addr net_addr
       service_user app_bin_dir extra_args snapshot_flag snapshot_uri
       snapshot_kind snapshot_no_check no_enable logging_mode =
-    let normalize_opt_string = function
-      | Some s ->
-          let trimmed = String.trim s in
-          if String.equal trimmed "" then None else Some trimmed
-      | None -> None
-    in
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
@@ -483,12 +483,6 @@ let install_baker_cmd =
   in
   let make instance_opt node_instance node_data_dir node_endpoint base_dir network
       delegates extra_args service_user app_bin_dir no_enable logging_mode =
-    let normalize_opt_string = function
-      | Some s ->
-          let trimmed = String.trim s in
-          if String.equal trimmed "" then None else Some trimmed
-      | None -> None
-    in
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
