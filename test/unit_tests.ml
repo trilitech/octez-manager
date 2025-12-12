@@ -2285,7 +2285,7 @@ let rpc_scheduler_respects_min_spacing () =
 let make_absolute_path_absolute_stays_same () =
   match Common.make_absolute_path "/usr/bin" with
   | Ok path -> Alcotest.(check string) "absolute unchanged" "/usr/bin" path
-  | Error (`Msg msg) -> Alcotest.failf "unexpected error: %s" msg
+  | Error msg -> Alcotest.failf "unexpected error: %s" msg
 
 let make_absolute_path_relative_converted () =
   let result = Common.make_absolute_path "bin" in
@@ -2299,7 +2299,7 @@ let make_absolute_path_relative_converted () =
         "path ends with bin"
         true
         (String.ends_with ~suffix:"bin" path)
-  | Error (`Msg msg) -> Alcotest.failf "unexpected error: %s" msg
+  | Error msg -> Alcotest.failf "unexpected error: %s" msg
 
 let make_absolute_path_dotdot_relative () =
   let result = Common.make_absolute_path "../work/bin" in
@@ -2313,18 +2313,18 @@ let make_absolute_path_dotdot_relative () =
         "path contains work/bin"
         true
         (String.ends_with ~suffix:"work/bin" path)
-  | Error (`Msg msg) -> Alcotest.failf "unexpected error: %s" msg
+  | Error msg -> Alcotest.failf "unexpected error: %s" msg
 
 let make_absolute_path_empty_error () =
   match Common.make_absolute_path "" with
   | Ok _ -> Alcotest.fail "empty path should fail"
-  | Error (`Msg msg) ->
+  | Error msg ->
       Alcotest.(check bool) "error mentions empty" true (String.contains msg ' ')
 
 let make_absolute_path_whitespace_error () =
   match Common.make_absolute_path "   " with
   | Ok _ -> Alcotest.fail "whitespace-only path should fail"
-  | Error (`Msg _) -> ()
+  | Error _ -> ()
 
 let () =
   Alcotest.run

@@ -92,7 +92,7 @@ let which prog =
 
 let make_absolute_path path =
   let trimmed = String.trim path in
-  if trimmed = "" then Error (`Msg "Path cannot be empty")
+  if trimmed = "" then Error "Path cannot be empty"
   else if Filename.is_relative trimmed then
     Ok (Filename.concat (Sys.getcwd ()) trimmed)
   else Ok trimmed

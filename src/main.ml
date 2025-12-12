@@ -93,7 +93,7 @@ let resolve_app_bin_dir = function
   | Some dir when String.trim dir <> "" -> (
       match Common.make_absolute_path dir with
       | Ok abs_path -> Ok abs_path
-      | Error (`Msg msg) -> Error msg)
+      | Error msg -> Error msg)
   | _ -> (
       match Common.which "octez-node" with
       | Some path -> Ok (Filename.dirname path)
