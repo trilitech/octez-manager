@@ -331,7 +331,7 @@ let open_binary_help s =
   in
   let label = function
     | `Local -> "Local node help (run with local node)"
-    | `Remote -> "Remote node help (run with remote node)"
+    | `Remote -> "Remote node help (run remotely)"
   in
   let open_for mode =
     Binary_help_explorer.open_baker_run_help

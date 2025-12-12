@@ -2094,6 +2094,24 @@ let systemd_dropin_extra_paths () =
                    ~needle:("ReadWritePaths=" ^ extra_path)
                    dropin_body))))
 
+let systemd_baker_exec_line_remote () =
+  let exec = Systemd.For_tests.exec_line "baker" in
+  Alcotest.(check bool)
+    "contains 'run remotely' for remote mode"
+    true
+    (string_contains ~needle:"run remotely" exec) ;
+  Alcotest.(check bool)
+    "does not contain 'run with remote node'"
+    false
+    (string_contains ~needle:"run with remote node" exec)
+
+let systemd_baker_exec_line_local () =
+  let exec = Systemd.For_tests.exec_line "baker" in
+  Alcotest.(check bool)
+    "contains 'run with local node' for local mode"
+    true
+    (string_contains ~needle:"run with local node" exec)
+
 let system_user_validate_missing () =
   match
     System_user.validate_user_for_service ~user:"__missing_octez_user__"
@@ -2644,6 +2662,14 @@ let () =
             `Quick
             systemd_install_dropin_and_service_commands;
           Alcotest.test_case "extra paths" `Quick systemd_dropin_extra_paths;
+          Alcotest.test_case
+            "baker exec remote"
+            `Quick
+            systemd_baker_exec_line_remote;
+          Alcotest.test_case
+            "baker exec local"
+            `Quick
+            systemd_baker_exec_line_local;
         ] );
       ( "system_user",
         [
