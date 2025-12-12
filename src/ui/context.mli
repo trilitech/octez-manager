@@ -1,6 +1,6 @@
-val set_pending_instance_detail : string -> unit
+val set_pending_instance_detail : string -> string -> unit
 
-val take_pending_instance_detail : unit -> string option
+val take_pending_instance_detail : unit -> (string * string) option
 
 val mark_instances_dirty : unit -> unit
 

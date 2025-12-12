@@ -318,7 +318,7 @@ let endpoint_of_rpc rpc_addr =
   else "http://" ^ trimmed
 
 let lookup_node_service instance =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role:"node" in
   match svc_opt with
   | Some svc when String.equal (String.lowercase_ascii svc.Service.role) "node"
     ->
@@ -1026,22 +1026,22 @@ let install_signer (request : signer_request) =
   Ok service
 
 let start_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   Systemd.start ~role ~instance
 
 let stop_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   Systemd.stop ~role ~instance
 
 let restart_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   Systemd.restart ~role ~instance
 
 let remove_service ~delete_data_dir ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   let data_dir =
     match svc_opt with Some svc -> Some svc.data_dir | None -> None
@@ -1057,12 +1057,12 @@ let remove_service ~delete_data_dir ~instance ~role =
     | true, Some dir -> Common.remove_tree dir
     | _ -> Ok ()
   in
-  let* () = Service_registry.remove ~instance in
+  let* () = Service_registry.remove ~instance ~role in
   let* services = Service_registry.list () in
   Systemd.sync_logrotate (logrotate_specs_of services)
 
 let purge_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role in
   match svc_opt with
   | None -> remove_service ~delete_data_dir:true ~instance ~role
   | Some svc ->
@@ -1104,7 +1104,7 @@ let schedule_refresh ~instance ~frequency ~snapshot_kind ~no_check =
 let unschedule_refresh ~instance = Systemd.remove_refresh_timer ~instance
 
 let generate_secret_key ~instance ~alias =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role:"signer" in
   match svc_opt with
   | Some svc when String.equal svc.role "signer" ->
       let signer_bin = Filename.concat svc.app_bin_dir "octez-signer" in
@@ -1124,7 +1124,7 @@ let generate_secret_key ~instance ~alias =
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let list_keys ~instance =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role:"signer" in
   match svc_opt with
   | Some svc when String.equal svc.role "signer" ->
       let signer_bin = Filename.concat svc.app_bin_dir "octez-signer" in
@@ -1135,7 +1135,7 @@ let list_keys ~instance =
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let add_authorized_key ~instance ~key ~name =
-  let* svc_opt = Service_registry.find ~instance in
+  let* svc_opt = Service_registry.find ~instance ~role:"signer" in
   match svc_opt with
   | Some svc when String.equal svc.role "signer" ->
       add_authorized_keys
