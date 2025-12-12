@@ -315,7 +315,7 @@ let install_node_cmd =
           | None ->
               if is_interactive () then
                 Ok (prompt_required_string "Instance name")
-              else Error "--instance/-i is required"
+              else Error "Instance name is required in non-interactive mode"
         in
         match instance_result with
         | Error msg -> cmdliner_error msg
@@ -492,7 +492,7 @@ let install_baker_cmd =
           | None ->
               if is_interactive () then
                 Ok (prompt_required_string "Instance name")
-              else Error "--instance/-i is required"
+              else Error "Instance name is required in non-interactive mode"
         in
         match instance_result with
         | Error msg -> cmdliner_error msg
