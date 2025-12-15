@@ -116,6 +116,7 @@ let create_baker_flow ~services ~on_success =
                     base_dir = None;
                     delegates;
                     dal_endpoint = None;
+                    liquidity_baking_vote = None;
                     extra_args = [];
                     service_user = "octez";
                     app_bin_dir = "/usr/bin";
