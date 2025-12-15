@@ -125,10 +125,11 @@ let prompt_input ?default question =
           Printf.sprintf " [%s]" display
       | _ -> ""
     in
-    Format.printf "%s%s: %!" question suffix ;
-    match read_line () with
+    let prompt = Printf.sprintf "%s%s: " question suffix in
+    match LNoise.linenoise prompt with
     | exception End_of_file -> Option.map snd default
-    | line ->
+    | None -> Option.map snd default
+    | Some line ->
         let trimmed = String.trim line in
         if String.equal trimmed "" then Option.map snd default else Some trimmed
 
