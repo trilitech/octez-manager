@@ -88,8 +88,8 @@ module Service_lifecycle_impl = struct
     Systemd.disable ~role ~instance:inst ~stop_now:false
     |> Result.map_error (function `Msg m -> m)
 
-  let remove_instance_files ~role ~inst ~remove_data =
-    Installer.remove_service ~delete_data_dir:remove_data ~instance:inst ~role
+  let remove_instance_files ~role:_ ~inst ~remove_data =
+    Installer.remove_service ~delete_data_dir:remove_data ~instance:inst
     |> Result.map_error (function `Msg m -> m)
 end
 

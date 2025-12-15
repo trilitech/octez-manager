@@ -1106,10 +1106,6 @@ let instance_term =
     in
     Arg.(value & pos 1 (some (enum actions)) None & info [] ~docv:"ACTION")
   in
-  let role =
-    Arg.(
-      value & opt string "node" & info ["role"] ~doc:"Service role" ~docv:"ROLE")
-  in
   let delete_data_dir =
     Arg.(
       value & flag
@@ -1167,7 +1163,7 @@ let instance_term =
             "Pass --no-check to octez-node snapshot import during \
              refresh-from-new-snapshot.")
   in
-  let run instance action role delete_data_dir snapshot_uri_override
+  let run instance action delete_data_dir snapshot_uri_override
       snapshot_kind_override snapshot_network_override
       snapshot_history_mode_override snapshot_no_check =
     match (instance, action) with
@@ -1178,13 +1174,13 @@ let instance_term =
            (start|stop|restart|remove|purge|show|show-service|refresh-from-new-snapshot)"
     | Some inst, Some action -> (
         match action with
-        | Start -> run_result (Installer.start_service ~instance:inst ~role)
-        | Stop -> run_result (Installer.stop_service ~instance:inst ~role)
-        | Restart -> run_result (Installer.restart_service ~instance:inst ~role)
+        | Start -> run_result (Installer.start_service ~instance:inst)
+        | Stop -> run_result (Installer.stop_service ~instance:inst)
+        | Restart -> run_result (Installer.restart_service ~instance:inst)
         | Remove ->
             run_result
-              (Installer.remove_service ~delete_data_dir ~instance:inst ~role)
-        | Purge -> run_result (Installer.purge_service ~instance:inst ~role)
+              (Installer.remove_service ~delete_data_dir ~instance:inst)
+        | Purge -> run_result (Installer.purge_service ~instance:inst)
         | Refresh_snapshot ->
             run_result
               (Installer.refresh_instance_from_snapshot
@@ -1206,10 +1202,10 @@ let instance_term =
         | Show_service -> (
             match Service_registry.find ~instance:inst with
             | Error (`Msg msg) -> cmdliner_error msg
-            | Ok svc_opt ->
-                let role =
-                  match svc_opt with Some svc -> svc.S.role | None -> role
-                in
+            | Ok None ->
+                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+            | Ok (Some svc) ->
+                let role = svc.S.role in
                 let unit = Systemd.unit_name role inst in
                 let print_dropin () =
                   let path = dropin_path_for ~role ~instance:inst in
@@ -1251,7 +1247,7 @@ let instance_term =
   in
   Term.(
     ret
-      (const run $ instance $ action $ role $ delete_data_dir
+      (const run $ instance $ action $ delete_data_dir
      $ snapshot_uri_override $ snapshot_kind_override
      $ snapshot_network_override $ snapshot_history_mode_override
      $ snapshot_no_check))
@@ -1299,7 +1295,7 @@ let purge_all_cmd =
                 let instance = svc.S.instance in
                 let role = svc.S.role in
                 Format.printf "Purging instance '%s' (%s)...@." instance role ;
-                match Installer.purge_service ~instance ~role with
+                match Installer.purge_service ~instance with
                 | Ok () -> Format.printf "  ✓ Successfully purged '%s'@." instance
                 | Error (`Msg msg) ->
                     Format.eprintf "  ✗ Failed to purge '%s': %s@." instance msg ;

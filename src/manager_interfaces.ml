@@ -104,22 +104,15 @@ module type Installer = sig
 
   (* Legacy monolithic interface, to be deprecated or kept for CLI convenience *)
   val remove_service :
-    delete_data_dir:bool ->
-    instance:string ->
-    role:string ->
-    (unit, [`Msg of string]) result
+    delete_data_dir:bool -> instance:string -> (unit, [`Msg of string]) result
 
-  val start_service :
-    instance:string -> role:string -> (unit, [`Msg of string]) result
+  val start_service : instance:string -> (unit, [`Msg of string]) result
 
-  val stop_service :
-    instance:string -> role:string -> (unit, [`Msg of string]) result
+  val stop_service : instance:string -> (unit, [`Msg of string]) result
 
-  val restart_service :
-    instance:string -> role:string -> (unit, [`Msg of string]) result
+  val restart_service : instance:string -> (unit, [`Msg of string]) result
 
-  val purge_service :
-    instance:string -> role:string -> (unit, [`Msg of string]) result
+  val purge_service : instance:string -> (unit, [`Msg of string]) result
 end
 
 module Installer_capability = struct

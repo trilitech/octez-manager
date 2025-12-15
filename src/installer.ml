@@ -1064,48 +1064,46 @@ let install_signer (request : signer_request) =
   in
   Ok service
 
-let start_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
-  let role = match svc_opt with Some svc -> svc.role | None -> role in
-  Systemd.start ~role ~instance
-
-let stop_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
-  let role = match svc_opt with Some svc -> svc.role | None -> role in
-  Systemd.stop ~role ~instance
-
-let restart_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
-  let role = match svc_opt with Some svc -> svc.role | None -> role in
-  Systemd.restart ~role ~instance
-
-let remove_service ~delete_data_dir ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance in
-  let role = match svc_opt with Some svc -> svc.role | None -> role in
-  let data_dir =
-    match svc_opt with Some svc -> Some svc.data_dir | None -> None
-  in
-  let* () =
-    match svc_opt with
-    | Some _ -> Systemd.disable ~role ~instance ~stop_now:true
-    | None -> Ok ()
-  in
-  Systemd.remove_dropin ~role ~instance ;
-  let* () =
-    match (delete_data_dir, data_dir) with
-    | true, Some dir -> Common.remove_tree dir
-    | _ -> Ok ()
-  in
-  let* () = Service_registry.remove ~instance in
-  let* services = Service_registry.list () in
-  Systemd.sync_logrotate (logrotate_specs_of services)
-
-let purge_service ~instance ~role =
+let start_service ~instance =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | None -> remove_service ~delete_data_dir:true ~instance ~role
+  | Some svc -> Systemd.start ~role:svc.role ~instance
+  | None -> R.error_msgf "Instance '%s' not found" instance
+
+let stop_service ~instance =
+  let* svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | Some svc -> Systemd.stop ~role:svc.role ~instance
+  | None -> R.error_msgf "Instance '%s' not found" instance
+
+let restart_service ~instance =
+  let* svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | Some svc -> Systemd.restart ~role:svc.role ~instance
+  | None -> R.error_msgf "Instance '%s' not found" instance
+
+let remove_service ~delete_data_dir ~instance =
+  let* svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
-      let* () = remove_service ~delete_data_dir:true ~instance ~role in
+      let* () = Systemd.disable ~role:svc.role ~instance ~stop_now:true in
+      Systemd.remove_dropin ~role:svc.role ~instance ;
+      let* () =
+        match delete_data_dir with
+        | true -> Common.remove_tree svc.data_dir
+        | false -> Ok ()
+      in
+      let* () = Service_registry.remove ~instance in
+      let* services = Service_registry.list () in
+      Systemd.sync_logrotate (logrotate_specs_of services)
+
+let purge_service ~instance =
+  let* svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | None -> R.error_msgf "Instance '%s' not found" instance
+  | Some svc ->
+      let* () = remove_service ~delete_data_dir:true ~instance in
       let* () = remove_logging_artifacts svc.logging_mode in
       let* remaining = Service_registry.list () in
       if
