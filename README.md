@@ -70,6 +70,16 @@ signer, optionally pre-authorizes public keys via repeated `--authorize
 NAME:KEY` flags, and prints the `octez-client -R` hint needed to tether
 bakers to the remote signer endpoint.
 
+For `install-baker`, you can configure DAL node integration via
+`--dal-endpoint`:
+- Provide an endpoint URL (e.g., `http://localhost:10732`) to use a DAL node
+- Use `none` or `disabled` to opt-out with the `--without-dal` flag
+- Omit the flag in non-interactive mode to auto-detect (no DAL flags)
+- In interactive mode, you'll be prompted for the DAL endpoint or opt-out
+
+The baker also requires `--liquidity-baking-vote` (or interactive prompt) with
+one of `on`, `off`, or `pass`.
+
 Run `octez-manager --help` for the full list of commands. Instance-level
 operations now go through the explicit `instance` command:
 `octez-manager instance <instance> <action>` where `<action>` is one of
