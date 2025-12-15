@@ -277,8 +277,8 @@ let field_hint (f : form_state) cursor : string option * string option =
   | 8 ->
       mk
         "Liquidity Baking Vote"
-        "Vote on liquidity baking subsidy: `on` (continue), `off` (end), or \
-         `pass` (abstain). Required for baker to start."
+        "Vote on liquidity baking subsidy: `on`, `off`, or `pass`. Required \
+         for baker to start."
   | 9 ->
       mk
         "Service User"
