@@ -318,7 +318,7 @@ let endpoint_of_rpc rpc_addr =
   else "http://" ^ trimmed
 
 let lookup_node_service instance =
-  let* svc_opt = Service_registry.find ~instance ~role:"node" in
+  let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | Some svc when String.equal (String.lowercase_ascii svc.Service.role) "node"
     ->
@@ -618,7 +618,21 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       let (_ : (unit, _) result) = restore_once () in
       e
 
+let validate_instance_name_unique ~instance =
+  let* services = Service_registry.list () in
+  let existing =
+    List.find_opt (fun svc -> String.equal svc.Service.instance instance) services
+  in
+  match existing with
+  | Some svc ->
+      R.error_msgf
+        "Instance name '%s' is already in use by a %s service. Please choose a different name."
+        instance
+        svc.Service.role
+  | None -> Ok ()
+
 let install_node (request : node_request) =
+  let* () = validate_instance_name_unique ~instance:request.instance in
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
   in
@@ -745,6 +759,7 @@ let install_node (request : node_request) =
   Ok service
 
 let install_daemon (request : daemon_request) =
+  let* () = validate_instance_name_unique ~instance:request.instance in
   let logging_mode =
     prepare_logging
       ~instance:request.instance
@@ -953,6 +968,7 @@ let add_authorized_keys ~app_bin_dir ~base_dir ~service_user entries =
   List.fold_left apply (Ok ()) entries
 
 let install_signer (request : signer_request) =
+  let* () = validate_instance_name_unique ~instance:request.instance in
   let base_dir =
     match request.base_dir with
     | Some dir when String.trim dir <> "" -> dir
@@ -1026,22 +1042,22 @@ let install_signer (request : signer_request) =
   Ok service
 
 let start_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance ~role in
+  let* svc_opt = Service_registry.find ~instance in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   Systemd.start ~role ~instance
 
 let stop_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance ~role in
+  let* svc_opt = Service_registry.find ~instance in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   Systemd.stop ~role ~instance
 
 let restart_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance ~role in
+  let* svc_opt = Service_registry.find ~instance in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   Systemd.restart ~role ~instance
 
 let remove_service ~delete_data_dir ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance ~role in
+  let* svc_opt = Service_registry.find ~instance in
   let role = match svc_opt with Some svc -> svc.role | None -> role in
   let data_dir =
     match svc_opt with Some svc -> Some svc.data_dir | None -> None
@@ -1057,12 +1073,12 @@ let remove_service ~delete_data_dir ~instance ~role =
     | true, Some dir -> Common.remove_tree dir
     | _ -> Ok ()
   in
-  let* () = Service_registry.remove ~instance ~role in
+  let* () = Service_registry.remove ~instance in
   let* services = Service_registry.list () in
   Systemd.sync_logrotate (logrotate_specs_of services)
 
 let purge_service ~instance ~role =
-  let* svc_opt = Service_registry.find ~instance ~role in
+  let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | None -> remove_service ~delete_data_dir:true ~instance ~role
   | Some svc ->
@@ -1104,7 +1120,7 @@ let schedule_refresh ~instance ~frequency ~snapshot_kind ~no_check =
 let unschedule_refresh ~instance = Systemd.remove_refresh_timer ~instance
 
 let generate_secret_key ~instance ~alias =
-  let* svc_opt = Service_registry.find ~instance ~role:"signer" in
+  let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | Some svc when String.equal svc.role "signer" ->
       let signer_bin = Filename.concat svc.app_bin_dir "octez-signer" in
@@ -1124,7 +1140,7 @@ let generate_secret_key ~instance ~alias =
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let list_keys ~instance =
-  let* svc_opt = Service_registry.find ~instance ~role:"signer" in
+  let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | Some svc when String.equal svc.role "signer" ->
       let signer_bin = Filename.concat svc.app_bin_dir "octez-signer" in
@@ -1135,7 +1151,7 @@ let list_keys ~instance =
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let add_authorized_key ~instance ~key ~name =
-  let* svc_opt = Service_registry.find ~instance ~role:"signer" in
+  let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | Some svc when String.equal svc.role "signer" ->
       add_authorized_keys
@@ -1153,6 +1169,8 @@ let restore_backup_for_tests = restore_backup
 
 module For_tests = struct
   type nonrec file_backup = file_backup
+
+  let validate_instance_name_unique = validate_instance_name_unique
 
   let ensure_logging_base_directory = ensure_logging_base_directory
 
