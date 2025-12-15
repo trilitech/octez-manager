@@ -30,23 +30,16 @@ val refresh_instance_from_snapshot :
   unit ->
   (unit, [`Msg of string]) result
 
-val start_service :
-  instance:string -> role:string -> (unit, [`Msg of string]) result
+val start_service : instance:string -> (unit, [`Msg of string]) result
 
-val stop_service :
-  instance:string -> role:string -> (unit, [`Msg of string]) result
+val stop_service : instance:string -> (unit, [`Msg of string]) result
 
-val restart_service :
-  instance:string -> role:string -> (unit, [`Msg of string]) result
+val restart_service : instance:string -> (unit, [`Msg of string]) result
 
 val remove_service :
-  delete_data_dir:bool ->
-  instance:string ->
-  role:string ->
-  (unit, [`Msg of string]) result
+  delete_data_dir:bool -> instance:string -> (unit, [`Msg of string]) result
 
-val purge_service :
-  instance:string -> role:string -> (unit, [`Msg of string]) result
+val purge_service : instance:string -> (unit, [`Msg of string]) result
 
 val list_services : unit -> (Service.t list, [`Msg of string]) result
 

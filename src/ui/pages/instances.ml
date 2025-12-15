@@ -402,24 +402,23 @@ let remove_modal state =
           | `Purge -> "Purge (also drop user/logs)")
         ~on_select:(fun choice ->
           let instance = svc.Service.instance in
-          let role = svc.Service.role in
           let verb, action =
             match choice with
             | `Remove ->
                 ( "remove",
                   fun () ->
                     let* (module I) = require_installer () in
-                    I.remove_service ~delete_data_dir:false ~instance ~role )
+                    I.remove_service ~delete_data_dir:false ~instance )
             | `RemoveData ->
                 ( "remove",
                   fun () ->
                     let* (module I) = require_installer () in
-                    I.remove_service ~delete_data_dir:true ~instance ~role )
+                    I.remove_service ~delete_data_dir:true ~instance )
             | `Purge ->
                 ( "purge",
                   fun () ->
                     let* (module I) = require_installer () in
-                    I.purge_service ~instance ~role )
+                    I.purge_service ~instance )
           in
           run_unit_action ~verb ~instance action) ;
       state)
