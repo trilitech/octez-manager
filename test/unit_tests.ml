@@ -153,9 +153,7 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
   }
 
 let sort_services =
-  List.sort (fun a b ->
-      let cmp_inst = compare a.Service.instance b.Service.instance in
-      if cmp_inst <> 0 then cmp_inst else compare a.Service.role b.Service.role)
+  List.sort (fun a b -> compare a.Service.instance b.Service.instance)
 
 let sample_node_request ?data_dir ?(bootstrap = Genesis)
     ?(history_mode = History_mode.Rolling)
@@ -1776,18 +1774,14 @@ let service_registry_roundtrip () =
       let () = expect_ok (Service_registry.write service) in
       let listed = expect_ok (Service_registry.list ()) |> sort_services in
       Alcotest.(check int) "one entry" 1 (List.length listed) ;
-      let found =
-        expect_ok (Service_registry.find ~instance:"alpha" ~role:"node")
-      in
+      let found = expect_ok (Service_registry.find ~instance:"alpha") in
       (match found with
       | Some svc -> check_service service svc
       | None -> Alcotest.fail "service not found") ;
-      let () =
-        expect_ok (Service_registry.remove ~instance:"alpha" ~role:"node")
-      in
+      let () = expect_ok (Service_registry.remove ~instance:"alpha") in
       let after = expect_ok (Service_registry.list ()) in
       Alcotest.(check int) "empty after removal" 0 (List.length after) ;
-      match expect_ok (Service_registry.find ~instance:"alpha" ~role:"node") with
+      match expect_ok (Service_registry.find ~instance:"alpha") with
       | None -> ()
       | Some _ -> Alcotest.fail "service should have been removed")
 
@@ -1810,92 +1804,35 @@ let service_registry_list_invalid_json () =
 
 let service_registry_remove_missing () =
   with_fake_xdg (fun _env ->
-      match Service_registry.remove ~instance:"ghost" ~role:"node" with
+      match Service_registry.remove ~instance:"ghost" with
       | Ok () -> ()
       | Error (`Msg msg) -> Alcotest.failf "remove missing registry: %s" msg)
 
-let service_registry_same_instance_different_roles () =
+let installer_instance_name_unique () =
   with_fake_xdg (fun _env ->
       (* Create a node service with instance "foo" *)
-      let node_service =
-        Service.make
-          ~instance:"foo"
-          ~role:"node"
-          ~network:"mainnet"
-          ~history_mode:History_mode.Rolling
-          ~data_dir:"/test/foo/node"
-          ~rpc_addr:"127.0.0.1:8732"
-          ~net_addr:"127.0.0.1:9732"
-          ~service_user:"octez"
-          ~app_bin_dir:"/test/bin"
-          ~logging_mode:Logging_mode.Journald
-          ()
-      in
-      (* Create a baker service with the same instance name "foo" *)
-      let baker_service =
-        Service.make
-          ~instance:"foo"
-          ~role:"baker"
-          ~network:"mainnet"
-          ~history_mode:History_mode.Rolling
-          ~data_dir:"/test/foo/baker"
-          ~rpc_addr:"127.0.0.1:8732"
-          ~net_addr:""
-          ~service_user:"octez"
-          ~app_bin_dir:"/test/bin"
-          ~logging_mode:Logging_mode.Journald
-          ()
-      in
-      (* Write both services *)
+      let node_service = sample_service () in
+      let node_service = {node_service with Service.instance = "foo"} in
       let () = expect_ok (Service_registry.write node_service) in
-      let () = expect_ok (Service_registry.write baker_service) in
-      (* List should return both services *)
-      let listed = expect_ok (Service_registry.list ()) |> sort_services in
-      Alcotest.(check int) "two services" 2 (List.length listed) ;
-      (* Find node service should return the node *)
-      let found_node =
-        expect_ok (Service_registry.find ~instance:"foo" ~role:"node")
-      in
-      (match found_node with
-      | Some svc ->
-          Alcotest.(check string)
-            "node role"
-            "node"
-            svc.Service.role ;
-          Alcotest.(check string)
-            "node data_dir"
-            "/test/foo/node"
-            svc.Service.data_dir
-      | None -> Alcotest.fail "node service not found") ;
-      (* Find baker service should return the baker *)
-      let found_baker =
-        expect_ok (Service_registry.find ~instance:"foo" ~role:"baker")
-      in
-      (match found_baker with
-      | Some svc ->
-          Alcotest.(check string)
-            "baker role"
-            "baker"
-            svc.Service.role ;
-          Alcotest.(check string)
-            "baker data_dir"
-            "/test/foo/baker"
-            svc.Service.data_dir
-      | None -> Alcotest.fail "baker service not found") ;
-      (* Remove node service *)
-      let () =
-        expect_ok (Service_registry.remove ~instance:"foo" ~role:"node")
-      in
-      (* Baker should still exist *)
-      let after_remove = expect_ok (Service_registry.list ()) in
-      Alcotest.(check int) "one service remaining" 1 (List.length after_remove) ;
-      let remaining =
-        expect_ok (Service_registry.find ~instance:"foo" ~role:"baker")
-      in
-      match remaining with
-      | Some svc ->
-          Alcotest.(check string) "baker still exists" "baker" svc.Service.role
-      | None -> Alcotest.fail "baker should still exist after node removal")
+      (* Try to validate instance name "foo" - should fail *)
+      match Installer.For_tests.validate_instance_name_unique ~instance:"foo" with
+      | Ok () -> Alcotest.fail "Should have failed: instance name already in use"
+      | Error (`Msg msg) ->
+          Alcotest.(check bool)
+            "error message mentions instance in use"
+            true
+            (string_contains ~needle:"already in use" msg) ;
+          Alcotest.(check bool)
+            "error message mentions role"
+            true
+            (string_contains ~needle:"node" msg) ;
+          (* Try to validate a different instance name - should succeed *)
+          match
+            Installer.For_tests.validate_instance_name_unique ~instance:"bar"
+          with
+          | Ok () -> ()
+          | Error (`Msg msg) ->
+              Alcotest.failf "Should have succeeded with different name: %s" msg)
 
 let node_env_write_file () =
   with_fake_xdg (fun env ->
@@ -2626,6 +2563,10 @@ let () =
       ( "installer",
         [
           Alcotest.test_case
+            "instance name unique"
+            `Quick
+            installer_instance_name_unique;
+          Alcotest.test_case
             "log dir base"
             `Quick
             installer_log_directory_creation;
@@ -2731,10 +2672,6 @@ let () =
             "remove missing"
             `Quick
             service_registry_remove_missing;
-          Alcotest.test_case
-            "same instance different roles"
-            `Quick
-            service_registry_same_instance_different_roles;
         ] );
       ( "node.env",
         [
