@@ -2141,13 +2141,19 @@ let systemd_baker_exec_line_local () =
 let systemd_baker_exec_line_lb_vote () =
   let exec = Systemd.For_tests.exec_line "baker" in
   Alcotest.(check bool)
-    "includes liquidity-baking-toggle-vote flag"
+    "always includes liquidity-baking-toggle-vote flag"
     true
     (string_contains ~needle:"--liquidity-baking-toggle-vote" exec) ;
   Alcotest.(check bool)
     "references OCTEZ_BAKER_LB_VOTE env var"
     true
-    (string_contains ~needle:"OCTEZ_BAKER_LB_VOTE" exec)
+    (string_contains ~needle:"OCTEZ_BAKER_LB_VOTE" exec) ;
+  Alcotest.(check bool)
+    "flag is unconditional (no if statement around it)"
+    false
+    (string_contains
+       ~needle:"if [ -n \"${OCTEZ_BAKER_LB_VOTE"
+       exec)
 
 let system_user_validate_missing () =
   match

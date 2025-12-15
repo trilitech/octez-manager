@@ -912,10 +912,23 @@ let install_baker (request : baker_request) =
     | Some ep when String.trim ep <> "" -> Some (endpoint_of_rpc ep)
     | _ -> None
   in
-  let liquidity_baking_vote =
+  let* liquidity_baking_vote =
     match request.liquidity_baking_vote with
-    | Some vote when String.trim vote <> "" -> String.trim vote
-    | _ -> ""
+    | Some vote when String.trim vote <> "" ->
+        let normalized = String.lowercase_ascii (String.trim vote) in
+        if
+          normalized = "on" || normalized = "off" || normalized = "pass"
+        then Ok normalized
+        else
+          R.error_msg
+            (Printf.sprintf
+               "Invalid liquidity baking vote '%s'. Must be 'on', 'off', or \
+                'pass'."
+               vote)
+    | _ ->
+        R.error_msg
+          "Liquidity baking vote is required. Use --liquidity-baking-vote \
+           with 'on', 'off', or 'pass'."
   in
   let node_mode_env =
     match resolved_node_mode with `Local -> "local" | `Remote -> "remote"

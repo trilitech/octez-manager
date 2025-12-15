@@ -492,8 +492,8 @@ let install_baker_cmd =
       & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
   in
   let make instance_opt node_instance node_data_dir node_endpoint base_dir network
-      delegates liquidity_baking_vote extra_args service_user app_bin_dir no_enable
-      logging_mode =
+      delegates liquidity_baking_vote_opt extra_args service_user app_bin_dir
+      no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
@@ -508,33 +508,51 @@ let install_baker_cmd =
         match instance_result with
         | Error msg -> cmdliner_error msg
         | Ok instance -> (
-            let req : baker_request =
-              {
-                instance;
-                network;
-                node_instance;
-                node_data_dir;
-                node_endpoint;
-                node_mode = `Auto;
-                base_dir;
-                delegates;
-                dal_endpoint = None;
-                liquidity_baking_vote;
-                extra_args;
-                service_user;
-                app_bin_dir;
-                logging_mode;
-                auto_enable = not no_enable;
-              }
+            let lb_vote_result =
+              match normalize_opt_string liquidity_baking_vote_opt with
+              | Some vote -> Ok (Some vote)
+              | None ->
+                  if is_interactive () then
+                    let vote =
+                      prompt_required_string
+                        "Liquidity baking vote (on/off/pass)"
+                    in
+                    Ok (Some vote)
+                  else
+                    Error
+                      "Liquidity baking vote is required in non-interactive \
+                       mode. Use --liquidity-baking-vote"
             in
-            match Installer.install_baker req with
-            | Ok service ->
-                Format.printf
-                  "Installed %s (%s)\n"
-                  service.S.instance
-                  service.network ;
-                `Ok ()
-            | Error (`Msg msg) -> cmdliner_error msg))
+            match lb_vote_result with
+            | Error msg -> cmdliner_error msg
+            | Ok liquidity_baking_vote -> (
+                let req : baker_request =
+                  {
+                    instance;
+                    network;
+                    node_instance;
+                    node_data_dir;
+                    node_endpoint;
+                    node_mode = `Auto;
+                    base_dir;
+                    delegates;
+                    dal_endpoint = None;
+                    liquidity_baking_vote;
+                    extra_args;
+                    service_user;
+                    app_bin_dir;
+                    logging_mode;
+                    auto_enable = not no_enable;
+                  }
+                in
+                match Installer.install_baker req with
+                | Ok service ->
+                    Format.printf
+                      "Installed %s (%s)\n"
+                      service.S.instance
+                      service.network ;
+                    `Ok ()
+                | Error (`Msg msg) -> cmdliner_error msg)))
   in
   let term =
     Term.(
