@@ -907,10 +907,11 @@ let install_baker (request : baker_request) =
     | Some dir when String.trim dir <> "" -> dir
     | _ -> Common.default_role_dir "baker" request.instance
   in
-  let dal_endpoint =
-    match request.dal_endpoint with
-    | Some ep when String.trim ep <> "" -> Some (endpoint_of_rpc ep)
-    | _ -> None
+  let dal_config =
+    match request.dal_config with
+    | Dal_endpoint ep when String.trim ep <> "" -> Dal_endpoint (endpoint_of_rpc ep)
+    | Dal_disabled -> Dal_disabled
+    | _ -> Dal_auto
   in
   let* liquidity_baking_vote =
     match request.liquidity_baking_vote with
@@ -956,8 +957,11 @@ let install_baker (request : baker_request) =
           ("OCTEZ_BAKER_BASE_DIR", base_dir);
           ("OCTEZ_NODE_ENDPOINT", node_endpoint);
           ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
-          ( "OCTEZ_DAL_ENDPOINT",
-            match dal_endpoint with Some ep -> ep | None -> "" );
+          ( "OCTEZ_DAL_CONFIG",
+            match dal_config with
+            | Dal_disabled -> "disabled"
+            | Dal_endpoint ep -> ep
+            | Dal_auto -> "" );
           ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
           ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
           ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);

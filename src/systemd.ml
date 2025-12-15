@@ -86,10 +86,11 @@ let exec_line role =
        \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
        \\\"${OCTEZ_NODE_ENDPOINT}\\\"\"; if [ \"$MODE\" = \"remote\" ]; then \
        CMD=\"$CMD run remotely\"; else CMD=\"$CMD run with local node \
-       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; if [ -n \
-       \"${OCTEZ_DAL_ENDPOINT:-}\" ]; then CMD=\"$CMD --dal-node \
-       \\\"${OCTEZ_DAL_ENDPOINT}\\\"\"; fi; CMD=\"$CMD \
-       --liquidity-baking-toggle-vote \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; exec $CMD \
+       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; DAL_CFG=\"${OCTEZ_DAL_CONFIG:-}\"; if \
+       [ \"$DAL_CFG\" = \"disabled\" ]; then CMD=\"$CMD --without-dal\"; elif \
+       [ -n \"$DAL_CFG\" ]; then CMD=\"$CMD --dal-node \\\"$DAL_CFG\\\"\"; fi; \
+       CMD=\"$CMD --liquidity-baking-toggle-vote \
+       \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; exec $CMD \
        ${OCTEZ_BAKER_DELEGATES_ARGS:-} ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
   | "node" ->
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \

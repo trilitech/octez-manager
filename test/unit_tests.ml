@@ -2155,6 +2155,25 @@ let systemd_baker_exec_line_lb_vote () =
        ~needle:"if [ -n \"${OCTEZ_BAKER_LB_VOTE"
        exec)
 
+let systemd_baker_exec_line_dal_config () =
+  let exec = Systemd.For_tests.exec_line "baker" in
+  Alcotest.(check bool)
+    "references OCTEZ_DAL_CONFIG env var"
+    true
+    (string_contains ~needle:"OCTEZ_DAL_CONFIG" exec) ;
+  Alcotest.(check bool)
+    "includes --without-dal when disabled"
+    true
+    (string_contains ~needle:"--without-dal" exec) ;
+  Alcotest.(check bool)
+    "includes --dal-node when endpoint provided"
+    true
+    (string_contains ~needle:"--dal-node" exec) ;
+  Alcotest.(check bool)
+    "checks for 'disabled' value"
+    true
+    (string_contains ~needle:"= \"disabled\"" exec)
+
 let system_user_validate_missing () =
   match
     System_user.validate_user_for_service ~user:"__missing_octez_user__"
@@ -2721,6 +2740,10 @@ let () =
             "baker exec line lb vote"
             `Quick
             systemd_baker_exec_line_lb_vote;
+          Alcotest.test_case
+            "baker exec line dal config"
+            `Quick
+            systemd_baker_exec_line_dal_config;
         ] );
       ( "system_user",
         [

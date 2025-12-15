@@ -459,6 +459,16 @@ let install_baker_cmd =
     let doc = "Delegate key hash or alias passed as --delegate." in
     Arg.(value & opt_all string [] & info ["delegate"] ~doc ~docv:"KEY")
   in
+  let dal_endpoint =
+    let doc =
+      "DAL node endpoint (e.g., http://localhost:10732). Use 'none' or \
+       'disabled' to opt-out with --without-dal flag."
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["dal-endpoint"] ~doc ~docv:"ENDPOINT")
+  in
   let liquidity_baking_vote =
     let doc =
       "Liquidity baking toggle vote (on, off, or pass). Required for baker to \
@@ -492,8 +502,8 @@ let install_baker_cmd =
       & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
   in
   let make instance_opt node_instance node_data_dir node_endpoint base_dir network
-      delegates liquidity_baking_vote_opt extra_args service_user app_bin_dir
-      no_enable logging_mode =
+      delegates dal_endpoint_opt liquidity_baking_vote_opt extra_args service_user
+      app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
@@ -526,40 +536,65 @@ let install_baker_cmd =
             match lb_vote_result with
             | Error msg -> cmdliner_error msg
             | Ok liquidity_baking_vote -> (
-                let req : baker_request =
-                  {
-                    instance;
-                    network;
-                    node_instance;
-                    node_data_dir;
-                    node_endpoint;
-                    node_mode = `Auto;
-                    base_dir;
-                    delegates;
-                    dal_endpoint = None;
-                    liquidity_baking_vote;
-                    extra_args;
-                    service_user;
-                    app_bin_dir;
-                    logging_mode;
-                    auto_enable = not no_enable;
-                  }
+                let dal_config_result =
+                  match normalize_opt_string dal_endpoint_opt with
+                  | Some ep ->
+                      let normalized = String.lowercase_ascii (String.trim ep) in
+                      if normalized = "none" || normalized = "disabled" then
+                        Ok Dal_disabled
+                      else Ok (Dal_endpoint ep)
+                  | None ->
+                      if is_interactive () then
+                        let response =
+                          prompt_required_string
+                            "DAL node endpoint (or 'none' to opt-out)"
+                        in
+                        let normalized =
+                          String.lowercase_ascii (String.trim response)
+                        in
+                        if normalized = "none" || normalized = "disabled" then
+                          Ok Dal_disabled
+                        else Ok (Dal_endpoint response)
+                      else Ok Dal_auto
                 in
-                match Installer.install_baker req with
-                | Ok service ->
-                    Format.printf
-                      "Installed %s (%s)\n"
-                      service.S.instance
-                      service.network ;
-                    `Ok ()
-                | Error (`Msg msg) -> cmdliner_error msg)))
+                match dal_config_result with
+                | Error msg -> cmdliner_error msg
+                | Ok dal_config -> (
+                    let req : baker_request =
+                      {
+                        instance;
+                        network;
+                        node_instance;
+                        node_data_dir;
+                        node_endpoint;
+                        node_mode = `Auto;
+                        base_dir;
+                        delegates;
+                        dal_config;
+                        liquidity_baking_vote;
+                        extra_args;
+                        service_user;
+                        app_bin_dir;
+                        logging_mode;
+                        auto_enable = not no_enable;
+                      }
+                    in
+                    match Installer.install_baker req with
+                    | Ok service ->
+                        Format.printf
+                          "Installed %s (%s)\n"
+                          service.S.instance
+                          service.network ;
+                        `Ok ()
+                    | Error (`Msg msg) -> cmdliner_error msg))))
   in
   let term =
     Term.(
       ret
         (const make $ instance $ node_instance $ node_data_dir $ node_endpoint
-       $ base_dir $ network $ delegates $ liquidity_baking_vote $ extra_args
-       $ service_user $ app_bin_dir $ auto_enable $ logging_mode_term))
+       $ base_dir $ network $ delegates $ dal_endpoint $ liquidity_baking_vote
+       $ extra_args $ service_user $ app_bin_dir $ auto_enable
+       $ logging_mode_term))
   in
   let info = Cmd.info "install-baker" ~doc:"Install an octez-baker service" in
   Cmd.v info term

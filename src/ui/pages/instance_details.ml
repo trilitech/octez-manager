@@ -108,7 +108,12 @@ let view_details svc =
       in
       let node_mode = lookup "OCTEZ_BAKER_NODE_MODE" in
       let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
-      let dal_endpoint = lookup "OCTEZ_DAL_ENDPOINT" in
+      let dal_config = lookup "OCTEZ_DAL_CONFIG" in
+      let dal_display =
+        if dal_config = "disabled" then "(opt-out: --without-dal)"
+        else if dal_config = "" then "(auto)"
+        else dal_config
+      in
       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
       let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
       let logging =
@@ -128,7 +133,7 @@ let view_details svc =
           ("Node Mode", if node_mode = "" then "remote" else node_mode);
           ( "Node Endpoint",
             if node_endpoint = "" then "(unset)" else node_endpoint );
-          ("DAL Endpoint", if dal_endpoint = "" then "(none)" else dal_endpoint);
+          ("DAL Config", dal_display);
           ("Data Dir", svc.Service.data_dir);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
