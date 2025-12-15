@@ -459,6 +459,16 @@ let install_baker_cmd =
     let doc = "Delegate key hash or alias passed as --delegate." in
     Arg.(value & opt_all string [] & info ["delegate"] ~doc ~docv:"KEY")
   in
+  let liquidity_baking_vote =
+    let doc =
+      "Liquidity baking toggle vote (on, off, or pass). Required for baker to \
+       start."
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["liquidity-baking-vote"] ~doc ~docv:"VOTE")
+  in
   let extra_args =
     let doc = "Additional arguments appended to the baker command." in
     Arg.(value & opt_all string [] & info ["extra-arg"] ~doc ~docv:"ARG")
@@ -482,7 +492,8 @@ let install_baker_cmd =
       & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
   in
   let make instance_opt node_instance node_data_dir node_endpoint base_dir network
-      delegates extra_args service_user app_bin_dir no_enable logging_mode =
+      delegates liquidity_baking_vote extra_args service_user app_bin_dir no_enable
+      logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
@@ -508,6 +519,7 @@ let install_baker_cmd =
                 base_dir;
                 delegates;
                 dal_endpoint = None;
+                liquidity_baking_vote;
                 extra_args;
                 service_user;
                 app_bin_dir;
@@ -528,8 +540,8 @@ let install_baker_cmd =
     Term.(
       ret
         (const make $ instance $ node_instance $ node_data_dir $ node_endpoint
-       $ base_dir $ network $ delegates $ extra_args $ service_user
-       $ app_bin_dir $ auto_enable $ logging_mode_term))
+       $ base_dir $ network $ delegates $ liquidity_baking_vote $ extra_args
+       $ service_user $ app_bin_dir $ auto_enable $ logging_mode_term))
   in
   let info = Cmd.info "install-baker" ~doc:"Install an octez-baker service" in
   Cmd.v info term

@@ -29,6 +29,7 @@ type form_state = {
   dal : dal_selection;
   base_dir : string;
   delegates : string list;
+  liquidity_baking_vote : string;
   service_user : string;
   app_bin_dir : string;
   logging : [`Journald | `File];
@@ -66,6 +67,7 @@ let default_form =
     dal = Dal_none;
     base_dir = "";
     delegates = [];
+    liquidity_baking_vote = "pass";
     service_user = default_service_user ();
     app_bin_dir = "/usr/bin";
     logging = `File;
@@ -274,26 +276,31 @@ let field_hint (f : form_state) cursor : string option * string option =
         "Optional delegate aliases/addresses. Add/remove multiple entries."
   | 8 ->
       mk
+        "Liquidity Baking Vote"
+        "Vote on liquidity baking subsidy: `on` (continue), `off` (end), or \
+         `pass` (abstain). Required for baker to start."
+  | 9 ->
+      mk
         "Service User"
         (Printf.sprintf
            "Account running the service (current: `%s`). If root and missing, \
             the installer will create it."
            f.service_user)
-  | 9 ->
+  | 10 ->
       mk
         "App Bin Dir"
         (Printf.sprintf
            "Directory containing `octez-baker`. Current: `%s`."
            f.app_bin_dir)
-  | 10 ->
+  | 11 ->
       mk
         "Logging"
         "File writes baker.log under the instance log dir; Journald uses \
          systemd journal."
-  | 11 -> mk "Enable on Boot" "Runs systemctl enable so the baker auto-starts."
-  | 12 -> mk "Start Now" "Start the baker service immediately after install."
-  | 13 -> mk "Extra Args" "Additional octez-baker run flags (space-separated)."
-  | 14 ->
+  | 12 -> mk "Enable on Boot" "Runs systemctl enable so the baker auto-starts."
+  | 13 -> mk "Start Now" "Start the baker service immediately after install."
+  | 14 -> mk "Extra Args" "Additional octez-baker run flags (space-separated)."
+  | 15 ->
       mk
         "Confirm & Install"
         "Runs the installer with current values. All required fields must be \
@@ -305,7 +312,7 @@ let apply_field_hint s =
   push_help_hint ?short ?long ()
 
 let move s delta =
-  let max_cursor = 14 in
+  let max_cursor = 15 in
   (* Number of fields + confirm *)
   let cursor = max 0 (min max_cursor (s.cursor + delta)) in
   {s with cursor}
@@ -553,6 +560,16 @@ let edit_field s =
       open_choice_modal ~title:"Delegates" ~items ~to_string ~on_select ;
       s
   | 8 ->
+      (* Liquidity Baking Vote *)
+      let items = ["pass"; "on"; "off"] in
+      open_choice_modal
+        ~title:"Liquidity Baking Vote"
+        ~items
+        ~to_string:(fun x -> x)
+        ~on_select:(fun v ->
+          update_form_ref (fun f -> {f with liquidity_baking_vote = v})) ;
+      s
+  | 9 ->
       (* Service User *)
       prompt_text_modal
         ~title:"Service User"
@@ -561,7 +578,7 @@ let edit_field s =
           update_form_ref (fun f -> {f with service_user = v}))
         () ;
       s
-  | 9 ->
+  | 10 ->
       (* App Bin Dir *)
       prompt_text_modal
         ~title:"App Bin Directory"
@@ -570,7 +587,7 @@ let edit_field s =
           update_form_ref (fun f -> {f with app_bin_dir = v}))
         () ;
       s
-  | 10 ->
+  | 11 ->
       (* Logging *)
       let items = ["File"; "Journald"] in
       open_choice_modal
@@ -581,18 +598,18 @@ let edit_field s =
           let logging = if v = "File" then `File else `Journald in
           update_form_ref (fun f -> {f with logging})) ;
       s
-  | 11 ->
+  | 12 ->
       (* Enable on Boot *)
       update_form_ref (fun f -> {f with enable_on_boot = not f.enable_on_boot}) ;
       s
-  | 12 ->
+  | 13 ->
       (* Start Now *)
       update_form_ref (fun f -> {f with start_now = not f.start_now}) ;
       s
-  | 13 ->
+  | 14 ->
       (* Extra Args -> open flag explorer *)
       open_binary_help s
-  | 14 -> (
+  | 15 -> (
       (* Confirm *)
       let f = !form_ref in
       let selected_node = find_node s.service_states f.parent_node in
@@ -682,6 +699,9 @@ let edit_field s =
             base_dir = Some base_dir;
             delegates = f.delegates;
             dal_endpoint;
+            liquidity_baking_vote =
+              (if String.trim f.liquidity_baking_vote = "" then None
+              else Some (String.trim f.liquidity_baking_vote));
             extra_args;
             service_user = f.service_user;
             app_bin_dir = f.app_bin_dir;
@@ -778,13 +798,18 @@ let view s ~focus:_ ~size =
   in
   let valid_base_dir = is_nonempty f.base_dir in
   let valid_delegates = List.for_all is_nonempty f.delegates in
+  let valid_lb_vote =
+    let vote = String.lowercase_ascii (String.trim f.liquidity_baking_vote) in
+    vote = "on" || vote = "off" || vote = "pass"
+  in
   let valid_service_user =
     is_nonempty f.service_user && service_user_valid ~user:f.service_user
   in
   let valid_app_bin_dir = has_octez_baker_binary f.app_bin_dir in
   let all_ok =
     valid_instance && valid_node_dir && valid_node_endpoint && valid_base_dir
-    && valid_delegates && valid_service_user && valid_app_bin_dir && valid_dal
+    && valid_delegates && valid_lb_vote && valid_service_user
+    && valid_app_bin_dir && valid_dal
   in
   let status ok = if ok then "✓" else "✗" in
   let items =
@@ -801,6 +826,7 @@ let view s ~focus:_ ~size =
       ("Node Data Dir", node_data_dir, valid_node_dir);
       ("Baker Base Dir", f.base_dir, valid_base_dir);
       ("Delegates", delegate_label f.delegates, valid_delegates);
+      ("Liquidity Baking Vote", f.liquidity_baking_vote, valid_lb_vote);
       ("Service User", f.service_user, valid_service_user);
       ("App Bin Dir", f.app_bin_dir, valid_app_bin_dir);
       ( "Logging",

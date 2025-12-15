@@ -912,6 +912,11 @@ let install_baker (request : baker_request) =
     | Some ep when String.trim ep <> "" -> Some (endpoint_of_rpc ep)
     | _ -> None
   in
+  let liquidity_baking_vote =
+    match request.liquidity_baking_vote with
+    | Some vote when String.trim vote <> "" -> String.trim vote
+    | _ -> ""
+  in
   let node_mode_env =
     match resolved_node_mode with `Local -> "local" | `Remote -> "remote"
   in
@@ -942,6 +947,7 @@ let install_baker (request : baker_request) =
             match dal_endpoint with Some ep -> ep | None -> "" );
           ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
           ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
+          ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
           ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
         ];
       extra_paths = [base_dir];
