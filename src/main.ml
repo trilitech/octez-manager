@@ -501,9 +501,9 @@ let install_baker_cmd =
       value & flag
       & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
   in
-  let make instance_opt node_instance node_data_dir node_endpoint base_dir network
-      delegates dal_endpoint_opt liquidity_baking_vote_opt extra_args service_user
-      app_bin_dir no_enable logging_mode =
+  let make instance_opt node_instance node_data_dir node_endpoint base_dir
+      network delegates dal_endpoint_opt liquidity_baking_vote_opt extra_args
+      service_user app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
@@ -539,7 +539,9 @@ let install_baker_cmd =
                 let dal_config_result =
                   match normalize_opt_string dal_endpoint_opt with
                   | Some ep ->
-                      let normalized = String.lowercase_ascii (String.trim ep) in
+                      let normalized =
+                        String.lowercase_ascii (String.trim ep)
+                      in
                       if normalized = "none" || normalized = "disabled" then
                         Ok Dal_disabled
                       else Ok (Dal_endpoint ep)
@@ -891,6 +893,17 @@ let install_dal_node_cmd =
       & opt string "127.0.0.1:10732"
       & info ["rpc-addr"] ~doc:"DAL node RPC address" ~docv:"ADDR")
   in
+  let net_addr =
+    Arg.(
+      value & opt string "0.0.0.0:11732"
+      & info ["net-addr"] ~doc:"DAL node P2P address" ~docv:"ADDR")
+  in
+  let endpoint =
+    Arg.(
+      value
+      & opt string "http://127.0.0.1:8732"
+      & info ["endpoint"] ~doc:"Tezos node RPC endpoint" ~docv:"URI")
+  in
   let extra_args =
     Arg.(
       value & opt_all string []
@@ -918,8 +931,8 @@ let install_dal_node_cmd =
     Arg.(
       value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
   in
-  let make instance_opt network data_dir_opt rpc_addr extra_args service_user
-      app_bin_dir no_enable logging_mode =
+  let make instance_opt network data_dir_opt rpc_addr net_addr endpoint
+      extra_args service_user app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
@@ -940,7 +953,18 @@ let install_dal_node_cmd =
               | _ -> Common.default_role_dir "dal-node" instance
             in
             let service_args =
-              ["run"; "--data-dir"; data_dir; "--rpc-addr"; rpc_addr] @ extra_args
+              [
+                "run";
+                "--data-dir";
+                data_dir;
+                "--rpc-addr";
+                rpc_addr;
+                "--net-addr";
+                net_addr;
+                "--endpoint";
+                endpoint;
+              ]
+              @ extra_args
             in
             let req : daemon_request =
               {
@@ -950,7 +974,7 @@ let install_dal_node_cmd =
                 history_mode = History_mode.default;
                 data_dir;
                 rpc_addr;
-                net_addr = rpc_addr;
+                net_addr;
                 service_user;
                 app_bin_dir;
                 logging_mode;
@@ -972,8 +996,9 @@ let install_dal_node_cmd =
   let term =
     Term.(
       ret
-        (const make $ instance $ network $ data_dir_opt $ rpc_addr $ extra_args
-       $ service_user $ app_bin_dir $ auto_enable $ logging_mode_term))
+        (const make $ instance $ network $ data_dir_opt $ rpc_addr $ net_addr
+       $ endpoint $ extra_args $ service_user $ app_bin_dir $ auto_enable
+       $ logging_mode_term))
   in
   let info =
     Cmd.info "install-dal-node" ~doc:"Install an octez-dal-node service"
@@ -1257,10 +1282,9 @@ let instance_term =
   in
   Term.(
     ret
-      (const run $ instance $ action $ delete_data_dir
-     $ snapshot_uri_override $ snapshot_kind_override
-     $ snapshot_network_override $ snapshot_history_mode_override
-     $ snapshot_no_check))
+      (const run $ instance $ action $ delete_data_dir $ snapshot_uri_override
+     $ snapshot_kind_override $ snapshot_network_override
+     $ snapshot_history_mode_override $ snapshot_no_check))
 
 let instance_cmd =
   let info = Cmd.info "instance" ~doc:"Manage existing Octez services." in
@@ -1306,7 +1330,8 @@ let purge_all_cmd =
                 let role = svc.S.role in
                 Format.printf "Purging instance '%s' (%s)...@." instance role ;
                 match Installer.purge_service ~instance with
-                | Ok () -> Format.printf "  ✓ Successfully purged '%s'@." instance
+                | Ok () ->
+                    Format.printf "  ✓ Successfully purged '%s'@." instance
                 | Error (`Msg msg) ->
                     Format.eprintf "  ✗ Failed to purge '%s': %s@." instance msg ;
                     failures := (instance, msg) :: !failures)
@@ -1523,7 +1548,7 @@ let ui_cmd =
              let result =
                Eio_main.run @@ fun env ->
                Eio.Switch.run @@ fun sw ->
-               Miaou_helpers.Fiber_runtime.init ~env ~sw;
+               Miaou_helpers.Fiber_runtime.init ~env ~sw ;
                Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
              in
              match result with
