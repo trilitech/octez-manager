@@ -379,6 +379,16 @@ let resolve_node_endpoint s =
   | Some svc -> node_endpoint_of_service svc.Data.Service_state.service
   | None -> endpoint_with_scheme s.form.node_endpoint
 
+let resolve_dal_config s =
+  match s.form.dal with
+  | Dal_none -> Dal_disabled
+  | Dal_endpoint ep -> Dal_endpoint (endpoint_with_scheme ep)
+  | Dal_instance inst -> (
+      match find_dal s.service_states inst with
+      | Some svc ->
+          Dal_endpoint (dal_endpoint_of_service svc.Data.Service_state.service)
+      | None -> Dal_auto)
+
 let init () =
   ensure_defaults () ;
   let service_states = Data.load_service_states () in
@@ -613,17 +623,7 @@ let edit_field s =
         | `Remote -> true
       in
       let node_endpoint = resolve_node_endpoint s in
-      let dal_config =
-        match s.form.dal with
-        | Dal_none -> Dal_disabled
-        | Dal_endpoint ep -> Dal_endpoint (endpoint_with_scheme ep)
-        | Dal_instance inst -> (
-            match find_dal s.service_states inst with
-            | Some svc ->
-                Dal_endpoint
-                  (dal_endpoint_of_service svc.Data.Service_state.service)
-            | None -> Dal_auto)
-      in
+      let dal_config = resolve_dal_config s in
       if instance = "" then (
         show_error ~title:"Error" "Instance name is required." ;
         s)
