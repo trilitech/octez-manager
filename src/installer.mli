@@ -94,6 +94,9 @@ val refresh_instance_from_snapshot :
 module For_tests : sig
   type file_backup
 
+  val validate_instance_name_unique :
+    instance:string -> (unit, [`Msg of string]) result
+
   val ensure_logging_base_directory :
     owner:string ->
     group:string ->
