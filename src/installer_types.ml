@@ -48,6 +48,7 @@ type baker_request = {
   base_dir : string option;
   delegates : string list;
   dal_endpoint : string option;
+  liquidity_baking_vote : string option;
   extra_args : string list;
   service_user : string;
   app_bin_dir : string;
