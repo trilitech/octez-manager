@@ -2138,6 +2138,17 @@ let systemd_baker_exec_line_local () =
     true
     (string_contains ~needle:"run with local node" exec)
 
+let systemd_baker_exec_line_lb_vote () =
+  let exec = Systemd.For_tests.exec_line "baker" in
+  Alcotest.(check bool)
+    "includes liquidity-baking-toggle-vote flag"
+    true
+    (string_contains ~needle:"--liquidity-baking-toggle-vote" exec) ;
+  Alcotest.(check bool)
+    "references OCTEZ_BAKER_LB_VOTE env var"
+    true
+    (string_contains ~needle:"OCTEZ_BAKER_LB_VOTE" exec)
+
 let system_user_validate_missing () =
   match
     System_user.validate_user_for_service ~user:"__missing_octez_user__"
@@ -2700,6 +2711,10 @@ let () =
             "baker exec local"
             `Quick
             systemd_baker_exec_line_local;
+          Alcotest.test_case
+            "baker exec line lb vote"
+            `Quick
+            systemd_baker_exec_line_lb_vote;
         ] );
       ( "system_user",
         [
