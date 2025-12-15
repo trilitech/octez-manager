@@ -38,6 +38,8 @@ type daemon_request = {
 
 type baker_node_mode = [`Auto | `Local | `Remote]
 
+type dal_config = Dal_auto | Dal_disabled | Dal_endpoint of string
+
 type baker_request = {
   instance : string;
   network : string option;
@@ -47,7 +49,7 @@ type baker_request = {
   node_mode : baker_node_mode;
   base_dir : string option;
   delegates : string list;
-  dal_endpoint : string option;
+  dal_config : dal_config;
   liquidity_baking_vote : string option;
   extra_args : string list;
   service_user : string;

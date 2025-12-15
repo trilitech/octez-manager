@@ -115,7 +115,7 @@ let create_baker_flow ~services ~on_success =
                     node_mode = `Auto;
                     base_dir = None;
                     delegates;
-                    dal_endpoint = None;
+                    dal_config = Dal_auto;
                     liquidity_baking_vote = None;
                     extra_args = [];
                     service_user = "octez";

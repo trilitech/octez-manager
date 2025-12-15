@@ -379,16 +379,6 @@ let resolve_node_endpoint s =
   | Some svc -> node_endpoint_of_service svc.Data.Service_state.service
   | None -> endpoint_with_scheme s.form.node_endpoint
 
-let resolve_dal_endpoint s =
-  match s.form.dal with
-  | Dal_none -> None
-  | Dal_endpoint ep -> Some (endpoint_with_scheme ep)
-  | Dal_instance inst -> (
-      match find_dal s.service_states inst with
-      | Some svc ->
-          Some (dal_endpoint_of_service svc.Data.Service_state.service)
-      | None -> None)
-
 let init () =
   ensure_defaults () ;
   let service_states = Data.load_service_states () in
@@ -623,7 +613,17 @@ let edit_field s =
         | `Remote -> true
       in
       let node_endpoint = resolve_node_endpoint s in
-      let dal_endpoint = resolve_dal_endpoint s in
+      let dal_config =
+        match s.form.dal with
+        | Dal_none -> Dal_disabled
+        | Dal_endpoint ep -> Dal_endpoint (endpoint_with_scheme ep)
+        | Dal_instance inst -> (
+            match find_dal s.service_states inst with
+            | Some svc ->
+                Dal_endpoint
+                  (dal_endpoint_of_service svc.Data.Service_state.service)
+            | None -> Dal_auto)
+      in
       if instance = "" then (
         show_error ~title:"Error" "Instance name is required." ;
         s)
@@ -698,7 +698,7 @@ let edit_field s =
             node_mode;
             base_dir = Some base_dir;
             delegates = f.delegates;
-            dal_endpoint;
+            dal_config;
             liquidity_baking_vote =
               (if String.trim f.liquidity_baking_vote = "" then None
               else Some (String.trim f.liquidity_baking_vote));
