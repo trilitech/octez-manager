@@ -205,11 +205,20 @@ let create_dal_node_flow ~on_success =
                 history_mode = History_mode.default;
                 data_dir = Common.default_role_dir "dal-node" instance;
                 rpc_addr = "127.0.0.1:10732";
-                net_addr = "127.0.0.1:10732";
+                net_addr = "0.0.0.0:11732";
                 service_user = "octez";
                 app_bin_dir = "/usr/bin";
                 logging_mode = Logging_mode.Journald;
-                service_args = ["run"; "--rpc-addr"; "127.0.0.1:10732"];
+                service_args =
+                  [
+                    "run";
+                    "--rpc-addr";
+                    "127.0.0.1:10732";
+                    "--net-addr";
+                    "0.0.0.0:11732";
+                    "--endpoint";
+                    "http://127.0.0.1:8732";
+                  ];
                 extra_env = [];
                 extra_paths = [];
                 auto_enable = true;
