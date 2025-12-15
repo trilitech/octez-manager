@@ -870,10 +870,9 @@ let install_signer_cmd =
 
 let install_dal_node_cmd =
   let instance =
+    let doc = "Instance name used for dal-node.env and systemd units." in
     Arg.(
-      required
-      & opt (some string) None
-      & info ["instance"] ~doc:"DAL node instance" ~docv:"NAME")
+      value & opt (some string) None & info ["instance"; "i"] ~doc ~docv:"NAME")
   in
   let network =
     Arg.(
@@ -919,45 +918,56 @@ let install_dal_node_cmd =
     Arg.(
       value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
   in
-  let make instance network data_dir_opt rpc_addr extra_args service_user
+  let make instance_opt network data_dir_opt rpc_addr extra_args service_user
       app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
-        let data_dir =
-          match data_dir_opt with
-          | Some dir when String.trim dir <> "" -> dir
-          | _ -> Common.default_role_dir "dal-node" instance
+        let instance_result =
+          match normalize_opt_string instance_opt with
+          | Some inst -> Ok inst
+          | None ->
+              if is_interactive () then
+                Ok (prompt_required_string "Instance name")
+              else Error "Instance name is required in non-interactive mode"
         in
-        let service_args =
-          ["run"; "--data-dir"; data_dir; "--rpc-addr"; rpc_addr] @ extra_args
-        in
-        let req : daemon_request =
-          {
-            role = "dal-node";
-            instance;
-            network;
-            history_mode = History_mode.default;
-            data_dir;
-            rpc_addr;
-            net_addr = rpc_addr;
-            service_user;
-            app_bin_dir;
-            logging_mode;
-            service_args;
-            extra_env = [];
-            extra_paths = [];
-            auto_enable = not no_enable;
-          }
-        in
-        match Installer.install_daemon req with
-        | Ok service ->
-            Format.printf
-              "Installed %s (%s)\n"
-              service.S.instance
-              service.network ;
-            `Ok ()
-        | Error (`Msg msg) -> cmdliner_error msg)
+        match instance_result with
+        | Error msg -> cmdliner_error msg
+        | Ok instance -> (
+            let data_dir =
+              match data_dir_opt with
+              | Some dir when String.trim dir <> "" -> dir
+              | _ -> Common.default_role_dir "dal-node" instance
+            in
+            let service_args =
+              ["run"; "--data-dir"; data_dir; "--rpc-addr"; rpc_addr] @ extra_args
+            in
+            let req : daemon_request =
+              {
+                role = "dal-node";
+                instance;
+                network;
+                history_mode = History_mode.default;
+                data_dir;
+                rpc_addr;
+                net_addr = rpc_addr;
+                service_user;
+                app_bin_dir;
+                logging_mode;
+                service_args;
+                extra_env = [];
+                extra_paths = [];
+                auto_enable = not no_enable;
+              }
+            in
+            match Installer.install_daemon req with
+            | Ok service ->
+                Format.printf
+                  "Installed %s (%s)\n"
+                  service.S.instance
+                  service.network ;
+                `Ok ()
+            | Error (`Msg msg) -> cmdliner_error msg))
   in
   let term =
     Term.(
