@@ -1514,7 +1514,13 @@ let ui_cmd =
       ret
         (const (fun page log logfile ->
              Capabilities.register () ;
-             match Octez_manager_ui.Manager_app.run ?page ~log ?logfile () with
+             let result =
+               Eio_main.run @@ fun env ->
+               Eio.Switch.run @@ fun sw ->
+               Miaou_helpers.Fiber_runtime.init ~env ~sw;
+               Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
+             in
+             match result with
              | Ok () -> `Ok ()
              | Error (`Msg msg) -> cmdliner_error msg)
         $ page_arg $ log_flag $ logfile_arg))

@@ -6,6 +6,7 @@
   history_mode
   system_user
   logging_mode
+  log_viewer
   node_env
   systemd
   service

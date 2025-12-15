@@ -84,15 +84,16 @@ let force_refresh state =
 
 let maybe_refresh state =
   let now = Unix.gettimeofday () in
-  let next_page = Context.consume_navigation () in
+  let pending_nav = Context.consume_navigation () in
   let state =
-    match next_page with
+    match pending_nav with
     | Some p -> {state with next_page = Some p}
-    | None -> {state with next_page = None}
+    | None -> state  (* Don't clear next_page if already set *)
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
     force_refresh state
-  else state
+  else
+    state
 
 let set_filter state filter =
   let filtered = apply_filter filter state.services in
@@ -428,7 +429,8 @@ let journalctl_args unit_name =
     ["journalctl"; "-u"; unit_name; "--no-pager"; "-n"; "200"]
   else ["journalctl"; "--user"; "-u"; unit_name; "--no-pager"; "-n"; "200"]
 
-let view_logs state =
+(* Replaced by log_viewer page navigation *)
+let _view_logs_old state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
       let title = Printf.sprintf "Logs · %s" svc.Service.instance in
@@ -640,7 +642,9 @@ let instance_actions_modal state =
                     ~service:instance
                   |> Result.map_error (fun e -> `Msg e))
           | `RefreshSnapshot -> refresh_modal state |> ignore
-          | `Logs -> view_logs state |> ignore
+          | `Logs ->
+              Context.set_pending_instance_detail instance ;
+              Context.navigate Log_viewer_page.name
           | `Remove -> remove_modal state |> ignore) ;
       state)
 

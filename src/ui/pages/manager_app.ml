@@ -15,7 +15,8 @@ let register_pages () =
   Instance_details.register () ;
   Install_node_form.register () ;
   Install_baker_form.register () ;
-  Diagnostics.register ()
+  Diagnostics.register () ;
+  Log_viewer_page.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in
@@ -46,14 +47,18 @@ let run ?page ?(log = false) ?logfile () =
   Runtime.initialize ~log ?logfile () ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
-    if !quit_requested then Ok ()
+    if !quit_requested then raise Exit
     else
       let* current_page = find_page_or_default current_name Instances.name in
-      match Miaou_driver_term.Lambda_term_driver.run current_page with
-      | `Quit -> Ok ()
-      | `SwitchTo "__EXIT__" -> Ok ()
+      let result = Miaou_driver_term.Lambda_term_driver.run current_page in
+      match result with
+      | `Quit -> raise Exit
+      | `SwitchTo "__EXIT__" -> raise Exit
       | `SwitchTo "__BACK__" -> (
-          match history with [] -> Ok () | prev :: rest -> loop rest prev)
+          match history with
+          | [] -> raise Exit
+          | prev :: rest -> loop rest prev)
       | `SwitchTo next_page -> loop (current_name :: history) next_page
   in
-  try loop [] start_name with Exit | Sys.Break -> Ok ()
+  (try loop [] start_name with
+  | Exit | Sys.Break -> Ok ())
