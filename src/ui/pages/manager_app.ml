@@ -15,6 +15,7 @@ let register_pages () =
   Instance_details.register () ;
   Install_node_form.register () ;
   Install_baker_form.register () ;
+  Install_accuser_form.register () ;
   Diagnostics.register () ;
   Log_viewer_page.register ()
 
