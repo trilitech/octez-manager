@@ -114,6 +114,7 @@ _octez-manager() {
         install-node)
           _arguments \
             '--instance=[Instance name]:instance:' \
+            '-i=[Instance name]:instance:' \
             '--network=[Network name]:network:' \
             '--rpc-addr=[RPC address]:address:' \
             '--net-addr=[P2P network address]:address:' \
@@ -121,11 +122,13 @@ _octez-manager() {
             '--service-user=[Service user]:user:_users' \
             '--app-bin-dir=[Octez binary directory]:directory:_directories' \
             '--data-dir=[Data directory]:directory:_directories' \
+            '--extra-arg=[Additional node arguments]:arg:' \
             '--snapshot[Enable snapshot import]' \
             '--snapshot-uri=[Snapshot URI]:uri:_urls' \
             '--snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds' \
             '--snapshot-no-check[Skip snapshot validation]' \
             '--no-enable[Do not enable service on boot]' \
+            '--journald[Send logs to journald]' \
             '--log-file=[Log file path]:file:_files' \
             '--log-rotate[Enable log rotation]' \
             '(- *)'{-h,--help}'[Show help information]'
@@ -141,11 +144,16 @@ _octez-manager() {
         install-baker)
           _arguments \
             '--instance=[Instance name]:instance:' \
+            '-i=[Instance name]:instance:' \
             '--network=[Network name]:network:' \
             '--node-instance=[Connect to existing node instance]:instance:' \
+            '--node-data-dir=[Node data directory]:directory:_directories' \
             '--node-endpoint=[Node RPC endpoint]:endpoint:_urls' \
+            '--base-dir=[Baker base directory]:directory:_directories' \
+            '--delegate=[Delegate key]:key:' \
             '--liquidity-baking-vote=[Liquidity baking vote]:vote:->lb-votes' \
             '--dal-endpoint=[DAL node endpoint]:endpoint:_urls' \
+            '--extra-arg=[Additional baker arguments]:arg:' \
             '--service-user=[Service user]:user:_users' \
             '--app-bin-dir=[Octez binary directory]:directory:_directories' \
             '--no-enable[Do not enable service on boot]' \
@@ -160,8 +168,9 @@ _octez-manager() {
           _arguments \
             '--instance=[Instance name]:instance:' \
             '--network=[Network name]:network:' \
-            '--node-instance=[Connect to existing node instance]:instance:' \
-            '--node-endpoint=[Node RPC endpoint]:endpoint:_urls' \
+            '--endpoint=[RPC endpoint to monitor]:endpoint:_urls' \
+            '--base-dir=[Accuser base directory]:directory:_directories' \
+            '--extra-arg=[Additional octez-accuser arguments]:arg:' \
             '--service-user=[Service user]:user:_users' \
             '--app-bin-dir=[Octez binary directory]:directory:_directories' \
             '--no-enable[Do not enable service on boot]' \
@@ -170,8 +179,11 @@ _octez-manager() {
         install-signer)
           _arguments \
             '--instance=[Instance name]:instance:' \
-            '--net-addr=[Network address for signer]:address:' \
+            '--network=[Network label]:network:' \
+            '--base-dir=[Signer data directory]:directory:_directories' \
+            '--port=[TCP port for the signer]:port:' \
             '--authorize=[Authorize key (NAME:KEY)]:auth:' \
+            '--no-auth[Disable --require-authentication]' \
             '--service-user=[Service user]:user:_users' \
             '--app-bin-dir=[Octez binary directory]:directory:_directories' \
             '--no-enable[Do not enable service on boot]' \
@@ -180,8 +192,12 @@ _octez-manager() {
         install-dal-node)
           _arguments \
             '--instance=[Instance name]:instance:' \
-            '--endpoint=[Tezos node endpoint]:endpoint:_urls' \
-            '--net-addr=[P2P network address]:address:' \
+            '-i=[Instance name]:instance:' \
+            '--data-dir=[DAL node data directory]:directory:_directories' \
+            '--rpc-addr=[DAL node RPC address]:address:' \
+            '--net-addr=[DAL node P2P address]:address:' \
+            '--endpoint=[Tezos node RPC endpoint]:endpoint:_urls' \
+            '--extra-arg=[Additional dal-node arguments]:arg:' \
             '--service-user=[Service user]:user:_users' \
             '--app-bin-dir=[Octez binary directory]:directory:_directories' \
             '--no-enable[Do not enable service on boot]' \
@@ -240,4 +256,6 @@ _octez-manager() {
   esac
 }
 
-_octez-manager "$@"
+if [[ -n $ZSH_VERSION ]]; then
+  compdef _octez-manager octez-manager
+fi
