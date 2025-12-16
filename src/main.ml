@@ -836,8 +836,9 @@ let install_accuser_cmd =
           | Some dir when String.trim dir <> "" -> dir
           | _ -> data_dir
         in
+        (* Global options must come before 'run accuser' subcommand *)
         let service_args =
-          ["run"; "--endpoint"; endpoint; "--base-dir"; final_base_dir]
+          ["--endpoint"; endpoint; "--base-dir"; final_base_dir; "run"; "accuser"]
           @ extra_args
         in
         let req : daemon_request =
