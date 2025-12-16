@@ -1,7 +1,8 @@
 type network_info = {
   alias : string;
   network_url : string;
-  human_name : string option;
+  chain_name : string;
+  human_name : string;
   description : string option;
   faucet_url : string option;
   rpc_url : string option;
@@ -24,6 +25,9 @@ val resolve_network_for_octez_node :
   ?fetch:(unit -> (network_info list, Rresult.R.msg) result) ->
   string ->
   (string, [> Rresult.R.msg]) result
+
+val resolve_octez_node_chain :
+  endpoint:string -> (string, [> `Msg of string]) result
 
 module For_tests : sig
   val fetch_json_with :
