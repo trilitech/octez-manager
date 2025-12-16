@@ -57,7 +57,7 @@ let apply_filter filter services =
         services
 
 let clamp_selection filtered idx =
-  let len = List.length filtered + 2 in
+  let len = List.length filtered + 3 in
   max 0 (min idx (len - 1))
 
 let load_services () = Data.load_service_states ()
@@ -88,12 +88,11 @@ let maybe_refresh state =
   let state =
     match pending_nav with
     | Some p -> {state with next_page = Some p}
-    | None -> state  (* Don't clear next_page if already set *)
+    | None -> state (* Don't clear next_page if already set *)
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
     force_refresh state
-  else
-    state
+  else state
 
 let set_filter state filter =
   let filtered = apply_filter filter state.services in
@@ -120,8 +119,8 @@ let cycle_filter state =
     set_filter state next_filter
 
 let current_service state =
-  if state.selected < 2 then None
-  else List.nth_opt state.filtered (state.selected - 2)
+  if state.selected < 3 then None
+  else List.nth_opt state.filtered (state.selected - 3)
 
 let with_service state handler =
   match current_service state with
@@ -255,7 +254,7 @@ let network_short (n : string) =
 
 let line_for_service idx selected (st : Service_state.t) =
   let svc = st.Service_state.service in
-  let marker = if idx + 2 = selected then Widgets.bold "➤" else " " in
+  let marker = if idx + 3 = selected then Widgets.bold "➤" else " " in
   let status = status_icon st in
   let enabled = enabled_badge st in
   let role_str =
@@ -312,6 +311,10 @@ let table_lines state =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
   in
+  let manage_wallet_row =
+    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
+  in
   let instance_rows =
     if state.filtered = [] then
       ["  No managed instances match the current filter."]
@@ -319,7 +322,7 @@ let table_lines state =
       state.filtered
       |> List.mapi (fun idx svc -> line_for_service idx state.selected svc)
   in
-  install_row :: "" :: instance_rows
+  install_row :: manage_wallet_row :: "" :: instance_rows
 
 let summary_line state =
   let total = List.length state.services in
@@ -752,8 +755,29 @@ let go_to_diagnostics state =
   Context.navigate Diagnostics.name ;
   state
 
+let manage_wallet_modal state =
+  Modal_helpers.select_client_base_dir_modal
+    ~on_select:(fun path ->
+      let content =
+        Printf.sprintf
+          "# Wallet Management\n\n\
+           Using wallet directory: `%s`\n\n\
+           ## No Wallet UI Yet\n\n\
+           Octez Manager does not provide a wallet interface yet.\n\
+           Please use `octez-client` to manage keys and addresses.\n\n\
+           For documentation, see: https://octez.tezos.com"
+          path
+      in
+      let rendered = Miaou.Internal.Modal_utils.markdown_to_ansi content in
+      Modal_helpers.open_text_modal
+        ~title:"Wallet Management"
+        ~lines:(String.split_on_char '\n' rendered))
+    () ;
+  state
+
 let activate_selection s =
   if s.selected = 0 then create_menu_modal s
+  else if s.selected = 1 then manage_wallet_modal s
   else
     match current_service s with
     | Some _ -> instance_actions_modal s
@@ -783,7 +807,8 @@ struct
   let back s = s
 
   let handled_keys () =
-    Miaou.Core.Keys.[Enter; Char "c"; Char "f"; Char "b"; Char "r"; Char "R"; Char "d"]
+    Miaou.Core.Keys.
+      [Enter; Char "c"; Char "f"; Char "b"; Char "r"; Char "R"; Char "d"]
 
   let keymap _ =
     [
@@ -858,7 +883,7 @@ struct
     else
       let raw = s.selected + delta in
       let selected = clamp_selection s.filtered raw in
-      let selected = if selected = 1 then selected + delta else selected in
+      let selected = if selected = 2 then selected + delta else selected in
       let selected = clamp_selection s.filtered selected in
       {s with selected}
 
@@ -897,9 +922,12 @@ struct
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 end
 
-module Page = Monitored_page.Make(Page_Impl)(struct
-  let page_name = "instances"
-end)
+module Page =
+  Monitored_page.Make
+    (Page_Impl)
+    (struct
+      let page_name = "instances"
+    end)
 
 let page : Miaou.Core.Registry.page =
   (module Page : Miaou.Core.Tui_page.PAGE_SIG)

@@ -46,10 +46,20 @@ let list_dir path =
 let probe_writable path =
   try
     if Sys.file_exists path then (
-      let oc = open_out_gen [Open_wronly; Open_append] 0 path in
-      close_out oc ;
-      Ok true)
+      (* If it's a directory, test writability by creating a temp file inside *)
+      if Sys.is_directory path then (
+        let tmp = Filename.concat path ".write_test_tmp" in
+        let oc = open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o600 tmp in
+        close_out oc ;
+        Sys.remove tmp ;
+        Ok true)
+      else (
+        (* For files, try to open with append *)
+        let oc = open_out_gen [Open_wronly; Open_append] 0 path in
+        close_out oc ;
+        Ok true))
     else (
+      (* Path doesn't exist - test parent directory writability *)
       ensure_dir (Filename.dirname path) ;
       let tmp =
         Filename.concat (Filename.dirname path) (Filename.basename path ^ ".tmp")

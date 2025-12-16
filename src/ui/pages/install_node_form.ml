@@ -673,27 +673,21 @@ let edit_field s =
       s
   | 3 ->
       (* Data Dir *)
-      prompt_validated_text_modal
-        ~title:"Data Directory"
-        ~initial:!form_ref.data_dir
-        ~validator:(fun v ->
-          let trimmed = String.trim v in
-          if trimmed = "" then Error "Data directory cannot be empty"
-          else if data_dir_in_use ~states:s.service_states trimmed then
-            Error "This data directory is already used by a registered instance"
-          else Ok ())
-        ~on_submit:(fun v ->
-          update_form_ref (fun f ->
-              {f with data_dir = v; preserve_data = `Auto}))
+      Modal_helpers.select_node_data_dir_modal
+        ~on_select:(fun path ->
+          if data_dir_in_use ~states:s.service_states path then
+            Modal_helpers.show_error
+              ~title:"Data Directory"
+              "This directory is already used by another service"
+          else
+            update_form_ref (fun f -> {f with data_dir = path; preserve_data = `Auto}))
         () ;
       s
   | 4 ->
       (* App Bin Dir *)
-      prompt_text_modal
-        ~title:"App Bin Directory"
-        ~initial:!form_ref.app_bin_dir
-        ~on_submit:(fun v ->
-          update_form_ref (fun f -> {f with app_bin_dir = v}))
+      Modal_helpers.select_app_bin_dir_modal
+        ~on_select:(fun path ->
+          update_form_ref (fun f -> {f with app_bin_dir = path}))
         () ;
       s
   | 5 ->

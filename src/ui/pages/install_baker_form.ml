@@ -190,8 +190,17 @@ let find_dal states inst =
 let dal_endpoint_of_service (svc : Service.t) =
   endpoint_with_scheme svc.Service.rpc_addr
 
-let delegate_label delegates =
-  match delegates with [] -> "(none)" | lst -> String.concat ", " lst
+let delegate_label ?(max_width = 50) delegates =
+  match delegates with
+  | [] -> "(none)"
+  | [single] ->
+      (* Truncate single delegate if too long *)
+      if String.length single > max_width then
+        String.sub single 0 (max_width - 3) ^ "..."
+      else single
+  | lst ->
+      (* Multiple delegates: just show count *)
+      Printf.sprintf "%d delegates" (List.length lst)
 
 let baker_node_mode s =
   match find_node s.service_states s.form.parent_node with
@@ -510,36 +519,60 @@ let edit_field s =
       s
   | 5 ->
       (* Node Data Dir *)
-      prompt_validated_text_modal
-        ~title:"Node Data Directory"
-        ~initial:!form_ref.node_data_dir
-        ~validator:(fun _ -> Ok ())
-        ~on_submit:(fun v ->
-          update_form_ref (fun f -> {f with node_data_dir = v}))
+      Modal_helpers.select_node_data_dir_modal
+        ~on_select:(fun path ->
+          update_form_ref (fun f -> {f with node_data_dir = path}))
         () ;
       s
   | 6 ->
       (* Baker Base Dir *)
-      prompt_text_modal
-        ~title:"Baker Base Directory"
-        ~initial:!form_ref.base_dir
-        ~on_submit:(fun v -> update_form_ref (fun f -> {f with base_dir = v}))
+      Modal_helpers.select_client_base_dir_modal
+        ~on_select:(fun path ->
+          update_form_ref (fun f -> {f with base_dir = path}))
         () ;
       s
   | 7 ->
       (* Delegates *)
-      let delegates = !form_ref.delegates in
-      let removable = List.map (fun d -> `Remove d) delegates in
-      let items =
+      let build_items () =
+        let delegates = !form_ref.delegates in
+        let base_dir = !form_ref.base_dir in
+
+        (* Read available keys from base_dir if specified *)
+        let available_keys =
+          if String.trim base_dir = "" then []
+          else
+            match Keys_reader.read_public_key_hashes ~base_dir with
+            | Ok keys -> keys
+            | Error _ -> []
+        in
+
+        (* Build items list: available keys to toggle, then add/remove options *)
+        let key_items = List.map (fun k -> `ToggleKey k) available_keys in
+        let removable = List.map (fun d -> `Remove d) delegates in
         let base = if delegates = [] then removable else `Clear :: removable in
-        `Add :: base
+        key_items @ [`Add] @ base
       in
+
       let to_string = function
-        | `Add -> "Add delegate"
+        | `ToggleKey k ->
+            let delegates = !form_ref.delegates in
+            let checked = List.mem k.Keys_reader.value delegates in
+            let checkbox = if checked then "[x]" else "[ ]" in
+            Printf.sprintf "%s %s (%s)" checkbox k.Keys_reader.name k.Keys_reader.value
+        | `Add -> "Add delegate (manual)"
         | `Clear -> "Clear all"
         | `Remove d -> "Remove: " ^ d
       in
+
       let on_select = function
+        | `ToggleKey k ->
+            (* Toggle the key *)
+            update_form_ref (fun f ->
+                if List.mem k.Keys_reader.value f.delegates then
+                  {f with delegates = List.filter (fun x -> x <> k.Keys_reader.value) f.delegates}
+                else
+                  {f with delegates = f.delegates @ [k.Keys_reader.value]}) ;
+            `KeepOpen
         | `Add ->
             prompt_validated_text_modal
               ~title:"Add Delegate"
@@ -551,13 +584,17 @@ let edit_field s =
                 update_form_ref (fun f ->
                     if List.mem v f.delegates then f
                     else {f with delegates = f.delegates @ [v]}))
-              ()
-        | `Clear -> update_form_ref (fun f -> {f with delegates = []})
+              () ;
+            `KeepOpen
+        | `Clear ->
+            update_form_ref (fun f -> {f with delegates = []}) ;
+            `KeepOpen
         | `Remove d ->
             update_form_ref (fun f ->
-                {f with delegates = List.filter (fun x -> x <> d) f.delegates})
+                {f with delegates = List.filter (fun x -> x <> d) f.delegates}) ;
+            `KeepOpen
       in
-      open_choice_modal ~title:"Delegates" ~items ~to_string ~on_select ;
+      Modal_helpers.open_multiselect_modal ~title:"Delegates" ~items:build_items ~to_string ~on_select ;
       s
   | 8 ->
       (* Liquidity Baking Vote *)

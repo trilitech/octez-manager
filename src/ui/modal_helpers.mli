@@ -16,6 +16,13 @@ val open_choice_modal_with_hint :
   on_select:('a -> unit) ->
   unit
 
+val open_multiselect_modal :
+  title:string ->
+  items:(unit -> 'a list) ->
+  to_string:('a -> string) ->
+  on_select:('a -> [< `KeepOpen | `Close ]) ->
+  unit
+
 val prompt_text_modal :
   ?title:string ->
   ?width:int ->
@@ -45,3 +52,24 @@ val confirm_modal :
 val show_help_modal : unit -> unit
 
 val show_menu_modal : unit -> unit
+
+val open_file_browser_modal :
+  ?initial_path:string ->
+  dirs_only:bool ->
+  require_writable:bool ->
+  on_select:(string -> unit) ->
+  unit ->
+  unit
+
+val select_directory_modal :
+  title:string ->
+  dir_type:Octez_manager_lib.Directory_registry.dir_type ->
+  on_select:(string -> unit) ->
+  unit ->
+  unit
+
+val select_node_data_dir_modal : on_select:(string -> unit) -> unit -> unit
+
+val select_client_base_dir_modal : on_select:(string -> unit) -> unit -> unit
+
+val select_app_bin_dir_modal : on_select:(string -> unit) -> unit -> unit

@@ -83,9 +83,7 @@ let strip_file_uri s =
 let history_mode_matches ~requested ~snapshot_mode =
   let requested_str = History_mode.to_string requested in
   let requested_lower = String.lowercase_ascii requested_str in
-  let snapshot_lower =
-    String.lowercase_ascii (String.trim snapshot_mode)
-  in
+  let snapshot_lower = String.lowercase_ascii (String.trim snapshot_mode) in
   requested_lower = snapshot_lower
 
 let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
@@ -127,7 +125,7 @@ let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
         network
   | Some entry -> (
       match entry.history_mode with
-      | Some snapshot_mode when String.trim snapshot_mode <> "" ->
+      | Some snapshot_mode when String.trim snapshot_mode <> "" -> (
           if not (history_mode_matches ~requested:history_mode ~snapshot_mode)
           then
             R.error_msgf
@@ -137,7 +135,7 @@ let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
               entry.label
               snapshot_mode
               (History_mode.to_string history_mode)
-          else (
+          else
             match entry.download_url with
             | Some url ->
                 Ok {download_url = String.trim url; network_slug; kind_slug}
@@ -621,12 +619,15 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
 let validate_instance_name_unique ~instance =
   let* services = Service_registry.list () in
   let existing =
-    List.find_opt (fun svc -> String.equal svc.Service.instance instance) services
+    List.find_opt
+      (fun svc -> String.equal svc.Service.instance instance)
+      services
   in
   match existing with
   | Some svc ->
       R.error_msgf
-        "Instance name '%s' is already in use by a %s service. Please choose a different name."
+        "Instance name '%s' is already in use by a %s service. Please choose a \
+         different name."
         instance
         svc.Service.role
   | None -> Ok ()
@@ -909,7 +910,8 @@ let install_baker (request : baker_request) =
   in
   let dal_config =
     match request.dal_config with
-    | Dal_endpoint ep when String.trim ep <> "" -> Dal_endpoint (endpoint_of_rpc ep)
+    | Dal_endpoint ep when String.trim ep <> "" ->
+        Dal_endpoint (endpoint_of_rpc ep)
     | Dal_disabled -> Dal_disabled
     | _ -> Dal_auto
   in
@@ -917,9 +919,8 @@ let install_baker (request : baker_request) =
     match request.liquidity_baking_vote with
     | Some vote when String.trim vote <> "" ->
         let normalized = String.lowercase_ascii (String.trim vote) in
-        if
-          normalized = "on" || normalized = "off" || normalized = "pass"
-        then Ok normalized
+        if normalized = "on" || normalized = "off" || normalized = "pass" then
+          Ok normalized
         else
           R.error_msg
             (Printf.sprintf
@@ -928,8 +929,8 @@ let install_baker (request : baker_request) =
                vote)
     | _ ->
         R.error_msg
-          "Liquidity baking vote is required. Use --liquidity-baking-vote \
-           with 'on', 'off', or 'pass'."
+          "Liquidity baking vote is required. Use --liquidity-baking-vote with \
+           'on', 'off', or 'pass'."
   in
   let node_mode_env =
     match resolved_node_mode with `Local -> "local" | `Remote -> "remote"
