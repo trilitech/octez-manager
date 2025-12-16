@@ -1152,6 +1152,69 @@ let cmd_to_string_tests () =
     "echo 'hello world' 'a'\"'\"'b'"
     (Common.cmd_to_string argv)
 
+let shellwords_parser_tests () =
+  let module FB = Octez_manager_ui.Form_builder_common in
+  let test_case name input expected =
+    Alcotest.(check list_string) name expected (FB.prepare_extra_args input)
+  in
+  (* Basic cases *)
+  test_case "empty string" "" [] ;
+  test_case "whitespace only" "   \t  \n  " [] ;
+  test_case "simple words" "foo bar baz" ["foo"; "bar"; "baz"] ;
+  test_case "multiple spaces" "foo  bar    baz" ["foo"; "bar"; "baz"] ;
+
+  (* Single quotes *)
+  test_case
+    "single quotes preserve spaces"
+    "foo 'bar baz' qux"
+    ["foo"; "bar baz"; "qux"] ;
+  test_case
+    "single quotes preserve everything literally"
+    "'hello world' 'foo\"bar'"
+    ["hello world"; "foo\"bar"] ;
+
+  (* Double quotes *)
+  test_case
+    "double quotes preserve spaces"
+    "foo \"bar baz\" qux"
+    ["foo"; "bar baz"; "qux"] ;
+  test_case
+    "double quotes allow escaping"
+    "\"hello\\\"world\""
+    ["hello\"world"] ;
+
+  (* Backslash escaping *)
+  test_case "escape space outside quotes" "foo\\ bar" ["foo bar"] ;
+  test_case "escape quote" "foo\\\"bar" ["foo\"bar"] ;
+  test_case
+    "backslash in single quotes is literal"
+    "'foo\\bar'"
+    ["foo\\bar"] ;
+
+  (* Mixed quotes *)
+  test_case
+    "mixed single and double"
+    "foo 'bar baz' \"qux quux\" end"
+    ["foo"; "bar baz"; "qux quux"; "end"] ;
+
+  (* Real-world examples *)
+  test_case
+    "typical CLI args"
+    "--endpoint http://localhost:8732 --log-level info"
+    ["--endpoint"; "http://localhost:8732"; "--log-level"; "info"] ;
+  test_case
+    "path with spaces"
+    "--data-dir \"/home/user/my data/node\""
+    ["--data-dir"; "/home/user/my data/node"] ;
+  test_case
+    "complex flag"
+    "--option=\"value with spaces\" --flag"
+    ["--option=value with spaces"; "--flag"] ;
+  test_case
+    "quoted URL"
+    "--peer 'http://example.com:9732' --bootstrap-threshold 1"
+    ["--peer"; "http://example.com:9732"; "--bootstrap-threshold"; "1"]
+
 let home_dir_fallback () =
   let pw = Unix.getpwuid (Unix.geteuid ()) in
   with_env
@@ -2590,6 +2653,7 @@ let () =
         [
           Alcotest.test_case "sh_quote" `Quick sh_quote_tests;
           Alcotest.test_case "cmd_to_string" `Quick cmd_to_string_tests;
+          Alcotest.test_case "shellwords parser" `Quick shellwords_parser_tests;
           Alcotest.test_case "run helpers" `Quick common_run_helpers;
           Alcotest.test_case "run_as self" `Quick common_run_as_self;
         ] );
