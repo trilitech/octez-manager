@@ -4,6 +4,17 @@ open Rresult
 
 let ( let* ) = Result.bind
 
+let is_valid_instance_char c =
+  match c with
+  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> true
+  | _ -> false
+
+let instance_has_valid_chars name =
+  String.for_all is_valid_instance_char name
+
+let invalid_instance_name_error_msg =
+  "Instance name contains invalid characters. " ^ Installer.invalid_instance_name_chars_msg
+
 let require_package_manager () =
   match
     Miaou_interfaces.Capability.get
@@ -24,6 +35,8 @@ let create_node_flow ~on_success =
       let instance = String.trim instance in
       if instance = "" then
         show_error ~title:"Error" "Instance name cannot be empty"
+      else if not (instance_has_valid_chars instance) then
+        show_error ~title:"Error" invalid_instance_name_error_msg
       else
         open_choice_modal
           ~title:"Network"
@@ -97,7 +110,13 @@ let create_baker_flow ~services ~on_success =
           ~title:"Baker Instance Name"
           ~initial:("baker-" ^ parent_node)
           ~on_submit:(fun instance ->
-            prompt_text_modal
+            let instance = String.trim instance in
+            if instance = "" then
+              show_error ~title:"Error" "Instance name cannot be empty"
+            else if not (instance_has_valid_chars instance) then
+              show_error ~title:"Error" invalid_instance_name_error_msg
+            else
+              prompt_text_modal
               ~title:"Delegates (comma separated)"
               ~on_submit:(fun delegates_str ->
                 let delegates =
@@ -145,6 +164,8 @@ let create_accuser_flow ~on_success =
       let instance = String.trim instance in
       if instance = "" then
         show_error ~title:"Error" "Instance name cannot be empty"
+      else if not (instance_has_valid_chars instance) then
+        show_error ~title:"Error" invalid_instance_name_error_msg
       else
         open_choice_modal
           ~title:"Network"
@@ -190,6 +211,8 @@ let create_dal_node_flow ~on_success =
       let instance = String.trim instance in
       if instance = "" then
         show_error ~title:"Error" "Instance name cannot be empty"
+      else if not (instance_has_valid_chars instance) then
+        show_error ~title:"Error" invalid_instance_name_error_msg
       else
         open_choice_modal
           ~title:"Network"
@@ -244,6 +267,8 @@ let create_signer_flow ~on_success =
       let instance = String.trim instance in
       if instance = "" then
         show_error ~title:"Error" "Instance name cannot be empty"
+      else if not (instance_has_valid_chars instance) then
+        show_error ~title:"Error" invalid_instance_name_error_msg
       else
         let request =
           {

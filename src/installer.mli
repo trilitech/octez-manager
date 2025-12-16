@@ -2,6 +2,8 @@ open Installer_types
 
 [@@@warning "-32"]
 
+val invalid_instance_name_chars_msg : string
+
 val install_node : node_request -> (Service.t, [`Msg of string]) result
 
 val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
@@ -89,7 +91,13 @@ val endpoint_of_rpc : string -> string
 module For_tests : sig
   type file_backup
 
+  val validate_instance_name_chars :
+    instance:string -> (unit, [`Msg of string]) result
+
   val validate_instance_name_unique :
+    instance:string -> (unit, [`Msg of string]) result
+
+  val validate_instance_name :
     instance:string -> (unit, [`Msg of string]) result
 
   val ensure_logging_base_directory :

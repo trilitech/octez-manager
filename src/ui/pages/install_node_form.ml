@@ -565,6 +565,14 @@ let instance_in_use ?states name =
          String.equal target (normalized s.service.Service.instance))
        states
 
+let is_valid_instance_char c =
+  match c with
+  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> true
+  | _ -> false
+
+let instance_has_valid_chars name =
+  String.for_all is_valid_instance_char name
+
 let append_extra_args tokens =
   if tokens = [] then ()
   else
@@ -991,6 +999,7 @@ let view s ~focus:_ ~size =
       let is_nonempty s = String.trim s <> "" in
       let valid_instance =
         is_nonempty f.instance_name
+        && instance_has_valid_chars f.instance_name
         && not (instance_in_use ~states:s.service_states f.instance_name)
       in
       let valid_service_user =
