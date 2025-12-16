@@ -45,11 +45,21 @@ let list_dir path =
 
 let probe_writable path =
   try
-    if Sys.file_exists path then (
-      let oc = open_out_gen [Open_wronly; Open_append] 0 path in
-      close_out oc ;
-      Ok true)
+    if Sys.file_exists path then
+      if Sys.is_directory path then
+        (* For directories, try to create a temp file inside *)
+        let tmp = Filename.concat path ".octez_manager_writable_test" in
+        let oc = open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o600 tmp in
+        close_out oc ;
+        Sys.remove tmp ;
+        Ok true
+      else
+        (* For files, try to open in append mode *)
+        let oc = open_out_gen [Open_wronly; Open_append] 0 path in
+        close_out oc ;
+        Ok true
     else (
+      (* Path doesn't exist - try to create a temp file in parent dir *)
       ensure_dir (Filename.dirname path) ;
       let tmp =
         Filename.concat (Filename.dirname path) (Filename.basename path ^ ".tmp")
