@@ -26,11 +26,21 @@ type ('model, 'value) field_internal = {
 (** Existentially wrapped field (hides the 'value type parameter). *)
 type 'model field = Field : ('model, 'value) field_internal -> 'model field
 
+type 'model pre_submit_modal_config =
+  | PreSubmitModal : {
+      title : string;
+      message : string option;
+      choices : 'choice list;
+      to_string : 'choice -> string;
+      on_choice : 'choice -> 'model -> 'model;
+    } -> 'model pre_submit_modal_config
+
 type 'model spec = {
   title : string;
   initial_model : 'model;
   fields : 'model field list;
   pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;
+  pre_submit_modal : ('model -> 'model pre_submit_modal_config option) option;
   on_submit : 'model -> (unit, [`Msg of string]) result;
 }
 
@@ -372,7 +382,7 @@ struct
     let cursor = max 0 (min max_cursor (s.cursor + delta)) in
     {s with cursor}
 
-  let submit s =
+  let rec submit s =
     let model = !(s.model_ref) in
     (* Check all validations before submitting *)
     let validation_errors =
@@ -393,37 +403,60 @@ struct
           (Printf.sprintf "%s is invalid" label) ;
         s
     | [] -> (
-        (* Run pre-submission validation if provided *)
-        match S.spec.pre_submit with
-        | Some pre_fn -> (
-            match pre_fn model with
-            | Ok () -> (
-                (* Pre-validation passed, proceed with submission *)
-                match S.spec.on_submit model with
-                | Ok () ->
-                    Context.mark_instances_dirty () ;
-                    s.next_page <- Some "instances" ;
-                    s
-                | Error (`Msg msg) ->
-                    Modal_helpers.show_error ~title:"Installation Failed" msg ;
-                    s)
-            | Error (`Msg msg) ->
-                Modal_helpers.show_error ~title:"Validation Failed" msg ;
-                s
-            | Error (`Modal (_title, action)) ->
-                (* Pre-validation wants to show a modal (e.g., "Keep or Refresh data?") *)
-                action () ;
-                s)
-        | None -> (
-            (* No pre-validation, proceed directly *)
+        (* Check if we need to show a pre-submission modal *)
+        match S.spec.pre_submit_modal with
+        | Some modal_fn -> (
+            match modal_fn model with
+            | Some (PreSubmitModal modal_config) ->
+                (* Show choice modal and update model based on selection *)
+                let on_select choice =
+                  s.model_ref := modal_config.on_choice choice !(s.model_ref)
+                in
+                Modal_helpers.open_choice_modal
+                  ~title:modal_config.title
+                  ~items:modal_config.choices
+                  ~to_string:modal_config.to_string
+                  ~on_select ;
+                s  (* Don't proceed with submission - user must submit again *)
+            | None ->
+                (* No modal needed, proceed with normal submission *)
+                proceed_with_submission s model)
+        | None ->
+            (* No pre-submit modal configured, proceed normally *)
+            proceed_with_submission s model)
+
+  and proceed_with_submission s model =
+    (* Run pre-submission validation if provided *)
+    match S.spec.pre_submit with
+    | Some pre_fn -> (
+        match pre_fn model with
+        | Ok () -> (
+            (* Pre-validation passed, proceed with submission *)
             match S.spec.on_submit model with
             | Ok () ->
                 Context.mark_instances_dirty () ;
-                s.next_page <- Some "instances" ;
+                Context.navigate "instances" ;  (* Use Context.navigate for proper history *)
                 s
             | Error (`Msg msg) ->
                 Modal_helpers.show_error ~title:"Installation Failed" msg ;
-                s))
+                s)
+        | Error (`Msg msg) ->
+            Modal_helpers.show_error ~title:"Validation Failed" msg ;
+            s
+        | Error (`Modal (_title, action)) ->
+            (* Pre-validation wants to show a modal (e.g., "Keep or Refresh data?") *)
+            action () ;
+            s)
+    | None -> (
+        (* No pre-validation, proceed directly *)
+        match S.spec.on_submit model with
+        | Ok () ->
+            Context.mark_instances_dirty () ;
+            Context.navigate "instances" ;  (* Use Context.navigate for proper history *)
+            s
+        | Error (`Msg msg) ->
+            Modal_helpers.show_error ~title:"Installation Failed" msg ;
+            s)
 
   let enter s =
     if s.cursor < List.length S.spec.fields then (

@@ -41,6 +41,16 @@
 (** An existentially quantified field wrapper. *)
 type 'model field
 
+(** Configuration for a pre-submission choice modal (with existential type for choices). *)
+type 'model pre_submit_modal_config =
+  | PreSubmitModal : {
+      title : string;
+      message : string option;
+      choices : 'choice list;
+      to_string : 'choice -> string;
+      on_choice : 'choice -> 'model -> 'model;
+    } -> 'model pre_submit_modal_config
+
 (** A specification for an entire form page. *)
 type 'model spec = {
   title : string;
@@ -49,6 +59,11 @@ type 'model spec = {
   (** Pre-submission validation with custom error handling.
       Return Ok() to proceed with submission, or Error to show modal and abort. *)
   pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;
+  (** Optional conditional modal shown before submission.
+      If the function returns Some modal_config, shows a choice modal and updates
+      the model based on user's choice. User must then submit again to proceed.
+      If returns None, proceeds directly to on_submit. *)
+  pre_submit_modal : ('model -> 'model pre_submit_modal_config option) option;
   (** Main submission handler. Can perform async operations, show progress modals, etc.
       Return Ok() for success (navigates to instances), Error for failure (shows error modal). *)
   on_submit : 'model -> (unit, [`Msg of string]) result;
