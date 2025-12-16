@@ -694,8 +694,7 @@ let install_baker_cmd =
                                       instance_map)) ;
                               match
                                 prompt_with_completion
-                                  "DAL node instance (press Enter for default: \
-                                   none)"
+                                  "DAL node instance (press Enter for default: none)"
                                   instance_names
                               with
                               | Some selected ->
@@ -707,15 +706,16 @@ let install_baker_cmd =
                                        dal_services
                                    with
                                   | Some svc ->
+                                      let addr = svc.Service.rpc_addr in
+                                      let addr_lower = String.lowercase_ascii addr in
                                       let endpoint =
-                                        let addr = svc.Service.rpc_addr in
                                         if
                                           String.starts_with
                                             ~prefix:"http://"
-                                            (String.lowercase_ascii addr)
+                                            addr_lower
                                           || String.starts_with
                                                ~prefix:"https://"
-                                               (String.lowercase_ascii addr)
+                                               addr_lower
                                         then addr
                                         else "http://" ^ addr
                                       in
