@@ -823,7 +823,7 @@ let show_menu_modal () =
   let items =
     [
       ("Instances", "instances");
-      ("Install node", "install_node_form");
+      ("Install node", "install_node_form_v2");
       ("Install baker", "install_baker_form_v2");
       ("Install accuser", "install_accuser_form_v2");
     ]
