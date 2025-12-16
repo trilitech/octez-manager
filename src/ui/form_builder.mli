@@ -138,6 +138,7 @@ val custom :
   get:('model -> string) ->
   edit:('model ref -> unit) ->
   ?validate:('model -> bool) ->
+  ?validate_msg:('model -> string option) ->
   unit ->
   'model field
 
