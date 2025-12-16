@@ -127,7 +127,9 @@ let prompt_input ?default question =
     in
     let prompt = Printf.sprintf "%s%s: " question suffix in
     match LNoise.linenoise prompt with
-    | exception Sys.Break -> raise Sys.Break
+    | exception Sys.Break ->
+        prerr_endline "" ;
+        exit 130 (* Standard exit code for Ctrl-C *)
     | exception End_of_file -> Option.map snd default
     | None -> Option.map snd default
     | Some line ->
