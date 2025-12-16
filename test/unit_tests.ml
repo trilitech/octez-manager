@@ -1510,15 +1510,14 @@ let teztnets_parse_pairs_basic () =
   | Ok infos ->
       let pairs =
         List.map
-          (fun (n : Teztnets.network_info) ->
-            (Option.value ~default:n.alias n.human_name, n.network_url))
+          (fun (n : Teztnets.network_info) -> (n.human_name, n.network_url))
           infos
       in
       Alcotest.(check list_pairs)
         "parsed pairs"
         [
           ("Seoulnet", "https://example/seo.json");
-          ("custom", "https://example/custom.json");
+          ("unknown", "https://example/custom.json");
         ]
         pairs
   | Error (`Msg msg) -> Alcotest.failf "parse_networks error: %s" msg
@@ -1535,8 +1534,7 @@ let teztnets_parse_pairs_assoc_keys () =
   | Ok infos ->
       let pairs =
         List.map
-          (fun (n : Teztnets.network_info) ->
-            (Option.value ~default:n.alias n.human_name, n.network_url))
+          (fun (n : Teztnets.network_info) -> (n.human_name, n.network_url))
           infos
       in
       let expected =
@@ -1559,8 +1557,7 @@ let teztnets_parse_pairs_mainnet_without_url () =
   | Ok infos ->
       let pairs =
         List.map
-          (fun (n : Teztnets.network_info) ->
-            (Option.value ~default:n.alias n.human_name, n.network_url))
+          (fun (n : Teztnets.network_info) -> (n.human_name, n.network_url))
           infos
       in
       Alcotest.(check list_pairs)
@@ -1583,13 +1580,12 @@ let teztnets_list_networks_custom_fetch () =
   | Ok infos ->
       let pairs =
         List.map
-          (fun (n : Teztnets.network_info) ->
-            (Option.value ~default:n.alias n.human_name, n.network_url))
+          (fun (n : Teztnets.network_info) -> (n.human_name, n.network_url))
           infos
       in
       Alcotest.(check list_pairs)
         "list networks"
-        [("Seoulnet", "https://example/seoul.json"); ("ghostnet", "ghostnet")]
+        [("Seoulnet", "https://example/seoul.json"); ("unknown", "ghostnet")]
         pairs
   | Error (`Msg msg) -> Alcotest.failf "list_networks error: %s" msg
 
@@ -1598,8 +1594,7 @@ let teztnets_list_networks_fallback_fetch () =
   | Ok infos ->
       let pairs =
         List.map
-          (fun (n : Teztnets.network_info) ->
-            (Option.value ~default:n.alias n.human_name, n.network_url))
+          (fun (n : Teztnets.network_info) -> (n.human_name, n.network_url))
           infos
       in
       Alcotest.(check list_pairs) "fallback" Teztnets.fallback_pairs pairs
@@ -1610,8 +1605,7 @@ let teztnets_list_networks_empty_json_fallback () =
   | Ok infos ->
       let pairs =
         List.map
-          (fun (n : Teztnets.network_info) ->
-            (Option.value ~default:n.alias n.human_name, n.network_url))
+          (fun (n : Teztnets.network_info) -> (n.human_name, n.network_url))
           infos
       in
       Alcotest.(check list_pairs) "fallback" Teztnets.fallback_pairs pairs
@@ -1630,14 +1624,13 @@ let teztnets_parse_top_level_list () =
   | Ok infos ->
       let pairs =
         List.map
-          (fun (n : Teztnets.network_info) ->
-            (Option.value ~default:n.alias n.human_name, n.network_url))
+          (fun (n : Teztnets.network_info) -> (n.human_name, n.network_url))
           infos
       in
       Alcotest.(check list_pairs)
         "top-level list"
         [
-          ("Alpha", "https://example/a.json"); ("beta", "https://example/b.json");
+          ("Alpha", "https://example/a.json"); ("unknown", "https://example/b.json");
         ]
         pairs
   | Error (`Msg msg) -> Alcotest.failf "parse top-level list error: %s" msg
