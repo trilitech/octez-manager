@@ -267,18 +267,8 @@ let line_for_service idx selected (st : Service_state.t) =
     | _ -> padded
   in
   let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
-  let history, network =
-    match svc.Service.role with
-    | "baker" ->
-        (* Bakers inherit network/mode from their node; hide these columns to
-           keep the focus on the instance itself. *)
-        (Printf.sprintf "%-10s" "", Printf.sprintf "%-12s" "")
-    | _ ->
-        ( Printf.sprintf
-            "%-10s"
-            (History_mode.to_string svc.Service.history_mode),
-          Printf.sprintf "%-12s" (network_short svc.Service.network) )
-  in
+  let history = Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode) in
+  let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
   let first_line =
     Printf.sprintf
       "%s %s %s %s %s %s %s"

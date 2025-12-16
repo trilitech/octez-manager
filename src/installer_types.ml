@@ -42,7 +42,6 @@ type dal_config = Dal_auto | Dal_disabled | Dal_endpoint of string
 
 type baker_request = {
   instance : string;
-  network : string option;
   node_instance : string option;
   node_data_dir : string option;
   node_endpoint : string option;
