@@ -24,6 +24,7 @@
   mirage-crypto-rng
   uri
   lambda-term
+  linenoise
   (ppx_deriving :build)
   (alcotest :with-test)
   (bisect_ppx :with-test))
