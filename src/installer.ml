@@ -884,7 +884,6 @@ let install_baker (request : baker_request) =
     | Some dir when String.trim dir <> "" -> dir
     | _ -> Common.default_data_dir request.instance
   in
-  let data_dir_for_service = base_dir in
   let history_mode =
     match node_service_opt with
     | Some svc -> svc.Service.history_mode
@@ -941,7 +940,7 @@ let install_baker (request : baker_request) =
       instance = request.instance;
       network;
       history_mode;
-      data_dir = data_dir_for_service;
+      data_dir = base_dir;
       rpc_addr = node_endpoint;
       net_addr = "";
       service_user = request.service_user;
