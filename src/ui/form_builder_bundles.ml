@@ -199,6 +199,124 @@ let client_fields ~get_client ~set_client () =
       ();
   ]
 
+(** {1 Client-based Tool Bundle with Auto-naming} *)
+
+let client_fields_with_autoname ~role ~binary:_ ~binary_validator
+    ~get_core ~set_core ~get_client ~set_client () =
+  let open Form_builder in
+  [
+    (* Node Selection with auto-naming *)
+    custom
+      ~label:"Node"
+      ~get:(fun m ->
+        match (get_client m).node with
+        | `None -> "None"
+        | `Service inst -> inst
+        | `Endpoint ep -> if ep = "" then "Custom" else ep)
+      ~validate:(fun m ->
+        match (get_client m).node with
+        | `None -> false
+        | `Service inst ->
+            let states = Data.load_service_states () in
+            List.exists
+              (fun (s : Data.Service_state.t) ->
+                s.service.Service.role = "node"
+                && s.service.Service.instance = inst)
+              states
+        | `Endpoint ep ->
+            is_nonempty ep
+            && Option.is_some (parse_host_port ep))
+      ~validate_msg:(fun m ->
+        match (get_client m).node with
+        | `None -> Some "Node selection is required"
+        | `Service inst ->
+            let states = Data.load_service_states () in
+            let exists =
+              List.exists
+                (fun (s : Data.Service_state.t) ->
+                  s.service.Service.role = "node"
+                  && s.service.Service.instance = inst)
+                states
+            in
+            if not exists then
+              Some (Printf.sprintf "Node instance '%s' not found" inst)
+            else None
+        | `Endpoint ep ->
+            if Option.is_none (parse_host_port ep) then
+              Some "Invalid endpoint format (must be host:port, e.g., 127.0.0.1:8732)"
+            else None)
+      ~edit:(fun model_ref ->
+        let states = Data.load_service_states () in
+        let nodes =
+          List.filter (fun (s : Data.Service_state.t) ->
+            s.service.Service.role = "node") states
+        in
+        let items =
+          (nodes |> List.map (fun n -> `Node n)) @ [`Endpoint]
+        in
+        let to_string = function
+          | `Node n ->
+              let svc = n.Data.Service_state.service in
+              Printf.sprintf "Node · %s (%s)" svc.Service.instance svc.Service.network
+          | `Endpoint -> "Custom endpoint (host:port)..."
+        in
+        let on_select = function
+          | `Node n ->
+              let svc = n.Data.Service_state.service in
+              let current_name = normalize (get_core !model_ref).instance_name in
+              let should_autoname =
+                current_name = "" || String.equal current_name role
+              in
+              let endpoint =
+                let addr = String.trim svc.Service.rpc_addr in
+                if String.starts_with ~prefix:"http://" (String.lowercase_ascii addr)
+                   || String.starts_with ~prefix:"https://" (String.lowercase_ascii addr)
+                then addr
+                else "http://" ^ addr
+              in
+              let client = get_client !model_ref in
+              model_ref := set_client
+                {client with node = `Service svc.Service.instance; node_endpoint = endpoint}
+                !model_ref ;
+              if should_autoname then
+                let new_name = Printf.sprintf "%s-%s" role svc.Service.instance in
+                let default_dir = Common.default_role_dir role new_name in
+                let core = get_core !model_ref in
+                let client = get_client !model_ref in
+                model_ref := set_core {core with instance_name = new_name} !model_ref ;
+                model_ref := set_client {client with base_dir = default_dir} !model_ref ;
+              (* Maybe use app_bin_dir from node *)
+              if binary_validator svc.Service.app_bin_dir
+                 && not (binary_validator (get_core !model_ref).app_bin_dir)
+              then
+                let core = get_core !model_ref in
+                model_ref := set_core {core with app_bin_dir = svc.Service.app_bin_dir} !model_ref
+          | `Endpoint ->
+              Modal_helpers.prompt_text_modal
+                ~title:"Node Endpoint"
+                ~placeholder:(Some "host:port (e.g., 127.0.0.1:8732)")
+                ~initial:(match (get_client !model_ref).node with `Endpoint ep -> ep | _ -> "")
+                ~on_submit:(fun ep ->
+                  let client = get_client !model_ref in
+                  model_ref := set_client
+                    {client with node = `Endpoint ep; node_endpoint = ep}
+                    !model_ref)
+                ()
+        in
+        Modal_helpers.open_choice_modal ~title:"Select Node" ~items ~to_string ~on_select)
+      ();
+
+    (* Base Directory *)
+    client_base_dir
+      ~label:"Base Dir"
+      ~get:(fun m -> (get_client m).base_dir)
+      ~set:(fun base_dir m ->
+        let client = get_client m in
+        set_client {client with base_dir} m)
+      ~validate:(fun m -> is_nonempty (get_client m).base_dir)
+      ();
+  ]
+
 (** {1 Node-specific Bundle} *)
 
 let node_fields ~get_node ~set_node () =
