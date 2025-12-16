@@ -237,51 +237,6 @@ let create_dal_node_flow ~on_success =
             | Error (`Msg e) -> show_error ~title:"Error" e))
     ()
 
-let create_smart_rollup_node_flow ~on_success =
-  let open Modal_helpers in
-  prompt_text_modal
-    ~title:"Smart Rollup Node Instance Name"
-    ~on_submit:(fun instance ->
-      let instance = String.trim instance in
-      if instance = "" then
-        show_error ~title:"Error" "Instance name cannot be empty"
-      else
-        open_choice_modal
-          ~title:"Network"
-          ~items:["mainnet"; "ghostnet"; "weeklynet"]
-          ~to_string:(fun x -> x)
-          ~on_select:(fun network ->
-            let request =
-              {
-                role = "smart-rollup-node";
-                instance;
-                network;
-                history_mode = History_mode.default;
-                data_dir = Common.default_role_dir "smart-rollup-node" instance;
-                rpc_addr = "127.0.0.1:8932";
-                net_addr = "127.0.0.1:8932";
-                service_user = "octez";
-                app_bin_dir = "/usr/bin";
-                logging_mode = Logging_mode.Journald;
-                service_args = ["run"; "--rpc-addr"; "127.0.0.1:8932"];
-                extra_env = [];
-                extra_paths = [];
-                auto_enable = true;
-              }
-            in
-            let res =
-              let* (module PM) = require_package_manager () in
-              PM.install_daemon request
-            in
-            match res with
-            | Ok _ ->
-                show_success
-                  ~title:"Success"
-                  ("Smart Rollup Node " ^ instance ^ " created.") ;
-                on_success ()
-            | Error (`Msg e) -> show_error ~title:"Error" e))
-    ()
-
 let create_signer_flow ~on_success =
   let open Modal_helpers in
   prompt_text_modal
