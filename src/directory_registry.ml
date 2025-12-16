@@ -240,3 +240,27 @@ let update_linked_services ~path ~linked_services =
       let updated = {entry with linked_services} in
       let filtered = List.filter (fun e -> e.path <> path) existing in
       write_all (updated :: filtered)
+
+let cleanup_for_instance ~instance =
+  let* all_dirs = read_all () in
+  (* Find directories that have this instance in linked_services *)
+  let updated_dirs =
+    List.filter_map
+      (fun entry ->
+        if List.mem instance entry.linked_services then
+          (* Remove this instance from linked_services *)
+          let new_services =
+            List.filter (fun s -> s <> instance) entry.linked_services
+          in
+          if new_services = [] then
+            (* No more linked services - don't keep this directory *)
+            None
+          else
+            (* Update with new linked_services list *)
+            Some {entry with linked_services = new_services}
+        else
+          (* This directory doesn't use this instance - keep as-is *)
+          Some entry)
+      all_dirs
+  in
+  write_all updated_dirs
