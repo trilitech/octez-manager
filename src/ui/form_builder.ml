@@ -402,7 +402,7 @@ struct
                 match S.spec.on_submit model with
                 | Ok () ->
                     Context.mark_instances_dirty () ;
-                    s.next_page <- Some "instances" ;
+                    Context.navigate "instances" ;  (* Use Context.navigate for proper history *)
                     s
                 | Error (`Msg msg) ->
                     Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -419,7 +419,7 @@ struct
             match S.spec.on_submit model with
             | Ok () ->
                 Context.mark_instances_dirty () ;
-                s.next_page <- Some "instances" ;
+                Context.navigate "instances" ;  (* Use Context.navigate for proper history *)
                 s
             | Error (`Msg msg) ->
                 Modal_helpers.show_error ~title:"Installation Failed" msg ;

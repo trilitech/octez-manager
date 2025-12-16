@@ -212,10 +212,23 @@ let read_all () =
 
 let add ~path ~dir_type ~linked_services =
   let* existing = read_all () in
-  (* Check if path already exists, if so update it *)
-  let filtered = List.filter (fun e -> e.path <> path) existing in
-  let new_entry = {path; dir_type; created_at = now (); linked_services} in
-  write_all (new_entry :: filtered)
+  (* Check if path already exists - merge linked_services *)
+  match List.find_opt (fun e -> e.path = path) existing with
+  | Some existing_entry ->
+      (* Path exists - merge linked_services (keep unique) *)
+      let merged_services =
+        List.sort_uniq String.compare
+          (existing_entry.linked_services @ linked_services)
+      in
+      let updated_entry =
+        {existing_entry with linked_services = merged_services}
+      in
+      let filtered = List.filter (fun e -> e.path <> path) existing in
+      write_all (updated_entry :: filtered)
+  | None ->
+      (* New path - create fresh entry *)
+      let new_entry = {path; dir_type; created_at = now (); linked_services} in
+      write_all (new_entry :: existing)
 
 let find_by_path path =
   let* all = read_all () in
