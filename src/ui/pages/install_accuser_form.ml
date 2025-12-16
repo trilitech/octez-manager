@@ -343,8 +343,9 @@ and submit_form s =
       if String.trim form.extra_args = "" then []
       else String.split_on_char ' ' form.extra_args
     in
+    (* Global options must come before 'run accuser' subcommand *)
     let service_args =
-      ["run"; "--endpoint"; endpoint; "--base-dir"; form.base_dir]
+      ["--endpoint"; endpoint; "--base-dir"; form.base_dir; "run"; "accuser"]
       @ extra_args_list
     in
     let logging_mode =
