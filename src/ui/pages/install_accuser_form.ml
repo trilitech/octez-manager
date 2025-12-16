@@ -143,56 +143,82 @@ let node_endpoint_of_service (svc : Service.t) =
 let refresh_state s =
   {s with service_states = Data.load_service_states ()}
 
-let render_field ~label ~value ~focused =
-  let marker = if focused then Widgets.bold "➤" else " " in
-  let field_label = Widgets.bold label in
-  Printf.sprintf "%s %s: %s" marker field_label value
-
-let view s ~focus:_ ~size:_ =
+let view s ~focus:_ ~size =
   let form = !form_ref in
-  let fields =
+  let has_instance_name = String.trim form.instance_name <> "" in
+  let valid_node =
+    match form.node with
+    | Node_instance inst ->
+        List.exists
+          (fun st ->
+            st.Data.Service_state.service.Service.instance = inst
+            && st.service.role = "node")
+          s.service_states
+    | Node_endpoint ep -> parse_host_port ep <> None
+  in
+  let has_base_dir = String.trim form.base_dir <> "" in
+  let all_ok = has_instance_name && valid_node && has_base_dir in
+
+  let status ok = if ok then "✓" else "✗" in
+  let items =
     [
-      ("Instance Name", form.instance_name, 0);
-      ("Node", node_label ~states:s.service_states form.node, 1);
-      ("Base Dir", form.base_dir, 2);
-      ("Service User", form.service_user, 3);
-      ("App Bin Dir", form.app_bin_dir, 4);
+      ("Instance Name", form.instance_name, has_instance_name);
+      ("Node", node_label ~states:s.service_states form.node, valid_node);
+      ("Base Dir", form.base_dir, has_base_dir);
+      ("Service User", form.service_user, true);
+      ("App Bin Dir", form.app_bin_dir, true);
       ( "Logging",
         (match form.logging with `Journald -> "Journald" | `File -> "File"),
-        5 );
-      ("Enable on Boot", (if form.enable_on_boot then "Yes" else "No"), 6);
-      ("Start Now", (if form.start_now then "Yes" else "No"), 7);
-      ("Extra Args", form.extra_args, 8);
+        true );
+      ("Enable on Boot", string_of_bool form.enable_on_boot, true);
+      ("Start Now", string_of_bool form.start_now, true);
+      ("Extra Args", (if form.extra_args = "" then "(none)" else form.extra_args), true);
+      ("Confirm & Install", (if all_ok then "Ready" else "Incomplete"), all_ok);
     ]
   in
-  let field_lines =
+  let rows =
     List.map
-      (fun (label, value, idx) ->
-        render_field ~label ~value ~focused:(s.cursor = idx))
-      fields
+      (fun (label, value, ok) ->
+        let value = if ok then value else Widgets.fg 214 (Widgets.bold value) in
+        (label, value, status ok))
+      items
   in
-  let status =
-    if is_form_valid form ~states:s.service_states then
-      Widgets.bg 22 (Widgets.fg 15 " ✓ Form complete - press Enter to install ")
+  let columns =
+    [
+      {
+        Miaou_widgets_display.Table_widget.Table.header = "Parameter";
+        to_string = (fun (l, _, _) -> l);
+      };
+      {header = "Value"; to_string = (fun (_, v, _) -> v)};
+      {header = "S"; to_string = (fun (_, _, s) -> s)};
+    ]
+  in
+  let table =
+    Table_widget.Table.create ~cols:size.LTerm_geom.cols ~columns ~rows ()
+  in
+  let table = Table_widget.Table.move_cursor table s.cursor in
+  let status_banner =
+    if all_ok then
+      Widgets.bg 22 (Widgets.fg 15 " ✓ Form is valid - ready to install! ")
     else
-      Widgets.bg 160 (Widgets.fg 15
-        (Widgets.bold (" ⚠ " ^ validation_message form ~states:s.service_states ^ " ")))
+      let msg = " ⚠ Form incomplete: " ^ validation_message form ~states:s.service_states ^ " " in
+      Widgets.bg 160 (Widgets.fg 15 (Widgets.bold msg))
   in
-  let header = [Widgets.title_highlight " Install Accuser "; ""] in
-  let footer = [""; status; ""; "Press Esc to cancel"] in
-  String.concat "\n" (header @ field_lines @ footer)
+  let title_line = Widgets.title_highlight " Install Accuser " in
+  let header = [title_line; status_banner] in
+  let footer =
+    [Widgets.dim "↑/↓ navigate, Enter to edit, Esc back"]
+  in
+  Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
+      Table_widget.Table.render table)
 
 let move s delta =
-  let field_count = 9 in
-  let new_cursor = s.cursor + delta in
-  let clamped =
-    if new_cursor < 0 then 0
-    else if new_cursor >= field_count then field_count - 1
-    else new_cursor
-  in
-  {s with cursor = clamped}
+  let max_cursor = 9 in
+  (* Number of fields + confirm *)
+  let cursor = max 0 (min max_cursor (s.cursor + delta)) in
+  {s with cursor}
 
-let edit_field s =
+let rec edit_field s =
   let open Modal_helpers in
   match s.cursor with
   | 0 ->
@@ -284,9 +310,12 @@ let edit_field s =
         ~on_submit:(fun v -> update_form_ref (fun f -> {f with extra_args = v}))
         () ;
       s
+  | 9 ->
+      (* Confirm & Install *)
+      submit_form s
   | _ -> s
 
-let submit_form s =
+and submit_form s =
   let form = !form_ref in
   if not (is_form_valid form ~states:s.service_states) then (
     Modal_helpers.show_error
@@ -415,10 +444,7 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG with type state = state and type
       match key with
       | "Up" -> move s (-1)
       | "Down" -> move s 1
-      | "Enter" ->
-          if is_form_valid !form_ref ~states:s.service_states && s.cursor = 8 then
-            submit_form s
-          else edit_field s
+      | "Enter" -> edit_field s
       | "Esc" | "Escape" -> {s with next_page = Some "instances"}
       | _ -> s
 
