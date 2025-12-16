@@ -497,12 +497,6 @@ let install_baker_cmd =
     in
     Arg.(value & opt (some string) None & info ["base-dir"] ~doc ~docv:"DIR")
   in
-  let network =
-    let doc =
-      "Override the target network (defaults to the node network or mainnet)."
-    in
-    Arg.(value & opt (some string) None & info ["network"] ~doc ~docv:"NET")
-  in
   let delegates =
     let doc = "Delegate key hash or alias passed as --delegate." in
     Arg.(value & opt_all string [] & info ["delegate"] ~doc ~docv:"KEY")
@@ -549,7 +543,7 @@ let install_baker_cmd =
       & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
   in
   let make instance_opt node_instance node_data_dir node_endpoint base_dir
-      network delegates dal_endpoint_opt liquidity_baking_vote_opt extra_args
+      delegates dal_endpoint_opt liquidity_baking_vote_opt extra_args
       service_user app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
@@ -732,7 +726,6 @@ let install_baker_cmd =
                         let req : baker_request =
                           {
                             instance;
-                            network;
                             node_instance = resolved_node_instance;
                             node_data_dir;
                             node_endpoint;
@@ -761,7 +754,7 @@ let install_baker_cmd =
     Term.(
       ret
         (const make $ instance $ node_instance $ node_data_dir $ node_endpoint
-       $ base_dir $ network $ delegates $ dal_endpoint $ liquidity_baking_vote
+       $ base_dir $ delegates $ dal_endpoint $ liquidity_baking_vote
        $ extra_args $ service_user $ app_bin_dir $ auto_enable
        $ logging_mode_term))
   in
