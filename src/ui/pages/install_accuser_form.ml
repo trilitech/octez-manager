@@ -76,6 +76,18 @@ let endpoint_host_port s =
   | Some (h, p) -> (h, p)
   | None -> ("127.0.0.1", 8732)
 
+let has_octez_baker_binary dir =
+  let trimmed = String.trim dir in
+  if trimmed = "" then false
+  else
+    let candidate = Filename.concat trimmed "octez-baker" in
+    Sys.file_exists candidate
+    &&
+      try
+        Unix.access candidate [Unix.X_OK] ;
+        true
+      with Unix.Unix_error _ -> false
+
 let node_label ~states node_selection =
   match node_selection with
   | Node_instance inst -> (
@@ -97,7 +109,8 @@ let is_form_valid form ~states =
     | Node_endpoint ep -> parse_host_port ep <> None
   in
   let has_base_dir = String.trim form.base_dir <> "" in
-  has_instance_name && has_valid_node && has_base_dir
+  let has_valid_bin_dir = has_octez_baker_binary form.app_bin_dir in
+  has_instance_name && has_valid_node && has_base_dir && has_valid_bin_dir
 
 let validation_message form ~states =
   let issues = ref [] in
@@ -118,6 +131,8 @@ let validation_message form ~states =
         issues := "Valid endpoint (host:port) required" :: !issues) ;
   if String.trim form.base_dir = "" then
     issues := "Base directory required" :: !issues ;
+  if not (has_octez_baker_binary form.app_bin_dir) then
+    issues := "octez-baker not found in bin dir" :: !issues ;
   match !issues with
   | [] -> ""
   | lst -> String.concat ", " (List.rev lst)
@@ -157,7 +172,8 @@ let view s ~focus:_ ~size =
     | Node_endpoint ep -> parse_host_port ep <> None
   in
   let has_base_dir = String.trim form.base_dir <> "" in
-  let all_ok = has_instance_name && valid_node && has_base_dir in
+  let valid_bin_dir = has_octez_baker_binary form.app_bin_dir in
+  let all_ok = has_instance_name && valid_node && has_base_dir && valid_bin_dir in
 
   let status ok = if ok then "✓" else "✗" in
   let items =
@@ -166,7 +182,7 @@ let view s ~focus:_ ~size =
       ("Node", node_label ~states:s.service_states form.node, valid_node);
       ("Base Dir", form.base_dir, has_base_dir);
       ("Service User", form.service_user, true);
-      ("App Bin Dir", form.app_bin_dir, true);
+      ("App Bin Dir", form.app_bin_dir, valid_bin_dir);
       ( "Logging",
         (match form.logging with `Journald -> "Journald" | `File -> "File"),
         true );
@@ -303,12 +319,12 @@ let rec edit_field s =
       update_form_ref (fun f -> {f with start_now = not f.start_now}) ;
       s
   | 8 ->
-      (* Extra Args *)
-      prompt_text_modal
-        ~title:"Extra Arguments"
-        ~initial:!form_ref.extra_args
-        ~on_submit:(fun v -> update_form_ref (fun f -> {f with extra_args = v}))
-        () ;
+      (* Extra Args -> open flag explorer *)
+      Binary_help_explorer.open_accuser_run_help
+        ~app_bin_dir:!form_ref.app_bin_dir
+        ~on_apply:(fun tokens ->
+          let arg_str = String.concat " " tokens in
+          update_form_ref (fun f -> {f with extra_args = arg_str})) ;
       s
   | 9 ->
       (* Confirm & Install *)

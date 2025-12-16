@@ -1019,6 +1019,71 @@ let open_baker_run_help ~app_bin_dir ~mode ~on_apply =
         open_modal ~title ~options:filtered ~on_apply
     | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
 
+let excluded_accuser_options =
+  [
+    "--help";
+    "-help";
+    "--version";
+    "--base-dir";
+    "--endpoint";
+    "--log-file";
+    "--chain";
+  ]
+
+let load_accuser_options ~binary =
+  let cache_key = Printf.sprintf "%s:accuser" binary in
+  match Hashtbl.find_opt cache cache_key with
+  | Some opts -> Ok opts
+  | None ->
+      let try_cmd label cmd =
+        match run_help_cmd binary cmd with
+        | Error (`Msg msg) -> Error (`Msg (Printf.sprintf "%s: %s" label msg))
+        | Ok output ->
+            let opts = parse_help_baker (strip_ansi output) in
+            if opts = [] then
+              Error
+                (`Msg
+                   (Printf.sprintf
+                      "%s: no options parsed from help output"
+                      label))
+            else Ok opts
+      in
+      let candidates =
+        [
+          ("accuser", ["run"; "accuser"; "--help"]);
+          ("help", ["--help"]);
+          ("run-help", ["run"; "--help"]);
+        ]
+      in
+      let rec loop errs = function
+        | [] -> Error (`Msg (String.concat " | " (List.rev errs)))
+        | (label, cmd) :: rest -> (
+            match try_cmd label cmd with
+            | Ok opts -> Ok opts
+            | Error (`Msg m) -> loop (m :: errs) rest)
+      in
+      let* opts = loop [] candidates in
+      Hashtbl.replace cache cache_key opts ;
+      Ok opts
+
+let open_accuser_run_help ~app_bin_dir ~on_apply =
+  let app_bin_dir = String.trim app_bin_dir in
+  let title = "Accuser Flags" in
+  if app_bin_dir = "" then
+    Modal_helpers.show_error ~title "Octez bin directory is empty"
+  else
+    let binary = Filename.concat app_bin_dir "octez-baker" in
+    match load_accuser_options ~binary with
+    | Ok options ->
+        let filtered =
+          List.filter
+            (fun opt ->
+              not (is_excluded_option opt ~excluded:excluded_accuser_options))
+            options
+        in
+        open_modal ~title ~options:filtered ~on_apply
+    | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
+
 module For_tests = struct
   let parse_help = parse_help_node
 
