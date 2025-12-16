@@ -127,6 +127,7 @@ let prompt_input ?default question =
     in
     let prompt = Printf.sprintf "%s%s: " question suffix in
     match LNoise.linenoise prompt with
+    | exception Sys.Break -> raise Sys.Break
     | exception End_of_file -> Option.map snd default
     | None -> Option.map snd default
     | Some line ->
