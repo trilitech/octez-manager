@@ -220,11 +220,17 @@ let prompt_with_completion question completions =
                 LNoise.Yellow,
                 false )
         | _ -> None) ;
-    match LNoise.linenoise (question ^ ": ") with
-    | None -> None
-    | Some line ->
-        let trimmed = String.trim line in
-        if String.equal trimmed "" then None else Some trimmed
+    (* Read a line, then clear callbacks to avoid leaking completions to later prompts *)
+    let res = match LNoise.linenoise (question ^ ": ") with
+      | None -> None
+      | Some line ->
+          let trimmed = String.trim line in
+          if String.equal trimmed "" then None else Some trimmed
+    in
+    (* Clear callbacks *)
+    LNoise.set_completion_callback (fun _ _ -> ()) ;
+    LNoise.set_hints_callback (fun _ -> None) ;
+    res
 
 let run_result = function
   | Ok () -> `Ok ()
@@ -621,10 +627,15 @@ let install_baker_cmd =
                   | Some vote -> Ok (Some vote)
                   | None ->
                       if is_interactive () then
+                        let completions = ["on"; "off"; "pass"] in
                         let vote =
-                          prompt_string_with_default
-                            "Liquidity baking vote (on/off/pass)"
-                            "pass"
+                          match
+                            prompt_with_completion
+                              "Liquidity baking vote (press Enter for default: pass)"
+                              completions
+                          with
+                          | Some v -> v
+                          | None -> "pass"
                         in
                         Ok (Some vote)
                       else Ok (Some "pass")
