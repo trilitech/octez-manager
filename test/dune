@@ -16,3 +16,10 @@
  (modules tui_flow_tests)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name directory_registry_tests)
+ (libraries octez_manager_lib)
+ (modules directory_registry_tests)
+ (instrumentation
+  (backend bisect_ppx)))
