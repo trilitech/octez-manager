@@ -1096,6 +1096,9 @@ let remove_service ~delete_data_dir ~instance =
         | false -> Ok ()
       in
       let* () = Service_registry.remove ~instance in
+      (* Clean up directory registry: remove this instance from linked_services
+         and remove directories that are no longer linked to any instance *)
+      let* () = Directory_registry.cleanup_for_instance ~instance in
       let* services = Service_registry.list () in
       Systemd.sync_logrotate (logrotate_specs_of services)
 

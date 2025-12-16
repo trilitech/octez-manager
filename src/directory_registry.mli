@@ -48,6 +48,11 @@ val remove : string -> (unit, [`Msg of string]) result
 val update_linked_services :
   path:string -> linked_services:string list -> (unit, [`Msg of string]) result
 
+(** Clean up directories when an instance is removed.
+    Removes the instance from all directories' linked_services lists.
+    If a directory becomes unlinked (empty linked_services), removes it from the registry. *)
+val cleanup_for_instance : instance:string -> (unit, [`Msg of string]) result
+
 (** Migrate from old base_dirs.json format.
     Called automatically on first read. *)
 val migrate_from_base_dir_registry : unit -> (unit, [`Msg of string]) result
