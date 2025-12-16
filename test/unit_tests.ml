@@ -374,9 +374,9 @@ let installer_normalize_data_dir_default () =
       Alcotest.(check string) "default data dir" expected actual)
 
 let installer_endpoint_of_rpc_formats () =
-  let trimmed = Installer.For_tests.endpoint_of_rpc "  localhost:8732  " in
+  let trimmed = Installer.endpoint_of_rpc "  localhost:8732  " in
   Alcotest.(check string) "adds scheme" "http://localhost:8732" trimmed ;
-  let passthrough = Installer.For_tests.endpoint_of_rpc "https://node:8732" in
+  let passthrough = Installer.endpoint_of_rpc "https://node:8732" in
   Alcotest.(check string) "keeps scheme" "https://node:8732" passthrough
 
 let installer_build_run_args_file_logging () =
@@ -440,11 +440,17 @@ let installer_snapshot_metadata_variants () =
     Installer.For_tests.snapshot_metadata_of_plan ~no_check:false No_snapshot
   in
   Alcotest.(check bool) "no auto" false no_meta.auto ;
-  Alcotest.(check bool) "no_check propagates for No_snapshot" false no_meta.no_check ;
+  Alcotest.(check bool)
+    "no_check propagates for No_snapshot"
+    false
+    no_meta.no_check ;
   let no_meta_with_check =
     Installer.For_tests.snapshot_metadata_of_plan ~no_check:true No_snapshot
   in
-  Alcotest.(check bool) "no_check true for No_snapshot when set" true no_meta_with_check.no_check ;
+  Alcotest.(check bool)
+    "no_check true for No_snapshot when set"
+    true
+    no_meta_with_check.no_check ;
   let direct_meta =
     Installer.For_tests.snapshot_metadata_of_plan
       ~no_check:false
@@ -478,10 +484,7 @@ let installer_snapshot_metadata_variants () =
     "network slug"
     (Some "seoulnet")
     tzinit_meta.network_slug ;
-  Alcotest.(check bool)
-    "no_check false for tzinit"
-    false
-    tzinit_meta.no_check ;
+  Alcotest.(check bool) "no_check false for tzinit" false tzinit_meta.no_check ;
   let tzinit_meta_no_check =
     Installer.For_tests.snapshot_metadata_of_plan
       ~no_check:true
@@ -551,8 +554,7 @@ let installer_snapshot_history_mode_mismatch () =
       [("History mode", "full"); ("HTTPS", "https://example/full.snap")]
   in
   let fetch url =
-    if String.ends_with ~suffix:"/mainnet/rolling.html" url then
-      Ok (200, html)
+    if String.ends_with ~suffix:"/mainnet/rolling.html" url then Ok (200, html)
     else Ok (404, "missing")
   in
   Snapshots.For_tests.with_fetch fetch (fun () ->
@@ -577,8 +579,7 @@ let installer_snapshot_history_mode_match () =
       [("History mode", "rolling"); ("HTTPS", "https://example/rolling.snap")]
   in
   let fetch url =
-    if String.ends_with ~suffix:"/mainnet/rolling.html" url then
-      Ok (200, html)
+    if String.ends_with ~suffix:"/mainnet/rolling.html" url then Ok (200, html)
     else Ok (404, "missing")
   in
   Snapshots.For_tests.with_fetch fetch (fun () ->
@@ -1675,25 +1676,19 @@ let teztnets_fetch_json_prefers_eio () =
 
 let teztnets_resolve_network_builtin () =
   let fetch () = Error (`Msg "should not fetch") in
-  match
-    Teztnets.resolve_network_for_octez_node ~fetch "mainnet"
-  with
+  match Teztnets.resolve_network_for_octez_node ~fetch "mainnet" with
   | Ok net -> Alcotest.(check string) "mainnet builtin" "mainnet" net
   | Error (`Msg msg) -> Alcotest.failf "mainnet should be builtin: %s" msg
 
 let teztnets_resolve_network_builtin_ghostnet () =
   let fetch () = Error (`Msg "should not fetch") in
-  match
-    Teztnets.resolve_network_for_octez_node ~fetch "ghostnet"
-  with
+  match Teztnets.resolve_network_for_octez_node ~fetch "ghostnet" with
   | Ok net -> Alcotest.(check string) "ghostnet builtin" "ghostnet" net
   | Error (`Msg msg) -> Alcotest.failf "ghostnet should be builtin: %s" msg
 
 let teztnets_resolve_network_builtin_case_insensitive () =
   let fetch () = Error (`Msg "should not fetch") in
-  match
-    Teztnets.resolve_network_for_octez_node ~fetch "Mainnet"
-  with
+  match Teztnets.resolve_network_for_octez_node ~fetch "Mainnet" with
   | Ok net -> Alcotest.(check string) "Mainnet lowercased" "mainnet" net
   | Error (`Msg msg) -> Alcotest.failf "Mainnet should be lowercased: %s" msg
 
@@ -1719,7 +1714,10 @@ let teztnets_resolve_network_alias_lowercase () =
   in
   match Teztnets.resolve_network_for_octez_node ~fetch "seoulnet" with
   | Ok net ->
-      Alcotest.(check string) "seoulnet resolved" "https://teztnets.com/seoulnet" net
+      Alcotest.(check string)
+        "seoulnet resolved"
+        "https://teztnets.com/seoulnet"
+        net
   | Error (`Msg msg) -> Alcotest.failf "seoulnet should resolve: %s" msg
 
 let teztnets_resolve_network_alias_mixed_case () =
@@ -1737,7 +1735,10 @@ let teztnets_resolve_network_alias_mixed_case () =
   in
   match Teztnets.resolve_network_for_octez_node ~fetch "Seoulnet" with
   | Ok net ->
-      Alcotest.(check string) "Seoulnet resolved" "https://teztnets.com/seoulnet" net
+      Alcotest.(check string)
+        "Seoulnet resolved"
+        "https://teztnets.com/seoulnet"
+        net
   | Error (`Msg msg) -> Alcotest.failf "Seoulnet should resolve: %s" msg
 
 let teztnets_resolve_network_alias_not_found () =
@@ -1815,9 +1816,12 @@ let installer_instance_name_unique () =
       let node_service = {node_service with Service.instance = "foo"} in
       let () = expect_ok (Service_registry.write node_service) in
       (* Try to validate instance name "foo" - should fail *)
-      match Installer.For_tests.validate_instance_name_unique ~instance:"foo" with
-      | Ok () -> Alcotest.fail "Should have failed: instance name already in use"
-      | Error (`Msg msg) ->
+      match
+        Installer.For_tests.validate_instance_name_unique ~instance:"foo"
+      with
+      | Ok () ->
+          Alcotest.fail "Should have failed: instance name already in use"
+      | Error (`Msg msg) -> (
           Alcotest.(check bool)
             "error message mentions instance in use"
             true
@@ -1832,7 +1836,8 @@ let installer_instance_name_unique () =
           with
           | Ok () -> ()
           | Error (`Msg msg) ->
-              Alcotest.failf "Should have succeeded with different name: %s" msg)
+              Alcotest.failf "Should have succeeded with different name: %s" msg
+          ))
 
 let node_env_write_file () =
   with_fake_xdg (fun env ->
@@ -2151,9 +2156,7 @@ let systemd_baker_exec_line_lb_vote () =
   Alcotest.(check bool)
     "flag is unconditional (no if statement around it)"
     false
-    (string_contains
-       ~needle:"if [ -n \"${OCTEZ_BAKER_LB_VOTE"
-       exec)
+    (string_contains ~needle:"if [ -n \"${OCTEZ_BAKER_LB_VOTE" exec)
 
 let systemd_baker_exec_line_dal_config () =
   let exec = Systemd.For_tests.exec_line "baker" in
@@ -2399,7 +2402,10 @@ let make_absolute_path_empty_error () =
   match Common.make_absolute_path "" with
   | Ok _ -> Alcotest.fail "empty path should fail"
   | Error msg ->
-      Alcotest.(check bool) "error mentions empty" true (String.contains msg ' ')
+      Alcotest.(check bool)
+        "error mentions empty"
+        true
+        (String.contains msg ' ')
 
 let make_absolute_path_whitespace_error () =
   match Common.make_absolute_path "   " with

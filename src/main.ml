@@ -710,18 +710,9 @@ let install_baker_cmd =
                                        dal_services
                                    with
                                   | Some svc ->
-                                      let addr = svc.Service.rpc_addr in
-                                      let addr_lower = String.lowercase_ascii addr in
                                       let endpoint =
-                                        if
-                                          String.starts_with
-                                            ~prefix:"http://"
-                                            addr_lower
-                                          || String.starts_with
-                                               ~prefix:"https://"
-                                               addr_lower
-                                        then addr
-                                        else "http://" ^ addr
+                                        Installer.endpoint_of_rpc
+                                          svc.Service.rpc_addr
                                       in
                                       Ok (Dal_endpoint endpoint)
                                   | None -> Ok Dal_disabled)
