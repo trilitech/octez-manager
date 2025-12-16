@@ -55,6 +55,36 @@ val client_fields :
   unit ->
   'model Form_builder.field list
 
+(** Generate fields for client-based tools WITH auto-naming support.
+
+    Same as client_fields but with auto-naming: when selecting a node service,
+    automatically sets instance name to "{role}-{node_instance}" if the current
+    name is empty or still the default.
+
+    Also inherits app_bin_dir from the selected node if the binary exists there.
+
+    Includes:
+    - Node selection (with auto-naming)
+    - Base directory
+
+    @param role Service role (e.g., "baker", "accuser")
+    @param binary Binary name to check (e.g., "octez-baker")
+    @param binary_validator Function to check if binary exists in a directory
+    @param get_core Extract core config from model
+    @param set_core Update model with new core config
+    @param get_client Extract client config from model
+    @param set_client Update model with new client config *)
+val client_fields_with_autoname :
+  role:string ->
+  binary:string ->
+  binary_validator:(string -> bool) ->
+  get_core:('model -> Form_builder_common.core_service_config) ->
+  set_core:(Form_builder_common.core_service_config -> 'model -> 'model) ->
+  get_client:('model -> Form_builder_common.client_config) ->
+  set_client:(Form_builder_common.client_config -> 'model -> 'model) ->
+  unit ->
+  'model Form_builder.field list
+
 (** {1 Node-specific Bundle} *)
 
 (** Generate fields specific to node installation.
