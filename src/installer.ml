@@ -884,12 +884,6 @@ let install_baker (request : baker_request) =
     | Some dir -> dir
     | None -> Common.default_role_dir "baker" request.instance ^ "/remote-node"
   in
-  let network =
-    match (request.network, node_service_opt) with
-    | Some net, _ when String.trim net <> "" -> net
-    | None, Some svc -> svc.Service.network
-    | _ -> "mainnet"
-  in
   let history_mode =
     match node_service_opt with
     | Some svc -> svc.Service.history_mode
@@ -902,6 +896,11 @@ let install_baker (request : baker_request) =
         match node_service_opt with
         | Some svc -> endpoint_of_rpc svc.Service.rpc_addr
         | None -> "http://127.0.0.1:8732")
+  in
+  let* network =
+    match node_service_opt with
+    | Some svc -> Ok svc.Service.network
+    | None -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
   in
   let base_dir =
     match request.base_dir with

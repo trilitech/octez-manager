@@ -558,7 +558,11 @@ let edit_field s =
             let delegates = !form_ref.delegates in
             let checked = List.mem k.Keys_reader.value delegates in
             let checkbox = if checked then "[x]" else "[ ]" in
-            Printf.sprintf "%s %s (%s)" checkbox k.Keys_reader.name k.Keys_reader.value
+            Printf.sprintf
+              "%s %s (%s)"
+              checkbox
+              k.Keys_reader.name
+              k.Keys_reader.value
         | `Add -> "Add delegate (manual)"
         | `Clear -> "Clear all"
         | `Remove d -> "Remove: " ^ d
@@ -569,9 +573,14 @@ let edit_field s =
             (* Toggle the key *)
             update_form_ref (fun f ->
                 if List.mem k.Keys_reader.value f.delegates then
-                  {f with delegates = List.filter (fun x -> x <> k.Keys_reader.value) f.delegates}
-                else
-                  {f with delegates = f.delegates @ [k.Keys_reader.value]}) ;
+                  {
+                    f with
+                    delegates =
+                      List.filter
+                        (fun x -> x <> k.Keys_reader.value)
+                        f.delegates;
+                  }
+                else {f with delegates = f.delegates @ [k.Keys_reader.value]}) ;
             `KeepOpen
         | `Add ->
             prompt_validated_text_modal
@@ -594,7 +603,11 @@ let edit_field s =
                 {f with delegates = List.filter (fun x -> x <> d) f.delegates}) ;
             `KeepOpen
       in
-      Modal_helpers.open_multiselect_modal ~title:"Delegates" ~items:build_items ~to_string ~on_select ;
+      Modal_helpers.open_multiselect_modal
+        ~title:"Delegates"
+        ~items:build_items
+        ~to_string
+        ~on_select ;
       s
   | 8 ->
       (* Liquidity Baking Vote *)
@@ -719,7 +732,6 @@ let edit_field s =
         let req =
           {
             instance;
-            network = None;
             node_instance =
               (match selected_node with
               | Some svc -> Some svc.Data.Service_state.service.Service.instance
@@ -738,7 +750,7 @@ let edit_field s =
             dal_config;
             liquidity_baking_vote =
               (if String.trim f.liquidity_baking_vote = "" then None
-              else Some (String.trim f.liquidity_baking_vote));
+               else Some (String.trim f.liquidity_baking_vote));
             extra_args;
             service_user = f.service_user;
             app_bin_dir = f.app_bin_dir;
@@ -969,9 +981,12 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let has_modal = has_modal
 end
 
-module Page = Monitored_page.Make(Page_Impl)(struct
-  let page_name = "install_baker"
-end)
+module Page =
+  Monitored_page.Make
+    (Page_Impl)
+    (struct
+      let page_name = "install_baker"
+    end)
 
 let page : Miaou.Core.Registry.page = (module Page)
 

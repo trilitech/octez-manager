@@ -108,7 +108,6 @@ let create_baker_flow ~services ~on_success =
                 let request =
                   {
                     instance;
-                    network = None;
                     node_instance = Some parent_node;
                     node_data_dir = None;
                     node_endpoint = None;
