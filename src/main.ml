@@ -1005,113 +1005,6 @@ let install_dal_node_cmd =
   in
   Cmd.v info term
 
-let install_smart_rollup_node_cmd =
-  let instance =
-    Arg.(
-      required
-      & opt (some string) None
-      & info ["instance"] ~doc:"Smart rollup node instance" ~docv:"NAME")
-  in
-  let network =
-    Arg.(
-      value & opt string "mainnet"
-      & info ["network"] ~doc:"Target network" ~docv:"NET")
-  in
-  let data_dir_opt =
-    Arg.(
-      value
-      & opt (some string) None
-      & info ["data-dir"] ~doc:"Smart rollup node data directory" ~docv:"DIR")
-  in
-  let rpc_addr =
-    Arg.(
-      value
-      & opt string "127.0.0.1:8932"
-      & info ["rpc-addr"] ~doc:"Smart rollup node RPC address" ~docv:"ADDR")
-  in
-  let extra_args =
-    Arg.(
-      value & opt_all string []
-      & info
-          ["extra-arg"]
-          ~doc:"Additional smart-rollup-node arguments"
-          ~docv:"ARG")
-  in
-  let default_user =
-    if Common.is_root () then "octez"
-    else fst (Common.current_user_group_names ())
-  in
-  let service_user =
-    Arg.(
-      value & opt string default_user
-      & info ["service-user"] ~doc:"System user" ~docv:"USER")
-  in
-  let app_bin_dir =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["app-bin-dir"]
-          ~doc:"Directory containing Octez binaries"
-          ~docv:"DIR")
-  in
-  let auto_enable =
-    Arg.(
-      value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
-  in
-  let make instance network data_dir_opt rpc_addr extra_args service_user
-      app_bin_dir no_enable logging_mode =
-    match resolve_app_bin_dir app_bin_dir with
-    | Error msg -> cmdliner_error msg
-    | Ok app_bin_dir -> (
-        let data_dir =
-          match data_dir_opt with
-          | Some dir when String.trim dir <> "" -> dir
-          | _ -> Common.default_role_dir "smart-rollup-node" instance
-        in
-        let service_args =
-          ["run"; "--data-dir"; data_dir; "--rpc-addr"; rpc_addr] @ extra_args
-        in
-        let req : daemon_request =
-          {
-            role = "smart-rollup-node";
-            instance;
-            network;
-            history_mode = History_mode.default;
-            data_dir;
-            rpc_addr;
-            net_addr = rpc_addr;
-            service_user;
-            app_bin_dir;
-            logging_mode;
-            service_args;
-            extra_env = [];
-            extra_paths = [];
-            auto_enable = not no_enable;
-          }
-        in
-        match Installer.install_daemon req with
-        | Ok service ->
-            Format.printf
-              "Installed %s (%s)\n"
-              service.S.instance
-              service.network ;
-            `Ok ()
-        | Error (`Msg msg) -> cmdliner_error msg)
-  in
-  let term =
-    Term.(
-      ret
-        (const make $ instance $ network $ data_dir_opt $ rpc_addr $ extra_args
-       $ service_user $ app_bin_dir $ auto_enable $ logging_mode_term))
-  in
-  let info =
-    Cmd.info
-      "install-smart-rollup-node"
-      ~doc:"Install an octez-smart-rollup-node service"
-  in
-  Cmd.v info term
-
 type instance_action =
   | Start
   | Stop
@@ -1575,7 +1468,6 @@ let root_cmd =
       install_accuser_cmd;
       install_signer_cmd;
       install_dal_node_cmd;
-      install_smart_rollup_node_cmd;
       list_cmd;
       purge_all_cmd;
       list_networks_cmd;
