@@ -70,7 +70,8 @@ let fetch_json () : (string, [> R.msg]) result =
 type network_info = {
   alias : string;
   network_url : string;
-  human_name : string option;
+  chain_name : string;
+  human_name : string;
   description : string option;
   faucet_url : string option;
   rpc_url : string option;
@@ -122,14 +123,15 @@ let parse_networks (json_s : string) : (network_info list, [> R.msg]) result =
     in
     let to_info it =
       let human_name =
-        pick_string
-          ["humanName"; "human_name"; "name"; "chainName"; "chain_name"; "id"]
-          it
+        Option.value
+          ~default:"unknown"
+          (pick_string ["humanName"; "human_name"; "name"; "id"] it)
+      in
+      let chain_name =
+        Option.value ~default:"unknown" (pick_string ["chain_name"] it)
       in
       let slug =
-        match pick_string ["slug"; "id"; "name"] it with
-        | Some s -> s
-        | None -> Option.value ~default:"unknown" human_name
+        Option.value ~default:human_name (pick_string ["slug"; "id"; "name"] it)
       in
       let network_url =
         pick_string
@@ -157,7 +159,7 @@ let parse_networks (json_s : string) : (network_info list, [> R.msg]) result =
       let final_url =
         match (slug, human_name, network_url) with
         | s, _, _ when is_mn s -> String.lowercase_ascii s
-        | _, Some l, _ when is_mn l -> String.lowercase_ascii l
+        | _, l, _ when is_mn l -> String.lowercase_ascii l
         | _, _, Some u -> u
         | _ -> ""
       in
@@ -167,6 +169,7 @@ let parse_networks (json_s : string) : (network_info list, [> R.msg]) result =
           {
             alias = slug;
             network_url = final_url;
+            chain_name;
             human_name;
             description = pick_string ["description"; "desc"] it;
             faucet_url = pick_string ["faucetUrl"; "faucet_url"; "faucet"] it;
@@ -189,7 +192,8 @@ let fallback_networks =
     {
       alias = "mainnet";
       network_url = "mainnet";
-      human_name = Some "Tezos Mainnet";
+      chain_name = "TEZOS_MAINNET";
+      human_name = "Tezos Mainnet";
       description = Some "The main Tezos network";
       faucet_url = None;
       rpc_url = Some "https://mainnet.ecadinfra.com";
@@ -201,7 +205,8 @@ let fallback_networks =
     {
       alias = "ghostnet";
       network_url = "ghostnet";
-      human_name = Some "Ghostnet";
+      chain_name = "TEZOS_ITHACANET_2022-01-25T15:00:00Z";
+      human_name = "Ghostnet";
       description = Some "Long-running testnet";
       faucet_url = Some "https://faucet.ghostnet.teztnets.com";
       rpc_url = Some "https://rpc.ghostnet.teztnets.com";
@@ -213,7 +218,8 @@ let fallback_networks =
     {
       alias = "seoulnet";
       network_url = "https://teztnets.com/seoulnet";
-      human_name = Some "Seoulnet";
+      chain_name = "TEZOS_SEOULNET_2025-07-11T08:00:00Z";
+      human_name = "Seoulnet";
       description = Some "Testnet for Seoul protocol";
       faucet_url = Some "https://faucet.seoulnet.teztnets.com";
       rpc_url = Some "https://rpc.seoulnet.teztnets.com";
@@ -225,7 +231,8 @@ let fallback_networks =
     {
       alias = "weeklynet";
       network_url = "https://teztnets.com/weeklynet";
-      human_name = Some "Weeklynet";
+      chain_name = "TEZOS-WEEKLYNET-2025-12-10T00:00:00.000Z";
+      human_name = "Weeklynet";
       description = Some "Weekly ephemeral testnet";
       faucet_url = None;
       rpc_url = None;
@@ -246,9 +253,7 @@ let list_networks ?(fetch = fetch_json) () :
   | Error _ -> Ok fallback_networks
 
 let fallback_pairs =
-  List.map
-    (fun n -> (Option.value ~default:n.alias n.human_name, n.network_url))
-    fallback_networks
+  List.map (fun n -> (n.human_name, n.network_url)) fallback_networks
 
 let is_http_url s =
   let trimmed = String.trim s |> String.lowercase_ascii in
@@ -260,9 +265,13 @@ let is_builtin_network s =
   lower = "mainnet" || lower = "ghostnet" || lower = "sandbox"
 
 let resolve_network_for_octez_node :
-  ?fetch:(unit -> (network_info list, [> Rresult.R.msg]) result) ->
-  string -> (string, [> Rresult.R.msg]) result =
- fun ?(fetch = (fun () -> (list_networks () : (network_info list, [> Rresult.R.msg]) result))) network ->
+    ?fetch:(unit -> (network_info list, [> Rresult.R.msg]) result) ->
+    string ->
+    (string, [> Rresult.R.msg]) result =
+ fun ?(fetch =
+       fun () ->
+         (list_networks () : (network_info list, [> Rresult.R.msg]) result))
+     network ->
   let trimmed = String.trim network in
   if trimmed = "" then R.error_msg "Network cannot be empty"
   else if is_http_url trimmed then Ok trimmed
@@ -276,20 +285,47 @@ let resolve_network_for_octez_node :
           List.find_opt
             (fun (n : network_info) ->
               String.lowercase_ascii n.alias = lower_input
-              ||
-              match n.human_name with
-              | Some hn -> String.lowercase_ascii hn = lower_input
-              | None -> false)
+              || String.lowercase_ascii n.human_name = lower_input)
             infos
         in
         match match_opt with
         | Some info -> Ok info.network_url
         | None ->
             R.error_msgf
-              "Network '%s' not recognized. Use 'list-available-networks' to see \
-               supported networks, or provide a URL or file path."
+              "Network '%s' not recognized. Use 'list-available-networks' to \
+               see supported networks, or provide a URL or file path."
               network)
     | Error (`Msg m) -> R.error_msg m
+
+let resolve_octez_node_chain ~endpoint =
+  let ( let* ) = Result.bind in
+  let* node_chain_name =
+    match
+      Common.run_out
+        ["curl"; "-sf"; "--connect-timeout"; "2"; endpoint ^ "/config"]
+    with
+    | Ok out -> (
+        try
+          let j = Yojson.Safe.from_string out in
+          let open Yojson.Safe.Util in
+          match member "network" j |> member "chain_name" with
+          | `String s -> Ok (String.trim s)
+          | _ -> Error (`Msg "Failed to retrieve .network.chain_name")
+        with exn -> Error (`Msg (Printexc.to_string exn)))
+    | Error s -> Error s
+  in
+  let* networks = list_networks () in
+  let* network =
+    try
+      Ok
+        (List.find
+           (fun network -> network.chain_name = node_chain_name)
+           networks)
+    with Not_found ->
+      Error
+        (`Msg (Format.sprintf "Node chain name is unknown: %S" node_chain_name))
+  in
+  Ok network.human_name
 
 module For_tests = struct
   let fetch_json_with :

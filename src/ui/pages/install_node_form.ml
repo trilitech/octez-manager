@@ -140,11 +140,11 @@ let network_display_name value =
         || normalize_string info.alias = normalized_value)
       !network_cache
   with
-  | Some info -> Option.value ~default:info.alias info.human_name
+  | Some info -> info.human_name
   | None -> value
 
 let format_network_choice (info : Teztnets.network_info) =
-  let label = Option.value ~default:info.alias info.human_name in
+  let label = info.human_name in
   if normalize_string info.network_url = normalize_string info.alias then label
   else Printf.sprintf "%s · %s" label info.network_url
 
@@ -647,10 +647,8 @@ let edit_field s =
             |> List.sort
                  (fun (a : Teztnets.network_info) (b : Teztnets.network_info) ->
                    String.compare
-                     (normalize_string
-                        (Option.value ~default:a.alias a.human_name))
-                     (normalize_string
-                        (Option.value ~default:b.alias b.human_name)))
+                     (normalize_string a.human_name)
+                     (normalize_string b.human_name))
           in
           open_choice_modal
             ~title:"Network"
@@ -680,7 +678,8 @@ let edit_field s =
               ~title:"Data Directory"
               "This directory is already used by another service"
           else
-            update_form_ref (fun f -> {f with data_dir = path; preserve_data = `Auto}))
+            update_form_ref (fun f ->
+                {f with data_dir = path; preserve_data = `Auto}))
         () ;
       s
   | 4 ->
