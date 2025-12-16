@@ -1,0 +1,5 @@
+; Install zsh completion script
+(install
+ (section share)
+ (files
+  (_octez-manager as zsh/site-functions/_octez-manager)))
