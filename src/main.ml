@@ -608,7 +608,7 @@ let install_baker_cmd =
                                   instance_map)) ;
                           match
                             prompt_with_completion
-                              "Node instance (or press Enter to skip)"
+                              "Node instance (press Enter for default: 127.0.0.1:8732)"
                               instance_names
                           with
                           | Some selected -> Ok (Some selected)
@@ -634,6 +634,7 @@ let install_baker_cmd =
             match lb_vote_result with
             | Error msg -> cmdliner_error msg
             | Ok liquidity_baking_vote -> (
+                (* Prompt for dal_endpoint if not provided in interactive mode *)
                 let dal_config_result =
                   match normalize_opt_string dal_endpoint_opt with
                   | Some ep ->
@@ -645,17 +646,86 @@ let install_baker_cmd =
                       else Ok (Dal_endpoint ep)
                   | None ->
                       if is_interactive () then
-                        let response =
-                          prompt_string_with_default
-                            "DAL node endpoint (or 'none' to opt-out)"
-                            "none"
-                        in
-                        let normalized =
-                          String.lowercase_ascii (String.trim response)
-                        in
-                        if normalized = "none" || normalized = "disabled" then
-                          Ok Dal_disabled
-                        else Ok (Dal_endpoint response)
+                        (* Get list of available DAL node instances *)
+                        match Service_registry.list () with
+                        | Error (`Msg msg) ->
+                            prerr_endline
+                              ("Warning: Could not load services: " ^ msg) ;
+                            Ok Dal_disabled
+                        | Ok services ->
+                            let dal_services =
+                              List.filter
+                                (fun (svc : Service.t) ->
+                                  let role_lower =
+                                    String.lowercase_ascii svc.role
+                                  in
+                                  String.equal role_lower "dal-node"
+                                  || String.equal role_lower "dal")
+                                services
+                            in
+                            if dal_services = [] then (
+                              let response =
+                                prompt_string_with_default
+                                  "DAL node endpoint (or 'none' to opt-out)"
+                                  "none"
+                              in
+                              let normalized =
+                                String.lowercase_ascii (String.trim response)
+                              in
+                              if
+                                normalized = "none" || normalized = "disabled"
+                              then Ok Dal_disabled
+                              else Ok (Dal_endpoint response))
+                            else
+                              let instance_names =
+                                List.map
+                                  (fun (svc : Service.t) -> svc.instance)
+                                  dal_services
+                              in
+                              let instance_map =
+                                List.map
+                                  (fun (svc : Service.t) ->
+                                    (svc.instance, svc.rpc_addr))
+                                  dal_services
+                              in
+                              Format.printf
+                                "Available DAL node instances: %s@."
+                                (String.concat
+                                   ", "
+                                   (List.map
+                                      (fun (inst, addr) ->
+                                        Printf.sprintf "%s (%s)" inst addr)
+                                      instance_map)) ;
+                              match
+                                prompt_with_completion
+                                  "DAL node instance (press Enter for default: \
+                                   none)"
+                                  instance_names
+                              with
+                              | Some selected ->
+                                  (* Find the selected DAL service and get its endpoint *)
+                                  (match
+                                     List.find_opt
+                                       (fun (svc : Service.t) ->
+                                         String.equal svc.instance selected)
+                                       dal_services
+                                   with
+                                  | Some svc ->
+                                      let endpoint =
+                                        let addr = svc.Service.rpc_addr in
+                                        if
+                                          String.starts_with
+                                            ~prefix:"http://"
+                                            (String.lowercase_ascii addr)
+                                          || String.starts_with
+                                               ~prefix:"https://"
+                                               (String.lowercase_ascii addr)
+                                        then addr
+                                        else "http://" ^ addr
+                                      in
+                                      Ok (Dal_endpoint endpoint)
+                                  | None -> Ok Dal_disabled)
+                              | None -> Ok Dal_disabled
                       else Ok Dal_disabled
                 in
                 match dal_config_result with
