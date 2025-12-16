@@ -1,0 +1,243 @@
+#compdef octez-manager
+
+# Zsh completion script for octez-manager
+# Installation:
+#   - Copy this file to a directory in your $fpath (e.g., /usr/share/zsh/site-functions/)
+#   - Or source it directly in your .zshrc: source /path/to/_octez-manager
+#   - Then run: compinit
+
+_octez-manager() {
+  local -a commands
+  commands=(
+    'instance:Manage existing Octez services'
+    'install-node:Install an octez-node systemd instance'
+    'install-baker:Install an octez-baker service'
+    'install-accuser:Install an octez-accuser service'
+    'install-signer:Install an octez-signer service'
+    'install-dal-node:Install an octez-dal-node service'
+    'list:Show registered services'
+    'purge-all:Purge all registered instances'
+    'list-available-networks:Show networks advertised on teztnets.com'
+    'list-snapshots:List downloads published on snapshots.tzinit.org for a network'
+    'snapshots:Snapshot management helpers'
+    'ui:Launch the Miaou-based interactive interface (experimental)'
+  )
+
+  local -a instance_actions
+  instance_actions=(
+    'start:Start the service'
+    'stop:Stop the service'
+    'restart:Restart the service'
+    'remove:Unregister and remove the service'
+    'purge:Remove service and delete all data'
+    'show:Display service configuration'
+    'show-service:Display systemd unit and status'
+    'refresh-from-new-snapshot:Re-import a fresh snapshot'
+  )
+
+  local -a snapshot_commands
+  snapshot_commands=(
+    'import:Stop the node, (re)import a snapshot, and restart the service if it was running'
+  )
+
+  local -a history_modes
+  history_modes=(
+    'archive:Full archive mode'
+    'full:Full mode'
+    'rolling:Rolling mode'
+  )
+
+  local -a snapshot_kinds
+  snapshot_kinds=(
+    'rolling:Rolling snapshot'
+    'full:Full snapshot'
+    'full\:50:Full snapshot with 50 cycles'
+    'archive:Archive snapshot'
+  )
+
+  local -a lb_votes
+  lb_votes=(
+    'on:Vote for liquidity baking'
+    'off:Vote against liquidity baking'
+    'pass:Abstain from voting (default)'
+  )
+
+  _arguments -C \
+    '(- *)'{-h,--help}'[Show help information]' \
+    '(- *)--version[Show version information]' \
+    '1: :->command' \
+    '*:: :->args'
+
+  case $state in
+    command)
+      _describe -t commands 'octez-manager commands' commands
+      ;;
+    args)
+      case $words[1] in
+        instance)
+          if (( CURRENT == 2 )); then
+            # Complete instance names - could be enhanced to query actual instances
+            _message 'instance name'
+          elif (( CURRENT == 3 )); then
+            _describe -t actions 'instance actions' instance_actions
+          else
+            case $words[3] in
+              start|stop|restart|remove|purge|show|show-service)
+                _arguments \
+                  '(- *)'{-h,--help}'[Show help information]'
+                ;;
+              refresh-from-new-snapshot)
+                _arguments \
+                  '--snapshot-uri=[Snapshot URI]:uri:_urls' \
+                  '--snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds' \
+                  '--network=[Network]:network:' \
+                  '--history-mode=[History mode]:mode:->history-modes' \
+                  '--no-check[Skip validation during snapshot import]' \
+                  '(- *)'{-h,--help}'[Show help information]'
+                case $state in
+                  snapshot-kinds)
+                    _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds
+                    ;;
+                  history-modes)
+                    _describe -t history-modes 'history modes' history_modes
+                    ;;
+                esac
+                ;;
+              remove)
+                _arguments \
+                  '--delete-data-dir[Delete data directory when removing]' \
+                  '(- *)'{-h,--help}'[Show help information]'
+                ;;
+            esac
+          fi
+          ;;
+        install-node)
+          _arguments \
+            '--instance=[Instance name]:instance:' \
+            '--network=[Network name]:network:' \
+            '--rpc-addr=[RPC address]:address:' \
+            '--net-addr=[P2P network address]:address:' \
+            '--history-mode=[History mode]:mode:->history-modes' \
+            '--service-user=[Service user]:user:_users' \
+            '--app-bin-dir=[Octez binary directory]:directory:_directories' \
+            '--data-dir=[Data directory]:directory:_directories' \
+            '--snapshot[Enable snapshot import]' \
+            '--snapshot-uri=[Snapshot URI]:uri:_urls' \
+            '--snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds' \
+            '--snapshot-no-check[Skip snapshot validation]' \
+            '--no-enable[Do not enable service on boot]' \
+            '--log-file=[Log file path]:file:_files' \
+            '--log-rotate[Enable log rotation]' \
+            '(- *)'{-h,--help}'[Show help information]'
+          case $state in
+            snapshot-kinds)
+              _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds
+              ;;
+            history-modes)
+              _describe -t history-modes 'history modes' history_modes
+              ;;
+          esac
+          ;;
+        install-baker)
+          _arguments \
+            '--instance=[Instance name]:instance:' \
+            '--network=[Network name]:network:' \
+            '--node-instance=[Connect to existing node instance]:instance:' \
+            '--node-endpoint=[Node RPC endpoint]:endpoint:_urls' \
+            '--liquidity-baking-vote=[Liquidity baking vote]:vote:->lb-votes' \
+            '--dal-endpoint=[DAL node endpoint]:endpoint:_urls' \
+            '--service-user=[Service user]:user:_users' \
+            '--app-bin-dir=[Octez binary directory]:directory:_directories' \
+            '--no-enable[Do not enable service on boot]' \
+            '(- *)'{-h,--help}'[Show help information]'
+          case $state in
+            lb-votes)
+              _describe -t lb-votes 'liquidity baking votes' lb_votes
+              ;;
+          esac
+          ;;
+        install-accuser)
+          _arguments \
+            '--instance=[Instance name]:instance:' \
+            '--network=[Network name]:network:' \
+            '--node-instance=[Connect to existing node instance]:instance:' \
+            '--node-endpoint=[Node RPC endpoint]:endpoint:_urls' \
+            '--service-user=[Service user]:user:_users' \
+            '--app-bin-dir=[Octez binary directory]:directory:_directories' \
+            '--no-enable[Do not enable service on boot]' \
+            '(- *)'{-h,--help}'[Show help information]'
+          ;;
+        install-signer)
+          _arguments \
+            '--instance=[Instance name]:instance:' \
+            '--net-addr=[Network address for signer]:address:' \
+            '--authorize=[Authorize key (NAME:KEY)]:auth:' \
+            '--service-user=[Service user]:user:_users' \
+            '--app-bin-dir=[Octez binary directory]:directory:_directories' \
+            '--no-enable[Do not enable service on boot]' \
+            '(- *)'{-h,--help}'[Show help information]'
+          ;;
+        install-dal-node)
+          _arguments \
+            '--instance=[Instance name]:instance:' \
+            '--endpoint=[Tezos node endpoint]:endpoint:_urls' \
+            '--net-addr=[P2P network address]:address:' \
+            '--service-user=[Service user]:user:_users' \
+            '--app-bin-dir=[Octez binary directory]:directory:_directories' \
+            '--no-enable[Do not enable service on boot]' \
+            '(- *)'{-h,--help}'[Show help information]'
+          ;;
+        list-snapshots)
+          _arguments \
+            '--network=[Network alias or teztnets.json URL]:network:' \
+            '--json[Emit JSON output]' \
+            '(- *)'{-h,--help}'[Show help information]'
+          ;;
+        list-available-networks)
+          _arguments \
+            '--json[Emit JSON output]' \
+            '(- *)'{-h,--help}'[Show help information]'
+          ;;
+        snapshots)
+          if (( CURRENT == 2 )); then
+            _describe -t snapshot-commands 'snapshot commands' snapshot_commands
+          else
+            case $words[2] in
+              import)
+                _arguments \
+                  '--instance=[Instance name]:instance:' \
+                  '--snapshot-uri=[Snapshot URI]:uri:_urls' \
+                  '--snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds' \
+                  '--network=[Network]:network:' \
+                  '--history-mode=[History mode]:mode:->history-modes' \
+                  '--no-check[Skip validation]' \
+                  '(- *)'{-h,--help}'[Show help information]'
+                case $state in
+                  snapshot-kinds)
+                    _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds
+                    ;;
+                  history-modes)
+                    _describe -t history-modes 'history modes' history_modes
+                    ;;
+                esac
+                ;;
+            esac
+          fi
+          ;;
+        ui)
+          _arguments \
+            '--page=[Start on a registered page]:page:' \
+            '--ui-log[Enable UI debug logs]' \
+            '--ui-logfile=[Write UI logs to file]:file:_files' \
+            '(- *)'{-h,--help}'[Show help information]'
+          ;;
+        list|purge-all)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help information]'
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_octez-manager "$@"
