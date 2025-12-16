@@ -66,6 +66,96 @@ let has_octez_baker_binary dir =
         true
       with Unix.Unix_error _ -> false
 
+(** Custom node selection field with auto-naming *)
+let node_selection_field =
+  Form_builder.custom
+    ~label:"Node"
+    ~get:(fun m ->
+      match m.client.node with
+      | `None -> "None"
+      | `Service inst -> inst
+      | `Endpoint ep -> if ep = "" then "Custom" else ep)
+    ~validate:(fun m ->
+      match m.client.node with
+      | `None -> false
+      | `Service inst ->
+          let states = Data.load_service_states () in
+          List.exists
+            (fun (s : Data.Service_state.t) ->
+              s.service.Service.role = "node"
+              && s.service.Service.instance = inst)
+            states
+      | `Endpoint ep ->
+          Form_builder_common.is_nonempty ep
+          && Option.is_some (Form_builder_common.parse_host_port ep))
+    ~validate_msg:(fun m ->
+      match m.client.node with
+      | `None -> Some "Node selection is required"
+      | `Service inst ->
+          let states = Data.load_service_states () in
+          let exists =
+            List.exists
+              (fun (s : Data.Service_state.t) ->
+                s.service.Service.role = "node"
+                && s.service.Service.instance = inst)
+              states
+          in
+          if not exists then
+            Some (Printf.sprintf "Node instance '%s' not found" inst)
+          else None
+      | `Endpoint ep ->
+          if Option.is_none (Form_builder_common.parse_host_port ep) then
+            Some "Invalid endpoint format (must be host:port, e.g., 127.0.0.1:8732)"
+          else None)
+    ~edit:(fun model_ref ->
+      let states = Data.load_service_states () in
+      let nodes =
+        List.filter (fun (s : Data.Service_state.t) ->
+          s.service.Service.role = "node") states
+      in
+      let items =
+        (nodes |> List.map (fun n -> `Node n)) @ [`Endpoint]
+      in
+      let to_string = function
+        | `Node n ->
+            let svc = n.Data.Service_state.service in
+            Printf.sprintf "Node · %s (%s)" svc.Service.instance svc.Service.network
+        | `Endpoint -> "Custom endpoint (host:port)..."
+      in
+      let on_select = function
+        | `Node n ->
+            let svc = n.Data.Service_state.service in
+            let current_name = Form_builder_common.normalize (!model_ref).core.instance_name in
+            let should_autoname =
+              current_name = "" || String.equal current_name "accuser"
+            in
+            let new_client = {(!model_ref).client with node = `Service svc.Service.instance} in
+            model_ref := {!model_ref with client = new_client} ;
+            if should_autoname then
+              let new_name = Printf.sprintf "accuser-%s" svc.Service.instance in
+              let default_dir = Common.default_role_dir "accuser" new_name in
+              let new_core = {(!model_ref).core with instance_name = new_name} in
+              let new_client = {(!model_ref).client with base_dir = default_dir} in
+              model_ref := {core = new_core; client = new_client} ;
+            (* Maybe use app_bin_dir from node *)
+            if has_octez_baker_binary svc.Service.app_bin_dir
+               && not (has_octez_baker_binary (!model_ref).core.app_bin_dir)
+            then
+              let new_core = {(!model_ref).core with app_bin_dir = svc.Service.app_bin_dir} in
+              model_ref := {!model_ref with core = new_core}
+        | `Endpoint ->
+            Modal_helpers.prompt_text_modal
+              ~title:"Node Endpoint"
+              ~placeholder:(Some "host:port (e.g., 127.0.0.1:8732)")
+              ~initial:(match !model_ref.client.node with `Endpoint ep -> ep | _ -> "")
+              ~on_submit:(fun ep ->
+                let new_client = {(!model_ref).client with node = `Endpoint ep} in
+                model_ref := {!model_ref with client = new_client})
+              ()
+      in
+      Modal_helpers.open_choice_modal ~title:"Select Node" ~items ~to_string ~on_select)
+    ()
+
 let spec =
   let open Form_builder in
   let open Form_builder_bundles in
@@ -73,7 +163,6 @@ let spec =
     title = " Install Accuser ";
     initial_model;
 
-    (* Compose fields from bundles - no custom fields needed! *)
     fields =
       core_service_fields
         ~get_core:(fun m -> m.core)
@@ -82,10 +171,15 @@ let spec =
         ~subcommand:["run"; "accuser"]
         ~binary_validator:has_octez_baker_binary
         ()
-      @ client_fields
-        ~get_client:(fun m -> m.client)
-        ~set_client:(fun client m -> {m with client})
-        ();
+      @ [
+        node_selection_field;
+        client_base_dir
+          ~label:"Base Dir"
+          ~get:(fun m -> m.client.base_dir)
+          ~set:(fun base_dir m -> {m with client = {m.client with base_dir}})
+          ~validate:(fun m -> Form_builder_common.is_nonempty m.client.base_dir)
+          ();
+      ];
 
     pre_submit = Some (fun model ->
       (* Validate node selection *)
