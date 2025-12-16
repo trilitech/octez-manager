@@ -128,7 +128,30 @@ let client_fields ~get_client ~set_client () =
                 s.service.Service.role = "node"
                 && s.service.Service.instance = inst)
               states
-        | `Endpoint ep -> is_nonempty ep)
+        | `Endpoint ep ->
+            is_nonempty ep
+            && Option.is_some (parse_host_port ep))
+      ~validate_msg:(fun m ->
+        match (get_client m).node with
+        | `None -> Some "Node selection is required"
+        | `Service inst ->
+            let states = Data.load_service_states () in
+            let exists =
+              List.exists
+                (fun (s : Data.Service_state.t) ->
+                  s.service.Service.role = "node"
+                  && s.service.Service.instance = inst)
+                states
+            in
+            if not exists then
+              Some (Printf.sprintf "Node instance '%s' not found" inst)
+            else None
+        | `Endpoint ep ->
+            if not (is_nonempty ep) then
+              Some "Node endpoint cannot be empty"
+            else if Option.is_none (parse_host_port ep) then
+              Some "Invalid endpoint format (must be host:port, e.g., 127.0.0.1:8732)"
+            else None)
       ~edit:(fun model_ref ->
         let states = Data.load_service_states () in
         let nodes =
