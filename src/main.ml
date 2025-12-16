@@ -186,29 +186,28 @@ let prompt_yes_no question ~default =
 let prompt_with_completion question completions =
   if not (is_interactive ()) then None
   else
+    (* Pre-compute lowercase versions for efficient matching *)
+    let completions_lower =
+      List.map (fun c -> (c, String.lowercase_ascii c)) completions
+    in
     (* Set up completions *)
     LNoise.set_completion_callback (fun line_so_far ln_completions ->
         let prefix = String.lowercase_ascii line_so_far in
         List.iter
-          (fun candidate ->
-            if
-              String.starts_with
-                ~prefix
-                (String.lowercase_ascii candidate)
-            then LNoise.add_completion ln_completions candidate)
-          completions) ;
+          (fun (candidate, candidate_lower) ->
+            if String.starts_with ~prefix candidate_lower then
+              LNoise.add_completion ln_completions candidate)
+          completions_lower) ;
     (* Set hints *)
     LNoise.set_hints_callback (fun line_so_far ->
         let prefix = String.lowercase_ascii line_so_far in
         match
           List.find_opt
-            (fun candidate ->
-              String.starts_with
-                ~prefix
-                (String.lowercase_ascii candidate))
-            completions
+            (fun (_, candidate_lower) ->
+              String.starts_with ~prefix candidate_lower)
+            completions_lower
         with
-        | Some hint when String.length hint > String.length line_so_far ->
+        | Some (hint, _) when String.length hint > String.length line_so_far ->
             Some
               ( String.sub hint (String.length line_so_far)
                   (String.length hint - String.length line_so_far),
@@ -585,35 +584,30 @@ let install_baker_cmd =
                              endpoint." ;
                           Ok None)
                         else
-                          let completions =
-                            List.map
-                              (fun (svc : Service.t) ->
-                                Printf.sprintf
-                                  "%s (%s)"
-                                  svc.instance
-                                  svc.network)
-                              node_services
-                          in
                           let instance_names =
                             List.map (fun (svc : Service.t) -> svc.instance)
                               node_services
                           in
+                          let instance_map =
+                            List.map
+                              (fun (svc : Service.t) ->
+                                (svc.instance, svc.network))
+                              node_services
+                          in
                           Format.printf
                             "Available node instances: %s@."
-                            (String.concat ", " instance_names) ;
+                            (String.concat
+                               ", "
+                               (List.map
+                                  (fun (inst, net) ->
+                                    Printf.sprintf "%s (%s)" inst net)
+                                  instance_map)) ;
                           match
                             prompt_with_completion
                               "Node instance (or press Enter to skip)"
                               instance_names
                           with
-                          | Some selected ->
-                              (* Extract just the instance name if user selected the full display *)
-                              let instance_name =
-                                match String.split_on_char ' ' selected with
-                                | first :: _ -> first
-                                | [] -> selected
-                              in
-                              Ok (Some instance_name)
+                          | Some selected -> Ok (Some selected)
                           | None -> Ok None
                   else Ok None
             in
