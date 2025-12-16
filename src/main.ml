@@ -739,19 +739,17 @@ let install_baker_cmd =
                         instance_names
                     with
                     | Some selected -> (
-                        (* Find the selected DAL service and get its endpoint *)
-                        match
-                          List.find_opt
-                            (fun (svc : Service.t) ->
-                              String.equal svc.instance selected)
-                            dal_services
-                        with
+                        (* Try to find a matching DAL service by instance name; if found,
+                           use its registered endpoint, otherwise treat the input as a
+                           literal endpoint string. *)
+                        (match
+                           List.find_opt
+                             (fun (svc : Service.t) -> String.equal svc.instance selected)
+                             dal_services
+                         with
                         | Some svc ->
-                            let endpoint =
-                              Installer.endpoint_of_rpc svc.Service.rpc_addr
-                            in
-                            Ok (Dal_endpoint endpoint)
-                        | None -> Ok Dal_disabled)
+                            Ok (Dal_endpoint (Installer.endpoint_of_rpc svc.Service.rpc_addr))
+                        | None -> Ok (Dal_endpoint (Installer.endpoint_of_rpc selected))))
                     | None -> Ok Dal_disabled)
             else Ok Dal_disabled
       in
