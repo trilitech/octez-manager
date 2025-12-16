@@ -182,6 +182,45 @@ let prompt_yes_no question ~default =
     in
     loop ()
 
+(* Prompt with linenoise for autocompletion support *)
+let prompt_with_completion question completions =
+  if not (is_interactive ()) then None
+  else
+    (* Set up completions *)
+    LNoise.set_completion_callback (fun line_so_far ln_completions ->
+        let prefix = String.lowercase_ascii line_so_far in
+        List.iter
+          (fun candidate ->
+            if
+              String.starts_with
+                ~prefix
+                (String.lowercase_ascii candidate)
+            then LNoise.add_completion ln_completions candidate)
+          completions) ;
+    (* Set hints *)
+    LNoise.set_hints_callback (fun line_so_far ->
+        let prefix = String.lowercase_ascii line_so_far in
+        match
+          List.find_opt
+            (fun candidate ->
+              String.starts_with
+                ~prefix
+                (String.lowercase_ascii candidate))
+            completions
+        with
+        | Some hint when String.length hint > String.length line_so_far ->
+            Some
+              ( String.sub hint (String.length line_so_far)
+                  (String.length hint - String.length line_so_far),
+                LNoise.Yellow,
+                false )
+        | _ -> None) ;
+    match LNoise.linenoise (question ^ ": ") with
+    | None -> None
+    | Some line ->
+        let trimmed = String.trim line in
+        if String.equal trimmed "" then None else Some trimmed
+
 let run_result = function
   | Ok () -> `Ok ()
   | Error (`Msg msg) -> cmdliner_error msg
@@ -521,6 +560,66 @@ let install_baker_cmd =
         match instance_result with
         | Error msg -> cmdliner_error msg
         | Ok instance -> (
+            (* Prompt for node_instance if not provided in interactive mode *)
+            let node_instance_result =
+              match normalize_opt_string node_instance with
+              | Some ni -> Ok (Some ni)
+              | None ->
+                  if is_interactive () then
+                    (* Get list of available node instances *)
+                    match Service_registry.list () with
+                    | Error (`Msg msg) ->
+                        prerr_endline
+                          ("Warning: Could not load services: " ^ msg) ;
+                        Ok None
+                    | Ok services ->
+                        let node_services =
+                          List.filter
+                            (fun (svc : Service.t) ->
+                              String.equal svc.role "node")
+                            services
+                        in
+                        if node_services = [] then (
+                          prerr_endline
+                            "No node instances found. You can specify a custom \
+                             endpoint." ;
+                          Ok None)
+                        else
+                          let completions =
+                            List.map
+                              (fun (svc : Service.t) ->
+                                Printf.sprintf
+                                  "%s (%s)"
+                                  svc.instance
+                                  svc.network)
+                              node_services
+                          in
+                          let instance_names =
+                            List.map (fun (svc : Service.t) -> svc.instance)
+                              node_services
+                          in
+                          Format.printf
+                            "Available node instances: %s@."
+                            (String.concat ", " instance_names) ;
+                          match
+                            prompt_with_completion
+                              "Node instance (or press Enter to skip)"
+                              instance_names
+                          with
+                          | Some selected ->
+                              (* Extract just the instance name if user selected the full display *)
+                              let instance_name =
+                                match String.split_on_char ' ' selected with
+                                | first :: _ -> first
+                                | [] -> selected
+                              in
+                              Ok (Some instance_name)
+                          | None -> Ok None
+                  else Ok None
+            in
+            match node_instance_result with
+            | Error msg -> cmdliner_error msg
+            | Ok resolved_node_instance -> (
             let lb_vote_result =
               match normalize_opt_string liquidity_baking_vote_opt with
               | Some vote -> Ok (Some vote)
@@ -568,7 +667,7 @@ let install_baker_cmd =
                       {
                         instance;
                         network;
-                        node_instance;
+                        node_instance = resolved_node_instance;
                         node_data_dir;
                         node_endpoint;
                         node_mode = `Auto;
@@ -590,7 +689,7 @@ let install_baker_cmd =
                           service.S.instance
                           service.network ;
                         `Ok ()
-                    | Error (`Msg msg) -> cmdliner_error msg))))
+                    | Error (`Msg msg) -> cmdliner_error msg)))))
   in
   let term =
     Term.(
