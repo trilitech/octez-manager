@@ -152,8 +152,8 @@ let prompt_history_mode default =
   if not (is_interactive ()) then default
   else
     let default_label = History_mode.to_string default in
+    setup_completion_callbacks ["rolling"; "full"; "archive"] ;
     let rec loop () =
-      setup_completion_callbacks ["rolling"; "full"; "archive"] ;
       let suffix = Printf.sprintf " [%s]" default_label in
       let prompt = Printf.sprintf "History mode (rolling/full/archive)%s: " suffix in
       match LNoise.linenoise prompt with
