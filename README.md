@@ -82,7 +82,11 @@ The baker also accepts `--liquidity-baking-vote` with one of `on`, `off`, or
 
 You can connect the baker to an existing node instance via `--node-instance` 
 (use `octez-manager list` to see available nodes), or specify a custom endpoint 
-via `--node-endpoint` (defaults to `http://127.0.0.1:8732`).
+via `--node-endpoint` (defaults to `http://127.0.0.1:8732`). When using 
+`--node-instance`, the baker automatically inherits the network from the 
+connected node. When using a remote endpoint without `--node-instance`, the 
+baker attempts to determine the network by querying the node's `/config` 
+endpoint. You can override this with an explicit `--network` flag.
 
 Run `octez-manager --help` for the full list of commands. Instance-level
 operations now go through the explicit `instance` command:
