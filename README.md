@@ -110,6 +110,20 @@ dune exec -- octez-manager purge-all
 This iterates through all services, purging each one and reporting on any
 failures.
 
+## Interactive CLI Features
+
+When running `install-node`, `install-baker`, and other commands in interactive mode 
+(without all required flags), Octez Manager provides autocomplete suggestions powered by 
+linenoise:
+
+- **Network selection**: Tab completion from networks available on teztnets.com (with fallback to mainnet/ghostnet/seoulnet/weeklynet)
+- **History mode**: Autocomplete for rolling/full/archive options
+- **Snapshot kind**: Suggestions for rolling/full/full:50/full:100/archive
+- **Liquidity baking vote**: Complete on/off/pass options
+- **DAL endpoint**: Hints for none/disabled when no DAL instances are available
+
+Press Tab to see available options or start typing to see inline hints in yellow.
+
 ## Interactive UI
 
 Octez Manager includes a terminal user interface (TUI) powered by Miaou.
