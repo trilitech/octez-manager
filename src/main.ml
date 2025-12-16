@@ -531,12 +531,11 @@ let install_baker_cmd =
               | None ->
                   if is_interactive () then
                     let vote =
-                      prompt_required_string
-                        "Liquidity baking vote (on/off/pass) [default: pass]"
+                      prompt_string_with_default
+                        "Liquidity baking vote (on/off/pass)"
+                        "pass"
                     in
-                    let trimmed = String.trim vote in
-                    if trimmed = "" then Ok (Some "pass")
-                    else Ok (Some vote)
+                    Ok (Some vote)
                   else Ok (Some "pass")
             in
             match lb_vote_result with
@@ -554,13 +553,14 @@ let install_baker_cmd =
                   | None ->
                       if is_interactive () then
                         let response =
-                          prompt_required_string
-                            "DAL node endpoint (or 'none' to opt-out) [default: none]"
+                          prompt_string_with_default
+                            "DAL node endpoint (or 'none' to opt-out)"
+                            "none"
                         in
                         let normalized =
                           String.lowercase_ascii (String.trim response)
                         in
-                        if normalized = "" || normalized = "none" || normalized = "disabled" then
+                        if normalized = "none" || normalized = "disabled" then
                           Ok Dal_disabled
                         else Ok (Dal_endpoint response)
                       else Ok Dal_disabled
