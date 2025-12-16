@@ -74,11 +74,15 @@ For `install-baker`, you can configure DAL node integration via
 `--dal-endpoint`:
 - Provide an endpoint URL (e.g., `http://localhost:10732`) to use a DAL node
 - Use `none` or `disabled` to opt-out with the `--without-dal` flag
-- Omit the flag in non-interactive mode to auto-detect (no DAL flags)
-- In interactive mode, you'll be prompted for the DAL endpoint or opt-out
+- Omit the flag to default to disabled (no DAL integration)
+- In interactive mode, you'll be prompted for the DAL endpoint (defaults to 'none')
 
-The baker also requires `--liquidity-baking-vote` (or interactive prompt) with
-one of `on`, `off`, or `pass`.
+The baker also accepts `--liquidity-baking-vote` with one of `on`, `off`, or 
+`pass`. If omitted, it defaults to `pass`.
+
+You can connect the baker to an existing node instance via `--node-instance` 
+(use `octez-manager list` to see available nodes), or specify a custom endpoint 
+via `--node-endpoint` (defaults to `http://127.0.0.1:8732`).
 
 Run `octez-manager --help` for the full list of commands. Instance-level
 operations now go through the explicit `instance` command:

@@ -428,7 +428,8 @@ let install_baker_cmd =
   in
   let node_instance =
     let doc =
-      "Existing octez-manager node instance to reuse for data-dir and network."
+      "Existing octez-manager node instance to reuse for data-dir and network. \
+       Use 'octez-manager list' to see available node instances."
     in
     Arg.(
       value & opt (some string) None & info ["node-instance"] ~doc ~docv:"NODE")
@@ -442,7 +443,10 @@ let install_baker_cmd =
       value & opt (some string) None & info ["node-data-dir"] ~doc ~docv:"DIR")
   in
   let node_endpoint =
-    let doc = "Custom RPC endpoint for the baker to contact." in
+    let doc =
+      "Custom RPC endpoint for the baker to contact. Defaults to \
+       http://127.0.0.1:8732 if --node-instance is not specified."
+    in
     Arg.(
       value & opt (some string) None & info ["node-endpoint"] ~doc ~docv:"URI")
   in
@@ -466,7 +470,7 @@ let install_baker_cmd =
   let dal_endpoint =
     let doc =
       "DAL node endpoint (e.g., http://localhost:10732). Use 'none' or \
-       'disabled' to opt-out with --without-dal flag."
+       'disabled' to opt-out with --without-dal flag. Defaults to 'none'."
     in
     Arg.(
       value
@@ -475,8 +479,7 @@ let install_baker_cmd =
   in
   let liquidity_baking_vote =
     let doc =
-      "Liquidity baking toggle vote (on, off, or pass). Required for baker to \
-       start."
+      "Liquidity baking toggle vote (on, off, or pass). Defaults to 'pass'."
     in
     Arg.(
       value
@@ -529,13 +532,12 @@ let install_baker_cmd =
                   if is_interactive () then
                     let vote =
                       prompt_required_string
-                        "Liquidity baking vote (on/off/pass)"
+                        "Liquidity baking vote (on/off/pass) [default: pass]"
                     in
-                    Ok (Some vote)
-                  else
-                    Error
-                      "Liquidity baking vote is required in non-interactive \
-                       mode. Use --liquidity-baking-vote"
+                    let trimmed = String.trim vote in
+                    if trimmed = "" then Ok (Some "pass")
+                    else Ok (Some vote)
+                  else Ok (Some "pass")
             in
             match lb_vote_result with
             | Error msg -> cmdliner_error msg
@@ -553,15 +555,15 @@ let install_baker_cmd =
                       if is_interactive () then
                         let response =
                           prompt_required_string
-                            "DAL node endpoint (or 'none' to opt-out)"
+                            "DAL node endpoint (or 'none' to opt-out) [default: none]"
                         in
                         let normalized =
                           String.lowercase_ascii (String.trim response)
                         in
-                        if normalized = "none" || normalized = "disabled" then
+                        if normalized = "" || normalized = "none" || normalized = "disabled" then
                           Ok Dal_disabled
                         else Ok (Dal_endpoint response)
-                      else Ok Dal_auto
+                      else Ok Dal_disabled
                 in
                 match dal_config_result with
                 | Error msg -> cmdliner_error msg
