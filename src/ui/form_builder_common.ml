@@ -70,8 +70,69 @@ let default_service_user () =
 
 (** {1 Helpers} *)
 
+(** Parse shellwords-style arguments with quote support.
+
+    Supports:
+    - Single quotes: preserve everything literally
+    - Double quotes: preserve spaces, allow escaping with backslash
+    - Unquoted: split on spaces
+    - Backslash escaping in double quotes and unquoted context
+
+    Examples:
+    - "foo bar" -> ["foo"; "bar"]
+    - "foo 'bar baz'" -> ["foo"; "bar baz"]
+    - "foo \"bar baz\"" -> ["foo"; "bar baz"]
+    - "foo\\ bar" -> ["foo bar"]
+*)
+let parse_shellwords s =
+  let len = String.length s in
+  let rec parse_loop i acc current in_quote escape =
+    if i >= len then
+      (* End of string *)
+      let final = if current = "" then acc else current :: acc in
+      List.rev final
+    else
+      let c = s.[i] in
+      match (in_quote, escape, c) with
+      (* Handle escape sequences *)
+      | (_, true, _) ->
+          (* Previous char was backslash, add current char literally *)
+          parse_loop (i + 1) acc (current ^ String.make 1 c) in_quote false
+      | (Some '"', false, '\\') ->
+          (* Backslash in double quotes - escape next char *)
+          parse_loop (i + 1) acc current in_quote true
+      | (None, false, '\\') ->
+          (* Backslash outside quotes - escape next char *)
+          parse_loop (i + 1) acc current in_quote true
+
+      (* Handle quote boundaries *)
+      | (None, false, '\'') ->
+          (* Start single quote *)
+          parse_loop (i + 1) acc current (Some '\'') false
+      | (Some '\'', false, '\'') ->
+          (* End single quote *)
+          parse_loop (i + 1) acc current None false
+      | (None, false, '"') ->
+          (* Start double quote *)
+          parse_loop (i + 1) acc current (Some '"') false
+      | (Some '"', false, '"') ->
+          (* End double quote *)
+          parse_loop (i + 1) acc current None false
+
+      (* Handle whitespace *)
+      | (None, false, (' ' | '\t' | '\n' | '\r')) ->
+          (* Whitespace outside quotes - word boundary *)
+          if current = "" then
+            parse_loop (i + 1) acc current None false
+          else
+            parse_loop (i + 1) (current :: acc) "" None false
+
+      (* Regular characters *)
+      | _ ->
+          parse_loop (i + 1) acc (current ^ String.make 1 c) in_quote false
+  in
+  parse_loop 0 [] "" None false
+
 let prepare_extra_args s =
   if String.trim s = "" then []
-  else
-    String.split_on_char ' ' s
-    |> List.filter (fun s -> String.trim s <> "")
+  else parse_shellwords (String.trim s)
