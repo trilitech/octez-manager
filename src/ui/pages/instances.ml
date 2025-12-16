@@ -735,6 +735,7 @@ let create_menu_modal state =
     ~on_select:(function
       | `Node -> Context.navigate Install_node_form.name
       | `Baker -> Context.navigate Install_baker_form.name
+      | `Accuser -> Context.navigate Install_accuser_form_v2.name
       | _ ->
           show_error
             ~title:"Not Implemented"
