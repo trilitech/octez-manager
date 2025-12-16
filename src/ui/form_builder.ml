@@ -122,10 +122,9 @@ let readonly ~label ~get =
   let edit _ = () in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
-let custom ~label ~get ~edit ?(validate = fun _ -> true) () =
+let custom ~label ~get ~edit ?(validate = fun _ -> true) ?(validate_msg = fun _ -> None) () =
   let set _ m = m in
   let to_string v = v in
-  let validate_msg _ = None in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
 let node_data_dir ~label ~get ~set ?(validate = fun _ -> true) () =
