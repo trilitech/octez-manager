@@ -144,20 +144,12 @@ The UI is designed for efficiency with a list-first approach:
 
 Zsh completion is available to provide tab completion for all commands, options, and arguments.
 
-To install, see the [completions/README.md](completions/README.md) for detailed instructions.
-
-Quick install for zsh:
+If you install via opam/dune, completions are automatically installed. Just add to your `~/.zshrc`:
 ```sh
-# System-wide (requires sudo)
-sudo cp completions/_octez-manager /usr/share/zsh/site-functions/
-
-# Or user-specific
-mkdir -p ~/.zsh/completions
-cp completions/_octez-manager ~/.zsh/completions/
-# Add to ~/.zshrc: fpath=(~/.zsh/completions $fpath)
+fpath=($(opam var share)/zsh/site-functions $fpath)
 ```
 
-Then restart your shell or run `compinit`.
+For manual installation or other options, see [completions/README.md](completions/README.md).
 
 ## License
 

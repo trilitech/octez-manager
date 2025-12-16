@@ -8,7 +8,21 @@ This directory contains shell completion scripts for `octez-manager`.
 
 There are several ways to install the zsh completion:
 
-#### Option 1: System-wide installation (requires sudo)
+#### Option 1: Automatic installation via opam/dune
+
+If you install `octez-manager` via opam or dune, the completion file is automatically installed to your opam share directory. You just need to add the opam zsh completions to your fpath:
+
+```bash
+# Add to your ~/.zshrc (before compinit is called):
+fpath=($(opam var share)/zsh/site-functions $fpath)
+```
+
+Then restart your shell or run:
+```bash
+source ~/.zshrc
+```
+
+#### Option 2: System-wide installation (requires sudo)
 
 ```bash
 sudo cp completions/_octez-manager /usr/share/zsh/site-functions/
@@ -19,7 +33,7 @@ Then restart your shell or run:
 compinit
 ```
 
-#### Option 2: User-specific installation
+#### Option 3: User-specific installation
 
 1. Create a directory for your completions if it doesn't exist:
    ```bash
@@ -41,7 +55,7 @@ compinit
    source ~/.zshrc
    ```
 
-#### Option 3: Direct sourcing
+#### Option 4: Direct sourcing
 
 Add this line to your `~/.zshrc`:
 ```bash
