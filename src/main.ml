@@ -153,18 +153,24 @@ let prompt_history_mode default =
   else
     let default_label = History_mode.to_string default in
     let rec loop () =
-      match
-        prompt_input
-          ~default:(default_label, default_label)
-          "History mode (rolling/full/archive)"
-      with
-      | Some value -> (
-          match History_mode.of_string value with
-          | Ok hm -> hm
-          | Error _ ->
-              prerr_endline "Please enter rolling, full, or archive." ;
-              loop ())
-      | None -> loop ()
+      setup_completion_callbacks ["rolling"; "full"; "archive"] ;
+      let suffix = Printf.sprintf " [%s]" default_label in
+      let prompt = Printf.sprintf "History mode (rolling/full/archive)%s: " suffix in
+      match LNoise.linenoise prompt with
+      | exception Sys.Break ->
+          prerr_endline "" ;
+          exit 130
+      | exception End_of_file -> default
+      | None -> default
+      | Some line -> (
+          let trimmed = String.trim line in
+          if String.equal trimmed "" then default
+          else
+            match History_mode.of_string trimmed with
+            | Ok hm -> hm
+            | Error _ ->
+                prerr_endline "Please enter rolling, full, or archive." ;
+                loop ())
     in
     loop ()
 
@@ -186,45 +192,137 @@ let prompt_yes_no question ~default =
     in
     loop ()
 
+(* Helper to set up linenoise completion and hints for a list of options *)
+let setup_completion_callbacks completions =
+  (* Pre-compute lowercase versions for efficient matching *)
+  let completions_lower =
+    List.map (fun c -> (c, String.lowercase_ascii c)) completions
+  in
+  (* Set up completions *)
+  LNoise.set_completion_callback (fun line_so_far ln_completions ->
+      let prefix = String.lowercase_ascii line_so_far in
+      List.iter
+        (fun (candidate, candidate_lower) ->
+          if String.starts_with ~prefix candidate_lower then
+            LNoise.add_completion ln_completions candidate)
+        completions_lower) ;
+  (* Set hints *)
+  LNoise.set_hints_callback (fun line_so_far ->
+      let prefix = String.lowercase_ascii line_so_far in
+      match
+        List.find_opt
+          (fun (_, candidate_lower) ->
+            String.starts_with ~prefix candidate_lower)
+          completions_lower
+      with
+      | Some (hint, _) when String.length hint > String.length line_so_far ->
+          Some
+            ( String.sub
+                hint
+                (String.length line_so_far)
+                (String.length hint - String.length line_so_far),
+              LNoise.Yellow,
+              false )
+      | _ -> None)
+
 (* Prompt with linenoise for autocompletion support *)
 let prompt_with_completion question completions =
   if not (is_interactive ()) then None
-  else
-    (* Pre-compute lowercase versions for efficient matching *)
-    let completions_lower =
-      List.map (fun c -> (c, String.lowercase_ascii c)) completions
-    in
-    (* Set up completions *)
-    LNoise.set_completion_callback (fun line_so_far ln_completions ->
-        let prefix = String.lowercase_ascii line_so_far in
-        List.iter
-          (fun (candidate, candidate_lower) ->
-            if String.starts_with ~prefix candidate_lower then
-              LNoise.add_completion ln_completions candidate)
-          completions_lower) ;
-    (* Set hints *)
-    LNoise.set_hints_callback (fun line_so_far ->
-        let prefix = String.lowercase_ascii line_so_far in
-        match
-          List.find_opt
-            (fun (_, candidate_lower) ->
-              String.starts_with ~prefix candidate_lower)
-            completions_lower
-        with
-        | Some (hint, _) when String.length hint > String.length line_so_far ->
-            Some
-              ( String.sub
-                  hint
-                  (String.length line_so_far)
-                  (String.length hint - String.length line_so_far),
-                LNoise.Yellow,
-                false )
-        | _ -> None) ;
+  else (
+    setup_completion_callbacks completions ;
     match LNoise.linenoise (question ^ ": ") with
     | None -> None
     | Some line ->
         let trimmed = String.trim line in
+        if String.equal trimmed "" then None else Some trimmed)
+
+(* Get network names for autocompletion *)
+let get_network_names () =
+  match Teztnets.list_networks () with
+  | Ok networks -> List.map (fun (n : Teztnets.network_info) -> n.alias) networks
+  | Error _ ->
+      (* Fallback to hardcoded list if Teztnets API fails *)
+      ["mainnet"; "ghostnet"; "seoulnet"; "weeklynet"]
+
+(* Prompt for network with autocompletion *)
+let prompt_network default =
+  if not (is_interactive ()) then default
+  else
+    let network_names = get_network_names () in
+    setup_completion_callbacks network_names ;
+    let suffix = Printf.sprintf " [%s]" default in
+    let prompt = Printf.sprintf "Network (network name, e.g. mainnet)%s: " suffix in
+    match LNoise.linenoise prompt with
+    | exception Sys.Break ->
+        prerr_endline "" ;
+        exit 130
+    | exception End_of_file -> default
+    | None -> default
+    | Some line ->
+        let trimmed = String.trim line in
+        if String.equal trimmed "" then default else trimmed
+
+(* Prompt for snapshot kind with autocompletion *)
+let prompt_snapshot_kind () =
+  if not (is_interactive ()) then None
+  else
+    let snapshot_kinds =
+      ["rolling"; "full"; "full:50"; "full:100"; "archive"]
+    in
+    setup_completion_callbacks snapshot_kinds ;
+    match
+      LNoise.linenoise
+        "Snapshot kind (rolling/full/full:50/full:100/archive, leave blank for \
+         auto): "
+    with
+    | exception Sys.Break ->
+        prerr_endline "" ;
+        exit 130
+    | exception End_of_file -> None
+    | None -> None
+    | Some line ->
+        let trimmed = String.trim line in
         if String.equal trimmed "" then None else Some trimmed
+
+(* Prompt for liquidity baking vote with autocompletion *)
+let prompt_liquidity_baking_vote default =
+  if not (is_interactive ()) then default
+  else
+    let votes = ["on"; "off"; "pass"] in
+    setup_completion_callbacks votes ;
+    let suffix = Printf.sprintf " [%s]" default in
+    let prompt =
+      Printf.sprintf "Liquidity baking vote (on/off/pass)%s: " suffix
+    in
+    match LNoise.linenoise prompt with
+    | exception Sys.Break ->
+        prerr_endline "" ;
+        exit 130
+    | exception End_of_file -> default
+    | None -> default
+    | Some line ->
+        let trimmed = String.trim line in
+        if String.equal trimmed "" then default else trimmed
+
+(* Prompt for DAL endpoint with hints for none/disabled *)
+let prompt_dal_endpoint default =
+  if not (is_interactive ()) then default
+  else
+    let hints = ["none"; "disabled"] in
+    setup_completion_callbacks hints ;
+    let suffix = Printf.sprintf " [%s]" default in
+    let prompt =
+      Printf.sprintf "DAL node endpoint (or 'none' to opt-out)%s: " suffix
+    in
+    match LNoise.linenoise prompt with
+    | exception Sys.Break ->
+        prerr_endline "" ;
+        exit 130
+    | exception End_of_file -> default
+    | None -> default
+    | Some line ->
+        let trimmed = String.trim line in
+        if String.equal trimmed "" then default else trimmed
 
 let run_result = function
   | Ok () -> `Ok ()
@@ -368,10 +466,7 @@ let install_node_cmd =
               match normalize_opt_string network_opt with
               | Some net -> net
               | None ->
-                  if is_interactive () then
-                    prompt_string_with_default
-                      "Network (network name, e.g. mainnet)"
-                      "mainnet"
+                  if is_interactive () then prompt_network "mainnet"
                   else "mainnet"
             in
             let history_mode =
@@ -396,9 +491,7 @@ let install_node_cmd =
               match normalize_opt_string snapshot_kind with
               | Some _ as provided -> provided
               | None when snapshot_requested && is_interactive () ->
-                  prompt_input
-                    "Snapshot kind (rolling/full/full:50, leave blank for auto)"
-                  |> normalize_opt_string
+                  prompt_snapshot_kind ()
               | None -> None
             in
             let snapshot_uri =
@@ -627,11 +720,7 @@ let install_baker_cmd =
                   | Some vote -> Ok (Some vote)
                   | None ->
                       if is_interactive () then
-                        let vote =
-                          prompt_string_with_default
-                            "Liquidity baking vote (on/off/pass)"
-                            "pass"
-                        in
+                        let vote = prompt_liquidity_baking_vote "pass" in
                         Ok (Some vote)
                       else Ok (Some "pass")
                 in
@@ -668,18 +757,12 @@ let install_baker_cmd =
                                     services
                                 in
                                 if dal_services = [] then
-                                  let response =
-                                    prompt_string_with_default
-                                      "DAL node endpoint (or 'none' to opt-out)"
-                                      "none"
-                                  in
+                                  let response = prompt_dal_endpoint "none" in
                                   let normalized =
-                                    String.lowercase_ascii
-                                      (String.trim response)
+                                    String.lowercase_ascii (String.trim response)
                                   in
                                   if
-                                    normalized = "none"
-                                    || normalized = "disabled"
+                                    normalized = "none" || normalized = "disabled"
                                   then Ok Dal_disabled
                                   else Ok (Dal_endpoint response)
                                 else
