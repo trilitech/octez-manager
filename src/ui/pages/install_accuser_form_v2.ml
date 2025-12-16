@@ -205,6 +205,8 @@ let spec = Form_builder.{
     | Error msg -> Error (`Msg msg)
     | Ok _ -> Ok ());
 
+  pre_submit_modal = None;
+
   (* Installation handler *)
   on_submit = (fun model ->
     let states = Data.load_service_states () in

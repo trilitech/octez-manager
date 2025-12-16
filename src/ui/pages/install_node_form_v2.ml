@@ -7,17 +7,11 @@
 
 (** Node installation form using declarative form builder.
 
-    KNOWN LIMITATION: The preserve_data flow (asking "Refresh vs Keep" when
-    data directory exists) is not fully implemented. The original form shows
-    a conditional choice modal during submission, which doesn't fit well with
-    the form builder's result-based on_submit approach.
-
-    The form works correctly for:
-    - Fresh installations
-    - Installations where the data directory doesn't exist
-
-    For existing directories, the install will currently fail with an error
-    message prompting the user to handle it manually. *)
+    All features from the original node installer are preserved, including:
+    - Network and snapshot fetching/caching
+    - Port conflict detection
+    - History mode vs snapshot validation
+    - Preserve data flow (asks "Refresh vs Keep" for existing directories) *)
 
 open Octez_manager_lib
 open Installer_types
@@ -537,7 +531,7 @@ let spec =
 
     pre_submit = None;
 
-    on_submit = (fun model ->
+    pre_submit_modal = Some (fun model ->
       (* Check if we need to show preserve_data choice modal *)
       let data_dir =
         if String.trim model.data_dir = "" then
@@ -546,21 +540,28 @@ let spec =
       in
       let needs_choice = dir_nonempty data_dir && model.preserve_data = `Auto in
 
-      if needs_choice then (
-        (* Show choice modal and abort this submission *)
-        (* Note: The choice modal doesn't update the model - user must use a different approach *)
-        Modal_helpers.open_choice_modal
-          ~title:"Data directory exists"
-          ~items:[`Refresh; `Keep]
-          ~to_string:(function
-            | `Refresh -> "Refresh (wipe and import)"
-            | `Keep -> "Keep existing data")
-          ~on_select:(fun _choice ->
-            (* TODO: This needs a different approach - the modal can't easily update the model *)
-            ()) ;
-        Error (`Msg "Choose how to handle existing data directory - feature not fully implemented"))
+      if needs_choice then
+        Some (Form_builder.PreSubmitModal {
+          title = "Data directory exists";
+          message = Some "The selected data directory is not empty. Choose how to proceed:";
+          choices = ([`Refresh; `Keep] : preserve_data list);
+          to_string = (function
+            | `Refresh -> "Refresh (wipe and import snapshot)"
+            | `Keep -> "Keep (preserve existing data)"
+            | `Auto -> "");  (* Never shown *)
+          on_choice = (fun (choice : preserve_data) model ->
+            {model with preserve_data = choice});
+        })
       else
-        (* Proceed with installation *)
+        None);
+
+    on_submit = (fun model ->
+      (* Proceed with installation *)
+        let data_dir =
+          if String.trim model.data_dir = "" then
+            Common.default_data_dir model.instance_name
+          else model.data_dir
+        in
         let history_mode =
           match History_mode.of_string model.history_mode with
           | Ok m -> m

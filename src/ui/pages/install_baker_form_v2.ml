@@ -400,6 +400,7 @@ let spec =
     ];
 
     pre_submit = None;
+    pre_submit_modal = None;
 
     on_submit = (fun model ->
       (* Ensure service user and base_dir have defaults *)
