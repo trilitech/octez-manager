@@ -30,6 +30,7 @@ type 'model spec = {
   title : string;
   initial_model : 'model;
   fields : 'model field list;
+  pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;
   on_submit : 'model -> (unit, [`Msg of string]) result;
 }
 
@@ -171,6 +172,172 @@ let extra_args ~label ~get_args ~set_args ~get_bin_dir ~binary ?subcommand () =
   in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
+(** Helper to parse host:port *)
+let parse_host_port s =
+  match String.split_on_char ':' s with
+  | [host; port] -> (
+      try
+        let p = int_of_string (String.trim port) in
+        if p > 0 && p < 65536 && String.trim host <> "" then Ok ()
+        else Error "Port must be between 1 and 65535"
+      with _ -> Error "Invalid port number")
+  | _ -> Error "Format must be host:port (e.g., 127.0.0.1:8732)"
+
+let endpoint ~label ~get ~set ?default_port:(_ = 8732) () =
+  let to_string v = v in
+  let validate model =
+    let v = get model in
+    if String.trim v = "" then true (* Allow empty *)
+    else match parse_host_port v with Ok () -> true | Error _ -> false
+  in
+  let validate_msg model =
+    let v = get model in
+    if String.trim v = "" then None
+    else match parse_host_port v with Ok () -> None | Error msg -> Some msg
+  in
+  let edit model_ref =
+    let initial = get !model_ref in
+    let validator v =
+      if String.trim v = "" then Ok ()
+      else parse_host_port v
+    in
+    Modal_helpers.prompt_validated_text_modal
+      ~title:label
+      ~initial
+      ~validator
+      ~on_submit:(fun v -> model_ref := set v !model_ref)
+      ()
+  in
+  Field {label; get; set; to_string; validate; validate_msg; edit}
+
+let service_or_endpoint ~label ~role ~get ~set ?(external_label = "External endpoint...")
+    ?(endpoint_validator = parse_host_port) () =
+  let to_string = function
+    | `None -> "(none)"
+    | `Service inst -> inst
+    | `Endpoint ep -> ep
+  in
+  let validate model =
+    match get model with
+    | `None -> true
+    | `Service _ -> true
+    | `Endpoint ep ->
+        (match endpoint_validator ep with Ok () -> true | Error _ -> false)
+  in
+  let validate_msg model =
+    match get model with
+    | `Endpoint ep ->
+        (match endpoint_validator ep with Ok () -> None | Error msg -> Some msg)
+    | _ -> None
+  in
+  let edit model_ref =
+    (* Get list of services with matching role *)
+    let open Octez_manager_lib in
+    let services = Data.load_service_states () in
+    let matching_services =
+      services
+      |> List.filter (fun s -> s.Data.Service_state.service.Service.role = role)
+    in
+    let service_items = List.map (fun s -> `Service s) matching_services in
+    let items = [`None] @ service_items @ [`External] in
+
+    let to_string_item = function
+      | `None -> "None"
+      | `Service s ->
+          let svc = s.Data.Service_state.service in
+          Printf.sprintf "%s (%s)" svc.Service.instance svc.Service.network
+      | `External -> external_label
+    in
+
+    let on_select = function
+      | `None -> model_ref := set `None !model_ref
+      | `Service s ->
+          let inst = s.Data.Service_state.service.Service.instance in
+          model_ref := set (`Service inst) !model_ref
+      | `External ->
+          let initial =
+            match get !model_ref with
+            | `Endpoint ep -> ep
+            | _ -> ""
+          in
+          Modal_helpers.prompt_validated_text_modal
+            ~title:label
+            ~initial
+            ~validator:endpoint_validator
+            ~on_submit:(fun ep -> model_ref := set (`Endpoint ep) !model_ref)
+            ()
+    in
+    Modal_helpers.open_choice_modal ~title:label ~items ~to_string:to_string_item ~on_select
+  in
+  Field {label; get; set; to_string; validate; validate_msg; edit}
+
+let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
+    ?(item_validator = fun _ -> Ok ()) () =
+  let to_string lst =
+    if lst = [] then "(none)" else String.concat ", " lst
+  in
+  let validate _ = true in
+  let validate_msg _ = None in
+  let edit model_ref =
+    let build_items () =
+      let current = get !model_ref in
+      let suggestions = get_suggestions !model_ref in
+      (* Available suggestions that can be toggled *)
+      let suggestion_items = List.map (fun s -> `Toggle s) suggestions in
+      (* Current items that can be removed *)
+      let remove_items = List.map (fun item -> `Remove item) current in
+      let clear_item = if current = [] then [] else [`Clear] in
+      suggestion_items @ [`Add] @ clear_item @ remove_items
+    in
+
+    let to_string_item = function
+      | `Toggle item ->
+          let current = get !model_ref in
+          let checked = List.mem item current in
+          let checkbox = if checked then "[x]" else "[ ]" in
+          Printf.sprintf "%s %s" checkbox item
+      | `Add -> "Add item (manual)"
+      | `Clear -> "Clear all"
+      | `Remove item -> "Remove: " ^ item
+    in
+
+    let on_select = function
+      | `Toggle item ->
+          let current = get !model_ref in
+          let updated =
+            if List.mem item current then
+              List.filter (fun x -> x <> item) current
+            else
+              current @ [item]
+          in
+          model_ref := set updated !model_ref;
+          `KeepOpen
+      | `Add ->
+          Modal_helpers.prompt_validated_text_modal
+            ~title:("Add " ^ label)
+            ~validator:(fun v ->
+              if String.trim v = "" then Error "Cannot be empty"
+              else item_validator v)
+            ~on_submit:(fun v ->
+              let v = String.trim v in
+              let current = get !model_ref in
+              if not (List.mem v current) then
+                model_ref := set (current @ [v]) !model_ref)
+            ();
+          `KeepOpen
+      | `Clear ->
+          model_ref := set [] !model_ref;
+          `KeepOpen
+      | `Remove item ->
+          let current = get !model_ref in
+          model_ref := set (List.filter (fun x -> x <> item) current) !model_ref;
+          `KeepOpen
+    in
+    Modal_helpers.open_multiselect_modal ~title:label ~items:build_items
+      ~to_string:to_string_item ~on_select
+  in
+  Field {label; get; set; to_string; validate; validate_msg; edit}
+
 (*****************************************************************************)
 (*                                  FUNCTOR                                  *)
 (*****************************************************************************)
@@ -226,14 +393,37 @@ struct
           (Printf.sprintf "%s is invalid" label) ;
         s
     | [] -> (
-        match S.spec.on_submit model with
-        | Ok () ->
-            Context.mark_instances_dirty () ;
-            s.next_page <- Some "instances" ;
-            s
-        | Error (`Msg msg) ->
-            Modal_helpers.show_error ~title:"Installation Failed" msg ;
-            s)
+        (* Run pre-submission validation if provided *)
+        match S.spec.pre_submit with
+        | Some pre_fn -> (
+            match pre_fn model with
+            | Ok () -> (
+                (* Pre-validation passed, proceed with submission *)
+                match S.spec.on_submit model with
+                | Ok () ->
+                    Context.mark_instances_dirty () ;
+                    s.next_page <- Some "instances" ;
+                    s
+                | Error (`Msg msg) ->
+                    Modal_helpers.show_error ~title:"Installation Failed" msg ;
+                    s)
+            | Error (`Msg msg) ->
+                Modal_helpers.show_error ~title:"Validation Failed" msg ;
+                s
+            | Error (`Modal (_title, action)) ->
+                (* Pre-validation wants to show a modal (e.g., "Keep or Refresh data?") *)
+                action () ;
+                s)
+        | None -> (
+            (* No pre-validation, proceed directly *)
+            match S.spec.on_submit model with
+            | Ok () ->
+                Context.mark_instances_dirty () ;
+                s.next_page <- Some "instances" ;
+                s
+            | Error (`Msg msg) ->
+                Modal_helpers.show_error ~title:"Installation Failed" msg ;
+                s))
 
   let enter s =
     if s.cursor < List.length S.spec.fields then (
