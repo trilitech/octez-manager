@@ -30,8 +30,54 @@ let print_service_details svc =
   Format.printf "Network       : %s@." svc.network ;
   Format.printf "History mode  : %s@." (History_mode.to_string svc.history_mode) ;
   Format.printf "Data dir      : %s@." svc.data_dir ;
-  Format.printf "RPC addr      : %s@." svc.rpc_addr ;
-  Format.printf "P2P addr      : %s@." svc.net_addr ;
+  (* Special-case baker to show node/dal instance when available *)
+  if String.equal svc.role "baker" then (
+    let env =
+      match Node_env.read ~inst:svc.S.instance with
+      | Ok pairs -> pairs
+      | Error _ -> []
+    in
+    let lookup key =
+      match List.assoc_opt key env with Some v -> String.trim v | None -> ""
+    in
+    let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
+    let dal_cfg = lookup "OCTEZ_DAL_CONFIG" in
+    (* Try to map endpoints to managed instances *)
+    let resolve_instance_for_endpoint (ep : string) ~(roles : string list) :
+        string option =
+      if String.trim ep = "" then None
+      else
+        match Service_registry.list () with
+        | Error _ -> None
+        | Ok (services : Service.t list) ->
+            let rec find_match (lst : Service.t list) =
+              match lst with
+              | [] -> None
+              | s :: rest ->
+                  if
+                    List.exists (fun r -> String.equal s.role r) roles
+                    && String.equal (Installer.endpoint_of_rpc s.rpc_addr) ep
+                  then Some s.instance
+                  else find_match rest
+            in
+            find_match services
+    in
+    (match resolve_instance_for_endpoint node_ep ~roles:["node"] with
+    | Some inst -> Format.printf "Node instance : %s@." inst
+    | None ->
+        Format.printf
+          "Node endpoint : %s@."
+          (if node_ep = "" then svc.rpc_addr else node_ep)) ;
+    match String.lowercase_ascii (String.trim dal_cfg) with
+    | "disabled" -> Format.printf "DAL Config    : opt-out@."
+    | "" -> Format.printf "DAL Config    : auto@."
+    | raw -> (
+        match resolve_instance_for_endpoint raw ~roles:["dal-node"; "dal"] with
+        | Some inst -> Format.printf "DAL instance  : %s@." inst
+        | None -> Format.printf "DAL endpoint  : %s@." raw))
+  else (
+    Format.printf "RPC addr      : %s@." svc.rpc_addr ;
+    Format.printf "P2P addr      : %s@." svc.net_addr) ;
   Format.printf "Service user  : %s@." svc.service_user ;
   Format.printf "Octez bin dir : %s@." svc.app_bin_dir ;
   Format.printf "Created at    : %s@." svc.created_at ;
