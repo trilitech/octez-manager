@@ -163,6 +163,14 @@ let instance_in_use ~states name =
          String.equal target (normalize s.service.Service.instance))
        states
 
+let is_valid_instance_char c =
+  match c with
+  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> true
+  | _ -> false
+
+let instance_has_valid_chars name =
+  String.for_all is_valid_instance_char name
+
 let node_services states =
   states
   |> List.filter (fun (s : Data.Service_state.t) ->
@@ -833,6 +841,7 @@ let view s ~focus:_ ~size =
   in
   let valid_instance =
     is_nonempty f.instance_name
+    && instance_has_valid_chars f.instance_name
     && not (instance_in_use ~states:s.service_states f.instance_name)
   in
   let valid_parent_node = f.parent_node = "" || Option.is_some selected_node in

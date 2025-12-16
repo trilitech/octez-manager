@@ -1832,6 +1832,118 @@ let installer_instance_name_unique () =
               Alcotest.failf "Should have succeeded with different name: %s" msg
           ))
 
+let installer_instance_name_chars () =
+  with_fake_xdg (fun _env ->
+      (* Test valid instance names with allowed characters *)
+      let valid_names =
+        [
+          "simple";
+          "with-hyphen";
+          "with_underscore";
+          "with.dot";
+          "MixedCase123";
+          "a1b2c3";
+          "test-node_1.0";
+        ]
+      in
+      List.iter
+        (fun name ->
+          match Installer.For_tests.validate_instance_name_chars ~instance:name
+          with
+          | Ok () -> ()
+          | Error (`Msg msg) ->
+              Alcotest.failf "Valid name '%s' was rejected: %s" name msg)
+        valid_names ;
+      (* Test invalid instance names with disallowed characters *)
+      let invalid_names =
+        [
+          ("théo", "é");
+          (* UTF-8 character *)
+          ("test node", "space");
+          (* space *)
+          ("test@node", "@");
+          (* at sign *)
+          ("test#node", "#");
+          (* hash *)
+          ("test/node", "/");
+          (* slash *)
+          ("test\\node", "\\");
+          (* backslash *)
+          ("test|node", "|");
+          (* pipe *)
+          ("test&node", "&");
+          (* ampersand *)
+          ("test$node", "$");
+          (* dollar *)
+          ("test!node", "!");
+          (* exclamation *)
+          ("café", "é");
+          (* another UTF-8 example *)
+          ("tëst", "ë");
+          (* UTF-8 character *)
+          ("node*", "*");
+          (* asterisk *)
+          ("node?", "?");
+          (* question mark *)
+          ("node[1]", "[");
+          (* bracket *)
+          ("node(1)", "(");
+          (* parenthesis *)
+          ("node{1}", "{");
+          (* brace *)
+        ]
+      in
+      List.iter
+        (fun (name, _desc) ->
+          match Installer.For_tests.validate_instance_name_chars ~instance:name
+          with
+          | Ok () ->
+              Alcotest.failf "Invalid name '%s' was accepted but should fail" name
+          | Error (`Msg msg) ->
+              Alcotest.(check bool)
+                "error message mentions invalid characters"
+                true
+                (string_contains ~needle:"invalid characters" msg))
+        invalid_names ;
+      (* Test empty string *)
+      match Installer.For_tests.validate_instance_name_chars ~instance:"" with
+      | Ok () -> Alcotest.fail "Empty instance name was accepted but should fail"
+      | Error (`Msg msg) ->
+          Alcotest.(check bool)
+            "error message mentions empty"
+            true
+            (string_contains ~needle:"cannot be empty" msg))
+
+let installer_instance_name_full_validation () =
+  with_fake_xdg (fun _env ->
+      (* Create a node service with instance "foo" *)
+      let node_service = sample_service () in
+      let node_service = {node_service with Service.instance = "foo"} in
+      let () = expect_ok (Service_registry.write node_service) in
+      (* Test that validate_instance_name checks both chars and uniqueness *)
+      (* 1. Invalid characters should fail before uniqueness check *)
+      (match Installer.For_tests.validate_instance_name ~instance:"théo" with
+      | Ok () ->
+          Alcotest.fail "Instance name with invalid chars was accepted"
+      | Error (`Msg msg) ->
+          Alcotest.(check bool)
+            "error mentions invalid characters"
+            true
+            (string_contains ~needle:"invalid characters" msg)) ;
+      (* 2. Duplicate valid name should fail with uniqueness error *)
+      (match Installer.For_tests.validate_instance_name ~instance:"foo" with
+      | Ok () -> Alcotest.fail "Duplicate instance name was accepted"
+      | Error (`Msg msg) ->
+          Alcotest.(check bool)
+            "error mentions already in use"
+            true
+            (string_contains ~needle:"already in use" msg)) ;
+      (* 3. Valid unique name should succeed *)
+      match Installer.For_tests.validate_instance_name ~instance:"bar" with
+      | Ok () -> ()
+      | Error (`Msg msg) ->
+          Alcotest.failf "Valid unique name was rejected: %s" msg)
+
 let node_env_write_file () =
   with_fake_xdg (fun env ->
       let inst = "alpha" in
@@ -2601,6 +2713,14 @@ let () =
             "instance name unique"
             `Quick
             installer_instance_name_unique;
+          Alcotest.test_case
+            "instance name chars"
+            `Quick
+            installer_instance_name_chars;
+          Alcotest.test_case
+            "instance name full validation"
+            `Quick
+            installer_instance_name_full_validation;
           Alcotest.test_case
             "log dir base"
             `Quick

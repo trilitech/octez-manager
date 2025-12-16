@@ -3,6 +3,10 @@ open Installer_types
 
 let ( let* ) = Result.bind
 
+let invalid_instance_name_chars_msg =
+  "Only alphanumeric characters (a-z, A-Z, 0-9), hyphens (-), underscores \
+   (_), and dots (.) are allowed."
+
 let backup_file_if_exists path =
   let normalized = String.trim path in
   if normalized = "" then Ok None
@@ -616,6 +620,21 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       let (_ : (unit, _) result) = restore_once () in
       e
 
+let is_valid_instance_char c =
+  match c with
+  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> true
+  | _ -> false
+
+let validate_instance_name_chars ~instance =
+  if String.length instance = 0 then
+    R.error_msgf "Instance name cannot be empty."
+  else if not (String.for_all is_valid_instance_char instance) then
+    R.error_msgf
+      "Instance name '%s' contains invalid characters. %s"
+      instance
+      invalid_instance_name_chars_msg
+  else Ok ()
+
 let validate_instance_name_unique ~instance =
   let* services = Service_registry.list () in
   let existing =
@@ -632,8 +651,12 @@ let validate_instance_name_unique ~instance =
         svc.Service.role
   | None -> Ok ()
 
+let validate_instance_name ~instance =
+  let* () = validate_instance_name_chars ~instance in
+  validate_instance_name_unique ~instance
+
 let install_node (request : node_request) =
-  let* () = validate_instance_name_unique ~instance:request.instance in
+  let* () = validate_instance_name ~instance:request.instance in
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
   in
@@ -760,7 +783,7 @@ let install_node (request : node_request) =
   Ok service
 
 let install_daemon (request : daemon_request) =
-  let* () = validate_instance_name_unique ~instance:request.instance in
+  let* () = validate_instance_name ~instance:request.instance in
   let logging_mode =
     prepare_logging
       ~instance:request.instance
@@ -991,7 +1014,7 @@ let add_authorized_keys ~app_bin_dir ~base_dir ~service_user entries =
   List.fold_left apply (Ok ()) entries
 
 let install_signer (request : signer_request) =
-  let* () = validate_instance_name_unique ~instance:request.instance in
+  let* () = validate_instance_name ~instance:request.instance in
   let base_dir =
     match request.base_dir with
     | Some dir when String.trim dir <> "" -> dir
@@ -1191,7 +1214,11 @@ let restore_backup_for_tests = restore_backup
 module For_tests = struct
   type nonrec file_backup = file_backup
 
+  let validate_instance_name_chars = validate_instance_name_chars
+
   let validate_instance_name_unique = validate_instance_name_unique
+
+  let validate_instance_name = validate_instance_name
 
   let ensure_logging_base_directory = ensure_logging_base_directory
 
