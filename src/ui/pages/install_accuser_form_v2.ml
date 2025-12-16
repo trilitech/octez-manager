@@ -205,6 +205,8 @@ let spec = Form_builder.{
     | Error msg -> Error (`Msg msg)
     | Ok _ -> Ok ());
 
+  on_init = None;
+  on_refresh = None;
   pre_submit_modal = None;
 
   (* Installation handler *)

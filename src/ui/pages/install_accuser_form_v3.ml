@@ -107,7 +107,9 @@ let spec =
           if Form_builder_common.is_nonempty ep then Ok ()
           else Error (`Msg "Node endpoint cannot be empty"));
 
-    pre_submit_modal = None;
+    on_init = None;
+  on_refresh = None;
+  pre_submit_modal = None;
 
     on_submit = (fun model ->
       let states = Data.load_service_states () in

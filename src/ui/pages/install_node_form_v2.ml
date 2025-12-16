@@ -132,6 +132,8 @@ let snapshot_cache : (string, Snapshots.entry list * float) Hashtbl.t =
   Hashtbl.create 7
 
 let snapshot_cache_lock = Mutex.create ()
+let snapshot_cache_ttl = 300.  (* 5 minutes *)
+let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
 let fetch_snapshot_list slug =
   let fallback () = of_rresult (Snapshots.list ~network_slug:slug) in
@@ -150,11 +152,40 @@ let cache_snapshot slug entries =
   Mutex.protect snapshot_cache_lock (fun () ->
       Hashtbl.replace snapshot_cache slug (entries, Unix.gettimeofday ()))
 
+let schedule_snapshot_fetch slug =
+  let should_fetch =
+    Mutex.protect snapshot_cache_lock (fun () ->
+        if not (Hashtbl.mem snapshot_inflight slug) then (
+          Hashtbl.add snapshot_inflight slug () ;
+          true)
+        else false)
+  in
+  if should_fetch then
+    Background_runner.submit_blocking (fun () ->
+        Fun.protect
+          ~finally:(fun () ->
+            Mutex.protect snapshot_cache_lock (fun () ->
+                Hashtbl.remove snapshot_inflight slug))
+          (fun () ->
+            match fetch_snapshot_list slug with
+            | Ok entries -> cache_snapshot slug entries
+            | Error msg ->
+                prerr_endline
+                  (Printf.sprintf "snapshot fetch failed for %s: %s" slug msg)))
+
 let snapshot_entries_from_cache slug =
   Mutex.protect snapshot_cache_lock (fun () ->
       match Hashtbl.find_opt snapshot_cache slug with
-      | Some (entries, _ts) -> Some entries
+      | Some (entries, ts) ->
+          if Unix.gettimeofday () -. ts > snapshot_cache_ttl then
+            schedule_snapshot_fetch slug ;  (* Background refresh if stale *)
+          Some entries
       | None -> None)
+
+let prefetch_snapshot_list network =
+  match Snapshots.slug_of_network network with
+  | Some slug -> schedule_snapshot_fetch slug
+  | None -> ()
 
 let get_snapshot_entries network =
   match Snapshots.slug_of_network network with
@@ -530,6 +561,12 @@ let spec =
     ];
 
     pre_submit = None;
+
+    on_init = Some (fun model ->
+      (* Prefetch snapshots for the default network in background *)
+      prefetch_snapshot_list model.network);
+
+    on_refresh = None;
 
     pre_submit_modal = Some (fun model ->
       (* Check if we need to show preserve_data choice modal *)
