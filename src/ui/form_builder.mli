@@ -46,6 +46,11 @@ type 'model spec = {
   title : string;
   initial_model : 'model;
   fields : 'model field list;
+  (** Pre-submission validation with custom error handling.
+      Return Ok() to proceed with submission, or Error to show modal and abort. *)
+  pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;
+  (** Main submission handler. Can perform async operations, show progress modals, etc.
+      Return Ok() for success (navigates to instances), Error for failure (shows error modal). *)
   on_submit : 'model -> (unit, [`Msg of string]) result;
 }
 
@@ -151,5 +156,43 @@ val extra_args :
   get_bin_dir:('model -> string) ->
   binary:string ->
   ?subcommand:string list ->
+  unit ->
+  'model field
+
+(** {1 Advanced Field Constructors} *)
+
+(** Service selection with external endpoint option.
+    Shows existing service instances of a given role OR allows entering an external endpoint.
+    @param role Service role to filter (e.g., "node", "dal-node")
+    @param external_label Label for the external endpoint option (e.g., "External endpoint...")
+    @param endpoint_validator Optional validator for external endpoints *)
+val service_or_endpoint :
+  label:string ->
+  role:string ->
+  get:('model -> [`Service of string | `Endpoint of string | `None]) ->
+  set:([`Service of string | `Endpoint of string | `None] -> 'model -> 'model) ->
+  ?external_label:string ->
+  ?endpoint_validator:(string -> (unit, string) result) ->
+  unit ->
+  'model field
+
+(** String list editor with optional suggestions.
+    Allows adding/removing strings with optional pre-populated suggestions that can be toggled.
+    @param get_suggestions Optional function to get suggested items from current model *)
+val string_list :
+  label:string ->
+  get:('model -> string list) ->
+  set:(string list -> 'model -> 'model) ->
+  ?get_suggestions:('model -> string list) ->
+  ?item_validator:(string -> (unit, string) result) ->
+  unit ->
+  'model field
+
+(** Endpoint input with host:port validation. *)
+val endpoint :
+  label:string ->
+  get:('model -> string) ->
+  set:(string -> 'model -> 'model) ->
+  ?default_port:int ->
   unit ->
   'model field
