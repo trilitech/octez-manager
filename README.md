@@ -140,6 +140,25 @@ The UI is designed for efficiency with a list-first approach:
   - **Settings**: Configure global defaults.
   - **Diagnostics & Activity**: Monitor system health and background jobs.
 
+## Shell Completion
+
+Zsh completion is available to provide tab completion for all commands, options, and arguments.
+
+To install, see the [completions/README.md](completions/README.md) for detailed instructions.
+
+Quick install for zsh:
+```sh
+# System-wide (requires sudo)
+sudo cp completions/_octez-manager /usr/share/zsh/site-functions/
+
+# Or user-specific
+mkdir -p ~/.zsh/completions
+cp completions/_octez-manager ~/.zsh/completions/
+# Add to ~/.zshrc: fpath=(~/.zsh/completions $fpath)
+```
+
+Then restart your shell or run `compinit`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
