@@ -56,6 +56,13 @@ type 'model spec = {
   title : string;
   initial_model : 'model;
   fields : 'model field list;
+  (** Optional initialization hook called once when page is first loaded.
+      Use for prefetching data, starting background tasks, etc. *)
+  on_init : ('model -> unit) option;
+  (** Optional refresh hook called on every refresh cycle.
+      WARNING: Keep this lightweight - it's called frequently (on every keystroke).
+      Avoid spawning subprocesses or expensive operations here. *)
+  on_refresh : ('model -> unit) option;
   (** Pre-submission validation with custom error handling.
       Return Ok() to proceed with submission, or Error to show modal and abort. *)
   pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;

@@ -39,6 +39,8 @@ type 'model spec = {
   title : string;
   initial_model : 'model;
   fields : 'model field list;
+  on_init : ('model -> unit) option;
+  on_refresh : ('model -> unit) option;
   pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;
   pre_submit_modal : ('model -> 'model pre_submit_modal_config option) option;
   on_submit : 'model -> (unit, [`Msg of string]) result;
@@ -367,13 +369,22 @@ struct
   type msg = unit
 
   let init () =
-    {model_ref = ref S.spec.initial_model; cursor = 0; next_page = None}
+    let s = {model_ref = ref S.spec.initial_model; cursor = 0; next_page = None} in
+    (* Call on_init hook if provided *)
+    (match S.spec.on_init with
+    | Some f -> f !(s.model_ref)
+    | None -> ()) ;
+    s
 
   let update s _ = s
 
   let refresh s =
     (match Context.consume_navigation () with
     | Some p -> s.next_page <- Some p
+    | None -> ()) ;
+    (* Call on_refresh hook if provided *)
+    (match S.spec.on_refresh with
+    | Some f -> f !(s.model_ref)
     | None -> ()) ;
     s
 
