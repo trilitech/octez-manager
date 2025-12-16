@@ -60,8 +60,8 @@ fresh state, use `octez-manager instance <name> refresh-from-new-snapshot`
 with the same override flags (or rely on the stored tzinit metadata).
 
 Additional helpers exist for other Octez daemons:
-`install-baker`, `install-accuser`, `install-signer`, `install-dal-node`, and
-`install-smart-rollup-node`. These commands reuse the same systemd
+`install-baker`, `install-accuser`, `install-signer`, and `install-dal-node`.
+These commands reuse the same systemd
 scaffolding, accept the usual `--service-user`, `--app-bin-dir`, and
 `--no-enable` flags, and emit custom environment files/drop-ins so
 `octez-manager instance <name> ...` can manage every role uniformly. The
