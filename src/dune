@@ -11,6 +11,9 @@
   systemd
   service
   service_registry
+  base_dir_registry
+  directory_registry
+  keys_reader
   installer
   teztnets
   snapshots
