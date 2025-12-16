@@ -84,6 +84,8 @@ val refresh_instance_from_snapshot :
   unit ->
   (unit, [`Msg of string]) result
 
+val endpoint_of_rpc : string -> string
+
 module For_tests : sig
   type file_backup
 
@@ -112,8 +114,6 @@ module For_tests : sig
     (unit, [`Msg of string]) result
 
   val normalize_data_dir : string -> string option -> string
-
-  val endpoint_of_rpc : string -> string
 
   val build_run_args :
     network:string ->

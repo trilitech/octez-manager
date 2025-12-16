@@ -1207,8 +1207,6 @@ module For_tests = struct
 
   let normalize_data_dir = normalize_data_dir
 
-  let endpoint_of_rpc = endpoint_of_rpc
-
   let build_run_args = build_run_args
 
   let snapshot_plan_of_request = snapshot_plan_of_request
