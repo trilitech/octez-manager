@@ -53,7 +53,8 @@ jobs:
       - name: Test
         run: |
           chown -R opam:opam /home/opam/.opam
-          su opam -c "dune runtest"
+          chown -R opam:opam .
+          su -s /bin/sh opam -c "dune runtest"
 
       - name: Upload binary (main branch only)
         if: github.ref == 'refs/heads/main'
