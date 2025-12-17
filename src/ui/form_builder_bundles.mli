@@ -15,7 +15,7 @@
 (** Generate core service fields common to all Octez tools.
 
     Includes:
-    - Instance name (with uniqueness validation)
+    - Instance name (with uniqueness validation) - skip with ~skip_instance_name:true
     - Service user (with existence validation)
     - App bin dir (with binary validation)
     - Logging mode (Journald vs File)
@@ -27,13 +27,15 @@
     @param set_core Update model with new core config
     @param binary Binary name (e.g., "octez-baker", "octez-node")
     @param subcommand Subcommand for help explorer (e.g., ["run"])
-    @param binary_validator Optional custom validator for app_bin_dir *)
+    @param binary_validator Optional custom validator for app_bin_dir
+    @param skip_instance_name Skip instance name field (for forms with custom logic) *)
 val core_service_fields :
   get_core:('model -> Form_builder_common.core_service_config) ->
   set_core:(Form_builder_common.core_service_config -> 'model -> 'model) ->
   binary:string ->
   subcommand:string list ->
   ?binary_validator:(string -> bool) ->
+  ?skip_instance_name:bool ->
   unit ->
   'model Form_builder.field list
 

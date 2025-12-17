@@ -11,24 +11,29 @@ open Form_builder_common
 (** {1 Core Service Bundle} *)
 
 let core_service_fields ~get_core ~set_core ~binary ~subcommand
-    ?(binary_validator = fun _ -> true) () =
+    ?(binary_validator = fun _ -> true) ?(skip_instance_name = false) () =
   let open Form_builder in
-  [
-    (* Instance Name *)
-    validated_text
-      ~label:"Instance Name"
-      ~get:(fun m -> (get_core m).instance_name)
-      ~set:(fun instance_name m ->
-        let core = get_core m in
-        set_core {core with instance_name} m)
-      ~validate:(fun m ->
-        let states = Data.load_service_states () in
-        let name = (get_core m).instance_name in
-        if not (is_nonempty name) then
-          Error "Instance name is required"
-        else if instance_in_use ~states name then
-          Error "Instance name already exists"
-        else Ok ());
+  let instance_name_field =
+    if skip_instance_name then []
+    else [
+      (* Instance Name *)
+      validated_text
+        ~label:"Instance Name"
+        ~get:(fun m -> (get_core m).instance_name)
+        ~set:(fun instance_name m ->
+          let core = get_core m in
+          set_core {core with instance_name} m)
+        ~validate:(fun m ->
+          let states = Data.load_service_states () in
+          let name = (get_core m).instance_name in
+          if not (is_nonempty name) then
+            Error "Instance name is required"
+          else if instance_in_use ~states name then
+            Error "Instance name already exists"
+          else Ok ())
+    ]
+  in
+  instance_name_field @ [
 
     (* Service User *)
     validated_text

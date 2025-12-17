@@ -54,7 +54,7 @@ let initial_model = {
     history_mode = "rolling";
     data_dir = "";
     rpc_addr = "127.0.0.1:8732";
-    p2p_addr = "127.0.0.1:9732";
+    p2p_addr = "0.0.0.0:9732";  (* All interfaces for peer reachability *)
   };
   snapshot = `None;
   preserve_data = `Auto;
@@ -243,6 +243,7 @@ let spec =
           ~binary:"octez-node"
           ~subcommand:["run"]
           ~binary_validator:has_octez_node_binary
+          ~skip_instance_name:true  (* We define instance_name manually above with custom logic *)
           ();
 
     pre_submit = None;
