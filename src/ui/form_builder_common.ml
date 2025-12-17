@@ -56,7 +56,8 @@ let parse_host_port (s : string) : (string * int) option =
   | [host; port] -> (
       try
         let p = int_of_string (String.trim port) in
-        if p > 0 && p < 65536 && String.trim host <> "" then Some (host, p)
+        let h = String.trim host in
+        if p > 0 && p < 65536 && h <> "" then Some (h, p)
         else None
       with _ -> None)
   | _ -> None
