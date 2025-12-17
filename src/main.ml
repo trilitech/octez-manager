@@ -657,9 +657,7 @@ let install_baker_cmd =
                         instance_names
                     with
                     | Some selected -> (
-                        (* Try to find a matching node service by instance name; if found,
-                           use it as node_instance, otherwise treat the input as a
-                           literal endpoint string. *)
+                        (* Check if input matches existing instance name, otherwise treat as endpoint *)
                         match
                           List.find_opt
                             (fun (svc : Service.t) ->
@@ -750,9 +748,7 @@ let install_baker_cmd =
                         instance_names
                     with
                     | Some selected -> (
-                        (* Try to find a matching DAL service by instance name; if found,
-                           use its registered endpoint, otherwise treat the input as a
-                           literal endpoint string. *)
+                        (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
                         (match
                            List.find_opt
                              (fun (svc : Service.t) -> String.equal svc.instance selected)
