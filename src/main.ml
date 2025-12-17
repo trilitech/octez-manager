@@ -1147,11 +1147,11 @@ let install_dal_node_cmd =
       value & opt string "0.0.0.0:11732"
       & info ["net-addr"] ~doc:"DAL node P2P address" ~docv:"ADDR")
   in
-  let endpoint =
-    Arg.(
-      value
-      & opt string "http://127.0.0.1:8732"
-      & info ["endpoint"] ~doc:"Tezos node RPC endpoint" ~docv:"URI")
+  let node_instance =
+    let doc =
+      "Existing octez-manager node instance to reuse for network resolution. It can also be a custom RPC endpoint for the DAL node to contact."
+    in
+    Arg.(value & opt (some string) None & info ["node-instance"] ~doc ~docv:"NODE")
   in
   let extra_args =
     Arg.(
@@ -1180,7 +1180,7 @@ let install_dal_node_cmd =
     Arg.(
       value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
   in
-  let make instance_opt data_dir_opt rpc_addr net_addr endpoint extra_args
+  let make instance_opt data_dir_opt rpc_addr net_addr node_instance extra_args
       service_user app_bin_dir no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
@@ -1189,8 +1189,7 @@ let install_dal_node_cmd =
           match normalize_opt_string instance_opt with
           | Some inst -> Ok inst
           | None ->
-              if is_interactive () then
-                Ok (prompt_required_string "Instance name")
+              if is_interactive () then Ok (prompt_required_string "Instance name")
               else Error "Instance name is required in non-interactive mode"
         in
         match instance_result with
@@ -1201,10 +1200,51 @@ let install_dal_node_cmd =
               | Some dir when String.trim dir <> "" -> dir
               | _ -> Common.default_role_dir "dal-node" instance
             in
-            match
-              Teztnets.resolve_octez_node_chain
-                ~endpoint:(Installer.endpoint_of_rpc endpoint)
-            with
+            (* Merge node-instance and endpoint like the baker: accept an instance name or a custom endpoint *)
+            let node_choice =
+              match normalize_opt_string node_instance with
+              | Some ni -> Some ni
+              | None ->
+                  if is_interactive () then (
+                    match Service_registry.list () with
+                    | Error (`Msg msg) -> prerr_endline ("Warning: Could not load services: " ^ msg) ; None
+                    | Ok services ->
+                        let node_services = List.filter (fun (svc : Service.t) -> String.equal svc.role "node") services in
+                        if node_services = [] then (
+                          prerr_endline "No node instances found. You can specify a custom endpoint." ;
+                          None
+                        ) else (
+                          let instance_names = List.map (fun (svc : Service.t) -> svc.instance) node_services in
+                          let instance_map = List.map (fun (svc : Service.t) -> (svc.instance, svc.rpc_addr)) node_services in
+                          Format.printf "Available node instances: %s@." (String.concat ", " (List.map (fun (inst, addr) -> Printf.sprintf "%s (%s)" inst addr) instance_map)) ;
+                          prompt_with_completion "Node instance (press Enter for default: 127.0.0.1:8732)" instance_names)
+                  ) else None
+            in
+            let node_mode =
+              match node_choice with
+              | None -> Remote_endpoint "127.0.0.1:8732"
+              | Some choice -> (
+                  match Service_registry.find ~instance:choice with
+                  | Ok (Some svc) when String.equal (String.lowercase_ascii svc.Service.role) "node" -> Local_instance choice
+                  | _ -> Remote_endpoint choice)
+            in
+            let node_endpoint =
+              match node_mode with
+              | Remote_endpoint ep -> Installer.endpoint_of_rpc ep
+              | Local_instance inst -> (
+                  match Service_registry.find ~instance:inst with
+                  | Ok (Some svc) -> Installer.endpoint_of_rpc svc.Service.rpc_addr
+                  | _ -> Installer.endpoint_of_rpc "127.0.0.1:8732")
+            in
+            let maybe_network =
+              match node_mode with
+              | Local_instance inst -> (
+                  match Service_registry.find ~instance:inst with
+                  | Ok (Some svc) -> Ok svc.Service.network
+                  | _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint)
+              | Remote_endpoint _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
+            in
+            match maybe_network with
             | Error (`Msg msg) -> cmdliner_error msg
             | Ok network -> (
                 let service_args =
@@ -1217,7 +1257,7 @@ let install_dal_node_cmd =
                     "--net-addr";
                     net_addr;
                     "--endpoint";
-                    endpoint;
+                    node_endpoint;
                   ]
                   @ extra_args
                 in
@@ -1251,7 +1291,7 @@ let install_dal_node_cmd =
   let term =
     Term.(
       ret
-        (const make $ instance $ data_dir_opt $ rpc_addr $ net_addr $ endpoint
+        (const make $ instance $ data_dir_opt $ rpc_addr $ net_addr $ node_instance
        $ extra_args $ service_user $ app_bin_dir $ auto_enable
        $ logging_mode_term))
   in
