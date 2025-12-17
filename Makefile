@@ -17,6 +17,7 @@ deps-ci:
 
 build:
 	$(DUNE) build
+	cp -f _build/install/default/bin/octez-manager ./
 
 test:
 	$(DUNE) runtest
