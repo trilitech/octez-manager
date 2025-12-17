@@ -346,6 +346,7 @@ let spec =
           ~binary:"octez-baker"
           ~subcommand:["run"]
           ~binary_validator:has_octez_baker_binary
+          ~skip_instance_name:true  (* We define instance_name manually above with custom logic *)
           ();
 
     pre_submit = None;
