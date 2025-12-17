@@ -1215,6 +1215,101 @@ let shellwords_parser_tests () =
     "--peer 'http://example.com:9732' --bootstrap-threshold 1"
     ["--peer"; "http://example.com:9732"; "--bootstrap-threshold"; "1"]
 
+(** Form Builder Common Tests *)
+
+let form_builder_is_nonempty_tests () =
+  let module FB = Octez_manager_ui.Form_builder_common in
+  Alcotest.(check bool) "empty string" false (FB.is_nonempty "") ;
+  Alcotest.(check bool) "whitespace only" false (FB.is_nonempty "   \t  ") ;
+  Alcotest.(check bool) "non-empty" true (FB.is_nonempty "hello") ;
+  Alcotest.(check bool) "spaces around" true (FB.is_nonempty "  hello  ")
+
+let form_builder_normalize_tests () =
+  let module FB = Octez_manager_ui.Form_builder_common in
+  Alcotest.(check string) "lowercase" "hello" (FB.normalize "HELLO") ;
+  Alcotest.(check string) "trim" "hello" (FB.normalize "  hello  ") ;
+  Alcotest.(check string) "both" "hello world" (FB.normalize "  HELLO World  ")
+
+let form_builder_parse_host_port_tests () =
+  let module FB = Octez_manager_ui.Form_builder_common in
+  let option_pair = Alcotest.(option (pair string int)) in
+
+  (* Valid cases *)
+  Alcotest.(check option_pair)
+    "valid host:port"
+    (Some ("127.0.0.1", 8732))
+    (FB.parse_host_port "127.0.0.1:8732") ;
+
+  Alcotest.(check option_pair)
+    "with spaces"
+    (Some ("localhost", 9732))
+    (FB.parse_host_port " localhost : 9732 ") ;
+
+  Alcotest.(check option_pair)
+    "hostname"
+    (Some ("example.com", 443))
+    (FB.parse_host_port "example.com:443") ;
+
+  (* Invalid cases *)
+  Alcotest.(check option_pair)
+    "no port"
+    None
+    (FB.parse_host_port "localhost") ;
+
+  Alcotest.(check option_pair)
+    "no host"
+    None
+    (FB.parse_host_port ":8732") ;
+
+  Alcotest.(check option_pair)
+    "empty host"
+    None
+    (FB.parse_host_port "  :8732") ;
+
+  Alcotest.(check option_pair)
+    "invalid port"
+    None
+    (FB.parse_host_port "localhost:abc") ;
+
+  Alcotest.(check option_pair)
+    "port too high"
+    None
+    (FB.parse_host_port "localhost:99999") ;
+
+  Alcotest.(check option_pair)
+    "port zero"
+    None
+    (FB.parse_host_port "localhost:0") ;
+
+  Alcotest.(check option_pair)
+    "negative port"
+    None
+    (FB.parse_host_port "localhost:-1") ;
+
+  Alcotest.(check option_pair)
+    "multiple colons"
+    None
+    (FB.parse_host_port "host:123:456")
+
+let form_builder_prepare_extra_args_integration () =
+  let module FB = Octez_manager_ui.Form_builder_common in
+
+  (* Test that prepare_extra_args uses shellwords parser correctly *)
+  Alcotest.(check list_string)
+    "uses shellwords parser"
+    ["--option"; "value with spaces"]
+    (FB.prepare_extra_args "--option \"value with spaces\"") ;
+
+  Alcotest.(check list_string)
+    "handles empty"
+    []
+    (FB.prepare_extra_args "") ;
+
+  Alcotest.(check list_string)
+    "trims whitespace"
+    ["--flag"]
+    (FB.prepare_extra_args "  --flag  ")
+
 let home_dir_fallback () =
   let pw = Unix.getpwuid (Unix.geteuid ()) in
   with_env
@@ -2656,6 +2751,13 @@ let () =
           Alcotest.test_case "shellwords parser" `Quick shellwords_parser_tests;
           Alcotest.test_case "run helpers" `Quick common_run_helpers;
           Alcotest.test_case "run_as self" `Quick common_run_as_self;
+        ] );
+      ( "form_builder.common",
+        [
+          Alcotest.test_case "is_nonempty" `Quick form_builder_is_nonempty_tests;
+          Alcotest.test_case "normalize" `Quick form_builder_normalize_tests;
+          Alcotest.test_case "parse_host_port" `Quick form_builder_parse_host_port_tests;
+          Alcotest.test_case "prepare_extra_args" `Quick form_builder_prepare_extra_args_integration;
         ] );
       ( "snapshots.basic",
         [
