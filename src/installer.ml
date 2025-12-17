@@ -1112,6 +1112,61 @@ let purge_service ~instance =
 
 let list_services () = Service_registry.list ()
 
+let find_orphan_directories () =
+  let* services = Service_registry.list () in
+  let registered_dirs =
+    List.map (fun svc -> svc.Service.data_dir) services
+    |> List.sort_uniq String.compare
+  in
+  (* Base directories to scan for orphans *)
+  let octez_data_base =
+    if Common.is_root () then "/var/lib/octez"
+    else Filename.concat (Common.xdg_data_home ()) "octez"
+  in
+  let octez_log_base =
+    if Common.is_root () then "/var/log/octez"
+    else Filename.concat (Common.xdg_state_home ()) "octez/logs"
+  in
+  let list_subdirs dir =
+    if Sys.file_exists dir && Sys.is_directory dir then
+      Sys.readdir dir
+      |> Array.to_list
+      |> List.map (fun name -> Filename.concat dir name)
+      |> List.filter Sys.is_directory
+    else []
+  in
+  let list_files dir =
+    if Sys.file_exists dir && Sys.is_directory dir then
+      Sys.readdir dir
+      |> Array.to_list
+      |> List.map (fun name -> Filename.concat dir name)
+      |> List.filter (fun p -> Sys.file_exists p && not (Sys.is_directory p))
+    else []
+  in
+  (* Find orphan data directories *)
+  let all_data_dirs = list_subdirs octez_data_base in
+  let orphan_data_dirs =
+    List.filter (fun d -> not (List.mem d registered_dirs)) all_data_dirs
+  in
+  (* Find orphan log files *)
+  let orphan_log_files = list_files octez_log_base in
+  Ok (orphan_data_dirs, orphan_log_files)
+
+let cleanup_orphans ~dry_run =
+  let* orphan_dirs, orphan_logs = find_orphan_directories () in
+  let removed = ref [] in
+  let errors = ref [] in
+  let process_path path =
+    if dry_run then removed := path :: !removed
+    else
+      match Common.remove_tree path with
+      | Ok () -> removed := path :: !removed
+      | Error (`Msg msg) -> errors := (path, msg) :: !errors
+  in
+  List.iter process_path orphan_dirs;
+  List.iter process_path orphan_logs;
+  Ok (List.rev !removed, List.rev !errors)
+
 let schedule_refresh ~instance ~frequency ~snapshot_kind ~no_check =
   let* service = lookup_node_service instance in
   let manager_bin =
