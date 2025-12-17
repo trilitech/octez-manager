@@ -50,5 +50,7 @@
   rresult
   yojson
   linenoise)
+ (ocamlopt_flags
+  (:standard -ccopt -static))
  (instrumentation
   (backend bisect_ppx)))
