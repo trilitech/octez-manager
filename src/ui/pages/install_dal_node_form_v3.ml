@@ -35,7 +35,8 @@ let initial_model =
       };
     client =
       {
-        base_dir = Common.default_role_dir "dal" "dal";
+        base_dir =
+          Form_builder_common.default_base_dir ~role:"dal" ~instance:"dal";
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };

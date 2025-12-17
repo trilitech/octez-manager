@@ -38,7 +38,10 @@ let initial_model =
       };
     client =
       {
-        base_dir = Common.default_role_dir "accuser" "accuser";
+        base_dir =
+          Form_builder_common.default_base_dir
+            ~role:"accuser"
+            ~instance:"accuser";
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };
@@ -125,18 +128,7 @@ let node_selection_field =
             let should_autoname =
               current_name = "" || String.equal current_name "accuser"
             in
-            let endpoint =
-              let addr = String.trim svc.Service.rpc_addr in
-              if
-                String.starts_with
-                  ~prefix:"http://"
-                  (String.lowercase_ascii addr)
-                || String.starts_with
-                     ~prefix:"https://"
-                     (String.lowercase_ascii addr)
-              then addr
-              else "http://" ^ addr
-            in
+            let endpoint = Form_builder_common.endpoint_of_service svc in
             let new_client =
               {
                 !model_ref.client with

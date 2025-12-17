@@ -7,6 +7,8 @@
 
 (** Common types and utilities for form builder field bundles. *)
 
+open Octez_manager_lib
+
 (** {1 Configuration Types} *)
 
 (** Core service configuration shared by all Octez tools. *)
@@ -57,6 +59,8 @@ val parse_host_port : string -> (string * int) option
 (** Get default service user (octez for root, current user otherwise) *)
 val default_service_user : unit -> string
 
+val default_base_dir : role:string -> instance:string -> string
+
 (** [has_binary binary_name dir] checks if [binary_name] exists in [dir]
     and is executable. *)
 val has_binary : string -> string -> bool
@@ -66,6 +70,12 @@ val has_octez_baker_binary : string -> bool
 
 (** Check if octez-node binary exists and is executable in the given directory. *)
 val has_octez_node_binary : string -> bool
+
+(** Add http:// scheme if missing, defaulting to localhost when empty. *)
+val endpoint_with_scheme : string -> string
+
+(** Compute endpoint string from a service rpc_addr, adding scheme when missing. *)
+val endpoint_of_service : Service.t -> string
 
 (** {1 Helpers} *)
 
