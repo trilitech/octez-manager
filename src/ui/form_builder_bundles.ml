@@ -115,15 +115,7 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
           set_core {core with app_bin_dir} m)
         ~validate:(fun m -> binary_validator (get_core m).app_bin_dir)
         ();
-      (* Logging *)
-      choice
-        ~label:"Logging"
-        ~get:(fun m -> (get_core m).logging)
-        ~set:(fun logging m ->
-          let core = get_core m in
-          set_core {core with logging} m)
-        ~items:[`File; `Journald]
-        ~to_string:(function `File -> "File" | `Journald -> "Journald");
+      (* Logging is always journald - octez binaries handle their own file logging *)
       (* Enable on Boot *)
       toggle
         ~label:"Enable on Boot"

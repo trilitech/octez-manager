@@ -20,8 +20,6 @@ let print_services services =
 
 let pp_logging fmt = function
   | Logging_mode.Journald -> Format.fprintf fmt "journald"
-  | Logging_mode.File {path; rotate} ->
-      Format.fprintf fmt "file:%s (rotate=%b)" path rotate
 
 let print_service_details svc =
   (* Read env file for this instance *)
@@ -384,26 +382,8 @@ let run_result = function
   | Ok () -> `Ok ()
   | Error (`Msg msg) -> cmdliner_error msg
 
-let logging_mode_term =
-  let doc_file = "Write Octez logs to PATH (file logging)." in
-  let log_file =
-    Arg.(
-      value
-      & opt (some string) None
-      & info ["log-file"] ~doc:doc_file ~docv:"PATH")
-  in
-  let doc_rotate = "Request log rotation for file logging." in
-  let log_rotate = Arg.(value & flag & info ["log-rotate"] ~doc:doc_rotate) in
-  let doc_journal = "Send logs to journald instead of files." in
-  let journald = Arg.(value & flag & info ["journald"] ~doc:doc_journal) in
-  let make journald log_rotate log_file =
-    if journald then Logging_mode.Journald
-    else
-      let rotate = if log_rotate then true else Common.is_root () in
-      let path = match log_file with Some p -> p | None -> "" in
-      Logging_mode.File {path; rotate}
-  in
-  Term.(const make $ journald $ log_rotate $ log_file)
+(* Logging is always via journald - octez binaries handle their own file logging *)
+let logging_mode_term = Term.(const Logging_mode.default)
 
 let history_mode_doc =
   "History mode to configure on octez-node (rolling|full|archive)."

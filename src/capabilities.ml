@@ -72,8 +72,7 @@ module Service_lifecycle_impl = struct
     |> Result.map_error (function `Msg m -> m)
 
   let write_dropin_node ~inst ~data_dir ~app_bin_dir:_ =
-    let logging_mode = Logging_mode.default_for ~instance:inst ~role:"node" in
-    Systemd.write_dropin_node ~inst ~data_dir ~logging_mode
+    Systemd.write_dropin_node ~inst ~data_dir ~logging_mode:Logging_mode.default
     |> Result.map_error (function `Msg m -> m)
 
   let enable_start ~role ~inst =

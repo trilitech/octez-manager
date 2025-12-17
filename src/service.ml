@@ -53,29 +53,10 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     extra_args;
   }
 
-let logging_mode_to_yojson = function
-  | Logging_mode.Journald -> `Assoc [("type", `String "journald")]
-  | Logging_mode.File {path; rotate} ->
-      `Assoc
-        [
-          ("type", `String "file");
-          ("path", `String path);
-          ("rotate", `Bool rotate);
-        ]
+let logging_mode_to_yojson = Logging_mode.to_yojson
 
 let logging_mode_of_yojson json =
-  let open Yojson.Safe.Util in
-  try
-    match json |> member "type" |> to_string with
-    | "journald" -> Ok Logging_mode.Journald
-    | "file" ->
-        let path = json |> member "path" |> to_string in
-        let rotate =
-          match json |> member "rotate" with `Bool b -> b | _ -> false
-        in
-        Ok (Logging_mode.File {path; rotate})
-    | other -> Error (`Msg ("Unknown logging mode: " ^ other))
-  with Type_error (msg, _) -> Error (`Msg msg)
+  Logging_mode.of_yojson json |> Result.map_error (fun msg -> `Msg msg)
 
 let to_yojson t =
   `Assoc

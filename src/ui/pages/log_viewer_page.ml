@@ -36,7 +36,9 @@ let init () =
           (* Try to open daily logs first, fall back to journald *)
           let source, pager =
             match
-              Log_viewer.get_daily_log_file ~data_dir:svc.Service.data_dir
+              Log_viewer.get_daily_log_file
+                ~role:svc.Service.role
+                ~instance
             with
             | Ok log_file -> (
                 match File_pager.open_file ~follow:true log_file with
@@ -101,7 +103,9 @@ let refresh s =
       match Service_registry.find ~instance:s.instance with
       | Ok (Some svc) -> (
           match
-            Log_viewer.get_daily_log_file ~data_dir:svc.Service.data_dir
+            Log_viewer.get_daily_log_file
+              ~role:svc.Service.role
+              ~instance:s.instance
           with
           | Ok log_file -> (
               match File_pager.open_file ~follow:true log_file with
@@ -161,7 +165,9 @@ let toggle_source s =
       match Service_registry.find ~instance:s.instance with
       | Ok (Some svc) -> (
           match
-            Log_viewer.get_daily_log_file ~data_dir:svc.Service.data_dir
+            Log_viewer.get_daily_log_file
+              ~role:svc.Service.role
+              ~instance:s.instance
           with
           | Ok log_file ->
               let content =

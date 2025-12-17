@@ -368,19 +368,42 @@ let _view_logs_old state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
       let title = Printf.sprintf "Logs · %s" svc.Service.instance in
-      let open Option in
-      let baker_base_dir () =
-        let env =
-          match Node_env.read ~inst:svc.Service.instance with
-          | Ok pairs -> pairs
-          | Error _ -> []
-        in
-        match List.assoc_opt "OCTEZ_BAKER_BASE_DIR" env with
-        | Some v when String.trim v <> "" -> String.trim v
-        | _ -> Common.default_role_dir "baker" svc.Service.instance
+      let env =
+        match Node_env.read ~inst:svc.Service.instance with
+        | Ok pairs -> pairs
+        | Error _ -> []
       in
-      let baker_daily_logs () =
-        let dir = Filename.concat (baker_base_dir ()) "daily_logs" in
+      (* Find the directory where daily logs are written *)
+      let logs_dir () =
+        let lookup key =
+          match List.assoc_opt key env with
+          | Some v when String.trim v <> "" -> Some (String.trim v)
+          | _ -> None
+        in
+        match svc.Service.role with
+        | "node" ->
+            (* Node: <data_dir>/daily_logs/ *)
+            Filename.concat svc.Service.data_dir "daily_logs"
+        | "baker" ->
+            (* Baker: <base_dir>/logs/octez-baker/ *)
+            let base = Option.value (lookup "OCTEZ_BAKER_BASE_DIR") ~default:svc.Service.data_dir in
+            Filename.concat (Filename.concat base "logs") "octez-baker"
+        | "accuser" ->
+            (* Accuser: <base_dir>/logs/octez-accuser/ *)
+            let base = Option.value (lookup "OCTEZ_CLIENT_BASE_DIR") ~default:svc.Service.data_dir in
+            Filename.concat (Filename.concat base "logs") "octez-accuser"
+        | "dal-node" ->
+            (* DAL node: <data_dir>/daily_logs/ *)
+            let base = Option.value (lookup "OCTEZ_DAL_DATA_DIR") ~default:svc.Service.data_dir in
+            Filename.concat base "daily_logs"
+        | "signer" ->
+            (* Signer: <base_dir>/logs/octez-signer/ *)
+            let base = Option.value (lookup "OCTEZ_SIGNER_BASE_DIR") ~default:svc.Service.data_dir in
+            Filename.concat (Filename.concat base "logs") "octez-signer"
+        | _ -> Filename.concat svc.Service.data_dir "daily_logs"
+      in
+      let daily_logs () =
+        let dir = logs_dir () in
         if Sys.file_exists dir && Sys.is_directory dir then
           Sys.readdir dir |> Array.to_list
           |> List.map (Filename.concat dir)
@@ -407,53 +430,33 @@ let _view_logs_old state =
             Modal_helpers.show_error ~title msg ;
             state
       in
-      match svc.Service.role with
-      | "baker" -> (
-          match svc.Service.logging_mode with
-          | Logging_mode.Journald ->
-              let unit =
-                Systemd.unit_name svc.Service.role svc.Service.instance
-              in
-              (match Common.run_out (journalctl_args unit) with
-              | Ok text ->
-                  Modal_helpers.open_text_modal
-                    ~title
-                    ~lines:(String.split_on_char '\n' text)
-              | Error (`Msg msg) -> Modal_helpers.show_error ~title msg) ;
-              state
-          | Logging_mode.File _ -> (
-              (* When file logging is configured for bakers, only the
-                 rotation under daily_logs is reliable. *)
-              let logs = baker_daily_logs () in
-              match latest logs with
-              | Some path -> tail_file path
-              | None ->
-                  Modal_helpers.show_error
-                    ~title
-                    "No baker daily logs found under base_dir/daily_logs." ;
-                  state))
-      | _ -> (
-          match svc.Service.logging_mode with
-          | Logging_mode.Journald ->
-              let unit =
-                Systemd.unit_name svc.Service.role svc.Service.instance
-              in
-              (match Common.run_out (journalctl_args unit) with
-              | Ok text ->
-                  Modal_helpers.open_text_modal
-                    ~title
-                    ~lines:(String.split_on_char '\n' text)
-              | Error (`Msg msg) -> Modal_helpers.show_error ~title msg) ;
-              state
-          | Logging_mode.File {path; _} ->
-              let trimmed = String.trim path in
-              if trimmed = "" then (
-                Modal_helpers.show_error ~title "Log file path is empty" ;
-                state)
-              else if Sys.file_exists trimmed then tail_file trimmed
-              else (
-                Modal_helpers.show_error ~title "Log file does not exist" ;
-                state)))
+      let show_journald () =
+        let unit = Systemd.unit_name svc.Service.role svc.Service.instance in
+        match Common.run_out (journalctl_args unit) with
+        | Ok text ->
+            Modal_helpers.open_text_modal
+              ~title
+              ~lines:(String.split_on_char '\n' text)
+        | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
+      in
+      (* All octez binaries write daily logs - offer choice if they exist *)
+      let logs = daily_logs () in
+      match latest logs with
+      | Some path ->
+          Modal_helpers.open_choice_modal
+            ~title:"View Logs"
+            ~items:[`Journald; `DailyLogs]
+            ~to_string:(function
+              | `Journald -> "Journald (systemd)"
+              | `DailyLogs -> "Daily Logs (octez)")
+            ~on_select:(function
+              | `Journald -> show_journald ()
+              | `DailyLogs -> ignore (tail_file path)) ;
+          state
+      | None ->
+          (* No daily logs found, just show journald *)
+          show_journald () ;
+          state)
 
 let refresh_modal state =
   with_service state (fun svc_state ->

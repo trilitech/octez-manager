@@ -16,7 +16,6 @@ type core_service_config = {
   instance_name : string;
   service_user : string;
   app_bin_dir : string;
-  logging : [`Journald | `File];
   enable_on_boot : bool;
   start_now : bool;
   extra_args : string;

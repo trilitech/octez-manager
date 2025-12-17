@@ -42,32 +42,8 @@ let normalize_optional_string = function
       if trimmed = "" then None else Some trimmed
   | None -> None
 
-module Path_set = Set.Make (String)
-
-let logrotate_specs_of services =
-  let table = Hashtbl.create 7 in
-  let add_path role path =
-    let current =
-      match Hashtbl.find_opt table role with
-      | Some s -> s
-      | None -> Path_set.empty
-    in
-    Hashtbl.replace table role (Path_set.add path current)
-  in
-  List.iter
-    (fun (svc : Service.t) ->
-      match svc.logging_mode with
-      | Logging_mode.File {path; rotate} when rotate ->
-          let trimmed = String.trim path in
-          if trimmed <> "" then add_path svc.role trimmed
-      | _ -> ())
-    services ;
-  Hashtbl.fold
-    (fun role paths acc ->
-      let values = Path_set.elements paths in
-      if values = [] then acc else {Systemd.role; paths = values} :: acc)
-    table
-    []
+(* Logging is via journald - no logrotate needed *)
+let logrotate_specs_of (_services : Service.t list) = []
 
 let is_http_url s =
   let trimmed = String.trim s |> String.lowercase_ascii in
@@ -333,7 +309,7 @@ let lookup_node_service instance =
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let build_run_args ~network ~history_mode ~rpc_addr ~net_addr ~extra_args
-    ~logging_mode =
+    ~logging_mode:_ =
   let base =
     [
       "--network=" ^ network;
@@ -342,48 +318,19 @@ let build_run_args ~network ~history_mode ~rpc_addr ~net_addr ~extra_args
       "--net-addr=" ^ net_addr;
     ]
   in
-  let logging_args =
-    match logging_mode with
-    | Logging_mode.Journald -> []
-    | Logging_mode.File {path; _} -> ["--log-output=" ^ path]
-  in
-  String.concat " " (base @ logging_args @ extra_args)
+  (* Logging is via journald - octez binaries handle their own file logging *)
+  String.concat " " (base @ extra_args)
 
-let prepare_logging ~instance ~role ~logging_mode =
-  match logging_mode with
-  | Logging_mode.Journald -> Logging_mode.Journald
-  | Logging_mode.File ({path; _} as file) when String.trim path <> "" ->
-      Logging_mode.File file
-  | Logging_mode.File _ -> Logging_mode.default_for ~instance ~role
+let prepare_logging ~instance:_ ~role:_ ~logging_mode:_ =
+  (* Always use journald *)
+  Logging_mode.default
 
-let ensure_logging_destination ~service_user = function
-  | Logging_mode.Journald -> Ok ()
-  | Logging_mode.File {path; _} when String.trim path = "" -> Ok ()
-  | Logging_mode.File {path; _} ->
-      let dir = Filename.dirname path in
-      if dir = "" || dir = "." then Ok ()
-      else
-        let owner, group =
-          if Common.is_root () then (service_user, service_user)
-          else Common.current_user_group_names ()
-        in
-        Common.ensure_dir_path ~owner ~group ~mode:0o755 dir
+(* Logging is via journald - no file setup needed *)
+let ensure_logging_destination ~service_user:_ _logging_mode = Ok ()
 
-let ensure_logging_base_directory ~owner ~group = function
-  | Logging_mode.Journald -> Ok ()
-  | Logging_mode.File {path; _} ->
-      let trimmed = String.trim path in
-      if trimmed = "" then Ok ()
-      else
-        let dir = Filename.dirname trimmed in
-        if dir = "" || dir = "." then Ok ()
-        else Common.ensure_dir_path ~owner ~group ~mode:0o755 dir
+let ensure_logging_base_directory ~owner:_ ~group:_ _logging_mode = Ok ()
 
-let remove_logging_artifacts = function
-  | Logging_mode.Journald -> Ok ()
-  | Logging_mode.File {path; _} ->
-      let trimmed = String.trim path in
-      if trimmed = "" then Ok () else Common.remove_tree trimmed
+let remove_logging_artifacts _logging_mode = Ok ()
 
 let should_drop_service_user ~user ~remaining_services =
   let trimmed = String.trim user in
@@ -395,22 +342,8 @@ let should_drop_service_user ~user ~remaining_services =
            String.equal trimmed (String.trim svc.Service.service_user))
          remaining_services)
 
-let ensure_runtime_log_directory ~owner ~group = function
-  | Logging_mode.Journald -> Ok ()
-  | Logging_mode.File {path; _} when String.trim path = "" -> Ok ()
-  | Logging_mode.File {path; _} ->
-      let dir = Filename.dirname path in
-      let* () =
-        if dir = "" || dir = "." then Ok ()
-        else Common.ensure_dir_path ~owner ~group ~mode:0o755 dir
-      in
-      if Sys.file_exists path then Ok ()
-      else
-        let fd =
-          Unix.openfile path [Unix.O_CREAT; Unix.O_WRONLY; Unix.O_APPEND] 0o644
-        in
-        Unix.close fd ;
-        Ok ()
+(* Logging is via journald - no file setup needed *)
+let ensure_runtime_log_directory ~owner:_ ~group:_ _logging_mode = Ok ()
 
 let ensure_directories ~owner ~group paths =
   let filtered =
@@ -425,34 +358,19 @@ let ensure_directories ~owner ~group paths =
     (Ok ())
     filtered
 
-let reown_runtime_paths ~owner ~group ~paths ~logging_mode =
+let reown_runtime_paths ~owner ~group ~paths ~logging_mode:_ =
   let normalize =
     paths
     |> List.filter (fun p -> String.trim p <> "")
     |> List.sort_uniq String.compare
   in
-  let* () =
-    List.fold_left
-      (fun acc dir ->
-        let* () = acc in
-        Common.ensure_tree_owner ~owner ~group dir)
-      (Ok ())
-      normalize
-  in
-  match logging_mode with
-  | Logging_mode.Journald -> Ok ()
-  | Logging_mode.File {path; _} ->
-      let trimmed = String.trim path in
-      if trimmed = "" then Ok ()
-      else
-        let dir = Filename.dirname trimmed in
-        let* () =
-          if dir = "" || dir = "." then Ok ()
-          else Common.ensure_tree_owner ~owner ~group dir
-        in
-        if Sys.file_exists trimmed then
-          Common.ensure_tree_owner ~owner ~group trimmed
-        else Ok ()
+  (* Logging is via journald - no file ownership needed *)
+  List.fold_left
+    (fun acc dir ->
+      let* () = acc in
+      Common.ensure_tree_owner ~owner ~group dir)
+    (Ok ())
+    normalize
 
 let snapshot_plan_for_service ~(service : Service.t) ~history_mode
     ~network_override ~snapshot_uri_override ~snapshot_kind_override =
@@ -538,19 +456,8 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
   let progress = {on_download_progress} in
   let* snapshot_file_opt = materialize_snapshot_plan ~progress ~plan () in
   let identity_path = Filename.concat service.data_dir "identity.json" in
-  let log_path =
-    match service.logging_mode with
-    | Logging_mode.File {path; _} ->
-        let trimmed = String.trim path in
-        if trimmed = "" then None else Some trimmed
-    | Logging_mode.Journald -> None
-  in
+  (* Logging is via journald - no log file to backup *)
   let* identity_backup = backup_file_if_exists identity_path in
-  let* log_backup =
-    match log_path with
-    | Some path -> backup_file_if_exists path
-    | None -> Ok None
-  in
   let owner, group =
     if Common.is_root () then (service.service_user, service.service_user)
     else Common.current_user_group_names ()
@@ -561,7 +468,6 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       if !restored then Ok ()
       else
         let* () = restore_backup ~owner ~group identity_backup in
-        let* () = restore_backup ~owner ~group log_backup in
         restored := true ;
         Ok ()
   in

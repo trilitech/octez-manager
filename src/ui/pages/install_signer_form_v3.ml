@@ -37,7 +37,6 @@ let initial_model =
         instance_name = "signer";
         service_user = Form_builder_common.default_service_user ();
         app_bin_dir = "/usr/bin";
-        logging = `File;
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
@@ -112,19 +111,8 @@ let spec =
     pre_submit_modal = None;
     on_submit =
       (fun model ->
-        (* Build logging mode *)
-        let logging_mode =
-          match model.core.logging with
-          | `Journald -> Logging_mode.Journald
-          | `File ->
-              let dir =
-                Common.default_log_dir
-                  ~role:"signer"
-                  ~instance:model.core.instance_name
-              in
-              let path = Filename.concat dir "signer.log" in
-              Logging_mode.File {path; rotate = true}
-        in
+        (* Always use journald - octez binaries handle their own file logging *)
+        let logging_mode = Logging_mode.default in
 
         (* Prepare extra args (command options after "launch socket signer") *)
         let extra_args =

@@ -26,7 +26,7 @@ let string_contains ~needle haystack =
   in
   if nlen = 0 then true else loop 0
 
-type fake_xdg = {config : string; data : string; state : string}
+type fake_xdg = {config : string; data : string}
 
 let with_env overrides f =
   let set_var k = function
@@ -56,14 +56,9 @@ let with_fake_xdg f =
       in
       let config = mk_dir "cfg" in
       let data = mk_dir "data" in
-      let state = mk_dir "state" in
       with_env
-        [
-          ("XDG_CONFIG_HOME", Some config);
-          ("XDG_DATA_HOME", Some data);
-          ("XDG_STATE_HOME", Some state);
-        ]
-        (fun () -> f {config; data; state}))
+        [("XDG_CONFIG_HOME", Some config); ("XDG_DATA_HOME", Some data)]
+        (fun () -> f {config; data}))
 
 let write_exec_file path body =
   let oc = open_out path in
@@ -106,10 +101,6 @@ let current_user_group () =
 let logging_mode_equal a b =
   match (a, b) with
   | Logging_mode.Journald, Logging_mode.Journald -> true
-  | ( Logging_mode.File {path = p1; rotate = r1},
-      Logging_mode.File {path = p2; rotate = r2} ) ->
-      String.equal p1 p2 && Bool.equal r1 r2
-  | _ -> false
 
 let service_equal a b =
   String.equal a.Service.instance b.Service.instance
@@ -251,67 +242,26 @@ let history_mode_invalid () =
   | Ok _ -> Alcotest.fail "invalid mode should not parse"
   | Error _ -> ()
 
-let logging_mode_default_paths () =
-  with_fake_xdg (fun env ->
-      match Logging_mode.default_for ~instance:"alpha" ~role:"node" with
-      | Logging_mode.File {path; rotate} ->
-          let expected =
-            Filename.concat env.state "octez/logs/node-alpha.log"
-          in
-          Alcotest.(check string) "log path" expected path ;
-          Alcotest.(check bool) "rotation enabled" true rotate
-      | Logging_mode.Journald -> Alcotest.fail "expected file logging")
+let logging_mode_default_is_journald () =
+  match Logging_mode.default with
+  | Logging_mode.Journald -> ()
 
 let logging_mode_to_string_tests () =
-  let file_mode = Logging_mode.File {path = "/tmp/log"; rotate = true} in
   Alcotest.(check string)
     "journald"
     "journald"
-    (Logging_mode.to_string Logging_mode.Journald) ;
-  Alcotest.(check string) "file" "/tmp/log" (Logging_mode.to_string file_mode)
+    (Logging_mode.to_string Logging_mode.Journald)
 
-let logging_mode_baker_path_contains_role () =
-  with_fake_xdg (fun env ->
-      match Logging_mode.default_for ~instance:"beta" ~role:"baker" with
-      | Logging_mode.File {path; _} ->
-          let expected =
-            Filename.concat env.state "octez/logs/baker-beta.log"
-          in
-          Alcotest.(check string) "baker log path" expected path
-      | Logging_mode.Journald -> Alcotest.fail "expected file logging")
+(* Logging is via journald - no file setup needed *)
+let installer_logging_journald_noop () =
+  let owner, group = current_user_group () in
+  expect_ok
+    (Installer.For_tests.ensure_logging_base_directory
+       ~owner
+       ~group
+       Logging_mode.Journald) ;
+  expect_ok (Installer.For_tests.remove_logging_artifacts Logging_mode.Journald)
 
-let installer_log_directory_creation () =
-  with_fake_xdg (fun env ->
-      let log_path = Filename.concat env.state "octez/logs/demo-alpha.log" in
-      let log_dir = Filename.dirname log_path in
-      let (_ : (unit, [> Rresult.R.msg]) result) = Common.remove_tree log_dir in
-      let owner, group = current_user_group () in
-      let logging_mode = Logging_mode.File {path = log_path; rotate = false} in
-      let () =
-        expect_ok
-          (Installer.For_tests.ensure_logging_base_directory
-             ~owner
-             ~group
-             logging_mode)
-      in
-      Alcotest.(check bool) "log dir exists" true (Sys.is_directory log_dir))
-
-let installer_remove_logging_artifacts_file () =
-  with_temp_dir (fun base ->
-      let log_path = Filename.concat base "node-alpha.log" in
-      let oc = open_out log_path in
-      output_string oc "payload" ;
-      close_out oc ;
-      let logging_mode = Logging_mode.File {path = log_path; rotate = false} in
-      let () =
-        expect_ok (Installer.For_tests.remove_logging_artifacts logging_mode)
-      in
-      Alcotest.(check bool) "log removed" false (Sys.file_exists log_path))
-
-let installer_remove_logging_artifacts_journald () =
-  match Installer.For_tests.remove_logging_artifacts Logging_mode.Journald with
-  | Ok () -> ()
-  | Error (`Msg msg) -> Alcotest.failf "journald cleanup failed: %s" msg
 
 let installer_should_drop_service_user () =
   let mk_service ~instance ~user =
@@ -381,10 +331,8 @@ let installer_endpoint_of_rpc_formats () =
   let passthrough = Installer.endpoint_of_rpc "https://node:8732" in
   Alcotest.(check string) "keeps scheme" "https://node:8732" passthrough
 
-let installer_build_run_args_file_logging () =
-  let logging_mode =
-    Logging_mode.File {path = "/tmp/node-alpha.log"; rotate = false}
-  in
+let installer_build_run_args_journald () =
+  let logging_mode = Logging_mode.default in
   let args =
     Installer.For_tests.build_run_args
       ~network:"mainnet"
@@ -394,10 +342,16 @@ let installer_build_run_args_file_logging () =
       ~extra_args:["--peer"; "2"]
       ~logging_mode
   in
+  (* Journald logging: no --log-output flag *)
   Alcotest.(check bool)
-    "contains logging flag"
+    "no log-output flag"
+    false
+    (string_contains ~needle:"--log-output" args) ;
+  (* Should still have other args *)
+  Alcotest.(check bool)
+    "contains rpc addr"
     true
-    (string_contains ~needle:"--log-output=/tmp/node-alpha.log" args)
+    (string_contains ~needle:"--rpc-addr=127.0.0.1:8732" args)
 
 let installer_snapshot_plan_direct_uri () =
   let request =
@@ -1137,9 +1091,7 @@ let parse_help_skips_dividers () =
   Alcotest.(check (list string)) "names" ["-a"; "-b"] names
 
 let service_json_roundtrip () =
-  let logging_mode =
-    Logging_mode.File {path = "/tmp/octez.log"; rotate = true}
-  in
+  let logging_mode = Logging_mode.default in
   let service = sample_service ~logging_mode () in
   match Service.to_yojson service |> Service.of_yojson with
   | Ok decoded -> check_service service decoded
@@ -2264,17 +2216,11 @@ let systemd_helper_paths () =
 
 let systemd_logging_lines () =
   let open Systemd.For_tests in
+  (* Logging is always via journald *)
   Alcotest.(check list_string)
-    "journald explicit"
+    "journald"
     ["StandardOutput=journal"; "StandardError=journal"]
-    (render_logging_lines Logging_mode.Journald) ;
-  let file_mode =
-    Logging_mode.File {path = "/tmp/logs/node-alpha.log"; rotate = false}
-  in
-  Alcotest.(check list_string)
-    "file entry"
-    ["Environment=OCTEZ_LOG_PATH=/tmp/logs/node-alpha.log"]
-    (render_logging_lines file_mode)
+    (render_logging_lines Logging_mode.default)
 
 let systemd_unit_queries_use_stub () =
   with_fake_xdg (fun _env ->
@@ -2306,17 +2252,8 @@ let systemd_install_dropin_and_service_commands () =
                 expect_ok
                   (Common.ensure_dir_path ~owner ~group ~mode:0o755 data_dir)
               in
-              let log_path =
-                Filename.concat env.state "octez/logs/node-alpha.log"
-              in
-              let log_dir = Filename.dirname log_path in
-              let () =
-                expect_ok
-                  (Common.ensure_dir_path ~owner ~group ~mode:0o755 log_dir)
-              in
-              let logging_mode =
-                Logging_mode.File {path = log_path; rotate = false}
-              in
+              (* Logging is via journald *)
+              let logging_mode = Logging_mode.default in
               let () =
                 expect_ok
                   (Systemd.install_unit
@@ -2348,17 +2285,12 @@ let systemd_install_dropin_and_service_commands () =
                 (string_contains
                    ~needle:("Environment=OCTEZ_DATA_DIR=" ^ data_dir)
                    dropin_body) ;
+              (* Journald logging - no log path lines *)
               Alcotest.(check bool)
-                "log path line"
+                "journald output"
                 true
                 (string_contains
-                   ~needle:("Environment=OCTEZ_LOG_PATH=" ^ log_path)
-                   dropin_body) ;
-              Alcotest.(check bool)
-                "log rw path"
-                true
-                (string_contains
-                   ~needle:("ReadWritePaths=" ^ log_dir)
+                   ~needle:"StandardOutput=journal"
                    dropin_body) ;
               let () =
                 expect_ok
@@ -2410,9 +2342,7 @@ let systemd_dropin_extra_paths () =
                 expect_ok
                   (Common.ensure_dir_path ~owner ~group ~mode:0o755 extra_path)
               in
-              let logging_mode =
-                Logging_mode.default_for ~instance:"alpha" ~role:"baker"
-              in
+              let logging_mode = Logging_mode.default in
               let () =
                 expect_ok
                   (Systemd.install_unit
@@ -2923,12 +2853,8 @@ let () =
         ] );
       ( "logging_mode",
         [
-          Alcotest.test_case "default paths" `Quick logging_mode_default_paths;
+          Alcotest.test_case "default is journald" `Quick logging_mode_default_is_journald;
           Alcotest.test_case "to_string" `Quick logging_mode_to_string_tests;
-          Alcotest.test_case
-            "baker path"
-            `Quick
-            logging_mode_baker_path_contains_role;
         ] );
       ( "installer",
         [
@@ -2945,17 +2871,9 @@ let () =
             `Quick
             installer_instance_name_full_validation;
           Alcotest.test_case
-            "log dir base"
+            "journald logging noop"
             `Quick
-            installer_log_directory_creation;
-          Alcotest.test_case
-            "remove log artifacts"
-            `Quick
-            installer_remove_logging_artifacts_file;
-          Alcotest.test_case
-            "remove log journald"
-            `Quick
-            installer_remove_logging_artifacts_journald;
+            installer_logging_journald_noop;
           Alcotest.test_case
             "drop user heuristic"
             `Quick
@@ -2979,7 +2897,7 @@ let () =
           Alcotest.test_case
             "build run args"
             `Quick
-            installer_build_run_args_file_logging;
+            installer_build_run_args_journald;
           Alcotest.test_case
             "plan direct uri"
             `Quick

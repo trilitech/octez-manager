@@ -116,12 +116,7 @@ let view_details svc =
       in
       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
       let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
-      let logging =
-        match svc.Service.logging_mode with
-        | Logging_mode.Journald -> "journald"
-        | Logging_mode.File {path; rotate} ->
-            Printf.sprintf "file:%s (rotate=%b)" path rotate
-      in
+      let logging = Logging_mode.to_string svc.Service.logging_mode in
       render_fields
         [
           ("Instance", svc.Service.instance);
@@ -154,11 +149,7 @@ let view_details svc =
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
           ("Created At", svc.Service.created_at);
-          ( "Logging",
-            match svc.Service.logging_mode with
-            | Logging_mode.Journald -> "journald"
-            | Logging_mode.File {path; rotate} ->
-                Printf.sprintf "file:%s (rotate=%b)" path rotate );
+          ("Logging", Logging_mode.to_string svc.Service.logging_mode);
           ("Extra Args", String.concat " " svc.Service.extra_args);
         ]
 
@@ -233,55 +224,19 @@ let edit_config_modal s =
           "Editing is currently only supported for nodes." ;
         s)
       else (
-        Modal_helpers.open_choice_modal
-          ~title:("Edit Config · " ^ svc.Service.instance)
-          ~items:[`ExtraArgs; `LoggingMode]
-          ~to_string:(function
-            | `ExtraArgs -> "Extra Arguments" | `LoggingMode -> "Logging Mode")
-          ~on_select:(fun choice ->
-            match choice with
-            | `ExtraArgs ->
-                let initial = String.concat " " svc.Service.extra_args in
-                Modal_helpers.prompt_text_modal
-                  ~title:"Extra Arguments"
-                  ~initial
-                  ~on_submit:(fun text ->
-                    let extra_args =
-                      String.split_on_char ' ' text
-                      |> List.map String.trim
-                      |> List.filter (( <> ) "")
-                    in
-                    ignore
-                      (apply_node_update s (fun req -> {req with extra_args})))
-                  ()
-            | `LoggingMode ->
-                Modal_helpers.open_choice_modal
-                  ~title:"Select Logging Mode"
-                  ~items:[`Journald; `File]
-                  ~to_string:(function
-                    | `Journald -> "Journald" | `File -> "File (rotate)")
-                  ~on_select:(fun mode ->
-                    match mode with
-                    | `Journald ->
-                        ignore
-                          (apply_node_update s (fun req ->
-                               {req with logging_mode = Logging_mode.Journald}))
-                    | `File ->
-                        Modal_helpers.prompt_text_modal
-                          ~title:"Log File Path"
-                          ~initial:
-                            (Common.default_log_dir
-                               ~role:"node"
-                               ~instance:svc.Service.instance
-                            ^ "/node.log")
-                          ~on_submit:(fun path ->
-                            let logging_mode =
-                              Logging_mode.File {path; rotate = true}
-                            in
-                            ignore
-                              (apply_node_update s (fun req ->
-                                   {req with logging_mode})))
-                          ())) ;
+        (* Only extra args can be edited - logging is always journald *)
+        let initial = String.concat " " svc.Service.extra_args in
+        Modal_helpers.prompt_text_modal
+          ~title:("Extra Arguments · " ^ svc.Service.instance)
+          ~initial
+          ~on_submit:(fun text ->
+            let extra_args =
+              String.split_on_char ' ' text
+              |> List.map String.trim
+              |> List.filter (( <> ) "")
+            in
+            ignore (apply_node_update s (fun req -> {req with extra_args})))
+          () ;
         s)
 
 let open_actions_modal s =
