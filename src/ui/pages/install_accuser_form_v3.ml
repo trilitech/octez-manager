@@ -53,19 +53,6 @@ let require_package_manager () =
       Ok (module I : Manager_interfaces.Package_manager)
   | None -> Error (`Msg "Package manager capability not available")
 
-(* Binary validator for accuser *)
-let has_octez_baker_binary dir =
-  let trimmed = String.trim dir in
-  if trimmed = "" then false
-  else
-    let candidate = Filename.concat trimmed "octez-baker" in
-    Sys.file_exists candidate
-    &&
-      try
-        Unix.access candidate [Unix.X_OK] ;
-        true
-      with Unix.Unix_error _ -> false
-
 (** Custom node selection field with auto-naming *)
 let node_selection_field =
   Form_builder.custom
@@ -138,8 +125,8 @@ let node_selection_field =
               let new_client = {(!model_ref).client with base_dir = default_dir} in
               model_ref := {core = new_core; client = new_client} ;
             (* Maybe use app_bin_dir from node *)
-            if has_octez_baker_binary svc.Service.app_bin_dir
-               && not (has_octez_baker_binary (!model_ref).core.app_bin_dir)
+            if Form_builder_common.has_octez_baker_binary svc.Service.app_bin_dir
+               && not (Form_builder_common.has_octez_baker_binary (!model_ref).core.app_bin_dir)
             then
               let new_core = {(!model_ref).core with app_bin_dir = svc.Service.app_bin_dir} in
               model_ref := {!model_ref with core = new_core}
@@ -169,7 +156,7 @@ let spec =
         ~set_core:(fun core m -> {m with core})
         ~binary:"octez-baker"
         ~subcommand:["run"; "accuser"]
-        ~binary_validator:has_octez_baker_binary
+        ~binary_validator:Form_builder_common.has_octez_baker_binary
         ()
       @ [
         node_selection_field;

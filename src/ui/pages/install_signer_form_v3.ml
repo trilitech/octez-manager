@@ -50,19 +50,6 @@ let require_package_manager () =
       Ok (module I : Manager_interfaces.Package_manager)
   | None -> Error (`Msg "Package manager capability not available")
 
-(* Binary validator for signer *)
-let has_octez_baker_binary dir =
-  let trimmed = String.trim dir in
-  if trimmed = "" then false
-  else
-    let candidate = Filename.concat trimmed "octez-baker" in
-    Sys.file_exists candidate
-    &&
-      try
-        Unix.access candidate [Unix.X_OK] ;
-        true
-      with Unix.Unix_error _ -> false
-
 let spec =
   let open Form_builder in
   let open Form_builder_bundles in
@@ -77,12 +64,12 @@ let spec =
         ~set_core:(fun core m -> {m with core})
         ~binary:"octez-baker"
         ~subcommand:["run"; "signer"]
-        ~binary_validator:has_octez_baker_binary
+        ~binary_validator:Form_builder_common.has_octez_baker_binary
         ()
       @ client_fields_with_autoname
         ~role:"signer"
         ~binary:"octez-baker"
-        ~binary_validator:has_octez_baker_binary
+        ~binary_validator:Form_builder_common.has_octez_baker_binary
         ~get_core:(fun m -> m.core)
         ~set_core:(fun core m -> {m with core})
         ~get_client:(fun m -> m.client)
@@ -110,8 +97,8 @@ let spec =
           else Error (`Msg "Node endpoint cannot be empty"));
 
     on_init = None;
-  on_refresh = None;
-  pre_submit_modal = None;
+    on_refresh = None;
+    pre_submit_modal = None;
 
     on_submit = (fun model ->
       let states = Data.load_service_states () in
