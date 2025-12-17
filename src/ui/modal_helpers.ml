@@ -71,10 +71,9 @@ let open_text_modal ~title ~lines =
             "Esc"
         | _ -> key
       in
-      (* Only close modal on Esc/q when NOT in search/input mode *)
-      if key = "Esc" && not pager_in_input_mode then (
-        Miaou.Core.Modal_manager.close_top `Cancel ;
-        s)
+      (* Don't call close_top here - Modal_manager.handle_key handles it via
+         cancel_on. Just return state unchanged for Esc when not in input mode. *)
+      if key = "Esc" && not pager_in_input_mode then s
       else
         let rows = max 1 (size.LTerm_geom.rows - 4) in
         let win = rows in
@@ -144,12 +143,10 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
             "Esc"
         | _ -> key
       in
-      if key = "Enter" then (
-        Miaou.Core.Modal_manager.close_top `Commit ;
-        s)
-      else if key = "Esc" then (
-        Miaou.Core.Modal_manager.close_top `Cancel ;
-        s)
+      (* Don't call close_top here - Modal_manager.handle_key already handles
+         commit/cancel based on commit_on/cancel_on keys. Only handle selection
+         navigation here. *)
+      if key = "Enter" || key = "Esc" then s
       else Select_widget.handle_key s ~key
 
     let handle_key = handle_modal_key
