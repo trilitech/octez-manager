@@ -34,6 +34,7 @@ val core_service_fields :
   set_core:(Form_builder_common.core_service_config -> 'model -> 'model) ->
   binary:string ->
   subcommand:string list ->
+  ?baker_mode:('model -> [`Local | `Remote]) ->
   ?binary_validator:(string -> bool) ->
   ?skip_instance_name:bool ->
   unit ->

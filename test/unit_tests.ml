@@ -2,6 +2,7 @@ open Octez_manager_lib
 open Installer_types
 module Binary_help_explorer = Octez_manager_ui.Binary_help_explorer
 module Install_node_form_v3 = Octez_manager_ui.Install_node_form_v3
+module Install_baker_form_v3 = Octez_manager_ui.Install_baker_form_v3
 
 let option_string = Alcotest.(option string)
 
@@ -3012,6 +3013,13 @@ let () =
             "runtime probe writable directory"
             `Quick
             runtime_probe_writable_directory;
+          Alcotest.test_case "baker initial base dir default" `Quick (fun () ->
+              Alcotest.(check bool)
+                "base dir defaulted"
+                true
+                (String.trim
+                   Install_baker_form_v3.For_tests.initial_model.client.base_dir
+                <> ""));
           Alcotest.test_case
             "binary help parses"
             `Quick
