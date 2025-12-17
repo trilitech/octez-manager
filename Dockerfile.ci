@@ -12,7 +12,9 @@ RUN apk add --no-cache \
     zlib-dev \
     zlib-static \
     gmp-dev \
+    gmp-static \
     libffi-dev \
+    libffi-static \
     git \
     m4 \
     make \
