@@ -39,22 +39,6 @@ val core_service_fields :
 
 (** {1 Client-based Tool Bundle} *)
 
-(** Generate fields for client-based tools (baker, accuser, DAL node, signer).
-
-    Includes:
-    - Base directory (client wallet/config directory)
-    - Node selection (existing service or custom endpoint)
-
-    The node endpoint is derived from the node selection automatically.
-
-    @param get_client Extract client config from model
-    @param set_client Update model with new client config *)
-val client_fields :
-  get_client:('model -> Form_builder_common.client_config) ->
-  set_client:(Form_builder_common.client_config -> 'model -> 'model) ->
-  unit ->
-  'model Form_builder.field list
-
 (** Generate fields for client-based tools WITH auto-naming support.
 
     Same as client_fields but with auto-naming: when selecting a node service,
