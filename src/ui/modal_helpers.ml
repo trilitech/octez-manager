@@ -624,11 +624,30 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
         Miaou.Core.Modal_manager.close_top `Cancel ;
         browser''
         (* Check for commit with 's' key (Enter is used for navigation) *))
-      else if key = "s" && File_browser.can_commit browser'' then (
-        Miaou.Core.Modal_manager.close_top `Commit ;
-        browser'')
-      (* Return the updated browser state *)
-        else browser''
+      else
+        let selected = File_browser.get_selected_entry browser'' in
+        let is_dot =
+          match selected with Some {name = "."; _} -> true | _ -> false
+        in
+        let is_dir =
+          match selected with Some {is_dir; _} -> is_dir | None -> false
+        in
+        let has_selection =
+          match File_browser.get_selection browser'' with
+          | Some _ -> true
+          | None -> false
+        in
+        let should_commit =
+          File_browser.can_commit browser''
+          && (((key = "Space" || key = " ") && has_selection)
+             || key = "s"
+             || (key = "Enter" && (is_dot || not is_dir)))
+        in
+        if should_commit then (
+          Miaou.Core.Modal_manager.close_top `Commit ;
+          browser'')
+        (* Return the updated browser state *)
+          else browser''
 
     let handle_key = handle_modal_key
 
@@ -638,7 +657,9 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
   end in
   let ui : Miaou.Core.Modal_manager.ui =
     {
-      title = "Browse Directory (press 's' to select, Esc to cancel)";
+      title =
+        "Browse Directory (Space selects, Enter opens/Selects leaf, Esc to \
+         cancel)";
       left = None;
       max_width = Some (Fixed 100);
       dim_background = true;
@@ -696,7 +717,7 @@ let select_directory_modal ~title ~dir_type ~on_select () =
         (* Open file browser *)
         open_file_browser_modal
           ~dirs_only:true
-          ~require_writable:true
+          ~require_writable:false
           ~on_select:(fun path ->
             let trimmed = String.trim path in
 
@@ -710,36 +731,45 @@ let select_directory_modal ~title ~dir_type ~on_select () =
                 "Path exists but is not a directory"
             else
               (* Create directory with error handling *)
+              let is_writable_dir dir =
+                try
+                  Unix.access dir [Unix.W_OK; Unix.X_OK] ;
+                  true
+                with Unix.Unix_error _ -> false
+              in
               let user, group =
                 Octez_manager_lib.Common.current_user_group_names ()
               in
-              match
+              let ensure_dir () =
                 Octez_manager_lib.Common.ensure_dir_path
                   ~owner:user
                   ~group
                   ~mode:0o755
                   trimmed
-              with
-              | Ok () ->
-                  (* Verify it was created *)
-                  if not (Sys.file_exists trimmed) then
-                    show_error
-                      ~title:"Creation Failed"
-                      "Directory creation succeeded but path doesn't exist"
-                  else (
-                    (* Add to registry (ignore errors but log) *)
-                    (match
-                       Octez_manager_lib.Directory_registry.add
-                         ~path:trimmed
-                         ~dir_type
-                         ~linked_services:[]
-                     with
-                    | Ok () -> ()
-                    | Error (`Msg msg) ->
-                        prerr_endline ("Registry add failed: " ^ msg)) ;
-                    on_select trimmed)
-              | Error (`Msg msg) ->
-                  show_error ~title:"Directory Creation Failed" msg)
+              in
+              let proceed () =
+                (match
+                   Octez_manager_lib.Directory_registry.add
+                     ~path:trimmed
+                     ~dir_type
+                     ~linked_services:[]
+                 with
+                | Ok () -> ()
+                | Error (`Msg msg) ->
+                    prerr_endline ("Registry add failed: " ^ msg)) ;
+                on_select trimmed
+              in
+              if Sys.file_exists trimmed then
+                if is_writable_dir trimmed then proceed ()
+                else
+                  show_error
+                    ~title:"Permission Denied"
+                    (Printf.sprintf "Directory is not writable: %s" trimmed)
+              else
+                match ensure_dir () with
+                | Ok () -> proceed ()
+                | Error (`Msg msg) ->
+                    show_error ~title:"Directory Creation Failed" msg)
           ()
   in
 

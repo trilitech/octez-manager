@@ -16,6 +16,8 @@ open Rresult
 
 let ( let* ) = Result.bind
 
+let of_rresult = function Ok v -> Ok v | Error (`Msg msg) -> Error msg
+
 let name = "install_node_form_v3"
 
 (** {1 Custom Types} *)
@@ -40,7 +42,7 @@ type model = {
   preserve_data : preserve_data;
 }
 
-let initial_model =
+let base_initial_model =
   {
     core =
       {
@@ -56,7 +58,7 @@ let initial_model =
       {
         network = "mainnet";
         history_mode = "rolling";
-        data_dir = "";
+        data_dir = Common.default_role_dir "node" "node";
         rpc_addr = "127.0.0.1:8732";
         p2p_addr = "0.0.0.0:9732";
         (* All interfaces for peer reachability *)
@@ -102,10 +104,29 @@ let snapshot_cache_ttl = 300. (* 5 minutes *)
 
 let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
+let snapshot_provider () =
+  Miaou_interfaces.Capability.get
+    Manager_interfaces.Snapshot_provider_capability.key
+
+let slug_of_network network =
+  let fallback () = Snapshots.slug_of_network network in
+  match snapshot_provider () with
+  | Some cap -> (
+      let module P = (val cap : Manager_interfaces.Snapshot_provider) in
+      match P.slug_of_network network with
+      | Some slug -> Some slug
+      | None -> fallback ())
+  | None -> fallback ()
+
 let fetch_snapshot_list slug =
-  match Snapshots.list ~network_slug:slug with
-  | Ok entries -> Ok entries
-  | Error (`Msg e) -> Error e
+  let fallback () = of_rresult (Snapshots.list ~network_slug:slug) in
+  match snapshot_provider () with
+  | Some cap -> (
+      let module P = (val cap : Manager_interfaces.Snapshot_provider) in
+      match of_rresult (P.list ~network_slug:slug) with
+      | Ok entries -> Ok entries
+      | Error _ -> fallback ())
+  | None -> fallback ()
 
 let cache_snapshot slug entries =
   Mutex.protect snapshot_cache_lock (fun () ->
@@ -136,18 +157,152 @@ let snapshot_entries_from_cache slug =
   Mutex.protect snapshot_cache_lock (fun () ->
       match Hashtbl.find_opt snapshot_cache slug with
       | Some (entries, ts) ->
-          if Unix.gettimeofday () -. ts > snapshot_cache_ttl then
-            schedule_snapshot_fetch slug ;
+          let age = Unix.gettimeofday () -. ts in
+          if age > snapshot_cache_ttl then schedule_snapshot_fetch slug ;
           Some entries
       | None -> None)
 
+let ensure_snapshot_entries slug =
+  match snapshot_entries_from_cache slug with
+  | Some entries -> Ok entries
+  | None -> (
+      match fetch_snapshot_list slug with
+      | Ok entries ->
+          cache_snapshot slug entries ;
+          Ok entries
+      | Error msg -> Error msg)
+
 let prefetch_snapshot_list network =
-  match Snapshots.slug_of_network network with
+  match slug_of_network network with
   | Some slug -> (
       match snapshot_entries_from_cache slug with
       | Some _ -> ()
       | None -> schedule_snapshot_fetch slug)
   | None -> ()
+
+let parse_port addr =
+  match String.split_on_char ':' addr with
+  | [_; port_str] -> (
+      try Some (int_of_string (String.trim port_str)) with _ -> None)
+  | _ -> None
+
+let ports_from_states states =
+  let rpc_ports =
+    states
+    |> List.filter_map (fun (s : Data.Service_state.t) ->
+        match s.service.Service.role with
+        | "node" -> parse_port s.service.Service.rpc_addr
+        | _ -> None)
+  in
+  let p2p_ports =
+    states
+    |> List.filter_map (fun (s : Data.Service_state.t) ->
+        match s.service.Service.role with
+        | "node" -> parse_port s.service.Service.net_addr
+        | _ -> None)
+  in
+  (rpc_ports, p2p_ports)
+
+let is_port_in_use (port : int) : bool =
+  match
+    Miaou_interfaces.Capability.get Manager_interfaces.System_capability.key
+  with
+  | Some cap ->
+      let module Sys = (val cap : Manager_interfaces.System) in
+      Sys.is_port_in_use port
+  | None -> false
+
+let next_free_port ~start ~avoid =
+  let rec loop p =
+    if
+      p >= 1024 && p <= 65535
+      && (not (List.mem p avoid))
+      && not (is_port_in_use p)
+    then p
+    else loop (p + 1)
+  in
+  loop start
+
+let ensure_ports_initialized model_ref =
+  let states =
+    try Data.load_service_states () with _ -> []
+    (* In tests/early init, capability may be absent; default to empty. *)
+  in
+  let rpc_ports, p2p_ports = ports_from_states states in
+  let avoid = ref (rpc_ports @ p2p_ports) in
+  let ensure current ~default_host ~start_port setter =
+    let needs_new =
+      match Form_builder_common.parse_host_port current with
+      | Some (_host, port) ->
+          port < 1024 || port > 65535 || List.mem port !avoid
+          || is_port_in_use port
+      | None -> true
+    in
+    if needs_new then (
+      let port = next_free_port ~start:start_port ~avoid:!avoid in
+      setter (Printf.sprintf "%s:%d" default_host port) ;
+      avoid := port :: !avoid)
+    else
+      match Form_builder_common.parse_host_port current with
+      | Some (_host, port) -> avoid := port :: !avoid
+      | None -> ()
+  in
+  let current = !model_ref in
+  ensure
+    current.node.rpc_addr
+    ~default_host:"127.0.0.1"
+    ~start_port:8732
+    (fun value ->
+      model_ref :=
+        {
+          current with
+          node = Form_builder_common.{current.node with rpc_addr = value};
+        }) ;
+  let current = !model_ref in
+  ensure
+    current.node.p2p_addr
+    ~default_host:"0.0.0.0"
+    ~start_port:9732
+    (fun value ->
+      model_ref :=
+        {
+          current with
+          node = Form_builder_common.{current.node with p2p_addr = value};
+        })
+
+let initial_model =
+  let model_ref = ref base_initial_model in
+  ensure_ports_initialized model_ref ;
+  !model_ref
+
+let history_snapshot_conflict ~history_mode ~snapshot ~network =
+  match snapshot with
+  | `None | `Url _ -> false
+  | `Tzinit tz -> (
+      match slug_of_network network with
+      | None -> false
+      | Some slug -> (
+          match snapshot_entries_from_cache slug with
+          | None -> false
+          | Some entries -> (
+              match
+                List.find_opt
+                  (fun (e : Snapshots.entry) ->
+                    e.network = tz.network_slug && e.slug = tz.kind_slug)
+                  entries
+              with
+              | None -> false
+              | Some entry -> (
+                  match entry.history_mode with
+                  | Some snap_mode when String.trim snap_mode <> "" -> (
+                      match History_mode.of_string history_mode with
+                      | Ok requested ->
+                          not
+                            (Installer.For_tests.history_mode_matches
+                               ~requested
+                               ~snapshot_mode:snap_mode)
+                      | Error _ -> true)
+                  | _ -> false))))
 
 (** {1 Custom Fields} *)
 
@@ -162,8 +317,13 @@ let snapshot_field =
           Printf.sprintf "tzinit · %s (%s)" snap.label snap.kind_slug)
     ~edit:(fun model_ref ->
       let snapshots_opt =
-        match Snapshots.slug_of_network !model_ref.node.network with
-        | Some slug -> snapshot_entries_from_cache slug
+        match slug_of_network !model_ref.node.network with
+        | Some slug -> (
+            match ensure_snapshot_entries slug with
+            | Ok entries -> Some entries
+            | Error msg ->
+                Context.toast_info msg ;
+                snapshot_entries_from_cache slug)
         | None -> None
       in
 
@@ -207,6 +367,33 @@ let snapshot_field =
         ~items
         ~to_string
         ~on_select)
+    ~validate:(fun m ->
+      let history_conflict =
+        history_snapshot_conflict
+          ~history_mode:m.node.history_mode
+          ~snapshot:m.snapshot
+          ~network:m.node.network
+      in
+      if history_conflict then false
+      else
+        match m.snapshot with
+        | `None -> true
+        | `Url u -> String.trim u <> ""
+        | `Tzinit _ -> true)
+    ~validate_msg:(fun m ->
+      let history_conflict =
+        history_snapshot_conflict
+          ~history_mode:m.node.history_mode
+          ~snapshot:m.snapshot
+          ~network:m.node.network
+      in
+      if history_conflict then
+        Some "Snapshot history mode does not match selected history mode"
+      else
+        match m.snapshot with
+        | `None -> None
+        | `Url u when String.trim u = "" -> Some "Snapshot URL cannot be empty"
+        | _ -> None)
     ()
 
 (** {1 Form Specification} *)
@@ -254,6 +441,7 @@ let spec =
       @ node_fields
           ~get_node:(fun m -> m.node)
           ~set_node:(fun node m -> {m with node})
+          ~on_network_selected:prefetch_snapshot_list
           ()
       @ [snapshot_field]
       @ core_service_fields
@@ -380,6 +568,20 @@ module Page = Form_builder.Make (struct
 
   let spec = spec
 end)
+
+module For_tests = struct
+  let clear_snapshot_cache () =
+    Mutex.protect snapshot_cache_lock (fun () ->
+        Hashtbl.reset snapshot_cache ;
+        Hashtbl.reset snapshot_inflight)
+
+  let set_snapshot_cache ~network ~entries =
+    match slug_of_network network with
+    | None -> ()
+    | Some slug -> cache_snapshot slug entries
+
+  let history_snapshot_conflict = history_snapshot_conflict
+end
 
 let page : Miaou.Core.Registry.page = (module Page)
 
