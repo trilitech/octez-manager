@@ -13,7 +13,9 @@
   rresult
   yojson
   bos
-  miaou
+  miaou-core
+  miaou-driver-term
+  miaou-runner
   eio
   eio_main
   cohttp-eio
