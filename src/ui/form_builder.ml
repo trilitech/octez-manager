@@ -171,8 +171,6 @@ let extra_args ~label ~get_args ~set_args ~get_bin_dir ~binary ?subcommand () =
     match (binary, subcommand) with
     | ("octez-node", _) ->
         Binary_help_explorer.open_node_run_help ~app_bin_dir ~on_apply
-    | ("octez-baker", Some ["run"; "accuser"]) | ("octez-baker", Some ["run"; "with"; _; _; _; "accuser"]) ->
-        Binary_help_explorer.open_accuser_run_help ~app_bin_dir ~on_apply
     | ("octez-baker", _) ->
         (* For baker, we need to determine local vs remote mode *)
         Binary_help_explorer.open_baker_run_help ~app_bin_dir ~mode:`Local ~on_apply
@@ -381,7 +379,7 @@ struct
   let refresh s =
     (match Context.consume_navigation () with
     | Some p -> s.next_page <- Some p
-    | None -> ()) ;
+    | None -> s.next_page <- None) ; (* Clear next_page when no navigation pending *)
     (* Call on_refresh hook if provided *)
     (match S.spec.on_refresh with
     | Some f -> f !(s.model_ref)
@@ -541,7 +539,7 @@ struct
     else
       match Miaou.Core.Keys.of_string key with
       | Some (Miaou.Core.Keys.Char "Esc") | Some (Miaou.Core.Keys.Char "Escape") ->
-          s.next_page <- Some "instances" ;
+          s.next_page <- Some "__BACK__" ;
           s
       | Some Miaou.Core.Keys.Up -> move s (-1)
       | Some Miaou.Core.Keys.Down -> move s 1
@@ -557,7 +555,7 @@ struct
   let service_cycle s _ = s
 
   let back s =
-    s.next_page <- Some "instances" ;
+    s.next_page <- Some "__BACK__" ;
     s
 
   let keymap _ =
