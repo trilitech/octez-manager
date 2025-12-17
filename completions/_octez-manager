@@ -76,8 +76,36 @@ _octez-manager() {
       case $words[1] in
         instance)
           if (( CURRENT == 2 )); then
-            # Complete instance names - could be enhanced to query actual instances
-            _message 'instance name'
+            # Complete instance names by invoking "octez-manager list" and parsing output
+            local -a instances
+            instances=()
+            local cmd=""
+            if [[ -x ./octez-manager ]]; then
+              cmd=./octez-manager
+            elif [[ -x _build/bin/octez-manager ]]; then
+              cmd=_build/bin/octez-manager
+            elif command -v octez-manager >/dev/null 2>&1; then
+              cmd=octez-manager
+            fi
+            if [[ -n $cmd ]]; then
+              local out
+              out=$($cmd list 2>/dev/null)
+              if [[ -n $out ]]; then
+                while IFS= read -r line; do
+                  # Expect lines like: "<instance> <role> <network> (<data_dir>)"
+                  if [[ $line == *'('* ]]; then
+                    local inst=${line%%[[:space:]]*}
+                    instances+=("$inst")
+                  fi
+                done <<<"$out"
+              fi
+            fi
+            if (( ${#instances} )); then
+              typeset -U instances
+              _describe -t instances 'instances' instances
+            else
+              _message 'instance name'
+            fi
           elif (( CURRENT == 3 )); then
             _describe -t actions 'instance actions' instance_actions
           else
