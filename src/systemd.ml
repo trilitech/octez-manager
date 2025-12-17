@@ -81,17 +81,18 @@ let env_file_template user_mode =
 let exec_line role =
   match String.lowercase_ascii role with
   | "baker" ->
+      (* Order: global opts, subcommand, delegates (positional), command opts *)
       "ExecStart=/bin/sh -lc 'MODE=${OCTEZ_BAKER_NODE_MODE:-local}; \
-       CMD=\"${APP_BIN_DIR}/octez-baker\"; CMD=\"$CMD --base-dir \
+       CMD=\"${APP_BIN_DIR}/octez-baker --base-dir \
        \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
        \\\"${OCTEZ_NODE_ENDPOINT}\\\"\"; if [ \"$MODE\" = \"remote\" ]; then \
        CMD=\"$CMD run remotely\"; else CMD=\"$CMD run with local node \
-       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; DAL_CFG=\"${OCTEZ_DAL_CONFIG:-}\"; if \
-       [ \"$DAL_CFG\" = \"disabled\" ]; then CMD=\"$CMD --without-dal\"; elif \
-       [ -n \"$DAL_CFG\" ]; then CMD=\"$CMD --dal-node \\\"$DAL_CFG\\\"\"; fi; \
-       CMD=\"$CMD --liquidity-baking-toggle-vote \
-       \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; exec $CMD \
-       ${OCTEZ_BAKER_DELEGATES_ARGS:-} ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
+       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; CMD=\"$CMD ${OCTEZ_BAKER_DELEGATES_ARGS:-}\"; \
+       DAL_CFG=\"${OCTEZ_DAL_CONFIG:-}\"; if [ \"$DAL_CFG\" = \"disabled\" ]; then \
+       CMD=\"$CMD --without-dal\"; elif [ -n \"$DAL_CFG\" ]; then \
+       CMD=\"$CMD --dal-node \\\"$DAL_CFG\\\"\"; fi; \
+       CMD=\"$CMD --liquidity-baking-toggle-vote \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; \
+       exec $CMD ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
   | "node" ->
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \
        --data-dir=\"${OCTEZ_DATA_DIR}\" ${OCTEZ_NODE_ARGS:-}'"

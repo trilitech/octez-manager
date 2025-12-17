@@ -925,10 +925,8 @@ let install_baker (request : baker_request) =
   let node_mode_env =
     match node_mode with Local _ -> "local" | Remote _ -> "remote"
   in
-  let delegate_flags =
-    request.delegates |> List.concat_map (fun d -> ["--delegate"; d])
-  in
-  let delegate_args = String.concat " " delegate_flags |> String.trim in
+  (* Delegates are positional arguments, not --delegate flags *)
+  let delegate_args = String.concat " " request.delegates |> String.trim in
   let extra_args_str = String.concat " " request.extra_args |> String.trim in
   install_daemon
     {
