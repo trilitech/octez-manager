@@ -68,6 +68,8 @@ let default_service_user () =
     | pw when String.trim pw.Unix.pw_name <> "" -> pw.Unix.pw_name
     | _ -> "octez"
 
+let default_base_dir ~role ~instance = Common.default_role_dir role instance
+
 (** Check if a binary exists in a directory and is executable. *)
 let has_binary binary_name dir =
   let trimmed = String.trim dir in
@@ -86,6 +88,18 @@ let has_octez_baker_binary = has_binary "octez-baker"
 
 (** Check if octez-node binary exists and is executable. *)
 let has_octez_node_binary = has_binary "octez-node"
+
+let endpoint_with_scheme rpc_addr =
+  let trimmed = String.trim rpc_addr in
+  if trimmed = "" then "http://127.0.0.1:8732"
+  else if
+    String.starts_with ~prefix:"http://" (String.lowercase_ascii trimmed)
+    || String.starts_with ~prefix:"https://" (String.lowercase_ascii trimmed)
+  then trimmed
+  else "http://" ^ trimmed
+
+let endpoint_of_service (svc : Service.t) =
+  endpoint_with_scheme svc.Service.rpc_addr
 
 (** {1 Helpers} *)
 
