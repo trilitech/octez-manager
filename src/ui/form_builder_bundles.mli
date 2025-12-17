@@ -90,5 +90,6 @@ val client_fields_with_autoname :
 val node_fields :
   get_node:('model -> Form_builder_common.node_config) ->
   set_node:(Form_builder_common.node_config -> 'model -> 'model) ->
+  ?on_network_selected:(string -> unit) ->
   unit ->
   'model Form_builder.field list

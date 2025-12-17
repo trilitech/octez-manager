@@ -1,6 +1,7 @@
 open Octez_manager_lib
 open Installer_types
 module Binary_help_explorer = Octez_manager_ui.Binary_help_explorer
+module Install_node_form_v3 = Octez_manager_ui.Install_node_form_v3
 
 let option_string = Alcotest.(option string)
 
@@ -595,6 +596,69 @@ let installer_snapshot_history_mode_match () =
             "https://example/rolling.snap"
             res.download_url
       | Error (`Msg msg) -> Alcotest.failf "should accept matching mode: %s" msg)
+
+let install_node_form_v3_history_conflict () =
+  let module F = Octez_manager_ui.Install_node_form_v3.For_tests in
+  F.clear_snapshot_cache () ;
+  let mk_entry ~slug ~history_mode =
+    {
+      Snapshots.network = "mainnet";
+      slug;
+      label = slug;
+      download_url = None;
+      history_mode = Some history_mode;
+      metadata = [];
+    }
+  in
+  F.set_snapshot_cache
+    ~network:"mainnet"
+    ~entries:[mk_entry ~slug:"full" ~history_mode:"full"] ;
+  let snap_full =
+    `Tzinit
+      Install_node_form_v3.
+        {network_slug = "mainnet"; kind_slug = "full"; label = "full"}
+  in
+  Alcotest.(check bool)
+    "history conflict detected"
+    true
+    (F.history_snapshot_conflict
+       ~history_mode:"rolling"
+       ~snapshot:snap_full
+       ~network:"mainnet") ;
+  F.set_snapshot_cache
+    ~network:"mainnet"
+    ~entries:[mk_entry ~slug:"rolling" ~history_mode:"rolling"] ;
+  let snap_roll =
+    `Tzinit
+      Install_node_form_v3.
+        {network_slug = "mainnet"; kind_slug = "rolling"; label = "rolling"}
+  in
+  Alcotest.(check bool)
+    "history conflict resolved"
+    false
+    (F.history_snapshot_conflict
+       ~history_mode:"rolling"
+       ~snapshot:snap_roll
+       ~network:"mainnet")
+
+let runtime_probe_writable_directory () =
+  let dir = Filename.temp_file "octez_manager_probe" "" in
+  Sys.remove dir ;
+  Unix.mkdir dir 0o755 ;
+  Fun.protect
+    ~finally:(fun () ->
+      try Unix.rmdir dir
+      with _ ->
+        () ;
+        ())
+    (fun () ->
+      Octez_manager_ui.Runtime.initialize () ;
+      let module Sys = Miaou_interfaces.System in
+      let sys = Sys.require () in
+      match sys.probe_writable ~path:dir with
+      | Ok true -> ()
+      | Ok false -> Alcotest.fail "Expected writable directory"
+      | Error e -> Alcotest.failf "probe_writable failed: %s" e)
 
 let octez_node_run_help_plain =
   {|
@@ -2940,6 +3004,14 @@ let () =
             "snapshot history mode match"
             `Quick
             installer_snapshot_history_mode_match;
+          Alcotest.test_case
+            "node form snapshot conflict validation"
+            `Quick
+            install_node_form_v3_history_conflict;
+          Alcotest.test_case
+            "runtime probe writable directory"
+            `Quick
+            runtime_probe_writable_directory;
           Alcotest.test_case
             "binary help parses"
             `Quick

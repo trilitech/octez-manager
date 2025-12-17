@@ -7,6 +7,64 @@
 
 open Octez_manager_lib
 open Form_builder_common
+open Rresult
+
+let ( let* ) = Result.bind
+
+(** {1 Shared helpers} *)
+
+let of_rresult = function Ok v -> Ok v | Error (`Msg msg) -> Error msg
+
+let normalize_string s = String.lowercase_ascii (String.trim s)
+
+let network_cache : Teztnets.network_info list ref = ref []
+
+let fetch_network_infos () =
+  let fallback () = of_rresult (Teztnets.list_networks ()) in
+  match
+    Miaou_interfaces.Capability.get
+      Manager_interfaces.Network_explorer_capability.key
+  with
+  | Some cap -> (
+      let module N = (val cap : Manager_interfaces.Network_explorer) in
+      match of_rresult (N.list_networks ()) with
+      | Ok infos -> Ok infos
+      | Error _ -> fallback ())
+  | None -> fallback ()
+
+let get_network_infos () =
+  if !network_cache <> [] then Ok !network_cache
+  else
+    let* infos = fetch_network_infos () in
+    let seen = Hashtbl.create 31 in
+    let deduped =
+      infos
+      |> List.filter (fun (i : Teztnets.network_info) ->
+          let key = normalize_string i.network_url in
+          if Hashtbl.mem seen key then false
+          else (
+            Hashtbl.add seen key () ;
+            true))
+    in
+    network_cache := deduped ;
+    Ok deduped
+
+let network_display_name value =
+  let normalized_value = normalize_string value in
+  match
+    List.find_opt
+      (fun (info : Teztnets.network_info) ->
+        normalize_string info.network_url = normalized_value
+        || normalize_string info.alias = normalized_value)
+      !network_cache
+  with
+  | Some info -> info.human_name
+  | None -> value
+
+let format_network_choice (info : Teztnets.network_info) =
+  let label = info.human_name in
+  if normalize_string info.network_url = normalize_string info.alias then label
+  else Printf.sprintf "%s · %s" label info.network_url
 
 (** {1 Core Service Bundle} *)
 
@@ -242,23 +300,118 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
 
 (** {1 Node-specific Bundle} *)
 
-let node_fields ~get_node ~set_node () =
+let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
   let open Form_builder in
   (* Helper for network field - needs special handling for dynamic fetch *)
   let network_field =
     custom
       ~label:"Network"
-      ~get:(fun m -> (get_node m).network)
+      ~get:(fun m ->
+        let value = (get_node m).network in
+        if !network_cache = [] then value else network_display_name value)
       ~edit:(fun model_ref ->
-        (* Simplified - would need full Teztnets integration *)
-        Modal_helpers.prompt_text_modal
-          ~title:"Network"
-          ~initial:(get_node !model_ref).network
-          ~on_submit:(fun network ->
-            let node = get_node !model_ref in
-            model_ref := set_node {node with network} !model_ref)
-          ())
+        let fallback () =
+          Modal_helpers.prompt_text_modal
+            ~title:"Network"
+            ~initial:(get_node !model_ref).network
+            ~on_submit:(fun network ->
+              let node = get_node !model_ref in
+              model_ref := set_node {node with network} !model_ref ;
+              on_network_selected network)
+            ()
+        in
+        match get_network_infos () with
+        | Error msg ->
+            Modal_helpers.show_error ~title:"Network" msg ;
+            fallback ()
+        | Ok nets ->
+            let sorted =
+              nets
+              |> List.sort
+                   (fun
+                     (a : Teztnets.network_info) (b : Teztnets.network_info) ->
+                     String.compare
+                       (normalize_string a.human_name)
+                       (normalize_string b.human_name))
+            in
+            let items = (sorted |> List.map (fun n -> `Net n)) @ [`Custom] in
+            let to_string = function
+              | `Net n -> format_network_choice n
+              | `Custom -> "Custom URL or slug..."
+            in
+            let on_select = function
+              | `Net n ->
+                  let network = n.Teztnets.network_url in
+                  let node = get_node !model_ref in
+                  model_ref := set_node {node with network} !model_ref ;
+                  on_network_selected network
+              | `Custom ->
+                  Modal_helpers.prompt_text_modal
+                    ~title:"Network"
+                    ~initial:(get_node !model_ref).network
+                    ~on_submit:(fun network ->
+                      let node = get_node !model_ref in
+                      model_ref := set_node {node with network} !model_ref ;
+                      on_network_selected network)
+                    ()
+            in
+            Modal_helpers.open_choice_modal
+              ~title:"Network"
+              ~items
+              ~to_string
+              ~on_select)
       ()
+  in
+  let parse_port addr =
+    match String.split_on_char ':' addr with
+    | [_; port_str] -> (
+        try Some (int_of_string (String.trim port_str)) with _ -> None)
+    | _ -> None
+  in
+
+  let ports_from_states states =
+    let rpc_ports =
+      states
+      |> List.filter_map (fun (s : Data.Service_state.t) ->
+          match s.service.Service.role with
+          | "node" -> parse_port s.service.Service.rpc_addr
+          | _ -> None)
+    in
+    let p2p_ports =
+      states
+      |> List.filter_map (fun (s : Data.Service_state.t) ->
+          match s.service.Service.role with
+          | "node" -> parse_port s.service.Service.net_addr
+          | _ -> None)
+    in
+    (rpc_ports, p2p_ports)
+  in
+
+  let is_port_in_use (port : int) : bool =
+    match
+      Miaou_interfaces.Capability.get Manager_interfaces.System_capability.key
+    with
+    | Some cap ->
+        let module Sys = (val cap : Manager_interfaces.System) in
+        Sys.is_port_in_use port
+    | None -> false
+  in
+
+  let validate_port addr states ~label ~example =
+    match parse_host_port addr with
+    | None ->
+        Error (Printf.sprintf "%s must be host:port (e.g., %s)" label example)
+    | Some (_host, port) ->
+        if port < 1024 || port > 65535 then
+          Error (Printf.sprintf "%s port must be 1024-65535" label)
+        else
+          let rpc_ports, p2p_ports = ports_from_states states in
+          if List.mem port rpc_ports || List.mem port p2p_ports then
+            Error
+              (Printf.sprintf "Port %d is used by another Octez instance" port)
+          else if is_port_in_use port then
+            Error (Printf.sprintf "Port %d is in use" port)
+          else Ok ()
   in
 
   [
@@ -300,11 +453,8 @@ let node_fields ~get_node ~set_node () =
         set_node {node with rpc_addr} m)
       ~validate:(fun m ->
         let addr = (get_node m).rpc_addr in
-        match parse_host_port addr with
-        | None -> Error "Format must be host:port (e.g., 127.0.0.1:8732)"
-        | Some (_host, port) ->
-            if port < 1024 || port > 65535 then Error "Port must be 1024-65535"
-            else Ok ());
+        let states = Data.load_service_states () in
+        validate_port addr states ~label:"RPC Address" ~example:"127.0.0.1:8732");
     (* P2P Address *)
     validated_text
       ~label:"P2P Address"
@@ -314,9 +464,6 @@ let node_fields ~get_node ~set_node () =
         set_node {node with p2p_addr} m)
       ~validate:(fun m ->
         let addr = (get_node m).p2p_addr in
-        match parse_host_port addr with
-        | None -> Error "Format must be host:port (e.g., 0.0.0.0:9732)"
-        | Some (_host, port) ->
-            if port < 1024 || port > 65535 then Error "Port must be 1024-65535"
-            else Ok ());
+        let states = Data.load_service_states () in
+        validate_port addr states ~label:"P2P Address" ~example:"0.0.0.0:9732");
   ]
