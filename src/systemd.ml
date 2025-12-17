@@ -96,6 +96,12 @@ let exec_line role =
   | "node" ->
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \
        --data-dir=\"${OCTEZ_DATA_DIR}\" ${OCTEZ_NODE_ARGS:-}'"
+  | "accuser" ->
+      (* Accuser is a subcommand of octez-baker: octez-baker [global] run accuser [opts] *)
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" \
+       --base-dir \"${OCTEZ_CLIENT_BASE_DIR}\" \
+       --endpoint \"${OCTEZ_NODE_ENDPOINT}\" \
+       run accuser ${OCTEZ_SERVICE_ARGS:-}'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \
