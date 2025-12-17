@@ -35,7 +35,7 @@
   uri
   eio_main
   eio
-  miaou)
+  miaou-core.lib)
  (instrumentation
   (backend bisect_ppx)))
 

@@ -8,7 +8,7 @@ on:
       - 'docs/**'
       - '**/*.md'
   pull_request:
-    branches: [main, mb/ci-deps-pipeline]
+    branches: [main]
     paths-ignore:
       - 'README.md'
       - 'docs/**'
@@ -22,54 +22,82 @@ jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
-      # Use SSH-based URL (git@github.com:...) to avoid exposing credentials in logs
       MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
-      DUNE_CACHE: "enabled"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup OCaml
-        uses: ocaml/setup-ocaml@v3
-        with:
-          # Pinning to OCaml 5.1.1 for reproducible builds. If a newer patch release is compatible, consider updating.
-          ocaml-compiler: 5.1.1
-          opam-depext: true
-          cache: true
-          opam-repositories: |
-            default: https://opam.ocaml.org
-
-      - name: Cache dune
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/dune
-          key: ${{ runner.os }}-dune-${{ hashFiles('dune-project', 'Makefile', 'octez-manager.opam', '**/dune') }}
-          restore-keys: |
-            ${{ runner.os }}-dune-
-
-      - name: Cache opam download cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/opam
-          key: ${{ runner.os }}-opam-cache-${{ hashFiles('octez-manager.opam', '**/*.opam') }}
-          restore-keys: |
-            ${{ runner.os }}-opam-cache-
-
-      - name: Install dependencies
+      - name: Pin miaou packages
         run: |
           if [ -z "$MIAOU_GIT_URL" ]; then
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
-            echo "Configure it in repository Settings > Secrets and variables > Actions" >&2
-            echo "Set MIAOU_GIT_URL to point to the private miaou repository URL." >&2
             exit 1
           fi
-          sudo apt-get update
-          make deps-ci
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam install miaou-core miaou-driver-term miaou-runner
 
       - name: Build
-        run: make build
+        run: opam exec -- dune build --release
 
       - name: Test
-        run: make test
+        run: opam exec -- dune runtest
+
+      - name: Upload binary (main branch only)
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: octez-manager-linux-x86_64
+          path: _build/default/src/main.exe
+          retention-days: 3
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-test
+    permissions:
+      contents: write
+    container:
+      image: ghcr.io/${{ github.repository }}-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      OPAMYES: "true"
+      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pin miaou packages
+        run: |
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam install miaou-core miaou-driver-term miaou-runner
+
+      - name: Build static binary
+        run: opam exec -- dune build --release
+
+      - name: Prepare release artifact
+        run: |
+          mkdir -p release
+          cp _build/default/src/main.exe release/octez-manager-${{ github.ref_name }}-linux-x86_64
+          chmod +x release/octez-manager-${{ github.ref_name }}-linux-x86_64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/octez-manager-${{ github.ref_name }}-linux-x86_64
+          generate_release_notes: true

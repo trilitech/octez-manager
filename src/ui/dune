@@ -5,12 +5,9 @@
  (public_name octez-manager.ui)
  (libraries
   octez_manager_lib
-  miaou
-  miaou.core
-  miaou.widgets.display
-  miaou.widgets.input
-  miaou.widgets.layout
-  miaou.driver.term
+  miaou-core.lib
+  miaou-core.internals
+  miaou-driver-term.driver
   lambda-term
   eio
   eio_main)

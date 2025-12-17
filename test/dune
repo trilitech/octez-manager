@@ -11,7 +11,7 @@
   alcotest
   octez_manager_lib
   octez-manager.ui
-  miaou.core
+  miaou-core.lib
   lambda-term)
  (modules tui_flow_tests)
  (instrumentation
