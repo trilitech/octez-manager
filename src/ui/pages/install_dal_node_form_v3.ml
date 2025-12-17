@@ -50,19 +50,6 @@ let require_package_manager () =
       Ok (module I : Manager_interfaces.Package_manager)
   | None -> Error (`Msg "Package manager capability not available")
 
-(* Binary validator for DAL node *)
-let has_octez_baker_binary dir =
-  let trimmed = String.trim dir in
-  if trimmed = "" then false
-  else
-    let candidate = Filename.concat trimmed "octez-baker" in
-    Sys.file_exists candidate
-    &&
-      try
-        Unix.access candidate [Unix.X_OK] ;
-        true
-      with Unix.Unix_error _ -> false
-
 let spec =
   let open Form_builder in
   let open Form_builder_bundles in
@@ -77,12 +64,12 @@ let spec =
         ~set_core:(fun core m -> {m with core})
         ~binary:"octez-baker"
         ~subcommand:["run"; "dal"]
-        ~binary_validator:has_octez_baker_binary
+        ~binary_validator:Form_builder_common.has_octez_baker_binary
         ()
       @ client_fields_with_autoname
         ~role:"dal"
         ~binary:"octez-baker"
-        ~binary_validator:has_octez_baker_binary
+        ~binary_validator:Form_builder_common.has_octez_baker_binary
         ~get_core:(fun m -> m.core)
         ~set_core:(fun core m -> {m with core})
         ~get_client:(fun m -> m.client)
@@ -110,8 +97,8 @@ let spec =
           else Error (`Msg "Node endpoint cannot be empty"));
 
     on_init = None;
-  on_refresh = None;
-  pre_submit_modal = None;
+    on_refresh = None;
+    pre_submit_modal = None;
 
     on_submit = (fun model ->
       let states = Data.load_service_states () in
@@ -147,7 +134,7 @@ let spec =
             let dir =
               Common.default_log_dir ~role:"dal-node" ~instance:model.core.instance_name
             in
-            let path = Filename.concat dir "dal.log" in
+            let path = Filename.concat dir "dal-node.log" in
             Logging_mode.File {path; rotate = true}
       in
 
@@ -175,7 +162,7 @@ let spec =
       let base_dir =
         let trimmed = String.trim model.client.base_dir in
         if trimmed = "" then
-          Common.default_role_dir "dal" model.core.instance_name
+          Common.default_role_dir "dal-node" model.core.instance_name
         else trimmed
       in
 
@@ -191,7 +178,7 @@ let spec =
         instance = model.core.instance_name;
         network = Option.value ~default:"mainnet" network;
         history_mode = History_mode.default;
-        data_dir = Common.default_role_dir "dal" model.core.instance_name;
+        data_dir = Common.default_role_dir "dal-node" model.core.instance_name;
         rpc_addr = node_endpoint;
         net_addr = "";
         service_user = model.core.service_user;
