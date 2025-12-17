@@ -51,7 +51,9 @@ jobs:
         run: dune build --release
 
       - name: Test
-        run: dune runtest
+        run: |
+          chown -R opam:opam /home/opam/.opam
+          su opam -c "dune runtest"
 
       - name: Upload binary (main branch only)
         if: github.ref == 'refs/heads/main'
