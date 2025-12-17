@@ -48,7 +48,9 @@ jobs:
           opam install miaou-core miaou-driver-term miaou-runner
 
       - name: Build
-        run: dune build --release
+        run: |
+          echo '(-ccopt -static)' > static_flags.sexp
+          dune build --release
 
       - name: Test
         run: |
@@ -100,7 +102,9 @@ jobs:
           opam install miaou-core miaou-driver-term miaou-runner
 
       - name: Build static binary
-        run: dune build --release
+        run: |
+          echo '(-ccopt -static)' > static_flags.sexp
+          dune build --release
 
       - name: Prepare release artifact
         run: |

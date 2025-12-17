@@ -51,6 +51,7 @@
   yojson
   linenoise)
  (ocamlopt_flags
-  (:standard -ccopt -static))
+  (:standard
+   (:include %{project_root}/static_flags.sexp)))
  (instrumentation
   (backend bisect_ppx)))
