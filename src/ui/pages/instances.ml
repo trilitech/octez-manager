@@ -17,12 +17,8 @@ let ( let* ) = Result.bind
 
 let name = "instances"
 
-type filter = All | Role of string
-
 type state = {
   services : Service_state.t list;
-  filtered : Service_state.t list;
-  filter : filter;
   selected : int;
   last_updated : float;
   next_page : string option;
@@ -30,47 +26,18 @@ type state = {
 
 type msg = unit
 
-let filter_label = function All -> "all" | Role role -> role
-
-let filter_equal a b =
-  match (a, b) with
-  | All, All -> true
-  | Role x, Role y -> String.equal x y
-  | _ -> false
-
-let unique_roles services =
-  services
-  |> List.map (fun (st : Service_state.t) ->
-      st.Service_state.service.Service.role)
-  |> List.sort_uniq String.compare
-
-let filter_candidates services =
-  All :: List.map (fun role -> Role role) (unique_roles services)
-
-let apply_filter filter services =
-  match filter with
-  | All -> services
-  | Role role ->
-      List.filter
-        (fun (st : Service_state.t) ->
-          String.equal st.Service_state.service.Service.role role)
-        services
-
-let clamp_selection filtered idx =
-  let len = List.length filtered + 3 in
+let clamp_selection services idx =
+  let len = List.length services + 3 in
   max 0 (min idx (len - 1))
 
 let load_services () = Data.load_service_states ()
 
 let load_services_fresh () = Data.load_service_states ~detail:false ()
 
-let init_state filter =
+let init_state () =
   let services = load_services () in
-  let filtered = apply_filter filter services in
   {
     services;
-    filtered;
-    filter;
     selected = 0;
     last_updated = Unix.gettimeofday ();
     next_page = None;
@@ -78,9 +45,8 @@ let init_state filter =
 
 let force_refresh state =
   let services = load_services_fresh () in
-  let filtered = apply_filter state.filter services in
-  let selected = clamp_selection filtered state.selected in
-  {state with services; filtered; selected; last_updated = Unix.gettimeofday ()}
+  let selected = clamp_selection services state.selected in
+  {state with services; selected; last_updated = Unix.gettimeofday ()}
 
 let maybe_refresh state =
   let now = Unix.gettimeofday () in
@@ -94,33 +60,9 @@ let maybe_refresh state =
     force_refresh state
   else state
 
-let set_filter state filter =
-  let filtered = apply_filter filter state.services in
-  let selected = clamp_selection filtered state.selected in
-  {state with filter; filtered; selected}
-
-let cycle_filter state =
-  let candidates = filter_candidates state.services in
-  let total = List.length candidates in
-  if total = 0 then state
-  else
-    let rec find_index idx = function
-      | [] -> None
-      | f :: rest ->
-          if filter_equal f state.filter then Some idx
-          else find_index (idx + 1) rest
-    in
-    let next_idx =
-      match find_index 0 candidates with
-      | None -> 0
-      | Some idx -> (idx + 1) mod total
-    in
-    let next_filter = List.nth candidates next_idx in
-    set_filter state next_filter
-
 let current_service state =
   if state.selected < 3 then None
-  else List.nth_opt state.filtered (state.selected - 3)
+  else List.nth_opt state.services (state.selected - 3)
 
 let with_service state handler =
   match current_service state with
@@ -306,22 +248,17 @@ let table_lines state =
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
   in
   let instance_rows =
-    if state.filtered = [] then
-      ["  No managed instances match the current filter."]
+    if state.services = [] then
+      ["  No managed instances."]
     else
-      state.filtered
+      state.services
       |> List.mapi (fun idx svc -> line_for_service idx state.selected svc)
   in
   install_row :: manage_wallet_row :: "" :: instance_rows
 
 let summary_line state =
   let total = List.length state.services in
-  let filtered = List.length state.filtered in
-  Printf.sprintf
-    "Filter: %s · showing %d/%d"
-    (filter_label state.filter)
-    filtered
-    total
+  Printf.sprintf "Total instances: %d" total
 
 let run_unit_action ~verb ~instance action =
   let title = Printf.sprintf "%s %s" (String.capitalize_ascii verb) instance in
@@ -514,78 +451,72 @@ let _view_logs_old state =
                 state)))
 
 let refresh_modal state =
-  if state.filtered = [] then (
-    Modal_helpers.show_error
-      ~title:"Refresh snapshot"
-      "Select a service first (none matches the current filter)." ;
-    state)
-  else
-    with_service state (fun svc_state ->
-        let svc = svc_state.Service_state.service in
-        Modal_helpers.open_choice_modal
-          ~title:(Printf.sprintf "Refresh snapshot · %s" svc.Service.instance)
-          ~items:[`Auto; `AutoNoCheck; `CustomUri]
-          ~to_string:(function
-            | `Auto -> "Auto (latest tzinit snapshot)"
-            | `AutoNoCheck -> "Auto (--no-check)"
-            | `CustomUri -> "Custom URI")
-          ~on_select:(fun choice ->
-            let instance = svc.Service.instance in
-            let run_refresh ?snapshot_uri ?(no_check = false) () =
-              let now = Unix.gettimeofday () in
-              Rpc_metrics.set
-                ~instance
-                {
-                  Rpc_metrics.chain_id = None;
-                  head_level = None;
-                  bootstrapped = None;
-                  last_rpc_refresh = Some now;
-                  node_version = None;
-                  data_size = None;
-                  proto = None;
-                  last_error = None;
-                  last_block_time = None;
-                } ;
-              Context.mark_instances_dirty () ;
-              (* Stop RPC monitor while refreshing to avoid stale connections *)
-              Rpc_scheduler.stop_head_monitor instance ;
-              Context.progress_start
-                ~label:"Downloading snapshot"
-                ~estimate_secs:120.
-                ~width:48 ;
-              run_async_action
-                ~verb:"refresh"
-                ~instance
-                ~on_complete:(fun () -> Context.progress_finish ())
-                (fun () ->
-                  let* (module NM) = require_tezos_node_manager () in
-                  NM.refresh_instance_from_snapshot
-                    ~instance
-                    ?snapshot_uri
-                    ~no_check
-                    ~on_download_progress:(fun pct _ ->
-                      Context.progress_set
-                        ~label:"Downloading snapshot"
-                        ~progress:(float_of_int pct /. 100.)
-                        ())
-                    ())
-            in
-            match choice with
-            | `Auto -> run_refresh ()
-            | `AutoNoCheck -> run_refresh ~no_check:true ()
-            | `CustomUri ->
-                Modal_helpers.prompt_text_modal
-                  ~title:"Snapshot URI"
-                  ~placeholder:(Some "file:///path/to/snapshot or https://...")
-                  ~on_submit:(fun text ->
-                    let trimmed = String.trim text in
-                    if trimmed = "" then
-                      Modal_helpers.show_error
-                        ~title:"Snapshot URI"
-                        "Snapshot URI cannot be empty"
-                    else run_refresh ~snapshot_uri:trimmed ())
-                  ()) ;
-        state)
+  with_service state (fun svc_state ->
+      let svc = svc_state.Service_state.service in
+      Modal_helpers.open_choice_modal
+        ~title:(Printf.sprintf "Refresh snapshot · %s" svc.Service.instance)
+        ~items:[`Auto; `AutoNoCheck; `CustomUri]
+        ~to_string:(function
+          | `Auto -> "Auto (latest tzinit snapshot)"
+          | `AutoNoCheck -> "Auto (--no-check)"
+          | `CustomUri -> "Custom URI")
+        ~on_select:(fun choice ->
+          let instance = svc.Service.instance in
+          let run_refresh ?snapshot_uri ?(no_check = false) () =
+            let now = Unix.gettimeofday () in
+            Rpc_metrics.set
+              ~instance
+              {
+                Rpc_metrics.chain_id = None;
+                head_level = None;
+                bootstrapped = None;
+                last_rpc_refresh = Some now;
+                node_version = None;
+                data_size = None;
+                proto = None;
+                last_error = None;
+                last_block_time = None;
+              } ;
+            Context.mark_instances_dirty () ;
+            (* Stop RPC monitor while refreshing to avoid stale connections *)
+            Rpc_scheduler.stop_head_monitor instance ;
+            Context.progress_start
+              ~label:"Downloading snapshot"
+              ~estimate_secs:120.
+              ~width:48 ;
+            run_async_action
+              ~verb:"refresh"
+              ~instance
+              ~on_complete:(fun () -> Context.progress_finish ())
+              (fun () ->
+                let* (module NM) = require_tezos_node_manager () in
+                NM.refresh_instance_from_snapshot
+                  ~instance
+                  ?snapshot_uri
+                  ~no_check
+                  ~on_download_progress:(fun pct _ ->
+                    Context.progress_set
+                      ~label:"Downloading snapshot"
+                      ~progress:(float_of_int pct /. 100.)
+                      ())
+                  ())
+          in
+          match choice with
+          | `Auto -> run_refresh ()
+          | `AutoNoCheck -> run_refresh ~no_check:true ()
+          | `CustomUri ->
+              Modal_helpers.prompt_text_modal
+                ~title:"Snapshot URI"
+                ~placeholder:(Some "file:///path/to/snapshot or https://...")
+                ~on_submit:(fun text ->
+                  let trimmed = String.trim text in
+                  if trimmed = "" then
+                    Modal_helpers.show_error
+                      ~title:"Snapshot URI"
+                      "Snapshot URI cannot be empty"
+                  else run_refresh ~snapshot_uri:trimmed ())
+                ()) ;
+      state)
 
 let instance_actions_modal state =
   with_service state (fun svc_state ->
@@ -639,87 +570,6 @@ let instance_actions_modal state =
               Context.navigate Log_viewer_page.name
           | `Remove -> remove_modal state |> ignore) ;
       state)
-
-let bulk_action_modal state =
-  if state.filtered = [] then (
-    Modal_helpers.show_error ~title:"Bulk actions" "No instances match filter" ;
-    state)
-  else
-    let apply action_label action_fn =
-      let results =
-        List.map
-          (fun svc_state ->
-            let svc = svc_state.Service_state.service in
-            let outcome = action_fn svc in
-            (svc.Service.instance, outcome))
-          state.filtered
-      in
-      let successes, failures =
-        List.fold_left
-          (fun (oks, errs) (inst, res) ->
-            match res with
-            | Ok () -> (inst :: oks, errs)
-            | Error (`Msg msg) -> (oks, (inst, msg) :: errs))
-          ([], [])
-          results
-      in
-      if successes <> [] then Context.mark_instances_dirty () ;
-      let success_lines =
-        if successes = [] then ["  (none)"]
-        else successes |> List.rev |> List.map (fun inst -> "  - " ^ inst)
-      in
-      let failure_lines =
-        if failures = [] then ["  (none)"]
-        else
-          failures |> List.rev
-          |> List.concat_map (fun (inst, msg) -> ["  - " ^ inst; "    " ^ msg])
-      in
-      let lines =
-        [
-          Printf.sprintf "Action: %s" action_label;
-          Printf.sprintf "Targets: %d" (List.length state.filtered);
-          "";
-          Printf.sprintf "Succeeded (%d):" (List.length successes);
-        ]
-        @ success_lines
-        @ [""; Printf.sprintf "Failed (%d):" (List.length failures)]
-        @ failure_lines
-      in
-      Modal_helpers.open_text_modal ~title:("Bulk " ^ action_label) ~lines
-    in
-    Modal_helpers.open_choice_modal
-      ~title:"Bulk actions"
-      ~items:[`Start; `Stop; `Restart]
-      ~to_string:(function
-        | `Start -> "Start all filtered"
-        | `Stop -> "Stop all filtered"
-        | `Restart -> "Restart all filtered")
-      ~on_select:(function
-        | `Start ->
-            apply "start" (fun svc ->
-                let cap = Miaou_interfaces.Service_lifecycle.require () in
-                Miaou_interfaces.Service_lifecycle.start
-                  cap
-                  ~service:svc.Service.instance
-                  ~role:svc.Service.role
-                |> Result.map_error (fun e -> `Msg e))
-        | `Stop ->
-            apply "stop" (fun svc ->
-                let cap = Miaou_interfaces.Service_lifecycle.require () in
-                Miaou_interfaces.Service_lifecycle.stop
-                  cap
-                  ~service:svc.Service.instance
-                  ~role:svc.Service.role
-                |> Result.map_error (fun e -> `Msg e))
-        | `Restart ->
-            apply "restart" (fun svc ->
-                let cap = Miaou_interfaces.Service_lifecycle.require () in
-                Miaou_interfaces.Service_lifecycle.restart
-                  cap
-                  ~service:svc.Service.instance
-                  ~role:svc.Service.role
-                |> Result.map_error (fun e -> `Msg e))) ;
-    state
 
 let create_menu_modal state =
   let open Modal_helpers in
@@ -779,7 +629,7 @@ struct
 
   type nonrec msg = msg
 
-  let init () = init_state All
+  let init () = init_state ()
 
   let update s _ = s
 
@@ -797,14 +647,12 @@ struct
 
   let handled_keys () =
     Miaou.Core.Keys.
-      [Enter; Char "c"; Char "f"; Char "b"; Char "r"; Char "R"; Char "d"]
+      [Enter; Char "c"; Char "r"; Char "R"; Char "d"]
 
   let keymap _ =
     [
       ("Enter", activate_selection, "Open");
       ("c", create_menu_modal, "Create service");
-      ("f", cycle_filter, "Cycle filter");
-      ("b", bulk_action_modal, "Bulk actions");
       ("r", refresh_modal, "Refresh snapshot");
       ("R", refresh_modal, "Refresh snapshot");
       ("d", go_to_diagnostics, "Diagnostics");
@@ -828,8 +676,7 @@ struct
   let footer ~cols:_ =
     [
       Widgets.dim
-        "Arrows: move  Enter: actions  c: create  f: filter  b: bulk  m: menu  \
-         Esc: back";
+        "Arrows: move  Enter: actions  c: create  r: refresh  m: menu  Esc: back";
     ]
 
   let view s ~focus:_ ~size =
@@ -868,12 +715,12 @@ struct
     || lower = "^c" || String.equal key "\003"
 
   let move_selection s delta =
-    if s.filtered = [] then {s with selected = 0}
+    if s.services = [] then {s with selected = 0}
     else
       let raw = s.selected + delta in
-      let selected = clamp_selection s.filtered raw in
+      let selected = clamp_selection s.services raw in
       let selected = if selected = 2 then selected + delta else selected in
-      let selected = clamp_selection s.filtered selected in
+      let selected = clamp_selection s.services selected in
       {s with selected}
 
   let force_refresh_cmd s = force_refresh s
@@ -892,8 +739,6 @@ struct
         | Some (Keys.Char "j") -> move_selection s 1
         | Some Keys.Enter -> activate_selection s
         | Some (Keys.Char "c") -> create_menu_modal s
-        | Some (Keys.Char "f") -> cycle_filter s
-        | Some (Keys.Char "b") -> bulk_action_modal s
         | Some (Keys.Char " ") -> force_refresh_cmd s
         | Some (Keys.Char "r") -> refresh_modal s
         | Some (Keys.Char "R") -> refresh_modal s
