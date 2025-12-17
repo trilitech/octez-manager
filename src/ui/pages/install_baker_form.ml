@@ -512,25 +512,41 @@ let edit_field s =
       open_choice_modal ~title:"DAL Node" ~items ~to_string ~on_select ;
       s
   | 4 ->
-      (* Node Endpoint *)
-      prompt_validated_text_modal
-        ~title:"Node Endpoint (host:port)"
-        ~initial:!form_ref.node_endpoint
-        ~validator:(fun text ->
-          match parse_host_port (endpoint_host_port text) with
-          | Some _ -> Ok ()
-          | None -> Error "Format must be host:port (e.g., 127.0.0.1:8732)")
-        ~on_submit:(fun v ->
-          update_form_ref (fun f -> {f with node_endpoint = v}))
-        () ;
-      s
+      (* Node Endpoint: editable only for external nodes *)
+      let selected_node = find_node s.service_states s.form.parent_node in
+      (match selected_node with
+      | Some _ ->
+          show_error
+            ~title:"Node Endpoint"
+            "This value is derived from the selected parent node and cannot be edited." ;
+          s
+      | None ->
+          prompt_validated_text_modal
+            ~title:"Node Endpoint (host:port)"
+            ~initial:!form_ref.node_endpoint
+            ~validator:(fun text ->
+              match parse_host_port (endpoint_host_port text) with
+              | Some _ -> Ok ()
+              | None -> Error "Format must be host:port (e.g., 127.0.0.1:8732)")
+            ~on_submit:(fun v ->
+              update_form_ref (fun f -> {f with node_endpoint = v}))
+            () ;
+          s)
   | 5 ->
-      (* Node Data Dir *)
-      Modal_helpers.select_node_data_dir_modal
-        ~on_select:(fun path ->
-          update_form_ref (fun f -> {f with node_data_dir = path}))
-        () ;
-      s
+      (* Node Data Dir: editable only for external nodes *)
+      let selected_node = find_node s.service_states s.form.parent_node in
+      (match selected_node with
+      | Some _ ->
+          show_error
+            ~title:"Node Data Dir"
+            "This value is derived from the selected parent node and cannot be edited." ;
+          s
+      | None ->
+          Modal_helpers.select_node_data_dir_modal
+            ~on_select:(fun path ->
+              update_form_ref (fun f -> {f with node_data_dir = path}))
+            () ;
+          s)
   | 6 ->
       (* Baker Base Dir *)
       Modal_helpers.select_client_base_dir_modal
@@ -807,9 +823,7 @@ let handle_key s key ~size:_ =
 let view s ~focus:_ ~size =
   apply_field_hint s ;
   let f = s.form in
-  let selected_node = find_node s.service_states f.parent_node in
   let node_data_dir = resolve_node_data_dir s in
-  let node_endpoint = resolve_node_endpoint s in
   let node_mode = baker_node_mode s in
   let dal_label, valid_dal =
     match f.dal with
@@ -830,6 +844,8 @@ let view s ~focus:_ ~size =
               true )
         | None -> (Printf.sprintf "%s (missing)" inst, false))
   in
+  let selected_node = find_node s.service_states f.parent_node in
+  let node_endpoint = resolve_node_endpoint s in
   let valid_instance =
     is_nonempty f.instance_name
     && instance_has_valid_chars f.instance_name
