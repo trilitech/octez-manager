@@ -269,6 +269,9 @@ let prompt_with_completion question completions =
     (* Read a line, then clear callbacks to avoid leaking completions to later prompts *)
     let res =
       match LNoise.linenoise (question ^ ": ") with
+      | exception Sys.Break ->
+          prerr_endline "" ;
+          exit 130
       | None -> None
       | Some line ->
           let trimmed = String.trim line in
@@ -422,9 +425,18 @@ let install_node_cmd =
               | Some net -> net
               | None ->
                   if is_interactive () then
-                    prompt_string_with_default
-                      "Network (network name, e.g. mainnet)"
-                      "mainnet"
+                    (match Teztnets.list_networks () with
+                    | Ok infos -> (
+                        let aliases = List.map (fun (Teztnets.{ alias; _ }) -> alias) infos in
+                        match prompt_with_completion
+                                "Network"
+                                aliases with
+                        | Some sel -> sel
+                        | None -> "mainnet")
+                    | Error _ ->
+                        prompt_string_with_default
+                          "Network"
+                          "mainnet")
                   else "mainnet"
             in
             let history_mode =
@@ -1658,4 +1670,10 @@ let root_cmd =
       ui_cmd;
     ]
 
-let () = exit (Cmd.eval root_cmd)
+let () =
+  try exit (Cmd.eval root_cmd)
+  with Sys.Break ->
+    (* User pressed Ctrl-C during interactive prompts or operations; exit with
+       the conventional 130 status code without a stack trace. *)
+    prerr_endline "" ;
+    exit 130
