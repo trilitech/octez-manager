@@ -194,23 +194,81 @@ let prompt_string_with_default question default_value =
   | Some value -> value
   | None -> default_value
 
+(* Inline copy of prompt_with_completion placed before prompt_history_mode so it
+   can be referenced. This mirrors the main prompt_with_completion later in the
+   file. *)
+let prompt_with_completion_inline question completions =
+  if not (is_interactive ()) then None
+  else
+    let completions_lower =
+      List.map (fun c -> (c, String.lowercase_ascii c)) completions
+    in
+    LNoise.set_completion_callback (fun line_so_far ln_completions ->
+        let prefix = String.lowercase_ascii line_so_far in
+        List.iter
+          (fun (candidate, candidate_lower) ->
+            if String.starts_with ~prefix candidate_lower then
+              LNoise.add_completion ln_completions candidate)
+          completions_lower) ;
+    LNoise.set_hints_callback (fun line_so_far ->
+        let prefix = String.lowercase_ascii line_so_far in
+        match
+          List.find_opt
+            (fun (_, candidate_lower) ->
+              String.starts_with ~prefix candidate_lower)
+            completions_lower
+        with
+        | Some (hint, _) when String.length hint > String.length line_so_far ->
+            Some
+              ( String.sub
+                  hint
+                  (String.length line_so_far)
+                  (String.length hint - String.length line_so_far),
+                LNoise.Yellow,
+                false )
+        | _ -> None) ;
+    let res =
+      match LNoise.linenoise (question ^ ": ") with
+      | exception Sys.Break ->
+          prerr_endline "" ;
+          exit 130
+      | None -> None
+      | Some line ->
+          let trimmed = String.trim line in
+          if String.equal trimmed "" then None else Some trimmed
+    in
+    LNoise.set_completion_callback (fun _ _ -> ()) ;
+    LNoise.set_hints_callback (fun _ -> None) ;
+    res
+
 let prompt_history_mode default =
   if not (is_interactive ()) then default
   else
-    let default_label = History_mode.to_string default in
     let rec loop () =
-      match
-        prompt_input
-          ~default:(default_label, default_label)
-          "History mode (rolling/full/archive)"
-      with
-      | Some value -> (
+      let choices = ["rolling"; "full"; "archive"] in
+      match prompt_with_completion_inline "History mode" choices with
+      | Some raw_value -> (
+          let value = String.trim raw_value in
+          (* First try direct parse *)
           match History_mode.of_string value with
           | Ok hm -> hm
-          | Error _ ->
-              prerr_endline "Please enter rolling, full, or archive." ;
-              loop ())
-      | None -> loop ()
+          | Error _ -> (
+              (* If value looks like "full:50" try the prefix before ':' *)
+              let prefix_opt =
+                try Some (String.sub value 0 (String.index value ':'))
+                with Not_found -> None
+              in
+              match prefix_opt with
+              | Some p -> (
+                  match History_mode.of_string p with
+                  | Ok hm -> hm
+                  | Error _ -> (
+                      prerr_endline "Please enter rolling, full, or archive." ;
+                      loop ()))
+              | None -> (
+                  prerr_endline "Please enter rolling, full, or archive." ;
+                  loop ())))
+      | None -> default
     in
     loop ()
 
