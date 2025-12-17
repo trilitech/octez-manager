@@ -725,17 +725,19 @@ let install_baker_cmd =
             | None ->
                 if is_interactive () then
                   let completions = ["on"; "off"; "pass"] in
-                  let vote =
+                  let rec ask () =
                     match
                       prompt_with_completion
-                        "Liquidity baking vote (press Enter for default: pass)"
+                        "Liquidity baking vote"
                         completions
                     with
-                    | Some v -> v
-                    | None -> "pass"
+                    | Some v -> Ok (Some v)
+                    | None ->
+                        prerr_endline "Please choose 'on', 'off', or 'pass'." ;
+                        ask ()
                   in
-                  Ok (Some vote)
-                else Ok (Some "pass")
+                  ask ()
+                else Error "Liquidity baking vote is required in non-interactive mode"
           in
           (* Prompt for dal_endpoint if not provided in interactive mode *)
           let* dal_config =
