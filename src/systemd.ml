@@ -569,22 +569,12 @@ let sync_logrotate specs =
 
 type logging_resources = {extra_lines : string list; extra_paths : string list}
 
-let logging_resources ~role:_ ~logging_mode =
-  match logging_mode with
-  | Logging_mode.Journald ->
-      {
-        extra_lines = ["StandardOutput=journal"; "StandardError=journal"];
-        extra_paths = [];
-      }
-  | Logging_mode.File {path; _} ->
-      let trimmed = String.trim path in
-      if trimmed = "" then {extra_lines = []; extra_paths = []}
-      else
-        let dir = Filename.dirname trimmed in
-        {
-          extra_lines = [Printf.sprintf "Environment=OCTEZ_LOG_PATH=%s" trimmed];
-          extra_paths = (if dir = "" || dir = "." then [] else [dir]);
-        }
+let logging_resources ~role:_ ~logging_mode:_ =
+  (* Always use journald - octez binaries handle their own file logging *)
+  {
+    extra_lines = ["StandardOutput=journal"; "StandardError=journal"];
+    extra_paths = [];
+  }
 
 let unique_non_empty paths =
   paths

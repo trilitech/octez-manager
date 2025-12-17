@@ -44,7 +44,6 @@ let initial_model =
         instance_name = "baker";
         service_user = Form_builder_common.default_service_user ();
         app_bin_dir = "/usr/bin";
-        logging = `File;
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
@@ -467,18 +466,8 @@ let spec =
         let node_endpoint = resolve_node_endpoint model states in
         let dal_config = resolve_dal_config model states in
 
-        let logging_mode =
-          match model.core.logging with
-          | `Journald -> Logging_mode.Journald
-          | `File ->
-              let dir =
-                Common.default_log_dir
-                  ~role:"baker"
-                  ~instance:model.core.instance_name
-              in
-              let path = Filename.concat dir "baker.log" in
-              Logging_mode.File {path; rotate = true}
-        in
+        (* Always use journald - octez binaries handle their own file logging *)
+        let logging_mode = Logging_mode.default in
 
         let extra_args =
           Form_builder_common.prepare_extra_args model.core.extra_args

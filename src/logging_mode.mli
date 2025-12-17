@@ -1,6 +1,7 @@
-type t = Journald | File of {path : string; rotate : bool}
+(** Logging is always via journald - octez binaries handle their own file logging *)
+type t = Journald
 
-val default_for : instance:string -> role:string -> t
+val default : t
 
 val to_string : t -> string
 

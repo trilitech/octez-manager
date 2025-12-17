@@ -31,7 +31,6 @@ let initial_model =
         instance_name = "accuser";
         service_user = Form_builder_common.default_service_user ();
         app_bin_dir = "/usr/bin";
-        logging = `File;
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
@@ -266,19 +265,8 @@ let spec =
           | `None -> "http://127.0.0.1:8732"
         in
 
-        (* Build logging mode *)
-        let logging_mode =
-          match model.core.logging with
-          | `Journald -> Logging_mode.Journald
-          | `File ->
-              let dir =
-                Common.default_log_dir
-                  ~role:"accuser"
-                  ~instance:model.core.instance_name
-              in
-              let path = Filename.concat dir "accuser.log" in
-              Logging_mode.File {path; rotate = true}
-        in
+        (* Always use journald - octez binaries handle their own file logging *)
+        let logging_mode = Logging_mode.default in
 
         (* Prepare extra args *)
         let extra_args =
