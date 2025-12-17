@@ -200,7 +200,18 @@ let parent_node_field =
             let should_autoname =
               current_name = "" || String.equal current_name "baker"
             in
-            model_ref := {!model_ref with parent_node = svc.Service.instance} ;
+            model_ref :=
+              {
+                !model_ref with
+                parent_node = svc.Service.instance;
+                (* Derive endpoint + data dir from parent node *)
+                client =
+                  {
+                    !model_ref.client with
+                    node_endpoint = node_endpoint_of_service svc;
+                  };
+                node_data_dir = svc.Service.data_dir;
+              } ;
             if should_autoname then (
               let new_name = Printf.sprintf "baker-%s" svc.Service.instance in
               let default_dir = Common.default_role_dir "baker" new_name in
@@ -292,10 +303,9 @@ let dal_node_field =
     ()
 
 let node_data_dir_field =
-  Form_builder.node_data_dir
+  Form_builder.custom
     ~label:"Node Data Dir"
     ~get:(fun m -> m.node_data_dir)
-    ~set:(fun node_data_dir m -> {m with node_data_dir})
     ~validate:(fun m ->
       let states = Data.load_service_states () in
       let selected_node = find_node states m.parent_node in
@@ -305,6 +315,61 @@ let node_data_dir_field =
           Form_builder_common.is_nonempty (resolve_node_data_dir m states)
           || Option.is_some selected_node
       | `Remote -> true)
+    ~validate_msg:(fun m ->
+      let states = Data.load_service_states () in
+      let node_mode = baker_node_mode m states in
+      match node_mode with
+      | `Local -> Some "Node data directory is required for local mode"
+      | `Remote -> None)
+    ~edit:(fun model_ref ->
+      let states = Data.load_service_states () in
+      match find_node states !model_ref.parent_node with
+      | Some _ ->
+          Modal_helpers.show_error
+            ~title:"Node Data Dir"
+            "Derived from the selected parent node. Clear Parent Node to edit."
+      | None ->
+          Modal_helpers.select_node_data_dir_modal
+            ~on_select:(fun path ->
+              model_ref := {!model_ref with node_data_dir = path})
+            ())
+    ()
+
+let node_endpoint_field =
+  Form_builder.custom
+    ~label:"Node Endpoint"
+    ~get:(fun m -> m.client.node_endpoint)
+    ~validate:(fun m ->
+      match
+        Form_builder_common.parse_host_port
+          (endpoint_host_port m.client.node_endpoint)
+      with
+      | Some _ -> true
+      | None -> false)
+    ~validate_msg:(fun _ ->
+      Some "Format must be host:port (e.g., 127.0.0.1:8732)")
+    ~edit:(fun model_ref ->
+      let states = Data.load_service_states () in
+      match find_node states !model_ref.parent_node with
+      | Some _ ->
+          Modal_helpers.show_error
+            ~title:"Node Endpoint"
+            "Derived from the selected parent node. Clear Parent Node to edit."
+      | None ->
+          Modal_helpers.prompt_validated_text_modal
+            ~title:"Node Endpoint (host:port)"
+            ~initial:!model_ref.client.node_endpoint
+            ~validator:(fun text ->
+              match
+                Form_builder_common.parse_host_port (endpoint_host_port text)
+              with
+              | Some _ -> Ok ()
+              | None -> Error "Format must be host:port (e.g., 127.0.0.1:8732)")
+            ~on_submit:(fun v ->
+              let client = !model_ref.client in
+              model_ref :=
+                {!model_ref with client = {client with node_endpoint = v}})
+            ())
     ()
 
 (** {1 Form Specification} *)
@@ -353,12 +418,7 @@ let spec =
             else Ok ());
         parent_node_field;
         dal_node_field;
-        endpoint
-          ~label:"Node Endpoint"
-          ~get:(fun m -> m.client.node_endpoint)
-          ~set:(fun node_endpoint m ->
-            {m with client = {m.client with node_endpoint}})
-          ();
+        node_endpoint_field;
         node_data_dir_field;
         client_base_dir
           ~label:"Baker Base Dir"
