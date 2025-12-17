@@ -356,8 +356,6 @@ let spec =
     on_submit = (fun model ->
       let states = Data.load_service_states () in
       let selected_node = find_node states model.parent_node in
-      let node_mode = baker_node_mode model states in
-      let node_dir = resolve_node_data_dir model states in
       let node_endpoint = resolve_node_endpoint model states in
       let dal_config = resolve_dal_config model states in
 
@@ -381,21 +379,11 @@ let spec =
       in
 
       let req = {
-        instance = model.core.instance_name;
-        network = None;
-        node_instance =
+        Installer_types.instance = model.core.instance_name;
+        node_mode =
           (match selected_node with
-          | Some svc -> Some svc.Data.Service_state.service.Service.instance
-          | None -> None);
-        node_data_dir =
-          (match node_mode with
-          | `Local ->
-              if Option.is_some selected_node then None
-              else if String.trim node_dir = "" then None
-              else Some (String.trim node_dir)
-          | `Remote -> None);
-        node_endpoint = Some node_endpoint;
-        node_mode;
+          | Some svc -> Installer_types.Local_instance svc.Data.Service_state.service.Service.instance
+          | None -> Installer_types.Remote_endpoint node_endpoint);
         base_dir = Some base_dir;
         delegates = model.delegates;
         dal_config;
