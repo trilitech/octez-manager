@@ -58,10 +58,17 @@ jobs:
 
       - name: Upload binary (main branch only)
         if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p artifacts
+          cp _build/default/src/main.exe artifacts/octez-manager
+          chmod +x artifacts/octez-manager
+
+      - name: Upload artifact
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: octez-manager-linux-x86_64
-          path: _build/default/src/main.exe
+          path: artifacts/octez-manager
           retention-days: 3
 
   release:
