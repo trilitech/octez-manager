@@ -310,13 +310,8 @@ let spec =
           else trimmed
         in
 
-        (* Build service args: global options before "run accuser" *)
-        let service_args =
-          [
-            "--endpoint"; node_endpoint; "--base-dir"; base_dir; "run"; "accuser";
-          ]
-          @ extra_args
-        in
+        (* Service args are command options only (after "run accuser") *)
+        let service_args = extra_args in
 
         (* Build daemon request *)
         let req : Installer_types.daemon_request =
@@ -333,8 +328,12 @@ let spec =
             app_bin_dir = model.core.app_bin_dir;
             logging_mode;
             service_args;
-            extra_env = [];
-            extra_paths = [];
+            extra_env =
+              [
+                ("OCTEZ_CLIENT_BASE_DIR", base_dir);
+                ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+              ];
+            extra_paths = [base_dir];
             auto_enable = model.core.enable_on_boot;
           }
         in
