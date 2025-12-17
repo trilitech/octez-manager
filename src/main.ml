@@ -1245,7 +1245,14 @@ let install_dal_node_cmd =
               | Remote_endpoint _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
             in
             match maybe_network with
-            | Error (`Msg msg) -> cmdliner_error msg
+            | Error (`Msg msg) ->
+                cmdliner_error
+                  (Printf.sprintf
+                     "Unable to determine network from node endpoint %s: %s. \
+                      Ensure the endpoint is reachable and returns a valid RPC \
+                      response (e.g., start the node or check the address)."
+                     node_endpoint
+                     msg)
             | Ok network -> (
                 let service_args =
                   [
