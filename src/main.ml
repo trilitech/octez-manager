@@ -1556,6 +1556,63 @@ let purge_all_cmd =
   in
   Cmd.v info term
 
+let cleanup_orphans_cmd =
+  let dry_run =
+    Arg.(
+      value & flag
+      & info ["dry-run"; "n"]
+          ~doc:"Show what would be removed without actually deleting.")
+  in
+  let term =
+    let run dry_run =
+      Capabilities.register () ;
+      match Installer.find_orphan_directories () with
+      | Error (`Msg msg) -> cmdliner_error msg
+      | Ok (orphan_dirs, orphan_logs) ->
+          if orphan_dirs = [] && orphan_logs = [] then (
+            print_endline "No orphan directories or files found." ;
+            `Ok ())
+          else (
+            if dry_run then (
+              print_endline "Would remove the following orphan paths:" ;
+              List.iter
+                (fun d -> Format.printf "  [dir]  %s@." d)
+                orphan_dirs ;
+              List.iter
+                (fun f -> Format.printf "  [file] %s@." f)
+                orphan_logs ;
+              `Ok ())
+            else
+              match Installer.cleanup_orphans ~dry_run:false with
+              | Error (`Msg msg) -> cmdliner_error msg
+              | Ok (removed, errors) ->
+                  List.iter
+                    (fun p -> Format.printf "  ✓ Removed: %s@." p)
+                    removed ;
+                  List.iter
+                    (fun (p, msg) ->
+                      Format.eprintf "  ✗ Failed to remove %s: %s@." p msg)
+                    errors ;
+                  if errors = [] then (
+                    Format.printf "@.Cleanup complete. %d item(s) removed.@."
+                      (List.length removed) ;
+                    `Ok ())
+                  else
+                    cmdliner_error
+                      (Printf.sprintf "%d item(s) failed to remove"
+                         (List.length errors)))
+    in
+    Term.(ret (const run $ dry_run))
+  in
+  let info =
+    Cmd.info
+      "cleanup-orphans"
+      ~doc:
+        "Remove orphan data directories and log files not associated with any \
+         registered service. Use --dry-run to preview what would be removed."
+  in
+  Cmd.v info term
+
 let list_networks_cmd =
   let output_json =
     Arg.(value & flag & info ["json"] ~doc:"Emit JSON output instead of text.")
@@ -1771,6 +1828,7 @@ let root_cmd =
       install_dal_node_cmd;
       list_cmd;
       purge_all_cmd;
+      cleanup_orphans_cmd;
       list_networks_cmd;
       list_snapshots_cmd;
       snapshots_cmd;
