@@ -46,9 +46,15 @@ let list_dir path =
 let probe_writable path =
   try
     if Sys.file_exists path then (
-      let oc = open_out_gen [Open_wronly; Open_append] 0 path in
-      close_out oc ;
-      Ok true)
+      let st = Unix.stat path in
+      match st.Unix.st_kind with
+      | Unix.S_DIR ->
+          Unix.access path [Unix.W_OK; Unix.X_OK] ;
+          Ok true
+      | _ ->
+          let oc = open_out_gen [Open_wronly; Open_append] 0 path in
+          close_out oc ;
+          Ok true)
     else (
       ensure_dir (Filename.dirname path) ;
       let tmp =
@@ -58,7 +64,10 @@ let probe_writable path =
       close_out oc ;
       Sys.remove tmp ;
       Ok true)
-  with Sys_error msg -> Error msg
+  with
+  | Sys_error msg -> Error msg
+  | Unix.Unix_error (err, _, path) ->
+      Error (Printf.sprintf "%s: %s" path (Unix.error_message err))
 
 let read_all chan =
   let buf = Buffer.create 256 in
