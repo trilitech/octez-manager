@@ -125,11 +125,11 @@ let network_display_name value =
         || normalize_string info.alias = normalized_value)
       !network_cache
   with
-  | Some info -> Option.value ~default:info.alias info.human_name
+  | Some info -> info.human_name
   | None -> value
 
 let format_network_choice (info : Teztnets.network_info) =
-  let label = Option.value ~default:info.alias info.human_name in
+  let label = info.human_name in
   if normalize_string info.network_url = normalize_string info.alias then label
   else Printf.sprintf "%s · %s" label info.network_url
 
@@ -324,10 +324,8 @@ let network_field =
             |> List.sort
                  (fun (a : Teztnets.network_info) (b : Teztnets.network_info) ->
                    String.compare
-                     (normalize_string
-                        (Option.value ~default:a.alias a.human_name))
-                     (normalize_string
-                        (Option.value ~default:b.alias b.human_name)))
+                     (normalize_string a.human_name)
+                     (normalize_string b.human_name))
           in
           Modal_helpers.open_choice_modal
             ~title:"Network"
@@ -613,6 +611,10 @@ let spec =
         let* (module I) = require_package_manager () in
         let* _service = I.install_node req in
         Ok ());
+
+    on_init = None;
+    on_refresh = None;
+    pre_submit_modal = None;
   }
 
 module Page = Form_builder.Make(struct
