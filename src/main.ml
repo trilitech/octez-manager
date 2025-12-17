@@ -24,60 +24,100 @@ let pp_logging fmt = function
       Format.fprintf fmt "file:%s (rotate=%b)" path rotate
 
 let print_service_details svc =
-  Format.printf "Instance      : %s@." svc.S.instance ;
-  Format.printf "Service name  : %s@." (Systemd.unit_name svc.role svc.instance) ;
-  Format.printf "Role          : %s@." svc.role ;
-  Format.printf "Network       : %s@." svc.network ;
-  Format.printf "History mode  : %s@." (History_mode.to_string svc.history_mode) ;
-  Format.printf "Data dir      : %s@." svc.data_dir ;
-  (* Special-case baker to show node/dal instance when available *)
-  if String.equal svc.role "baker" then (
-    let env =
-      match Node_env.read ~inst:svc.S.instance with
-      | Ok pairs -> pairs
-      | Error _ -> []
-    in
-    let lookup key =
-      match List.assoc_opt key env with Some v -> String.trim v | None -> ""
-    in
+  (* Read env file for this instance *)
+  let env =
+    match Node_env.read ~inst:svc.S.instance with
+    | Ok pairs -> pairs
+    | Error _ -> []
+  in
+  let lookup key =
+    match List.assoc_opt key env with Some v -> String.trim v | None -> ""
+  in
+  (* Try to map endpoints to managed instances *)
+  let resolve_instance_for_endpoint (ep : string) ~(roles : string list) :
+      string option =
+    if String.trim ep = "" then None
+    else
+      match Service_registry.list () with
+      | Error _ -> None
+      | Ok (services : Service.t list) ->
+          let rec find_match (lst : Service.t list) =
+            match lst with
+            | [] -> None
+            | s :: rest ->
+                if
+                  List.exists (fun r -> String.equal s.role r) roles
+                  && String.equal (Installer.endpoint_of_rpc s.rpc_addr) ep
+                then Some s.instance
+                else find_match rest
+          in
+          find_match services
+  in
+  let print_node_endpoint () =
     let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
-    let dal_cfg = lookup "OCTEZ_DAL_CONFIG" in
-    (* Try to map endpoints to managed instances *)
-    let resolve_instance_for_endpoint (ep : string) ~(roles : string list) :
-        string option =
-      if String.trim ep = "" then None
-      else
-        match Service_registry.list () with
-        | Error _ -> None
-        | Ok (services : Service.t list) ->
-            let rec find_match (lst : Service.t list) =
-              match lst with
-              | [] -> None
-              | s :: rest ->
-                  if
-                    List.exists (fun r -> String.equal s.role r) roles
-                    && String.equal (Installer.endpoint_of_rpc s.rpc_addr) ep
-                  then Some s.instance
-                  else find_match rest
-            in
-            find_match services
-    in
-    (match resolve_instance_for_endpoint node_ep ~roles:["node"] with
+    match resolve_instance_for_endpoint node_ep ~roles:["node"] with
     | Some inst -> Format.printf "Node instance : %s@." inst
     | None ->
         Format.printf
           "Node endpoint : %s@."
-          (if node_ep = "" then svc.rpc_addr else node_ep)) ;
-    match String.lowercase_ascii (String.trim dal_cfg) with
-    | "disabled" -> Format.printf "DAL Config    : opt-out@."
-    | "" -> Format.printf "DAL Config    : auto@."
-    | raw -> (
-        match resolve_instance_for_endpoint raw ~roles:["dal-node"; "dal"] with
-        | Some inst -> Format.printf "DAL instance  : %s@." inst
-        | None -> Format.printf "DAL endpoint  : %s@." raw))
-  else (
-    Format.printf "RPC addr      : %s@." svc.rpc_addr ;
-    Format.printf "P2P addr      : %s@." svc.net_addr) ;
+          (if node_ep = "" then svc.rpc_addr else node_ep)
+  in
+  (* Common fields *)
+  Format.printf "Instance      : %s@." svc.S.instance ;
+  Format.printf "Service name  : %s@." (Systemd.unit_name svc.role svc.instance) ;
+  Format.printf "Role          : %s@." svc.role ;
+  Format.printf "Network       : %s@." svc.network ;
+  (* Role-specific fields *)
+  (match svc.role with
+  | "node" ->
+      Format.printf "History mode  : %s@." (History_mode.to_string svc.history_mode) ;
+      Format.printf "Data dir      : %s@." svc.data_dir ;
+      Format.printf "RPC addr      : %s@." svc.rpc_addr ;
+      Format.printf "P2P addr      : %s@." svc.net_addr
+  | "baker" ->
+      let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
+      let dal_cfg = lookup "OCTEZ_DAL_CONFIG" in
+      let delegates = lookup "OCTEZ_BAKER_DELEGATES_ARGS" in
+      let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
+      Format.printf "Base dir      : %s@." base_dir ;
+      print_node_endpoint () ;
+      (match String.lowercase_ascii (String.trim dal_cfg) with
+      | "disabled" -> Format.printf "DAL Config    : opt-out@."
+      | "" -> Format.printf "DAL Config    : auto@."
+      | raw -> (
+          match resolve_instance_for_endpoint raw ~roles:["dal-node"; "dal"] with
+          | Some inst -> Format.printf "DAL instance  : %s@." inst
+          | None -> Format.printf "DAL endpoint  : %s@." raw)) ;
+      if delegates <> "" then Format.printf "Delegates     : %s@." delegates ;
+      if lb_vote <> "" then Format.printf "LB Vote       : %s@." lb_vote
+  | "accuser" ->
+      let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+      Format.printf "Base dir      : %s@." base_dir ;
+      print_node_endpoint ()
+  | "dal-node" | "dal" ->
+      let client_base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+      let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
+      Format.printf "Client dir    : %s@." client_base_dir ;
+      Format.printf "DAL data dir  : %s@." dal_data_dir ;
+      print_node_endpoint () ;
+      if svc.rpc_addr <> "" then Format.printf "RPC addr      : %s@." svc.rpc_addr ;
+      if svc.net_addr <> "" then Format.printf "P2P addr      : %s@." svc.net_addr
+  | "signer" ->
+      let base_dir = lookup "OCTEZ_SIGNER_BASE_DIR" in
+      let address = lookup "OCTEZ_SIGNER_ADDRESS" in
+      let port = lookup "OCTEZ_SIGNER_PORT" in
+      let global_args = lookup "OCTEZ_SIGNER_GLOBAL_ARGS" in
+      Format.printf "Base dir      : %s@." base_dir ;
+      Format.printf "Listen addr   : %s@." address ;
+      Format.printf "Listen port   : %s@." port ;
+      if String.contains global_args 'A' then
+        Format.printf "Require auth  : yes@."
+  | _ ->
+      (* Fallback for unknown roles *)
+      Format.printf "Data dir      : %s@." svc.data_dir ;
+      Format.printf "RPC addr      : %s@." svc.rpc_addr ;
+      Format.printf "P2P addr      : %s@." svc.net_addr) ;
+  (* Common footer *)
   Format.printf "Service user  : %s@." svc.service_user ;
   Format.printf "Octez bin dir : %s@." svc.app_bin_dir ;
   Format.printf "Created at    : %s@." svc.created_at ;
