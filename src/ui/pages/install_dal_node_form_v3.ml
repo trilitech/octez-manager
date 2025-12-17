@@ -173,19 +173,21 @@ let spec =
           | _ -> None
         in
 
-        (* Build base_dir *)
-        let base_dir =
+        (* Build base_dir (client base dir for global --base-dir) *)
+        let client_base_dir =
           let trimmed = String.trim model.client.base_dir in
           if trimmed = "" then
             Common.default_role_dir "dal-node" model.core.instance_name
           else trimmed
         in
 
-        (* Build service args: global options before "run dal" *)
-        let service_args =
-          ["--endpoint"; node_endpoint; "--base-dir"; base_dir; "run"; "dal"]
-          @ extra_args
+        (* DAL data dir (for --data-dir command option) *)
+        let dal_data_dir =
+          Common.default_role_dir "dal-node" model.core.instance_name
         in
+
+        (* Service args are command options only (after "run dal --data-dir") *)
+        let service_args = extra_args in
 
         (* Build daemon request *)
         let req : Installer_types.daemon_request =
@@ -194,16 +196,20 @@ let spec =
             instance = model.core.instance_name;
             network = Option.value ~default:"mainnet" network;
             history_mode = History_mode.default;
-            data_dir =
-              Common.default_role_dir "dal-node" model.core.instance_name;
+            data_dir = dal_data_dir;
             rpc_addr = node_endpoint;
             net_addr = "";
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
             logging_mode;
             service_args;
-            extra_env = [];
-            extra_paths = [];
+            extra_env =
+              [
+                ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
+                ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+                ("OCTEZ_DAL_DATA_DIR", dal_data_dir);
+              ];
+            extra_paths = [client_base_dir; dal_data_dir];
             auto_enable = model.core.enable_on_boot;
           }
         in
