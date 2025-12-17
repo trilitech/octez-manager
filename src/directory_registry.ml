@@ -70,8 +70,7 @@ let registry_root () =
 
 let directories_file () = Filename.concat (registry_root ()) "directories.json"
 
-let old_base_dirs_file () =
-  Filename.concat (registry_root ()) "base_dirs.json"
+let old_base_dirs_file () = Filename.concat (registry_root ()) "base_dirs.json"
 
 let migrated_marker_file () =
   Filename.concat (registry_root ()) ".directories_migrated"
@@ -103,12 +102,7 @@ let write_all entries =
   let* () =
     Common.ensure_dir_path ~owner ~group ~mode:0o755 (registry_root ())
   in
-  Common.write_file
-    ~mode:0o644
-    ~owner
-    ~group
-    (directories_file ())
-    json
+  Common.write_file ~mode:0o644 ~owner ~group (directories_file ()) json
 
 let read_all_internal () =
   let path = directories_file () in
@@ -153,14 +147,17 @@ let migrate_from_base_dir_registry () =
               let path = json |> member "path" |> to_string in
               let created_at = json |> member "created_at" |> to_string in
               let linked_services =
-                json |> member "linked_services" |> to_list |> List.map to_string
+                json |> member "linked_services" |> to_list
+                |> List.map to_string
               in
-              Ok {
-                path;
-                dir_type = Client_base_dir; (* All old entries were client base dirs *)
-                created_at;
-                linked_services;
-              }
+              Ok
+                {
+                  path;
+                  dir_type = Client_base_dir;
+                  (* All old entries were client base dirs *)
+                  created_at;
+                  linked_services;
+                }
             with
             | Type_error (msg, _) -> Error (`Msg msg)
             | Undefined (msg, _) -> Error (`Msg msg)
@@ -180,11 +177,14 @@ let migrate_from_base_dir_registry () =
           (* Rename old file to .migrated *)
           let* () =
             try
-              Unix.rename old_file (old_file ^ ".migrated");
+              Unix.rename old_file (old_file ^ ".migrated") ;
               Ok ()
             with Unix.Unix_error (e, _, _) ->
-              Error (`Msg (Printf.sprintf "Failed to rename old file: %s"
-                            (Unix.error_message e)))
+              Error
+                (`Msg
+                   (Printf.sprintf
+                      "Failed to rename old file: %s"
+                      (Unix.error_message e)))
           in
 
           (* Create migration marker *)
@@ -192,12 +192,7 @@ let migrate_from_base_dir_registry () =
             if Common.is_root () then ("root", "root")
             else Common.current_user_group_names ()
           in
-          Common.write_file
-            ~mode:0o644
-            ~owner
-            ~group
-            migrated_marker
-            (now ())
+          Common.write_file ~mode:0o644 ~owner ~group migrated_marker (now ())
       | _ -> Error (`Msg "Invalid base_dirs.json format during migration")
     with
     | Sys_error msg -> Error (`Msg ("Migration error: " ^ msg))

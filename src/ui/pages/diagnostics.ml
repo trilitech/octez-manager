@@ -11,5 +11,7 @@
 include Diagnostics_page
 
 let name = Diagnostics_page.name
+
 let page = Diagnostics_page.page
+
 let register = Diagnostics_page.register

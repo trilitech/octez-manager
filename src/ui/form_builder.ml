@@ -33,7 +33,8 @@ type 'model pre_submit_modal_config =
       choices : 'choice list;
       to_string : 'choice -> string;
       on_choice : 'choice -> 'model -> 'model;
-    } -> 'model pre_submit_modal_config
+    }
+      -> 'model pre_submit_modal_config
 
 type 'model spec = {
   title : string;
@@ -41,7 +42,10 @@ type 'model spec = {
   fields : 'model field list;
   on_init : ('model -> unit) option;
   on_refresh : ('model -> unit) option;
-  pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;
+  pre_submit :
+    ('model ->
+    (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result)
+    option;
   pre_submit_modal : ('model -> 'model pre_submit_modal_config option) option;
   on_submit : 'model -> (unit, [`Msg of string]) result;
 }
@@ -122,7 +126,8 @@ let readonly ~label ~get =
   let edit _ = () in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
-let custom ~label ~get ~edit ?(validate = fun _ -> true) ?(validate_msg = fun _ -> None) () =
+let custom ~label ~get ~edit ?(validate = fun _ -> true)
+    ?(validate_msg = fun _ -> None) () =
   let set _ m = m in
   let to_string v = v in
   Field {label; get; set; to_string; validate; validate_msg; edit}
@@ -168,11 +173,14 @@ let extra_args ~label ~get_args ~set_args ~get_bin_dir ~binary ?subcommand () =
     in
     (* Call appropriate help function based on binary and subcommand *)
     match (binary, subcommand) with
-    | ("octez-node", _) ->
+    | "octez-node", _ ->
         Binary_help_explorer.open_node_run_help ~app_bin_dir ~on_apply
-    | ("octez-baker", _) ->
+    | "octez-baker", _ ->
         (* For baker, we need to determine local vs remote mode *)
-        Binary_help_explorer.open_baker_run_help ~app_bin_dir ~mode:`Local ~on_apply
+        Binary_help_explorer.open_baker_run_help
+          ~app_bin_dir
+          ~mode:`Local
+          ~on_apply
     | _ ->
         (* Generic fallback - show error for now *)
         Modal_helpers.show_error
@@ -206,10 +214,7 @@ let endpoint ~label ~get ~set ?default_port:(_ = 8732) () =
   in
   let edit model_ref =
     let initial = get !model_ref in
-    let validator v =
-      if String.trim v = "" then Ok ()
-      else parse_host_port v
-    in
+    let validator v = if String.trim v = "" then Ok () else parse_host_port v in
     Modal_helpers.prompt_validated_text_modal
       ~title:label
       ~initial
@@ -219,7 +224,8 @@ let endpoint ~label ~get ~set ?default_port:(_ = 8732) () =
   in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
-let service_or_endpoint ~label ~role ~get ~set ?(external_label = "External endpoint...")
+let service_or_endpoint ~label ~role ~get ~set
+    ?(external_label = "External endpoint...")
     ?(endpoint_validator = parse_host_port) () =
   let to_string = function
     | `None -> "(none)"
@@ -230,13 +236,13 @@ let service_or_endpoint ~label ~role ~get ~set ?(external_label = "External endp
     match get model with
     | `None -> true
     | `Service _ -> true
-    | `Endpoint ep ->
-        (match endpoint_validator ep with Ok () -> true | Error _ -> false)
+    | `Endpoint ep -> (
+        match endpoint_validator ep with Ok () -> true | Error _ -> false)
   in
   let validate_msg model =
     match get model with
-    | `Endpoint ep ->
-        (match endpoint_validator ep with Ok () -> None | Error msg -> Some msg)
+    | `Endpoint ep -> (
+        match endpoint_validator ep with Ok () -> None | Error msg -> Some msg)
     | _ -> None
   in
   let edit model_ref =
@@ -265,9 +271,7 @@ let service_or_endpoint ~label ~role ~get ~set ?(external_label = "External endp
           model_ref := set (`Service inst) !model_ref
       | `External ->
           let initial =
-            match get !model_ref with
-            | `Endpoint ep -> ep
-            | _ -> ""
+            match get !model_ref with `Endpoint ep -> ep | _ -> ""
           in
           Modal_helpers.prompt_validated_text_modal
             ~title:label
@@ -276,15 +280,17 @@ let service_or_endpoint ~label ~role ~get ~set ?(external_label = "External endp
             ~on_submit:(fun ep -> model_ref := set (`Endpoint ep) !model_ref)
             ()
     in
-    Modal_helpers.open_choice_modal ~title:label ~items ~to_string:to_string_item ~on_select
+    Modal_helpers.open_choice_modal
+      ~title:label
+      ~items
+      ~to_string:to_string_item
+      ~on_select
   in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
 let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
     ?(item_validator = fun _ -> Ok ()) () =
-  let to_string lst =
-    if lst = [] then "(none)" else String.concat ", " lst
-  in
+  let to_string lst = if lst = [] then "(none)" else String.concat ", " lst in
   let validate _ = true in
   let validate_msg _ = None in
   let edit model_ref =
@@ -316,10 +322,9 @@ let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
           let updated =
             if List.mem item current then
               List.filter (fun x -> x <> item) current
-            else
-              current @ [item]
+            else current @ [item]
           in
-          model_ref := set updated !model_ref;
+          model_ref := set updated !model_ref ;
           `KeepOpen
       | `Add ->
           Modal_helpers.prompt_validated_text_modal
@@ -332,18 +337,21 @@ let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
               let current = get !model_ref in
               if not (List.mem v current) then
                 model_ref := set (current @ [v]) !model_ref)
-            ();
+            () ;
           `KeepOpen
       | `Clear ->
-          model_ref := set [] !model_ref;
+          model_ref := set [] !model_ref ;
           `KeepOpen
       | `Remove item ->
           let current = get !model_ref in
-          model_ref := set (List.filter (fun x -> x <> item) current) !model_ref;
+          model_ref := set (List.filter (fun x -> x <> item) current) !model_ref ;
           `KeepOpen
     in
-    Modal_helpers.open_multiselect_modal ~title:label ~items:build_items
-      ~to_string:to_string_item ~on_select
+    Modal_helpers.open_multiselect_modal
+      ~title:label
+      ~items:build_items
+      ~to_string:to_string_item
+      ~on_select
   in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
@@ -366,11 +374,11 @@ struct
   type msg = unit
 
   let init () =
-    let s = {model_ref = ref S.spec.initial_model; cursor = 0; next_page = None} in
+    let s =
+      {model_ref = ref S.spec.initial_model; cursor = 0; next_page = None}
+    in
     (* Call on_init hook if provided *)
-    (match S.spec.on_init with
-    | Some f -> f !(s.model_ref)
-    | None -> ()) ;
+    (match S.spec.on_init with Some f -> f !(s.model_ref) | None -> ()) ;
     s
 
   let update s _ = s
@@ -378,11 +386,10 @@ struct
   let refresh s =
     (match Context.consume_navigation () with
     | Some p -> s.next_page <- Some p
-    | None -> s.next_page <- None) ; (* Clear next_page when no navigation pending *)
+    | None -> s.next_page <- None) ;
+    (* Clear next_page when no navigation pending *)
     (* Call on_refresh hook if provided *)
-    (match S.spec.on_refresh with
-    | Some f -> f !(s.model_ref)
-    | None -> ()) ;
+    (match S.spec.on_refresh with Some f -> f !(s.model_ref) | None -> ()) ;
     s
 
   let move s delta =
@@ -425,7 +432,7 @@ struct
                   ~items:modal_config.choices
                   ~to_string:modal_config.to_string
                   ~on_select ;
-                s  (* Don't proceed with submission - user must submit again *)
+                s (* Don't proceed with submission - user must submit again *)
             | None ->
                 (* No modal needed, proceed with normal submission *)
                 proceed_with_submission s model)
@@ -443,7 +450,8 @@ struct
             match S.spec.on_submit model with
             | Ok () ->
                 Context.mark_instances_dirty () ;
-                Context.navigate "instances" ;  (* Use Context.navigate for proper history *)
+                Context.navigate "instances" ;
+                (* Use Context.navigate for proper history *)
                 s
             | Error (`Msg msg) ->
                 Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -460,7 +468,8 @@ struct
         match S.spec.on_submit model with
         | Ok () ->
             Context.mark_instances_dirty () ;
-            Context.navigate "instances" ;  (* Use Context.navigate for proper history *)
+            Context.navigate "instances" ;
+            (* Use Context.navigate for proper history *)
             s
         | Error (`Msg msg) ->
             Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -481,14 +490,13 @@ struct
     let rows =
       S.spec.fields
       |> List.map (fun (Field f) ->
-             let value = f.get model in
-             let ok = f.validate model in
-             let value_str = f.to_string value in
-             let formatted_value =
-               if ok then value_str
-               else Widgets.fg 214 (Widgets.bold value_str)
-             in
-             (f.label, formatted_value, if ok then "✓" else "✗"))
+          let value = f.get model in
+          let ok = f.validate model in
+          let value_str = f.to_string value in
+          let formatted_value =
+            if ok then value_str else Widgets.fg 214 (Widgets.bold value_str)
+          in
+          (f.label, formatted_value, if ok then "✓" else "✗"))
     in
     let confirm_row =
       ( "Confirm & Install",
@@ -517,9 +525,7 @@ struct
     let status_banner =
       if all_valid then
         Widgets.bg 22 (Widgets.fg 15 " ✓ Form is valid - ready to install! ")
-      else
-        Widgets.bg 160
-          (Widgets.fg 15 (Widgets.bold " ⚠ Form incomplete "))
+      else Widgets.bg 160 (Widgets.fg 15 (Widgets.bold " ⚠ Form incomplete "))
     in
     let title_line = Widgets.title_highlight S.spec.title in
     let header = [title_line; status_banner] in
@@ -537,7 +543,8 @@ struct
       refresh s)
     else
       match Miaou.Core.Keys.of_string key with
-      | Some (Miaou.Core.Keys.Char "Esc") | Some (Miaou.Core.Keys.Char "Escape") ->
+      | Some (Miaou.Core.Keys.Char "Esc") | Some (Miaou.Core.Keys.Char "Escape")
+        ->
           s.next_page <- Some "__BACK__" ;
           s
       | Some Miaou.Core.Keys.Up -> move s (-1)

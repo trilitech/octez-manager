@@ -130,20 +130,22 @@ type state = {
 }
 
 let state =
-  let empty_snapshot = {
-    timestamp = 0.;
-    bg_queue_depth = 0;
-    bg_queue_max = 0;
-    services_active = 0;
-    services_total = 0;
-    render_p50 = None;
-    render_p90 = None;
-    render_p99 = None;
-    key_to_render_p50 = None;
-    key_to_render_p90 = None;
-    bg_wait_p50 = None;
-    bg_wait_p90 = None;
-  } in
+  let empty_snapshot =
+    {
+      timestamp = 0.;
+      bg_queue_depth = 0;
+      bg_queue_max = 0;
+      services_active = 0;
+      services_total = 0;
+      render_p50 = None;
+      render_p90 = None;
+      render_p99 = None;
+      key_to_render_p50 = None;
+      key_to_render_p90 = None;
+      bg_wait_p50 = None;
+      bg_wait_p90 = None;
+    }
+  in
   {
     enabled = false;
     render_hist = Page_map.empty;
@@ -178,8 +180,10 @@ let get_service_statuses () =
   Mutex.protect state.lock (fun () ->
       Service_map.bindings state.service_statuses
       |> List.map (fun (name, status) ->
-             let is_active = match status with Active -> true | Inactive -> false in
-             (name, is_active)))
+          let is_active =
+            match status with Active -> true | Inactive -> false
+          in
+          (name, is_active)))
 
 let record_render_duration_ms ~page duration_ms =
   (* Try to record, but don't block if lock is busy - better to skip than lag *)
@@ -242,7 +246,8 @@ let record_bg_dequeue ~queued_depth ~wait_ms =
 let record_service_status ~service ~is_active =
   Mutex.protect state.lock (fun () ->
       let status = if is_active then Active else Inactive in
-      state.service_statuses <- Service_map.add service status state.service_statuses)
+      state.service_statuses <-
+        Service_map.add service status state.service_statuses)
 
 let metrics_text () =
   let lines = Buffer.create 1024 in
@@ -313,10 +318,7 @@ let metrics_text () =
     | None -> ()
     | Some v ->
         add
-          (Printf.sprintf
-             "octez_manager_bg_wait_ms{quantile=\"%s\"} %.3f"
-             q
-             v)
+          (Printf.sprintf "octez_manager_bg_wait_ms{quantile=\"%s\"} %.3f" q v)
   in
   emit_bg_quantile "0.50" bg_snap.p50 ;
   emit_bg_quantile "0.90" bg_snap.p90 ;
@@ -395,7 +397,8 @@ let start_server ~addr ~port =
        - No CPU parallelism needed, just concurrent I/O
        - Simpler than domains (no cross-domain mutex issues) *)
     ignore
-      (Thread.create (fun () ->
+      (Thread.create
+         (fun () ->
            try serve_forever ~addr ~port
            with exn ->
              state.enabled <- false ;
@@ -404,7 +407,8 @@ let start_server ~addr ~port =
              prerr_endline
                (Printf.sprintf
                   "metrics server stopped: %s"
-                  (Printexc.to_string exn))) ()))
+                  (Printexc.to_string exn)))
+         ()))
 
 let maybe_start_from_env () =
   match Sys.getenv_opt "OCTEZ_MANAGER_METRICS_ADDR" with
@@ -422,7 +426,7 @@ let take_snapshot () =
   (* CRITICAL: Hold lock only while copying data, NOT while computing percentiles!
      Holding lock during percentile computation (which can take 10-50ms with large arrays)
      blocks ALL page renders/key events, causing severe UI lag. *)
-  let (all_renders, key_vals, bg_vals, bg_depth, bg_max, svc_active, svc_total) =
+  let all_renders, key_vals, bg_vals, bg_depth, bg_max, svc_active, svc_total =
     Mutex.protect state.lock (fun () ->
         (* Copy ring data (fast) *)
         let all_renders =
@@ -433,7 +437,7 @@ let take_snapshot () =
         in
         let key_vals = ring_values state.key_to_render.ring in
         let bg_vals = ring_values state.bg_wait.ring in
-        
+
         let services_active =
           Service_map.fold
             (fun _name status acc ->
@@ -442,22 +446,27 @@ let take_snapshot () =
             0
         in
         let services_total = Service_map.cardinal state.service_statuses in
-        
-        (all_renders, key_vals, bg_vals, state.bg_queue_depth, state.bg_queue_max,
-         services_active, services_total))
+
+        ( all_renders,
+          key_vals,
+          bg_vals,
+          state.bg_queue_depth,
+          state.bg_queue_max,
+          services_active,
+          services_total ))
   in
-  
+
   (* Compute percentiles WITHOUT holding lock (allows UI to remain responsive) *)
   let render_p50 = percentile all_renders 0.5 in
   let render_p90 = percentile all_renders 0.9 in
   let render_p99 = percentile all_renders 0.99 in
-  
+
   let key_to_render_p50 = percentile key_vals 0.5 in
   let key_to_render_p90 = percentile key_vals 0.9 in
-  
+
   let bg_wait_p50 = percentile bg_vals 0.5 in
   let bg_wait_p90 = percentile bg_vals 0.9 in
-  
+
   {
     timestamp = Unix.gettimeofday ();
     bg_queue_depth = bg_depth;
@@ -476,8 +485,10 @@ let take_snapshot () =
 let add_snapshot snapshot =
   Mutex.protect state.lock (fun () ->
       state.snapshots.(state.snapshots_next) <- snapshot ;
-      state.snapshots_next <- (state.snapshots_next + 1) mod Array.length state.snapshots ;
-      state.snapshots_count <- min (state.snapshots_count + 1) (Array.length state.snapshots))
+      state.snapshots_next <-
+        (state.snapshots_next + 1) mod Array.length state.snapshots ;
+      state.snapshots_count <-
+        min (state.snapshots_count + 1) (Array.length state.snapshots))
 
 let get_snapshots () =
   Mutex.protect state.lock (fun () ->
@@ -485,7 +496,9 @@ let get_snapshots () =
       else
         let result = ref [] in
         let start_idx =
-          (state.snapshots_next + Array.length state.snapshots - state.snapshots_count)
+          (state.snapshots_next
+          + Array.length state.snapshots
+          - state.snapshots_count)
           mod Array.length state.snapshots
         in
         for i = 0 to state.snapshots_count - 1 do
@@ -499,58 +512,64 @@ let set_recording_duration samples =
       if samples <> state.recording_duration then (
         let old_size = Array.length state.snapshots in
         let old_count = state.snapshots_count in
-        
+
         (* Preserve data: copy as many real snapshots as will fit *)
         let copy_count = min old_count samples in
-        
-        if copy_count = 0 then
+
+        if copy_count = 0 then (
           (* No existing data to preserve, just resize *)
-          let empty_snapshot = {
-            timestamp = 0.;
-            bg_queue_depth = 0;
-            bg_queue_max = 0;
-            services_active = 0;
-            services_total = 0;
-            render_p50 = None;
-            render_p90 = None;
-            render_p99 = None;
-            key_to_render_p50 = None;
-            key_to_render_p90 = None;
-            bg_wait_p50 = None;
-            bg_wait_p90 = None;
-          } in
+          let empty_snapshot =
+            {
+              timestamp = 0.;
+              bg_queue_depth = 0;
+              bg_queue_max = 0;
+              services_active = 0;
+              services_total = 0;
+              render_p50 = None;
+              render_p90 = None;
+              render_p99 = None;
+              key_to_render_p50 = None;
+              key_to_render_p90 = None;
+              bg_wait_p50 = None;
+              bg_wait_p90 = None;
+            }
+          in
           state.snapshots <- Array.make samples empty_snapshot ;
           state.snapshots_next <- 0 ;
           state.snapshots_count <- 0 ;
-          state.recording_duration <- samples
-        else (
+          state.recording_duration <- samples)
+        else
           (* Create new buffer and copy the most recent snapshots *)
-          let empty_snapshot = {
-            timestamp = 0.;
-            bg_queue_depth = 0;
-            bg_queue_max = 0;
-            services_active = 0;
-            services_total = 0;
-            render_p50 = None;
-            render_p90 = None;
-            render_p99 = None;
-            key_to_render_p50 = None;
-            key_to_render_p90 = None;
-            bg_wait_p50 = None;
-            bg_wait_p90 = None;
-          } in
+          let empty_snapshot =
+            {
+              timestamp = 0.;
+              bg_queue_depth = 0;
+              bg_queue_max = 0;
+              services_active = 0;
+              services_total = 0;
+              render_p50 = None;
+              render_p90 = None;
+              render_p99 = None;
+              key_to_render_p50 = None;
+              key_to_render_p90 = None;
+              bg_wait_p50 = None;
+              bg_wait_p90 = None;
+            }
+          in
           let new_snapshots = Array.make samples empty_snapshot in
-          
+
           (* Copy the most recent copy_count snapshots to the start of new buffer *)
           for i = 0 to copy_count - 1 do
-            let src_idx = (state.snapshots_next + old_size - copy_count + i) mod old_size in
+            let src_idx =
+              (state.snapshots_next + old_size - copy_count + i) mod old_size
+            in
             new_snapshots.(i) <- state.snapshots.(src_idx)
           done ;
-          
+
           state.snapshots <- new_snapshots ;
           state.snapshots_next <- copy_count mod samples ;
           state.snapshots_count <- copy_count ;
-          state.recording_duration <- samples)))
+          state.recording_duration <- samples))
 
 let clear_snapshots () =
   Mutex.protect state.lock (fun () ->
@@ -573,8 +592,7 @@ let start_recording () =
        - No parallelism needed, just periodic execution *)
     ignore (Thread.create recording_loop ()))
 
-let stop_recording () =
-  state.recording_enabled <- false
+let stop_recording () = state.recording_enabled <- false
 
 let is_recording () = state.recording_enabled
 
