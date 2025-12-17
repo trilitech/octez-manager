@@ -29,6 +29,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
+      OPAMROOT: /home/opam/.opam
       MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
 
     steps:
@@ -74,6 +75,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
+      OPAMROOT: /home/opam/.opam
       MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
 
     steps:
