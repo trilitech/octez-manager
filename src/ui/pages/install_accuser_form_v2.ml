@@ -278,6 +278,10 @@ let spec = Form_builder.{
             Ok ()
         | Error (`Msg msg) -> Error (`Msg msg)
   );
+
+  on_init = None;
+  on_refresh = None;
+  pre_submit_modal = None;
 }
 
 (*****************************************************************************)

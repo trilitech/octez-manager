@@ -201,6 +201,8 @@ let spec =
           if Form_builder_common.is_nonempty ep then Ok ()
           else Error (`Msg "Node endpoint cannot be empty"));
 
+    on_init = None;
+    on_refresh = None;
     pre_submit_modal = None;
 
     on_submit = (fun model ->

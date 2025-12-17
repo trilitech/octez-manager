@@ -18,7 +18,6 @@ let register_pages () =
   Install_node_form_v3.register () ;
   Install_baker_form.register () ;
   Install_baker_form_v3.register () ;
-  Install_accuser_form.register () ;
   Install_accuser_form_v2.register () ;
   Install_accuser_form_v3.register () ;
   Diagnostics.register () ;
