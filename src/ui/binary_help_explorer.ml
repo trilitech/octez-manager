@@ -584,7 +584,7 @@ let open_modal ~title ~options ~on_apply =
         let has_modal _ = true
       end in
       let ui : Miaou.Core.Modal_manager.ui =
-        {title; left = None; max_width = Some 76; dim_background = true}
+        {title; left = None; max_width = Some (Fixed 76); dim_background = true}
       in
       Miaou.Core.Modal_manager.push
         (module Modal)
@@ -845,7 +845,7 @@ let open_modal ~title ~options ~on_apply =
     let has_modal _ = true
   end in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some 96; dim_background = true}
+    {title; left = None; max_width = Some (Fixed 96); dim_background = true}
   in
   (* Use push instead of push_default so we can control commit_on/cancel_on.
      We handle Enter ourselves to open nested modals, so commit_on must be empty

@@ -89,7 +89,7 @@ let open_text_modal ~title ~lines =
   end in
   let ui : Miaou.Core.Modal_manager.ui =
     (* Limit modal width so header/separator stay on a single line *)
-    {title; left = None; max_width = Some 76; dim_background = true}
+    {title; left = None; max_width = Some (Fixed 76); dim_background = true}
   in
   Miaou.Core.Modal_manager.push_default
     (module Modal)
@@ -160,7 +160,7 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
   end in
   let widget = Select_widget.open_centered ~title ~items ~to_string () in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some 80; dim_background = true}
+    {title; left = None; max_width = Some (Fixed 80); dim_background = true}
   in
   Miaou.Core.Modal_manager.push_default
     (module Modal)
@@ -295,7 +295,7 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
   (* Set initial Help_hint for the default selection *)
   update_help_hint widget ;
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some 80; dim_background = true}
+    {title; left = None; max_width = Some (Fixed 80); dim_background = true}
   in
   (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
      in handle_modal_key. This prevents double-close when used as nested modal. *)
@@ -415,19 +415,23 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
             "Esc"
         | _ -> key
       in
-      if key = "Enter" then (
+      if key = "Enter" then
         match Select_widget.get_selection s with
         | Some choice -> (
             match on_select choice with
             | `KeepOpen ->
                 (* Rebuild widget with updated items from the callback *)
                 let updated_items = items () in
-                Select_widget.open_centered ~title ~items:updated_items ~to_string ()
+                Select_widget.open_centered
+                  ~title
+                  ~items:updated_items
+                  ~to_string
+                  ()
             | `Close ->
                 (* Close modal *)
                 Miaou.Core.Modal_manager.close_top `Commit ;
                 s)
-        | None -> s)
+        | None -> s
       else if key = "Esc" then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
         s)
@@ -439,9 +443,11 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
 
     let has_modal _ = true
   end in
-  let widget = Select_widget.open_centered ~title ~items:(items ()) ~to_string () in
+  let widget =
+    Select_widget.open_centered ~title ~items:(items ()) ~to_string ()
+  in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some 80; dim_background = true}
+    {title; left = None; max_width = Some (Fixed 80); dim_background = true}
   in
   (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
      in handle_modal_key. This prevents the modal from auto-closing on Enter. *)
@@ -572,7 +578,8 @@ let show_error ~title message =
   let lines = wrap_text ~width:50 message in
   open_text_modal ~title ~lines:(["Error"; ""] @ lines)
 
-let open_file_browser_modal ?initial_path ~dirs_only ~require_writable ~on_select () =
+let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
+    ~on_select () =
   let module File_browser = Miaou_widgets_layout.File_browser_widget in
   let module Modal = struct
     type state = File_browser.t
@@ -615,13 +622,13 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable ~on_selec
       (* Check for cancellation after browser processes key *)
       if File_browser.is_cancelled browser'' then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
-        browser'')
-      (* Check for commit with 's' key (Enter is used for navigation) *)
+        browser''
+        (* Check for commit with 's' key (Enter is used for navigation) *))
       else if key = "s" && File_browser.can_commit browser'' then (
         Miaou.Core.Modal_manager.close_top `Commit ;
         browser'')
       (* Return the updated browser state *)
-      else browser''
+        else browser''
 
     let handle_key = handle_modal_key
 
@@ -630,10 +637,12 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable ~on_selec
     let has_modal _ = true
   end in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title = "Browse Directory (press 's' to select, Esc to cancel)";
-     left = None;
-     max_width = Some 100;
-     dim_background = true}
+    {
+      title = "Browse Directory (press 's' to select, Esc to cancel)";
+      left = None;
+      max_width = Some (Fixed 100);
+      dim_background = true;
+    }
   in
   (* Use push with empty commit_on/cancel_on since we handle keys manually *)
   Miaou.Core.Modal_manager.push
@@ -644,7 +653,9 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable ~on_selec
     ~cancel_on:[]
     ~on_close:(fun state -> function
       | `Commit -> (
-          match Miaou_widgets_layout.File_browser_widget.get_selection state with
+          match
+            Miaou_widgets_layout.File_browser_widget.get_selection state
+          with
           | Some path -> on_select path
           | None -> ())
       | `Cancel -> ())
@@ -679,7 +690,8 @@ let select_directory_modal ~title ~dir_type ~on_select () =
   in
 
   let on_choice_select = function
-    | Existing_dir entry -> on_select entry.Octez_manager_lib.Directory_registry.path
+    | Existing_dir entry ->
+        on_select entry.Octez_manager_lib.Directory_registry.path
     | Browse_new_dir ->
         (* Open file browser *)
         open_file_browser_modal
@@ -693,23 +705,33 @@ let select_directory_modal ~title ~dir_type ~on_select () =
               show_error ~title:"Invalid Path" "Directory path cannot be empty"
             else if Sys.file_exists trimmed && not (Sys.is_directory trimmed)
             then
-              show_error ~title:"Invalid Path"
+              show_error
+                ~title:"Invalid Path"
                 "Path exists but is not a directory"
             else
               (* Create directory with error handling *)
-              let user, group = Octez_manager_lib.Common.current_user_group_names () in
+              let user, group =
+                Octez_manager_lib.Common.current_user_group_names ()
+              in
               match
-                Octez_manager_lib.Common.ensure_dir_path ~owner:user ~group ~mode:0o755 trimmed
+                Octez_manager_lib.Common.ensure_dir_path
+                  ~owner:user
+                  ~group
+                  ~mode:0o755
+                  trimmed
               with
               | Ok () ->
                   (* Verify it was created *)
                   if not (Sys.file_exists trimmed) then
-                    show_error ~title:"Creation Failed"
+                    show_error
+                      ~title:"Creation Failed"
                       "Directory creation succeeded but path doesn't exist"
                   else (
                     (* Add to registry (ignore errors but log) *)
                     (match
-                       Octez_manager_lib.Directory_registry.add ~path:trimmed ~dir_type
+                       Octez_manager_lib.Directory_registry.add
+                         ~path:trimmed
+                         ~dir_type
                          ~linked_services:[]
                      with
                     | Ok () -> ()
@@ -780,22 +802,25 @@ let select_app_bin_dir_modal ~on_select () =
             if trimmed = "" then
               show_error ~title:"Invalid Path" "Directory path cannot be empty"
             else if not (Sys.file_exists trimmed) then
-              show_error ~title:"Directory Not Found"
+              show_error
+                ~title:"Directory Not Found"
                 (Printf.sprintf "Directory does not exist: %s" trimmed)
             else if not (Sys.is_directory trimmed) then
-              show_error ~title:"Invalid Path" "Path exists but is not a directory"
+              show_error
+                ~title:"Invalid Path"
+                "Path exists but is not a directory"
             else
               (* Register in directory registry without creating *)
-              (match
-                 Octez_manager_lib.Directory_registry.add
-                   ~path:trimmed
-                   ~dir_type:Octez_manager_lib.Directory_registry.App_bin_dir
-                   ~linked_services:[]
-               with
+              match
+                Octez_manager_lib.Directory_registry.add
+                  ~path:trimmed
+                  ~dir_type:Octez_manager_lib.Directory_registry.App_bin_dir
+                  ~linked_services:[]
+              with
               | Ok () -> on_select trimmed
               | Error (`Msg _) ->
                   (* If registry update fails, still allow selection *)
-                  on_select trimmed))
+                  on_select trimmed)
           ()
   in
 
