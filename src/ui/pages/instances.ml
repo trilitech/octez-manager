@@ -88,7 +88,7 @@ let maybe_refresh state =
   let state =
     match pending_nav with
     | Some p -> {state with next_page = Some p}
-    | None -> state (* Don't clear next_page if already set *)
+    | None -> {state with next_page = None} (* Clear next_page after navigation consumed *)
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
     force_refresh state
