@@ -15,3 +15,7 @@ val page : Miaou.Core.Registry.page
 
 (** Register the accuser installation page in the Miaou registry *)
 val register : unit -> unit
+
+module For_tests : sig
+  val initial_base_dir : string
+end
