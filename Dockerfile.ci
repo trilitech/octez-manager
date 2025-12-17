@@ -1,0 +1,49 @@
+# CI build image for octez-manager
+# Contains OCaml, opam, and all public dependencies pre-installed
+# Miaou is pinned at CI runtime (private repo)
+
+FROM ocaml/opam:alpine-ocaml-5.1 AS base
+
+# Switch to root for system package installation
+USER root
+
+# Install system dependencies for static linking
+RUN apk add --no-cache \
+    zlib-dev \
+    zlib-static \
+    gmp-dev \
+    libffi-dev \
+    git \
+    m4 \
+    make \
+    patch \
+    gcc \
+    musl-dev
+
+# Switch back to opam user
+USER opam
+WORKDIR /home/opam
+
+# Update opam and install common dependencies that won't change often
+RUN opam update && opam install -y \
+    dune \
+    cmdliner \
+    rresult \
+    yojson \
+    bos \
+    eio \
+    eio_main \
+    cohttp-eio \
+    tls-eio \
+    tls \
+    ca-certs \
+    domain-name \
+    mirage-crypto-rng \
+    uri \
+    lambda-term \
+    linenoise \
+    ppx_deriving \
+    alcotest
+
+# Clean up opam cache to reduce image size
+RUN opam clean -a -c -s --logs
