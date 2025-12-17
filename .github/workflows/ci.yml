@@ -65,6 +65,7 @@ jobs:
             echo "Set MIAOU_GIT_URL to point to the private miaou repository URL." >&2
             exit 1
           fi
+          sudo apt-get update
           make deps-ci
 
       - name: Build
