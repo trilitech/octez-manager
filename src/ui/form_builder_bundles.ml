@@ -68,7 +68,7 @@ let format_network_choice (info : Teztnets.network_info) =
 
 (** {1 Core Service Bundle} *)
 
-let core_service_fields ~get_core ~set_core ~binary ~subcommand
+let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
     ?(binary_validator = fun _ -> true) ?(skip_instance_name = false) () =
   let open Form_builder in
   let instance_name_field =
@@ -147,6 +147,7 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand
           set_core {core with extra_args} m)
         ~get_bin_dir:(fun m -> (get_core m).app_bin_dir)
         ~binary
+        ?baker_mode
         ~subcommand
         ();
     ]

@@ -49,7 +49,12 @@ let initial_model =
         start_now = true;
         extra_args = "";
       };
-    client = {base_dir = ""; node = `None; node_endpoint = "127.0.0.1:8732"};
+    client =
+      {
+        base_dir = Common.default_role_dir "baker" "baker";
+        node = `None;
+        node_endpoint = "127.0.0.1:8732";
+      };
     parent_node = "";
     node_data_dir = "";
     dal = Dal_none;
@@ -307,6 +312,9 @@ let node_data_dir_field =
 let spec =
   let open Form_builder in
   let open Form_builder_bundles in
+  let baker_mode_for_help model =
+    try baker_node_mode model (Data.load_service_states ()) with _ -> `Remote
+  in
   {
     title = " Install Baker ";
     initial_model;
@@ -383,6 +391,7 @@ let spec =
           ~set_core:(fun core m -> {m with core})
           ~binary:"octez-baker"
           ~subcommand:["run"]
+          ~baker_mode:baker_mode_for_help
           ~binary_validator:has_octez_baker_binary
           ~skip_instance_name:true
             (* We define instance_name manually above with custom logic *)
@@ -469,6 +478,12 @@ module Page = Form_builder.Make (struct
 
   let spec = spec
 end)
+
+module For_tests = struct
+  let initial_model = initial_model
+
+  let baker_node_mode = baker_node_mode
+end
 
 let page : Miaou.Core.Registry.page = (module Page)
 
