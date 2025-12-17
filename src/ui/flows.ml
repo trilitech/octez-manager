@@ -222,13 +222,16 @@ let create_dal_node_flow ~on_success =
           ~items:["mainnet"; "ghostnet"; "weeklynet"]
           ~to_string:(fun x -> x)
           ~on_select:(fun network ->
+            let client_base_dir = Common.default_role_dir "dal-node" instance in
+            let dal_data_dir = Common.default_role_dir "dal-node" instance in
+            let node_endpoint = "http://127.0.0.1:8732" in
             let request =
               {
                 role = "dal-node";
                 instance;
                 network;
                 history_mode = History_mode.default;
-                data_dir = Common.default_role_dir "dal-node" instance;
+                data_dir = dal_data_dir;
                 rpc_addr = "127.0.0.1:10732";
                 net_addr = "0.0.0.0:11732";
                 service_user = "octez";
@@ -236,16 +239,18 @@ let create_dal_node_flow ~on_success =
                 logging_mode = Logging_mode.Journald;
                 service_args =
                   [
-                    "run";
                     "--rpc-addr";
                     "127.0.0.1:10732";
                     "--net-addr";
                     "0.0.0.0:11732";
-                    "--endpoint";
-                    "http://127.0.0.1:8732";
                   ];
-                extra_env = [];
-                extra_paths = [];
+                extra_env =
+                  [
+                    ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
+                    ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+                    ("OCTEZ_DAL_DATA_DIR", dal_data_dir);
+                  ];
+                extra_paths = [client_base_dir; dal_data_dir];
                 auto_enable = true;
               }
             in
