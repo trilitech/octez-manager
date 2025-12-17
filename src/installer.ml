@@ -1095,6 +1095,14 @@ let purge_service ~instance =
   | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
       let* () = remove_service ~delete_data_dir:true ~instance in
+      (* Also remove per-instance env files under XDG_CONFIG_HOME or /etc when purging *)
+      let env_dir = Filename.concat (Common.env_instances_base_dir ()) instance in
+      let _ =
+        (* Best-effort: don't fail purge if env removal fails *)
+        match Common.remove_tree env_dir with
+        | Ok () -> ()
+        | Error _ -> ()
+      in
       let* () = remove_logging_artifacts svc.logging_mode in
       let* remaining = Service_registry.list () in
       if
