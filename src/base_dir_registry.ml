@@ -6,16 +6,10 @@
 type base_dir_entry = Directory_registry.directory_entry
 
 let add ~path ~linked_services =
-  Directory_registry.add
-    ~path
-    ~dir_type:Client_base_dir
-    ~linked_services
+  Directory_registry.add ~path ~dir_type:Client_base_dir ~linked_services
 
-let find_by_path path =
-  Directory_registry.find_by_path path
+let find_by_path path = Directory_registry.find_by_path path
 
-let list () =
-  Directory_registry.list ~dir_type:Client_base_dir ()
+let list () = Directory_registry.list ~dir_type:Client_base_dir ()
 
-let remove path =
-  Directory_registry.remove path
+let remove path = Directory_registry.remove path

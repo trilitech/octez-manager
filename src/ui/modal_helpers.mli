@@ -20,7 +20,7 @@ val open_multiselect_modal :
   title:string ->
   items:(unit -> 'a list) ->
   to_string:('a -> string) ->
-  on_select:('a -> [< `KeepOpen | `Close ]) ->
+  on_select:('a -> [< `KeepOpen | `Close]) ->
   unit
 
 val prompt_text_modal :

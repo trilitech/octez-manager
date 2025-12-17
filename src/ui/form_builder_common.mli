@@ -39,35 +39,35 @@ type node_config = {
 
 (** {1 Common Validators} *)
 
-val is_nonempty : string -> bool
 (** Check if string is non-empty after trimming *)
+val is_nonempty : string -> bool
 
-val normalize : string -> string
 (** Lowercase and trim a string *)
+val normalize : string -> string
 
-val instance_in_use : states:Data.Service_state.t list -> string -> bool
 (** Check if an instance name is already in use *)
+val instance_in_use : states:Data.Service_state.t list -> string -> bool
 
-val service_user_valid : user:string -> bool
 (** Check if service user exists or can be created *)
+val service_user_valid : user:string -> bool
 
-val parse_host_port : string -> (string * int) option
 (** Parse "host:port" string *)
+val parse_host_port : string -> (string * int) option
 
-val default_service_user : unit -> string
 (** Get default service user (octez for root, current user otherwise) *)
+val default_service_user : unit -> string
 
-val has_binary : string -> string -> bool
 (** [has_binary binary_name dir] checks if [binary_name] exists in [dir]
     and is executable. *)
+val has_binary : string -> string -> bool
 
-val has_octez_baker_binary : string -> bool
 (** Check if octez-baker binary exists and is executable in the given directory. *)
+val has_octez_baker_binary : string -> bool
 
-val has_octez_node_binary : string -> bool
 (** Check if octez-node binary exists and is executable in the given directory. *)
+val has_octez_node_binary : string -> bool
 
 (** {1 Helpers} *)
 
-val prepare_extra_args : string -> string list
 (** Parse extra args string into list, filtering empty strings *)
+val prepare_extra_args : string -> string list

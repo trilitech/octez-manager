@@ -26,8 +26,11 @@ module Summary = struct
 end
 
 let cache : Service_state.t list Atomic.t = Atomic.make []
+
 let last_refresh = Atomic.make 0.0
+
 let refresh_inflight = Atomic.make false
+
 let cache_ttl_secs = 5.0
 
 let set_cache states =

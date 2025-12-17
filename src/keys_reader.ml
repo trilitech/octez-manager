@@ -8,7 +8,7 @@ let key_info_of_yojson json =
   try
     let name = json |> member "name" |> to_string in
     let value = json |> member "value" |> to_string in
-    Ok { name; value }
+    Ok {name; value}
   with
   | Type_error (msg, _) -> Error (`Msg msg)
   | Undefined (msg, _) -> Error (`Msg msg)

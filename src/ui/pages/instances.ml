@@ -54,7 +54,8 @@ let maybe_refresh state =
   let state =
     match pending_nav with
     | Some p -> {state with next_page = Some p}
-    | None -> {state with next_page = None} (* Clear next_page after navigation consumed *)
+    | None -> {state with next_page = None}
+    (* Clear next_page after navigation consumed *)
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
     force_refresh state
@@ -209,7 +210,9 @@ let line_for_service idx selected (st : Service_state.t) =
     | _ -> padded
   in
   let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
-  let history = Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode) in
+  let history =
+    Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
+  in
   let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
   let first_line =
     Printf.sprintf
@@ -248,8 +251,7 @@ let table_lines state =
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
   in
   let instance_rows =
-    if state.services = [] then
-      ["  No managed instances."]
+    if state.services = [] then ["  No managed instances."]
     else
       state.services
       |> List.mapi (fun idx svc -> line_for_service idx state.selected svc)
@@ -646,8 +648,7 @@ struct
   let back s = s
 
   let handled_keys () =
-    Miaou.Core.Keys.
-      [Enter; Char "c"; Char "r"; Char "R"; Char "d"]
+    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"]
 
   let keymap _ =
     [
@@ -676,7 +677,8 @@ struct
   let footer ~cols:_ =
     [
       Widgets.dim
-        "Arrows: move  Enter: actions  c: create  r: refresh  m: menu  Esc: back";
+        "Arrows: move  Enter: actions  c: create  r: refresh  m: menu  Esc: \
+         back";
     ]
 
   let view s ~focus:_ ~size =
