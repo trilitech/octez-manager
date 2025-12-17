@@ -379,7 +379,7 @@ let cleanup_system_logrotate active_roles =
            else Ok ())
          (Ok ())
 
-let sync_system_logrotate specs =
+let _sync_system_logrotate specs =
   let* () =
     List.fold_left
       (fun acc {role; paths} ->
@@ -534,7 +534,7 @@ let cleanup_user_logrotate_files () =
   let _ = Common.remove_tree (user_logrotate_include_dir ()) in
   ()
 
-let sync_user_logrotate specs =
+let _sync_user_logrotate specs =
   let owner, group = Common.current_user_group_names () in
   if specs = [] then (
     cleanup_user_logrotate_files () ;
@@ -563,9 +563,8 @@ let sync_user_logrotate specs =
     let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 state_dir in
     ensure_user_logrotate_timer ~owner ~group ~logrotate_bin
 
-let sync_logrotate specs =
-  if Common.is_root () then sync_system_logrotate specs
-  else sync_user_logrotate specs
+(* Logging is via journald - no logrotate needed *)
+let sync_logrotate _specs = Ok ()
 
 type logging_resources = {extra_lines : string list; extra_paths : string list}
 

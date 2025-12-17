@@ -549,7 +549,17 @@ let spec =
         in
         let* (module PM) = require_package_manager () in
         let* _service = PM.install_node req in
-        Ok ());
+        (* Start the service if requested, even if not enabling on boot *)
+        if model.core.start_now && not model.core.enable_on_boot then
+          match Miaou_interfaces.Service_lifecycle.get () with
+          | Some sl ->
+              Miaou_interfaces.Service_lifecycle.start
+                sl
+                ~role:"node"
+                ~service:model.core.instance_name
+              |> Result.map_error (fun e -> `Msg e)
+          | None -> Error (`Msg "Service lifecycle capability not available")
+        else Ok ());
   }
 
 module Page = Form_builder.Make (struct

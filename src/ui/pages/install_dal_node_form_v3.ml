@@ -19,6 +19,8 @@ let name = "install_dal_node_form_v3"
 type model = {
   core : Form_builder_common.core_service_config;
   client : Form_builder_common.client_config;
+  rpc_addr : string;  (** DAL node's own RPC address *)
+  net_addr : string;  (** DAL node's P2P address *)
 }
 
 let initial_model =
@@ -39,6 +41,8 @@ let initial_model =
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };
+    rpc_addr = "127.0.0.1:10732";
+    net_addr = "0.0.0.0:11732";
   }
 
 let require_package_manager () =
@@ -76,7 +80,19 @@ let spec =
           ~set_core:(fun core m -> {m with core})
           ~get_client:(fun m -> m.client)
           ~set_client:(fun client m -> {m with client})
-          ();
+          ()
+      @ [
+          (* DAL node's own RPC address *)
+          Form_builder.text
+            ~label:"DAL RPC Addr"
+            ~get:(fun m -> m.rpc_addr)
+            ~set:(fun rpc_addr m -> {m with rpc_addr});
+          (* DAL node's P2P address *)
+          Form_builder.text
+            ~label:"DAL P2P Addr"
+            ~get:(fun m -> m.net_addr)
+            ~set:(fun net_addr m -> {m with net_addr});
+        ];
     pre_submit =
       Some
         (fun model ->
@@ -185,8 +201,8 @@ let spec =
             network = Option.value ~default:"mainnet" network;
             history_mode = History_mode.default;
             data_dir = dal_data_dir;
-            rpc_addr = node_endpoint;
-            net_addr = "";
+            rpc_addr = model.rpc_addr;  (* DAL's own RPC address *)
+            net_addr = model.net_addr;  (* DAL's P2P address *)
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
             logging_mode;
@@ -196,6 +212,8 @@ let spec =
                 ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
                 ("OCTEZ_NODE_ENDPOINT", node_endpoint);
                 ("OCTEZ_DAL_DATA_DIR", dal_data_dir);
+                ("OCTEZ_DAL_RPC_ADDR", model.rpc_addr);
+                ("OCTEZ_DAL_NET_ADDR", model.net_addr);
               ];
             extra_paths = [client_base_dir; dal_data_dir];
             auto_enable = model.core.enable_on_boot;
