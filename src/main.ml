@@ -522,26 +522,12 @@ let install_baker_cmd =
   let node_instance =
     let doc =
       "Existing octez-manager node instance to reuse for data-dir and network. \
-       Use 'octez-manager list' to see available node instances."
+       Use 'octez-manager list' to see available node instances. It can also \
+       be a custom RPC endpoint for the baker to contact. Defaults to \
+       http://127.0.0.1:8732"
     in
     Arg.(
       value & opt (some string) None & info ["node-instance"] ~doc ~docv:"NODE")
-  in
-  let node_data_dir =
-    let doc =
-      "Path to the local node data directory (required if --node-instance is \
-       omitted)."
-    in
-    Arg.(
-      value & opt (some string) None & info ["node-data-dir"] ~doc ~docv:"DIR")
-  in
-  let node_endpoint =
-    let doc =
-      "Custom RPC endpoint for the baker to contact. Defaults to \
-       http://127.0.0.1:8732 if --node-instance is not specified."
-    in
-    Arg.(
-      value & opt (some string) None & info ["node-endpoint"] ~doc ~docv:"URI")
   in
   let base_dir =
     let doc =
@@ -595,9 +581,9 @@ let install_baker_cmd =
       value & flag
       & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
   in
-  let make instance_opt node_instance node_data_dir node_endpoint base_dir
-      delegates dal_endpoint_opt liquidity_baking_vote_opt extra_args
-      service_user app_bin_dir no_enable logging_mode =
+  let make instance_opt node_instance base_dir delegates dal_endpoint_opt
+      liquidity_baking_vote_opt extra_args service_user app_bin_dir no_enable
+      logging_mode =
     let res =
       let ( let* ) = Result.bind in
       let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
@@ -609,191 +595,192 @@ let install_baker_cmd =
               Ok (prompt_required_string "Instance name")
             else Error "Instance name is required in non-interactive mode"
       in
-      (* Prompt for node_instance if not provided in interactive mode *)
-      let* resolved_node_instance, resolved_node_endpoint =
-        match normalize_opt_string node_instance with
-        | Some ni -> Ok (Some ni, node_endpoint)
-        | None ->
-            if is_interactive () then
-              (* Get list of available node instances *)
-              match Service_registry.list () with
-              | Error (`Msg msg) ->
-                  prerr_endline ("Warning: Could not load services: " ^ msg) ;
-                  Ok (None, node_endpoint)
-              | Ok services -> (
-                  let node_services =
-                    List.filter
-                      (fun (svc : Service.t) -> String.equal svc.role "node")
-                      services
-                  in
-                  if node_services = [] then (
-                    prerr_endline
-                      "No node instances found. You can specify a custom \
-                       endpoint." ;
-                    Ok (None, node_endpoint))
-                  else
+      match Service_registry.list () with
+      | Error (`Msg msg) -> Error msg
+      | Ok services -> (
+          let* node_mode =
+            let node_services =
+              List.filter
+                (fun (svc : Service.t) -> String.equal svc.role "node")
+                services
+            in
+            let choice =
+              (* Prompt for node_instance if not provided in interactive mode *)
+              match normalize_opt_string node_instance with
+              | Some ni -> Some ni
+              | None ->
+                  if is_interactive () then (
                     let instance_names =
                       List.map
                         (fun (svc : Service.t) -> svc.instance)
                         node_services
                     in
-                    let instance_map =
-                      List.map
-                        (fun (svc : Service.t) -> (svc.instance, svc.network))
-                        node_services
-                    in
-                    Format.printf
-                      "Available node instances: %s@."
-                      (String.concat
-                         ", "
-                         (List.map
-                            (fun (inst, net) ->
-                              Printf.sprintf "%s (%s)" inst net)
-                            instance_map)) ;
+                    (if node_services = [] then
+                       prerr_endline
+                         "No node instances found. You can specify a custom \
+                          endpoint."
+                     else
+                       let instance_map =
+                         List.map
+                           (fun (svc : Service.t) ->
+                             (svc.instance, svc.network))
+                           node_services
+                       in
+                       Format.printf
+                         "Available node instances: %s@."
+                         (String.concat
+                            ", "
+                            (List.map
+                               (fun (inst, net) ->
+                                 Printf.sprintf "%s (%s)" inst net)
+                               instance_map))) ;
+                    prompt_with_completion
+                      "Node instance (press Enter for default: 127.0.0.1:8732)"
+                      instance_names)
+                  else None
+            in
+            match choice with
+            | None -> Ok (Remote_endpoint "127.0.0.1:8732")
+            | Some choice ->
+                if
+                  List.exists
+                    (fun (svc : Service.t) -> String.equal svc.instance choice)
+                    node_services
+                then Ok (Local_instance choice)
+                else Ok (Remote_endpoint choice)
+          in
+          let* liquidity_baking_vote =
+            match normalize_opt_string liquidity_baking_vote_opt with
+            | Some vote -> Ok (Some vote)
+            | None ->
+                if is_interactive () then
+                  let completions = ["on"; "off"; "pass"] in
+                  let vote =
                     match
                       prompt_with_completion
-                        "Node instance (press Enter for default: \
-                         127.0.0.1:8732)"
-                        instance_names
+                        "Liquidity baking vote (press Enter for default: pass)"
+                        completions
                     with
-                    | Some selected -> (
-                        (* Check if input matches existing instance name, otherwise treat as endpoint *)
-                        match
-                          List.find_opt
-                            (fun (svc : Service.t) ->
-                              String.equal svc.instance selected)
-                            node_services
-                        with
-                        | Some _svc -> Ok (Some selected, node_endpoint)
-                        | None -> Ok (None, Some selected))
-                    | None -> Ok (None, node_endpoint))
-            else Ok (None, node_endpoint)
-      in
-      let* liquidity_baking_vote =
-        match normalize_opt_string liquidity_baking_vote_opt with
-        | Some vote -> Ok (Some vote)
-        | None ->
-            if is_interactive () then
-              let completions = ["on"; "off"; "pass"] in
-              let vote =
-                match
-                  prompt_with_completion
-                    "Liquidity baking vote (press Enter for default: pass)"
-                    completions
-                with
-                | Some v -> v
-                | None -> "pass"
-              in
-              Ok (Some vote)
-            else Ok (Some "pass")
-      in
-      (* Prompt for dal_endpoint if not provided in interactive mode *)
-      let* dal_config =
-        match normalize_opt_string dal_endpoint_opt with
-        | Some ep ->
-            let normalized = String.lowercase_ascii (String.trim ep) in
-            if normalized = "none" || normalized = "disabled" then
-              Ok Dal_disabled
-            else Ok (Dal_endpoint ep)
-        | None ->
-            if is_interactive () then
-              (* Get list of available DAL node instances *)
-              match Service_registry.list () with
-              | Error (`Msg msg) ->
-                  prerr_endline ("Warning: Could not load services: " ^ msg) ;
+                    | Some v -> v
+                    | None -> "pass"
+                  in
+                  Ok (Some vote)
+                else Ok (Some "pass")
+          in
+          (* Prompt for dal_endpoint if not provided in interactive mode *)
+          let* dal_config =
+            match normalize_opt_string dal_endpoint_opt with
+            | Some ep ->
+                let normalized = String.lowercase_ascii (String.trim ep) in
+                if normalized = "none" || normalized = "disabled" then
                   Ok Dal_disabled
-              | Ok services -> (
-                  let dal_services =
-                    List.filter
-                      (fun (svc : Service.t) ->
-                        let role_lower = String.lowercase_ascii svc.role in
-                        String.equal role_lower "dal-node"
-                        || String.equal role_lower "dal")
-                      services
-                  in
-                  if dal_services = [] then
-                    let response =
-                      prompt_string_with_default
-                        "DAL node endpoint (or 'none' to opt-out)"
-                        "none"
-                    in
-                    let normalized =
-                      String.lowercase_ascii (String.trim response)
-                    in
-                    if normalized = "none" || normalized = "disabled" then
+                else Ok (Dal_endpoint ep)
+            | None ->
+                if is_interactive () then
+                  (* Get list of available DAL node instances *)
+                  match Service_registry.list () with
+                  | Error (`Msg msg) ->
+                      prerr_endline ("Warning: Could not load services: " ^ msg) ;
                       Ok Dal_disabled
-                    else Ok (Dal_endpoint response)
-                  else
-                    let instance_names =
-                      List.map
-                        (fun (svc : Service.t) -> svc.instance)
-                        dal_services
-                    in
-                    let instance_map =
-                      List.map
-                        (fun (svc : Service.t) -> (svc.instance, svc.rpc_addr))
-                        dal_services
-                    in
-                    Format.printf
-                      "Available DAL node instances: %s@."
-                      (String.concat
-                         ", "
-                         (List.map
-                            (fun (inst, addr) ->
-                              Printf.sprintf "%s (%s)" inst addr)
-                            instance_map)) ;
-                    match
-                      prompt_with_completion
-                        "DAL node instance (press Enter for default: none)"
-                        instance_names
-                    with
-                    | Some selected -> (
-                        (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
-                        (match
-                           List.find_opt
-                             (fun (svc : Service.t) -> String.equal svc.instance selected)
-                             dal_services
-                         with
-                        | Some svc ->
-                            Ok (Dal_endpoint (Installer.endpoint_of_rpc svc.Service.rpc_addr))
-                        | None -> Ok (Dal_endpoint (Installer.endpoint_of_rpc selected))))
-                    | None -> Ok Dal_disabled)
-            else Ok Dal_disabled
-      in
-      let req : baker_request =
-        {
-          instance;
-          node_instance = resolved_node_instance;
-          node_data_dir;
-          node_endpoint = resolved_node_endpoint;
-          node_mode = `Auto;
-          base_dir;
-          delegates;
-          dal_config;
-          liquidity_baking_vote;
-          extra_args;
-          service_user;
-          app_bin_dir;
-          logging_mode;
-          auto_enable = not no_enable;
-        }
-      in
-      (* Installer.install_baker returns an Rresult-style error; convert it to a string-error Result *)
-      match Installer.install_baker req with
-      | Ok service ->
-          Format.printf "Installed %s (%s)\n" service.S.instance service.network ;
-          Ok ()
-      | Error (`Msg s) -> Error s
+                  | Ok services -> (
+                      let dal_services =
+                        List.filter
+                          (fun (svc : Service.t) ->
+                            let role_lower = String.lowercase_ascii svc.role in
+                            String.equal role_lower "dal-node"
+                            || String.equal role_lower "dal")
+                          services
+                      in
+                      if dal_services = [] then
+                        let response =
+                          prompt_string_with_default
+                            "DAL node endpoint (or 'none' to opt-out)"
+                            "none"
+                        in
+                        let normalized =
+                          String.lowercase_ascii (String.trim response)
+                        in
+                        if normalized = "none" || normalized = "disabled" then
+                          Ok Dal_disabled
+                        else Ok (Dal_endpoint response)
+                      else
+                        let instance_names =
+                          List.map
+                            (fun (svc : Service.t) -> svc.instance)
+                            dal_services
+                        in
+                        let instance_map =
+                          List.map
+                            (fun (svc : Service.t) ->
+                              (svc.instance, svc.rpc_addr))
+                            dal_services
+                        in
+                        Format.printf
+                          "Available DAL node instances: %s@."
+                          (String.concat
+                             ", "
+                             (List.map
+                                (fun (inst, addr) ->
+                                  Printf.sprintf "%s (%s)" inst addr)
+                                instance_map)) ;
+                        match
+                          prompt_with_completion
+                            "DAL node instance (press Enter for default: none)"
+                            instance_names
+                        with
+                        | Some selected -> (
+                            (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
+                            match
+                              List.find_opt
+                                (fun (svc : Service.t) ->
+                                  String.equal svc.instance selected)
+                                dal_services
+                            with
+                            | Some svc ->
+                                Ok
+                                  (Dal_endpoint
+                                     (Installer.endpoint_of_rpc
+                                        svc.Service.rpc_addr))
+                            | None ->
+                                Ok
+                                  (Dal_endpoint
+                                     (Installer.endpoint_of_rpc selected)))
+                        | None -> Ok Dal_disabled)
+                else Ok Dal_disabled
+          in
+          let req : baker_request =
+            {
+              instance;
+              node_mode;
+              base_dir;
+              delegates;
+              dal_config;
+              liquidity_baking_vote;
+              extra_args;
+              service_user;
+              app_bin_dir;
+              logging_mode;
+              auto_enable = not no_enable;
+            }
+          in
+          (* Installer.install_baker returns an Rresult-style error; convert it to a string-error Result *)
+          match Installer.install_baker req with
+          | Ok service ->
+              Format.printf
+                "Installed %s (%s)\n"
+                service.S.instance
+                service.network ;
+              Ok ()
+          | Error (`Msg s) -> Error s)
     in
     match res with Ok () -> `Ok () | Error msg -> cmdliner_error msg
   in
   let term =
     Term.(
       ret
-        (const make $ instance $ node_instance $ node_data_dir $ node_endpoint
-       $ base_dir $ delegates $ dal_endpoint $ liquidity_baking_vote
-       $ extra_args $ service_user $ app_bin_dir $ auto_enable
-       $ logging_mode_term))
+        (const make $ instance $ node_instance $ base_dir $ delegates
+       $ dal_endpoint $ liquidity_baking_vote $ extra_args $ service_user
+       $ app_bin_dir $ auto_enable $ logging_mode_term))
   in
   let info = Cmd.info "install-baker" ~doc:"Install an octez-baker service" in
   Cmd.v info term

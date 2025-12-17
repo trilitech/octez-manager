@@ -4,8 +4,8 @@ open Installer_types
 let ( let* ) = Result.bind
 
 let invalid_instance_name_chars_msg =
-  "Only alphanumeric characters (a-z, A-Z, 0-9), hyphens (-), underscores \
-   (_), and dots (.) are allowed."
+  "Only alphanumeric characters (a-z, A-Z, 0-9), hyphens (-), underscores (_), \
+   and dots (.) are allowed."
 
 let backup_file_if_exists path =
   let normalized = String.trim path in
@@ -868,62 +868,30 @@ let install_daemon (request : daemon_request) =
   Ok service
 
 let install_baker (request : baker_request) =
-  let* node_service_opt =
-    match request.node_instance with
-    | None -> Ok None
-    | Some inst ->
-        let* svc = lookup_node_service inst in
-        Ok (Some svc)
-  in
-  let resolved_node_mode =
+  let* node_mode : Installer_types.resolved_baker_node_mode =
     match request.node_mode with
-    | `Local -> `Local
-    | `Remote -> `Remote
-    | `Auto -> (
-        match node_service_opt with
-        | Some _ -> `Local
-        | None -> (
-            match request.node_data_dir with
-            | Some dir when String.trim dir <> "" -> `Local
-            | _ -> `Remote))
+    | Remote_endpoint endpoint -> Ok (Remote endpoint)
+    | Local_instance inst ->
+        let* svc = lookup_node_service inst in
+        Ok (Local svc)
   in
-  let* node_data_dir_opt =
-    match resolved_node_mode with
-    | `Remote -> Ok None
-    | `Local -> (
-        match (node_service_opt, request.node_data_dir) with
-        | Some svc, _ -> Ok (Some svc.Service.data_dir)
-        | None, Some dir when String.trim dir <> "" -> Ok (Some dir)
-        | None, _ ->
-            R.error_msg "--node-data-dir is required when using a local node")
-  in
-  let node_data_dir_opt =
-    match node_data_dir_opt with
-    | Some dir when String.trim dir <> "" -> Some (String.trim dir)
-    | _ -> None
-  in
-  let data_dir_for_service =
-    match node_data_dir_opt with
-    | Some dir -> dir
-    | None -> Common.default_role_dir "baker" request.instance ^ "/remote-node"
+  let node_data_dir =
+    match node_mode with Remote _ -> "" | Local svc -> svc.Service.data_dir
   in
   let history_mode =
-    match node_service_opt with
-    | Some svc -> svc.Service.history_mode
-    | None -> History_mode.default
+    match node_mode with
+    | Local svc -> svc.Service.history_mode
+    | Remote _ -> History_mode.default
   in
   let node_endpoint =
-    match request.node_endpoint with
-    | Some endpoint when String.trim endpoint <> "" -> endpoint
-    | _ -> (
-        match node_service_opt with
-        | Some svc -> endpoint_of_rpc svc.Service.rpc_addr
-        | None -> "http://127.0.0.1:8732")
+    match node_mode with
+    | Remote endpoint -> endpoint_of_rpc endpoint
+    | Local svc -> endpoint_of_rpc svc.Service.rpc_addr
   in
   let* network =
-    match node_service_opt with
-    | Some svc -> Ok svc.Service.network
-    | None -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
+    match node_mode with
+    | Local svc -> Ok svc.Service.network
+    | Remote _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
   in
   let base_dir =
     match request.base_dir with
@@ -955,7 +923,7 @@ let install_baker (request : baker_request) =
            'on', 'off', or 'pass'."
   in
   let node_mode_env =
-    match resolved_node_mode with `Local -> "local" | `Remote -> "remote"
+    match node_mode with Local _ -> "local" | Remote _ -> "remote"
   in
   let delegate_flags =
     request.delegates |> List.concat_map (fun d -> ["--delegate"; d])
@@ -968,7 +936,7 @@ let install_baker (request : baker_request) =
       instance = request.instance;
       network;
       history_mode;
-      data_dir = data_dir_for_service;
+      data_dir = node_data_dir;
       rpc_addr = node_endpoint;
       net_addr = "";
       service_user = request.service_user;

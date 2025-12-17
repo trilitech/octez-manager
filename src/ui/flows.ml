@@ -9,11 +9,11 @@ let is_valid_instance_char c =
   | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> true
   | _ -> false
 
-let instance_has_valid_chars name =
-  String.for_all is_valid_instance_char name
+let instance_has_valid_chars name = String.for_all is_valid_instance_char name
 
 let invalid_instance_name_error_msg =
-  "Instance name contains invalid characters. " ^ Installer.invalid_instance_name_chars_msg
+  "Instance name contains invalid characters. "
+  ^ Installer.invalid_instance_name_chars_msg
 
 let require_package_manager () =
   match
@@ -117,43 +117,40 @@ let create_baker_flow ~services ~on_success =
               show_error ~title:"Error" invalid_instance_name_error_msg
             else
               prompt_text_modal
-              ~title:"Delegates (comma separated)"
-              ~on_submit:(fun delegates_str ->
-                let delegates =
-                  String.split_on_char ',' delegates_str
-                  |> List.map String.trim
-                  |> List.filter (( <> ) "")
-                in
-                let request =
-                  {
-                    instance;
-                    node_instance = Some parent_node;
-                    node_data_dir = None;
-                    node_endpoint = None;
-                    node_mode = `Auto;
-                    base_dir = None;
-                    delegates;
-                    dal_config = Dal_auto;
-                    liquidity_baking_vote = None;
-                    extra_args = [];
-                    service_user = "octez";
-                    app_bin_dir = "/usr/bin";
-                    logging_mode = Logging_mode.Journald;
-                    auto_enable = true;
-                  }
-                in
-                let res =
-                  let* (module PM) = require_package_manager () in
-                  PM.install_baker request
-                in
-                match res with
-                | Ok _ ->
-                    show_success
-                      ~title:"Success"
-                      ("Baker " ^ instance ^ " created.") ;
-                    on_success ()
-                | Error (`Msg e) -> show_error ~title:"Error" e)
-              ())
+                ~title:"Delegates (comma separated)"
+                ~on_submit:(fun delegates_str ->
+                  let delegates =
+                    String.split_on_char ',' delegates_str
+                    |> List.map String.trim
+                    |> List.filter (( <> ) "")
+                  in
+                  let request =
+                    {
+                      instance;
+                      node_mode = Local_instance parent_node;
+                      base_dir = None;
+                      delegates;
+                      dal_config = Dal_auto;
+                      liquidity_baking_vote = None;
+                      extra_args = [];
+                      service_user = "octez";
+                      app_bin_dir = "/usr/bin";
+                      logging_mode = Logging_mode.Journald;
+                      auto_enable = true;
+                    }
+                  in
+                  let res =
+                    let* (module PM) = require_package_manager () in
+                    PM.install_baker request
+                  in
+                  match res with
+                  | Ok _ ->
+                      show_success
+                        ~title:"Success"
+                        ("Baker " ^ instance ^ " created.") ;
+                      on_success ()
+                  | Error (`Msg e) -> show_error ~title:"Error" e)
+                ())
           ())
 
 let create_accuser_flow ~on_success =
