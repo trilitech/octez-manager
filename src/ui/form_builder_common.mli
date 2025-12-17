@@ -71,6 +71,9 @@ val has_octez_baker_binary : string -> bool
 (** Check if octez-node binary exists and is executable in the given directory. *)
 val has_octez_node_binary : string -> bool
 
+(** Check if octez-signer binary exists and is executable in the given directory. *)
+val has_octez_signer_binary : string -> bool
+
 (** Add http:// scheme if missing, defaulting to localhost when empty. *)
 val endpoint_with_scheme : string -> string
 
