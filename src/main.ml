@@ -98,8 +98,8 @@ let print_service_details svc =
       Format.printf "Client dir    : %s@." client_base_dir ;
       Format.printf "DAL data dir  : %s@." dal_data_dir ;
       print_node_endpoint () ;
-      if svc.rpc_addr <> "" then Format.printf "RPC addr      : %s@." svc.rpc_addr ;
-      if svc.net_addr <> "" then Format.printf "P2P addr      : %s@." svc.net_addr
+      if svc.rpc_addr <> "" then Format.printf "DAL RPC addr  : %s@." svc.rpc_addr ;
+      if svc.net_addr <> "" then Format.printf "DAL P2P addr  : %s@." svc.net_addr
   | "signer" ->
       let base_dir = lookup "OCTEZ_SIGNER_BASE_DIR" in
       let address = lookup "OCTEZ_SIGNER_ADDRESS" in
