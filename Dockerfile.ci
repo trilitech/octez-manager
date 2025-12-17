@@ -49,18 +49,11 @@ RUN opam update && opam install -y \
 RUN opam clean -a -c -s --logs
 
 # GitHub Actions runs containers as root by default
-# Initialize opam for root user, pointing to the existing switch
+# Set OPAMROOT to use opam user's installation
 USER root
-RUN mkdir -p /root/.opam && \
-    cp -r /home/opam/.opam/config /root/.opam/ && \
-    ln -s /home/opam/.opam/5.1 /root/.opam/5.1 && \
-    ln -s /home/opam/.opam/repo /root/.opam/repo && \
-    ln -s /home/opam/.opam/download-cache /root/.opam/download-cache && \
-    opam switch set 5.1
-
+ENV OPAMROOT=/home/opam/.opam
 ENV OPAM_SWITCH_PREFIX=/home/opam/.opam/5.1
 ENV CAML_LD_LIBRARY_PATH=/home/opam/.opam/5.1/lib/stublibs:/home/opam/.opam/5.1/lib/ocaml/stublibs:/home/opam/.opam/5.1/lib/ocaml
 ENV OCAML_TOPLEVEL_PATH=/home/opam/.opam/5.1/lib/toplevel
 ENV PATH=/home/opam/.opam/5.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 WORKDIR /github/workspace
-# trigger rebuild
