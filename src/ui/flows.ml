@@ -169,21 +169,27 @@ let create_accuser_flow ~on_success =
           ~items:["mainnet"; "ghostnet"; "weeklynet"]
           ~to_string:(fun x -> x)
           ~on_select:(fun network ->
+            let base_dir = Common.default_role_dir "accuser" instance in
+            let node_endpoint = "http://127.0.0.1:8732" in
             let request =
               {
                 role = "accuser";
                 instance;
                 network;
                 history_mode = History_mode.default;
-                data_dir = Common.default_role_dir "accuser" instance;
-                rpc_addr = "http://127.0.0.1:8732";
+                data_dir = base_dir;
+                rpc_addr = node_endpoint;
                 net_addr = "";
                 service_user = "octez";
                 app_bin_dir = "/usr/bin";
                 logging_mode = Logging_mode.Journald;
-                service_args = ["run"; "--endpoint"; "http://127.0.0.1:8732"];
-                extra_env = [];
-                extra_paths = [];
+                service_args = [];
+                extra_env =
+                  [
+                    ("OCTEZ_CLIENT_BASE_DIR", base_dir);
+                    ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+                  ];
+                extra_paths = [base_dir];
                 auto_enable = true;
               }
             in
