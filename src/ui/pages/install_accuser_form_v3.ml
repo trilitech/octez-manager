@@ -36,7 +36,12 @@ let initial_model =
         start_now = true;
         extra_args = "";
       };
-    client = {base_dir = ""; node = `None; node_endpoint = ""};
+    client =
+      {
+        base_dir = Common.default_role_dir "accuser" "accuser";
+        node = `None;
+        node_endpoint = "127.0.0.1:8732";
+      };
   }
 
 let require_package_manager () =
@@ -120,8 +125,24 @@ let node_selection_field =
             let should_autoname =
               current_name = "" || String.equal current_name "accuser"
             in
+            let endpoint =
+              let addr = String.trim svc.Service.rpc_addr in
+              if
+                String.starts_with
+                  ~prefix:"http://"
+                  (String.lowercase_ascii addr)
+                || String.starts_with
+                     ~prefix:"https://"
+                     (String.lowercase_ascii addr)
+              then addr
+              else "http://" ^ addr
+            in
             let new_client =
-              {!model_ref.client with node = `Service svc.Service.instance}
+              {
+                !model_ref.client with
+                node = `Service svc.Service.instance;
+                node_endpoint = endpoint;
+              }
             in
             model_ref := {!model_ref with client = new_client} ;
             if should_autoname then (
@@ -153,7 +174,13 @@ let node_selection_field =
                 | `Endpoint ep -> ep
                 | _ -> "")
               ~on_submit:(fun ep ->
-                let new_client = {!model_ref.client with node = `Endpoint ep} in
+                let new_client =
+                  {
+                    !model_ref.client with
+                    node = `Endpoint ep;
+                    node_endpoint = ep;
+                  }
+                in
                 model_ref := {!model_ref with client = new_client})
               ()
       in
@@ -345,6 +372,10 @@ module Page = Form_builder.Make (struct
 
   let spec = spec
 end)
+
+module For_tests = struct
+  let initial_base_dir = initial_model.client.base_dir
+end
 
 let page : Miaou.Core.Registry.page = (module Page)
 

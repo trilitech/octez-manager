@@ -3021,6 +3021,17 @@ let () =
                    Install_baker_form_v3.For_tests.initial_model.client.base_dir
                 <> ""));
           Alcotest.test_case
+            "accuser initial base dir default"
+            `Quick
+            (fun () ->
+              Alcotest.(check bool)
+                "base dir defaulted"
+                true
+                (String.trim
+                   Octez_manager_ui.Install_accuser_form_v3.For_tests
+                   .initial_base_dir
+                <> ""));
+          Alcotest.test_case
             "binary help parses"
             `Quick
             binary_help_parses_options;
