@@ -48,7 +48,7 @@ jobs:
           opam install miaou-core miaou-driver-term miaou-runner
 
       - name: Build
-        run: OCAMLPARAM='_,ccopt=-static' dune build --release
+        run: dune build --release
 
       - name: Test
         run: |
@@ -93,7 +93,7 @@ jobs:
           opam install miaou-core miaou-driver-term miaou-runner
 
       - name: Build static binary
-        run: OCAMLPARAM='_,ccopt=-static' dune build --release
+        run: dune build --release
 
       - name: Prepare release artifact
         run: |
