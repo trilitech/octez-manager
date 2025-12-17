@@ -13,11 +13,11 @@ let ( let* ) = Result.bind
 let register_pages () =
   Instances.register () ;
   Instance_details.register () ;
-  Install_node_form_v3.register () ;
-  Install_baker_form_v3.register () ;
-  Install_accuser_form_v3.register () ;
-  Install_dal_node_form_v3.register () ;
-  Install_signer_form_v3.register () ;
+  Install_node_form.register () ;
+  Install_baker_form.register () ;
+  Install_accuser_form.register () ;
+  Install_dal_node_form.register () ;
+  Install_signer_form.register () ;
   Diagnostics.register () ;
   Log_viewer_page.register ()
 

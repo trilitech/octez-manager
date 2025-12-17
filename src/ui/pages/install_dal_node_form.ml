@@ -13,7 +13,7 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-let name = "install_dal_node_form_v3"
+let name = "install_dal_node_form"
 
 (** Model uses the bundle config types directly *)
 type model = {

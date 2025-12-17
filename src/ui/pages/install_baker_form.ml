@@ -15,7 +15,7 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-let name = "install_baker_form_v3"
+let name = "install_baker_form"
 
 (** {1 Custom Types} *)
 

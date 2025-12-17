@@ -823,11 +823,11 @@ let show_menu_modal () =
   let items =
     [
       ("Instances", "instances");
-      ("Install node", "install_node_form_v3");
-      ("Install baker", "install_baker_form_v3");
-      ("Install accuser", "install_accuser_form_v3");
-      ("Install DAL node", "install_dal_node_form_v3");
-      ("Install signer", "install_signer_form_v3");
+      ("Install node", "install_node_form");
+      ("Install baker", "install_baker_form");
+      ("Install accuser", "install_accuser_form");
+      ("Install DAL node", "install_dal_node_form");
+      ("Install signer", "install_signer_form");
     ]
   in
   open_choice_modal
