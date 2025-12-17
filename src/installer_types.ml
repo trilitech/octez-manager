@@ -36,15 +36,16 @@ type daemon_request = {
   auto_enable : bool;
 }
 
-type baker_node_mode = [`Auto | `Local | `Remote]
+type baker_node_mode =
+  | Local_instance of string  (** instance name *)
+  | Remote_endpoint of string  (** endpoint *)
+
+type resolved_baker_node_mode = Local of Service.t | Remote of string
 
 type dal_config = Dal_auto | Dal_disabled | Dal_endpoint of string
 
 type baker_request = {
   instance : string;
-  node_instance : string option;
-  node_data_dir : string option;
-  node_endpoint : string option;
   node_mode : baker_node_mode;
   base_dir : string option;
   delegates : string list;

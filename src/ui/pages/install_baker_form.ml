@@ -168,8 +168,7 @@ let is_valid_instance_char c =
   | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> true
   | _ -> false
 
-let instance_has_valid_chars name =
-  String.for_all is_valid_instance_char name
+let instance_has_valid_chars name = String.for_all is_valid_instance_char name
 
 let node_services states =
   states
@@ -740,19 +739,11 @@ let edit_field s =
         let req =
           {
             instance;
-            node_instance =
+            node_mode =
               (match selected_node with
-              | Some svc -> Some svc.Data.Service_state.service.Service.instance
-              | None -> None);
-            node_data_dir =
-              (match node_mode with
-              | `Local ->
-                  if Option.is_some selected_node then None
-                  else if String.trim node_dir = "" then None
-                  else Some (String.trim node_dir)
-              | `Remote -> None);
-            node_endpoint = Some node_endpoint;
-            node_mode;
+              | Some svc ->
+                  Local_instance svc.Data.Service_state.service.Service.instance
+              | None -> Remote_endpoint node_endpoint);
             base_dir = Some base_dir;
             delegates = f.delegates;
             dal_config;
