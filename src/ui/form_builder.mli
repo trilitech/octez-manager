@@ -174,6 +174,7 @@ val app_bin_dir :
     @param binary The binary name ("octez-node", "octez-baker")
     @param subcommand Optional subcommand (e.g., ["run"] for node, ["run"; "accuser"] for accuser) *)
 val extra_args :
+  ?baker_mode:('model -> [`Local | `Remote]) ->
   label:string ->
   get_args:('model -> string) ->
   set_args:(string -> 'model -> 'model) ->

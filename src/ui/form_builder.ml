@@ -159,7 +159,8 @@ let app_bin_dir ~label ~get ~set ?(validate = fun _ -> true) () =
   in
   Field {label; get; set; to_string; validate; validate_msg; edit}
 
-let extra_args ~label ~get_args ~set_args ~get_bin_dir ~binary ?subcommand () =
+let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
+    ?subcommand () =
   let to_string args = if args = "" then "(none)" else args in
   let validate _ = true in
   let validate_msg _ = None in
@@ -176,11 +177,10 @@ let extra_args ~label ~get_args ~set_args ~get_bin_dir ~binary ?subcommand () =
     | "octez-node", _ ->
         Binary_help_explorer.open_node_run_help ~app_bin_dir ~on_apply
     | "octez-baker", _ ->
-        (* For baker, we need to determine local vs remote mode *)
-        Binary_help_explorer.open_baker_run_help
-          ~app_bin_dir
-          ~mode:`Local
-          ~on_apply
+        let mode =
+          match baker_mode with None -> `Local | Some f -> f !model_ref
+        in
+        Binary_help_explorer.open_baker_run_help ~app_bin_dir ~mode ~on_apply
     | _ ->
         (* Generic fallback - show error for now *)
         Modal_helpers.show_error
