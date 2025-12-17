@@ -15,10 +15,19 @@ let ( let* ) = Result.bind
 
 let name = "install_signer_form_v3"
 
-(** Model uses the bundle config types directly *)
+(** Signer-specific config *)
+type signer_config = {
+  address : string;
+  port : string;
+  require_auth : bool;
+  password_file : string;
+}
+
+(** Model for signer form *)
 type model = {
   core : Form_builder_common.core_service_config;
-  client : Form_builder_common.client_config;
+  base_dir : string;
+  signer : signer_config;
 }
 
 let initial_model =
@@ -33,12 +42,14 @@ let initial_model =
         start_now = true;
         extra_args = "";
       };
-    client =
+    base_dir =
+      Form_builder_common.default_base_dir ~role:"signer" ~instance:"signer";
+    signer =
       {
-        base_dir =
-          Form_builder_common.default_base_dir ~role:"signer" ~instance:"signer";
-        node = `None;
-        node_endpoint = "127.0.0.1:8732";
+        address = "127.0.0.1";
+        port = "6732";
+        require_auth = false;
+        password_file = "";
       };
   }
 
@@ -60,83 +71,47 @@ let spec =
   {
     title = " Install Signer ";
     initial_model;
-    (* Compose fields from bundles with auto-naming support *)
     fields =
       core_service_fields
         ~get_core:(fun m -> m.core)
         ~set_core:(fun core m -> {m with core})
-        ~binary:"octez-baker"
-        ~subcommand:["run"; "signer"]
-        ~binary_validator:Form_builder_common.has_octez_baker_binary
+        ~binary:"octez-signer"
+        ~subcommand:["launch"; "socket"; "signer"]
+        ~binary_validator:Form_builder_common.has_octez_signer_binary
         ()
-      @ client_fields_with_autoname
-          ~role:"signer"
-          ~binary:"octez-baker"
-          ~binary_validator:Form_builder_common.has_octez_baker_binary
-          ~get_core:(fun m -> m.core)
-          ~set_core:(fun core m -> {m with core})
-          ~get_client:(fun m -> m.client)
-          ~set_client:(fun client m -> {m with client})
-          ();
-    pre_submit =
-      Some
-        (fun model ->
-          (* Validate node selection *)
-          match model.client.node with
-          | `None -> Error (`Msg "Node selection is required for signer")
-          | `Service inst ->
-              let states = Data.load_service_states () in
-              let node_exists =
-                List.exists
-                  (fun (s : Data.Service_state.t) ->
-                    s.service.Service.role = "node"
-                    && s.service.Service.instance = inst)
-                  states
-              in
-              if not node_exists then
-                Error
-                  (`Msg (Printf.sprintf "Node instance '%s' not found" inst))
-              else Ok ()
-          | `Endpoint ep ->
-              if Form_builder_common.is_nonempty ep then Ok ()
-              else Error (`Msg "Node endpoint cannot be empty"));
+      @ [
+          client_base_dir
+            ~label:"Base Dir"
+            ~get:(fun m -> m.base_dir)
+            ~set:(fun base_dir m -> {m with base_dir})
+            ~validate:(fun m -> Form_builder_common.is_nonempty m.base_dir)
+            ();
+          text
+            ~label:"Listen Address"
+            ~get:(fun m -> m.signer.address)
+            ~set:(fun address m ->
+              {m with signer = {m.signer with address}});
+          text
+            ~label:"Listen Port"
+            ~get:(fun m -> m.signer.port)
+            ~set:(fun port m -> {m with signer = {m.signer with port}});
+          toggle
+            ~label:"Require Authentication"
+            ~get:(fun m -> m.signer.require_auth)
+            ~set:(fun require_auth m ->
+              {m with signer = {m.signer with require_auth}});
+          text
+            ~label:"Password File (optional)"
+            ~get:(fun m -> m.signer.password_file)
+            ~set:(fun password_file m ->
+              {m with signer = {m.signer with password_file}});
+        ];
+    pre_submit = None;
     on_init = None;
     on_refresh = None;
     pre_submit_modal = None;
     on_submit =
       (fun model ->
-        let states = Data.load_service_states () in
-
-        (* Resolve node endpoint *)
-        let node_endpoint =
-          match model.client.node with
-          | `Service inst -> (
-              let node =
-                List.find_opt
-                  (fun (s : Data.Service_state.t) ->
-                    s.service.Service.role = "node"
-                    && s.service.Service.instance = inst)
-                  states
-              in
-              match node with
-              | Some n ->
-                  let addr =
-                    String.trim n.Data.Service_state.service.Service.rpc_addr
-                  in
-                  if
-                    String.starts_with
-                      ~prefix:"http://"
-                      (String.lowercase_ascii addr)
-                    || String.starts_with
-                         ~prefix:"https://"
-                         (String.lowercase_ascii addr)
-                  then addr
-                  else "http://" ^ addr
-              | None -> "http://127.0.0.1:8732")
-          | `Endpoint ep -> ep
-          | `None -> "http://127.0.0.1:8732"
-        in
-
         (* Build logging mode *)
         let logging_mode =
           match model.core.logging with
@@ -151,58 +126,54 @@ let spec =
               Logging_mode.File {path; rotate = true}
         in
 
-        (* Prepare extra args *)
+        (* Prepare extra args (command options after "launch socket signer") *)
         let extra_args =
           Form_builder_common.prepare_extra_args model.core.extra_args
         in
 
-        (* Resolve network from node if available *)
-        let network =
-          match model.client.node with
-          | `Service inst -> (
-              let node =
-                List.find_opt
-                  (fun (s : Data.Service_state.t) ->
-                    s.service.Service.role = "node"
-                    && s.service.Service.instance = inst)
-                  states
-              in
-              match node with
-              | Some n -> Some n.Data.Service_state.service.Service.network
-              | None -> None)
-          | _ -> None
-        in
-
         (* Build base_dir *)
         let base_dir =
-          let trimmed = String.trim model.client.base_dir in
+          let trimmed = String.trim model.base_dir in
           if trimmed = "" then
             Common.default_role_dir "signer" model.core.instance_name
           else trimmed
         in
 
-        (* Build service args: global options before "run signer" *)
-        let service_args =
-          ["--endpoint"; node_endpoint; "--base-dir"; base_dir; "run"; "signer"]
-          @ extra_args
+        (* Build global args (-A for require-auth, -f for password file) *)
+        let global_args =
+          (if model.signer.require_auth then ["-A"] else [])
+          @
+          let pf = String.trim model.signer.password_file in
+          if pf <> "" then ["-f"; pf] else []
         in
+        let global_args_str = String.concat " " global_args in
+
+        (* Service args are command options only (after "launch socket signer --address --port") *)
+        let service_args = extra_args in
 
         (* Build daemon request *)
         let req : Installer_types.daemon_request =
           {
             role = "signer";
             instance = model.core.instance_name;
-            network = Option.value ~default:"mainnet" network;
+            network = "mainnet";
             history_mode = History_mode.default;
-            data_dir = Common.default_role_dir "signer" model.core.instance_name;
-            rpc_addr = node_endpoint;
+            data_dir = base_dir;
+            rpc_addr =
+              Printf.sprintf "%s:%s" model.signer.address model.signer.port;
             net_addr = "";
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
             logging_mode;
             service_args;
-            extra_env = [];
-            extra_paths = [];
+            extra_env =
+              [
+                ("OCTEZ_SIGNER_BASE_DIR", base_dir);
+                ("OCTEZ_SIGNER_ADDRESS", model.signer.address);
+                ("OCTEZ_SIGNER_PORT", model.signer.port);
+                ("OCTEZ_SIGNER_GLOBAL_ARGS", global_args_str);
+              ];
+            extra_paths = [base_dir];
             auto_enable = model.core.enable_on_boot;
           }
         in

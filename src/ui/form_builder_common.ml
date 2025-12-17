@@ -89,6 +89,9 @@ let has_octez_baker_binary = has_binary "octez-baker"
 (** Check if octez-node binary exists and is executable. *)
 let has_octez_node_binary = has_binary "octez-node"
 
+(** Check if octez-signer binary exists and is executable. *)
+let has_octez_signer_binary = has_binary "octez-signer"
+
 let endpoint_with_scheme rpc_addr =
   let trimmed = String.trim rpc_addr in
   if trimmed = "" then "http://127.0.0.1:8732"
