@@ -824,8 +824,10 @@ let show_menu_modal () =
     [
       ("Instances", "instances");
       ("Install node", "install_node_form_v3");
-      ("Install baker", "install_baker_form");
+      ("Install baker", "install_baker_form_v3");
       ("Install accuser", "install_accuser_form_v3");
+      ("Install DAL node", "install_dal_node_form_v3");
+      ("Install signer", "install_signer_form_v3");
     ]
   in
   open_choice_modal
