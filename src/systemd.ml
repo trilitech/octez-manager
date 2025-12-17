@@ -513,9 +513,11 @@ let ensure_user_logrotate_timer ~owner ~group ~logrotate_bin =
 
 let disable_user_logrotate_timer () =
   let timer = user_logrotate_unit ^ ".timer" in
-  let service = user_logrotate_unit ^ ".service" in
+  (* Only disable the timer - the service is triggered by timer and has no [Install] section *)
   ignore (run_systemctl ["disable"; "--now"; timer]) ;
-  ignore (run_systemctl ["disable"; "--now"; service]) ;
+  (* Stop the service if running, but don't try to disable it *)
+  let service = user_logrotate_unit ^ ".service" in
+  ignore (run_systemctl ["stop"; service]) ;
   ignore (run_systemctl_timeout ["daemon-reload"]) ;
   ()
 
