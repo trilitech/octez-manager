@@ -33,7 +33,12 @@ let initial_model =
         start_now = true;
         extra_args = "";
       };
-    client = {base_dir = ""; node = `None; node_endpoint = ""};
+    client =
+      {
+        base_dir = Common.default_role_dir "dal" "dal";
+        node = `None;
+        node_endpoint = "127.0.0.1:8732";
+      };
   }
 
 let require_package_manager () =
