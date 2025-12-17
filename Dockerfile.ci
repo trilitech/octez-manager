@@ -47,3 +47,12 @@ RUN opam update && opam install -y \
 
 # Clean up opam cache to reduce image size
 RUN opam clean -a -c -s --logs
+
+# GitHub Actions runs containers as root by default
+# Set up opam environment for root user
+USER root
+ENV OPAM_SWITCH_PREFIX=/home/opam/.opam/5.1
+ENV CAML_LD_LIBRARY_PATH=/home/opam/.opam/5.1/lib/stublibs:/home/opam/.opam/5.1/lib/ocaml/stublibs:/home/opam/.opam/5.1/lib/ocaml
+ENV OCAML_TOPLEVEL_PATH=/home/opam/.opam/5.1/lib/toplevel
+ENV PATH=/home/opam/.opam/5.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+WORKDIR /github/workspace
