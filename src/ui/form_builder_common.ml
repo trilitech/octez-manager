@@ -57,8 +57,7 @@ let parse_host_port (s : string) : (string * int) option =
       try
         let p = int_of_string (String.trim port) in
         let h = String.trim host in
-        if p > 0 && p < 65536 && h <> "" then Some (h, p)
-        else None
+        if p > 0 && p < 65536 && h <> "" then Some (h, p) else None
       with _ -> None)
   | _ -> None
 
@@ -115,44 +114,37 @@ let parse_shellwords s =
       let c = s.[i] in
       match (in_quote, escape, c) with
       (* Handle escape sequences *)
-      | (_, true, _) ->
+      | _, true, _ ->
           (* Previous char was backslash, add current char literally *)
           parse_loop (i + 1) acc (current ^ String.make 1 c) in_quote false
-      | (Some '"', false, '\\') ->
+      | Some '"', false, '\\' ->
           (* Backslash in double quotes - escape next char *)
           parse_loop (i + 1) acc current in_quote true
-      | (None, false, '\\') ->
+      | None, false, '\\' ->
           (* Backslash outside quotes - escape next char *)
           parse_loop (i + 1) acc current in_quote true
-
       (* Handle quote boundaries *)
-      | (None, false, '\'') ->
+      | None, false, '\'' ->
           (* Start single quote *)
           parse_loop (i + 1) acc current (Some '\'') false
-      | (Some '\'', false, '\'') ->
+      | Some '\'', false, '\'' ->
           (* End single quote *)
           parse_loop (i + 1) acc current None false
-      | (None, false, '"') ->
+      | None, false, '"' ->
           (* Start double quote *)
           parse_loop (i + 1) acc current (Some '"') false
-      | (Some '"', false, '"') ->
+      | Some '"', false, '"' ->
           (* End double quote *)
           parse_loop (i + 1) acc current None false
-
       (* Handle whitespace *)
-      | (None, false, (' ' | '\t' | '\n' | '\r')) ->
+      | None, false, (' ' | '\t' | '\n' | '\r') ->
           (* Whitespace outside quotes - word boundary *)
-          if current = "" then
-            parse_loop (i + 1) acc current None false
-          else
-            parse_loop (i + 1) (current :: acc) "" None false
-
+          if current = "" then parse_loop (i + 1) acc current None false
+          else parse_loop (i + 1) (current :: acc) "" None false
       (* Regular characters *)
-      | _ ->
-          parse_loop (i + 1) acc (current ^ String.make 1 c) in_quote false
+      | _ -> parse_loop (i + 1) acc (current ^ String.make 1 c) in_quote false
   in
   parse_loop 0 [] "" None false
 
 let prepare_extra_args s =
-  if String.trim s = "" then []
-  else parse_shellwords (String.trim s)
+  if String.trim s = "" then [] else parse_shellwords (String.trim s)

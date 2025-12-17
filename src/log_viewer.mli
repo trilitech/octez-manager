@@ -18,5 +18,4 @@ val read_logs :
   (string list, [> `Msg of string]) result
 
 (** Get the path to the daily log file for an instance's data directory *)
-val get_daily_log_file :
-  data_dir:string -> (string, [> `Msg of string]) result
+val get_daily_log_file : data_dir:string -> (string, [> `Msg of string]) result

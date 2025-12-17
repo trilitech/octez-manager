@@ -1178,18 +1178,12 @@ let shellwords_parser_tests () =
     "double quotes preserve spaces"
     "foo \"bar baz\" qux"
     ["foo"; "bar baz"; "qux"] ;
-  test_case
-    "double quotes allow escaping"
-    "\"hello\\\"world\""
-    ["hello\"world"] ;
+  test_case "double quotes allow escaping" "\"hello\\\"world\"" ["hello\"world"] ;
 
   (* Backslash escaping *)
   test_case "escape space outside quotes" "foo\\ bar" ["foo bar"] ;
   test_case "escape quote" "foo\\\"bar" ["foo\"bar"] ;
-  test_case
-    "backslash in single quotes is literal"
-    "'foo\\bar'"
-    ["foo\\bar"] ;
+  test_case "backslash in single quotes is literal" "'foo\\bar'" ["foo\\bar"] ;
 
   (* Mixed quotes *)
   test_case
@@ -1251,20 +1245,11 @@ let form_builder_parse_host_port_tests () =
     (FB.parse_host_port "example.com:443") ;
 
   (* Invalid cases *)
-  Alcotest.(check option_pair)
-    "no port"
-    None
-    (FB.parse_host_port "localhost") ;
+  Alcotest.(check option_pair) "no port" None (FB.parse_host_port "localhost") ;
 
-  Alcotest.(check option_pair)
-    "no host"
-    None
-    (FB.parse_host_port ":8732") ;
+  Alcotest.(check option_pair) "no host" None (FB.parse_host_port ":8732") ;
 
-  Alcotest.(check option_pair)
-    "empty host"
-    None
-    (FB.parse_host_port "  :8732") ;
+  Alcotest.(check option_pair) "empty host" None (FB.parse_host_port "  :8732") ;
 
   Alcotest.(check option_pair)
     "invalid port"
@@ -1293,17 +1278,13 @@ let form_builder_parse_host_port_tests () =
 
 let form_builder_prepare_extra_args_integration () =
   let module FB = Octez_manager_ui.Form_builder_common in
-
   (* Test that prepare_extra_args uses shellwords parser correctly *)
   Alcotest.(check list_string)
     "uses shellwords parser"
     ["--option"; "value with spaces"]
     (FB.prepare_extra_args "--option \"value with spaces\"") ;
 
-  Alcotest.(check list_string)
-    "handles empty"
-    []
-    (FB.prepare_extra_args "") ;
+  Alcotest.(check list_string) "handles empty" [] (FB.prepare_extra_args "") ;
 
   Alcotest.(check list_string)
     "trims whitespace"
@@ -1788,7 +1769,8 @@ let teztnets_parse_top_level_list () =
       Alcotest.(check list_pairs)
         "top-level list"
         [
-          ("Alpha", "https://example/a.json"); ("unknown", "https://example/b.json");
+          ("Alpha", "https://example/a.json");
+          ("unknown", "https://example/b.json");
         ]
         pairs
   | Error (`Msg msg) -> Alcotest.failf "parse top-level list error: %s" msg
@@ -2006,7 +1988,8 @@ let installer_instance_name_chars () =
       in
       List.iter
         (fun name ->
-          match Installer.For_tests.validate_instance_name_chars ~instance:name
+          match
+            Installer.For_tests.validate_instance_name_chars ~instance:name
           with
           | Ok () -> ()
           | Error (`Msg msg) ->
@@ -2053,10 +2036,13 @@ let installer_instance_name_chars () =
       in
       List.iter
         (fun (name, _desc) ->
-          match Installer.For_tests.validate_instance_name_chars ~instance:name
+          match
+            Installer.For_tests.validate_instance_name_chars ~instance:name
           with
           | Ok () ->
-              Alcotest.failf "Invalid name '%s' was accepted but should fail" name
+              Alcotest.failf
+                "Invalid name '%s' was accepted but should fail"
+                name
           | Error (`Msg msg) ->
               Alcotest.(check bool)
                 "error message mentions invalid characters"
@@ -2065,7 +2051,8 @@ let installer_instance_name_chars () =
         invalid_names ;
       (* Test empty string *)
       match Installer.For_tests.validate_instance_name_chars ~instance:"" with
-      | Ok () -> Alcotest.fail "Empty instance name was accepted but should fail"
+      | Ok () ->
+          Alcotest.fail "Empty instance name was accepted but should fail"
       | Error (`Msg msg) ->
           Alcotest.(check bool)
             "error message mentions empty"
@@ -2081,8 +2068,7 @@ let installer_instance_name_full_validation () =
       (* Test that validate_instance_name checks both chars and uniqueness *)
       (* 1. Invalid characters should fail before uniqueness check *)
       (match Installer.For_tests.validate_instance_name ~instance:"théo" with
-      | Ok () ->
-          Alcotest.fail "Instance name with invalid chars was accepted"
+      | Ok () -> Alcotest.fail "Instance name with invalid chars was accepted"
       | Error (`Msg msg) ->
           Alcotest.(check bool)
             "error mentions invalid characters"
@@ -2756,8 +2742,14 @@ let () =
         [
           Alcotest.test_case "is_nonempty" `Quick form_builder_is_nonempty_tests;
           Alcotest.test_case "normalize" `Quick form_builder_normalize_tests;
-          Alcotest.test_case "parse_host_port" `Quick form_builder_parse_host_port_tests;
-          Alcotest.test_case "prepare_extra_args" `Quick form_builder_prepare_extra_args_integration;
+          Alcotest.test_case
+            "parse_host_port"
+            `Quick
+            form_builder_parse_host_port_tests;
+          Alcotest.test_case
+            "prepare_extra_args"
+            `Quick
+            form_builder_prepare_extra_args_integration;
         ] );
       ( "snapshots.basic",
         [

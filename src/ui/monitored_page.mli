@@ -26,4 +26,5 @@ module Make : functor
   (_ : sig
      val page_name : string
    end)
-  -> Miaou.Core.Tui_page.PAGE_SIG with type state = P.state and type msg = P.msg
+  ->
+  Miaou.Core.Tui_page.PAGE_SIG with type state = P.state and type msg = P.msg

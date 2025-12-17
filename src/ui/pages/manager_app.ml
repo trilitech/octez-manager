@@ -58,10 +58,7 @@ let run ?page ?(log = false) ?logfile () =
       | `Quit -> raise Exit
       | `SwitchTo "__EXIT__" -> raise Exit
       | `SwitchTo "__BACK__" -> (
-          match history with
-          | [] -> raise Exit
-          | prev :: rest -> loop rest prev)
+          match history with [] -> raise Exit | prev :: rest -> loop rest prev)
       | `SwitchTo next_page -> loop (current_name :: history) next_page
   in
-  (try loop [] start_name with
-  | Exit | Sys.Break -> Ok ())
+  try loop [] start_name with Exit | Sys.Break -> Ok ()

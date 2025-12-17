@@ -7,9 +7,13 @@
 
 (** Wrapper functor that adds automatic metrics tracking to any page *)
 
-module Make (P : Miaou.Core.Tui_page.PAGE_SIG) (Config : sig
-  val page_name : string
-end) : Miaou.Core.Tui_page.PAGE_SIG with type state = P.state and type msg = P.msg = struct
+module Make
+    (P : Miaou.Core.Tui_page.PAGE_SIG)
+    (Config : sig
+      val page_name : string
+    end) :
+  Miaou.Core.Tui_page.PAGE_SIG with type state = P.state and type msg = P.msg =
+struct
   type state = P.state
 
   type msg = P.msg
@@ -21,7 +25,7 @@ end) : Miaou.Core.Tui_page.PAGE_SIG with type state = P.state and type msg = P.m
   (* Wrap view with metrics tracking *)
   let view s ~focus ~size =
     Metrics.record_render ~page:Config.page_name (fun () ->
-      P.view s ~focus ~size)
+        P.view s ~focus ~size)
 
   let move = P.move
 

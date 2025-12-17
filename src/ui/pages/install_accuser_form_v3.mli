@@ -7,11 +7,11 @@
 
 (** Accuser installation form using field bundles *)
 
-val name : string
 (** Page identifier for registration *)
+val name : string
 
-val page : Miaou.Core.Registry.page
 (** The page module implementing accuser installation *)
+val page : Miaou.Core.Registry.page
 
-val register : unit -> unit
 (** Register the accuser installation page in the Miaou registry *)
+val register : unit -> unit

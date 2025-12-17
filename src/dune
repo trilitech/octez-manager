@@ -43,6 +43,12 @@
  (name main)
  (public_name octez-manager)
  (modules main)
- (libraries octez_manager_lib octez-manager.ui cmdliner rresult yojson linenoise)
+ (libraries
+  octez_manager_lib
+  octez-manager.ui
+  cmdliner
+  rresult
+  yojson
+  linenoise)
  (instrumentation
   (backend bisect_ppx)))

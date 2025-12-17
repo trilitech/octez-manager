@@ -11,7 +11,8 @@
 (** Directory type discriminator *)
 type dir_type =
   | Node_data_dir  (** Node data directory (used by node services) *)
-  | Client_base_dir  (** Client base directory / wallet (used by baker/signer) *)
+  | Client_base_dir
+      (** Client base directory / wallet (used by baker/signer) *)
   | App_bin_dir  (** Application binary directory (contains octez binaries) *)
 
 (** Directory registry entry *)
@@ -36,9 +37,7 @@ val find_by_path : string -> (directory_entry option, [`Msg of string]) result
 (** List all registered directories.
     @param dir_type Optional filter by directory type *)
 val list :
-  ?dir_type:dir_type ->
-  unit ->
-  (directory_entry list, [`Msg of string]) result
+  ?dir_type:dir_type -> unit -> (directory_entry list, [`Msg of string]) result
 
 (** Remove a directory from the registry. *)
 val remove : string -> (unit, [`Msg of string]) result

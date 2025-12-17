@@ -49,29 +49,33 @@ type 'model pre_submit_modal_config =
       choices : 'choice list;
       to_string : 'choice -> string;
       on_choice : 'choice -> 'model -> 'model;
-    } -> 'model pre_submit_modal_config
+    }
+      -> 'model pre_submit_modal_config
 
 (** A specification for an entire form page. *)
 type 'model spec = {
   title : string;
   initial_model : 'model;
   fields : 'model field list;
-  (** Optional initialization hook called once when page is first loaded.
+      (** Optional initialization hook called once when page is first loaded.
       Use for prefetching data, starting background tasks, etc. *)
   on_init : ('model -> unit) option;
-  (** Optional refresh hook called on every refresh cycle.
+      (** Optional refresh hook called on every refresh cycle.
       WARNING: Keep this lightweight - it's called frequently (on every keystroke).
       Avoid spawning subprocesses or expensive operations here. *)
   on_refresh : ('model -> unit) option;
-  (** Pre-submission validation with custom error handling.
+      (** Pre-submission validation with custom error handling.
       Return Ok() to proceed with submission, or Error to show modal and abort. *)
-  pre_submit : ('model -> (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result) option;
-  (** Optional conditional modal shown before submission.
+  pre_submit :
+    ('model ->
+    (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result)
+    option;
+      (** Optional conditional modal shown before submission.
       If the function returns Some modal_config, shows a choice modal and updates
       the model based on user's choice. User must then submit again to proceed.
       If returns None, proceeds directly to on_submit. *)
   pre_submit_modal : ('model -> 'model pre_submit_modal_config option) option;
-  (** Main submission handler. Can perform async operations, show progress modals, etc.
+      (** Main submission handler. Can perform async operations, show progress modals, etc.
       Return Ok() for success (navigates to instances), Error for failure (shows error modal). *)
   on_submit : 'model -> (unit, [`Msg of string]) result;
 }
@@ -127,10 +131,7 @@ val dynamic_choice :
   'model field
 
 (** Read-only display field. *)
-val readonly :
-  label:string ->
-  get:('model -> string) ->
-  'model field
+val readonly : label:string -> get:('model -> string) -> 'model field
 
 (** Field with custom editing action. *)
 val custom :

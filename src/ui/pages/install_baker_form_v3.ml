@@ -30,34 +30,32 @@ type model = {
   core : Form_builder_common.core_service_config;
   client : Form_builder_common.client_config;
   (* Baker-specific fields *)
-  parent_node : string;  (* empty = external *)
+  parent_node : string; (* empty = external *)
   node_data_dir : string;
   dal : dal_selection;
   delegates : string list;
   liquidity_baking_vote : string;
 }
 
-let initial_model = {
-  core = {
-    instance_name = "baker";
-    service_user = Form_builder_common.default_service_user ();
-    app_bin_dir = "/usr/bin";
-    logging = `File;
-    enable_on_boot = true;
-    start_now = true;
-    extra_args = "";
-  };
-  client = {
-    base_dir = "";
-    node = `None;
-    node_endpoint = "127.0.0.1:8732";
-  };
-  parent_node = "";
-  node_data_dir = "";
-  dal = Dal_none;
-  delegates = [];
-  liquidity_baking_vote = "pass";
-}
+let initial_model =
+  {
+    core =
+      {
+        instance_name = "baker";
+        service_user = Form_builder_common.default_service_user ();
+        app_bin_dir = "/usr/bin";
+        logging = `File;
+        enable_on_boot = true;
+        start_now = true;
+        extra_args = "";
+      };
+    client = {base_dir = ""; node = `None; node_endpoint = "127.0.0.1:8732"};
+    parent_node = "";
+    node_data_dir = "";
+    dal = Dal_none;
+    delegates = [];
+    liquidity_baking_vote = "pass";
+  }
 
 (** {1 Helper Functions} *)
 
@@ -138,7 +136,9 @@ let endpoint_host_port ep =
 let baker_node_mode model states =
   match find_node states model.parent_node with
   | Some _ -> `Local
-  | None -> if Form_builder_common.is_nonempty model.node_data_dir then `Local else `Remote
+  | None ->
+      if Form_builder_common.is_nonempty model.node_data_dir then `Local
+      else `Remote
 
 let resolve_node_data_dir model states =
   match find_node states model.parent_node with
@@ -174,32 +174,52 @@ let parent_node_field =
         | `External -> "External/None (use custom endpoint)"
         | `Node n ->
             let svc = n.Data.Service_state.service in
-            Printf.sprintf "Node · %s (%s)" svc.Service.instance svc.Service.network
+            Printf.sprintf
+              "Node · %s (%s)"
+              svc.Service.instance
+              svc.Service.network
       in
       let on_select = function
         | `External ->
-            model_ref := {!model_ref with parent_node = ""; client = {(!model_ref).client with node = `None}}
+            model_ref :=
+              {
+                !model_ref with
+                parent_node = "";
+                client = {!model_ref.client with node = `None};
+              }
         | `Node n ->
             let svc = n.Data.Service_state.service in
-            let current_name = Form_builder_common.normalize (!model_ref).core.instance_name in
+            let current_name =
+              Form_builder_common.normalize !model_ref.core.instance_name
+            in
             let should_autoname =
               current_name = "" || String.equal current_name "baker"
             in
             model_ref := {!model_ref with parent_node = svc.Service.instance} ;
-            if should_autoname then
+            if should_autoname then (
               let new_name = Printf.sprintf "baker-%s" svc.Service.instance in
               let default_dir = Common.default_role_dir "baker" new_name in
-              let new_core = {(!model_ref).core with instance_name = new_name} in
-              let new_client = {(!model_ref).client with base_dir = default_dir} in
-              model_ref := {!model_ref with core = new_core; client = new_client} ;
-            (* Maybe use app_bin_dir from node *)
-            if has_octez_baker_binary svc.Service.app_bin_dir
-               && not (has_octez_baker_binary (!model_ref).core.app_bin_dir)
-            then
-              let new_core = {(!model_ref).core with app_bin_dir = svc.Service.app_bin_dir} in
-              model_ref := {!model_ref with core = new_core}
+              let new_core = {!model_ref.core with instance_name = new_name} in
+              let new_client =
+                {!model_ref.client with base_dir = default_dir}
+              in
+              model_ref :=
+                {!model_ref with core = new_core; client = new_client} ;
+              (* Maybe use app_bin_dir from node *)
+              if
+                has_octez_baker_binary svc.Service.app_bin_dir
+                && not (has_octez_baker_binary !model_ref.core.app_bin_dir)
+              then
+                let new_core =
+                  {!model_ref.core with app_bin_dir = svc.Service.app_bin_dir}
+                in
+                model_ref := {!model_ref with core = new_core})
       in
-      Modal_helpers.open_choice_modal ~title:"Parent Node" ~items ~to_string ~on_select)
+      Modal_helpers.open_choice_modal
+        ~title:"Parent Node"
+        ~items
+        ~to_string
+        ~on_select)
     ()
 
 let dal_node_field =
@@ -217,7 +237,8 @@ let dal_node_field =
           let states = Data.load_service_states () in
           Option.is_some (find_dal states inst)
       | Dal_endpoint ep ->
-          Option.is_some (Form_builder_common.parse_host_port (endpoint_host_port ep)))
+          Option.is_some
+            (Form_builder_common.parse_host_port (endpoint_host_port ep)))
     ~edit:(fun model_ref ->
       let states = Data.load_service_states () in
       let dal_nodes = dal_services states in
@@ -237,22 +258,32 @@ let dal_node_field =
         | `None -> model_ref := {!model_ref with dal = Dal_none}
         | `Dal n ->
             let svc = n.Data.Service_state.service in
-            model_ref := {!model_ref with dal = Dal_instance svc.Service.instance} ;
+            model_ref :=
+              {!model_ref with dal = Dal_instance svc.Service.instance} ;
             (* Maybe use app_bin_dir from DAL service *)
-            if has_octez_baker_binary svc.Service.app_bin_dir
-               && not (has_octez_baker_binary (!model_ref).core.app_bin_dir)
+            if
+              has_octez_baker_binary svc.Service.app_bin_dir
+              && not (has_octez_baker_binary !model_ref.core.app_bin_dir)
             then
-              let new_core = {(!model_ref).core with app_bin_dir = svc.Service.app_bin_dir} in
+              let new_core =
+                {!model_ref.core with app_bin_dir = svc.Service.app_bin_dir}
+              in
               model_ref := {!model_ref with core = new_core}
         | `Custom ->
             Modal_helpers.prompt_text_modal
               ~title:"DAL Endpoint"
               ~placeholder:(Some "host:port (e.g., 127.0.0.1:10732)")
-              ~initial:(match !model_ref.dal with Dal_endpoint ep -> ep | _ -> "")
-              ~on_submit:(fun ep -> model_ref := {!model_ref with dal = Dal_endpoint ep})
+              ~initial:
+                (match !model_ref.dal with Dal_endpoint ep -> ep | _ -> "")
+              ~on_submit:(fun ep ->
+                model_ref := {!model_ref with dal = Dal_endpoint ep})
               ()
       in
-      Modal_helpers.open_choice_modal ~title:"DAL Node" ~items ~to_string ~on_select)
+      Modal_helpers.open_choice_modal
+        ~title:"DAL Node"
+        ~items
+        ~to_string
+        ~on_select)
     ()
 
 let node_data_dir_field =
@@ -265,7 +296,9 @@ let node_data_dir_field =
       let selected_node = find_node states m.parent_node in
       let node_mode = baker_node_mode m states in
       match node_mode with
-      | `Local -> Form_builder_common.is_nonempty (resolve_node_data_dir m states) || Option.is_some selected_node
+      | `Local ->
+          Form_builder_common.is_nonempty (resolve_node_data_dir m states)
+          || Option.is_some selected_node
       | `Remote -> true)
     ()
 
@@ -277,7 +310,6 @@ let spec =
   {
     title = " Install Baker ";
     initial_model;
-
     fields =
       [
         (* Instance name with auto-update of base_dir *)
@@ -289,38 +321,43 @@ let spec =
             let default_dir = Common.default_role_dir "baker" instance_name in
             let keep_base_dir =
               String.trim m.client.base_dir <> ""
-              && not (String.equal m.client.base_dir (Common.default_role_dir "baker" old))
+              && not
+                   (String.equal
+                      m.client.base_dir
+                      (Common.default_role_dir "baker" old))
             in
             let new_core = {m.core with instance_name} in
-            let new_client = {m.client with base_dir = (if keep_base_dir then m.client.base_dir else default_dir)} in
+            let new_client =
+              {
+                m.client with
+                base_dir =
+                  (if keep_base_dir then m.client.base_dir else default_dir);
+              }
+            in
             {m with core = new_core; client = new_client})
           ~validate:(fun m ->
             let states = Data.load_service_states () in
             if not (Form_builder_common.is_nonempty m.core.instance_name) then
               Error "Instance name is required"
-            else if Form_builder_common.instance_in_use ~states m.core.instance_name then
-              Error "Instance name already exists"
+            else if
+              Form_builder_common.instance_in_use ~states m.core.instance_name
+            then Error "Instance name already exists"
             else Ok ());
-
         parent_node_field;
         dal_node_field;
-
         endpoint
           ~label:"Node Endpoint"
           ~get:(fun m -> m.client.node_endpoint)
           ~set:(fun node_endpoint m ->
             {m with client = {m.client with node_endpoint}})
           ();
-
         node_data_dir_field;
-
         client_base_dir
           ~label:"Baker Base Dir"
           ~get:(fun m -> m.client.base_dir)
           ~set:(fun base_dir m -> {m with client = {m.client with base_dir}})
           ~validate:(fun m -> Form_builder_common.is_nonempty m.client.base_dir)
           ();
-
         string_list
           ~label:"Delegates"
           ~get:(fun m -> m.delegates)
@@ -328,11 +365,12 @@ let spec =
           ~get_suggestions:(fun m ->
             if String.trim m.client.base_dir = "" then []
             else
-              match Keys_reader.read_public_key_hashes ~base_dir:m.client.base_dir with
+              match
+                Keys_reader.read_public_key_hashes ~base_dir:m.client.base_dir
+              with
               | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
               | Error _ -> [])
           ();
-
         choice
           ~label:"Liquidity Baking Vote"
           ~get:(fun m -> m.liquidity_baking_vote)
@@ -346,79 +384,89 @@ let spec =
           ~binary:"octez-baker"
           ~subcommand:["run"]
           ~binary_validator:has_octez_baker_binary
-          ~skip_instance_name:true  (* We define instance_name manually above with custom logic *)
+          ~skip_instance_name:true
+            (* We define instance_name manually above with custom logic *)
           ();
-
     pre_submit = None;
     on_init = None;
     on_refresh = None;
     pre_submit_modal = None;
+    on_submit =
+      (fun model ->
+        let states = Data.load_service_states () in
+        let selected_node = find_node states model.parent_node in
+        let node_endpoint = resolve_node_endpoint model states in
+        let dal_config = resolve_dal_config model states in
 
-    on_submit = (fun model ->
-      let states = Data.load_service_states () in
-      let selected_node = find_node states model.parent_node in
-      let node_endpoint = resolve_node_endpoint model states in
-      let dal_config = resolve_dal_config model states in
+        let logging_mode =
+          match model.core.logging with
+          | `Journald -> Logging_mode.Journald
+          | `File ->
+              let dir =
+                Common.default_log_dir
+                  ~role:"baker"
+                  ~instance:model.core.instance_name
+              in
+              let path = Filename.concat dir "baker.log" in
+              Logging_mode.File {path; rotate = true}
+        in
 
-      let logging_mode =
-        match model.core.logging with
-        | `Journald -> Logging_mode.Journald
-        | `File ->
-            let dir =
-              Common.default_log_dir ~role:"baker" ~instance:model.core.instance_name
-            in
-            let path = Filename.concat dir "baker.log" in
-            Logging_mode.File {path; rotate = true}
-      in
+        let extra_args =
+          Form_builder_common.prepare_extra_args model.core.extra_args
+        in
 
-      let extra_args = Form_builder_common.prepare_extra_args model.core.extra_args in
+        let base_dir =
+          let trimmed = String.trim model.client.base_dir in
+          if trimmed = "" then
+            Common.default_role_dir "baker" model.core.instance_name
+          else trimmed
+        in
 
-      let base_dir =
-        let trimmed = String.trim model.client.base_dir in
-        if trimmed = "" then Common.default_role_dir "baker" model.core.instance_name
-        else trimmed
-      in
+        let req =
+          {
+            Installer_types.instance = model.core.instance_name;
+            node_mode =
+              (match selected_node with
+              | Some svc ->
+                  Installer_types.Local_instance
+                    svc.Data.Service_state.service.Service.instance
+              | None -> Installer_types.Remote_endpoint node_endpoint);
+            base_dir = Some base_dir;
+            delegates = model.delegates;
+            dal_config;
+            liquidity_baking_vote =
+              (if String.trim model.liquidity_baking_vote = "" then None
+               else Some (String.trim model.liquidity_baking_vote));
+            extra_args;
+            service_user = model.core.service_user;
+            app_bin_dir = model.core.app_bin_dir;
+            logging_mode;
+            auto_enable = model.core.enable_on_boot;
+          }
+        in
 
-      let req = {
-        Installer_types.instance = model.core.instance_name;
-        node_mode =
-          (match selected_node with
-          | Some svc -> Installer_types.Local_instance svc.Data.Service_state.service.Service.instance
-          | None -> Installer_types.Remote_endpoint node_endpoint);
-        base_dir = Some base_dir;
-        delegates = model.delegates;
-        dal_config;
-        liquidity_baking_vote =
-          (if String.trim model.liquidity_baking_vote = "" then None
-          else Some (String.trim model.liquidity_baking_vote));
-        extra_args;
-        service_user = model.core.service_user;
-        app_bin_dir = model.core.app_bin_dir;
-        logging_mode;
-        auto_enable = model.core.enable_on_boot;
-      } in
-
-      let* () =
-        if Common.is_root () then
-          System_user.ensure_service_account ~name:model.core.service_user
-        else Ok ()
-      in
-      let* (module PM) = require_package_manager () in
-      let* _ = PM.install_baker req in
-      if model.core.start_now then
-        match Miaou_interfaces.Service_lifecycle.get () with
-        | Some sl ->
-            Miaou_interfaces.Service_lifecycle.start
-              sl
-              ~role:"baker"
-              ~service:model.core.instance_name
-            |> Result.map_error (fun e -> `Msg e)
-        | None -> Error (`Msg "Service lifecycle capability not available")
-      else Ok ());
+        let* () =
+          if Common.is_root () then
+            System_user.ensure_service_account ~name:model.core.service_user
+          else Ok ()
+        in
+        let* (module PM) = require_package_manager () in
+        let* _ = PM.install_baker req in
+        if model.core.start_now then
+          match Miaou_interfaces.Service_lifecycle.get () with
+          | Some sl ->
+              Miaou_interfaces.Service_lifecycle.start
+                sl
+                ~role:"baker"
+                ~service:model.core.instance_name
+              |> Result.map_error (fun e -> `Msg e)
+          | None -> Error (`Msg "Service lifecycle capability not available")
+        else Ok ());
   }
 
-module Page = Form_builder.Make(struct
+module Page = Form_builder.Make (struct
   type nonrec model = model
+
   let spec = spec
 end)
 
