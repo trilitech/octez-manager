@@ -102,6 +102,12 @@ let exec_line role =
        --base-dir \"${OCTEZ_CLIENT_BASE_DIR}\" \
        --endpoint \"${OCTEZ_NODE_ENDPOINT}\" \
        run accuser ${OCTEZ_SERVICE_ARGS:-}'"
+  | "dal-node" | "dal" ->
+      (* DAL is a subcommand of octez-baker: octez-baker [global] run dal [opts] *)
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" \
+       --base-dir \"${OCTEZ_CLIENT_BASE_DIR}\" \
+       --endpoint \"${OCTEZ_NODE_ENDPOINT}\" \
+       run dal --data-dir \"${OCTEZ_DAL_DATA_DIR}\" ${OCTEZ_SERVICE_ARGS:-}'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \
