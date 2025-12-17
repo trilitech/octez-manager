@@ -610,16 +610,16 @@ let install_baker_cmd =
             else Error "Instance name is required in non-interactive mode"
       in
       (* Prompt for node_instance if not provided in interactive mode *)
-      let* resolved_node_instance =
+      let* resolved_node_instance, resolved_node_endpoint =
         match normalize_opt_string node_instance with
-        | Some ni -> Ok (Some ni)
+        | Some ni -> Ok (Some ni, node_endpoint)
         | None ->
             if is_interactive () then
               (* Get list of available node instances *)
               match Service_registry.list () with
               | Error (`Msg msg) ->
                   prerr_endline ("Warning: Could not load services: " ^ msg) ;
-                  Ok None
+                  Ok (None, node_endpoint)
               | Ok services -> (
                   let node_services =
                     List.filter
@@ -630,7 +630,7 @@ let install_baker_cmd =
                     prerr_endline
                       "No node instances found. You can specify a custom \
                        endpoint." ;
-                    Ok None)
+                    Ok (None, node_endpoint))
                   else
                     let instance_names =
                       List.map
@@ -656,9 +656,20 @@ let install_baker_cmd =
                          127.0.0.1:8732)"
                         instance_names
                     with
-                    | Some selected -> Ok (Some selected)
-                    | None -> Ok None)
-            else Ok None
+                    | Some selected -> (
+                        (* Try to find a matching node service by instance name; if found,
+                           use it as node_instance, otherwise treat the input as a
+                           literal endpoint string. *)
+                        match
+                          List.find_opt
+                            (fun (svc : Service.t) ->
+                              String.equal svc.instance selected)
+                            node_services
+                        with
+                        | Some _svc -> Ok (Some selected, node_endpoint)
+                        | None -> Ok (None, Some selected))
+                    | None -> Ok (None, node_endpoint))
+            else Ok (None, node_endpoint)
       in
       let* liquidity_baking_vote =
         match normalize_opt_string liquidity_baking_vote_opt with
@@ -758,7 +769,7 @@ let install_baker_cmd =
           instance;
           node_instance = resolved_node_instance;
           node_data_dir;
-          node_endpoint;
+          node_endpoint = resolved_node_endpoint;
           node_mode = `Auto;
           base_dir;
           delegates;
