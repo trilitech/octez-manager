@@ -733,13 +733,11 @@ let create_menu_modal state =
       | `DalNode -> "DAL Node"
       | `Signer -> "Signer")
     ~on_select:(function
-      | `Node -> Context.navigate Install_node_form.name
-      | `Baker -> Context.navigate Install_baker_form.name
-      | `Accuser -> Context.navigate Install_accuser_form_v2.name
-      | _ ->
-          show_error
-            ~title:"Not Implemented"
-            "This service creation is not yet implemented via UI.") ;
+      | `Node -> Context.navigate Install_node_form_v3.name
+      | `Baker -> Context.navigate Install_baker_form_v3.name
+      | `Accuser -> Context.navigate Install_accuser_form_v3.name
+      | `DalNode -> Context.navigate Install_dal_node_form_v3.name
+      | `Signer -> Context.navigate Install_signer_form_v3.name) ;
   state
 
 let go_to_diagnostics state =
