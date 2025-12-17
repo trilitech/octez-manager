@@ -69,6 +69,25 @@ let default_service_user () =
     | pw when String.trim pw.Unix.pw_name <> "" -> pw.Unix.pw_name
     | _ -> "octez"
 
+(** Check if a binary exists in a directory and is executable. *)
+let has_binary binary_name dir =
+  let trimmed = String.trim dir in
+  if trimmed = "" then false
+  else
+    let candidate = Filename.concat trimmed binary_name in
+    Sys.file_exists candidate
+    &&
+      try
+        Unix.access candidate [Unix.X_OK] ;
+        true
+      with Unix.Unix_error _ -> false
+
+(** Check if octez-baker binary exists and is executable. *)
+let has_octez_baker_binary = has_binary "octez-baker"
+
+(** Check if octez-node binary exists and is executable. *)
+let has_octez_node_binary = has_binary "octez-node"
+
 (** {1 Helpers} *)
 
 (** Parse shellwords-style arguments with quote support.

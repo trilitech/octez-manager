@@ -57,6 +57,16 @@ val parse_host_port : string -> (string * int) option
 val default_service_user : unit -> string
 (** Get default service user (octez for root, current user otherwise) *)
 
+val has_binary : string -> string -> bool
+(** [has_binary binary_name dir] checks if [binary_name] exists in [dir]
+    and is executable. *)
+
+val has_octez_baker_binary : string -> bool
+(** Check if octez-baker binary exists and is executable in the given directory. *)
+
+val has_octez_node_binary : string -> bool
+(** Check if octez-node binary exists and is executable in the given directory. *)
+
 (** {1 Helpers} *)
 
 val prepare_extra_args : string -> string list
