@@ -76,7 +76,9 @@ let create_node_flow ~on_success =
                         rpc_addr = "127.0.0.1:8732";
                         net_addr = "0.0.0.0:9732";
                         service_user = "octez";
-                        app_bin_dir = "/usr/bin";
+                        app_bin_dir =
+                          Form_builder_common.default_app_bin_dir
+                            ~binary_name:"octez-node";
                         logging_mode = Logging_mode.Journald;
                         extra_args = [];
                         auto_enable = true;
@@ -141,7 +143,9 @@ let create_baker_flow ~services ~on_success =
                       liquidity_baking_vote = None;
                       extra_args = [];
                       service_user = "octez";
-                      app_bin_dir = "/usr/bin";
+                      app_bin_dir =
+                        Form_builder_common.default_app_bin_dir
+                          ~binary_name:"octez-baker";
                       logging_mode = Logging_mode.Journald;
                       auto_enable = true;
                     }
@@ -188,7 +192,9 @@ let create_accuser_flow ~on_success =
                 rpc_addr = node_endpoint;
                 net_addr = "";
                 service_user = "octez";
-                app_bin_dir = "/usr/bin";
+                app_bin_dir =
+                  Form_builder_common.default_app_bin_dir
+                    ~binary_name:"octez-accuser";
                 logging_mode = Logging_mode.Journald;
                 service_args = [];
                 extra_env =
@@ -242,7 +248,9 @@ let create_dal_node_flow ~on_success =
                 rpc_addr = "127.0.0.1:10732";
                 net_addr = "0.0.0.0:11732";
                 service_user = "octez";
-                app_bin_dir = "/usr/bin";
+                app_bin_dir =
+                  Form_builder_common.default_app_bin_dir
+                    ~binary_name:"octez-dal-node";
                 logging_mode = Logging_mode.Journald;
                 service_args =
                   [
@@ -293,7 +301,9 @@ let create_signer_flow ~on_success =
             address = "127.0.0.1";
             port = 6732;
             service_user = "octez";
-            app_bin_dir = "/usr/bin";
+            app_bin_dir =
+              Form_builder_common.default_app_bin_dir
+                ~binary_name:"octez-signer";
             logging_mode = Logging_mode.Journald;
             require_auth = false;
             password_file = None;
