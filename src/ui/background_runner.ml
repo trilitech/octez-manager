@@ -1,3 +1,10 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
 (* Background runner backed by an Eio stream. Producers enqueue tasks from any
    thread; a dedicated Eio runtime hosts worker fibers that execute tasks in
    separate domains to keep the UI responsive. *)
