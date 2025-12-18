@@ -322,14 +322,12 @@ let endpoint_of_rpc rpc_addr =
 let lookup_node_service instance =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc when String.equal (String.lowercase_ascii svc.Service.role) "node"
-    ->
-      Ok svc
+  | Some svc when svc.Service.role = Service.Node -> Ok svc
   | Some svc ->
       R.error_msgf
         "Instance '%s' is a %s service, expected a node"
         instance
-        svc.role
+        (Service.role_to_string svc.role)
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let build_run_args ~network ~history_mode ~rpc_addr ~net_addr ~extra_args
@@ -494,8 +492,9 @@ let import_snapshot_for_instance ~(instance : string) ?snapshot_uri
       ~snapshot_uri_override:snapshot_uri
       ~snapshot_kind_override:snapshot_kind
   in
-  let* was_active = Systemd.is_active ~role:"node" ~instance:service.instance in
-  let* () = Systemd.stop ~role:"node" ~instance:service.instance in
+  let role = Service.Node in
+  let* was_active = Systemd.is_active ~role ~instance:service.instance in
+  let* () = Systemd.stop ~role ~instance:service.instance in
   let* () =
     perform_snapshot_plan
       ~plan
@@ -515,8 +514,7 @@ let import_snapshot_for_instance ~(instance : string) ?snapshot_uri
       ~logging_mode:service.logging_mode
   in
   let* () =
-    if was_active then Systemd.start ~role:"node" ~instance:service.instance
-    else Ok ()
+    if was_active then Systemd.start ~role ~instance:service.instance else Ok ()
   in
   Ok ()
 
@@ -565,8 +563,9 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
         restored := true ;
         Ok ()
   in
-  let* was_active = Systemd.is_active ~role:"node" ~instance:service.instance in
-  let* () = Systemd.stop ~role:"node" ~instance:service.instance in
+  let role = Service.Node in
+  let* was_active = Systemd.is_active ~role ~instance:service.instance in
+  let* () = Systemd.stop ~role ~instance:service.instance in
   let result =
     Fun.protect
       ~finally:(fun () ->
@@ -608,8 +607,7 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
             ~logging_mode:service.logging_mode
         in
         let* () =
-          if was_active then
-            Systemd.start ~role:"node" ~instance:service.instance
+          if was_active then Systemd.start ~role ~instance:service.instance
           else Ok ()
         in
         Ok ())
@@ -648,7 +646,7 @@ let validate_instance_name_unique ~instance =
         "Instance name '%s' is already in use by a %s service. Please choose a \
          different name."
         instance
-        svc.Service.role
+        (Service.role_to_string svc.Service.role)
   | None -> Ok ()
 
 let validate_instance_name ~instance =
@@ -656,6 +654,7 @@ let validate_instance_name ~instance =
   validate_instance_name_unique ~instance
 
 let install_node (request : node_request) =
+  let role = Service.Node in
   let* () = validate_instance_name ~instance:request.instance in
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
@@ -664,7 +663,7 @@ let install_node (request : node_request) =
   let logging_mode =
     prepare_logging
       ~instance:request.instance
-      ~role:"node"
+      ~role
       ~logging_mode:request.logging_mode
   in
   let data_dir_nonempty =
@@ -731,7 +730,7 @@ let install_node (request : node_request) =
   let service =
     Service.make
       ~instance:request.instance
-      ~role:"node"
+      ~role
       ~network:request.network
       ~history_mode:request.history_mode
       ~data_dir
@@ -750,7 +749,7 @@ let install_node (request : node_request) =
   in
   let* () =
     Systemd.install_unit
-      ~role:"node"
+      ~role
       ~app_bin_dir:request.app_bin_dir
       ~user:request.service_user
   in
@@ -1096,7 +1095,9 @@ let purge_service ~instance =
   | Some svc ->
       let* () = remove_service ~delete_data_dir:true ~instance in
       (* Also remove per-instance env files under XDG_CONFIG_HOME or /etc when purging *)
-      let env_dir = Filename.concat (Common.env_instances_base_dir ()) instance in
+      let env_dir =
+        Filename.concat (Common.env_instances_base_dir ()) instance
+      in
       let _ =
         (* Best-effort: don't fail purge if env removal fails *)
         match Common.remove_tree env_dir with

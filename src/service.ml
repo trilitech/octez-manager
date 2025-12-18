@@ -1,21 +1,3 @@
-type role = Node | Dal_node | Baker | Accuser | Signer
-
-let role_to_string = function
-  | Node -> "node"
-  | Dal_node -> "dal-node"
-  | Baker -> "baker"
-  | Accuser -> "accuser"
-  | Signer -> "signer"
-
-let role_of_string s =
-  match String.trim @@ String.lowercase_ascii s with
-  | "node" -> Node
-  | "baker" -> Baker
-  | "accuser" -> Accuser
-  | "dal-node" -> Dal_node
-  | "signer" -> Signer
-  | s -> raise (Invalid_argument s)
-
 type t = {
   instance : string;
   role : role;
@@ -99,7 +81,7 @@ let to_yojson t =
   `Assoc
     [
       ("instance", `String t.instance);
-      ("role", `String t.role);
+      ("role", `String (role_to_string t.role));
       ("network", `String t.network);
       ("history_mode", `String (History_mode.to_string t.history_mode));
       ("data_dir", `String t.data_dir);
@@ -125,7 +107,7 @@ let of_yojson json =
   let open Yojson.Safe.Util in
   try
     let instance = json |> member "instance" |> to_string in
-    let role = json |> member "role" |> to_string in
+    let role = json |> member "role" |> to_string |> role_of_string in
     let network = json |> member "network" |> to_string in
     let history_mode =
       match json |> member "history_mode" with

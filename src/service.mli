@@ -20,13 +20,13 @@ type t = {
   extra_args : string list;
 }
 
-val role_of_string : role -> string
+val role_of_string : string -> role
 
-val role_to_string : string -> role
+val role_to_string : role -> string
 
 val make :
   instance:string ->
-  role:string ->
+  role:role ->
   network:string ->
   history_mode:History_mode.t ->
   data_dir:string ->

@@ -4,14 +4,21 @@ let default_for ~instance ~role =
   if Common.is_root () then
     File
       {
-        path = Printf.sprintf "/var/log/octez/%s-%s.log" role instance;
+        path =
+          Printf.sprintf
+            "/var/log/octez/%s-%s.log"
+            (Service.role_to_string role)
+            instance;
         rotate = true;
       }
   else
     let base = Filename.concat (Common.xdg_state_home ()) "octez/logs" in
     File
       {
-        path = Filename.concat base (Printf.sprintf "%s-%s.log" role instance);
+        path =
+          Filename.concat
+            base
+            (Printf.sprintf "%s-%s.log" (Service.role_to_string role) instance);
         rotate = true;
       }
 
