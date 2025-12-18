@@ -20,11 +20,14 @@ type directory_entry = {
   path : string;  (** Absolute directory path *)
   dir_type : dir_type;  (** Type of directory *)
   created_at : string;  (** ISO timestamp: YYYY-MM-DD HH:MM:SS *)
+  last_used_at : string;  (** ISO timestamp of last use *)
   linked_services : string list;  (** Instance names using this directory *)
 }
 
 (** Register or update a directory in the registry.
-    If the path already exists, updates its linked_services. *)
+    If the path already exists, updates its linked_services and last_used_at.
+    Entries are limited to 10 per type, keeping the most recently used.
+    All queries return entries sorted by last_used_at (most recent first). *)
 val add :
   path:string ->
   dir_type:dir_type ->
