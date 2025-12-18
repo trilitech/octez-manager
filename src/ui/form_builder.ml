@@ -15,6 +15,7 @@ module Table_widget = Miaou_widgets_display.Table_widget
 (** Internal field representation with existential type for value. *)
 type ('model, 'value) field_internal = {
   label : string;
+  hint : string option;  (** Help text describing the field's purpose *)
   get : 'model -> 'value;
   set : 'value -> 'model -> 'model; [@warning "-69"]
   to_string : 'value -> string;
@@ -25,6 +26,9 @@ type ('model, 'value) field_internal = {
 
 (** Existentially wrapped field (hides the 'value type parameter). *)
 type 'model field = Field : ('model, 'value) field_internal -> 'model field
+
+(** Add a hint to a field. *)
+let with_hint hint (Field f) = Field {f with hint = Some hint}
 
 type 'model pre_submit_modal_config =
   | PreSubmitModal : {
@@ -63,7 +67,7 @@ let text ~label ~get ~set =
     let on_submit v = model_ref := set v !model_ref in
     Modal_helpers.prompt_text_modal ~title:label ~initial ~on_submit ()
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let validated_text ~label ~get ~set ~validate =
   let to_string v = v in
@@ -87,7 +91,7 @@ let validated_text ~label ~get ~set ~validate =
       ~on_submit
       ()
   in
-  Field {label; get; set; to_string; validate = validate_fn; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate = validate_fn; validate_msg; edit}
 
 let toggle ~label ~get ~set =
   let to_string = string_of_bool in
@@ -97,7 +101,7 @@ let toggle ~label ~get ~set =
     let current = get !model_ref in
     model_ref := set (not current) !model_ref
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let choice ~label ~get ~set ~to_string ~items =
   let validate _ = true in
@@ -106,7 +110,7 @@ let choice ~label ~get ~set ~to_string ~items =
     let on_select v = model_ref := set v !model_ref in
     Modal_helpers.open_choice_modal ~title:label ~items ~to_string ~on_select
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let dynamic_choice ~label ~get ~set ~to_string ~get_items =
   let validate _ = true in
@@ -116,7 +120,7 @@ let dynamic_choice ~label ~get ~set ~to_string ~get_items =
     let on_select v = model_ref := set v !model_ref in
     Modal_helpers.open_choice_modal ~title:label ~items ~to_string ~on_select
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let readonly ~label ~get =
   let set _ m = m in
@@ -124,13 +128,13 @@ let readonly ~label ~get =
   let validate _ = true in
   let validate_msg _ = None in
   let edit _ = () in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let custom ~label ~get ~edit ?(validate = fun _ -> true)
     ?(validate_msg = fun _ -> None) () =
   let set _ m = m in
   let to_string v = v in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let node_data_dir ~label ~get ~set ?(validate = fun _ -> true) () =
   let to_string v = v in
@@ -139,7 +143,7 @@ let node_data_dir ~label ~get ~set ?(validate = fun _ -> true) () =
     let on_select path = model_ref := set path !model_ref in
     Modal_helpers.select_node_data_dir_modal ~on_select ()
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let client_base_dir ~label ~get ~set ?(validate = fun _ -> true) () =
   let to_string v = v in
@@ -148,7 +152,7 @@ let client_base_dir ~label ~get ~set ?(validate = fun _ -> true) () =
     let on_select path = model_ref := set path !model_ref in
     Modal_helpers.select_client_base_dir_modal ~on_select ()
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let app_bin_dir ~label ~get ~set ?(validate = fun _ -> true) () =
   let to_string v = v in
@@ -157,7 +161,7 @@ let app_bin_dir ~label ~get ~set ?(validate = fun _ -> true) () =
     let on_select path = model_ref := set path !model_ref in
     Modal_helpers.select_app_bin_dir_modal ~on_select ()
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
     ?subcommand () =
@@ -187,7 +191,7 @@ let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
           ~title:"Extra Args"
           (Printf.sprintf "Binary help not available for %s" binary)
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 (** Helper to parse host:port *)
 let parse_host_port s =
@@ -222,7 +226,7 @@ let endpoint ~label ~get ~set ?default_port:(_ = 8732) () =
       ~on_submit:(fun v -> model_ref := set v !model_ref)
       ()
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let service_or_endpoint ~label ~role ~get ~set
     ?(external_label = "External endpoint...")
@@ -286,7 +290,7 @@ let service_or_endpoint ~label ~role ~get ~set
       ~to_string:to_string_item
       ~on_select
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
     ?(item_validator = fun _ -> Ok ()) () =
@@ -353,7 +357,7 @@ let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
       ~to_string:to_string_item
       ~on_select
   in
-  Field {label; get; set; to_string; validate; validate_msg; edit}
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
 (*****************************************************************************)
 (*                                  FUNCTOR                                  *)
@@ -532,9 +536,17 @@ struct
         Widgets.bg 22 (Widgets.fg 15 " ✓ Form is valid - ready to install! ")
       else Widgets.bg 160 (Widgets.fg 15 (Widgets.bold " ⚠ Form incomplete "))
     in
+    (* Get hint for current field and set it for Help_hint modal *)
+    let current_hint =
+      if s.cursor < List.length S.spec.fields then
+        let (Field f) = List.nth S.spec.fields s.cursor in
+        f.hint
+      else Some "Press Enter to install the service"
+    in
+    Miaou.Core.Help_hint.set current_hint ;
     let title_line = Widgets.title_highlight S.spec.title in
     let header = [title_line; status_banner] in
-    let footer = [Widgets.dim "↑/↓ navigate, Enter to edit, Esc back"] in
+    let footer = [Widgets.dim "↑/↓ navigate, Enter to edit, ? for help, Esc back"] in
     Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
         Table_widget.Table.render table)
 

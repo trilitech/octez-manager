@@ -235,3 +235,5 @@ let update_linked_services ~path ~linked_services =
       let updated = {entry with linked_services} in
       let filtered = List.filter (fun e -> e.path <> path) existing in
       write_all (updated :: filtered)
+
+let clear_all () = write_all []

@@ -1538,6 +1538,13 @@ let purge_all_cmd =
       | Ok services ->
           if services = [] then (
             print_endline "No services registered to purge." ;
+            (* Still clear directory registry in case of stale entries *)
+            (match Directory_registry.clear_all () with
+            | Ok () -> Format.printf "Directory registry cleared.@."
+            | Error (`Msg msg) ->
+                Format.eprintf
+                  "Warning: Failed to clear directory registry: %s@."
+                  msg) ;
             `Ok ())
           else
             let failures = ref [] in
@@ -1554,7 +1561,15 @@ let purge_all_cmd =
                     failures := (instance, msg) :: !failures)
               services ;
             if !failures = [] then (
-              Format.printf "@.All instances purged successfully.@." ;
+              (* Clear directory registry after successful purge *)
+              (match Directory_registry.clear_all () with
+              | Ok () ->
+                  Format.printf "@.Directory registry cleared.@."
+              | Error (`Msg msg) ->
+                  Format.eprintf
+                    "@.Warning: Failed to clear directory registry: %s@."
+                    msg) ;
+              Format.printf "All instances purged successfully.@." ;
               `Ok ())
             else
               let error_summary =

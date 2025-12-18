@@ -47,6 +47,9 @@ val remove : string -> (unit, [`Msg of string]) result
 val update_linked_services :
   path:string -> linked_services:string list -> (unit, [`Msg of string]) result
 
+(** Remove all directories from the registry. *)
+val clear_all : unit -> (unit, [`Msg of string]) result
+
 (** Migrate from old base_dirs.json format.
     Called automatically on first read. *)
 val migrate_from_base_dir_registry : unit -> (unit, [`Msg of string]) result

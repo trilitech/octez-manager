@@ -105,7 +105,8 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
           if not (is_nonempty user) then Error "Service user is required"
           else if not (service_user_valid ~user) then
             Error "Service user does not exist (run as root to create)"
-          else Ok ());
+          else Ok ())
+      |> with_hint "Unix user that runs the service. Created automatically if running as root.";
       (* App Bin Dir *)
       app_bin_dir
         ~label:"App Bin Dir"
@@ -114,7 +115,8 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
           let core = get_core m in
           set_core {core with app_bin_dir} m)
         ~validate:(fun m -> binary_validator (get_core m).app_bin_dir)
-        ();
+        ()
+      |> with_hint "Directory containing octez binaries. Must include the required executable.";
       (* Logging is always journald - octez binaries handle their own file logging *)
       (* Enable on Boot *)
       toggle
@@ -122,14 +124,16 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
         ~get:(fun m -> (get_core m).enable_on_boot)
         ~set:(fun enable_on_boot m ->
           let core = get_core m in
-          set_core {core with enable_on_boot} m);
+          set_core {core with enable_on_boot} m)
+      |> with_hint "Auto-start service when system boots. Recommended for production.";
       (* Start Now *)
       toggle
         ~label:"Start Now"
         ~get:(fun m -> (get_core m).start_now)
         ~set:(fun start_now m ->
           let core = get_core m in
-          set_core {core with start_now} m);
+          set_core {core with start_now} m)
+      |> with_hint "Start service immediately after installation.";
       (* Extra Args *)
       extra_args
         ~label:"Extra Args"
@@ -141,7 +145,8 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
         ~binary
         ?baker_mode
         ~subcommand
-        ();
+        ()
+      |> with_hint "Additional command-line arguments passed to the binary. Press Enter to browse options.";
     ]
 
 (** {1 Client-based Tool Bundle with Auto-naming} *)
@@ -279,7 +284,8 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
           ~items
           ~to_string
           ~on_select)
-      ();
+      ()
+    |> with_hint "Node providing RPC. Select a managed instance or enter external endpoint.";
     (* Base Directory *)
     client_base_dir
       ~label:"Base Dir"
@@ -288,7 +294,8 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
         let client = get_client m in
         set_client {client with base_dir} m)
       ~validate:(fun m -> is_nonempty (get_client m).base_dir)
-      ();
+      ()
+    |> with_hint "Client configuration directory. Stores keys and operation receipts.";
   ]
 
 (** {1 Node-specific Bundle} *)
@@ -408,7 +415,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
   in
 
   [
-    network_field;
+    network_field
+    |> with_hint "Tezos network to connect to. Mainnet for production, testnets for development.";
     (* History Mode *)
     choice
       ~label:"History Mode"
@@ -417,7 +425,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
         let node = get_node m in
         set_node {node with history_mode} m)
       ~items:["rolling"; "full"; "archive"]
-      ~to_string:(fun x -> x);
+      ~to_string:(fun x -> x)
+    |> with_hint "Rolling: minimal disk (~50GB). Full: all blocks. Archive: all states (1TB+).";
     (* Data Directory *)
     node_data_dir
       ~label:"Data Dir"
@@ -436,7 +445,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
                     (String.trim st.service.Service.data_dir)
                     (String.trim data_dir))
                 states))
-      ();
+      ()
+    |> with_hint "Directory where blockchain data is stored. Must be writable by service user.";
     (* RPC Address *)
     validated_text
       ~label:"RPC Address"
@@ -447,7 +457,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
       ~validate:(fun m ->
         let addr = (get_node m).rpc_addr in
         let states = Data.load_service_states () in
-        validate_port addr states ~label:"RPC Address" ~example:"127.0.0.1:8732");
+        validate_port addr states ~label:"RPC Address" ~example:"127.0.0.1:8732")
+    |> with_hint "RPC endpoint for clients (bakers, wallets). Use 127.0.0.1 for local only.";
     (* P2P Address *)
     validated_text
       ~label:"P2P Address"
@@ -458,5 +469,6 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
       ~validate:(fun m ->
         let addr = (get_node m).p2p_addr in
         let states = Data.load_service_states () in
-        validate_port addr states ~label:"P2P Address" ~example:"0.0.0.0:9732");
+        validate_port addr states ~label:"P2P Address" ~example:"0.0.0.0:9732")
+    |> with_hint "P2P port for peer discovery. Use 0.0.0.0 to accept connections from all interfaces.";
   ]

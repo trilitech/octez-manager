@@ -41,6 +41,10 @@
 (** An existentially quantified field wrapper. *)
 type 'model field
 
+(** Add a help hint to a field. The hint is displayed in the footer
+    when the field is selected, helping users understand the field's purpose. *)
+val with_hint : string -> 'model field -> 'model field
+
 (** Configuration for a pre-submission choice modal (with existential type for choices). *)
 type 'model pre_submit_modal_config =
   | PreSubmitModal : {
