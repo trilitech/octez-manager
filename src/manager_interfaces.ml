@@ -1,3 +1,10 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
 open Installer_types
 
 module type Service_manager = sig

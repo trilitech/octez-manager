@@ -1,3 +1,10 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
 val open_text_modal : title:string -> lines:string list -> unit
 
 val open_choice_modal :

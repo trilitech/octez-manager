@@ -1,3 +1,10 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
 val set_pending_instance_detail : string -> unit
 
 val take_pending_instance_detail : unit -> string option

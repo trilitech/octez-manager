@@ -1,3 +1,10 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
 let ( let* ) = Rresult.R.bind
 
 let write_pairs ~inst pairs =

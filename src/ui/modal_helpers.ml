@@ -1,3 +1,10 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
 module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
