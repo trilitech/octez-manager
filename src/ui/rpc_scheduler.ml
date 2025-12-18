@@ -266,12 +266,17 @@ let start () =
              Unix.sleepf 1.0
            done)))
 
+(** Stop all active head monitors. Call this on app exit to kill curl processes. *)
+let stop_all_monitors () =
+  Hashtbl.iter (fun _ handle -> handle.Rpc_client.stop ()) head_monitors ;
+  Hashtbl.clear head_monitors
+
 module For_tests = struct
   let reset_state () =
+    stop_all_monitors () ;
     bg_inflight := 0 ;
     Hashtbl.reset last_boot_at ;
     Hashtbl.reset last_boot_state ;
-    Hashtbl.reset head_monitors ;
     last_global_rpc := 0.0 ;
     bg_inflight_cap := 4 ;
     now_ref := Unix.gettimeofday ;
