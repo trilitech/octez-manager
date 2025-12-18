@@ -31,28 +31,32 @@ let get_daily_log_file ~role ~instance =
         | "baker" ->
             (* Baker: <base_dir>/logs/octez-baker/ *)
             let base =
-              Option.value (lookup "OCTEZ_BAKER_BASE_DIR")
+              Option.value
+                (lookup "OCTEZ_BAKER_BASE_DIR")
                 ~default:svc.Service.data_dir
             in
             Some (Filename.concat (Filename.concat base "logs") "octez-baker")
         | "accuser" ->
             (* Accuser: <base_dir>/logs/octez-accuser/ *)
             let base =
-              Option.value (lookup "OCTEZ_CLIENT_BASE_DIR")
+              Option.value
+                (lookup "OCTEZ_CLIENT_BASE_DIR")
                 ~default:svc.Service.data_dir
             in
             Some (Filename.concat (Filename.concat base "logs") "octez-accuser")
         | "dal-node" ->
             (* DAL node: <data_dir>/daily_logs/ *)
             let base =
-              Option.value (lookup "OCTEZ_DAL_DATA_DIR")
+              Option.value
+                (lookup "OCTEZ_DAL_DATA_DIR")
                 ~default:svc.Service.data_dir
             in
             Some (Filename.concat base "daily_logs")
         | "signer" ->
             (* Signer: <base_dir>/logs/octez-signer/ *)
             let base =
-              Option.value (lookup "OCTEZ_SIGNER_BASE_DIR")
+              Option.value
+                (lookup "OCTEZ_SIGNER_BASE_DIR")
                 ~default:svc.Service.data_dir
             in
             Some (Filename.concat (Filename.concat base "logs") "octez-signer")
@@ -66,8 +70,11 @@ let get_daily_log_file ~role ~instance =
       else
         let today = Unix.time () |> Unix.localtime in
         let filename =
-          Printf.sprintf "daily-%04d%02d%02d.log" (1900 + today.tm_year)
-            (today.tm_mon + 1) today.tm_mday
+          Printf.sprintf
+            "daily-%04d%02d%02d.log"
+            (1900 + today.tm_year)
+            (today.tm_mon + 1)
+            today.tm_mday
         in
         let log_file = Filename.concat dir filename in
         if Sys.file_exists log_file then Ok log_file
@@ -99,7 +106,7 @@ let read_logs ~role ~instance ~source ~lines =
   | DailyLogs -> (
       match get_daily_log_file ~role ~instance with
       | Error e -> Error e
-      | Ok log_file ->
+      | Ok log_file -> (
           let cmd =
             Printf.sprintf "tail -n %d %s" lines (Filename.quote log_file)
           in
@@ -110,9 +117,9 @@ let read_logs ~role ~instance ~source ~lines =
             | exception End_of_file -> List.rev acc
           in
           let logs = read_all [] in
-          ( match Unix.close_process_in ic with
+          match Unix.close_process_in ic with
           | Unix.WEXITED 0 -> Ok logs
-          | _ -> Error (`Msg "Failed to read daily log file") ))
+          | _ -> Error (`Msg "Failed to read daily log file")))
 
 (* Unused - File_pager handles tailing for daily logs *)
 (* let tail_logs ~role ~instance ~source = ... *)

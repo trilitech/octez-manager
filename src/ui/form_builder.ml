@@ -91,7 +91,17 @@ let validated_text ~label ~get ~set ~validate =
       ~on_submit
       ()
   in
-  Field {label; hint = None; get; set; to_string; validate = validate_fn; validate_msg; edit}
+  Field
+    {
+      label;
+      hint = None;
+      get;
+      set;
+      to_string;
+      validate = validate_fn;
+      validate_msg;
+      edit;
+    }
 
 let toggle ~label ~get ~set =
   let to_string = string_of_bool in
@@ -546,7 +556,9 @@ struct
     Miaou.Core.Help_hint.set current_hint ;
     let title_line = Widgets.title_highlight S.spec.title in
     let header = [title_line; status_banner] in
-    let footer = [Widgets.dim "↑/↓ navigate, Enter to edit, ? for help, Esc back"] in
+    let footer =
+      [Widgets.dim "↑/↓ navigate, Enter to edit, ? for help, Esc back"]
+    in
     Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
         Table_widget.Table.render table)
 

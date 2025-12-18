@@ -9,16 +9,9 @@
 
 type status = Up | Down | Degraded | Unknown
 
-type check = {
-  name : string;
-  status : status;
-}
+type check = {name : string; status : status}
 
-type t = {
-  status : status;
-  checks : check list;
-  last_fetch : float;
-}
+type t = {status : status; checks : check list; last_fetch : float}
 
 val status_to_string : status -> string
 

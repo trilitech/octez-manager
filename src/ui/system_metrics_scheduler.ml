@@ -95,7 +95,6 @@ let get_state key =
           Hashtbl.replace table key s ;
           s)
 
-
 (** Update PIDs and version if changed *)
 let update_pids_and_version ~role ~instance ~binary ~data_dir state now =
   if now -. state.last_pid_check < pid_check_interval then ()
@@ -104,7 +103,10 @@ let update_pids_and_version ~role ~instance ~binary ~data_dir state now =
     let new_pids = System_metrics.get_service_pids ~role ~instance in
     let pids_changed =
       List.length new_pids <> List.length state.pids
-      || List.exists2 ( <> ) (List.sort compare new_pids) (List.sort compare state.pids)
+      || List.exists2
+           ( <> )
+           (List.sort compare new_pids)
+           (List.sort compare state.pids)
     in
     state.pids <- new_pids ;
     (* Refresh version when PIDs change (service restarted) *)
@@ -143,9 +145,9 @@ let poll_cpu state now =
     let history = state.cpu_history @ [cpu] in
     let len = List.length history in
     state.cpu_history <-
-      if len > cpu_max_points then
-        List.filteri (fun i _ -> i >= len - cpu_max_points) history
-      else history)
+      (if len > cpu_max_points then
+         List.filteri (fun i _ -> i >= len - cpu_max_points) history
+       else history))
 
 (** Poll memory for all tracked PIDs *)
 let poll_mem state now =
@@ -210,10 +212,7 @@ let render_cpu_chart ~role ~instance ~focus:_ =
             in
             let thresholds =
               Miaou_widgets_display.Line_chart_widget.
-                [
-                  {value = 90.0; color = "31"};
-                  {value = 75.0; color = "33"};
-                ]
+                [{value = 90.0; color = "31"}; {value = 75.0; color = "33"}]
             in
             let rendered =
               Miaou_widgets_display.Line_chart_widget.render
@@ -274,52 +273,68 @@ let tick () =
   let nodes =
     states
     |> List.filter (fun (st : Data.Service_state.t) ->
-           st.service.Service.role = "node")
+        st.service.Service.role = "node")
   in
   List.iter
     (fun (st : Data.Service_state.t) ->
       let svc = st.service in
       let binary = Filename.concat svc.Service.app_bin_dir "octez-node" in
       let data_dir = svc.Service.data_dir in
-      (try poll ~role:svc.Service.role ~instance:svc.Service.instance ~binary ~data_dir
-       with _ -> ()))
+      try
+        poll
+          ~role:svc.Service.role
+          ~instance:svc.Service.instance
+          ~binary
+          ~data_dir
+      with _ -> ())
     nodes ;
   (* Poll bakers *)
   let bakers =
     states
     |> List.filter (fun (st : Data.Service_state.t) ->
-           st.service.Service.role = "baker")
+        st.service.Service.role = "baker")
   in
   List.iter
     (fun (st : Data.Service_state.t) ->
       let svc = st.service in
       let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
-      (try poll ~role:svc.Service.role ~instance:svc.Service.instance ~binary ~data_dir:""
-       with _ -> ()))
+      try
+        poll
+          ~role:svc.Service.role
+          ~instance:svc.Service.instance
+          ~binary
+          ~data_dir:""
+      with _ -> ())
     bakers ;
   (* Poll DAL nodes *)
   let dal_nodes =
     states
     |> List.filter (fun (st : Data.Service_state.t) ->
-           st.service.Service.role = "dal-node")
+        st.service.Service.role = "dal-node")
   in
   List.iter
     (fun (st : Data.Service_state.t) ->
       let svc = st.service in
       let binary = Filename.concat svc.Service.app_bin_dir "octez-dal-node" in
       let data_dir = svc.Service.data_dir in
-      (try poll ~role:svc.Service.role ~instance:svc.Service.instance ~binary ~data_dir
+      (try
+         poll
+           ~role:svc.Service.role
+           ~instance:svc.Service.instance
+           ~binary
+           ~data_dir
        with _ -> ()) ;
       (* Also poll DAL health *)
       let rpc_endpoint =
-        if String.starts_with ~prefix:"http" svc.Service.rpc_addr then svc.Service.rpc_addr
+        if String.starts_with ~prefix:"http" svc.Service.rpc_addr then
+          svc.Service.rpc_addr
         else "http://" ^ svc.Service.rpc_addr
       in
-      (try
-         match Dal_health.fetch ~rpc_endpoint with
-         | Some health -> Dal_health.set ~instance:svc.Service.instance health
-         | None -> ()
-       with _ -> ()))
+      try
+        match Dal_health.fetch ~rpc_endpoint with
+        | Some health -> Dal_health.set ~instance:svc.Service.instance health
+        | None -> ()
+      with _ -> ())
     dal_nodes
 
 let started = ref false
@@ -330,7 +345,11 @@ let latest_stable_version : (int * int) option ref = ref None
 (** Parse version string like "23.3" or "v23.3" into (major, minor) *)
 let parse_version s =
   let s = String.trim s in
-  let s = if String.length s > 0 && s.[0] = 'v' then String.sub s 1 (String.length s - 1) else s in
+  let s =
+    if String.length s > 0 && s.[0] = 'v' then
+      String.sub s 1 (String.length s - 1)
+    else s
+  in
   match String.split_on_char '.' s with
   | major :: minor :: _ -> (
       match (int_of_string_opt major, int_of_string_opt minor) with
@@ -345,7 +364,7 @@ let parse_version s =
 (** Check if version string contains RC or dev markers *)
 let is_rc_or_dev s =
   let s = String.lowercase_ascii s in
-  String.contains s '-'  (* -rc, -rc1, -dev, etc. *)
+  String.contains s '-' (* -rc, -rc1, -dev, etc. *)
 
 (** Fetch and parse latest stable version from octez releases JSON *)
 let fetch_latest_version () =
@@ -357,7 +376,7 @@ let fetch_latest_version () =
         let data = Yojson.Safe.from_string json in
         (* Find entry with "latest": true and no "rc" field *)
         match data with
-        | `List versions ->
+        | `List versions -> (
             let latest =
               List.find_opt
                 (fun v ->
@@ -374,8 +393,8 @@ let fetch_latest_version () =
                   is_latest && not is_rc)
                 versions
             in
-            (match latest with
-            | Some v ->
+            match latest with
+            | Some v -> (
                 let major =
                   Yojson.Safe.Util.member "major" v
                   |> Yojson.Safe.Util.to_int_option
@@ -384,7 +403,7 @@ let fetch_latest_version () =
                   Yojson.Safe.Util.member "minor" v
                   |> Yojson.Safe.Util.to_int_option
                 in
-                (match (major, minor) with
+                match (major, minor) with
                 | Some maj, Some min -> latest_stable_version := Some (maj, min)
                 | _ -> ())
             | None -> ())
@@ -393,11 +412,11 @@ let fetch_latest_version () =
 
 (** Version status for coloring *)
 type version_status =
-  | Latest      (** Running latest stable *)
-  | MinorBehind (** Same major, older minor *)
-  | MajorBehind (** Older major version *)
-  | DevOrRC     (** Running dev or RC version *)
-  | Unknown     (** Can't determine *)
+  | Latest  (** Running latest stable *)
+  | MinorBehind  (** Same major, older minor *)
+  | MajorBehind  (** Older major version *)
+  | DevOrRC  (** Running dev or RC version *)
+  | Unknown  (** Can't determine *)
 
 (** Compare running version against latest stable *)
 let check_version_status ~running =
@@ -410,16 +429,16 @@ let check_version_status ~running =
         if rmaj = lmaj && rmin = lmin then Latest
         else if rmaj = lmaj && rmin < lmin then MinorBehind
         else if rmaj < lmaj then MajorBehind
-        else Latest  (* Running newer than "latest" - treat as latest *)
+        else Latest (* Running newer than "latest" - treat as latest *)
 
 (** Get ANSI color for version status *)
 let version_color status =
   match status with
-  | Latest -> "\027[32m"       (* green *)
-  | MinorBehind -> "\027[33m"  (* yellow *)
-  | MajorBehind -> "\027[31m"  (* red *)
-  | DevOrRC -> "\027[34m"      (* blue *)
-  | Unknown -> ""              (* no color *)
+  | Latest -> "\027[32m" (* green *)
+  | MinorBehind -> "\027[33m" (* yellow *)
+  | MajorBehind -> "\027[31m" (* red *)
+  | DevOrRC -> "\027[34m" (* blue *)
+  | Unknown -> "" (* no color *)
 
 (** Color reset *)
 let color_reset = "\027[0m"
@@ -436,21 +455,29 @@ let check_version_toast_for ~key ~instance ~version =
   (* Only check if we have latest version info *)
   match !latest_stable_version with
   | None -> ()
-  | Some (lmaj, lmin) ->
+  | Some (lmaj, lmin) -> (
       if Hashtbl.mem version_warned key then ()
       else
         let status = check_version_status ~running:version in
-        (match status with
+        match status with
         | MinorBehind ->
             Hashtbl.replace version_warned key () ;
             Context.toast_warn
-              (Printf.sprintf "%s: v%s is outdated (latest: %d.%d)"
-                 instance version lmaj lmin)
+              (Printf.sprintf
+                 "%s: v%s is outdated (latest: %d.%d)"
+                 instance
+                 version
+                 lmaj
+                 lmin)
         | MajorBehind ->
             Hashtbl.replace version_warned key () ;
             Context.toast_error
-              (Printf.sprintf "%s: v%s is deprecated (latest: %d.%d)"
-                 instance version lmaj lmin)
+              (Printf.sprintf
+                 "%s: v%s is deprecated (latest: %d.%d)"
+                 instance
+                 version
+                 lmaj
+                 lmin)
         | _ -> ())
 
 (* Wire up the forward reference *)
@@ -460,17 +487,17 @@ let start () =
   if not !started then (
     started := true ;
     (* Spawn dedicated domain for metrics polling - no Eio needed for simple I/O *)
-    ignore (Domain.spawn (fun () ->
-        (* Brief delay to let main UI initialize *)
-        Unix.sleepf 0.2 ;
-        (* Fetch latest version first *)
-        (try fetch_latest_version () with _ -> ()) ;
-        (* Simple polling loop *)
-        while true do
-          tick () ;
-          Unix.sleepf 0.5
-        done)))
+    ignore
+      (Domain.spawn (fun () ->
+           (* Brief delay to let main UI initialize *)
+           Unix.sleepf 0.2 ;
+           (* Fetch latest version first *)
+           (try fetch_latest_version () with _ -> ()) ;
+           (* Simple polling loop *)
+           while true do
+             tick () ;
+             Unix.sleepf 0.5
+           done)))
 
 (** Clear all state *)
-let clear () =
-  with_lock (fun () -> Hashtbl.clear table)
+let clear () = with_lock (fun () -> Hashtbl.clear table)

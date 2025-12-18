@@ -76,17 +76,15 @@ let get_service_main_pid ~role ~instance =
 
 (** Get child PIDs of a process *)
 let get_child_pids ~parent_pid =
-  let path =
-    Printf.sprintf "/proc/%d/task/%d/children" parent_pid parent_pid
-  in
+  let path = Printf.sprintf "/proc/%d/task/%d/children" parent_pid parent_pid in
   try
     let ic = open_in path in
     let line = try input_line ic with End_of_file -> "" in
     close_in ic ;
     String.split_on_char ' ' line
     |> List.filter_map (fun s ->
-           let s = String.trim s in
-           if s = "" then None else int_of_string_opt s)
+        let s = String.trim s in
+        if s = "" then None else int_of_string_opt s)
   with _ -> []
 
 (** Get all PIDs for a service (main + children, recursively) *)
@@ -111,7 +109,9 @@ let read_proc_stat ~pid =
        cminflt majflt cmajflt utime stime cutime cstime ...
        Fields are space-separated, but comm can contain spaces and is in parens *)
     let close_paren = String.rindex line ')' in
-    let rest = String.sub line (close_paren + 2) (String.length line - close_paren - 2) in
+    let rest =
+      String.sub line (close_paren + 2) (String.length line - close_paren - 2)
+    in
     let fields = String.split_on_char ' ' rest in
     (* After (comm), fields are: state(0) ppid(1) ... utime(11) stime(12) ... rss(21) *)
     let utime = List.nth_opt fields 11 |> Option.map Int64.of_string in
@@ -132,7 +132,7 @@ let total_memory =
        (try
           while true do
             let line = input_line ic in
-            if String.length line > 9 && String.sub line 0 9 = "MemTotal:" then (
+            if String.length line > 9 && String.sub line 0 9 = "MemTotal:" then
               let parts =
                 String.split_on_char ' ' line |> List.filter (fun s -> s <> "")
               in
@@ -143,7 +143,7 @@ let total_memory =
                       result := Int64.mul kb 1024L ;
                       raise Exit
                   | None -> ())
-              | _ -> ())
+              | _ -> ()
           done
         with Exit | End_of_file -> ()) ;
        close_in ic ;
@@ -158,9 +158,7 @@ let calc_cpu_percent ~prev ~curr =
     let delta_utime = Int64.sub curr.utime prev.utime in
     let delta_stime = Int64.sub curr.stime prev.stime in
     let delta_ticks = Int64.add delta_utime delta_stime in
-    let ticks_per_interval =
-      delta_time *. Float.of_int clock_ticks_per_sec
-    in
+    let ticks_per_interval = delta_time *. Float.of_int clock_ticks_per_sec in
     if ticks_per_interval <= 0.0 then 0.0
     else
       (* CPU percentage (can exceed 100% on multi-core systems) *)
@@ -184,9 +182,7 @@ let get_process_stats ~pid ~prev_sample =
           Int64.to_float rss /. Int64.to_float mem_total *. 100.0
         else 0.0
       in
-      Some
-        ( {pid; cpu_percent; memory_rss = rss; memory_percent},
-          curr_sample )
+      Some ({pid; cpu_percent; memory_rss = rss; memory_percent}, curr_sample)
 
 (** Extract version string from binary --version output *)
 let parse_version_output output =
@@ -195,7 +191,9 @@ let parse_version_output output =
   let rec find_version = function
     | [] -> None
     | line :: rest -> (
-        match Str.search_forward (Str.regexp "Octez \\([0-9]+\\.[0-9]+\\)") line 0 with
+        match
+          Str.search_forward (Str.regexp "Octez \\([0-9]+\\.[0-9]+\\)") line 0
+        with
         | _ -> Some (Str.matched_group 1 line)
         | exception Not_found -> find_version rest)
   in
@@ -211,7 +209,11 @@ let get_version ~binary =
   if not (Sys.file_exists full_path) then None
   else
     (* Use shell to redirect stderr and timeout to avoid broken pipe noise *)
-    let cmd = Printf.sprintf "timeout 2s %s --version 2>/dev/null" (Common.sh_quote full_path) in
+    let cmd =
+      Printf.sprintf
+        "timeout 2s %s --version 2>/dev/null"
+        (Common.sh_quote full_path)
+    in
     match Common.run_out ["sh"; "-c"; cmd] with
     | Ok output -> parse_version_output output
     | Error _ -> None

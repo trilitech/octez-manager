@@ -85,7 +85,7 @@ let tick () =
   let bakers =
     Data.load_service_states ()
     |> List.filter (fun (st : Data.Service_state.t) ->
-           st.service.Service.role = "baker")
+        st.service.Service.role = "baker")
   in
   List.iter
     (fun (st : Data.Service_state.t) ->
@@ -100,17 +100,18 @@ let start () =
   if not !started then (
     started := true ;
     (* Spawn dedicated domain for delegate polling - no Eio needed for simple I/O *)
-    ignore (Domain.spawn (fun () ->
-        (* Delay to let UI initialize first *)
-        Unix.sleepf 2.0 ;
-        (* Simple polling loop *)
-        while true do
-          let now = Unix.gettimeofday () in
-          if now -. !last_poll >= poll_interval then (
-            last_poll := now ;
-            tick ()) ;
-          Unix.sleepf 5.0
-        done)))
+    ignore
+      (Domain.spawn (fun () ->
+           (* Delay to let UI initialize first *)
+           Unix.sleepf 2.0 ;
+           (* Simple polling loop *)
+           while true do
+             let now = Unix.gettimeofday () in
+             if now -. !last_poll >= poll_interval then (
+               last_poll := now ;
+               tick ()) ;
+             Unix.sleepf 5.0
+           done)))
 
 (** Get delegate data for display *)
 let get_delegate_data ~pkh = Delegate_data.get ~pkh

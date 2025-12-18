@@ -1007,7 +1007,9 @@ let purge_service ~instance =
   | Some svc ->
       let* () = remove_service ~delete_data_dir:true ~instance in
       (* Also remove per-instance env files under XDG_CONFIG_HOME or /etc when purging *)
-      let env_dir = Filename.concat (Common.env_instances_base_dir ()) instance in
+      let env_dir =
+        Filename.concat (Common.env_instances_base_dir ()) instance
+      in
       let _ =
         (* Best-effort: don't fail purge if env removal fails *)
         match Common.remove_tree env_dir with
@@ -1042,16 +1044,14 @@ let find_orphan_directories () =
   in
   let list_subdirs dir =
     if Sys.file_exists dir && Sys.is_directory dir then
-      Sys.readdir dir
-      |> Array.to_list
+      Sys.readdir dir |> Array.to_list
       |> List.map (fun name -> Filename.concat dir name)
       |> List.filter Sys.is_directory
     else []
   in
   let list_files dir =
     if Sys.file_exists dir && Sys.is_directory dir then
-      Sys.readdir dir
-      |> Array.to_list
+      Sys.readdir dir |> Array.to_list
       |> List.map (fun name -> Filename.concat dir name)
       |> List.filter (fun p -> Sys.file_exists p && not (Sys.is_directory p))
     else []
@@ -1076,8 +1076,8 @@ let cleanup_orphans ~dry_run =
       | Ok () -> removed := path :: !removed
       | Error (`Msg msg) -> errors := (path, msg) :: !errors
   in
-  List.iter process_path orphan_dirs;
-  List.iter process_path orphan_logs;
+  List.iter process_path orphan_dirs ;
+  List.iter process_path orphan_logs ;
   Ok (List.rev !removed, List.rev !errors)
 
 let schedule_refresh ~instance ~frequency ~snapshot_kind ~no_check =

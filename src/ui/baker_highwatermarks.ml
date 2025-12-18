@@ -13,10 +13,7 @@
 open Octez_manager_lib
 
 (** Highwatermark entry for a delegate *)
-type highwatermark = {
-  round : int;
-  level : int;
-}
+type highwatermark = {round : int; level : int}
 
 (** Per-delegate activity *)
 type delegate_activity = {
@@ -47,9 +44,7 @@ let parse_entry json =
 (** Parse all entries of a given type (blocks/preattestations/attestations) *)
 let parse_entries json =
   let open Yojson.Safe.Util in
-  try
-    json |> to_list |> List.filter_map parse_entry
-  with _ -> []
+  try json |> to_list |> List.filter_map parse_entry with _ -> []
 
 (** Read and parse a highwatermarks file *)
 let read_file path =
@@ -64,24 +59,51 @@ let read_file path =
     let attestations = json |> member "attestations" |> parse_entries in
     (* Combine into per-delegate activity *)
     let delegates = Hashtbl.create 17 in
-    List.iter (fun (d, hwm) ->
-        let entry = match Hashtbl.find_opt delegates d with
+    List.iter
+      (fun (d, hwm) ->
+        let entry =
+          match Hashtbl.find_opt delegates d with
           | Some e -> {e with last_block = hwm}
-          | None -> {delegate = d; last_block = hwm; last_preattestation = None; last_attestation = None}
+          | None ->
+              {
+                delegate = d;
+                last_block = hwm;
+                last_preattestation = None;
+                last_attestation = None;
+              }
         in
-        Hashtbl.replace delegates d entry) blocks ;
-    List.iter (fun (d, hwm) ->
-        let entry = match Hashtbl.find_opt delegates d with
+        Hashtbl.replace delegates d entry)
+      blocks ;
+    List.iter
+      (fun (d, hwm) ->
+        let entry =
+          match Hashtbl.find_opt delegates d with
           | Some e -> {e with last_preattestation = hwm}
-          | None -> {delegate = d; last_block = None; last_preattestation = hwm; last_attestation = None}
+          | None ->
+              {
+                delegate = d;
+                last_block = None;
+                last_preattestation = hwm;
+                last_attestation = None;
+              }
         in
-        Hashtbl.replace delegates d entry) preattestations ;
-    List.iter (fun (d, hwm) ->
-        let entry = match Hashtbl.find_opt delegates d with
+        Hashtbl.replace delegates d entry)
+      preattestations ;
+    List.iter
+      (fun (d, hwm) ->
+        let entry =
+          match Hashtbl.find_opt delegates d with
           | Some e -> {e with last_attestation = hwm}
-          | None -> {delegate = d; last_block = None; last_preattestation = None; last_attestation = hwm}
+          | None ->
+              {
+                delegate = d;
+                last_block = None;
+                last_preattestation = None;
+                last_attestation = hwm;
+              }
         in
-        Hashtbl.replace delegates d entry) attestations ;
+        Hashtbl.replace delegates d entry)
+      attestations ;
     Hashtbl.fold (fun _ v acc -> v :: acc) delegates []
   with _ -> []
 
@@ -91,8 +113,8 @@ let find_highwatermarks_file base_dir =
     let files = Sys.readdir base_dir in
     Array.to_list files
     |> List.find_opt (fun f ->
-        String.length f > 15 &&
-        String.sub f (String.length f - 15) 15 = "_highwatermarks")
+        String.length f > 15
+        && String.sub f (String.length f - 15) 15 = "_highwatermarks")
     |> Option.map (fun f -> Filename.concat base_dir f)
   with _ -> None
 
@@ -119,28 +141,31 @@ let read ~instance =
 (** Get the maximum level from a delegate's activity *)
 let max_level activity =
   let levels =
-    [activity.last_block; activity.last_preattestation; activity.last_attestation]
+    [
+      activity.last_block;
+      activity.last_preattestation;
+      activity.last_attestation;
+    ]
     |> List.filter_map (Option.map (fun h -> h.level))
   in
-  match levels with
-  | [] -> None
-  | l -> Some (List.fold_left max 0 l)
+  match levels with [] -> None | l -> Some (List.fold_left max 0 l)
 
 (** Format a short summary for display *)
 let format_summary activities =
   if activities = [] then None
   else
-    let parts = List.filter_map (fun a ->
-        match max_level a with
-        | None -> None
-        | Some lvl ->
-            let short_delegate =
-              if String.length a.delegate > 8 then
-                String.sub a.delegate 0 8 ^ "…"
-              else a.delegate
-            in
-            Some (Printf.sprintf "%s:L%d" short_delegate lvl)
-      ) activities
+    let parts =
+      List.filter_map
+        (fun a ->
+          match max_level a with
+          | None -> None
+          | Some lvl ->
+              let short_delegate =
+                if String.length a.delegate > 8 then
+                  String.sub a.delegate 0 8 ^ "…"
+                else a.delegate
+              in
+              Some (Printf.sprintf "%s:L%d" short_delegate lvl))
+        activities
     in
-    if parts = [] then None
-    else Some (String.concat " " parts)
+    if parts = [] then None else Some (String.concat " " parts)

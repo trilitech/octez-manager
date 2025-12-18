@@ -88,8 +88,7 @@ let spec =
           text
             ~label:"Listen Address"
             ~get:(fun m -> m.signer.address)
-            ~set:(fun address m ->
-              {m with signer = {m.signer with address}});
+            ~set:(fun address m -> {m with signer = {m.signer with address}});
           text
             ~label:"Listen Port"
             ~get:(fun m -> m.signer.port)
