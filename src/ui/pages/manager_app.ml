@@ -61,4 +61,8 @@ let run ?page ?(log = false) ?logfile () =
           match history with [] -> raise Exit | prev :: rest -> loop rest prev)
       | `SwitchTo next_page -> loop (current_name :: history) next_page
   in
-  try loop [] start_name with Exit | Sys.Break -> Ok ()
+  try loop [] start_name
+  with Exit | Sys.Break ->
+    (* Cleanup: stop all head monitors to kill curl processes *)
+    Rpc_scheduler.stop_all_monitors () ;
+    Ok ()

@@ -377,15 +377,18 @@ let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
     =
   let stopped = ref false in
   let running = ref true in
+  let ic_ref = ref None in
   let url = absolutize_url s "/monitor/heads/main" in
   let cmd = Printf.sprintf "curl -sN --connect-timeout 2 --no-buffer %s" url in
   let run () =
     let ic = Unix.open_process_in cmd in
+    ic_ref := Some ic ;
     let rec loop () =
       if !stopped then ()
       else
         match input_line ic with
         | exception End_of_file -> ()
+        | exception Sys_error _ -> () (* Channel closed by stop() *)
         | line ->
             (try
                let j = Yojson.Safe.from_string line in
@@ -408,14 +411,18 @@ let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
             loop ()
     in
     loop () ;
-    ignore (Unix.close_process_in ic) ;
+    ic_ref := None ;
+    (try ignore (Unix.close_process_in ic) with _ -> ()) ;
     running := false ;
     on_disconnect ()
   in
   Bg.submit_blocking run ;
   let stop () =
     stopped := true ;
-    Unix.sleepf 0.01 ;
+    (* Close the channel to unblock input_line and kill the curl process *)
+    (match !ic_ref with
+    | Some ic -> ( try close_in_noerr ic with _ -> ())
+    | None -> ()) ;
     ()
   in
   let alive () = !running in
