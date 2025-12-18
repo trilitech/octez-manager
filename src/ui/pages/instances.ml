@@ -1039,10 +1039,14 @@ Press **Enter** to open instance menu.|}
     || lower = "^c" || String.equal key "\003"
 
   let move_selection s delta =
-    if s.services = [] then {s with selected = 0}
+    if s.services = [] then
+      (* Only menu items (0 and 1) when no services *)
+      let selected = max 0 (min 1 (s.selected + delta)) in
+      {s with selected}
     else
       let raw = s.selected + delta in
       let selected = clamp_selection s.services raw in
+      (* Skip position 2 (separator between menu and services) *)
       let selected = if selected = 2 then selected + delta else selected in
       let selected = clamp_selection s.services selected in
       {s with selected}
