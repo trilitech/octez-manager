@@ -251,24 +251,24 @@ let resolve_network_for_octez_node :
     | Error (`Msg m) -> R.error_msg m
 
 let resolve_octez_node_chain ~endpoint =
-  let ( let* ) = Result.bind in
-  let* node_chain_name =
-    match
-      Common.run_out
-        ["curl"; "-sf"; "--connect-timeout"; "2"; endpoint ^ "/config"]
-    with
-    | Ok out -> (
-        try
-          let j = Yojson.Safe.from_string out in
-          let open Yojson.Safe.Util in
-          match member "network" j |> member "chain_name" with
-          | `String s -> Ok (String.trim s)
-          | _ -> Error (`Msg "Failed to retrieve .network.chain_name")
-        with exn -> Error (`Msg (Printexc.to_string exn)))
-    | Error s -> Error s
-  in
-  let* networks = list_networks () in
-  let* network =
+  let res =
+    let ( let* ) = Result.bind in
+    let* node_chain_name =
+      match
+        Common.run_out
+          ["curl"; "-sf"; "--connect-timeout"; "2"; endpoint ^ "/config"]
+      with
+      | Ok out -> (
+          try
+            let j = Yojson.Safe.from_string out in
+            let open Yojson.Safe.Util in
+            match member "network" j |> member "chain_name" with
+            | `String s -> Ok (String.trim s)
+            | _ -> Error (`Msg "Failed to retrieve .network.chain_name")
+          with exn -> Error (`Msg (Printexc.to_string exn)))
+      | Error s -> Error s
+    in
+    let* networks = list_networks () in
     try
       Ok
         (List.find
@@ -278,7 +278,17 @@ let resolve_octez_node_chain ~endpoint =
       Error
         (`Msg (Format.sprintf "Node chain name is unknown: %S" node_chain_name))
   in
-  Ok network.human_name
+  match res with
+  | Ok network -> Ok network.human_name
+  | Error (`Msg msg) ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "Unable to determine network from node endpoint %s: %s. Ensure \
+               the endpoint is reachable and returns a valid RPC response \
+               (e.g., start the node or check the address)."
+              endpoint
+              msg))
 
 module For_tests = struct
   let fetch_json_with :
