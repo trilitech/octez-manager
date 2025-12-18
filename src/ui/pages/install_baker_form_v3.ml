@@ -37,7 +37,7 @@ type model = {
   liquidity_baking_vote : string;
 }
 
-let initial_model =
+let make_initial_model () =
   {
     core =
       {
@@ -381,7 +381,7 @@ let spec =
   in
   {
     title = " Install Baker ";
-    initial_model;
+    initial_model = make_initial_model;
     fields =
       [
         (* Instance name with auto-update of base_dir *)
@@ -529,7 +529,7 @@ module Page = Form_builder.Make (struct
 end)
 
 module For_tests = struct
-  let initial_model = initial_model
+  let initial_model = make_initial_model
 
   let baker_node_mode = baker_node_mode
 end

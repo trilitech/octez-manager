@@ -23,7 +23,7 @@ type model = {
   net_addr : string;  (** DAL node's P2P address *)
 }
 
-let initial_model =
+let make_initial_model () =
   {
     core =
       {
@@ -62,7 +62,7 @@ let spec =
   let open Form_builder_bundles in
   {
     title = " Install DAL Node ";
-    initial_model;
+    initial_model = make_initial_model;
     (* Compose fields from bundles with auto-naming support *)
     fields =
       core_service_fields

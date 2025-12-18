@@ -24,7 +24,7 @@ type model = {
   client : Form_builder_common.client_config;
 }
 
-let initial_model =
+let make_initial_model () =
   {
     core =
       {
@@ -187,7 +187,7 @@ let spec =
   let open Form_builder_bundles in
   {
     title = " Install Accuser ";
-    initial_model;
+    initial_model = make_initial_model;
     fields =
       core_service_fields
         ~get_core:(fun m -> m.core)
@@ -353,7 +353,7 @@ module Page = Form_builder.Make (struct
 end)
 
 module For_tests = struct
-  let initial_base_dir = initial_model.client.base_dir
+  let initial_base_dir = (make_initial_model ()).client.base_dir
 end
 
 let page : Miaou.Core.Registry.page = (module Page)

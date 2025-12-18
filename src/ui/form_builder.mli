@@ -55,7 +55,7 @@ type 'model pre_submit_modal_config =
 (** A specification for an entire form page. *)
 type 'model spec = {
   title : string;
-  initial_model : 'model;
+  initial_model : unit -> 'model;  (** Called to get fresh initial values *)
   fields : 'model field list;
       (** Optional initialization hook called once when page is first loaded.
       Use for prefetching data, starting background tasks, etc. *)
