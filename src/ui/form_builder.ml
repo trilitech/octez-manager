@@ -384,10 +384,11 @@ struct
   let update s _ = s
 
   let refresh s =
+    (* Only update next_page if there's a pending navigation from Context,
+       don't clear it - submit may have set it directly *)
     (match Context.consume_navigation () with
     | Some p -> s.next_page <- Some p
-    | None -> s.next_page <- None) ;
-    (* Clear next_page when no navigation pending *)
+    | None -> ()) ;
     (* Call on_refresh hook if provided *)
     (match S.spec.on_refresh with Some f -> f !(s.model_ref) | None -> ()) ;
     s
@@ -450,8 +451,10 @@ struct
             match S.spec.on_submit model with
             | Ok () ->
                 Context.mark_instances_dirty () ;
-                Context.navigate "instances" ;
-                (* Use Context.navigate for proper history *)
+                (* Reset form to initial values for next use *)
+                s.model_ref := S.spec.initial_model ;
+                (* Navigate back to instances page *)
+                s.next_page <- Some "instances" ;
                 s
             | Error (`Msg msg) ->
                 Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -468,8 +471,10 @@ struct
         match S.spec.on_submit model with
         | Ok () ->
             Context.mark_instances_dirty () ;
-            Context.navigate "instances" ;
-            (* Use Context.navigate for proper history *)
+            (* Reset form to initial values for next use *)
+            s.model_ref := S.spec.initial_model ;
+            (* Navigate back to instances page *)
+            s.next_page <- Some "instances" ;
             s
         | Error (`Msg msg) ->
             Modal_helpers.show_error ~title:"Installation Failed" msg ;
