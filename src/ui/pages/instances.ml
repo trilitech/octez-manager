@@ -242,6 +242,46 @@ let adjust_column_scroll ~column_scroll ~col ~line_start ~line_count
 (* Mutable reference to track visible height for scroll calculations *)
 let last_visible_height_ref = ref 20
 
+(** Find first non-empty column, or None if all empty *)
+let find_non_empty_column ~num_columns ~services =
+  let rec find col =
+    if col >= num_columns then None
+    else
+      let indices = services_in_column ~num_columns ~services col in
+      if indices <> [] then Some col else find (col + 1)
+  in
+  find 0
+
+(** Ensure active_column points to a non-empty column, adjusting selection if needed.
+    If all columns are empty (no services), move selection to menu. *)
+let ensure_valid_column state =
+  if state.services = [] then
+    (* No services, go to "Install new instance" *)
+    {state with selected = 0; active_column = 0}
+  else if state.num_columns <= 1 then state
+  else
+    let current_indices =
+      services_in_column
+        ~num_columns:state.num_columns
+        ~services:state.services
+        state.active_column
+    in
+    if current_indices <> [] then state
+    else
+      (* Current column is empty, find a non-empty one *)
+      match find_non_empty_column ~num_columns:state.num_columns ~services:state.services with
+      | None ->
+          (* All columns empty (shouldn't happen if services <> []) *)
+          {state with selected = 0; active_column = 0}
+      | Some new_col ->
+          let first_svc =
+            first_service_in_column
+              ~num_columns:state.num_columns
+              ~services:state.services
+              new_col
+          in
+          {state with active_column = new_col; selected = first_svc + 3}
+
 let init_state () =
   let services = load_services () in
   (* Start with all instances folded by default *)
@@ -269,7 +309,8 @@ let init_state () =
 let force_refresh state =
   let services = load_services_fresh () in
   let selected = clamp_selection services state.selected in
-  {state with services; selected; last_updated = Unix.gettimeofday ()}
+  let state = {state with services; selected; last_updated = Unix.gettimeofday ()} in
+  ensure_valid_column state
 
 let maybe_refresh state =
   let now = Unix.gettimeofday () in
@@ -282,7 +323,7 @@ let maybe_refresh state =
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
     force_refresh state
-  else state
+  else ensure_valid_column state
 
 let current_service state =
   if state.selected < 3 then None
