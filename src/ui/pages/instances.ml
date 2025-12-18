@@ -589,11 +589,39 @@ let role_header = function
   | "signer" -> "── Signers ──"
   | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
 
-(** Pad a line to column width using visible character count *)
+(** Truncate a string to max visible characters, preserving ANSI codes *)
+let truncate_visible ~max_width s =
+  let len = String.length s in
+  let buf = Buffer.create len in
+  let visible = ref 0 in
+  let i = ref 0 in
+  while !i < len && !visible < max_width do
+    let c = s.[!i] in
+    if c = '\027' then (
+      (* ANSI escape sequence - copy until 'm' *)
+      while !i < len && s.[!i] <> 'm' do
+        Buffer.add_char buf s.[!i] ;
+        incr i
+      done ;
+      if !i < len then (
+        Buffer.add_char buf 'm' ;
+        incr i))
+    else (
+      Buffer.add_char buf c ;
+      incr visible ;
+      incr i)
+  done ;
+  (* Add reset if we truncated mid-formatting *)
+  if !i < len && !visible >= max_width then Buffer.add_string buf "\027[0m" ;
+  Buffer.contents buf
+
+(** Pad or truncate a line to exact column width using visible character count *)
 let pad_line ~col_width line =
   let visible_len = Miaou_helpers.Helpers.visible_chars_count line in
   if visible_len < col_width then
     line ^ String.make (col_width - visible_len) ' '
+  else if visible_len > col_width then
+    truncate_visible ~max_width:col_width line
   else line
 
 (** Render a single column's content - returns list of lines *)
