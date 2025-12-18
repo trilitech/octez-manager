@@ -210,7 +210,9 @@ let get_version ~binary =
   in
   if not (Sys.file_exists full_path) then None
   else
-    match Common.run_out [full_path; "--version"] with
+    (* Use shell to redirect stderr and timeout to avoid broken pipe noise *)
+    let cmd = Printf.sprintf "timeout 2s %s --version 2>/dev/null" (Common.sh_quote full_path) in
+    match Common.run_out ["sh"; "-c"; cmd] with
     | Ok output -> parse_version_output output
     | Error _ -> None
 

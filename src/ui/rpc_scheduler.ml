@@ -245,15 +245,18 @@ let tick () =
 
 let started = ref false
 
-let rec loop () =
-  tick () ;
-  Unix.sleepf 1.0 ;
-  loop ()
-
 let start () =
   if not !started then (
     started := true ;
-    Bg.submit_blocking (fun () -> loop ()))
+    (* Use dedicated domain instead of blocking a Background_runner worker *)
+    ignore (Domain.spawn (fun () ->
+        (* Brief delay to let UI initialize *)
+        Unix.sleepf 0.2 ;
+        (* Simple polling loop *)
+        while true do
+          tick () ;
+          Unix.sleepf 1.0
+        done)))
 
 module For_tests = struct
   let reset_state () =

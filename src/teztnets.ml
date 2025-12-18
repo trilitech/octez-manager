@@ -2,31 +2,6 @@ open Rresult
 
 let teztnets_url = "https://teztnets.com/teztnets.json"
 
-let https_connector =
-  lazy
-    (Mirage_crypto_rng_unix.use_default () ;
-     match Ca_certs.authenticator () with
-     | Error (`Msg msg) -> R.error_msgf "TLS authenticator: %s" msg
-     | Ok authenticator -> (
-         match Tls.Config.client ~authenticator () with
-         | Error (`Msg msg) -> R.error_msgf "TLS config: %s" msg
-         | Ok tls_config ->
-             let https uri socket =
-               let host =
-                 match Uri.host uri with
-                 | None -> None
-                 | Some h -> (
-                     match Domain_name.of_string h with
-                     | Ok raw -> (
-                         match Domain_name.host raw with
-                         | Ok host -> Some host
-                         | Error _ -> None)
-                     | Error _ -> None)
-               in
-               Tls_eio.client_of_flow ?host tls_config socket
-             in
-             Ok https))
-
 let fetch_via_curl () : (string, [> R.msg]) result =
   match
     Common.run_out
@@ -36,36 +11,7 @@ let fetch_via_curl () : (string, [> R.msg]) result =
   | Ok _ -> R.error_msg "Empty teztnets.json response"
   | Error (`Msg m) -> R.error_msg m
 
-let fetch_json () : (string, [> R.msg]) result =
-  let via_eio () =
-    match Lazy.force https_connector with
-    | Error _ as e -> e
-    | Ok https -> (
-        try
-          Eio_main.run (fun env ->
-              Eio.Switch.run (fun sw ->
-                  let client =
-                    Cohttp_eio.Client.make ~https:(Some https) env#net
-                  in
-                  let uri = Uri.of_string teztnets_url in
-                  let resp, body = Cohttp_eio.Client.get client ~sw uri in
-                  let status = Cohttp.Response.status resp in
-                  let code = Cohttp.Code.code_of_status status in
-                  let body =
-                    Eio.Buf_read.(parse_exn take_all) body ~max_size:max_int
-                  in
-                  if Cohttp.Code.is_success code then
-                    if String.trim body = "" then
-                      R.error_msg "Empty teztnets.json response"
-                    else Ok body
-                  else
-                    R.error_msgf "HTTP %d while fetching %s" code teztnets_url))
-        with exn ->
-          R.error_msgf
-            "Failed to fetch teztnets.json via eio: %s"
-            (Printexc.to_string exn))
-  in
-  match via_eio () with Ok _ as ok -> ok | Error _ -> fetch_via_curl ()
+let fetch_json () : (string, [> R.msg]) result = fetch_via_curl ()
 
 type network_info = {
   alias : string;

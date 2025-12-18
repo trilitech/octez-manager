@@ -11,7 +11,6 @@
     configurable intervals. Uses sparklines to display history. *)
 
 open Octez_manager_lib
-module Bg = Background_runner
 
 (** Metrics storage per instance *)
 type instance_state = {
@@ -212,8 +211,8 @@ let render_cpu_chart ~role ~instance ~focus:_ =
             let thresholds =
               Miaou_widgets_display.Line_chart_widget.
                 [
-                  {value = 90.0; color = "\027[31m"};
-                  {value = 75.0; color = "\027[33m"};
+                  {value = 90.0; color = "31"};
+                  {value = 75.0; color = "33"};
                 ]
             in
             let rendered =
@@ -268,63 +267,38 @@ let get_disk_size ~role ~instance =
       | None -> None
       | Some state -> state.data_dir_size)
 
-(** Background polling state *)
-let bg_inflight = ref 0
-
-let bg_inflight_cap = 2
-
-let bg_lock = Mutex.create ()
-
-let schedule (f : unit -> unit) : bool =
-  let allowed =
-    Mutex.lock bg_lock ;
-    let allowed = !bg_inflight < bg_inflight_cap in
-    if allowed then incr bg_inflight ;
-    Mutex.unlock bg_lock ;
-    allowed
-  in
-  if allowed then (
-    Bg.submit_blocking
-      ~on_complete:(fun () ->
-        Mutex.lock bg_lock ;
-        decr bg_inflight ;
-        Mutex.unlock bg_lock)
-      (fun () -> try f () with _ -> ()) ;
-    true)
-  else false
-
-(** Tick - poll all node instances *)
+(** Tick - poll all node and baker instances *)
 let tick () =
+  let states = Data.load_service_states () in
+  (* Poll nodes *)
   let nodes =
-    Data.load_service_states ()
+    states
     |> List.filter (fun (st : Data.Service_state.t) ->
            st.service.Service.role = "node")
   in
   List.iter
     (fun (st : Data.Service_state.t) ->
       let svc = st.service in
-      let binary =
-        Filename.concat svc.Service.app_bin_dir "octez-node"
-      in
+      let binary = Filename.concat svc.Service.app_bin_dir "octez-node" in
       let data_dir = svc.Service.data_dir in
-      let _ =
-        schedule (fun () ->
-            poll
-              ~role:svc.Service.role
-              ~instance:svc.Service.instance
-              ~binary
-              ~data_dir)
-      in
-      ())
-    nodes
+      (try poll ~role:svc.Service.role ~instance:svc.Service.instance ~binary ~data_dir
+       with _ -> ()))
+    nodes ;
+  (* Poll bakers *)
+  let bakers =
+    states
+    |> List.filter (fun (st : Data.Service_state.t) ->
+           st.service.Service.role = "baker")
+  in
+  List.iter
+    (fun (st : Data.Service_state.t) ->
+      let svc = st.service in
+      let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
+      (try poll ~role:svc.Service.role ~instance:svc.Service.instance ~binary ~data_dir:""
+       with _ -> ()))
+    bakers
 
 let started = ref false
-
-let rec loop () =
-  tick () ;
-  (* Sleep for minimum poll interval *)
-  Unix.sleepf 0.5 ;
-  loop ()
 
 (** Latest stable Octez version from feed *)
 let latest_stable_version : (int * int) option ref = ref None
@@ -461,10 +435,17 @@ let () = check_version_toast_ref := check_version_toast_for
 let start () =
   if not !started then (
     started := true ;
-    (* Fetch latest version in background *)
-    Bg.submit_blocking (fun () ->
-        try fetch_latest_version () with _ -> ()) ;
-    Bg.submit_blocking (fun () -> loop ()))
+    (* Spawn dedicated domain for metrics polling - no Eio needed for simple I/O *)
+    ignore (Domain.spawn (fun () ->
+        (* Brief delay to let main UI initialize *)
+        Unix.sleepf 0.2 ;
+        (* Fetch latest version first *)
+        (try fetch_latest_version () with _ -> ()) ;
+        (* Simple polling loop *)
+        while true do
+          tick () ;
+          Unix.sleepf 0.5
+        done)))
 
 (** Clear all state *)
 let clear () =

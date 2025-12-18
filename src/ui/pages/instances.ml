@@ -196,23 +196,79 @@ let line_for_service idx selected (st : Service_state.t) =
   (* Align RPC under the role column visually. We rely on fixed column widths
      (marker 1 + status 1 + instance 16) with spaces between. *)
   let role_column_start = 1 + 1 + 1 + 1 + 16 + 1 in
+  (* Render highwatermarks line for bakers (last signed levels) *)
+  let baker_highwatermarks_line ~instance =
+    let activities = Baker_highwatermarks.read ~instance in
+    match Baker_highwatermarks.format_summary activities with
+    | None -> Widgets.dim "no signing activity"
+    | Some summary -> summary
+  in
+  (* Render delegate status for bakers (from RPC) *)
+  let delegate_status_line ~instance =
+    let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
+    if delegate_pkhs = [] then
+      Widgets.dim "no delegates configured"
+    else
+      let parts =
+        List.map
+          (fun pkh ->
+            let short_pkh =
+              if String.length pkh > 8 then String.sub pkh 0 8 ^ "…"
+              else pkh
+            in
+            (* Try to get cached data *)
+            match Delegate_data.get ~pkh with
+            | None ->
+                (* No data yet - show pending *)
+                Printf.sprintf "%s:%s" short_pkh (Widgets.dim "…")
+            | Some d ->
+                (* Status indicators *)
+                let status =
+                  if d.is_forbidden then Widgets.red "FORBIDDEN"
+                  else if d.deactivated then Widgets.dim "inactive"
+                  else
+                    (* Missed slots status *)
+                    let missed = d.participation.missed_slots in
+                    let remaining = d.participation.remaining_allowed_missed_slots in
+                    match Delegate_data.missed_slots_status d with
+                    | Delegate_data.Critical ->
+                        Widgets.red (Printf.sprintf "missed:%d/%d" missed remaining)
+                    | Delegate_data.Warning ->
+                        Widgets.yellow (Printf.sprintf "missed:%d/%d" missed remaining)
+                    | Delegate_data.Good ->
+                        if missed > 0 then
+                          Printf.sprintf "missed:%d/%d" missed remaining
+                        else Widgets.green "ok"
+                in
+                Printf.sprintf "%s:%s" short_pkh status)
+          delegate_pkhs
+      in
+      String.concat " · " parts
+  in
   let second_line =
     match svc.Service.role with
     | "baker" ->
-        let msg = Widgets.dim "RPC not available for bakers; use logs." in
-        Printf.sprintf "%s%s" (String.make role_column_start ' ') msg
+        (* Line 2 for bakers: highwatermarks (last signed levels) *)
+        let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
+        Printf.sprintf "%s%s" (String.make role_column_start ' ') hwm
     | _ ->
         Printf.sprintf
           "%s%s"
           (String.make role_column_start ' ')
           (rpc_status_line ~service_status:st.Service_state.status svc)
   in
-  (* Additional lines for nodes: metrics + CPU chart *)
+  (* Additional lines for nodes and bakers: metrics + CPU chart *)
   let extra_lines =
     match svc.Service.role with
-    | "node" ->
+    | "node" | "baker" ->
         let focus = idx + 3 = selected in
         let indent = String.make role_column_start ' ' in
+        (* For bakers: add delegate status line (line 3) *)
+        let baker_delegate_line =
+          if svc.Service.role = "baker" then
+            [indent ^ delegate_status_line ~instance:svc.Service.instance]
+          else []
+        in
         let version =
           match
             System_metrics_scheduler.get_version
@@ -228,20 +284,23 @@ let line_for_service idx selected (st : Service_state.t) =
             ~instance:svc.Service.instance
             ~focus
         in
-        let disk =
-          match
-            System_metrics_scheduler.get_disk_size
-              ~role:svc.Service.role
-              ~instance:svc.Service.instance
-          with
-          | Some sz -> System_metrics.format_bytes sz
-          | None -> Widgets.dim "?"
-        in
-        (* Line 3: version, memory, disk *)
+        (* Metrics line: version, memory, disk (disk only for nodes) *)
         let metrics_parts =
           [version]
           @ (if mem = "" then [] else ["MEM " ^ mem])
-          @ ["DISK " ^ disk]
+          @
+          if svc.Service.role = "node" then
+            let disk =
+              match
+                System_metrics_scheduler.get_disk_size
+                  ~role:svc.Service.role
+                  ~instance:svc.Service.instance
+              with
+              | Some sz -> System_metrics.format_bytes sz
+              | None -> Widgets.dim "?"
+            in
+            ["DISK " ^ disk]
+          else []
         in
         let metrics_line = indent ^ String.concat " · " metrics_parts in
         (* Lines 4+: CPU chart (multi-row braille) *)
@@ -263,7 +322,7 @@ let line_for_service idx selected (st : Service_state.t) =
                   else Printf.sprintf "%s    %s" indent row)
                 chart_rows
         in
-        metrics_line :: cpu_lines
+        baker_delegate_line @ [metrics_line] @ cpu_lines
     | _ -> []
   in
   String.concat "\n" ([first_line; second_line] @ extra_lines)
@@ -737,11 +796,43 @@ struct
 
 Press **Enter** to open instance menu.|}
 
+  let baker_help_hint =
+    {|## Baker Instance
+
+**Line 1:** Instance status
+- `●` running, `○` stopped
+- `[enabled]` starts on boot
+
+**Line 2:** Signing activity (local baker data)
+- Read from `<base_dir>/<chain>_highwatermarks`
+- Shows last signed level per delegate
+- `no signing activity` = no blocks/attestations signed yet
+
+**Line 3:** Delegate status (from chain RPC)
+- Fetched from node every 60s (head~2 for stability)
+- `pkh:ok` = no missed slots (green)
+- `pkh:missed:N/M` = missed slots vs remaining allowed
+  - Yellow: missed >= remaining/2
+  - Red: missed > remaining (CRITICAL)
+- `pkh:inactive` = delegate is deactivated
+- `pkh:FORBIDDEN` = delegate is forbidden (red alert)
+- `pkh:…` = data not yet fetched
+
+**Line 4:** System metrics (local process)
+- Version: from `--version` output
+- `MEM` = RSS memory usage sparkline
+
+**Line 5+:** CPU usage chart (braille)
+
+Press **Enter** to open instance menu.|}
+
   let view s ~focus:_ ~size =
     (* Set contextual help hint based on selection *)
     (match current_service s with
     | Some st when st.service.Service.role = "node" ->
         Miaou.Core.Help_hint.set (Some node_help_hint)
+    | Some st when st.service.Service.role = "baker" ->
+        Miaou.Core.Help_hint.set (Some baker_help_hint)
     | _ -> Miaou.Core.Help_hint.set (Some "Press Enter to select, ? for help")) ;
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
