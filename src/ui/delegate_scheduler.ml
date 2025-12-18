@@ -176,7 +176,7 @@ let start () =
              let now = Unix.gettimeofday () in
              if now -. !last_poll >= poll_interval then (
                last_poll := now ;
-               tick ()) ;
+               Metrics.record_scheduler_tick ~scheduler:"delegate" tick) ;
              Unix.sleepf 5.0
            done)))
 

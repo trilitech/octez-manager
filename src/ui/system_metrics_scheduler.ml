@@ -536,7 +536,7 @@ let start () =
            (try fetch_latest_version () with _ -> ()) ;
            (* Simple polling loop *)
            while true do
-             tick () ;
+             Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick ;
              Unix.sleepf 0.5
            done)))
 

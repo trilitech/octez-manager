@@ -90,6 +90,7 @@ let hist_snapshot h =
 
 module Page_map = Map.Make (String)
 module Service_map = Map.Make (String)
+module Scheduler_map = Map.Make (String)
 
 type service_status = Active | Inactive
 
@@ -117,6 +118,7 @@ type state = {
   mutable bg_queue_depth : int;
   mutable bg_queue_max : int;
   mutable service_statuses : service_status Service_map.t;
+  mutable scheduler_hist : histogram Scheduler_map.t;
   lock : Mutex.t;
   mutable last_input_ts : float option;
   mutable server_addr : string option;
@@ -154,6 +156,7 @@ let state =
     bg_queue_depth = 0;
     bg_queue_max = 0;
     service_statuses = Service_map.empty;
+    scheduler_hist = Scheduler_map.empty;
     lock = Mutex.create ();
     last_input_ts = None;
     server_addr = None;
@@ -249,6 +252,36 @@ let record_service_status ~service ~is_active =
       state.service_statuses <-
         Service_map.add service status state.service_statuses)
 
+(** Record scheduler tick duration in milliseconds *)
+let record_scheduler_tick_ms ~scheduler duration_ms =
+  if Mutex.try_lock state.lock then
+    Fun.protect
+      ~finally:(fun () -> Mutex.unlock state.lock)
+      (fun () ->
+        let existing =
+          match Scheduler_map.find_opt scheduler state.scheduler_hist with
+          | Some h -> h
+          | None ->
+              let h = make_histogram () in
+              state.scheduler_hist <-
+                Scheduler_map.add scheduler h state.scheduler_hist ;
+              h
+        in
+        hist_add existing duration_ms)
+
+(** Wrap a scheduler tick function to record its duration *)
+let record_scheduler_tick ~scheduler (tick : unit -> unit) : unit =
+  let start = Unix.gettimeofday () in
+  tick () ;
+  let duration_ms = (Unix.gettimeofday () -. start) *. 1000. in
+  record_scheduler_tick_ms ~scheduler duration_ms
+
+(** Get scheduler histogram snapshots *)
+let get_scheduler_snapshots () =
+  Mutex.protect state.lock (fun () ->
+      Scheduler_map.bindings state.scheduler_hist
+      |> List.map (fun (name, hist) -> (name, hist_snapshot hist)))
+
 let metrics_text () =
   let lines = Buffer.create 1024 in
   let add fmt = Printf.bprintf lines "%s\n" fmt in
@@ -337,6 +370,37 @@ let metrics_text () =
            (match status with Active -> "active" | Inactive -> "inactive")
            value))
     state.service_statuses ;
+  (* Scheduler tick metrics *)
+  Scheduler_map.iter
+    (fun scheduler hist ->
+      let snap = hist_snapshot hist in
+      let labels q =
+        Printf.sprintf "{scheduler=\"%s\",quantile=\"%s\"}" scheduler q
+      in
+      let emit_quantile q_label v_opt =
+        match v_opt with
+        | None -> ()
+        | Some v ->
+            add
+              (Printf.sprintf
+                 "octez_manager_scheduler_tick_ms%s %.3f"
+                 (labels q_label)
+                 v)
+      in
+      emit_quantile "0.50" snap.p50 ;
+      emit_quantile "0.90" snap.p90 ;
+      emit_quantile "0.99" snap.p99 ;
+      add
+        (Printf.sprintf
+           "octez_manager_scheduler_tick_ms_sum{scheduler=\"%s\"} %.3f"
+           scheduler
+           snap.sum) ;
+      add
+        (Printf.sprintf
+           "octez_manager_scheduler_tick_ms_count{scheduler=\"%s\"} %d"
+           scheduler
+           snap.count))
+    state.scheduler_hist ;
   Buffer.contents lines
 
 let serve_forever ~addr ~port =

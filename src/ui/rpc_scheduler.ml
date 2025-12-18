@@ -6,7 +6,7 @@
 (******************************************************************************)
 
 open Octez_manager_lib
-module Metrics = Rpc_metrics
+module Rpc_m = Rpc_metrics
 module Rpc = Rpc_client
 module Bg = Background_runner
 
@@ -72,7 +72,7 @@ let poll_boot (svc : Service.t) now =
       Context.toast_success (Printf.sprintf "%s is synced" svc.Service.instance)
   | _ -> ()) ;
   Hashtbl.replace last_boot_state svc.Service.instance boot ;
-  let existing = Metrics.get ~instance:svc.Service.instance in
+  let existing = Rpc_m.get ~instance:svc.Service.instance in
   let node_version =
     match existing with
     | Some m when Option.is_some m.Rpc_metrics.node_version ->
@@ -104,7 +104,7 @@ let poll_boot (svc : Service.t) now =
         m.Rpc_metrics.last_block_time
     | _ -> None
   in
-  Metrics.set
+  Rpc_m.set
     ~instance:svc.Service.instance
     {
       Rpc_metrics.chain_id;
@@ -137,7 +137,7 @@ let start_head_monitor (svc : Service.t) =
           let now = Unix.gettimeofday () in
           let boot = Rpc.rpc_is_bootstrapped svc in
           Hashtbl.replace last_boot_state instance boot ;
-          let existing = Metrics.get ~instance in
+          let existing = Rpc_m.get ~instance in
           let node_version =
             match existing with
             | Some m when Option.is_some m.Rpc_metrics.node_version ->
@@ -163,7 +163,7 @@ let start_head_monitor (svc : Service.t) =
                 | None -> Rpc.rpc_protocol svc)
           in
           let last_error = Rpc.rpc_last_error svc in
-          Metrics.set
+          Rpc_m.set
             ~instance
             {
               Rpc_metrics.chain_id;
@@ -262,7 +262,7 @@ let start () =
            Unix.sleepf 0.2 ;
            (* Simple polling loop *)
            while true do
-             tick () ;
+             Metrics.record_scheduler_tick ~scheduler:"rpc" tick ;
              Unix.sleepf 1.0
            done)))
 

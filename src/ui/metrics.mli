@@ -20,6 +20,23 @@ val record_bg_dequeue : queued_depth:int -> wait_ms:float -> unit
 (** Record service status for monitoring. *)
 val record_service_status : service:string -> is_active:bool -> unit
 
+(** Wrap a scheduler tick function to record its duration. *)
+val record_scheduler_tick : scheduler:string -> (unit -> unit) -> unit
+
+(** Histogram snapshot type *)
+type snapshot = {
+  count : int;
+  sum : float;
+  min_v : float;
+  max_v : float;
+  p50 : float option;
+  p90 : float option;
+  p99 : float option;
+}
+
+(** Get scheduler histogram snapshots. Returns (scheduler_name, snapshot) pairs. *)
+val get_scheduler_snapshots : unit -> (string * snapshot) list
+
 (** Get current background queue depth. *)
 val get_bg_queue_depth : unit -> int
 
