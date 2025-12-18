@@ -20,7 +20,7 @@ build:
 	cp -f _build/install/default/bin/octez-manager ./
 
 fmt:
-	$(DUNE) build @fmt
+	@$(DUNE) build @fmt || true
 
 fmt-check:
 	@$(DUNE) build @fmt >/dev/null
