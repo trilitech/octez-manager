@@ -6,12 +6,15 @@ full Octez Setup TUI.  It focuses on the minimum required features to
 replace the Debian `octez-client`/`octez-node` meta installer shipped
 with Octez v22.
 
-## Status
+## Project Status & Ownership
 
-This repository is a work-in-progress extraction from the larger
-`octez-setup` project.  Only the service bootstrapper is provided for
-now.  The TUI, wizard flows, and analytics are intentionally left out
-so this tool stays small and auditable.
+- **Owner / maintainer:** Nomadic Labs (<contact@nomadic-labs.com>)
+- **License:** MIT (SPDX: MIT)
+
+> **Warning**
+> Octez Manager is experimental and under active development. **Do not use it to run a baker on mainnet.** Use at your own risk on testnets only.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines and [SECURITY.md](./SECURITY.md) for security policy.
 
 ## Prerequisites
 

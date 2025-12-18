@@ -1,3 +1,10 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
 (* DEPRECATED: Use Directory_registry directly with dir_type:Client_base_dir
 
    This module is kept for backward compatibility but now just wraps

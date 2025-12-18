@@ -8,3 +8,7 @@ _coverage/
 TODO.md
 TODO_CAPABILITIES.md
 octez-manager
+
+# Internal docs
+docs/
+AGENTS.md
