@@ -460,11 +460,53 @@ let format_tokens rows =
       let flag = primary_name r.opt.names in
       match r.value with None -> [flag] | Some v -> [flag ^ "=" ^ v])
 
-let open_modal ~title ~options ~on_apply =
-  let rows =
-    Array.of_list
-      (List.map (fun opt -> {opt; value = None; selected = false}) options)
+(* Parse initial args string into (flag, value option) pairs.
+   Handles formats like: --flag --flag=value --flag value *)
+let parse_initial_args args_str =
+  let tokens = Form_builder_common.parse_shellwords args_str in
+  let rec loop acc = function
+    | [] -> List.rev acc
+    | token :: rest ->
+        if String.length token > 0 && token.[0] = '-' then
+          (* It's a flag *)
+          if String.contains token '=' then
+            (* --flag=value format *)
+            let idx = String.index token '=' in
+            let flag = String.sub token 0 idx in
+            let value =
+              String.sub token (idx + 1) (String.length token - idx - 1)
+            in
+            loop ((flag, Some value) :: acc) rest
+          else
+            (* Check if next token is a value (doesn't start with -) *)
+            match rest with
+            | next :: rest2 when String.length next > 0 && next.[0] <> '-' ->
+                loop ((token, Some next) :: acc) rest2
+            | _ -> loop ((token, None) :: acc) rest
+        else
+          (* Skip non-flag tokens *)
+          loop acc rest
   in
+  loop [] tokens
+
+(* Check if option matches a flag name *)
+let option_matches_flag opt flag =
+  List.exists (fun name -> String.equal name flag) opt.names
+
+(* Initialize rows from options, pre-selecting based on initial_args *)
+let init_rows_from_args options initial_args =
+  let parsed = parse_initial_args initial_args in
+  List.map
+    (fun opt ->
+      match
+        List.find_opt (fun (flag, _) -> option_matches_flag opt flag) parsed
+      with
+      | Some (_, value) -> {opt; value; selected = true}
+      | None -> {opt; value = None; selected = false})
+    options
+
+let open_modal ~title ~options ~initial_args ~on_apply =
+  let rows = Array.of_list (init_rows_from_args options initial_args) in
   let module Modal = struct
     type state = {
       rows : row array;
@@ -738,7 +780,15 @@ let open_modal ~title ~options ~on_apply =
       else if key = " " || key = "Space" then (
         (match current_row s with
         | None -> ()
-        | Some row -> row.selected <- not row.selected) ;
+        | Some row -> (
+            match row.opt.kind with
+            | Toggle -> row.selected <- not row.selected
+            | Value _ ->
+                (* For value flags: if selected, toggle off; otherwise open value modal *)
+                if row.selected then (
+                  row.selected <- false ;
+                  row.value <- None)
+                else edit_value s)) ;
         update_help_hint s ;
         s)
       else if key = "Backspace" || key = "\b" then (
@@ -820,9 +870,16 @@ let open_modal ~title ~options ~on_apply =
             s.last_key <- "Space(keymap)" ;
             (match current_row s with
             | None -> ()
-            | Some row -> row.selected <- not row.selected) ;
+            | Some row -> (
+                match row.opt.kind with
+                | Toggle -> row.selected <- not row.selected
+                | Value _ ->
+                    if row.selected then (
+                      row.selected <- false ;
+                      row.value <- None)
+                    else edit_value s)) ;
             s),
-          "Toggle" );
+          "Toggle/Edit" );
         ( "Backspace",
           (fun s ->
             s.last_key <- "Backspace(keymap)" ;
@@ -904,7 +961,7 @@ let is_excluded_option opt ~excluded =
       List.exists (fun name -> name_matches_excluded name excluded) opt.names)
     excluded
 
-let open_node_run_help ~app_bin_dir ~on_apply =
+let open_node_run_help ~app_bin_dir ~initial_args ~on_apply =
   let app_bin_dir = String.trim app_bin_dir in
   if app_bin_dir = "" then
     Modal_helpers.show_error ~title:"Node Flags" "Octez bin directory is empty"
@@ -918,7 +975,7 @@ let open_node_run_help ~app_bin_dir ~on_apply =
               not (is_excluded_option opt ~excluded:excluded_node_options))
             options
         in
-        open_modal ~title:"Node Flags" ~options:filtered ~on_apply
+        open_modal ~title:"Node Flags" ~options:filtered ~initial_args ~on_apply
     | Error (`Msg msg) -> Modal_helpers.show_error ~title:"Node Flags" msg
 
 let excluded_baker_options =
@@ -1004,7 +1061,7 @@ let load_baker_options ~binary ~mode =
       Hashtbl.replace cache cache_key opts ;
       Ok opts
 
-let open_baker_run_help ~app_bin_dir ~mode ~on_apply =
+let open_baker_run_help ~app_bin_dir ~mode ~initial_args ~on_apply =
   let app_bin_dir = String.trim app_bin_dir in
   let title =
     match mode with
@@ -1023,7 +1080,7 @@ let open_baker_run_help ~app_bin_dir ~mode ~on_apply =
               not (is_excluded_option opt ~excluded:excluded_baker_options))
             options
         in
-        open_modal ~title ~options:filtered ~on_apply
+        open_modal ~title ~options:filtered ~initial_args ~on_apply
     | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
 
 module For_tests = struct
@@ -1042,4 +1099,6 @@ module For_tests = struct
     | Value Number -> "number"
     | Value Float -> "float"
     | Value Text -> "text"
+
+  let parse_initial_args = parse_initial_args
 end

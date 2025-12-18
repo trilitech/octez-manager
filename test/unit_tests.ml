@@ -1312,6 +1312,45 @@ let form_builder_prepare_extra_args_integration () =
     ["--flag"]
     (FB.prepare_extra_args "  --flag  ")
 
+let parse_initial_args_tests () =
+  let module BH = Octez_manager_ui.Binary_help_explorer.For_tests in
+  let flag_value_pair =
+    Alcotest.testable
+      (fun ppf (flag, value) ->
+        match value with
+        | None -> Format.fprintf ppf "(%s, None)" flag
+        | Some v -> Format.fprintf ppf "(%s, Some %s)" flag v)
+      ( = )
+  in
+  let list_pairs = Alcotest.list flag_value_pair in
+  (* Single flag without value *)
+  Alcotest.(check list_pairs)
+    "single flag"
+    [("--flag", None)]
+    (BH.parse_initial_args "--flag") ;
+  (* Flag with value using = *)
+  Alcotest.(check list_pairs)
+    "flag=value"
+    [("--flag", Some "value")]
+    (BH.parse_initial_args "--flag=value") ;
+  (* Flag with value as next token *)
+  Alcotest.(check list_pairs)
+    "flag value"
+    [("--flag", Some "value")]
+    (BH.parse_initial_args "--flag value") ;
+  (* Multiple flags *)
+  Alcotest.(check list_pairs)
+    "multiple flags"
+    [("--flag1", None); ("--flag2", Some "val")]
+    (BH.parse_initial_args "--flag1 --flag2=val") ;
+  (* Empty string *)
+  Alcotest.(check list_pairs) "empty" [] (BH.parse_initial_args "") ;
+  (* Flag with quoted value *)
+  Alcotest.(check list_pairs)
+    "quoted value"
+    [("--msg", Some "hello world")]
+    (BH.parse_initial_args "--msg 'hello world'")
+
 let home_dir_fallback () =
   let pw = Unix.getpwuid (Unix.geteuid ()) in
   with_env
@@ -2761,6 +2800,10 @@ let () =
             "prepare_extra_args"
             `Quick
             form_builder_prepare_extra_args_integration;
+        ] );
+      ( "binary_help_explorer",
+        [
+          Alcotest.test_case "parse_initial_args" `Quick parse_initial_args_tests;
         ] );
       ( "snapshots.basic",
         [

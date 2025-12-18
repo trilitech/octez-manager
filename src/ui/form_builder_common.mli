@@ -94,3 +94,12 @@ val prepare_extra_args : string -> string list
     @param binary_name The name of the binary to find (e.g., "octez-node")
     @return The directory containing the binary, or /usr/bin as fallback *)
 val default_app_bin_dir : binary_name:string -> string
+
+(** Parse shellwords-style arguments with quote support.
+
+    Supports:
+    - Single quotes: preserve everything literally
+    - Double quotes: preserve spaces, allow escaping with backslash
+    - Unquoted: split on spaces
+    - Backslash escaping in double quotes and unquoted context *)
+val parse_shellwords : string -> string list
