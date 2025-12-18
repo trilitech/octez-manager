@@ -627,24 +627,35 @@ let pad_line ~col_width line =
 (** Render a single column's content - returns list of lines *)
 let render_column ~col_width ~state ~column_groups ~is_active:_ =
   let items = column_items ~column_groups ~global_services:state.services in
-  List.concat_map
-    (fun item ->
-      match item with
-      | Header role_name ->
-          let header = Widgets.bold role_name in
-          [pad_line ~col_width header]
-      | Instance (idx, svc) ->
-          let is_folded =
-            StringSet.mem svc.service.Service.instance state.folded
-          in
-          (* Render instance line(s) *)
-          let line =
-            line_for_service idx state.selected ~folded:is_folded svc
-          in
-          (* Split into individual lines and pad each *)
-          let lines = String.split_on_char '\n' line in
-          List.map (pad_line ~col_width) lines)
-    items
+  let empty_line = String.make col_width ' ' in
+  let _, lines =
+    List.fold_left
+      (fun (is_first, acc) item ->
+        match item with
+        | Header role_name ->
+            let header = Widgets.bold role_name in
+            let header_line = pad_line ~col_width header in
+            (* Add empty line before header unless it's the first item *)
+            let new_lines =
+              if is_first then [header_line] else [empty_line; header_line]
+            in
+            (false, acc @ new_lines)
+        | Instance (idx, svc) ->
+            let is_folded =
+              StringSet.mem svc.service.Service.instance state.folded
+            in
+            (* Render instance line(s) *)
+            let line =
+              line_for_service idx state.selected ~folded:is_folded svc
+            in
+            (* Split into individual lines and pad each *)
+            let instance_lines =
+              String.split_on_char '\n' line |> List.map (pad_line ~col_width)
+            in
+            (false, acc @ instance_lines))
+      (true, []) items
+  in
+  lines
 
 (** Merge multiple column renders into combined lines *)
 let merge_columns ~col_width ~columns_content =
