@@ -22,7 +22,7 @@ module StringSet = Set.Make (String)
 (** Matrix layout configuration *)
 let min_column_width = 50
 
-let column_separator = " │ "
+let column_separator = "   "
 
 type state = {
   services : Service_state.t list;
@@ -53,11 +53,11 @@ let role_order = function
 
 (** Role section headers *)
 let role_header = function
-  | "node" -> "── 🔗 Nodes ──"
-  | "baker" -> "── 🍞 Bakers ──"
-  | "accuser" -> "── 👁 Accusers ──"
-  | "dal-node" -> "── 💎 DAL Nodes ──"
-  | "signer" -> "── 🔑 Signers ──"
+  | "node" -> "── Nodes ──"
+  | "baker" -> "── Bakers ──"
+  | "accuser" -> "── Accusers ──"
+  | "dal-node" -> "── DAL Nodes ──"
+  | "signer" -> "── Signers ──"
   | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
 
 (** Sort services by role, then by instance name *)
@@ -631,8 +631,7 @@ let render_column ~col_width ~state ~column_groups ~is_active:_ =
     (fun item ->
       match item with
       | Header role_name ->
-          (* Add indent to align with instance content (after marker/fold/status) *)
-          let header = "  " ^ Widgets.bold role_name in
+          let header = Widgets.bold role_name in
           [pad_line ~col_width header]
       | Instance (idx, svc) ->
           let is_folded =
