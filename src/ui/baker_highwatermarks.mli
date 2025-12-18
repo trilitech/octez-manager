@@ -21,8 +21,18 @@ type delegate_activity = {
   last_attestation : highwatermark option;
 }
 
-(** Read highwatermarks for a baker instance.
+(** Get cached highwatermarks for a baker instance (never blocks on I/O).
     Returns a list of delegate activities. *)
+val get : instance:string -> delegate_activity list
+
+(** Refresh highwatermarks cache for an instance (does file I/O).
+    Called by the background scheduler. *)
+val refresh : instance:string -> unit
+
+(** Clear cache entry when instance is removed. *)
+val clear : instance:string -> unit
+
+(** Deprecated: use [get] instead. *)
 val read : instance:string -> delegate_activity list
 
 (** Get the maximum level from a delegate's activity. *)
