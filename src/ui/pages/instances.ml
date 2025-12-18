@@ -17,9 +17,12 @@ let ( let* ) = Result.bind
 
 let name = "instances"
 
+module StringSet = Set.Make (String)
+
 type state = {
   services : Service_state.t list;
   selected : int;
+  folded : StringSet.t;  (* instance names that are folded *)
   last_updated : float;
   next_page : string option;
 }
@@ -39,6 +42,7 @@ let init_state () =
   {
     services;
     selected = 0;
+    folded = StringSet.empty;
     last_updated = Unix.gettimeofday ();
     next_page = None;
   }
@@ -163,7 +167,7 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
 let network_short (n : string) =
   match Snapshots.slug_of_network n with Some slug -> slug | None -> n
 
-let line_for_service idx selected (st : Service_state.t) =
+let line_for_service idx selected ~folded (st : Service_state.t) =
   let svc = st.Service_state.service in
   let marker = if idx + 3 = selected then Widgets.bold "➤" else " " in
   let status = status_icon st in
@@ -182,10 +186,12 @@ let line_for_service idx selected (st : Service_state.t) =
     Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
   in
   let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
+  let fold_indicator = if folded then "▸" else "▾" in
   let first_line =
     Printf.sprintf
-      "%s %s %s %s %s %s %s"
+      "%s %s %s %s %s %s %s %s"
       marker
+      fold_indicator
       status
       instance_str
       role_str
@@ -193,9 +199,12 @@ let line_for_service idx selected (st : Service_state.t) =
       network
       enabled
   in
+  (* If folded, return only the first line *)
+  if folded then first_line
+  else
   (* Align RPC under the role column visually. We rely on fixed column widths
-     (marker 1 + status 1 + instance 16) with spaces between. *)
-  let role_column_start = 1 + 1 + 1 + 1 + 16 + 1 in
+     (marker 1 + fold 1 + status 1 + instance 16) with spaces between. *)
+  let role_column_start = 1 + 1 + 1 + 1 + 1 + 1 + 16 + 1 in
   (* Render highwatermarks line for bakers (last signed levels) *)
   let baker_highwatermarks_line ~instance =
     let activities = Baker_highwatermarks.read ~instance in
@@ -408,7 +417,9 @@ let table_lines state =
     if state.services = [] then ["  No managed instances."]
     else
       state.services
-      |> List.mapi (fun idx svc -> line_for_service idx state.selected svc)
+      |> List.mapi (fun idx (svc : Service_state.t) ->
+             let is_folded = StringSet.mem svc.service.Service.instance state.folded in
+             line_for_service idx state.selected ~folded:is_folded svc)
   in
   install_row :: manage_wallet_row :: "" :: instance_rows
 
@@ -837,7 +848,7 @@ struct
   let footer ~cols:_ =
     [
       Widgets.dim
-        "Arrows: move  Enter: actions  c: create  r: refresh  m: menu  Esc: \
+        "Arrows: move  Tab: fold  Enter: actions  c: create  r: refresh  Esc: \
          back";
     ]
 
@@ -1014,6 +1025,17 @@ Press **Enter** to open instance menu.|}
 
   let force_refresh_cmd s = force_refresh s
 
+  let toggle_fold s =
+    match current_service s with
+    | None -> s
+    | Some st ->
+        let inst = st.service.Service.instance in
+        let folded =
+          if StringSet.mem inst s.folded then StringSet.remove inst s.folded
+          else StringSet.add inst s.folded
+        in
+        {s with folded}
+
   let handle_key s key ~size:_ =
     let s =
       if Miaou.Core.Modal_manager.has_active () then (
@@ -1026,6 +1048,7 @@ Press **Enter** to open instance menu.|}
         | Some Keys.Down -> move_selection s 1
         | Some (Keys.Char "k") -> move_selection s (-1)
         | Some (Keys.Char "j") -> move_selection s 1
+        | Some Keys.Tab -> toggle_fold s
         | Some Keys.Enter -> activate_selection s
         | Some (Keys.Char "c") -> create_menu_modal s
         | Some (Keys.Char " ") -> force_refresh_cmd s
