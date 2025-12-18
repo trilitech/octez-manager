@@ -30,7 +30,7 @@ type model = {
   signer : signer_config;
 }
 
-let initial_model =
+let make_initial_model () =
   {
     core =
       {
@@ -69,7 +69,7 @@ let spec =
   let open Form_builder_bundles in
   {
     title = " Install Signer ";
-    initial_model;
+    initial_model = make_initial_model;
     fields =
       core_service_fields
         ~get_core:(fun m -> m.core)

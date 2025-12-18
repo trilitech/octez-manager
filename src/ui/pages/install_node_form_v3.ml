@@ -269,7 +269,7 @@ let ensure_ports_initialized model_ref =
           node = Form_builder_common.{current.node with p2p_addr = value};
         })
 
-let initial_model =
+let make_initial_model () =
   let model_ref = ref base_initial_model in
   ensure_ports_initialized model_ref ;
   !model_ref
@@ -402,7 +402,7 @@ let spec =
   let open Form_builder_bundles in
   {
     title = " Install Node ";
-    initial_model;
+    initial_model = make_initial_model;
     fields =
       [
         (* Instance name with auto-update of data_dir *)
