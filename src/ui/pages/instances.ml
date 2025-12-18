@@ -19,12 +19,21 @@ let name = "instances"
 
 module StringSet = Set.Make (String)
 
+(** Matrix layout configuration *)
+let min_column_width = 50
+
+let column_separator = " │ "
+
 type state = {
   services : Service_state.t list;
   selected : int;
   folded : StringSet.t; (* instance names that are folded *)
   last_updated : float;
   next_page : string option;
+  (* Matrix layout state *)
+  num_columns : int; (* number of columns based on terminal width *)
+  active_column : int; (* which column has focus, 0-indexed *)
+  column_scroll : int array; (* scroll offset per column *)
 }
 
 type msg = unit
@@ -41,6 +50,15 @@ let role_order = function
   | "dal-node" -> 3
   | "signer" -> 4
   | _ -> 5
+
+(** Role section headers *)
+let role_header = function
+  | "node" -> "── 🔗 Nodes ──"
+  | "baker" -> "── 🍞 Bakers ──"
+  | "accuser" -> "── 👁 Accusers ──"
+  | "dal-node" -> "── 💎 DAL Nodes ──"
+  | "signer" -> "── 🔑 Signers ──"
+  | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
 
 (** Sort services by role, then by instance name *)
 let sort_services services =
@@ -60,6 +78,127 @@ let load_services () = Data.load_service_states () |> sort_services
 let load_services_fresh () =
   Data.load_service_states ~detail:false () |> sort_services
 
+(** Calculate number of columns based on terminal width *)
+let calc_num_columns ~cols =
+  let separator_width = String.length column_separator in
+  let available = cols - separator_width in
+  (* At least 1 column, max based on available width *)
+  max 1 (available / (min_column_width + separator_width))
+
+(** Group services by role, preserving order *)
+let group_by_role services =
+  let roles = ["node"; "baker"; "accuser"; "dal-node"; "signer"] in
+  List.filter_map
+    (fun role ->
+      let instances =
+        List.filter
+          (fun (st : Service_state.t) -> st.service.Service.role = role)
+          services
+      in
+      if instances = [] then None else Some (role, instances))
+    roles
+
+(** Distribute role groups across columns, balancing by instance count.
+    Returns: column index -> list of (role, instances) *)
+let distribute_to_columns ~num_columns role_groups =
+  if num_columns <= 1 then [|role_groups|]
+  else
+    let columns = Array.make num_columns [] in
+    let column_counts = Array.make num_columns 0 in
+    (* Assign each role group to the column with fewest instances *)
+    List.iter
+      (fun ((_role, instances) as group) ->
+        let min_col =
+          let min_idx = ref 0 in
+          for i = 1 to num_columns - 1 do
+            if column_counts.(i) < column_counts.(!min_idx) then min_idx := i
+          done ;
+          !min_idx
+        in
+        columns.(min_col) <- columns.(min_col) @ [group] ;
+        column_counts.(min_col) <-
+          column_counts.(min_col) + List.length instances + 2
+        (* +2 for header and spacing *))
+      role_groups ;
+    columns
+
+(** Get flat list of services for a column, with their global indices *)
+type column_item =
+  | Header of string
+  | Instance of int * Service_state.t (* global index, service *)
+
+let column_items ~column_groups ~global_services =
+  List.concat_map
+    (fun (role, instances) ->
+      let header = Header (role_header role) in
+      let items =
+        List.map
+          (fun (st : Service_state.t) ->
+            (* Find global index *)
+            let idx =
+              List.find_mapi
+                (fun i (s : Service_state.t) ->
+                  if
+                    String.equal
+                      s.service.Service.instance
+                      st.service.Service.instance
+                  then Some i
+                  else None)
+                global_services
+              |> Option.value ~default:0
+            in
+            Instance (idx, st))
+          instances
+      in
+      header :: items)
+    column_groups
+
+(** Get list of global service indices in a column *)
+let column_service_indices ~column_groups ~global_services =
+  column_items ~column_groups ~global_services
+  |> List.filter_map (function
+    | Header _ -> None
+    | Instance (idx, _) -> Some idx)
+
+(** Get first service index in a column *)
+let first_service_in_column ~num_columns ~services col =
+  if num_columns <= 1 then 0
+  else
+    let role_groups = group_by_role services in
+    let columns = distribute_to_columns ~num_columns role_groups in
+    if col >= Array.length columns then 0
+    else
+      let indices =
+        column_service_indices
+          ~column_groups:columns.(col)
+          ~global_services:services
+      in
+      match indices with [] -> 0 | first :: _ -> first
+
+(** Get all service indices in a column *)
+let services_in_column ~num_columns ~services col =
+  if num_columns <= 1 then List.mapi (fun i _ -> i) services
+  else
+    let role_groups = group_by_role services in
+    let columns = distribute_to_columns ~num_columns role_groups in
+    if col >= Array.length columns then []
+    else
+      column_service_indices
+        ~column_groups:columns.(col)
+        ~global_services:services
+
+(** Find which column contains a given service index *)
+let column_for_service ~num_columns ~services idx =
+  if num_columns <= 1 then 0
+  else
+    let rec find_col col =
+      if col >= num_columns then 0
+      else
+        let indices = services_in_column ~num_columns ~services col in
+        if List.mem idx indices then col else find_col (col + 1)
+    in
+    find_col 0
+
 let init_state () =
   let services = load_services () in
   (* Start with all instances folded by default *)
@@ -70,12 +209,18 @@ let init_state () =
       StringSet.empty
       services
   in
+  (* Default to 1 column, will be updated on first render with actual cols *)
+  let num_columns = 1 in
   {
     services;
     selected = 0;
     folded = all_folded;
     last_updated = Unix.gettimeofday ();
     next_page = None;
+    num_columns;
+    active_column = 0;
+    column_scroll = Array.make 10 0;
+    (* pre-allocate for up to 10 columns *)
   }
 
 let force_refresh state =
@@ -444,9 +589,59 @@ let role_header = function
   | "signer" -> "── Signers ──"
   | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
 
-let table_lines state =
-  (* Clear visibility markers at start of render pass *)
-  System_metrics_scheduler.clear_visibility () ;
+(** Pad a line to column width using visible character count *)
+let pad_line ~col_width line =
+  let visible_len = Miaou_helpers.Helpers.visible_chars_count line in
+  if visible_len < col_width then
+    line ^ String.make (col_width - visible_len) ' '
+  else line
+
+(** Render a single column's content - returns list of lines *)
+let render_column ~col_width ~state ~column_groups ~is_active:_ =
+  let items = column_items ~column_groups ~global_services:state.services in
+  List.concat_map
+    (fun item ->
+      match item with
+      | Header role_name ->
+          let header = Widgets.dim role_name in
+          [pad_line ~col_width header]
+      | Instance (idx, svc) ->
+          let is_folded =
+            StringSet.mem svc.service.Service.instance state.folded
+          in
+          (* Render instance line(s) *)
+          let line =
+            line_for_service idx state.selected ~folded:is_folded svc
+          in
+          (* Split into individual lines and pad each *)
+          let lines = String.split_on_char '\n' line in
+          List.map (pad_line ~col_width) lines)
+    items
+
+(** Merge multiple column renders into combined lines *)
+let merge_columns ~col_width ~columns_content =
+  let max_height =
+    Array.fold_left (fun m col -> max m (List.length col)) 0 columns_content
+  in
+  let pad_column col =
+    let len = List.length col in
+    if len < max_height then
+      col @ List.init (max_height - len) (fun _ -> String.make col_width ' ')
+    else col
+  in
+  let padded = Array.map pad_column columns_content in
+  List.init max_height (fun row_idx ->
+      let parts =
+        Array.to_list
+          (Array.map
+             (fun col ->
+               if row_idx < List.length col then List.nth col row_idx else "")
+             padded)
+      in
+      String.concat column_separator parts)
+
+(** Single-column layout (original) *)
+let table_lines_single state =
   let install_row =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
@@ -480,6 +675,54 @@ let table_lines state =
       build_rows 0 None [] state.services
   in
   install_row :: manage_wallet_row :: "" :: instance_rows
+
+(** Multi-column matrix layout *)
+let table_lines_matrix ~cols state =
+  let num_columns = calc_num_columns ~cols in
+  let role_groups = group_by_role state.services in
+  let columns = distribute_to_columns ~num_columns role_groups in
+  let col_width =
+    (cols - ((num_columns - 1) * String.length column_separator)) / num_columns
+  in
+  (* Render each column *)
+  let columns_content =
+    Array.mapi
+      (fun col_idx column_groups ->
+        let is_active = col_idx = state.active_column in
+        render_column ~col_width ~state ~column_groups ~is_active)
+      columns
+  in
+  (* Header rows (install/wallet) span full width in single line *)
+  let install_row =
+    let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+  in
+  let manage_wallet_row =
+    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
+  in
+  let instance_rows = merge_columns ~col_width ~columns_content in
+  install_row :: manage_wallet_row :: "" :: instance_rows
+
+let table_lines ?(cols = 80) state =
+  (* Clear visibility markers at start of render pass *)
+  System_metrics_scheduler.clear_visibility () ;
+  let num_columns = calc_num_columns ~cols in
+  (* Silence unused field warnings - these will be used for scrolling *)
+  let _ = state.num_columns in
+  let _ = state.column_scroll in
+  if state.services = [] then
+    let install_row =
+      let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
+      Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+    in
+    let manage_wallet_row =
+      let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+      Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
+    in
+    [install_row; manage_wallet_row; ""; "  No managed instances."]
+  else if num_columns <= 1 then table_lines_single state
+  else table_lines_matrix ~cols state
 
 let summary_line state =
   let total = List.length state.services in
@@ -1023,7 +1266,7 @@ Press **Enter** to open instance menu.|}
       ~footer:footer_lines
       ~child:(fun inner_size ->
         (* Get all table lines and flatten to individual lines *)
-        let table = table_lines s in
+        let table = table_lines ~cols s in
         let all_lines =
           List.concat_map (fun s -> String.split_on_char '\n' s) table
         in
@@ -1114,13 +1357,55 @@ Press **Enter** to open instance menu.|}
       (* Only menu items (0 and 1) when no services *)
       let selected = max 0 (min 1 (s.selected + delta)) in
       {s with selected}
-    else
+    else if s.num_columns <= 1 then
+      (* Single column mode: simple linear navigation *)
       let raw = s.selected + delta in
       let selected = clamp_selection s.services raw in
       (* Skip position 2 (separator between menu and services) *)
       let selected = if selected = 2 then selected + delta else selected in
       let selected = clamp_selection s.services selected in
       {s with selected}
+    else if
+      (* Multi-column mode: navigate within current column *)
+      s.selected < 3
+    then
+      (* In menu area, simple navigation *)
+      let selected = max 0 (min 2 (s.selected + delta)) in
+      (* Jump from menu to first service in active column *)
+      if selected >= 2 && delta > 0 then
+        let first_svc =
+          first_service_in_column
+            ~num_columns:s.num_columns
+            ~services:s.services
+            s.active_column
+        in
+        {s with selected = first_svc + 3}
+      else {s with selected}
+    else
+      (* In services area: stay within column *)
+      let current_idx = s.selected - 3 in
+      let col_indices =
+        services_in_column
+          ~num_columns:s.num_columns
+          ~services:s.services
+          s.active_column
+      in
+      let current_pos =
+        List.find_mapi
+          (fun i idx -> if idx = current_idx then Some i else None)
+          col_indices
+        |> Option.value ~default:0
+      in
+      let new_pos = current_pos + delta in
+      if new_pos < 0 then
+        (* Moving up from first service goes to menu *)
+        {s with selected = 1}
+      else if new_pos >= List.length col_indices then
+        (* At bottom of column, stay put *)
+        s
+      else
+        let new_idx = List.nth col_indices new_pos in
+        {s with selected = new_idx + 3}
 
   let force_refresh_cmd s = force_refresh s
 
@@ -1135,7 +1420,47 @@ Press **Enter** to open instance menu.|}
         in
         {s with folded}
 
-  let handle_key s key ~size:_ =
+  (** Move to a different column (for matrix layout) *)
+  let move_column s delta =
+    let num_cols = s.num_columns in
+    if num_cols <= 1 then s
+    else if s.selected < 3 then
+      (* In menu area, just change column *)
+      let new_col = (s.active_column + delta + num_cols) mod num_cols in
+      {s with active_column = new_col}
+    else
+      (* In services area: move to same position in target column *)
+      let current_idx = s.selected - 3 in
+      let current_col_indices =
+        services_in_column
+          ~num_columns:num_cols
+          ~services:s.services
+          s.active_column
+      in
+      let current_pos =
+        List.find_mapi
+          (fun i idx -> if idx = current_idx then Some i else None)
+          current_col_indices
+        |> Option.value ~default:0
+      in
+      let new_col = (s.active_column + delta + num_cols) mod num_cols in
+      let target_col_indices =
+        services_in_column ~num_columns:num_cols ~services:s.services new_col
+      in
+      if target_col_indices = [] then
+        (* Target column is empty, stay in current column *)
+        s
+      else
+        (* Move to same position (clamped) in target column *)
+        let target_pos = min current_pos (List.length target_col_indices - 1) in
+        let target_idx = List.nth target_col_indices target_pos in
+        {s with active_column = new_col; selected = target_idx + 3}
+
+  let handle_key s key ~size =
+    (* Update num_columns based on current terminal size *)
+    let cols = size.LTerm_geom.cols in
+    let num_columns = calc_num_columns ~cols in
+    let s = {s with num_columns} in
     let s =
       if Miaou.Core.Modal_manager.has_active () then (
         Miaou.Core.Modal_manager.handle_key key ;
@@ -1147,6 +1472,10 @@ Press **Enter** to open instance menu.|}
         | Some Keys.Down -> move_selection s 1
         | Some (Keys.Char "k") -> move_selection s (-1)
         | Some (Keys.Char "j") -> move_selection s 1
+        | Some Keys.Left -> move_column s (-1)
+        | Some Keys.Right -> move_column s 1
+        | Some (Keys.Char "h") -> move_column s (-1)
+        | Some (Keys.Char "l") -> move_column s 1
         | Some Keys.Tab -> toggle_fold s
         | Some Keys.Enter -> activate_selection s
         | Some (Keys.Char "c") -> create_menu_modal s
@@ -1159,6 +1488,19 @@ Press **Enter** to open instance menu.|}
         | Some (Keys.Char "C-c") ->
             {s with next_page = Some "__BACK__"}
         | _ -> s
+    in
+    (* Keep active_column in sync with selection *)
+    let s =
+      if s.selected >= 3 && s.num_columns > 1 then
+        let svc_idx = s.selected - 3 in
+        let col =
+          column_for_service
+            ~num_columns:s.num_columns
+            ~services:s.services
+            svc_idx
+        in
+        {s with active_column = col}
+      else s
     in
     check_navigation s
 
