@@ -19,6 +19,13 @@ build:
 	$(DUNE) build
 	cp -f _build/install/default/bin/octez-manager ./
 
+fmt:
+	$(DUNE) build @fmt
+
+fmt-check:
+	@$(DUNE) build @fmt >/dev/null
+	@git --no-pager diff --exit-code || (echo "Formatting changes required. Run 'make fmt' and commit." && false)
+
 test:
 	$(DUNE) runtest
 
