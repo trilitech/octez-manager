@@ -182,6 +182,7 @@ let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
   let set args m = set_args args m in
   let edit model_ref =
     let app_bin_dir = get_bin_dir !model_ref in
+    let initial_args = get_args !model_ref in
     let on_apply tokens =
       let arg_str = String.concat " " tokens in
       model_ref := set_args arg_str !model_ref
@@ -189,12 +190,19 @@ let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
     (* Call appropriate help function based on binary and subcommand *)
     match (binary, subcommand) with
     | "octez-node", _ ->
-        Binary_help_explorer.open_node_run_help ~app_bin_dir ~on_apply
+        Binary_help_explorer.open_node_run_help
+          ~app_bin_dir
+          ~initial_args
+          ~on_apply
     | "octez-baker", _ ->
         let mode =
           match baker_mode with None -> `Local | Some f -> f !model_ref
         in
-        Binary_help_explorer.open_baker_run_help ~app_bin_dir ~mode ~on_apply
+        Binary_help_explorer.open_baker_run_help
+          ~app_bin_dir
+          ~mode
+          ~initial_args
+          ~on_apply
     | _ ->
         (* Generic fallback - show error for now *)
         Modal_helpers.show_error
