@@ -1,0 +1,58 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Background scheduler for collecting system metrics.
+
+    Polls CPU, memory, disk usage, and version information at
+    configurable intervals. Uses sparklines to display history. *)
+
+(** {2 Metrics Polling} *)
+
+(** Poll metrics for a specific service instance.
+    Call this to update CPU, memory, disk, and version data. *)
+val poll :
+  role:string -> instance:string -> binary:string -> data_dir:string -> unit
+
+(** {2 Metrics Access} *)
+
+
+(** Get version string for an instance. *)
+val get_version : role:string -> instance:string -> string option
+
+(** Format version with color based on comparison with latest stable.
+    - Green: running latest stable
+    - Yellow: same major, older minor
+    - Red: older major version
+    - Blue: dev or RC version *)
+val format_version_colored : string -> string
+
+(** Get disk size for an instance. *)
+val get_disk_size : role:string -> instance:string -> int64 option
+
+(** {2 Rendering} *)
+
+(** Render CPU line chart for an instance (multi-row braille).
+    Returns [Some (chart_lines, avg_percent)] or [None] if no data.
+    The chart_lines string contains newlines for multi-row display. *)
+val render_cpu_chart :
+  role:string -> instance:string -> focus:bool -> (string * float) option
+
+(** Render memory sparkline for an instance.
+    Returns empty string if no data. *)
+val render_mem_sparkline : role:string -> instance:string -> focus:bool -> string
+
+(** {2 Scheduler Control} *)
+
+(** Start the background polling loop.
+    Only starts once; subsequent calls are no-ops. *)
+val start : unit -> unit
+
+(** Perform one tick of polling. *)
+val tick : unit -> unit
+
+(** Clear all stored metrics. *)
+val clear : unit -> unit

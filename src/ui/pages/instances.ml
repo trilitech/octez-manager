@@ -107,7 +107,6 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
       {
         Metrics.head_level;
         bootstrapped;
-        last_rpc_refresh;
         chain_id;
         proto;
         last_error;
@@ -116,11 +115,7 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
       } ->
       let error_prefix =
         match last_error with
-        | Some msg ->
-            let msg =
-              if String.length msg > 64 then String.sub msg 0 64 else msg
-            in
-            Some (Widgets.red (Printf.sprintf "rpc error: %s" msg))
+        | Some _ -> Some (Widgets.red "no rpc")
         | None -> None
       in
       let lvl =
@@ -136,61 +131,34 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
       in
       let staleness =
         match last_block_time with
-        | None -> Widgets.dim ""
+        | None -> ""
         | Some ts ->
             let age = Unix.gettimeofday () -. ts in
-            let label =
-              if age >= 120. then Widgets.red (Printf.sprintf "Δ %.0fs" age)
-              else if age >= 30. then
-                Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
-              else Widgets.green (Printf.sprintf "Δ %.0fs" age)
-            in
-            label
-      in
-      let age =
-        if stopped then Widgets.dim ""
-        else
-          match last_rpc_refresh with
-          | None -> Widgets.dim ""
-          | Some ts ->
-              let secs = Unix.gettimeofday () -. ts in
-              let label =
-                if secs >= 60. then Printf.sprintf "(%.0fm)" (secs /. 60.)
-                else Printf.sprintf "(%.0fs)" secs
-              in
-              Widgets.dim label
+            if age >= 120. then Widgets.red (Printf.sprintf "Δ %.0fs" age)
+            else if age >= 30. then
+              Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
+            else Widgets.green (Printf.sprintf "Δ %.0fs" age)
       in
       let proto_s =
         match proto with
-        | None -> Widgets.dim "proto:?"
+        | None -> Widgets.dim "?"
         | Some p ->
-            let s =
-              Printf.sprintf
-                "proto:%s"
-                (String.sub p 0 (min 6 (String.length p)))
-            in
+            let s = String.sub p 0 (min 8 (String.length p)) in
             if stopped then Widgets.dim s else s
       in
       let chain_s =
         match chain_id with
-        | None -> Widgets.dim "chain:?"
+        | None -> Widgets.dim "?"
         | Some c ->
-            let s =
-              Printf.sprintf
-                "chain:%s"
-                (String.sub c 0 (min 6 (String.length c)))
-            in
+            let s = String.sub c 0 (min 8 (String.length c)) in
             if stopped then Widgets.dim s else s
       in
       let lvl_s = if stopped then Widgets.dim lvl else lvl in
-      Printf.sprintf
-        "%s · %s · %s · %s · %s %s"
-        boot
-        lvl_s
-        proto_s
-        chain_s
-        staleness
-        age
+      let parts =
+        [boot; lvl_s; proto_s; chain_s]
+        @ (if staleness = "" then [] else [staleness])
+      in
+      String.concat " · " parts
 
 let network_short (n : string) =
   match Snapshots.slug_of_network n with Some slug -> slug | None -> n
@@ -239,7 +207,66 @@ let line_for_service idx selected (st : Service_state.t) =
           (String.make role_column_start ' ')
           (rpc_status_line ~service_status:st.Service_state.status svc)
   in
-  String.concat "\n" [first_line; second_line]
+  (* Additional lines for nodes: metrics + CPU chart *)
+  let extra_lines =
+    match svc.Service.role with
+    | "node" ->
+        let focus = idx + 3 = selected in
+        let indent = String.make role_column_start ' ' in
+        let version =
+          match
+            System_metrics_scheduler.get_version
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some v -> System_metrics_scheduler.format_version_colored v
+          | None -> Widgets.dim "v?"
+        in
+        let mem =
+          System_metrics_scheduler.render_mem_sparkline
+            ~role:svc.Service.role
+            ~instance:svc.Service.instance
+            ~focus
+        in
+        let disk =
+          match
+            System_metrics_scheduler.get_disk_size
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some sz -> System_metrics.format_bytes sz
+          | None -> Widgets.dim "?"
+        in
+        (* Line 3: version, memory, disk *)
+        let metrics_parts =
+          [version]
+          @ (if mem = "" then [] else ["MEM " ^ mem])
+          @ ["DISK " ^ disk]
+        in
+        let metrics_line = indent ^ String.concat " · " metrics_parts in
+        (* Lines 4+: CPU chart (multi-row braille) *)
+        let cpu_lines =
+          match
+            System_metrics_scheduler.render_cpu_chart
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+              ~focus
+          with
+          | None -> []
+          | Some (chart, avg) ->
+              let chart_rows = String.split_on_char '\n' chart in
+              let last_idx = List.length chart_rows - 1 in
+              List.mapi
+                (fun i row ->
+                  if i = last_idx then
+                    Printf.sprintf "%sCPU %s %.0f%%" indent row avg
+                  else Printf.sprintf "%s    %s" indent row)
+                chart_rows
+        in
+        metrics_line :: cpu_lines
+    | _ -> []
+  in
+  String.concat "\n" ([first_line; second_line] @ extra_lines)
 
 let table_lines state =
   let install_row =
@@ -687,7 +714,35 @@ struct
          back";
     ]
 
+  let node_help_hint =
+    {|## Node Instance
+
+**Line 1:** Instance status
+- `●` running, `○` stopped
+- `[enabled]` starts on boot
+
+**Line 2:** RPC status
+- `synced`/`syncing` = bootstrap state
+- `L12345` = head level
+- Protocol & chain ID (8 chars)
+- `Δ` = time since last block
+- `no rpc` = node not responding
+
+**Line 3:** System metrics
+- Version: green=latest, yellow=outdated, red=deprecated, blue=RC
+- `MEM` = memory sparkline
+- `DISK` = data directory size
+
+**Line 4+:** CPU usage chart
+
+Press **Enter** to open instance menu.|}
+
   let view s ~focus:_ ~size =
+    (* Set contextual help hint based on selection *)
+    (match current_service s with
+    | Some st when st.service.Service.role = "node" ->
+        Miaou.Core.Help_hint.set (Some node_help_hint)
+    | _ -> Miaou.Core.Help_hint.set (Some "Press Enter to select, ? for help")) ;
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
     Context.tick_toasts () ;
