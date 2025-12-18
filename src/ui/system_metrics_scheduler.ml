@@ -267,7 +267,7 @@ let get_disk_size ~role ~instance =
       | None -> None
       | Some state -> state.data_dir_size)
 
-(** Tick - poll all node and baker instances *)
+(** Tick - poll all node, baker, and dal instances *)
 let tick () =
   let states = Data.load_service_states () in
   (* Poll nodes *)
@@ -296,7 +296,31 @@ let tick () =
       let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
       (try poll ~role:svc.Service.role ~instance:svc.Service.instance ~binary ~data_dir:""
        with _ -> ()))
-    bakers
+    bakers ;
+  (* Poll DAL nodes *)
+  let dal_nodes =
+    states
+    |> List.filter (fun (st : Data.Service_state.t) ->
+           st.service.Service.role = "dal-node")
+  in
+  List.iter
+    (fun (st : Data.Service_state.t) ->
+      let svc = st.service in
+      let binary = Filename.concat svc.Service.app_bin_dir "octez-dal-node" in
+      let data_dir = svc.Service.data_dir in
+      (try poll ~role:svc.Service.role ~instance:svc.Service.instance ~binary ~data_dir
+       with _ -> ()) ;
+      (* Also poll DAL health *)
+      let rpc_endpoint =
+        if String.starts_with ~prefix:"http" svc.Service.rpc_addr then svc.Service.rpc_addr
+        else "http://" ^ svc.Service.rpc_addr
+      in
+      (try
+         match Dal_health.fetch ~rpc_endpoint with
+         | Some health -> Dal_health.set ~instance:svc.Service.instance health
+         | None -> ()
+       with _ -> ()))
+    dal_nodes
 
 let started = ref false
 

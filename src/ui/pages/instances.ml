@@ -203,12 +203,24 @@ let line_for_service idx selected (st : Service_state.t) =
     | None -> Widgets.dim "no signing activity"
     | Some summary -> summary
   in
+  (* Check if baker has DAL enabled *)
+  let baker_has_dal ~instance =
+    match Node_env.read ~inst:instance with
+    | Error _ -> false
+    | Ok pairs -> (
+        match List.assoc_opt "OCTEZ_DAL_CONFIG" pairs with
+        | None -> false
+        | Some cfg ->
+            let cfg = String.trim (String.lowercase_ascii cfg) in
+            cfg <> "" && cfg <> "disabled")
+  in
   (* Render delegate status for bakers (from RPC) *)
   let delegate_status_line ~instance =
     let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
     if delegate_pkhs = [] then
       Widgets.dim "no delegates configured"
     else
+      let has_dal = baker_has_dal ~instance in
       let parts =
         List.map
           (fun pkh ->
@@ -240,10 +252,62 @@ let line_for_service idx selected (st : Service_state.t) =
                           Printf.sprintf "missed:%d/%d" missed remaining
                         else Widgets.green "ok"
                 in
-                Printf.sprintf "%s:%s" short_pkh status)
+                (* DAL participation info if baker has DAL enabled *)
+                let dal_info =
+                  if not has_dal then ""
+                  else
+                    let dp = d.dal_participation in
+                    let attested = dp.delegate_attested_dal_slots in
+                    let attestable = dp.delegate_attestable_dal_slots in
+                    let ratio =
+                      if attestable > 0 then
+                        Printf.sprintf "%d/%d" attested attestable
+                      else "-"
+                    in
+                    let dal_status =
+                      if dp.denounced then Widgets.red "denounced"
+                      else if not dp.sufficient_dal_participation && attestable > 0 then
+                        Widgets.yellow (Printf.sprintf "dal:%s" ratio)
+                      else if attestable > 0 then
+                        Widgets.green (Printf.sprintf "dal:%s" ratio)
+                      else ""
+                    in
+                    if dal_status = "" then "" else " " ^ dal_status
+                in
+                Printf.sprintf "%s:%s%s" short_pkh status dal_info)
           delegate_pkhs
       in
       String.concat " · " parts
+  in
+  let dal_health_line ~instance =
+    match Dal_health.get ~instance with
+    | None -> Widgets.dim "health: ?"
+    | Some health ->
+        let status_str =
+          match health.Dal_health.status with
+          | Dal_health.Up -> Widgets.green "up"
+          | Dal_health.Down -> Widgets.red "down"
+          | Dal_health.Degraded -> Widgets.yellow "degraded"
+          | Dal_health.Unknown -> Widgets.dim "?"
+        in
+        let checks_str =
+          if health.Dal_health.checks = [] then ""
+          else
+            let check_strs =
+              List.map (fun (c : Dal_health.check) ->
+                  let st =
+                    match c.status with
+                    | Dal_health.Up -> Widgets.green "ok"
+                    | Dal_health.Down -> Widgets.red "ko"
+                    | Dal_health.Degraded -> Widgets.yellow "deg"
+                    | Dal_health.Unknown -> "?"
+                  in
+                  Printf.sprintf "%s:%s" c.name st)
+                health.Dal_health.checks
+            in
+            " · " ^ String.concat " " check_strs
+        in
+        Printf.sprintf "health: %s%s" status_str checks_str
   in
   let second_line =
     match svc.Service.role with
@@ -251,16 +315,20 @@ let line_for_service idx selected (st : Service_state.t) =
         (* Line 2 for bakers: highwatermarks (last signed levels) *)
         let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
         Printf.sprintf "%s%s" (String.make role_column_start ' ') hwm
+    | "dal-node" ->
+        (* Line 2 for DAL nodes: health status *)
+        Printf.sprintf "%s%s" (String.make role_column_start ' ')
+          (dal_health_line ~instance:svc.Service.instance)
     | _ ->
         Printf.sprintf
           "%s%s"
           (String.make role_column_start ' ')
           (rpc_status_line ~service_status:st.Service_state.status svc)
   in
-  (* Additional lines for nodes and bakers: metrics + CPU chart *)
+  (* Additional lines for nodes, bakers, and dal-nodes: metrics + CPU chart *)
   let extra_lines =
     match svc.Service.role with
-    | "node" | "baker" ->
+    | "node" | "baker" | "dal-node" ->
         let focus = idx + 3 = selected in
         let indent = String.make role_column_start ' ' in
         (* For bakers: add delegate status line (line 3) *)
@@ -284,12 +352,12 @@ let line_for_service idx selected (st : Service_state.t) =
             ~instance:svc.Service.instance
             ~focus
         in
-        (* Metrics line: version, memory, disk (disk only for nodes) *)
+        (* Metrics line: version, memory, disk (for nodes and dal-nodes) *)
         let metrics_parts =
           [version]
           @ (if mem = "" then [] else ["MEM " ^ mem])
           @
-          if svc.Service.role = "node" then
+          if svc.Service.role = "node" || svc.Service.role = "dal-node" then
             let disk =
               match
                 System_metrics_scheduler.get_disk_size
