@@ -199,6 +199,49 @@ let column_for_service ~num_columns ~services idx =
     in
     find_col 0
 
+(** Calculate line position of a service within its column.
+    Returns (start_line, line_count) where start_line is 0-indexed
+    from the top of the column content (after headers). *)
+let service_line_position ~num_columns ~services ~folded svc_idx col =
+  if num_columns <= 1 then (0, 1)
+  else
+    let role_groups = group_by_role services in
+    let columns = distribute_to_columns ~num_columns role_groups in
+    if col >= Array.length columns then (0, 1)
+    else
+      let column_groups = columns.(col) in
+      let items = column_items ~column_groups ~global_services:services in
+      let rec count_lines line_acc is_first = function
+        | [] -> (line_acc, 1)
+        | Header _ :: rest ->
+            (* Header + possible empty line before it *)
+            let header_lines = if is_first then 1 else 2 in
+            count_lines (line_acc + header_lines) false rest
+        | Instance (idx, st) :: rest ->
+            let is_folded = StringSet.mem st.service.Service.instance folded in
+            let line_count = if is_folded then 2 else 6 in
+            (* Approximate: 2 lines folded, ~6 unfolded *)
+            if idx = svc_idx then (line_acc, line_count)
+            else count_lines (line_acc + line_count) false rest
+      in
+      count_lines 0 true items
+
+(** Adjust column scroll to keep selection visible.
+    Mutates column_scroll array in place. *)
+let adjust_column_scroll ~column_scroll ~col ~line_start ~line_count
+    ~visible_height =
+  let scroll = column_scroll.(col) in
+  let new_scroll =
+    if line_start < scroll then line_start
+    else if line_start + line_count > scroll + visible_height then
+      line_start + line_count - visible_height
+    else scroll
+  in
+  column_scroll.(col) <- max 0 new_scroll
+
+(* Mutable reference to track visible height for scroll calculations *)
+let last_visible_height_ref = ref 20
+
 let init_state () =
   let services = load_services () in
   (* Start with all instances folded by default *)
@@ -657,25 +700,37 @@ let render_column ~col_width ~state ~column_groups ~is_active:_ =
   in
   lines
 
-(** Merge multiple column renders into combined lines *)
-let merge_columns ~col_width ~columns_content =
-  let max_height =
-    Array.fold_left (fun m col -> max m (List.length col)) 0 columns_content
+(** Merge multiple column renders into combined lines with per-column scrolling *)
+let merge_columns ~col_width ~visible_height ~column_scroll ~columns_content =
+  let empty_line = String.make col_width ' ' in
+  (* Apply scroll offset to each column and take visible_height lines *)
+  let scrolled_columns =
+    Array.mapi
+      (fun col_idx col ->
+        let scroll = column_scroll.(col_idx) in
+        let col_len = List.length col in
+        (* Clamp scroll to valid range *)
+        let scroll = max 0 (min scroll (max 0 (col_len - visible_height))) in
+        (* Take visible_height lines starting from scroll offset *)
+        let visible =
+          col
+          |> List.filteri (fun i _ -> i >= scroll && i < scroll + visible_height)
+        in
+        (* Pad to visible_height if needed *)
+        let pad_count = visible_height - List.length visible in
+        if pad_count > 0 then visible @ List.init pad_count (fun _ -> empty_line)
+        else visible)
+      columns_content
   in
-  let pad_column col =
-    let len = List.length col in
-    if len < max_height then
-      col @ List.init (max_height - len) (fun _ -> String.make col_width ' ')
-    else col
-  in
-  let padded = Array.map pad_column columns_content in
-  List.init max_height (fun row_idx ->
+  (* Merge columns line by line *)
+  List.init visible_height (fun row_idx ->
       let parts =
         Array.to_list
           (Array.map
              (fun col ->
-               if row_idx < List.length col then List.nth col row_idx else "")
-             padded)
+               if row_idx < List.length col then List.nth col row_idx
+               else empty_line)
+             scrolled_columns)
       in
       String.concat column_separator parts)
 
@@ -716,7 +771,7 @@ let table_lines_single state =
   install_row :: manage_wallet_row :: "" :: instance_rows
 
 (** Multi-column matrix layout *)
-let table_lines_matrix ~cols state =
+let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   let num_columns = calc_num_columns ~cols in
   let role_groups = group_by_role state.services in
   let columns = distribute_to_columns ~num_columns role_groups in
@@ -740,16 +795,15 @@ let table_lines_matrix ~cols state =
     let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
   in
-  let instance_rows = merge_columns ~col_width ~columns_content in
+  let instance_rows =
+    merge_columns ~col_width ~visible_height ~column_scroll ~columns_content
+  in
   install_row :: manage_wallet_row :: "" :: instance_rows
 
-let table_lines ?(cols = 80) state =
+let table_lines ?(cols = 80) ?(visible_height = 20) state =
   (* Clear visibility markers at start of render pass *)
   System_metrics_scheduler.clear_visibility () ;
   let num_columns = calc_num_columns ~cols in
-  (* Silence unused field warnings - these will be used for scrolling *)
-  let _ = state.num_columns in
-  let _ = state.column_scroll in
   if state.services = [] then
     let install_row =
       let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
@@ -761,7 +815,10 @@ let table_lines ?(cols = 80) state =
     in
     [install_row; manage_wallet_row; ""; "  No managed instances."]
   else if num_columns <= 1 then table_lines_single state
-  else table_lines_matrix ~cols state
+  else
+    (* For matrix layout, subtract 3 for menu rows (install, wallet, separator) *)
+    let matrix_height = max 5 (visible_height - 3) in
+    table_lines_matrix ~cols ~visible_height:matrix_height ~column_scroll:state.column_scroll state
 
 let summary_line state =
   let total = List.length state.services in
@@ -1304,31 +1361,6 @@ Press **Enter** to open instance menu.|}
       ~header:(header s)
       ~footer:footer_lines
       ~child:(fun inner_size ->
-        (* Get all table lines and flatten to individual lines *)
-        let table = table_lines ~cols s in
-        let all_lines =
-          List.concat_map (fun s -> String.split_on_char '\n' s) table
-        in
-        let total_lines = List.length all_lines in
-        (* Calculate line index where current selection starts *)
-        let selection_line_start =
-          (* Count lines before current selection *)
-          let rec count_lines idx acc =
-            if idx >= s.selected then acc
-            else if idx >= List.length table then acc
-            else
-              let entry = List.nth table idx in
-              let lines = String.split_on_char '\n' entry in
-              count_lines (idx + 1) (acc + List.length lines)
-          in
-          count_lines 0 0
-        in
-        let selection_line_count =
-          if s.selected >= List.length table then 1
-          else
-            let entry = List.nth table s.selected in
-            List.length (String.split_on_char '\n' entry)
-        in
         (* Available rows for content (reserve space for progress/toasts) *)
         let progress_lines =
           if String.trim progress = "" then 0
@@ -1342,40 +1374,77 @@ Press **Enter** to open instance menu.|}
           inner_size.LTerm_geom.rows - progress_lines - toast_lines - 1
         in
         let avail_rows = max 5 avail_rows in
-        (* Adjust scroll offset to keep selection visible *)
-        let scroll = !scroll_offset_ref in
-        let scroll =
-          (* If selection is above visible area, scroll up *)
-          if selection_line_start < scroll then selection_line_start
-            (* If selection bottom is below visible area, scroll down *)
-          else if
-            selection_line_start + selection_line_count > scroll + avail_rows
-          then selection_line_start + selection_line_count - avail_rows
-          else scroll
-        in
-        let scroll = max 0 (min scroll (max 0 (total_lines - avail_rows))) in
-        scroll_offset_ref := scroll ;
-        (* Slice visible lines *)
-        let visible_lines =
-          all_lines
-          |> List.mapi (fun i l -> (i, l))
-          |> List.filter (fun (i, _) -> i >= scroll && i < scroll + avail_rows)
-          |> List.map snd
-        in
-        (* Add scroll indicators *)
-        let up_indicator = if scroll > 0 then [Widgets.dim "↑ more"] else [] in
-        let down_indicator =
-          if scroll + avail_rows < total_lines then [Widgets.dim "↓ more"]
-          else []
-        in
-        (* Build final body *)
-        let content_lines = up_indicator @ visible_lines @ down_indicator in
-        let base = String.concat "\n" content_lines in
-        let body =
-          if String.trim progress = "" then base else progress ^ "\n" ^ base
-        in
-        if String.length toast_lines_str > 0 then body ^ "\n" ^ toast_lines_str
-        else body)
+        (* Update visible height for scroll calculations *)
+        last_visible_height_ref := avail_rows - 3 ;
+        (* subtract menu rows *)
+        let num_columns = calc_num_columns ~cols in
+        (* Matrix layout handles its own scrolling per-column *)
+        if num_columns > 1 then
+          let table = table_lines ~cols ~visible_height:avail_rows s in
+          let body = String.concat "\n" table in
+          let body =
+            if String.trim progress = "" then body else progress ^ "\n" ^ body
+          in
+          if String.length toast_lines_str > 0 then
+            body ^ "\n" ^ toast_lines_str
+          else body
+        else
+          (* Single column: use global scrolling *)
+          let table = table_lines ~cols ~visible_height:avail_rows s in
+          let all_lines =
+            List.concat_map (fun s -> String.split_on_char '\n' s) table
+          in
+          let total_lines = List.length all_lines in
+          (* Calculate line index where current selection starts *)
+          let selection_line_start =
+            let rec count_lines idx acc =
+              if idx >= s.selected then acc
+              else if idx >= List.length table then acc
+              else
+                let entry = List.nth table idx in
+                let lines = String.split_on_char '\n' entry in
+                count_lines (idx + 1) (acc + List.length lines)
+            in
+            count_lines 0 0
+          in
+          let selection_line_count =
+            if s.selected >= List.length table then 1
+            else
+              let entry = List.nth table s.selected in
+              List.length (String.split_on_char '\n' entry)
+          in
+          (* Adjust scroll offset to keep selection visible *)
+          let scroll = !scroll_offset_ref in
+          let scroll =
+            if selection_line_start < scroll then selection_line_start
+            else if
+              selection_line_start + selection_line_count > scroll + avail_rows
+            then selection_line_start + selection_line_count - avail_rows
+            else scroll
+          in
+          let scroll = max 0 (min scroll (max 0 (total_lines - avail_rows))) in
+          scroll_offset_ref := scroll ;
+          let visible_lines =
+            all_lines
+            |> List.mapi (fun i l -> (i, l))
+            |> List.filter (fun (i, _) -> i >= scroll && i < scroll + avail_rows)
+            |> List.map snd
+          in
+          let up_indicator =
+            if scroll > 0 then [Widgets.dim "↑ more"] else []
+          in
+          let down_indicator =
+            if scroll + avail_rows < total_lines then [Widgets.dim "↓ more"]
+            else []
+          in
+          let content_lines = up_indicator @ visible_lines @ down_indicator in
+          let base = String.concat "\n" content_lines in
+          let body =
+            if String.trim progress = "" then base else progress ^ "\n" ^ base
+          in
+          if String.length toast_lines_str > 0 then
+            body ^ "\n" ^ toast_lines_str
+          else body)
 
   let check_navigation s =
     match Context.consume_navigation () with
@@ -1436,14 +1505,31 @@ Press **Enter** to open instance menu.|}
         |> Option.value ~default:0
       in
       let new_pos = current_pos + delta in
-      if new_pos < 0 then
+      if new_pos < 0 then (
         (* Moving up from first service goes to menu *)
-        {s with selected = 1}
+        (* Scroll to top of column *)
+        s.column_scroll.(s.active_column) <- 0 ;
+        {s with selected = 1})
       else if new_pos >= List.length col_indices then
         (* At bottom of column, stay put *)
         s
       else
         let new_idx = List.nth col_indices new_pos in
+        (* Adjust scroll to keep selection visible *)
+        let line_start, line_count =
+          service_line_position
+            ~num_columns:s.num_columns
+            ~services:s.services
+            ~folded:s.folded
+            new_idx
+            s.active_column
+        in
+        adjust_column_scroll
+          ~column_scroll:s.column_scroll
+          ~col:s.active_column
+          ~line_start
+          ~line_count
+          ~visible_height:!last_visible_height_ref ;
         {s with selected = new_idx + 3}
 
   let force_refresh_cmd s = force_refresh s
