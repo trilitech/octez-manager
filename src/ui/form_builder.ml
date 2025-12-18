@@ -38,7 +38,7 @@ type 'model pre_submit_modal_config =
 
 type 'model spec = {
   title : string;
-  initial_model : 'model;
+  initial_model : unit -> 'model;  (** Called to get fresh initial values *)
   fields : 'model field list;
   on_init : ('model -> unit) option;
   on_refresh : ('model -> unit) option;
@@ -375,7 +375,7 @@ struct
 
   let init () =
     let s =
-      {model_ref = ref S.spec.initial_model; cursor = 0; next_page = None}
+      {model_ref = ref (S.spec.initial_model ()); cursor = 0; next_page = None}
     in
     (* Call on_init hook if provided *)
     (match S.spec.on_init with Some f -> f !(s.model_ref) | None -> ()) ;
@@ -451,8 +451,8 @@ struct
             match S.spec.on_submit model with
             | Ok () ->
                 Context.mark_instances_dirty () ;
-                (* Reset form to initial values for next use *)
-                s.model_ref := S.spec.initial_model ;
+                (* Reset form to fresh initial values for next use *)
+                s.model_ref := S.spec.initial_model () ;
                 (* Navigate back to instances page *)
                 s.next_page <- Some "instances" ;
                 s
@@ -471,8 +471,8 @@ struct
         match S.spec.on_submit model with
         | Ok () ->
             Context.mark_instances_dirty () ;
-            (* Reset form to initial values for next use *)
-            s.model_ref := S.spec.initial_model ;
+            (* Reset form to fresh initial values for next use *)
+            s.model_ref := S.spec.initial_model () ;
             (* Navigate back to instances page *)
             s.next_page <- Some "instances" ;
             s

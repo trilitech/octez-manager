@@ -2936,7 +2936,7 @@ let () =
                 "base dir defaulted"
                 true
                 (String.trim
-                   Install_baker_form_v3.For_tests.initial_model.client.base_dir
+                   (Install_baker_form_v3.For_tests.initial_model ()).client.base_dir
                 <> ""));
           Alcotest.test_case
             "accuser initial base dir default"
