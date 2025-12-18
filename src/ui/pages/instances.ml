@@ -894,6 +894,9 @@ Press **Enter** to open instance menu.|}
 
 Press **Enter** to open instance menu.|}
 
+  (* Mutable scroll offset - updated during view to keep selection visible *)
+  let scroll_offset_ref = ref 0
+
   let view s ~focus:_ ~size =
     (* Set contextual help hint based on selection *)
     (match current_service s with
@@ -907,20 +910,84 @@ Press **Enter** to open instance menu.|}
     Context.tick_toasts () ;
     let cols = size.LTerm_geom.cols in
     let progress = Context.render_progress ~cols in
-    let body =
-      let base = String.concat "\n" (table_lines s) in
-      if String.trim progress = "" then base else progress ^ "\n" ^ base
-    in
-    let toast_lines = Context.render_toasts ~cols in
-    let body_with_toasts =
-      if String.length toast_lines > 0 then body ^ "\n" ^ toast_lines else body
-    in
+    let toast_lines_str = Context.render_toasts ~cols in
     let footer_lines = footer ~cols in
     Vsection.render
       ~size
       ~header:(header s)
       ~footer:footer_lines
-      ~child:(fun _ -> body_with_toasts)
+      ~child:(fun inner_size ->
+        (* Get all table lines and flatten to individual lines *)
+        let table = table_lines s in
+        let all_lines =
+          List.concat_map (fun s -> String.split_on_char '\n' s) table
+        in
+        let total_lines = List.length all_lines in
+        (* Calculate line index where current selection starts *)
+        let selection_line_start =
+          (* Count lines before current selection *)
+          let rec count_lines idx acc =
+            if idx >= s.selected then acc
+            else if idx >= List.length table then acc
+            else
+              let entry = List.nth table idx in
+              let lines = String.split_on_char '\n' entry in
+              count_lines (idx + 1) (acc + List.length lines)
+          in
+          count_lines 0 0
+        in
+        let selection_line_count =
+          if s.selected >= List.length table then 1
+          else
+            let entry = List.nth table s.selected in
+            List.length (String.split_on_char '\n' entry)
+        in
+        (* Available rows for content (reserve space for progress/toasts) *)
+        let progress_lines =
+          if String.trim progress = "" then 0
+          else List.length (String.split_on_char '\n' progress)
+        in
+        let toast_lines =
+          if String.length toast_lines_str = 0 then 0
+          else List.length (String.split_on_char '\n' toast_lines_str)
+        in
+        let avail_rows = inner_size.LTerm_geom.rows - progress_lines - toast_lines - 1 in
+        let avail_rows = max 5 avail_rows in
+        (* Adjust scroll offset to keep selection visible *)
+        let scroll = !scroll_offset_ref in
+        let scroll =
+          (* If selection is above visible area, scroll up *)
+          if selection_line_start < scroll then selection_line_start
+          (* If selection bottom is below visible area, scroll down *)
+          else if selection_line_start + selection_line_count > scroll + avail_rows then
+            selection_line_start + selection_line_count - avail_rows
+          else scroll
+        in
+        let scroll = max 0 (min scroll (max 0 (total_lines - avail_rows))) in
+        scroll_offset_ref := scroll ;
+        (* Slice visible lines *)
+        let visible_lines =
+          all_lines
+          |> List.mapi (fun i l -> (i, l))
+          |> List.filter (fun (i, _) -> i >= scroll && i < scroll + avail_rows)
+          |> List.map snd
+        in
+        (* Add scroll indicators *)
+        let up_indicator =
+          if scroll > 0 then [Widgets.dim "↑ more"] else []
+        in
+        let down_indicator =
+          if scroll + avail_rows < total_lines then [Widgets.dim "↓ more"]
+          else []
+        in
+        (* Build final body *)
+        let content_lines = up_indicator @ visible_lines @ down_indicator in
+        let base = String.concat "\n" content_lines in
+        let body =
+          if String.trim progress = "" then base else progress ^ "\n" ^ base
+        in
+        if String.length toast_lines_str > 0 then body ^ "\n" ^ toast_lines_str
+        else body)
 
   let check_navigation s =
     match Context.consume_navigation () with
