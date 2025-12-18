@@ -631,7 +631,8 @@ let render_column ~col_width ~state ~column_groups ~is_active:_ =
     (fun item ->
       match item with
       | Header role_name ->
-          let header = Widgets.dim role_name in
+          (* Add indent to align with instance content (after marker/fold/status) *)
+          let header = "  " ^ Widgets.bold role_name in
           [pad_line ~col_width header]
       | Instance (idx, svc) ->
           let is_folded =
