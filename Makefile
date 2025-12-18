@@ -26,7 +26,7 @@ fmt-check:
 	@$(DUNE) build @fmt >/dev/null
 	@git --no-pager diff --exit-code || (echo "Formatting changes required. Run 'make fmt' and commit." && false)
 
-test:
+test: fmt-check
 	$(DUNE) runtest
 
 clean:
