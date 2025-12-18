@@ -298,6 +298,53 @@ let view s ~focus:_ ~size =
           in
           String.split_on_char '\n' summary |> List.iter add) ;
 
+      (* Scheduler Metrics Section *)
+      add "" ;
+      add (Widgets.fg 11 (Widgets.bold "━━━ Scheduler Performance ━━━")) ;
+      add "" ;
+      let scheduler_snapshots = Metrics.get_scheduler_snapshots () in
+      if scheduler_snapshots = [] then
+        add (Widgets.dim "  No scheduler metrics recorded yet")
+      else
+        List.iter
+          (fun (name, (snap : Metrics.snapshot)) ->
+            let avg =
+              if snap.count > 0 then snap.sum /. float_of_int snap.count else 0.
+            in
+            let p50_str =
+              match snap.p50 with
+              | Some v -> Printf.sprintf "%.1f" v
+              | None -> "-"
+            in
+            let p90_str =
+              match snap.p90 with
+              | Some v -> Printf.sprintf "%.1f" v
+              | None -> "-"
+            in
+            let p99_str =
+              match snap.p99 with
+              | Some v -> Printf.sprintf "%.1f" v
+              | None -> "-"
+            in
+            let color =
+              match snap.p90 with
+              | Some v when v > 100. -> 9 (* red if p90 > 100ms *)
+              | Some v when v > 50. -> 11 (* yellow if p90 > 50ms *)
+              | _ -> 10 (* green *)
+            in
+            add
+              (Printf.sprintf
+                 "  %s %-16s  %s avg:%.1fms  p50:%s  p90:%s  p99:%s  (n=%d)"
+                 (Widgets.fg color "●")
+                 name
+                 (Widgets.dim "|")
+                 avg
+                 p50_str
+                 p90_str
+                 p99_str
+                 snap.count))
+          scheduler_snapshots ;
+
       add "" ;
       add (Widgets.fg 14 (Widgets.bold "━━━ Metrics Server Configuration ━━━")) ;
       add "" ;
