@@ -8,7 +8,10 @@
 (** Baker highwatermarks reading.
 
     Reads the highwatermarks file from the baker's base directory
-    to display the last signed block/attestation/preattestation levels. *)
+    to display the last signed block/attestation/preattestation levels.
+
+    Data is cached and updated by a background scheduler. The UI only
+    reads from the cache and never blocks on file I/O. *)
 
 open Octez_manager_lib
 
@@ -129,14 +132,41 @@ let get_baker_base_dir ~instance =
           let d = String.trim d in
           if d = "" then None else Some d)
 
-(** Read highwatermarks for a baker instance *)
-let read ~instance =
+(** Read highwatermarks for a baker instance (internal, does file I/O) *)
+let read_from_disk ~instance =
   match get_baker_base_dir ~instance with
   | None -> []
   | Some base_dir -> (
       match find_highwatermarks_file base_dir with
       | None -> []
       | Some path -> read_file path)
+
+(** {1 Cache for UI access} *)
+
+(** Cache: instance -> delegate_activity list *)
+let cache : (string, delegate_activity list) Hashtbl.t = Hashtbl.create 17
+
+let cache_lock = Mutex.create ()
+
+(** Get cached highwatermarks for display (never blocks on I/O) *)
+let get ~instance =
+  Mutex.protect cache_lock (fun () ->
+      Hashtbl.find_opt cache instance |> Option.value ~default:[])
+
+(** Update cache for an instance (called by background scheduler) *)
+let refresh ~instance =
+  let data = read_from_disk ~instance in
+  Mutex.protect cache_lock (fun () -> Hashtbl.replace cache instance data)
+
+(** Clear cache entry when instance is removed.
+    Note: Currently not called automatically - stale entries persist until
+    the app restarts. This is acceptable since instance names are unique
+    and stale entries cause no harm (they're just not displayed). *)
+let clear ~instance =
+  Mutex.protect cache_lock (fun () -> Hashtbl.remove cache instance)
+
+(** Deprecated: use [get] instead. This exists for backwards compatibility. *)
+let read ~instance = get ~instance
 
 (** Get the maximum level from a delegate's activity *)
 let max_level activity =
