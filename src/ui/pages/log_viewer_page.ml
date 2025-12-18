@@ -36,9 +36,7 @@ let init () =
           (* Try to open daily logs first, fall back to journald *)
           let source, pager =
             match
-              Log_viewer.get_daily_log_file
-                ~role:svc.Service.role
-                ~instance
+              Log_viewer.get_daily_log_file ~role:svc.Service.role ~instance
             with
             | Ok log_file -> (
                 match File_pager.open_file ~follow:true log_file with

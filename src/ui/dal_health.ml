@@ -11,16 +11,9 @@ open Octez_manager_lib
 
 type status = Up | Down | Degraded | Unknown
 
-type check = {
-  name : string;
-  status : status;
-}
+type check = {name : string; status : status}
 
-type t = {
-  status : status;
-  checks : check list;
-  last_fetch : float;
-}
+type t = {status : status; checks : check list; last_fetch : float}
 
 let status_of_string = function
   | "up" | "ok" -> Up
@@ -46,7 +39,10 @@ let with_lock f =
 (** Fetch health from DAL node RPC *)
 let fetch ~rpc_endpoint =
   let url = rpc_endpoint ^ "/health" in
-  match Common.run_out ["curl"; "-sf"; "--connect-timeout"; "2"; "--max-time"; "5"; url] with
+  match
+    Common.run_out
+      ["curl"; "-sf"; "--connect-timeout"; "2"; "--max-time"; "5"; url]
+  with
   | Error _ -> None
   | Ok json -> (
       try
@@ -60,32 +56,29 @@ let fetch ~rpc_endpoint =
         let checks =
           match member "checks" j with
           | `List items ->
-              List.filter_map (fun item ->
+              List.filter_map
+                (fun item ->
                   let name =
-                    match member "name" item with
-                    | `String s -> s
-                    | _ -> ""
+                    match member "name" item with `String s -> s | _ -> ""
                   in
                   let st =
                     match member "status" item with
                     | `String s -> status_of_string (String.lowercase_ascii s)
                     | _ -> Unknown
                   in
-                  if name = "" then None else Some { name; status = st })
+                  if name = "" then None else Some {name; status = st})
                 items
           | _ -> []
         in
-        Some { status; checks; last_fetch = Unix.gettimeofday () }
+        Some {status; checks; last_fetch = Unix.gettimeofday ()}
       with _ -> None)
 
 (** Get cached health for an instance *)
-let get ~instance =
-  with_lock (fun () -> Hashtbl.find_opt cache instance)
+let get ~instance = with_lock (fun () -> Hashtbl.find_opt cache instance)
 
 (** Set health for an instance *)
 let set ~instance data =
   with_lock (fun () -> Hashtbl.replace cache instance data)
 
 (** Clear cache *)
-let clear () =
-  with_lock (fun () -> Hashtbl.clear cache)
+let clear () = with_lock (fun () -> Hashtbl.clear cache)

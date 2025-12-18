@@ -19,7 +19,6 @@ val poll :
 
 (** {2 Metrics Access} *)
 
-
 (** Get version string for an instance. *)
 val get_version : role:string -> instance:string -> string option
 
@@ -43,7 +42,8 @@ val render_cpu_chart :
 
 (** Render memory sparkline for an instance.
     Returns empty string if no data. *)
-val render_mem_sparkline : role:string -> instance:string -> focus:bool -> string
+val render_mem_sparkline :
+  role:string -> instance:string -> focus:bool -> string
 
 (** {2 Scheduler Control} *)
 

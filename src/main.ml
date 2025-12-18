@@ -75,7 +75,9 @@ let print_service_details svc =
   (* Role-specific fields *)
   (match svc.role with
   | "node" ->
-      Format.printf "History mode  : %s@." (History_mode.to_string svc.history_mode) ;
+      Format.printf
+        "History mode  : %s@."
+        (History_mode.to_string svc.history_mode) ;
       Format.printf "Data dir      : %s@." svc.data_dir ;
       Format.printf "RPC addr      : %s@." svc.rpc_addr ;
       Format.printf "P2P addr      : %s@." svc.net_addr
@@ -90,7 +92,9 @@ let print_service_details svc =
       | "disabled" -> Format.printf "DAL Config    : opt-out@."
       | "" -> Format.printf "DAL Config    : auto@."
       | raw -> (
-          match resolve_instance_for_endpoint raw ~roles:["dal-node"; "dal"] with
+          match
+            resolve_instance_for_endpoint raw ~roles:["dal-node"; "dal"]
+          with
           | Some inst -> Format.printf "DAL instance  : %s@." inst
           | None -> Format.printf "DAL endpoint  : %s@." raw)) ;
       if delegates <> "" then Format.printf "Delegates     : %s@." delegates ;
@@ -105,8 +109,10 @@ let print_service_details svc =
       Format.printf "Client dir    : %s@." client_base_dir ;
       Format.printf "DAL data dir  : %s@." dal_data_dir ;
       print_node_endpoint () ;
-      if svc.rpc_addr <> "" then Format.printf "DAL RPC addr  : %s@." svc.rpc_addr ;
-      if svc.net_addr <> "" then Format.printf "DAL P2P addr  : %s@." svc.net_addr
+      if svc.rpc_addr <> "" then
+        Format.printf "DAL RPC addr  : %s@." svc.rpc_addr ;
+      if svc.net_addr <> "" then
+        Format.printf "DAL P2P addr  : %s@." svc.net_addr
   | "signer" ->
       let base_dir = lookup "OCTEZ_SIGNER_BASE_DIR" in
       let address = lookup "OCTEZ_SIGNER_ADDRESS" in
@@ -307,12 +313,12 @@ let prompt_history_mode default =
               | Some p -> (
                   match History_mode.of_string p with
                   | Ok hm -> hm
-                  | Error _ -> (
+                  | Error _ ->
                       prerr_endline "Please enter rolling, full, or archive." ;
-                      loop ()))
-              | None -> (
+                      loop ())
+              | None ->
                   prerr_endline "Please enter rolling, full, or archive." ;
-                  loop ())))
+                  loop ()))
       | None -> default
     in
     loop ()
@@ -510,18 +516,15 @@ let install_node_cmd =
               | Some net -> net
               | None ->
                   if is_interactive () then
-                    (match Teztnets.list_networks () with
+                    match Teztnets.list_networks () with
                     | Ok infos -> (
-                        let aliases = List.map (fun (Teztnets.{ alias; _ }) -> alias) infos in
-                        match prompt_with_completion
-                                "Network"
-                                aliases with
+                        let aliases =
+                          List.map (fun Teztnets.{alias; _} -> alias) infos
+                        in
+                        match prompt_with_completion "Network" aliases with
                         | Some sel -> sel
                         | None -> "mainnet")
-                    | Error _ ->
-                        prompt_string_with_default
-                          "Network"
-                          "mainnet")
+                    | Error _ -> prompt_string_with_default "Network" "mainnet"
                   else "mainnet"
             in
             let history_mode =
@@ -754,9 +757,7 @@ let install_baker_cmd =
                   let completions = ["on"; "off"; "pass"] in
                   let rec ask () =
                     match
-                      prompt_with_completion
-                        "Liquidity baking vote"
-                        completions
+                      prompt_with_completion "Liquidity baking vote" completions
                     with
                     | Some v -> Ok (Some v)
                     | None ->
@@ -764,7 +765,9 @@ let install_baker_cmd =
                         ask ()
                   in
                   ask ()
-                else Error "Liquidity baking vote is required in non-interactive mode"
+                else
+                  Error
+                    "Liquidity baking vote is required in non-interactive mode"
           in
           (* Prompt for dal_endpoint if not provided in interactive mode *)
           let* dal_config =
@@ -1178,9 +1181,11 @@ let install_dal_node_cmd =
   in
   let node_instance =
     let doc =
-      "Existing octez-manager node instance to reuse for network resolution. It can also be a custom RPC endpoint for the DAL node to contact."
+      "Existing octez-manager node instance to reuse for network resolution. \
+       It can also be a custom RPC endpoint for the DAL node to contact."
     in
-    Arg.(value & opt (some string) None & info ["node-instance"] ~doc ~docv:"NODE")
+    Arg.(
+      value & opt (some string) None & info ["node-instance"] ~doc ~docv:"NODE")
   in
   let extra_args =
     Arg.(
@@ -1218,7 +1223,8 @@ let install_dal_node_cmd =
           match normalize_opt_string instance_opt with
           | Some inst -> Ok inst
           | None ->
-              if is_interactive () then Ok (prompt_required_string "Instance name")
+              if is_interactive () then
+                Ok (prompt_required_string "Instance name")
               else Error "Instance name is required in non-interactive mode"
         in
         match instance_result with
@@ -1236,25 +1242,58 @@ let install_dal_node_cmd =
               | None ->
                   if is_interactive () then (
                     match Service_registry.list () with
-                    | Error (`Msg msg) -> prerr_endline ("Warning: Could not load services: " ^ msg) ; None
+                    | Error (`Msg msg) ->
+                        prerr_endline
+                          ("Warning: Could not load services: " ^ msg) ;
+                        None
                     | Ok services ->
-                        let node_services = List.filter (fun (svc : Service.t) -> String.equal svc.role "node") services in
+                        let node_services =
+                          List.filter
+                            (fun (svc : Service.t) ->
+                              String.equal svc.role "node")
+                            services
+                        in
                         if node_services = [] then (
-                          prerr_endline "No node instances found. You can specify a custom endpoint." ;
-                          None
-                        ) else (
-                          let instance_names = List.map (fun (svc : Service.t) -> svc.instance) node_services in
-                          let instance_map = List.map (fun (svc : Service.t) -> (svc.instance, svc.rpc_addr)) node_services in
-                          Format.printf "Available node instances: %s@." (String.concat ", " (List.map (fun (inst, addr) -> Printf.sprintf "%s (%s)" inst addr) instance_map)) ;
-                          prompt_with_completion "Node instance (press Enter for default: 127.0.0.1:8732)" instance_names)
-                  ) else None
+                          prerr_endline
+                            "No node instances found. You can specify a custom \
+                             endpoint." ;
+                          None)
+                        else
+                          let instance_names =
+                            List.map
+                              (fun (svc : Service.t) -> svc.instance)
+                              node_services
+                          in
+                          let instance_map =
+                            List.map
+                              (fun (svc : Service.t) ->
+                                (svc.instance, svc.rpc_addr))
+                              node_services
+                          in
+                          Format.printf
+                            "Available node instances: %s@."
+                            (String.concat
+                               ", "
+                               (List.map
+                                  (fun (inst, addr) ->
+                                    Printf.sprintf "%s (%s)" inst addr)
+                                  instance_map)) ;
+                          prompt_with_completion
+                            "Node instance (press Enter for default: \
+                             127.0.0.1:8732)"
+                            instance_names)
+                  else None
             in
             let node_mode =
               match node_choice with
               | None -> Remote_endpoint "127.0.0.1:8732"
               | Some choice -> (
                   match Service_registry.find ~instance:choice with
-                  | Ok (Some svc) when String.equal (String.lowercase_ascii svc.Service.role) "node" -> Local_instance choice
+                  | Ok (Some svc)
+                    when String.equal
+                           (String.lowercase_ascii svc.Service.role)
+                           "node" ->
+                      Local_instance choice
                   | _ -> Remote_endpoint choice)
             in
             let node_endpoint =
@@ -1262,7 +1301,8 @@ let install_dal_node_cmd =
               | Remote_endpoint ep -> Installer.endpoint_of_rpc ep
               | Local_instance inst -> (
                   match Service_registry.find ~instance:inst with
-                  | Ok (Some svc) -> Installer.endpoint_of_rpc svc.Service.rpc_addr
+                  | Ok (Some svc) ->
+                      Installer.endpoint_of_rpc svc.Service.rpc_addr
                   | _ -> Installer.endpoint_of_rpc "127.0.0.1:8732")
             in
             let maybe_network =
@@ -1270,8 +1310,10 @@ let install_dal_node_cmd =
               | Local_instance inst -> (
                   match Service_registry.find ~instance:inst with
                   | Ok (Some svc) -> Ok svc.Service.network
-                  | _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint)
-              | Remote_endpoint _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
+                  | _ ->
+                      Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint)
+              | Remote_endpoint _ ->
+                  Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
             in
             match maybe_network with
             | Error (`Msg msg) ->
@@ -1327,8 +1369,8 @@ let install_dal_node_cmd =
   let term =
     Term.(
       ret
-        (const make $ instance $ data_dir_opt $ rpc_addr $ net_addr $ node_instance
-       $ extra_args $ service_user $ app_bin_dir $ auto_enable
+        (const make $ instance $ data_dir_opt $ rpc_addr $ net_addr
+       $ node_instance $ extra_args $ service_user $ app_bin_dir $ auto_enable
        $ logging_mode_term))
   in
   let info =
@@ -1570,8 +1612,7 @@ let purge_all_cmd =
             if !failures = [] then (
               (* Clear directory registry after successful purge *)
               (match Directory_registry.clear_all () with
-              | Ok () ->
-                  Format.printf "@.Directory registry cleared.@."
+              | Ok () -> Format.printf "@.Directory registry cleared.@."
               | Error (`Msg msg) ->
                   Format.eprintf
                     "@.Warning: Failed to clear directory registry: %s@."
@@ -1602,7 +1643,8 @@ let cleanup_orphans_cmd =
   let dry_run =
     Arg.(
       value & flag
-      & info ["dry-run"; "n"]
+      & info
+          ["dry-run"; "n"]
           ~doc:"Show what would be removed without actually deleting.")
   in
   let term =
@@ -1610,39 +1652,34 @@ let cleanup_orphans_cmd =
       Capabilities.register () ;
       match Installer.find_orphan_directories () with
       | Error (`Msg msg) -> cmdliner_error msg
-      | Ok (orphan_dirs, orphan_logs) ->
+      | Ok (orphan_dirs, orphan_logs) -> (
           if orphan_dirs = [] && orphan_logs = [] then (
             print_endline "No orphan directories or files found." ;
             `Ok ())
-          else (
-            if dry_run then (
-              print_endline "Would remove the following orphan paths:" ;
-              List.iter
-                (fun d -> Format.printf "  [dir]  %s@." d)
-                orphan_dirs ;
-              List.iter
-                (fun f -> Format.printf "  [file] %s@." f)
-                orphan_logs ;
-              `Ok ())
-            else
-              match Installer.cleanup_orphans ~dry_run:false with
-              | Error (`Msg msg) -> cmdliner_error msg
-              | Ok (removed, errors) ->
-                  List.iter
-                    (fun p -> Format.printf "  ✓ Removed: %s@." p)
-                    removed ;
-                  List.iter
-                    (fun (p, msg) ->
-                      Format.eprintf "  ✗ Failed to remove %s: %s@." p msg)
-                    errors ;
-                  if errors = [] then (
-                    Format.printf "@.Cleanup complete. %d item(s) removed.@."
-                      (List.length removed) ;
-                    `Ok ())
-                  else
-                    cmdliner_error
-                      (Printf.sprintf "%d item(s) failed to remove"
-                         (List.length errors)))
+          else if dry_run then (
+            print_endline "Would remove the following orphan paths:" ;
+            List.iter (fun d -> Format.printf "  [dir]  %s@." d) orphan_dirs ;
+            List.iter (fun f -> Format.printf "  [file] %s@." f) orphan_logs ;
+            `Ok ())
+          else
+            match Installer.cleanup_orphans ~dry_run:false with
+            | Error (`Msg msg) -> cmdliner_error msg
+            | Ok (removed, errors) ->
+                List.iter (fun p -> Format.printf "  ✓ Removed: %s@." p) removed ;
+                List.iter
+                  (fun (p, msg) ->
+                    Format.eprintf "  ✗ Failed to remove %s: %s@." p msg)
+                  errors ;
+                if errors = [] then (
+                  Format.printf
+                    "@.Cleanup complete. %d item(s) removed.@."
+                    (List.length removed) ;
+                  `Ok ())
+                else
+                  cmdliner_error
+                    (Printf.sprintf
+                       "%d item(s) failed to remove"
+                       (List.length errors)))
     in
     Term.(ret (const run $ dry_run))
   in

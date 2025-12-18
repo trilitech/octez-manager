@@ -256,14 +256,15 @@ let start () =
   if not !started then (
     started := true ;
     (* Use dedicated domain instead of blocking a Background_runner worker *)
-    ignore (Domain.spawn (fun () ->
-        (* Brief delay to let UI initialize *)
-        Unix.sleepf 0.2 ;
-        (* Simple polling loop *)
-        while true do
-          tick () ;
-          Unix.sleepf 1.0
-        done)))
+    ignore
+      (Domain.spawn (fun () ->
+           (* Brief delay to let UI initialize *)
+           Unix.sleepf 0.2 ;
+           (* Simple polling loop *)
+           while true do
+             tick () ;
+             Unix.sleepf 1.0
+           done)))
 
 module For_tests = struct
   let reset_state () =

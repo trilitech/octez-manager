@@ -106,8 +106,7 @@ let current_user_group () =
   | pair -> pair
 
 let logging_mode_equal a b =
-  match (a, b) with
-  | Logging_mode.Journald, Logging_mode.Journald -> true
+  match (a, b) with Logging_mode.Journald, Logging_mode.Journald -> true
 
 let service_equal a b =
   String.equal a.Service.instance b.Service.instance
@@ -250,8 +249,7 @@ let history_mode_invalid () =
   | Error _ -> ()
 
 let logging_mode_default_is_journald () =
-  match Logging_mode.default with
-  | Logging_mode.Journald -> ()
+  match Logging_mode.default with Logging_mode.Journald -> ()
 
 let logging_mode_to_string_tests () =
   Alcotest.(check string)
@@ -268,7 +266,6 @@ let installer_logging_journald_noop () =
        ~group
        Logging_mode.Journald) ;
   expect_ok (Installer.For_tests.remove_logging_artifacts Logging_mode.Journald)
-
 
 let installer_should_drop_service_user () =
   let mk_service ~instance ~user =
@@ -2296,9 +2293,7 @@ let systemd_install_dropin_and_service_commands () =
               Alcotest.(check bool)
                 "journald output"
                 true
-                (string_contains
-                   ~needle:"StandardOutput=journal"
-                   dropin_body) ;
+                (string_contains ~needle:"StandardOutput=journal" dropin_body) ;
               let () =
                 expect_ok
                   (Systemd.enable
@@ -2860,7 +2855,10 @@ let () =
         ] );
       ( "logging_mode",
         [
-          Alcotest.test_case "default is journald" `Quick logging_mode_default_is_journald;
+          Alcotest.test_case
+            "default is journald"
+            `Quick
+            logging_mode_default_is_journald;
           Alcotest.test_case "to_string" `Quick logging_mode_to_string_tests;
         ] );
       ( "installer",
@@ -2943,7 +2941,8 @@ let () =
                 "base dir defaulted"
                 true
                 (String.trim
-                   (Install_baker_form_v3.For_tests.initial_model ()).client.base_dir
+                   (Install_baker_form_v3.For_tests.initial_model ()).client
+                     .base_dir
                 <> ""));
           Alcotest.test_case
             "accuser initial base dir default"

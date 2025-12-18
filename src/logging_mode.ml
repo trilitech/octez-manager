@@ -12,8 +12,7 @@ let default = Journald
 
 let to_string = function Journald -> "journald"
 
-let to_yojson = function
-  | Journald -> `Assoc [("type", `String "journald")]
+let to_yojson = function Journald -> `Assoc [("type", `String "journald")]
 
 let of_yojson json =
   let open Yojson.Safe.Util in

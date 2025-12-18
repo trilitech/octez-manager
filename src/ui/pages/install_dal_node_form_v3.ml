@@ -201,8 +201,10 @@ let spec =
             network = Option.value ~default:"mainnet" network;
             history_mode = History_mode.default;
             data_dir = dal_data_dir;
-            rpc_addr = model.rpc_addr;  (* DAL's own RPC address *)
-            net_addr = model.net_addr;  (* DAL's P2P address *)
+            rpc_addr = model.rpc_addr;
+            (* DAL's own RPC address *)
+            net_addr = model.net_addr;
+            (* DAL's P2P address *)
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
             logging_mode;

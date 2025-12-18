@@ -11,10 +11,7 @@
     to display the last signed block/attestation/preattestation levels. *)
 
 (** Highwatermark entry for a delegate *)
-type highwatermark = {
-  round : int;
-  level : int;
-}
+type highwatermark = {round : int; level : int}
 
 (** Per-delegate activity *)
 type delegate_activity = {

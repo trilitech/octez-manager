@@ -223,7 +223,7 @@ let edit_config_modal s =
           ~title:"Not Supported"
           "Editing is currently only supported for nodes." ;
         s)
-      else (
+      else
         (* Only extra args can be edited - logging is always journald *)
         let initial = String.concat " " svc.Service.extra_args in
         Modal_helpers.prompt_text_modal
@@ -237,7 +237,7 @@ let edit_config_modal s =
             in
             ignore (apply_node_update s (fun req -> {req with extra_args})))
           () ;
-        s)
+        s
 
 let open_actions_modal s =
   match s.service with

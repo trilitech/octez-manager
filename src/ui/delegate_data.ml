@@ -51,21 +51,25 @@ let parse_participation json =
   let open Yojson.Safe.Util in
   {
     expected_cycle_activity =
-      json |> member "expected_cycle_activity" |> to_int_option
-      |> Option.value ~default:0;
+      json
+      |> member "expected_cycle_activity"
+      |> to_int_option |> Option.value ~default:0;
     minimal_cycle_activity =
-      json |> member "minimal_cycle_activity" |> to_int_option
-      |> Option.value ~default:0;
+      json
+      |> member "minimal_cycle_activity"
+      |> to_int_option |> Option.value ~default:0;
     missed_slots =
       json |> member "missed_slots" |> to_int_option |> Option.value ~default:0;
     missed_levels =
       json |> member "missed_levels" |> to_int_option |> Option.value ~default:0;
     remaining_allowed_missed_slots =
-      json |> member "remaining_allowed_missed_slots" |> to_int_option
-      |> Option.value ~default:0;
+      json
+      |> member "remaining_allowed_missed_slots"
+      |> to_int_option |> Option.value ~default:0;
     expected_attesting_rewards =
-      json |> member "expected_attesting_rewards" |> to_string_option
-      |> Option.value ~default:"0";
+      json
+      |> member "expected_attesting_rewards"
+      |> to_string_option |> Option.value ~default:"0";
   }
 
 (** Parse DAL participation from JSON *)
@@ -73,22 +77,29 @@ let parse_dal_participation json =
   let open Yojson.Safe.Util in
   {
     expected_assigned_shards_per_slot =
-      json |> member "expected_assigned_shards_per_slot" |> to_int_option
-      |> Option.value ~default:0;
+      json
+      |> member "expected_assigned_shards_per_slot"
+      |> to_int_option |> Option.value ~default:0;
     delegate_attested_dal_slots =
-      json |> member "delegate_attested_dal_slots" |> to_int_option
-      |> Option.value ~default:0;
+      json
+      |> member "delegate_attested_dal_slots"
+      |> to_int_option |> Option.value ~default:0;
     delegate_attestable_dal_slots =
-      json |> member "delegate_attestable_dal_slots" |> to_int_option
-      |> Option.value ~default:0;
+      json
+      |> member "delegate_attestable_dal_slots"
+      |> to_int_option |> Option.value ~default:0;
     expected_dal_rewards =
-      json |> member "expected_dal_rewards" |> to_string_option
-      |> Option.value ~default:"0";
+      json
+      |> member "expected_dal_rewards"
+      |> to_string_option |> Option.value ~default:"0";
     sufficient_dal_participation =
-      json |> member "sufficient_dal_participation" |> to_bool_option
+      json
+      |> member "sufficient_dal_participation"
+      |> to_bool_option
       |> Option.value ~default:false;
     denounced =
-      json |> member "denounced" |> to_bool_option |> Option.value ~default:false;
+      json |> member "denounced" |> to_bool_option
+      |> Option.value ~default:false;
   }
 
 (** Parse delegate data from RPC JSON response *)
@@ -103,9 +114,7 @@ let of_json ~pkh json =
       json |> member "is_forbidden" |> to_bool_option
       |> Option.value ~default:false
     in
-    let participation =
-      json |> member "participation" |> parse_participation
-    in
+    let participation = json |> member "participation" |> parse_participation in
     let dal_participation =
       json |> member "dal_participation" |> parse_dal_participation
     in
@@ -144,8 +153,10 @@ let of_json ~pkh json =
     Uses head~2 for stability (head can change rapidly). *)
 let fetch ~node_endpoint ~pkh =
   let url =
-    Printf.sprintf "%s/chains/main/blocks/head~2/context/delegates/%s"
-      node_endpoint pkh
+    Printf.sprintf
+      "%s/chains/main/blocks/head~2/context/delegates/%s"
+      node_endpoint
+      pkh
   in
   match Common.run_out ["curl"; "-sfL"; "--max-time"; "10"; url] with
   | Error _ -> None
@@ -172,21 +183,19 @@ let set data = with_cache_lock (fun () -> Hashtbl.replace cache data.pkh data)
 
 (** Get all cached delegates *)
 let get_all () =
-  with_cache_lock (fun () ->
-      Hashtbl.fold (fun _ v acc -> v :: acc) cache [])
+  with_cache_lock (fun () -> Hashtbl.fold (fun _ v acc -> v :: acc) cache [])
 
 (** Clear cache *)
 let clear () = with_cache_lock (fun () -> Hashtbl.clear cache)
 
 (** Check if data is stale (older than max_age seconds) *)
-let is_stale ~max_age data =
-  Unix.gettimeofday () -. data.fetched_at > max_age
+let is_stale ~max_age data = Unix.gettimeofday () -. data.fetched_at > max_age
 
 (** Missed slots status *)
 type missed_status =
-  | Good        (** No missed slots *)
-  | Warning     (** Missed >= remaining/2 *)
-  | Critical    (** Missed > remaining *)
+  | Good  (** No missed slots *)
+  | Warning  (** Missed >= remaining/2 *)
+  | Critical  (** Missed > remaining *)
 
 (** Get missed slots status *)
 let missed_slots_status data =

@@ -94,34 +94,32 @@ let exec_line role =
        \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
        \\\"${OCTEZ_NODE_ENDPOINT}\\\"\"; if [ \"$MODE\" = \"remote\" ]; then \
        CMD=\"$CMD run remotely\"; else CMD=\"$CMD run with local node \
-       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; CMD=\"$CMD ${OCTEZ_BAKER_DELEGATES_ARGS:-}\"; \
-       DAL_CFG=\"${OCTEZ_DAL_CONFIG:-}\"; if [ \"$DAL_CFG\" = \"disabled\" ]; then \
-       CMD=\"$CMD --without-dal\"; elif [ -n \"$DAL_CFG\" ]; then \
-       CMD=\"$CMD --dal-node \\\"$DAL_CFG\\\"\"; fi; \
-       CMD=\"$CMD --liquidity-baking-toggle-vote \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; \
-       exec $CMD ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
+       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; CMD=\"$CMD \
+       ${OCTEZ_BAKER_DELEGATES_ARGS:-}\"; DAL_CFG=\"${OCTEZ_DAL_CONFIG:-}\"; \
+       if [ \"$DAL_CFG\" = \"disabled\" ]; then CMD=\"$CMD --without-dal\"; \
+       elif [ -n \"$DAL_CFG\" ]; then CMD=\"$CMD --dal-node \
+       \\\"$DAL_CFG\\\"\"; fi; CMD=\"$CMD --liquidity-baking-toggle-vote \
+       \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; exec $CMD \
+       ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
   | "node" ->
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \
        --data-dir=\"${OCTEZ_DATA_DIR}\" ${OCTEZ_NODE_ARGS:-}'"
   | "accuser" ->
       (* Accuser is a subcommand of octez-baker: octez-baker [global] run accuser [opts] *)
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" \
-       --base-dir \"${OCTEZ_CLIENT_BASE_DIR}\" \
-       --endpoint \"${OCTEZ_NODE_ENDPOINT}\" \
-       run accuser ${OCTEZ_SERVICE_ARGS:-}'"
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" --base-dir \
+       \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
+       accuser ${OCTEZ_SERVICE_ARGS:-}'"
   | "dal-node" | "dal" ->
       (* DAL is a subcommand of octez-baker: octez-baker [global] run dal [opts] *)
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" \
-       --base-dir \"${OCTEZ_CLIENT_BASE_DIR}\" \
-       --endpoint \"${OCTEZ_NODE_ENDPOINT}\" \
-       run dal --data-dir \"${OCTEZ_DAL_DATA_DIR}\" ${OCTEZ_SERVICE_ARGS:-}'"
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" --base-dir \
+       \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
+       dal --data-dir \"${OCTEZ_DAL_DATA_DIR}\" ${OCTEZ_SERVICE_ARGS:-}'"
   | "signer" ->
       (* Signer is a separate binary: octez-signer [global] launch socket signer [opts] *)
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-signer\" \
-       --base-dir \"${OCTEZ_SIGNER_BASE_DIR}\" ${OCTEZ_SIGNER_GLOBAL_ARGS:-} \
-       launch socket signer \
-       --address \"${OCTEZ_SIGNER_ADDRESS}\" \
-       --port \"${OCTEZ_SIGNER_PORT}\" ${OCTEZ_SERVICE_ARGS:-}'"
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-signer\" --base-dir \
+       \"${OCTEZ_SIGNER_BASE_DIR}\" ${OCTEZ_SIGNER_GLOBAL_ARGS:-} launch \
+       socket signer --address \"${OCTEZ_SIGNER_ADDRESS}\" --port \
+       \"${OCTEZ_SIGNER_PORT}\" ${OCTEZ_SERVICE_ARGS:-}'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \
@@ -149,36 +147,27 @@ let node_prestart_script_body =
   ^ "LMDB_TOREMOVE=\"$DATA_DIR/lmdb_store_to_remove\"\n"
   ^ "LOCK_FILE=\"$DATA_DIR/lock\"\n\n"
   ^ "# Check if store has actual chain data (not just empty directory)\n"
-  ^ "has_chain_data() {\n"
-  ^ "  for d in \"$STORE_DIR\"/chain_*; do\n"
-  ^ "    [ -d \"$d\" ] && return 0\n"
-  ^ "  done\n"
-  ^ "  return 1\n"
-  ^ "}\n\n"
-  ^ "if [ -d \"$STORE_DIR\" ]; then\n"
-  ^ "  if has_chain_data; then\n"
+  ^ "has_chain_data() {\n" ^ "  for d in \"$STORE_DIR\"/chain_*; do\n"
+  ^ "    [ -d \"$d\" ] && return 0\n" ^ "  done\n" ^ "  return 1\n" ^ "}\n\n"
+  ^ "if [ -d \"$STORE_DIR\" ]; then\n" ^ "  if has_chain_data; then\n"
   ^ "    # Store has data - check version.json\n"
   ^ "    if [ ! -f \"$VERSION_FILE\" ]; then\n"
-  ^ "      # Missing version.json but store looks valid (dev builds may not create it)\n"
-  ^ "      echo \"octez-manager prestart: missing version.json, creating default for existing store\" >&2\n"
-  ^ "      echo '{ \"version\": \"3.2\" }' > \"$VERSION_FILE\"\n"
-  ^ "    fi\n"
+  ^ "      # Missing version.json but store looks valid (dev builds may not \
+     create it)\n"
+  ^ "      echo \"octez-manager prestart: missing version.json, creating \
+     default for existing store\" >&2\n"
+  ^ "      echo '{ \"version\": \"3.2\" }' > \"$VERSION_FILE\"\n" ^ "    fi\n"
   ^ "    \"$NODE_BIN\" upgrade storage --data-dir \"$DATA_DIR\"\n"
   ^ "    if [ -d \"$LMDB_TOREMOVE\" ]; then\n"
-  ^ "      rm -rf \"$LMDB_TOREMOVE\"\n"
-  ^ "    fi\n"
-  ^ "    exit 0\n"
-  ^ "  else\n"
-  ^ "    # Store directory exists but is empty/corrupt - wipe it\n"
-  ^ "    echo \"octez-manager prestart: store exists but has no chain data, wiping\" >&2\n"
+  ^ "      rm -rf \"$LMDB_TOREMOVE\"\n" ^ "    fi\n" ^ "    exit 0\n"
+  ^ "  else\n" ^ "    # Store directory exists but is empty/corrupt - wipe it\n"
+  ^ "    echo \"octez-manager prestart: store exists but has no chain data, \
+     wiping\" >&2\n"
   ^ "    rm -rf \"$STORE_DIR\" \"$DATA_DIR/context\" \"$VERSION_FILE\"\n"
-  ^ "  fi\n"
-  ^ "fi\n\n"
-  ^ "if [ -f \"$LOCK_FILE\" ]; then\n"
-  ^ "  rm -f \"$LOCK_FILE\"\n"
-  ^ "fi\n\n"
-  ^ "AUTO=\"${OCTEZ_SNAPSHOT_AUTO:-0}\"\n"
-  ^ "if [ \"$AUTO\" != \"1\" ]; then\n" ^ "  exit 0\n" ^ "fi\n\n"
+  ^ "  fi\n" ^ "fi\n\n" ^ "if [ -f \"$LOCK_FILE\" ]; then\n"
+  ^ "  rm -f \"$LOCK_FILE\"\n" ^ "fi\n\n"
+  ^ "AUTO=\"${OCTEZ_SNAPSHOT_AUTO:-0}\"\n" ^ "if [ \"$AUTO\" != \"1\" ]; then\n"
+  ^ "  exit 0\n" ^ "fi\n\n"
   ^ "TMP=$(mktemp /tmp/octez-manager.snapshot.XXXXXX)\n" ^ "cleanup() {\n"
   ^ "  rm -f \"$TMP\"\n" ^ "}\n" ^ "trap cleanup EXIT INT TERM\n\n"
   ^ "NETWORK=\"${OCTEZ_NETWORK:-${OCTEZ_SNAPSHOT_NETWORK_SLUG:-}}\"\n"

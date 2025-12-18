@@ -71,9 +71,9 @@ val is_stale : max_age:float -> t -> bool
 
 (** Missed slots status *)
 type missed_status =
-  | Good        (** No missed slots *)
-  | Warning     (** Missed >= remaining/2 *)
-  | Critical    (** Missed > remaining *)
+  | Good  (** No missed slots *)
+  | Warning  (** Missed >= remaining/2 *)
+  | Critical  (** Missed > remaining *)
 
 (** Get missed slots status based on participation data. *)
 val missed_slots_status : t -> missed_status
