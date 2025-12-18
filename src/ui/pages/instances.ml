@@ -19,12 +19,21 @@ let name = "instances"
 
 module StringSet = Set.Make (String)
 
+(** Matrix layout configuration *)
+let min_column_width = 50
+
+let column_separator = " │ "
+
 type state = {
   services : Service_state.t list;
   selected : int;
   folded : StringSet.t; (* instance names that are folded *)
   last_updated : float;
   next_page : string option;
+  (* Matrix layout state *)
+  num_columns : int; (* number of columns based on terminal width *)
+  active_column : int; (* which column has focus, 0-indexed *)
+  column_scroll : int array; (* scroll offset per column *)
 }
 
 type msg = unit
@@ -33,26 +42,185 @@ let clamp_selection services idx =
   let len = List.length services + 3 in
   max 0 (min idx (len - 1))
 
-let load_services () = Data.load_service_states ()
+(** Role ordering for display grouping *)
+let role_order = function
+  | "node" -> 0
+  | "baker" -> 1
+  | "accuser" -> 2
+  | "dal-node" -> 3
+  | "signer" -> 4
+  | _ -> 5
 
-let load_services_fresh () = Data.load_service_states ~detail:false ()
+(** Role section headers *)
+let role_header = function
+  | "node" -> "── 🔗 Nodes ──"
+  | "baker" -> "── 🍞 Bakers ──"
+  | "accuser" -> "── 👁 Accusers ──"
+  | "dal-node" -> "── 💎 DAL Nodes ──"
+  | "signer" -> "── 🔑 Signers ──"
+  | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
+
+(** Sort services by role, then by instance name *)
+let sort_services services =
+  List.sort
+    (fun (a : Service_state.t) (b : Service_state.t) ->
+      let role_cmp =
+        compare
+          (role_order a.service.Service.role)
+          (role_order b.service.Service.role)
+      in
+      if role_cmp <> 0 then role_cmp
+      else String.compare a.service.Service.instance b.service.Service.instance)
+    services
+
+let load_services () = Data.load_service_states () |> sort_services
+
+let load_services_fresh () =
+  Data.load_service_states ~detail:false () |> sort_services
+
+(** Calculate number of columns based on terminal width *)
+let calc_num_columns ~cols =
+  let separator_width = String.length column_separator in
+  let available = cols - separator_width in
+  (* At least 1 column, max based on available width *)
+  max 1 (available / (min_column_width + separator_width))
+
+(** Group services by role, preserving order *)
+let group_by_role services =
+  let roles = ["node"; "baker"; "accuser"; "dal-node"; "signer"] in
+  List.filter_map
+    (fun role ->
+      let instances =
+        List.filter
+          (fun (st : Service_state.t) -> st.service.Service.role = role)
+          services
+      in
+      if instances = [] then None else Some (role, instances))
+    roles
+
+(** Distribute role groups across columns, balancing by instance count.
+    Returns: column index -> list of (role, instances) *)
+let distribute_to_columns ~num_columns role_groups =
+  if num_columns <= 1 then [|role_groups|]
+  else
+    let columns = Array.make num_columns [] in
+    let column_counts = Array.make num_columns 0 in
+    (* Assign each role group to the column with fewest instances *)
+    List.iter
+      (fun ((_role, instances) as group) ->
+        let min_col =
+          let min_idx = ref 0 in
+          for i = 1 to num_columns - 1 do
+            if column_counts.(i) < column_counts.(!min_idx) then min_idx := i
+          done ;
+          !min_idx
+        in
+        columns.(min_col) <- columns.(min_col) @ [group] ;
+        column_counts.(min_col) <-
+          column_counts.(min_col) + List.length instances + 2
+        (* +2 for header and spacing *))
+      role_groups ;
+    columns
+
+(** Get flat list of services for a column, with their global indices *)
+type column_item =
+  | Header of string
+  | Instance of int * Service_state.t (* global index, service *)
+
+let column_items ~column_groups ~global_services =
+  List.concat_map
+    (fun (role, instances) ->
+      let header = Header (role_header role) in
+      let items =
+        List.map
+          (fun (st : Service_state.t) ->
+            (* Find global index *)
+            let idx =
+              List.find_mapi
+                (fun i (s : Service_state.t) ->
+                  if
+                    String.equal
+                      s.service.Service.instance
+                      st.service.Service.instance
+                  then Some i
+                  else None)
+                global_services
+              |> Option.value ~default:0
+            in
+            Instance (idx, st))
+          instances
+      in
+      header :: items)
+    column_groups
+
+(** Get list of global service indices in a column *)
+let column_service_indices ~column_groups ~global_services =
+  column_items ~column_groups ~global_services
+  |> List.filter_map (function
+    | Header _ -> None
+    | Instance (idx, _) -> Some idx)
+
+(** Get first service index in a column *)
+let first_service_in_column ~num_columns ~services col =
+  if num_columns <= 1 then 0
+  else
+    let role_groups = group_by_role services in
+    let columns = distribute_to_columns ~num_columns role_groups in
+    if col >= Array.length columns then 0
+    else
+      let indices =
+        column_service_indices
+          ~column_groups:columns.(col)
+          ~global_services:services
+      in
+      match indices with [] -> 0 | first :: _ -> first
+
+(** Get all service indices in a column *)
+let services_in_column ~num_columns ~services col =
+  if num_columns <= 1 then List.mapi (fun i _ -> i) services
+  else
+    let role_groups = group_by_role services in
+    let columns = distribute_to_columns ~num_columns role_groups in
+    if col >= Array.length columns then []
+    else
+      column_service_indices
+        ~column_groups:columns.(col)
+        ~global_services:services
+
+(** Find which column contains a given service index *)
+let column_for_service ~num_columns ~services idx =
+  if num_columns <= 1 then 0
+  else
+    let rec find_col col =
+      if col >= num_columns then 0
+      else
+        let indices = services_in_column ~num_columns ~services col in
+        if List.mem idx indices then col else find_col (col + 1)
+    in
+    find_col 0
 
 let init_state () =
   let services = load_services () in
   (* Start with all instances folded by default *)
-  let folded =
+  let all_folded =
     List.fold_left
       (fun acc (st : Service_state.t) ->
         StringSet.add st.service.Service.instance acc)
       StringSet.empty
       services
   in
+  (* Default to 1 column, will be updated on first render with actual cols *)
+  let num_columns = 1 in
   {
     services;
     selected = 0;
-    folded;
+    folded = all_folded;
     last_updated = Unix.gettimeofday ();
     next_page = None;
+    num_columns;
+    active_column = 0;
+    column_scroll = Array.make 10 0;
+    (* pre-allocate for up to 10 columns *)
   }
 
 let force_refresh state =
@@ -66,14 +234,11 @@ let maybe_refresh state =
   let state =
     match pending_nav with
     | Some p -> {state with next_page = Some p}
-    | None ->
-        state (* Don't clear next_page - it may have been set by handle_key *)
+    | None -> {state with next_page = None}
+    (* Clear next_page after navigation consumed *)
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
-    (* Use cached data + schedule background refresh to avoid blocking UI *)
-    let services = load_services () in
-    let selected = clamp_selection services state.selected in
-    {state with services; selected; last_updated = now}
+    force_refresh state
   else state
 
 let current_service state =
@@ -183,15 +348,6 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let marker = if idx + 3 = selected then Widgets.bold "➤" else " " in
   let status = status_icon st in
   let enabled = enabled_badge st in
-  let role_str =
-    let r = svc.Service.role in
-    let padded = Printf.sprintf "%-10s" r in
-    match r with
-    | "node" -> Widgets.blue padded
-    | "baker" -> Widgets.yellow padded
-    | "accuser" -> Widgets.magenta padded
-    | _ -> padded
-  in
   let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
   let history =
     Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
@@ -200,153 +356,166 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let fold_indicator = if folded then "▸" else "▾" in
   let first_line =
     Printf.sprintf
-      "%s %s %s %s %s %s %s %s"
+      "%s %s %s %s %s %s %s"
       marker
       fold_indicator
       status
       instance_str
-      role_str
       history
       network
       enabled
   in
-  (* If folded, return only the first line *)
-  if folded then first_line
-  else
-    (* Align RPC under the role column visually. We rely on fixed column widths
-     (marker 1 + fold 1 + status 1 + instance 16) with spaces between. *)
-    let role_column_start = 1 + 1 + 1 + 1 + 1 + 1 + 16 + 1 in
-    (* Render highwatermarks line for bakers (last signed levels) *)
-    let baker_highwatermarks_line ~instance =
-      let activities = Baker_highwatermarks.get ~instance in
-      match Baker_highwatermarks.format_summary activities with
-      | None -> Widgets.dim "no signing activity"
-      | Some summary -> summary
-    in
-    (* Render delegate status for bakers (from RPC) *)
-    let delegate_status_line ~instance =
-      let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
-      if delegate_pkhs = [] then Widgets.dim "no delegates configured"
-      else
-        let has_dal = Delegate_scheduler.baker_has_dal ~instance in
-        let parts =
-          List.map
-            (fun pkh ->
-              let short_pkh =
-                if String.length pkh > 8 then String.sub pkh 0 8 ^ "…" else pkh
-              in
-              (* Try to get cached data *)
-              match Delegate_data.get ~pkh with
-              | None ->
-                  (* No data yet - show pending *)
-                  Printf.sprintf "%s:%s" short_pkh (Widgets.dim "…")
-              | Some d ->
-                  (* Status indicators *)
-                  let status =
-                    if d.is_forbidden then Widgets.red "FORBIDDEN"
-                    else if d.deactivated then Widgets.dim "inactive"
-                    else
-                      (* Missed slots status *)
-                      let missed = d.participation.missed_slots in
-                      let remaining =
-                        d.participation.remaining_allowed_missed_slots
-                      in
-                      match Delegate_data.missed_slots_status d with
-                      | Delegate_data.Critical ->
-                          Widgets.red
-                            (Printf.sprintf "missed:%d/%d" missed remaining)
-                      | Delegate_data.Warning ->
-                          Widgets.yellow
-                            (Printf.sprintf "missed:%d/%d" missed remaining)
-                      | Delegate_data.Good ->
-                          if missed > 0 then
-                            Printf.sprintf "missed:%d/%d" missed remaining
-                          else Widgets.green "ok"
-                  in
-                  (* DAL participation info if baker has DAL enabled *)
-                  let dal_info =
-                    if not has_dal then ""
-                    else
-                      let dp = d.dal_participation in
-                      let attested = dp.delegate_attested_dal_slots in
-                      let attestable = dp.delegate_attestable_dal_slots in
-                      let ratio =
-                        if attestable > 0 then
-                          Printf.sprintf "%d/%d" attested attestable
-                        else "-"
-                      in
-                      let dal_status =
-                        if dp.denounced then Widgets.red "denounced"
-                        else if
-                          (not dp.sufficient_dal_participation)
-                          && attestable > 0
-                        then Widgets.yellow (Printf.sprintf "dal:%s" ratio)
-                        else if attestable > 0 then
-                          Widgets.green (Printf.sprintf "dal:%s" ratio)
-                        else ""
-                      in
-                      if dal_status = "" then "" else " " ^ dal_status
-                  in
-                  Printf.sprintf "%s:%s%s" short_pkh status dal_info)
-            delegate_pkhs
-        in
-        String.concat " · " parts
-    in
-    let dal_health_line ~instance =
-      match Dal_health.get ~instance with
-      | None -> Widgets.dim "health: ?"
-      | Some health ->
-          let status_str =
-            match health.Dal_health.status with
-            | Dal_health.Up -> Widgets.green "up"
-            | Dal_health.Down -> Widgets.red "down"
-            | Dal_health.Degraded -> Widgets.yellow "degraded"
-            | Dal_health.Unknown -> Widgets.dim "?"
-          in
-          let checks_str =
-            if health.Dal_health.checks = [] then ""
-            else
-              let check_strs =
-                List.map
-                  (fun (c : Dal_health.check) ->
-                    let st =
-                      match c.status with
-                      | Dal_health.Up -> Widgets.green "ok"
-                      | Dal_health.Down -> Widgets.red "ko"
-                      | Dal_health.Degraded -> Widgets.yellow "deg"
-                      | Dal_health.Unknown -> "?"
+  (* Indent for second line and extra lines - align under instance name.
+     marker 1 + space + fold 1 + space + status 1 + space = 6 *)
+  let indent_start = 6 in
+  (* Render highwatermarks line for bakers (last signed levels) *)
+  let baker_highwatermarks_line ~instance =
+    let activities = Baker_highwatermarks.read ~instance in
+    match Baker_highwatermarks.format_summary activities with
+    | None -> Widgets.yellow "no signing activity"
+    | Some summary -> summary
+  in
+  (* Check if baker has DAL enabled *)
+  let baker_has_dal ~instance =
+    match Node_env.read ~inst:instance with
+    | Error _ -> false
+    | Ok pairs -> (
+        match List.assoc_opt "OCTEZ_DAL_CONFIG" pairs with
+        | None -> false
+        | Some cfg ->
+            let cfg = String.trim (String.lowercase_ascii cfg) in
+            cfg <> "" && cfg <> "disabled")
+  in
+  (* Render delegate status for bakers (from RPC) *)
+  let delegate_status_line ~instance =
+    let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
+    if delegate_pkhs = [] then Widgets.dim "no delegates configured"
+    else
+      let has_dal = baker_has_dal ~instance in
+      let parts =
+        List.map
+          (fun pkh ->
+            let short_pkh =
+              if String.length pkh > 8 then String.sub pkh 0 8 ^ "…" else pkh
+            in
+            (* Try to get cached data *)
+            match Delegate_data.get ~pkh with
+            | None ->
+                (* No data yet - show pending *)
+                Printf.sprintf "%s:%s" short_pkh (Widgets.dim "…")
+            | Some d ->
+                (* Status indicators *)
+                let status =
+                  if d.is_forbidden then Widgets.red "FORBIDDEN"
+                  else if d.deactivated then Widgets.dim "inactive"
+                  else
+                    (* Missed slots status *)
+                    let missed = d.participation.missed_slots in
+                    let remaining =
+                      d.participation.remaining_allowed_missed_slots
                     in
-                    Printf.sprintf "%s:%s" c.name st)
-                  health.Dal_health.checks
-              in
-              " · " ^ String.concat " " check_strs
-          in
-          Printf.sprintf "health: %s%s" status_str checks_str
-    in
-    let second_line =
-      match svc.Service.role with
-      | "baker" ->
-          (* Line 2 for bakers: highwatermarks (last signed levels) *)
-          let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
-          Printf.sprintf "%s%s" (String.make role_column_start ' ') hwm
-      | "dal-node" ->
-          (* Line 2 for DAL nodes: health status *)
-          Printf.sprintf
-            "%s%s"
-            (String.make role_column_start ' ')
-            (dal_health_line ~instance:svc.Service.instance)
-      | _ ->
-          Printf.sprintf
-            "%s%s"
-            (String.make role_column_start ' ')
-            (rpc_status_line ~service_status:st.Service_state.status svc)
-    in
+                    match Delegate_data.missed_slots_status d with
+                    | Delegate_data.Critical ->
+                        Widgets.red
+                          (Printf.sprintf "missed:%d/%d" missed remaining)
+                    | Delegate_data.Warning ->
+                        Widgets.yellow
+                          (Printf.sprintf "missed:%d/%d" missed remaining)
+                    | Delegate_data.Good ->
+                        if missed > 0 then
+                          Printf.sprintf "missed:%d/%d" missed remaining
+                        else Widgets.green "ok"
+                in
+                (* DAL participation info if baker has DAL enabled *)
+                let dal_info =
+                  if not has_dal then ""
+                  else
+                    let dp = d.dal_participation in
+                    let attested = dp.delegate_attested_dal_slots in
+                    let attestable = dp.delegate_attestable_dal_slots in
+                    let ratio =
+                      if attestable > 0 then
+                        Printf.sprintf "%d/%d" attested attestable
+                      else "-"
+                    in
+                    let dal_status =
+                      if dp.denounced then Widgets.red "denounced"
+                      else if
+                        (not dp.sufficient_dal_participation) && attestable > 0
+                      then Widgets.yellow (Printf.sprintf "dal:%s" ratio)
+                      else if attestable > 0 then
+                        Widgets.green (Printf.sprintf "dal:%s" ratio)
+                      else ""
+                    in
+                    if dal_status = "" then "" else " " ^ dal_status
+                in
+                Printf.sprintf "%s:%s%s" short_pkh status dal_info)
+          delegate_pkhs
+      in
+      String.concat " · " parts
+  in
+  let dal_health_line ~instance =
+    match Dal_health.get ~instance with
+    | None -> Widgets.dim "health: ?"
+    | Some health ->
+        let status_str =
+          match health.Dal_health.status with
+          | Dal_health.Up -> Widgets.green "up"
+          | Dal_health.Down -> Widgets.red "down"
+          | Dal_health.Degraded -> Widgets.yellow "degraded"
+          | Dal_health.Unknown -> Widgets.dim "?"
+        in
+        let checks_str =
+          if health.Dal_health.checks = [] then ""
+          else
+            let check_strs =
+              List.map
+                (fun (c : Dal_health.check) ->
+                  let st =
+                    match c.status with
+                    | Dal_health.Up -> Widgets.green "ok"
+                    | Dal_health.Down -> Widgets.red "ko"
+                    | Dal_health.Degraded -> Widgets.yellow "deg"
+                    | Dal_health.Unknown -> "?"
+                  in
+                  Printf.sprintf "%s:%s" c.name st)
+                health.Dal_health.checks
+            in
+            " · " ^ String.concat " " check_strs
+        in
+        Printf.sprintf "health: %s%s" status_str checks_str
+  in
+  let second_line =
+    match svc.Service.role with
+    | "baker" ->
+        (* Line 2 for bakers: highwatermarks (last signed levels) *)
+        let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
+        Printf.sprintf "%s%s" (String.make indent_start ' ') hwm
+    | "dal-node" ->
+        (* Line 2 for DAL nodes: health status *)
+        Printf.sprintf
+          "%s%s"
+          (String.make indent_start ' ')
+          (dal_health_line ~instance:svc.Service.instance)
+    | _ ->
+        Printf.sprintf
+          "%s%s"
+          (String.make indent_start ' ')
+          (rpc_status_line ~service_status:st.Service_state.status svc)
+  in
+  (* If folded, return first two lines (header + RPC/health status) *)
+  if folded then String.concat "\n" [first_line; second_line]
+  else (
+    (* Mark as visible for system metrics polling (unfolded = higher refresh rate) *)
+    System_metrics_scheduler.mark_visible
+      ~role:svc.Service.role
+      ~instance:svc.Service.instance ;
     (* Additional lines for nodes, bakers, and dal-nodes: metrics + CPU chart *)
     let extra_lines =
       match svc.Service.role with
       | "node" | "baker" | "dal-node" ->
           let focus = idx + 3 = selected in
-          let indent = String.make role_column_start ' ' in
+          let indent = String.make indent_start ' ' in
           (* For bakers: add delegate status line (line 3) *)
           let baker_delegate_line =
             if svc.Service.role = "baker" then
@@ -409,9 +578,70 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
           baker_delegate_line @ [metrics_line] @ cpu_lines
       | _ -> []
     in
-    String.concat "\n" ([first_line; second_line] @ extra_lines)
+    String.concat "\n" ([first_line; second_line] @ extra_lines))
 
-let table_lines state =
+(** Role section headers *)
+let role_header = function
+  | "node" -> "── Nodes ──"
+  | "baker" -> "── Bakers ──"
+  | "accuser" -> "── Accusers ──"
+  | "dal-node" -> "── DAL Nodes ──"
+  | "signer" -> "── Signers ──"
+  | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
+
+(** Pad a line to column width using visible character count *)
+let pad_line ~col_width line =
+  let visible_len = Miaou_helpers.Helpers.visible_chars_count line in
+  if visible_len < col_width then
+    line ^ String.make (col_width - visible_len) ' '
+  else line
+
+(** Render a single column's content - returns list of lines *)
+let render_column ~col_width ~state ~column_groups ~is_active:_ =
+  let items = column_items ~column_groups ~global_services:state.services in
+  List.concat_map
+    (fun item ->
+      match item with
+      | Header role_name ->
+          let header = Widgets.dim role_name in
+          [pad_line ~col_width header]
+      | Instance (idx, svc) ->
+          let is_folded =
+            StringSet.mem svc.service.Service.instance state.folded
+          in
+          (* Render instance line(s) *)
+          let line =
+            line_for_service idx state.selected ~folded:is_folded svc
+          in
+          (* Split into individual lines and pad each *)
+          let lines = String.split_on_char '\n' line in
+          List.map (pad_line ~col_width) lines)
+    items
+
+(** Merge multiple column renders into combined lines *)
+let merge_columns ~col_width ~columns_content =
+  let max_height =
+    Array.fold_left (fun m col -> max m (List.length col)) 0 columns_content
+  in
+  let pad_column col =
+    let len = List.length col in
+    if len < max_height then
+      col @ List.init (max_height - len) (fun _ -> String.make col_width ' ')
+    else col
+  in
+  let padded = Array.map pad_column columns_content in
+  List.init max_height (fun row_idx ->
+      let parts =
+        Array.to_list
+          (Array.map
+             (fun col ->
+               if row_idx < List.length col then List.nth col row_idx else "")
+             padded)
+      in
+      String.concat column_separator parts)
+
+(** Single-column layout (original) *)
+let table_lines_single state =
   let install_row =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
@@ -423,14 +653,76 @@ let table_lines state =
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
     else
-      state.services
-      |> List.mapi (fun idx (svc : Service_state.t) ->
-          let is_folded =
-            StringSet.mem svc.service.Service.instance state.folded
-          in
-          line_for_service idx state.selected ~folded:is_folded svc)
+      (* Services are already sorted by role then instance name *)
+      (* Group by role and add headers - use prepend + reverse for O(n) *)
+      let rec build_rows idx prev_role acc = function
+        | [] -> List.rev acc
+        | (svc : Service_state.t) :: rest ->
+            let role = svc.service.Service.role in
+            let acc =
+              if Some role <> prev_role then
+                Widgets.dim (role_header role) :: "" :: acc
+              else acc
+            in
+            let is_folded =
+              StringSet.mem svc.service.Service.instance state.folded
+            in
+            let row =
+              line_for_service idx state.selected ~folded:is_folded svc
+            in
+            build_rows (idx + 1) (Some role) (row :: acc) rest
+      in
+      build_rows 0 None [] state.services
   in
   install_row :: manage_wallet_row :: "" :: instance_rows
+
+(** Multi-column matrix layout *)
+let table_lines_matrix ~cols state =
+  let num_columns = calc_num_columns ~cols in
+  let role_groups = group_by_role state.services in
+  let columns = distribute_to_columns ~num_columns role_groups in
+  let col_width =
+    (cols - ((num_columns - 1) * String.length column_separator)) / num_columns
+  in
+  (* Render each column *)
+  let columns_content =
+    Array.mapi
+      (fun col_idx column_groups ->
+        let is_active = col_idx = state.active_column in
+        render_column ~col_width ~state ~column_groups ~is_active)
+      columns
+  in
+  (* Header rows (install/wallet) span full width in single line *)
+  let install_row =
+    let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+  in
+  let manage_wallet_row =
+    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
+  in
+  let instance_rows = merge_columns ~col_width ~columns_content in
+  install_row :: manage_wallet_row :: "" :: instance_rows
+
+let table_lines ?(cols = 80) state =
+  (* Clear visibility markers at start of render pass *)
+  System_metrics_scheduler.clear_visibility () ;
+  let num_columns = calc_num_columns ~cols in
+  (* Silence unused field warnings - these will be used for scrolling *)
+  let _ = state.num_columns in
+  let _ = state.column_scroll in
+  if state.services = [] then
+    let install_row =
+      let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
+      Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+    in
+    let manage_wallet_row =
+      let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+      Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
+    in
+    [install_row; manage_wallet_row; ""; "  No managed instances."]
+  else if num_columns <= 1 then table_lines_single state
+  else table_lines_matrix ~cols state
 
 let summary_line state =
   let total = List.length state.services in
@@ -871,11 +1163,7 @@ struct
     ]
 
   let footer ~cols:_ =
-    [
-      Widgets.dim
-        "Arrows: move  Tab: fold  Enter: actions  c: create  r: refresh  Esc: \
-         back";
-    ]
+    [Widgets.dim "Tab: fold  d: diagnostics  Enter: actions  q: quit"]
 
   let node_help_hint =
     {|## Node Instance
@@ -978,7 +1266,7 @@ Press **Enter** to open instance menu.|}
       ~footer:footer_lines
       ~child:(fun inner_size ->
         (* Get all table lines and flatten to individual lines *)
-        let table = table_lines s in
+        let table = table_lines ~cols s in
         let all_lines =
           List.concat_map (fun s -> String.split_on_char '\n' s) table
         in
@@ -1069,13 +1357,55 @@ Press **Enter** to open instance menu.|}
       (* Only menu items (0 and 1) when no services *)
       let selected = max 0 (min 1 (s.selected + delta)) in
       {s with selected}
-    else
+    else if s.num_columns <= 1 then
+      (* Single column mode: simple linear navigation *)
       let raw = s.selected + delta in
       let selected = clamp_selection s.services raw in
       (* Skip position 2 (separator between menu and services) *)
       let selected = if selected = 2 then selected + delta else selected in
       let selected = clamp_selection s.services selected in
       {s with selected}
+    else if
+      (* Multi-column mode: navigate within current column *)
+      s.selected < 3
+    then
+      (* In menu area, simple navigation *)
+      let selected = max 0 (min 2 (s.selected + delta)) in
+      (* Jump from menu to first service in active column *)
+      if selected >= 2 && delta > 0 then
+        let first_svc =
+          first_service_in_column
+            ~num_columns:s.num_columns
+            ~services:s.services
+            s.active_column
+        in
+        {s with selected = first_svc + 3}
+      else {s with selected}
+    else
+      (* In services area: stay within column *)
+      let current_idx = s.selected - 3 in
+      let col_indices =
+        services_in_column
+          ~num_columns:s.num_columns
+          ~services:s.services
+          s.active_column
+      in
+      let current_pos =
+        List.find_mapi
+          (fun i idx -> if idx = current_idx then Some i else None)
+          col_indices
+        |> Option.value ~default:0
+      in
+      let new_pos = current_pos + delta in
+      if new_pos < 0 then
+        (* Moving up from first service goes to menu *)
+        {s with selected = 1}
+      else if new_pos >= List.length col_indices then
+        (* At bottom of column, stay put *)
+        s
+      else
+        let new_idx = List.nth col_indices new_pos in
+        {s with selected = new_idx + 3}
 
   let force_refresh_cmd s = force_refresh s
 
@@ -1090,7 +1420,47 @@ Press **Enter** to open instance menu.|}
         in
         {s with folded}
 
-  let handle_key s key ~size:_ =
+  (** Move to a different column (for matrix layout) *)
+  let move_column s delta =
+    let num_cols = s.num_columns in
+    if num_cols <= 1 then s
+    else if s.selected < 3 then
+      (* In menu area, just change column *)
+      let new_col = (s.active_column + delta + num_cols) mod num_cols in
+      {s with active_column = new_col}
+    else
+      (* In services area: move to same position in target column *)
+      let current_idx = s.selected - 3 in
+      let current_col_indices =
+        services_in_column
+          ~num_columns:num_cols
+          ~services:s.services
+          s.active_column
+      in
+      let current_pos =
+        List.find_mapi
+          (fun i idx -> if idx = current_idx then Some i else None)
+          current_col_indices
+        |> Option.value ~default:0
+      in
+      let new_col = (s.active_column + delta + num_cols) mod num_cols in
+      let target_col_indices =
+        services_in_column ~num_columns:num_cols ~services:s.services new_col
+      in
+      if target_col_indices = [] then
+        (* Target column is empty, stay in current column *)
+        s
+      else
+        (* Move to same position (clamped) in target column *)
+        let target_pos = min current_pos (List.length target_col_indices - 1) in
+        let target_idx = List.nth target_col_indices target_pos in
+        {s with active_column = new_col; selected = target_idx + 3}
+
+  let handle_key s key ~size =
+    (* Update num_columns based on current terminal size *)
+    let cols = size.LTerm_geom.cols in
+    let num_columns = calc_num_columns ~cols in
+    let s = {s with num_columns} in
     let s =
       if Miaou.Core.Modal_manager.has_active () then (
         Miaou.Core.Modal_manager.handle_key key ;
@@ -1102,6 +1472,10 @@ Press **Enter** to open instance menu.|}
         | Some Keys.Down -> move_selection s 1
         | Some (Keys.Char "k") -> move_selection s (-1)
         | Some (Keys.Char "j") -> move_selection s 1
+        | Some Keys.Left -> move_column s (-1)
+        | Some Keys.Right -> move_column s 1
+        | Some (Keys.Char "h") -> move_column s (-1)
+        | Some (Keys.Char "l") -> move_column s 1
         | Some Keys.Tab -> toggle_fold s
         | Some Keys.Enter -> activate_selection s
         | Some (Keys.Char "c") -> create_menu_modal s
@@ -1114,6 +1488,19 @@ Press **Enter** to open instance menu.|}
         | Some (Keys.Char "C-c") ->
             {s with next_page = Some "__BACK__"}
         | _ -> s
+    in
+    (* Keep active_column in sync with selection *)
+    let s =
+      if s.selected >= 3 && s.num_columns > 1 then
+        let svc_idx = s.selected - 3 in
+        let col =
+          column_for_service
+            ~num_columns:s.num_columns
+            ~services:s.services
+            svc_idx
+        in
+        {s with active_column = col}
+      else s
     in
     check_navigation s
 
