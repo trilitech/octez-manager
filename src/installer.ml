@@ -873,6 +873,61 @@ let install_baker (request : baker_request) =
       auto_enable = request.auto_enable;
     }
 
+let install_accuser (request : accuser_request) =
+  let* node_mode : Installer_types.resolved_baker_node_mode =
+    match request.node_mode with
+    | Remote_endpoint endpoint -> Ok (Remote endpoint)
+    | Local_instance inst ->
+        let* svc = lookup_node_service inst in
+        Ok (Local svc)
+  in
+  let node_data_dir =
+    match node_mode with Remote _ -> "" | Local svc -> svc.Service.data_dir
+  in
+  let history_mode =
+    match node_mode with
+    | Local svc -> svc.Service.history_mode
+    | Remote _ -> History_mode.default
+  in
+  let node_endpoint =
+    match node_mode with
+    | Remote endpoint -> endpoint_of_rpc endpoint
+    | Local svc -> endpoint_of_rpc svc.Service.rpc_addr
+  in
+  let* network =
+    match node_mode with
+    | Local svc -> Ok svc.Service.network
+    | Remote _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
+  in
+  let base_dir =
+    match request.base_dir with
+    | Some dir when String.trim dir <> "" -> dir
+    | _ -> Common.default_role_dir "accuser" request.instance
+  in
+  let extra_args_str = String.concat " " request.extra_args |> String.trim in
+  install_daemon
+    {
+      role = "accuser";
+      instance = request.instance;
+      network;
+      history_mode;
+      data_dir = node_data_dir;
+      rpc_addr = node_endpoint;
+      net_addr = "";
+      service_user = request.service_user;
+      app_bin_dir = request.app_bin_dir;
+      logging_mode = request.logging_mode;
+      service_args = [];
+      extra_env =
+        [
+          ("OCTEZ_CLIENT_BASE_DIR", base_dir);
+          ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+          ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
+        ];
+      extra_paths = [base_dir];
+      auto_enable = request.auto_enable;
+    }
+
 let add_authorized_keys ~app_bin_dir ~base_dir ~service_user entries =
   let signer_bin = Filename.concat app_bin_dir "octez-signer" in
   let apply acc (name_opt, key_raw) =

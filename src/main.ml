@@ -889,21 +889,16 @@ let install_baker_cmd =
 
 let install_accuser_cmd =
   let instance =
-    Arg.(
-      required
-      & opt (some string) None
-      & info ["instance"] ~doc:"Accuser instance name" ~docv:"NAME")
+    let doc = "Accuser instance name" in
+    Arg.(value & opt (some string) None & info ["instance"] ~doc ~docv:"NAME")
   in
-  let network =
+  let node_instance =
+    let doc =
+      "Existing octez-manager node instance to reuse for endpoint; can also be \
+       a custom RPC endpoint"
+    in
     Arg.(
-      value & opt string "mainnet"
-      & info ["network"] ~doc:"Target Tezos network" ~docv:"NET")
-  in
-  let endpoint =
-    Arg.(
-      value
-      & opt string "http://127.0.0.1:8732"
-      & info ["endpoint"] ~doc:"RPC endpoint to monitor" ~docv:"URI")
+      value & opt (some string) None & info ["node-instance"] ~doc ~docv:"NODE")
   in
   let base_dir =
     Arg.(
@@ -938,67 +933,100 @@ let install_accuser_cmd =
     Arg.(
       value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
   in
-  let data_dir_opt =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["data-dir"]
-          ~doc:"State directory (defaults to a role-specific path)"
-          ~docv:"DIR")
-  in
-  let make instance network endpoint base_dir extra_args service_user
-      app_bin_dir no_enable logging_mode data_dir_opt =
-    match resolve_app_bin_dir app_bin_dir with
+  let make instance_opt node_instance base_dir extra_args service_user
+      app_bin_dir no_enable logging_mode =
+    let res =
+      let ( let* ) = Result.bind in
+      let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
+      let* instance =
+        match normalize_opt_string instance_opt with
+        | Some inst -> Ok inst
+        | None ->
+            if is_interactive () then
+              Ok (prompt_required_string "Instance name")
+            else Error "Instance name is required in non-interactive mode"
+      in
+      match Service_registry.list () with
+      | Error (`Msg msg) -> Error msg
+      | Ok services -> (
+          let node_mode =
+            let node_services =
+              List.filter
+                (fun (svc : Service.t) -> String.equal svc.role "node")
+                services
+            in
+            let choice =
+              (* Prompt for node_instance if not provided in interactive mode *)
+              match normalize_opt_string node_instance with
+              | Some ni -> Some ni
+              | None ->
+                  if is_interactive () then (
+                    let instance_names =
+                      List.map
+                        (fun (svc : Service.t) -> svc.instance)
+                        node_services
+                    in
+                    (if node_services = [] then
+                       prerr_endline
+                         "No node instances found. You can specify a custom \
+                          endpoint."
+                     else
+                       let instance_map =
+                         List.map
+                           (fun (svc : Service.t) ->
+                             (svc.instance, svc.network))
+                           node_services
+                       in
+                       Format.printf
+                         "Available node instances: %s@."
+                         (String.concat
+                            ", "
+                            (List.map
+                               (fun (inst, net) ->
+                                 Printf.sprintf "%s (%s)" inst net)
+                               instance_map))) ;
+                    prompt_with_completion
+                      "Node instance (press Enter for default: 127.0.0.1:8732)"
+                      instance_names)
+                  else None
+            in
+            match choice with
+            | None -> Remote_endpoint "127.0.0.1:8732"
+            | Some choice ->
+                if
+                  List.exists
+                    (fun (svc : Service.t) -> String.equal svc.instance choice)
+                    node_services
+                then Local_instance choice
+                else Remote_endpoint choice
+          in
+          let req : accuser_request =
+            {
+              instance;
+              app_bin_dir;
+              node_mode;
+              base_dir;
+              extra_args;
+              service_user;
+              logging_mode;
+              auto_enable = not no_enable;
+            }
+          in
+          match Installer.install_accuser req with
+          | Ok svc -> Ok svc
+          | Error (`Msg msg) -> Error msg)
+    in
+    match res with
+    | Ok service ->
+        Format.printf "Installed  %s (%s)\n" service.S.instance service.network ;
+        `Ok ()
     | Error msg -> cmdliner_error msg
-    | Ok app_bin_dir -> (
-        let data_dir =
-          match data_dir_opt with
-          | Some dir when String.trim dir <> "" -> dir
-          | _ -> Common.default_role_dir "accuser" instance
-        in
-        let final_base_dir =
-          match base_dir with
-          | Some dir when String.trim dir <> "" -> dir
-          | _ -> data_dir
-        in
-        let service_args =
-          ["run"; "--endpoint"; endpoint; "--base-dir"; final_base_dir]
-          @ extra_args
-        in
-        let req : daemon_request =
-          {
-            role = "accuser";
-            instance;
-            network;
-            history_mode = History_mode.default;
-            data_dir;
-            rpc_addr = endpoint;
-            net_addr = "";
-            service_user;
-            app_bin_dir;
-            logging_mode;
-            service_args;
-            extra_env = [];
-            extra_paths = [];
-            auto_enable = not no_enable;
-          }
-        in
-        match Installer.install_daemon req with
-        | Ok service ->
-            Format.printf
-              "Installed %s (%s)\n"
-              service.S.instance
-              service.network ;
-            `Ok ()
-        | Error (`Msg msg) -> cmdliner_error msg)
   in
   let term =
     Term.(
       ret
-        (const make $ instance $ network $ endpoint $ base_dir $ extra_args
-       $ service_user $ app_bin_dir $ auto_enable $ logging_mode_term
-       $ data_dir_opt))
+        (const make $ instance $ node_instance $ base_dir $ extra_args
+       $ service_user $ app_bin_dir $ auto_enable $ logging_mode_term))
   in
   let info =
     Cmd.info "install-accuser" ~doc:"Install an octez-accuser service"
