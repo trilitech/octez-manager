@@ -51,7 +51,7 @@ let classify_active result =
   | Error (`Msg msg) -> (None, Service_state.Unknown msg)
 
 let fetch_status ?(detail = false) service =
-  let role = service.Service.role in
+  let role = service.Role.t in
   let instance = service.Service.instance in
   let active_raw = Systemd.is_active ~role ~instance in
   let active, status = classify_active active_raw in
@@ -100,7 +100,7 @@ let refresh_cache ?detail () =
       List.iter
         (fun st ->
           let svc = st.Service_state.service in
-          if String.equal svc.Service.role "node" then
+          if String.equal svc.Role.t "node" then
             match Rpc_metrics.get ~instance:svc.instance with
             | None ->
                 Rpc_metrics.set
@@ -175,7 +175,7 @@ let diagnostics_lines states =
       Printf.sprintf
         "- %s (%s, %s) → %s%s"
         svc.Service.instance
-        svc.Service.role
+        svc.Role.t
         svc.Service.network
         (Service_state.status_label state)
         (match state.enabled with
@@ -240,5 +240,5 @@ let spotlight_lines states ~limit =
         | Service_state.Stopped -> "○"
         | Service_state.Unknown _ -> "?"
       in
-      Printf.sprintf "%s %s (%s)" marker svc.Service.instance svc.Service.role)
+      Printf.sprintf "%s %s (%s)" marker svc.Service.instance svc.Role.t)
     focus

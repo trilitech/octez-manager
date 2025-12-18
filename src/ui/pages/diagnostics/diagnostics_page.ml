@@ -188,7 +188,7 @@ let view s ~focus:_ ~size =
                 "  %s %-20s  %s  %s"
                 (Widgets.fg status_color status_icon)
                 (Widgets.bold svc.Service.instance)
-                (Widgets.fg 8 svc.Service.role)
+                (Widgets.fg 8 svc.Role.t)
                 (Widgets.dim
                    (Printf.sprintf
                       "net:%s mode:%s"

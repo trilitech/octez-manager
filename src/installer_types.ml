@@ -20,7 +20,7 @@ type node_request = {
 }
 
 type daemon_request = {
-  role : string;
+  role : Role.t;
   instance : string;
   network : string;
   history_mode : History_mode.t;

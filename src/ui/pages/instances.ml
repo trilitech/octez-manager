@@ -201,7 +201,7 @@ let line_for_service idx selected (st : Service_state.t) =
   let status = status_icon st in
   let enabled = enabled_badge st in
   let role_str =
-    let r = svc.Service.role in
+    let r = svc.Role.t in
     let padded = Printf.sprintf "%-10s" r in
     match r with
     | "node" -> Widgets.blue padded
@@ -229,7 +229,7 @@ let line_for_service idx selected (st : Service_state.t) =
      (marker 1 + status 1 + instance 16) with spaces between. *)
   let role_column_start = 1 + 1 + 1 + 1 + 16 + 1 in
   let second_line =
-    match svc.Service.role with
+    match svc.Role.t with
     | "baker" ->
         let msg = Widgets.dim "RPC not available for bakers; use logs." in
         Printf.sprintf "%s%s" (String.make role_column_start ' ') msg
@@ -404,12 +404,12 @@ let _view_logs_old state =
             Modal_helpers.show_error ~title msg ;
             state
       in
-      match svc.Service.role with
+      match svc.Role.t with
       | "baker" -> (
           match svc.Service.logging_mode with
           | Logging_mode.Journald ->
               let unit =
-                Systemd.unit_name svc.Service.role svc.Service.instance
+                Systemd.unit_name svc.Role.t svc.Service.instance
               in
               (match Common.run_out (journalctl_args unit) with
               | Ok text ->
@@ -433,7 +433,7 @@ let _view_logs_old state =
           match svc.Service.logging_mode with
           | Logging_mode.Journald ->
               let unit =
-                Systemd.unit_name svc.Service.role svc.Service.instance
+                Systemd.unit_name svc.Role.t svc.Service.instance
               in
               (match Common.run_out (journalctl_args unit) with
               | Ok text ->
@@ -537,7 +537,7 @@ let instance_actions_modal state =
           | `Remove -> "Remove")
         ~on_select:(fun choice ->
           let instance = svc.Service.instance in
-          let role = svc.Service.role in
+          let role = svc.Role.t in
           match choice with
           | `Details ->
               Context.set_pending_instance_detail instance ;

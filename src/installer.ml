@@ -322,12 +322,12 @@ let endpoint_of_rpc rpc_addr =
 let lookup_node_service instance =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc when svc.Service.role = Service.Node -> Ok svc
+  | Some svc when svc.Service.role = Role.Node -> Ok svc
   | Some svc ->
       R.error_msgf
         "Instance '%s' is a %s service, expected a node"
         instance
-        (Service.role_to_string svc.role)
+        (Role.to_string svc.role)
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let build_run_args ~network ~history_mode ~rpc_addr ~net_addr ~extra_args
@@ -492,7 +492,7 @@ let import_snapshot_for_instance ~(instance : string) ?snapshot_uri
       ~snapshot_uri_override:snapshot_uri
       ~snapshot_kind_override:snapshot_kind
   in
-  let role = Service.Node in
+  let role = Role.Node in
   let* was_active = Systemd.is_active ~role ~instance:service.instance in
   let* () = Systemd.stop ~role ~instance:service.instance in
   let* () =
@@ -563,7 +563,7 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
         restored := true ;
         Ok ()
   in
-  let role = Service.Node in
+  let role = Role.Node in
   let* was_active = Systemd.is_active ~role ~instance:service.instance in
   let* () = Systemd.stop ~role ~instance:service.instance in
   let result =
@@ -646,7 +646,7 @@ let validate_instance_name_unique ~instance =
         "Instance name '%s' is already in use by a %s service. Please choose a \
          different name."
         instance
-        (Service.role_to_string svc.Service.role)
+        (Role.to_string svc.Service.role)
   | None -> Ok ()
 
 let validate_instance_name ~instance =
@@ -654,7 +654,7 @@ let validate_instance_name ~instance =
   validate_instance_name_unique ~instance
 
 let install_node (request : node_request) =
-  let role = Service.Node in
+  let role = Role.Node in
   let* () = validate_instance_name ~instance:request.instance in
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
@@ -776,7 +776,7 @@ let install_node (request : node_request) =
   let* () = Systemd.sync_logrotate (logrotate_specs_of services) in
   let* () =
     if request.auto_enable then
-      Systemd.enable ~role:"node" ~instance:request.instance ~start_now:true
+      Systemd.enable ~role:Role.Node ~instance:request.instance ~start_now:true
     else Ok ()
   in
   Ok service
@@ -931,7 +931,7 @@ let install_baker (request : baker_request) =
   let extra_args_str = String.concat " " request.extra_args |> String.trim in
   install_daemon
     {
-      role = "baker";
+      role = Role.Baker;
       instance = request.instance;
       network;
       history_mode;
@@ -1017,7 +1017,7 @@ let install_signer (request : signer_request) =
   in
   let daemon_request : daemon_request =
     {
-      role = "signer";
+      role = Role.Signer;
       instance = request.instance;
       network = request.network;
       history_mode = History_mode.default;
@@ -1049,7 +1049,10 @@ let install_signer (request : signer_request) =
   in
   let* () =
     if request.auto_enable then
-      Systemd.enable ~role:"signer" ~instance:request.instance ~start_now:true
+      Systemd.enable
+        ~role:Role.Signer
+        ~instance:request.instance
+        ~start_now:true
     else Ok ()
   in
   Ok service
@@ -1143,7 +1146,7 @@ let unschedule_refresh ~instance = Systemd.remove_refresh_timer ~instance
 let generate_secret_key ~instance ~alias =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc when String.equal svc.role "signer" ->
+  | Some svc when svc.role = Role.Signer ->
       let signer_bin = Filename.concat svc.app_bin_dir "octez-signer" in
       Common.run_as
         ~user:svc.service_user
@@ -1157,31 +1160,40 @@ let generate_secret_key ~instance ~alias =
           alias;
         ]
   | Some svc ->
-      R.error_msgf "Instance '%s' is a %s, expected a signer" instance svc.role
+      R.error_msgf
+        "Instance '%s' is a %s, expected a signer"
+        instance
+        (Role.to_string svc.role)
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let list_keys ~instance =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc when String.equal svc.role "signer" ->
+  | Some svc when svc.role = Role.Signer ->
       let signer_bin = Filename.concat svc.app_bin_dir "octez-signer" in
       Common.run_out
         [signer_bin; "--base-dir"; svc.data_dir; "list"; "known"; "keys"]
   | Some svc ->
-      R.error_msgf "Instance '%s' is a %s, expected a signer" instance svc.role
+      R.error_msgf
+        "Instance '%s' is a %s, expected a signer"
+        instance
+        (Role.to_string svc.role)
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let add_authorized_key ~instance ~key ~name =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc when String.equal svc.role "signer" ->
+  | Some svc when svc.role = Role.Signer ->
       add_authorized_keys
         ~app_bin_dir:svc.app_bin_dir
         ~base_dir:svc.data_dir
         ~service_user:svc.service_user
         [(name, key)]
   | Some svc ->
-      R.error_msgf "Instance '%s' is a %s, expected a signer" instance svc.role
+      R.error_msgf
+        "Instance '%s' is a %s, expected a signer"
+        instance
+        (Role.to_string svc.role)
   | None -> R.error_msgf "Unknown instance '%s'" instance
 
 let backup_file_if_exists_for_tests = backup_file_if_exists

@@ -7,7 +7,7 @@ let default_for ~instance ~role =
         path =
           Printf.sprintf
             "/var/log/octez/%s-%s.log"
-            (Service.role_to_string role)
+            (Role.to_string role)
             instance;
         rotate = true;
       }
@@ -18,7 +18,7 @@ let default_for ~instance ~role =
         path =
           Filename.concat
             base
-            (Printf.sprintf "%s-%s.log" (Service.role_to_string role) instance);
+            (Printf.sprintf "%s-%s.log" (Role.to_string role) instance);
         rotate = true;
       }
 

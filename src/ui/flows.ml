@@ -95,7 +95,7 @@ let create_baker_flow ~services ~on_success =
   let open Modal_helpers in
   let nodes =
     services
-    |> List.filter (fun s -> s.Service.role = "node")
+    |> List.filter (fun s -> s.Role.t = "node")
     |> List.map (fun s -> s.Service.instance)
   in
   if nodes = [] then

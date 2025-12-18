@@ -2,18 +2,18 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-let role_binary role = "octez" ^ Service.role_to_string role
+let role_binary role = "octez" ^ Role.to_string role
 
 let system_unit_path role =
   Printf.sprintf
     "/etc/systemd/system/octez-%s@.service"
-    (Service.role_to_string role)
+    (Role.to_string role)
 
 let user_unit_path role =
   let dir = Filename.concat (Common.xdg_config_home ()) "systemd/user" in
   Filename.concat
     dir
-    (Printf.sprintf "octez-%s@.service" (Service.role_to_string role))
+    (Printf.sprintf "octez-%s@.service" (Role.to_string role))
 
 let unit_path role =
   if Common.is_root () then system_unit_path role else user_unit_path role
@@ -22,7 +22,7 @@ let dropin_dir role inst =
   if Common.is_root () then
     Printf.sprintf
       "/etc/systemd/system/octez-%s@%s.service.d"
-      (Service.role_to_string role)
+      (Role.to_string role)
       inst
   else
     let base = Filename.concat (Common.xdg_config_home ()) "systemd/user" in
@@ -30,14 +30,14 @@ let dropin_dir role inst =
       base
       (Printf.sprintf
          "octez-%s@%s.service.d"
-         (Service.role_to_string role)
+         (Role.to_string role)
          inst)
 
 let dropin_path role inst =
   Filename.concat (dropin_dir role inst) "override.conf"
 
 let unit_name role inst =
-  Printf.sprintf "octez-%s@%s" (Service.role_to_string role) inst
+  Printf.sprintf "octez-%s@%s" (Role.to_string role) inst
 
 let systemctl_cmd () =
   if Common.is_root () then ["systemctl"] else ["systemctl"; "--user"]
@@ -87,7 +87,7 @@ let env_file_template user_mode =
 
 let exec_line role =
   match role with
-  | Service.Baker ->
+  | Role.Baker ->
       "ExecStart=/bin/sh -lc 'MODE=${OCTEZ_BAKER_NODE_MODE:-local}; \
        CMD=\"${APP_BIN_DIR}/octez-baker\"; CMD=\"$CMD --base-dir \
        \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
@@ -99,14 +99,14 @@ let exec_line role =
        CMD=\"$CMD --liquidity-baking-toggle-vote \
        \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; exec $CMD \
        ${OCTEZ_BAKER_DELEGATES_ARGS:-} ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
-  | Service.Node ->
+  | Role.Node ->
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \
        --data-dir=\"${OCTEZ_DATA_DIR}\" ${OCTEZ_NODE_ARGS:-}'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \
          ${OCTEZ_SERVICE_ARGS:-}'"
-        (Service.role_to_string other)
+        (Role.to_string other)
 
 let prestart_hooks_dir () =
   let base =
@@ -118,7 +118,7 @@ let prestart_hooks_dir () =
 let prestart_script_path role =
   Filename.concat
     (prestart_hooks_dir ())
-    (Printf.sprintf "octez-%s-prestart.sh" (Service.role_to_string role))
+    (Printf.sprintf "octez-%s-prestart.sh" (Role.to_string role))
 
 let node_prestart_script_body =
   "#!/bin/sh\n" ^ "set -eu\n\n"
@@ -176,7 +176,7 @@ let node_prestart_script_body =
 
 let write_prestart_script role =
   match role with
-  | Service.Node ->
+  | Role.Node ->
       let path = prestart_script_path role in
       let owner, group =
         if Common.is_root () then ("root", "root")
@@ -206,9 +206,9 @@ let unit_template ~user_mode ~role ~app_bin_dir ~user ?prestart () =
        Environment=APP_BIN_DIR=%s\n\
        Environment=ROLE=%s\n\
        EnvironmentFile=-%s\n"
-      (Service.role_to_string role)
+      (Role.to_string role)
       bin_dir
-      (Service.role_to_string role)
+      (Role.to_string role)
       env_file
   in
   let header =
@@ -286,7 +286,7 @@ let install_unit ~role ~app_bin_dir ~user =
 
 module StringSet = Set.Make (String)
 
-type logrotate_spec = {role : Service.role; paths : string list}
+type logrotate_spec = {role : Role.t; paths : string list}
 
 let managed_logrotate_header = "# Managed by octez-manager"
 
@@ -331,7 +331,7 @@ let remove_file_if_managed path =
   else Ok ()
 
 let system_logrotate_config_path role =
-  Printf.sprintf "/etc/logrotate.d/octez-%s" (Service.role_to_string role)
+  Printf.sprintf "/etc/logrotate.d/octez-%s" (Role.to_string role)
 
 let write_system_logrotate role paths =
   if paths = [] then remove_file_if_managed (system_logrotate_config_path role)
@@ -351,7 +351,7 @@ let cleanup_system_logrotate active_roles =
   else
     let active =
       List.fold_left
-        (fun acc role -> StringSet.add (Service.role_to_string role) acc)
+        (fun acc role -> StringSet.add (Role.to_string role) acc)
         StringSet.empty
         active_roles
     in
@@ -390,7 +390,7 @@ let user_logrotate_main_config () =
 let user_logrotate_role_config role =
   Filename.concat
     (user_logrotate_include_dir ())
-    (Printf.sprintf "%s.conf" (Service.role_to_string role))
+    (Printf.sprintf "%s.conf" (Role.to_string role))
 
 let user_logrotate_state_file () =
   Filename.concat
@@ -434,7 +434,7 @@ let remove_unused_user_role_configs active_roles =
   else
     let active =
       List.fold_left
-        (fun acc role -> StringSet.add (Service.role_to_string role) acc)
+        (fun acc role -> StringSet.add (Role.to_string role) acc)
         StringSet.empty
         active_roles
     in
@@ -615,10 +615,10 @@ let write_dropin ~role ~inst ~data_dir ~logging_mode ?(extra_paths = []) () =
   run_systemctl_timeout ["daemon-reload"]
 
 let write_dropin_node ~inst ~data_dir ~logging_mode =
-  write_dropin ~role:Service.Node ~inst ~data_dir ~logging_mode ()
+  write_dropin ~role:Role.Node ~inst ~data_dir ~logging_mode ()
 
 let render_logging_lines logging_mode =
-  (logging_resources ~role:Service.Node ~logging_mode).extra_lines
+  (logging_resources ~role:Role.Node ~logging_mode).extra_lines
 
 let enable ~role ~instance ~start_now =
   let unit = unit_name role instance in

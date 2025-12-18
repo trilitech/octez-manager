@@ -251,7 +251,7 @@ let service_or_endpoint ~label ~role ~get ~set
     let services = Data.load_service_states () in
     let matching_services =
       services
-      |> List.filter (fun s -> s.Data.Service_state.service.Service.role = role)
+      |> List.filter (fun s -> s.Data.Service_state.service.Role.t = role)
     in
     let service_items = List.map (fun s -> `Service s) matching_services in
     let items = [`None] @ service_items @ [`External] in

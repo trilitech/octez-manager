@@ -1,6 +1,6 @@
 type t = {
   instance : string;
-  role : role;
+  role : Role.t;
   network : string;
   history_mode : History_mode.t;
   data_dir : string;
@@ -81,7 +81,7 @@ let to_yojson t =
   `Assoc
     [
       ("instance", `String t.instance);
-      ("role", `String (role_to_string t.role));
+      ("role", `String (Role.to_string t.role));
       ("network", `String t.network);
       ("history_mode", `String (History_mode.to_string t.history_mode));
       ("data_dir", `String t.data_dir);
@@ -107,7 +107,7 @@ let of_yojson json =
   let open Yojson.Safe.Util in
   try
     let instance = json |> member "instance" |> to_string in
-    let role = json |> member "role" |> to_string |> role_of_string in
+    let role = json |> member "role" |> to_string |> Role.of_string in
     let network = json |> member "network" |> to_string in
     let history_mode =
       match json |> member "history_mode" with

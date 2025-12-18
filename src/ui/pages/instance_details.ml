@@ -68,7 +68,7 @@ let header s =
   [
     Widgets.title_highlight (" Instance Details · " ^ s.instance);
     (match s.service with
-    | Some svc -> Widgets.dim (svc.Service.role ^ " @ " ^ svc.Service.network)
+    | Some svc -> Widgets.dim (svc.Role.t ^ " @ " ^ svc.Service.network)
     | None -> "");
   ]
 
@@ -87,7 +87,7 @@ let view_details svc =
           (Widgets.dim (Printf.sprintf "%-*s" width label))
           value)
   in
-  match svc.Service.role with
+  match svc.Role.t with
   | "baker" ->
       let env =
         match Node_env.read ~inst:svc.Service.instance with
@@ -125,7 +125,7 @@ let view_details svc =
       render_fields
         [
           ("Instance", svc.Service.instance);
-          ("Role", svc.Service.role);
+          ("Role", svc.Role.t);
           ("Network", svc.Service.network);
           ("History Mode", History_mode.to_string svc.Service.history_mode);
           ("Baker Base Dir", if base_dir = "" then "(unset)" else base_dir);
@@ -145,7 +145,7 @@ let view_details svc =
       render_fields
         [
           ("Instance", svc.Service.instance);
-          ("Role", svc.Service.role);
+          ("Role", svc.Role.t);
           ("Network", svc.Service.network);
           ("History Mode", History_mode.to_string svc.Service.history_mode);
           ("Data Dir", svc.Service.data_dir);
@@ -227,7 +227,7 @@ let edit_config_modal s =
   match s.service with
   | None -> s
   | Some svc ->
-      if svc.Service.role <> "node" then (
+      if svc.Role.t <> "node" then (
         Modal_helpers.show_error
           ~title:"Not Supported"
           "Editing is currently only supported for nodes." ;

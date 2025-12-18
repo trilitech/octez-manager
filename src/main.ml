@@ -1227,7 +1227,7 @@ let install_dal_node_cmd =
               | None -> Remote_endpoint "127.0.0.1:8732"
               | Some choice -> (
                   match Service_registry.find ~instance:choice with
-                  | Ok (Some svc) when String.equal (String.lowercase_ascii svc.Service.role) "node" -> Local_instance choice
+                  | Ok (Some svc) when String.equal (String.lowercase_ascii svc.Role.t) "node" -> Local_instance choice
                   | _ -> Remote_endpoint choice)
             in
             let node_endpoint =

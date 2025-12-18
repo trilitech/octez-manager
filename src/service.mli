@@ -1,8 +1,6 @@
-type role = Node | Dal_node | Baker | Accuser | Signer
-
 type t = {
   instance : string;
-  role : role;
+  role : Role.t;
   network : string;
   history_mode : History_mode.t;
   data_dir : string;
@@ -20,13 +18,9 @@ type t = {
   extra_args : string list;
 }
 
-val role_of_string : string -> role
-
-val role_to_string : role -> string
-
 val make :
   instance:string ->
-  role:role ->
+  role:Role.t ->
   network:string ->
   history_mode:History_mode.t ->
   data_dir:string ->

@@ -86,7 +86,7 @@ let has_octez_baker_binary dir =
 let node_services states =
   states
   |> List.filter (fun (s : Data.Service_state.t) ->
-      String.equal s.service.Service.role "node")
+      String.equal s.service.Role.t "node")
 
 let find_node states inst =
   node_services states
@@ -98,7 +98,7 @@ let find_node states inst =
 let dal_services states =
   states
   |> List.filter (fun (s : Data.Service_state.t) ->
-      let role = Form_builder_common.normalize s.service.Service.role in
+      let role = Form_builder_common.normalize s.service.Role.t in
       String.equal role "dal-node" || String.equal role "dal")
 
 let find_dal states inst =

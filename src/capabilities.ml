@@ -72,7 +72,9 @@ module Service_lifecycle_impl = struct
     |> Result.map_error (function `Msg m -> m)
 
   let write_dropin_node ~inst ~data_dir ~app_bin_dir:_ =
-    let logging_mode = Logging_mode.default_for ~instance:inst ~role:"node" in
+    let logging_mode =
+      Logging_mode.default_for ~instance:inst ~role:Role.Node
+    in
     Systemd.write_dropin_node ~inst ~data_dir ~logging_mode
     |> Result.map_error (function `Msg m -> m)
 
@@ -166,13 +168,21 @@ let register () =
   Miaou_interfaces.Logger_capability.set (Logger.make ()) ;
   Miaou_interfaces.Service_lifecycle.register
     (Miaou_interfaces.Service_lifecycle.create
-       ~start:Service_lifecycle_impl.start
-       ~stop:Service_lifecycle_impl.stop
-       ~restart:Service_lifecycle_impl.restart
-       ~status:Service_lifecycle_impl.status
-       ~install_unit:Service_lifecycle_impl.install_unit
+       ~start:(fun ~role ->
+         Service_lifecycle_impl.start ~role:(Role.of_string role))
+       ~stop:(fun ~role ->
+         Service_lifecycle_impl.stop ~role:(Role.of_string role))
+       ~restart:(fun ~role ->
+         Service_lifecycle_impl.restart ~role:(Role.of_string role))
+       ~status:(fun ~role ->
+         Service_lifecycle_impl.status ~role:(Role.of_string role))
+       ~install_unit:(fun ~role ->
+         Service_lifecycle_impl.install_unit ~role:(Role.of_string role))
        ~write_dropin_node:Service_lifecycle_impl.write_dropin_node
-       ~enable_start:Service_lifecycle_impl.enable_start
-       ~enable:Service_lifecycle_impl.enable
-       ~disable:Service_lifecycle_impl.disable
+       ~enable_start:(fun ~role ->
+         Service_lifecycle_impl.enable_start ~role:(Role.of_string role))
+       ~enable:(fun ~role ->
+         Service_lifecycle_impl.enable ~role:(Role.of_string role))
+       ~disable:(fun ~role ->
+         Service_lifecycle_impl.disable ~role:(Role.of_string role))
        ~remove_instance_files:Service_lifecycle_impl.remove_instance_files)

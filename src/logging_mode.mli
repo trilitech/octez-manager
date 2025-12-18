@@ -1,6 +1,6 @@
 type t = Journald | File of {path : string; rotate : bool}
 
-val default_for : instance:string -> role:string -> t
+val default_for : instance:string -> role:Role.t -> t
 
 val to_string : t -> string
 

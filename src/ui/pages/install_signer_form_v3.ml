@@ -83,7 +83,7 @@ let spec =
               let node_exists =
                 List.exists
                   (fun (s : Data.Service_state.t) ->
-                    s.service.Service.role = "node"
+                    s.service.Role.t = "node"
                     && s.service.Service.instance = inst)
                   states
               in
@@ -108,7 +108,7 @@ let spec =
               let node =
                 List.find_opt
                   (fun (s : Data.Service_state.t) ->
-                    s.service.Service.role = "node"
+                    s.service.Role.t = "node"
                     && s.service.Service.instance = inst)
                   states
               in
@@ -157,7 +157,7 @@ let spec =
               let node =
                 List.find_opt
                   (fun (s : Data.Service_state.t) ->
-                    s.service.Service.role = "node"
+                    s.service.Role.t = "node"
                     && s.service.Service.instance = inst)
                   states
               in

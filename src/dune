@@ -2,6 +2,7 @@
  (name octez_manager_lib)
  (public_name octez-manager.lib)
  (modules
+  role
   common
   history_mode
   system_user

@@ -46,7 +46,7 @@ let init () =
                     let content =
                       match
                         Log_viewer.read_logs
-                          ~role:svc.Service.role
+                          ~role:svc.Role.t
                           ~instance
                           ~source:Journald
                           ~lines:1000
@@ -63,7 +63,7 @@ let init () =
                 let content =
                   match
                     Log_viewer.read_logs
-                      ~role:svc.Service.role
+                      ~role:svc.Role.t
                       ~instance
                       ~source:Journald
                       ~lines:1000
@@ -74,7 +74,7 @@ let init () =
                 let p = Pager.open_text ~title:("Logs: " ^ instance) content in
                 (Log_viewer.Journald, Static p)
           in
-          {instance; role = svc.Service.role; source; pager; next_page = None}
+          {instance; role = svc.Role.t; source; pager; next_page = None}
       | Ok None ->
           let pager =
             Static (Pager.open_text ~title:"Error" "Instance not found")
