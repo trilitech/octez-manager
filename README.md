@@ -2,6 +2,8 @@
 
 A command-line tool and terminal UI for managing Octez services (nodes, bakers, accusers, signers, DAL nodes) as systemd units.
 
+![Octez Manager UI](assets/screenshot.gif)
+
 > **Warning**
 > Octez Manager is experimental. Use at your own risk on testnets only.
 
