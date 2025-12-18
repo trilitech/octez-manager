@@ -207,28 +207,17 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     let role_column_start = 1 + 1 + 1 + 1 + 1 + 1 + 16 + 1 in
     (* Render highwatermarks line for bakers (last signed levels) *)
     let baker_highwatermarks_line ~instance =
-      let activities = Baker_highwatermarks.read ~instance in
+      let activities = Baker_highwatermarks.get ~instance in
       match Baker_highwatermarks.format_summary activities with
       | None -> Widgets.dim "no signing activity"
       | Some summary -> summary
-    in
-    (* Check if baker has DAL enabled *)
-    let baker_has_dal ~instance =
-      match Node_env.read ~inst:instance with
-      | Error _ -> false
-      | Ok pairs -> (
-          match List.assoc_opt "OCTEZ_DAL_CONFIG" pairs with
-          | None -> false
-          | Some cfg ->
-              let cfg = String.trim (String.lowercase_ascii cfg) in
-              cfg <> "" && cfg <> "disabled")
     in
     (* Render delegate status for bakers (from RPC) *)
     let delegate_status_line ~instance =
       let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
       if delegate_pkhs = [] then Widgets.dim "no delegates configured"
       else
-        let has_dal = baker_has_dal ~instance in
+        let has_dal = Delegate_scheduler.baker_has_dal ~instance in
         let parts =
           List.map
             (fun pkh ->
