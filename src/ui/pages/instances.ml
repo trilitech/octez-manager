@@ -905,6 +905,28 @@ Press **Enter** to open instance menu.|}
 
 Press **Enter** to open instance menu.|}
 
+  let dal_help_hint =
+    {|## DAL Node Instance
+
+**Line 1:** Instance status
+- `●` running, `○` stopped
+- `[enabled]` starts on boot
+
+**Line 2:** Health status (from /health RPC)
+- `health: up` (green) = all checks passing
+- `health: degraded` (yellow) = partial issues
+- `health: down` (red) = node unhealthy
+- Individual check statuses shown if available
+
+**Line 3:** System metrics
+- Version: from `--version` output
+- `MEM` = RSS memory usage sparkline
+- `DISK` = DAL node data directory size
+
+**Line 4+:** CPU usage chart (braille)
+
+Press **Enter** to open instance menu.|}
+
   (* Mutable scroll offset - updated during view to keep selection visible *)
   let scroll_offset_ref = ref 0
 
@@ -915,6 +937,8 @@ Press **Enter** to open instance menu.|}
         Miaou.Core.Help_hint.set (Some node_help_hint)
     | Some st when st.service.Service.role = "baker" ->
         Miaou.Core.Help_hint.set (Some baker_help_hint)
+    | Some st when st.service.Service.role = "dal-node" ->
+        Miaou.Core.Help_hint.set (Some dal_help_hint)
     | _ -> Miaou.Core.Help_hint.set (Some "Press Enter to select, ? for help")) ;
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
