@@ -17,6 +17,8 @@ val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
 
 val install_baker : baker_request -> (Service.t, [`Msg of string]) result
 
+val install_accuser : accuser_request -> (Service.t, [`Msg of string]) result
+
 val install_signer : signer_request -> (Service.t, [`Msg of string]) result
 
 val import_snapshot_for_instance :

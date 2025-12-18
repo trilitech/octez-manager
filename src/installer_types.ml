@@ -65,6 +65,17 @@ type baker_request = {
   auto_enable : bool;
 }
 
+type accuser_request = {
+  instance : string;
+  node_mode : baker_node_mode;
+  base_dir : string option;
+  extra_args : string list;
+  service_user : string;
+  app_bin_dir : string;
+  logging_mode : Logging_mode.t;
+  auto_enable : bool;
+}
+
 type signer_request = {
   instance : string;
   network : string;
