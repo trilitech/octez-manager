@@ -28,6 +28,7 @@ WORKDIR /home/opam
 # Update opam and install common dependencies that won't change often
 RUN opam update && opam install -y \
     dune \
+    ocamlformat \
     cmdliner \
     rresult \
     yojson \
