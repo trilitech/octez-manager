@@ -1438,6 +1438,13 @@ let common_run_as_self () =
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "run_as error: %s" msg
 
+let kill_active_download_noop () =
+  (* Calling kill_active_download when no download is active should be safe *)
+  Common.kill_active_download () ;
+  (* Call twice to ensure idempotency *)
+  Common.kill_active_download () ;
+  ()
+
 let snapshot_root = snapshot_base ^ "/"
 
 let snapshots_fetch_entry_success () =
@@ -2734,6 +2741,13 @@ let () =
           Alcotest.test_case "shellwords parser" `Quick shellwords_parser_tests;
           Alcotest.test_case "run helpers" `Quick common_run_helpers;
           Alcotest.test_case "run_as self" `Quick common_run_as_self;
+        ] );
+      ( "common.download",
+        [
+          Alcotest.test_case
+            "kill_active_download noop"
+            `Quick
+            kill_active_download_noop;
         ] );
       ( "form_builder.common",
         [

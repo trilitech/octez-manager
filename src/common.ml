@@ -236,6 +236,31 @@ let download_file ~url ~dest_path =
       dest_path;
     ]
 
+(* Track active download process for cleanup on exit.
+   Note: Only one download runs at a time (snapshot download is sequential),
+   so a single reference is sufficient. If concurrent downloads are needed
+   in the future, this would need to be a list or set. *)
+let active_download :
+    (in_channel * out_channel * in_channel * string) option ref =
+  ref None
+
+let active_download_lock = Mutex.create ()
+
+(** Kill any active download process. Call this on app exit. *)
+let kill_active_download () =
+  Mutex.protect active_download_lock (fun () ->
+      match !active_download with
+      | None -> ()
+      | Some (ic, oc, ec, dest_path) -> (
+          active_download := None ;
+          (* Close channels to kill the curl process *)
+          (try close_in_noerr ic with _ -> ()) ;
+          (try close_out_noerr oc with _ -> ()) ;
+          (try close_in_noerr ec with _ -> ()) ;
+          (* Clean up partial download *)
+          try if Sys.file_exists dest_path then Sys.remove dest_path
+          with _ -> ()))
+
 (* Streaming download progress using curl progress meter. We parse percent from
    stderr lines; when parsing fails we still complete without progress ticks. *)
 let download_file_with_progress ~url ~dest_path ~on_progress =
@@ -257,6 +282,8 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
     ]
   in
   let ic, oc, ec = Unix.open_process_full (cmd_to_string cmd) [||] in
+  Mutex.protect active_download_lock (fun () ->
+      active_download := Some (ic, oc, ec, dest_path)) ;
   close_out oc ;
   let buffer = Buffer.create 128 in
   let input_char_opt ch = try Some (input_char ch) with End_of_file -> None in
@@ -287,6 +314,7 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
           loop ())
   in
   loop () ;
+  Mutex.protect active_download_lock (fun () -> active_download := None) ;
   close_in_noerr ic ;
   close_in_noerr ec ;
   match Unix.close_process_full (ic, oc, ec) with

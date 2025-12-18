@@ -64,6 +64,9 @@ val download_file_with_progress :
   on_progress:(int -> int option -> unit) ->
   (unit, [> `Msg of string]) result
 
+(** Kill any active download process and clean up partial file. Call on exit. *)
+val kill_active_download : unit -> unit
+
 val sh_quote : string -> string
 
 val cmd_to_string : string list -> string
