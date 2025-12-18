@@ -435,14 +435,15 @@ let spec =
             else if
               Form_builder_common.instance_in_use ~states m.core.instance_name
             then Error "Instance name already exists"
-            else Ok ());
+            else Ok ())
+        |> with_hint "Unique identifier for this node. Used in systemd unit and default paths.";
       ]
       @ node_fields
           ~get_node:(fun m -> m.node)
           ~set_node:(fun node m -> {m with node})
           ~on_network_selected:prefetch_snapshot_list
           ()
-      @ [snapshot_field]
+      @ [snapshot_field |> with_hint "Import a snapshot for faster sync. None = sync from genesis (slow)."]
       @ core_service_fields
           ~get_core:(fun m -> m.core)
           ~set_core:(fun core m -> {m with core})
