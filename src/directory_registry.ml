@@ -15,8 +15,12 @@ type directory_entry = {
   path : string;
   dir_type : dir_type;
   created_at : string;
+  last_used_at : string;
   linked_services : string list;
 }
+
+(* Maximum entries per directory type to avoid unbounded growth *)
+let max_entries_per_type = 10
 
 (* JSON serialization *)
 
@@ -41,6 +45,7 @@ let directory_entry_to_yojson entry =
       ("path", `String entry.path);
       ("dir_type", dir_type_to_yojson entry.dir_type);
       ("created_at", `String entry.created_at);
+      ("last_used_at", `String entry.last_used_at);
       ( "linked_services",
         `List (List.map (fun s -> `String s) entry.linked_services) );
     ]
@@ -54,10 +59,16 @@ let directory_entry_of_yojson json =
       |> Result.map_error (fun msg -> `Msg msg)
     in
     let created_at = json |> member "created_at" |> to_string in
+    (* Backwards compatibility: default last_used_at to created_at if missing *)
+    let last_used_at =
+      match json |> member "last_used_at" with
+      | `Null -> created_at
+      | j -> to_string j
+    in
     let linked_services =
       json |> member "linked_services" |> to_list |> List.map to_string
     in
-    Ok {path; dir_type; created_at; linked_services}
+    Ok {path; dir_type; created_at; last_used_at; linked_services}
   with
   | Type_error (msg, _) -> Error (`Msg msg)
   | Undefined (msg, _) -> Error (`Msg msg)
@@ -156,6 +167,7 @@ let migrate_from_base_dir_registry () =
                   dir_type = Client_base_dir;
                   (* All old entries were client base dirs *)
                   created_at;
+                  last_used_at = created_at;
                   linked_services;
                 }
             with
@@ -198,19 +210,61 @@ let migrate_from_base_dir_registry () =
     | Sys_error msg -> Error (`Msg ("Migration error: " ^ msg))
     | Yojson.Json_error msg -> Error (`Msg ("Migration JSON error: " ^ msg))
 
+(* Helper: sort entries by last_used_at descending (most recent first) *)
+let sort_by_last_used entries =
+  List.sort (fun a b -> String.compare b.last_used_at a.last_used_at) entries
+
+(* Helper: limit entries per type to max_entries_per_type, keeping most recent *)
+let limit_entries_per_type entries =
+  let all_types = [Node_data_dir; Client_base_dir; App_bin_dir] in
+  let limited =
+    List.concat_map
+      (fun dt ->
+        entries |> List.filter (fun e -> e.dir_type = dt) |> sort_by_last_used
+        |> fun lst ->
+        let rec take n acc = function
+          | [] -> List.rev acc
+          | _ when n <= 0 -> List.rev acc
+          | x :: xs -> take (n - 1) (x :: acc) xs
+        in
+        take max_entries_per_type [] lst)
+      all_types
+  in
+  sort_by_last_used limited
+
 (* Public API *)
 
 let read_all () =
   (* Attempt migration first *)
   let _ = migrate_from_base_dir_registry () in
-  read_all_internal ()
+  let* entries = read_all_internal () in
+  (* Return sorted by most recently used *)
+  Ok (sort_by_last_used entries)
 
 let add ~path ~dir_type ~linked_services =
   let* existing = read_all () in
-  (* Check if path already exists, if so update it *)
+  let timestamp = now () in
+  (* Check if path already exists *)
+  let existing_entry = List.find_opt (fun e -> e.path = path) existing in
   let filtered = List.filter (fun e -> e.path <> path) existing in
-  let new_entry = {path; dir_type; created_at = now (); linked_services} in
-  write_all (new_entry :: filtered)
+  let new_entry =
+    match existing_entry with
+    | Some e ->
+        (* Update existing: keep created_at, update last_used_at *)
+        {e with last_used_at = timestamp; linked_services; dir_type}
+    | None ->
+        (* New entry *)
+        {
+          path;
+          dir_type;
+          created_at = timestamp;
+          last_used_at = timestamp;
+          linked_services;
+        }
+  in
+  (* Add new entry at front, then limit per type *)
+  let all_entries = new_entry :: filtered in
+  write_all (limit_entries_per_type all_entries)
 
 let find_by_path path =
   let* all = read_all () in
@@ -232,8 +286,8 @@ let update_linked_services ~path ~linked_services =
   match List.find_opt (fun e -> e.path = path) existing with
   | None -> Ok () (* Path not found, nothing to update *)
   | Some entry ->
-      let updated = {entry with linked_services} in
+      let updated = {entry with linked_services; last_used_at = now ()} in
       let filtered = List.filter (fun e -> e.path <> path) existing in
-      write_all (updated :: filtered)
+      write_all (limit_entries_per_type (updated :: filtered))
 
 let clear_all () = write_all []
