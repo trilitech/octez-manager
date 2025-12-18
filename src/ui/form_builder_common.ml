@@ -164,3 +164,30 @@ let parse_shellwords s =
 
 let prepare_extra_args s =
   if String.trim s = "" then [] else parse_shellwords (String.trim s)
+
+(** Find the best default app_bin_dir for a given binary.
+
+    Priority order:
+    1. Use `which <binary>` to find system-installed binary
+    2. Look in registered services for a directory containing the binary
+    3. Fall back to /usr/bin
+
+    @param binary_name The name of the binary to find (e.g., "octez-node")
+    @return The directory containing the binary, or /usr/bin as fallback *)
+let default_app_bin_dir ~binary_name =
+  (* 1. Try `which` first *)
+  match Common.which binary_name with
+  | Some path ->
+      (* which returns full path, we need the directory *)
+      Filename.dirname path
+  | None -> (
+      (* 2. Look in registered services for a directory with this binary *)
+      match Service_registry.list () with
+      | Ok services -> (
+          let found =
+            List.find_opt
+              (fun (svc : Service.t) -> has_binary binary_name svc.app_bin_dir)
+              services
+          in
+          match found with Some svc -> svc.app_bin_dir | None -> "/usr/bin")
+      | Error _ -> "/usr/bin")

@@ -42,13 +42,14 @@ type model = {
   preserve_data : preserve_data;
 }
 
-let base_initial_model =
+let base_initial_model () =
   {
     core =
       {
         instance_name = "node";
         service_user = Form_builder_common.default_service_user ();
-        app_bin_dir = "/usr/bin";
+        app_bin_dir =
+          Form_builder_common.default_app_bin_dir ~binary_name:"octez-node";
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
@@ -270,7 +271,7 @@ let ensure_ports_initialized model_ref =
         })
 
 let make_initial_model () =
-  let model_ref = ref base_initial_model in
+  let model_ref = ref (base_initial_model ()) in
   ensure_ports_initialized model_ref ;
   !model_ref
 

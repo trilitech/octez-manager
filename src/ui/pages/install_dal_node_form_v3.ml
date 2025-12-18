@@ -29,7 +29,8 @@ let make_initial_model () =
       {
         instance_name = "dal";
         service_user = Form_builder_common.default_service_user ();
-        app_bin_dir = "/usr/bin";
+        app_bin_dir =
+          Form_builder_common.default_app_bin_dir ~binary_name:"octez-dal-node";
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
