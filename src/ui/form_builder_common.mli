@@ -83,3 +83,14 @@ val endpoint_of_service : Service.t -> string
 
 (** Parse extra args string into list, filtering empty strings *)
 val prepare_extra_args : string -> string list
+
+(** Find the best default app_bin_dir for a given binary.
+
+    Priority order:
+    1. Use `which <binary>` to find system-installed binary
+    2. Look in registered services for a directory containing the binary
+    3. Fall back to /usr/bin
+
+    @param binary_name The name of the binary to find (e.g., "octez-node")
+    @return The directory containing the binary, or /usr/bin as fallback *)
+val default_app_bin_dir : binary_name:string -> string
