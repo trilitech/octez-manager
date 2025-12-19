@@ -95,14 +95,11 @@ let has_octez_node_binary dir =
 
 (** {1 Snapshot Cache} *)
 
-let snapshot_cache : (string, Snapshots.entry list * float) Hashtbl.t =
-  Hashtbl.create 7
-
-let snapshot_cache_lock = Mutex.create ()
-
-let snapshot_cache_ttl = 300. (* 5 minutes *)
+let snapshot_cache = Cache.create_safe_keyed ~name:"snapshots" ~ttl:300.0 ()
 
 let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
+
+let snapshot_inflight_lock = Mutex.create ()
 
 let snapshot_provider () =
   Miaou_interfaces.Capability.get
@@ -129,12 +126,11 @@ let fetch_snapshot_list slug =
   | None -> fallback ()
 
 let cache_snapshot slug entries =
-  Mutex.protect snapshot_cache_lock (fun () ->
-      Hashtbl.replace snapshot_cache slug (entries, Unix.gettimeofday ()))
+  Cache.set_safe_keyed snapshot_cache slug entries
 
 let schedule_snapshot_fetch slug =
   let should_fetch =
-    Mutex.protect snapshot_cache_lock (fun () ->
+    Mutex.protect snapshot_inflight_lock (fun () ->
         if not (Hashtbl.mem snapshot_inflight slug) then (
           Hashtbl.add snapshot_inflight slug () ;
           true)
@@ -144,7 +140,7 @@ let schedule_snapshot_fetch slug =
     Background_runner.submit_blocking (fun () ->
         Fun.protect
           ~finally:(fun () ->
-            Mutex.protect snapshot_cache_lock (fun () ->
+            Mutex.protect snapshot_inflight_lock (fun () ->
                 Hashtbl.remove snapshot_inflight slug))
           (fun () ->
             match fetch_snapshot_list slug with
@@ -154,13 +150,7 @@ let schedule_snapshot_fetch slug =
                   (Printf.sprintf "Background snapshot fetch failed: %s" msg)))
 
 let snapshot_entries_from_cache slug =
-  Mutex.protect snapshot_cache_lock (fun () ->
-      match Hashtbl.find_opt snapshot_cache slug with
-      | Some (entries, ts) ->
-          let age = Unix.gettimeofday () -. ts in
-          if age > snapshot_cache_ttl then schedule_snapshot_fetch slug ;
-          Some entries
-      | None -> None)
+  Cache.get_safe_keyed_cached snapshot_cache slug
 
 let ensure_snapshot_entries slug =
   match snapshot_entries_from_cache slug with
@@ -579,8 +569,8 @@ end)
 
 module For_tests = struct
   let clear_snapshot_cache () =
-    Mutex.protect snapshot_cache_lock (fun () ->
-        Hashtbl.reset snapshot_cache ;
+    Cache.invalidate_safe_keyed snapshot_cache ;
+    Mutex.protect snapshot_inflight_lock (fun () ->
         Hashtbl.reset snapshot_inflight)
 
   let set_snapshot_cache ~network ~entries =

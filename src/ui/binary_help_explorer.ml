@@ -41,7 +41,8 @@ type row = {
   mutable selected : bool;
 }
 
-let cache : (string, option_entry list) Hashtbl.t = Hashtbl.create 3
+(* Cache for binary help output - uses long TTL since binaries rarely change *)
+let cache = Cache.create_safe_keyed ~name:"binary_help" ~ttl:3600.0 ()
 
 let set_help_hint ?short ?long () =
   Miaou.Core.Help_hint.clear () ;
@@ -353,7 +354,7 @@ let run_help_cmd binary cmd =
       (["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ cmd)
 
 let load_options ~binary =
-  match Hashtbl.find_opt cache binary with
+  match Cache.get_safe_keyed_cached cache binary with
   | Some opts -> Ok opts
   | None ->
       let* output = run_help binary in
@@ -361,7 +362,7 @@ let load_options ~binary =
       let opts = parse_help_node output in
       if opts = [] then Error (`Msg "No options parsed from help output")
       else (
-        Hashtbl.replace cache binary opts ;
+        Cache.set_safe_keyed cache binary opts ;
         Ok opts)
 
 let render_value = function None -> "" | Some v -> v
@@ -1000,7 +1001,7 @@ let load_baker_options ~binary ~mode =
       binary
       (match mode with `Local -> "local" | `Remote -> "remote")
   in
-  match Hashtbl.find_opt cache cache_key with
+  match Cache.get_safe_keyed_cached cache cache_key with
   | Some opts -> Ok opts
   | None ->
       let try_cmd label cmd =
@@ -1058,7 +1059,7 @@ let load_baker_options ~binary ~mode =
             | Error (`Msg m) -> loop (m :: errs) rest)
       in
       let* opts = loop [] candidates in
-      Hashtbl.replace cache cache_key opts ;
+      Cache.set_safe_keyed cache cache_key opts ;
       Ok opts
 
 let open_baker_run_help ~app_bin_dir ~mode ~initial_args ~on_apply =

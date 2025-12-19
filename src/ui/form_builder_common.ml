@@ -12,22 +12,12 @@ open Octez_manager_lib
     Forms call validators frequently (on every render). To avoid repeated
     syscalls, we cache service states with a short TTL. *)
 
-let service_states_cache : Data.Service_state.t list ref = ref []
+let service_states_cache =
+  Cache.create ~name:"service_states" ~ttl:0.5 Data.load_service_states
 
-let service_states_cache_time : float ref = ref 0.0
+let cached_service_states () = Cache.get service_states_cache
 
-let service_states_cache_ttl = 0.5 (* 500ms *)
-
-let cached_service_states () =
-  let now = Unix.gettimeofday () in
-  if now -. !service_states_cache_time > service_states_cache_ttl then (
-    service_states_cache := Data.load_service_states () ;
-    service_states_cache_time := now) ;
-  !service_states_cache
-
-let invalidate_service_states_cache () =
-  service_states_cache_time := 0.0 ;
-  service_states_cache := []
+let invalidate_service_states_cache () = Cache.invalidate service_states_cache
 
 (** {1 Configuration Types} *)
 
@@ -70,29 +60,12 @@ let instance_in_use ~states name =
 
 (** Cache for service user validation results.
     User existence rarely changes during a form session. *)
-let user_valid_cache : (string, bool) Hashtbl.t = Hashtbl.create 17
-
-let user_valid_cache_time : float ref = ref 0.0
-
-let user_valid_cache_ttl = 5.0 (* 5 seconds - users don't change often *)
+let user_valid_cache =
+  Cache.create_keyed ~name:"user_validation" ~ttl:5.0 (fun user ->
+      Result.is_ok (System_user.validate_user_for_service ~user))
 
 let service_user_valid ~user =
-  if Common.is_root () then true
-  else
-    let now = Unix.gettimeofday () in
-    (* Invalidate cache if TTL expired *)
-    if now -. !user_valid_cache_time > user_valid_cache_ttl then (
-      Hashtbl.clear user_valid_cache ;
-      user_valid_cache_time := now) ;
-    (* Check cache first *)
-    match Hashtbl.find_opt user_valid_cache user with
-    | Some result -> result
-    | None ->
-        let result =
-          Result.is_ok (System_user.validate_user_for_service ~user)
-        in
-        Hashtbl.replace user_valid_cache user result ;
-        result
+  if Common.is_root () then true else Cache.get_keyed user_valid_cache user
 
 let parse_host_port (s : string) : (string * int) option =
   match String.split_on_char ':' s with
