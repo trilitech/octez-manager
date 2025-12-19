@@ -389,7 +389,7 @@ let prompt_with_completion question completions =
     LNoise.set_hints_callback (fun _ -> None) ;
     res
 
-let resolve_node_instance_or_endpoint ~node_instance =
+let rec resolve_node_instance_or_endpoint ~node_instance =
   let ( let* ) = Result.bind in
   let* services = Service_registry.list () in
   let node_services =
@@ -398,9 +398,9 @@ let resolve_node_instance_or_endpoint ~node_instance =
   let default = "127.0.0.1:8732" in
   let choice =
     match node_instance with
-    | Some ni -> ni
+    | Some ni -> Some ni
     | None ->
-        if not (is_interactive ()) then default
+        if not (is_interactive ()) then Some default
         else
           let instance_names =
             List.map (fun (svc : Service.t) -> svc.instance) node_services
@@ -421,18 +421,19 @@ let resolve_node_instance_or_endpoint ~node_instance =
                   (List.map
                      (fun (inst, net) -> Printf.sprintf "%s (%s)" inst net)
                      instance_map))) ;
-          Option.value
-            ~default
-            (prompt_with_completion
-               "Node instance (default to 127.0.0.1:8732)"
-               instance_names)
+          prompt_with_completion "Node instance" (default :: instance_names)
   in
-  if
-    List.exists
-      (fun (svc : Service.t) -> String.equal svc.instance choice)
-      node_services
-  then Ok (`Instance choice)
-  else Ok (`Endpoint choice)
+  match choice with
+  | None ->
+      prerr_endline "Enter a node instance or custom endpoint" ;
+      resolve_node_instance_or_endpoint ~node_instance
+  | Some choice ->
+      if
+        List.exists
+          (fun (svc : Service.t) -> String.equal svc.instance choice)
+          node_services
+      then Ok (`Instance choice)
+      else Ok (`Endpoint choice)
 
 let run_result = function
   | Ok () -> `Ok ()
@@ -751,7 +752,7 @@ let install_baker_cmd =
               | Error (`Msg msg) ->
                   prerr_endline ("Warning: Could not load services: " ^ msg) ;
                   Ok Dal_disabled
-              | Ok services -> (
+              | Ok services ->
                   let dal_services =
                     List.filter
                       (fun (svc : Service.t) ->
@@ -770,47 +771,52 @@ let install_baker_cmd =
                     | Some "" | Some "none" | None -> Ok Dal_disabled
                     | Some endpoint -> Ok (Dal_endpoint endpoint)
                   else
-                    let instance_names =
-                      List.map
-                        (fun (svc : Service.t) -> svc.instance)
-                        dal_services
+                    let rec loop () =
+                      let instance_names =
+                        List.map
+                          (fun (svc : Service.t) -> svc.instance)
+                          dal_services
+                      in
+                      let instance_map =
+                        List.map
+                          (fun (svc : Service.t) ->
+                            (svc.instance, svc.rpc_addr))
+                          dal_services
+                      in
+                      Format.printf
+                        "Available DAL node instances: %s@."
+                        (String.concat
+                           ", "
+                           (List.map
+                              (fun (inst, addr) ->
+                                Printf.sprintf "%s (%s)" inst addr)
+                              instance_map)) ;
+                      match
+                        prompt_with_completion
+                          "DAL node instance"
+                          ("none" :: instance_names)
+                      with
+                      | Some "" | None -> loop ()
+                      | Some "none" -> Ok Dal_disabled
+                      | Some selected -> (
+                          (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
+                          match
+                            List.find_opt
+                              (fun (svc : Service.t) ->
+                                String.equal svc.instance selected)
+                              dal_services
+                          with
+                          | Some svc ->
+                              Ok
+                                (Dal_endpoint
+                                   (Installer.endpoint_of_rpc
+                                      svc.Service.rpc_addr))
+                          | None ->
+                              Ok
+                                (Dal_endpoint
+                                   (Installer.endpoint_of_rpc selected)))
                     in
-                    let instance_map =
-                      List.map
-                        (fun (svc : Service.t) -> (svc.instance, svc.rpc_addr))
-                        dal_services
-                    in
-                    Format.printf
-                      "Available DAL node instances: %s@."
-                      (String.concat
-                         ", "
-                         (List.map
-                            (fun (inst, addr) ->
-                              Printf.sprintf "%s (%s)" inst addr)
-                            instance_map)) ;
-                    match
-                      prompt_with_completion
-                        "DAL node instance"
-                        ("none" :: instance_names)
-                    with
-                    | Some "none" | Some "" | None -> Ok Dal_disabled
-                    | Some selected -> (
-                        (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
-                        match
-                          List.find_opt
-                            (fun (svc : Service.t) ->
-                              String.equal svc.instance selected)
-                            dal_services
-                        with
-                        | Some svc ->
-                            Ok
-                              (Dal_endpoint
-                                 (Installer.endpoint_of_rpc
-                                    svc.Service.rpc_addr))
-                        | None ->
-                            Ok
-                              (Dal_endpoint (Installer.endpoint_of_rpc selected))
-                        ))
+                    loop ()
             else Ok Dal_disabled
       in
       let req : baker_request =
