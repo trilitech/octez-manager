@@ -45,6 +45,19 @@ val render_cpu_chart :
 val render_mem_sparkline :
   role:string -> instance:string -> focus:bool -> string
 
+(** {2 Visibility Tracking} *)
+
+(** Mark an instance as visible (unfolded and on-screen).
+    Visible instances are polled at normal intervals. *)
+val mark_visible : role:string -> instance:string -> unit
+
+(** Mark an instance as hidden.
+    Hidden instances are polled at reduced intervals (4x slower). *)
+val mark_hidden : role:string -> instance:string -> unit
+
+(** Clear all visibility markers (call at start of render pass). *)
+val clear_visibility : unit -> unit
+
 (** {2 Scheduler Control} *)
 
 (** Start the background polling loop.
