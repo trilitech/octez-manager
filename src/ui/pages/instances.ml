@@ -39,10 +39,18 @@ let load_services_fresh () = Data.load_service_states ~detail:false ()
 
 let init_state () =
   let services = load_services () in
+  (* Start with all instances folded by default *)
+  let folded =
+    List.fold_left
+      (fun acc (st : Service_state.t) ->
+        StringSet.add st.service.Service.instance acc)
+      StringSet.empty
+      services
+  in
   {
     services;
     selected = 0;
-    folded = StringSet.empty;
+    folded;
     last_updated = Unix.gettimeofday ();
     next_page = None;
   }
