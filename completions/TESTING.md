@@ -1,11 +1,12 @@
 # Testing Zsh Completion
 
-This document describes how to test the zsh completion for octez-manager.
+This document describes how to test the shell completion scripts for octez-manager.
 
 ## Manual Testing
 
 ### Prerequisites
 - zsh installed on your system
+- bash installed on your system
 - octez-manager completion script installed (see completions/README.md)
 
 ### Basic Testing
@@ -45,6 +46,43 @@ This document describes how to test the zsh completion for octez-manager.
    ```
    Should show 'import' as the only subcommand
 
+### Bash Basic Testing
+
+1. **Test command completion**:
+   ```bash
+   octez-manager <TAB>
+   ```
+   Should show all available commands (instance, install-node, install-baker, etc.)
+
+2. **Test option completion**:
+   ```bash
+   octez-manager install-node --<TAB>
+   ```
+   Should show all options for install-node command (--instance, --network, --rpc-addr, etc.)
+
+3. **Test subcommand completion**:
+   ```bash
+   octez-manager instance mynode <TAB>
+   ```
+   Should show instance actions (start, stop, restart, remove, purge, show, show-service, refresh-from-new-snapshot)
+
+4. **Test value completion**:
+   ```bash
+   octez-manager install-node --history-mode <TAB>
+   ```
+   Should show history mode options (archive, full, rolling)
+
+   ```bash
+   octez-manager install-baker --liquidity-baking-vote <TAB>
+   ```
+   Should show voting options (on, off, pass)
+
+5. **Test snapshots subcommand**:
+   ```bash
+   octez-manager snapshots <TAB>
+   ```
+   Should show 'import' as the only subcommand
+
 ### Syntax Validation
 
 To check for zsh syntax errors without running the completion:
@@ -54,6 +92,12 @@ zsh -n completions/_octez-manager
 ```
 
 This will report syntax errors without executing the script.
+
+To check for bash syntax errors without running the completion:
+
+```bash
+bash -n completions/octez-manager
+```
 
 ### Debugging
 

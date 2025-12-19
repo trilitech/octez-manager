@@ -1,0 +1,5 @@
+(executable
+ (name gen_completion)
+ (public_name octez-manager-gen-completion)
+ (modules gen_completion)
+ (libraries octez_manager_lib rresult))

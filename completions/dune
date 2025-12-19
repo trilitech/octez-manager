@@ -3,4 +3,5 @@
 (install
  (section share)
  (files
-  (_octez-manager as zsh/site-functions/_octez-manager)))
+  (_octez-manager as zsh/site-functions/_octez-manager)
+  (octez-manager as bash-completion/completions/octez-manager)))
