@@ -303,7 +303,7 @@ let init_state () =
     num_columns;
     active_column = 0;
     column_scroll = Array.make 10 0;
-    (* max columns = number of roles (currently 5), 10 leaves room for future *)
+    (* max practical columns based on terminal width; 10 is a safe upper bound *)
   }
 
 let force_refresh state =
@@ -741,7 +741,7 @@ let render_column ~col_width ~state ~column_groups =
   in
   lines
 
-(** Dim inactive column lines to make active column stand out *)
+(** Dim inactive column lines to make active column stand out. *)
 let dim_inactive_column line =
   (* Wrap entire line in dim formatting *)
   Printf.sprintf "\027[2m%s\027[22m" line
@@ -750,6 +750,12 @@ let dim_inactive_column line =
 let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
     ~columns_content =
   let empty_line = String.make col_width ' ' in
+  (* Count non-empty columns for dimming decision *)
+  let non_empty_cols =
+    Array.fold_left
+      (fun acc col -> if col <> [] then acc + 1 else acc)
+      0 columns_content
+  in
   (* Apply scroll offset to each column and take visible_height lines *)
   let scrolled_columns =
     Array.mapi
@@ -763,9 +769,10 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
           col
           |> List.filteri (fun i _ -> i >= scroll && i < scroll + visible_height)
         in
-        (* Dim inactive columns to make active column stand out *)
+        (* Dim inactive columns to make active column stand out (only if multiple non-empty columns) *)
         let visible =
-          if col_idx <> active_column then List.map dim_inactive_column visible
+          if non_empty_cols > 1 && col_idx <> active_column then
+            List.map dim_inactive_column visible
           else visible
         in
         (* Pad to visible_height if needed *)
@@ -807,7 +814,7 @@ let table_lines_single state =
             let role = svc.service.Service.role in
             let acc =
               if Some role <> prev_role then
-                Widgets.dim (role_header role) :: "" :: acc
+                Widgets.bold (role_header role) :: "" :: acc
               else acc
             in
             let is_folded =
