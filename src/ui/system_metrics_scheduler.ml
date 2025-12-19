@@ -85,6 +85,40 @@ let disk_interval = 5.0 (* 5s *)
 
 let pid_check_interval = 5.0 (* Check PIDs every 5s *)
 
+(** Multiplier for hidden instances (folded or off-screen) *)
+let hidden_interval_multiplier = 4.0
+
+(** Track which instances are currently visible (unfolded and on-screen) *)
+let visible_instances : (string, unit) Hashtbl.t = Hashtbl.create 17
+
+let visible_lock = Mutex.create ()
+
+(** Mark an instance as visible (called from UI during render) *)
+let mark_visible ~role ~instance =
+  let key = Printf.sprintf "%s/%s" role instance in
+  Mutex.protect visible_lock (fun () ->
+      Hashtbl.replace visible_instances key ())
+
+(** Mark an instance as hidden.
+    Note: Currently unused as clear_visibility is called each render pass,
+    but kept for API completeness if explicit hiding is needed in future. *)
+let mark_hidden ~role ~instance =
+  let key = Printf.sprintf "%s/%s" role instance in
+  Mutex.protect visible_lock (fun () -> Hashtbl.remove visible_instances key)
+
+(** Clear all visibility (called at start of render pass) *)
+let clear_visibility () =
+  Mutex.protect visible_lock (fun () -> Hashtbl.clear visible_instances)
+
+(** Check if an instance is visible *)
+let is_visible key =
+  Mutex.protect visible_lock (fun () -> Hashtbl.mem visible_instances key)
+
+(** Get effective interval based on visibility *)
+let effective_interval ~key ~base_interval =
+  if is_visible key then base_interval
+  else base_interval *. hidden_interval_multiplier
+
 (** Get or create instance state *)
 let get_state key =
   with_lock (fun () ->
@@ -96,10 +130,10 @@ let get_state key =
           s)
 
 (** Update PIDs and version if changed *)
-let update_pids_and_version ~role ~instance ~binary ~data_dir state now =
-  if now -. state.last_pid_check < pid_check_interval then ()
-  else (
-    state.last_pid_check <- now ;
+let update_pids_and_version ~key ~role ~instance ~binary ~data_dir state now =
+  let interval = effective_interval ~key ~base_interval:pid_check_interval in
+  if now -. state.last_pid_check < interval then ()
+  else
     let new_pids = System_metrics.get_service_pids ~role ~instance in
     let pids_changed =
       List.length new_pids <> List.length state.pids
@@ -114,7 +148,6 @@ let update_pids_and_version ~role ~instance ~binary ~data_dir state now =
     if pids_changed || Option.is_none state.version then
       state.version <- System_metrics.get_version ~binary ;
     (* Check version and show toast if outdated (on first detection or change) *)
-    let key = Printf.sprintf "%s/%s" role instance in
     (match (old_version, state.version) with
     | _, None -> ()
     | old, Some v when old <> Some v ->
@@ -123,13 +156,15 @@ let update_pids_and_version ~role ~instance ~binary ~data_dir state now =
         !check_version_toast_ref ~key ~instance ~version:v
     | _ -> ()) ;
     (* Update disk size on PID check *)
-    state.data_dir_size <- System_metrics.get_dir_size ~path:data_dir)
+    state.data_dir_size <- System_metrics.get_dir_size ~path:data_dir ;
+    (* Update timestamp at completion to spread load across instances *)
+    state.last_pid_check <- Unix.gettimeofday ()
 
 (** Poll CPU for all tracked PIDs *)
-let poll_cpu state now =
-  if now -. state.last_cpu_poll < cpu_interval then ()
-  else (
-    state.last_cpu_poll <- now ;
+let poll_cpu ~key state now =
+  let interval = effective_interval ~key ~base_interval:cpu_interval in
+  if now -. state.last_cpu_poll < interval then ()
+  else
     let total_cpu = ref 0.0 in
     List.iter
       (fun pid ->
@@ -147,13 +182,15 @@ let poll_cpu state now =
     state.cpu_history <-
       (if len > cpu_max_points then
          List.filteri (fun i _ -> i >= len - cpu_max_points) history
-       else history))
+       else history) ;
+    (* Update timestamp at completion to spread load across instances *)
+    state.last_cpu_poll <- Unix.gettimeofday ()
 
 (** Poll memory for all tracked PIDs *)
-let poll_mem state now =
-  if now -. state.last_mem_poll < mem_interval then ()
-  else (
-    state.last_mem_poll <- now ;
+let poll_mem ~key state now =
+  let interval = effective_interval ~key ~base_interval:mem_interval in
+  if now -. state.last_mem_poll < interval then ()
+  else
     let total_rss = ref 0L in
     List.iter
       (fun pid ->
@@ -163,24 +200,28 @@ let poll_mem state now =
       state.pids ;
     state.memory_rss <- !total_rss ;
     let mem_mb = Int64.to_float !total_rss /. 1048576.0 in
-    Miaou_widgets_display.Sparkline_widget.push state.mem_sparkline mem_mb)
+    Miaou_widgets_display.Sparkline_widget.push state.mem_sparkline mem_mb ;
+    (* Update timestamp at completion to spread load across instances *)
+    state.last_mem_poll <- Unix.gettimeofday ()
 
 (** Poll disk size *)
-let poll_disk ~data_dir state now =
-  if now -. state.last_disk_poll < disk_interval then ()
+let poll_disk ~key ~data_dir state now =
+  let interval = effective_interval ~key ~base_interval:disk_interval in
+  if now -. state.last_disk_poll < interval then ()
   else (
-    state.last_disk_poll <- now ;
-    state.data_dir_size <- System_metrics.get_dir_size ~path:data_dir)
+    state.data_dir_size <- System_metrics.get_dir_size ~path:data_dir ;
+    (* Update timestamp at completion to spread load across instances *)
+    state.last_disk_poll <- Unix.gettimeofday ())
 
 (** Poll all metrics for an instance *)
 let poll ~role ~instance ~binary ~data_dir =
   let key = Printf.sprintf "%s/%s" role instance in
   let state = get_state key in
   let now = Unix.gettimeofday () in
-  update_pids_and_version ~role ~instance ~binary ~data_dir state now ;
-  poll_cpu state now ;
-  poll_mem state now ;
-  poll_disk ~data_dir state now
+  update_pids_and_version ~key ~role ~instance ~binary ~data_dir state now ;
+  poll_cpu ~key state now ;
+  poll_mem ~key state now ;
+  poll_disk ~key ~data_dir state now
 
 (** Render CPU line chart (multi-row braille) *)
 let render_cpu_chart ~role ~instance ~focus:_ =
