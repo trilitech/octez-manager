@@ -13,6 +13,7 @@
   service_registry
   base_dir_registry
   directory_registry
+  help_parser
   keys_reader
   installer
   teztnets
