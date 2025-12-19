@@ -303,7 +303,7 @@ let init_state () =
     num_columns;
     active_column = 0;
     column_scroll = Array.make 10 0;
-    (* pre-allocate for up to 10 columns *)
+    (* max columns = number of roles (currently 5), 10 leaves room for future *)
   }
 
 let force_refresh state =
@@ -709,7 +709,7 @@ let pad_line ~col_width line =
   else line
 
 (** Render a single column's content - returns list of lines *)
-let render_column ~col_width ~state ~column_groups ~is_active:_ =
+let render_column ~col_width ~state ~column_groups =
   let items = column_items ~column_groups ~global_services:state.services in
   let empty_line = String.make col_width ' ' in
   let _, lines =
@@ -821,10 +821,8 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Render each column *)
   let columns_content =
-    Array.mapi
-      (fun col_idx column_groups ->
-        let is_active = col_idx = state.active_column in
-        render_column ~col_width ~state ~column_groups ~is_active)
+    Array.map
+      (fun column_groups -> render_column ~col_width ~state ~column_groups)
       columns
   in
   (* Header rows (install/wallet) span full width in single line *)
