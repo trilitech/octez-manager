@@ -497,7 +497,9 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
 
     let service_select s _ = s
 
-    let service_cycle s _ = s
+    let service_cycle s _ =
+      (* Tick debounced validation *)
+      Miaou_widgets_input.Validated_textbox_widget.tick s
 
     let back s = s
 
@@ -507,6 +509,10 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
 
     let handle_modal_key s key ~size:_ =
       if key = "Enter" then
+        (* Flush any pending validation before checking validity *)
+        let s =
+          Miaou_widgets_input.Validated_textbox_widget.flush_validation s
+        in
         if Miaou_widgets_input.Validated_textbox_widget.is_valid s then (
           Miaou.Core.Modal_manager.close_top `Commit ;
           s)
