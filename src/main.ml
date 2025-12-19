@@ -241,11 +241,6 @@ let rec prompt_required_string question =
       prerr_endline "A value is required." ;
       prompt_required_string question
 
-let prompt_string_with_default question default_value =
-  match prompt_input ~default:(default_value, default_value) question with
-  | Some value -> value
-  | None -> default_value
-
 (* Inline copy of prompt_with_completion placed before prompt_history_mode so it
    can be referenced. This mirrors the main prompt_with_completion later in the
    file. *)
@@ -299,6 +294,9 @@ let prompt_history_mode default =
     let rec loop () =
       let choices = ["rolling"; "full"; "archive"] in
       match prompt_with_completion_inline "History mode" choices with
+      | Some "" | None ->
+          prerr_endline "Please enter rolling, full or archive." ;
+          loop ()
       | Some raw_value -> (
           let value = String.trim raw_value in
           (* First try direct parse *)
@@ -315,14 +313,11 @@ let prompt_history_mode default =
                   match History_mode.of_string p with
                   | Ok hm -> hm
                   | Error _ ->
-                      prerr_endline
-                        "Please enter rolling, full, full:50 or archive." ;
+                      prerr_endline "Please enter rolling, full or archive." ;
                       loop ())
               | None ->
-                  prerr_endline
-                    "Please enter rolling, full, full:50 or archive." ;
+                  prerr_endline "Please enter rolling, full or archive." ;
                   loop ()))
-      | None -> default
     in
     loop ()
 
@@ -537,86 +532,86 @@ let install_node_cmd =
   let make instance_opt network_opt history_mode_opt data_dir rpc_addr net_addr
       service_user app_bin_dir extra_args snapshot_flag snapshot_uri
       snapshot_no_check no_enable logging_mode =
-    match resolve_app_bin_dir app_bin_dir with
-    | Error msg -> cmdliner_error msg
-    | Ok app_bin_dir -> (
-        let instance_result =
-          match normalize_opt_string instance_opt with
-          | Some inst -> Ok inst
-          | None ->
-              if is_interactive () then
-                Ok (prompt_required_string "Instance name")
-              else Error "Instance name is required in non-interactive mode"
-        in
-        match instance_result with
-        | Error msg -> cmdliner_error msg
-        | Ok instance -> (
-            let network =
-              match normalize_opt_string network_opt with
-              | Some net -> net
-              | None ->
-                  if is_interactive () then
-                    match Teztnets.list_networks () with
-                    | Ok infos -> (
-                        let aliases =
-                          List.map (fun Teztnets.{alias; _} -> alias) infos
-                        in
-                        match prompt_with_completion "Network" aliases with
-                        | Some sel -> sel
-                        | None -> "mainnet")
-                    | Error _ -> prompt_string_with_default "Network" "mainnet"
-                  else "mainnet"
-            in
-            let history_mode =
-              match history_mode_opt with
-              | Some hm -> hm
-              | None -> prompt_history_mode History_mode.default
-            in
-            let snapshot_requested_initial =
-              snapshot_flag || Option.is_some snapshot_uri
-            in
-            let snapshot_requested =
-              if snapshot_requested_initial then true
-              else if is_interactive () then
-                prompt_yes_no
-                  "Download and import a tzinit snapshot before starting?"
-                  ~default:true
-              else false
-            in
-            let snapshot_uri = normalize_opt_string snapshot_uri in
-            let snapshot_requested =
-              snapshot_requested || Option.is_some snapshot_uri
-            in
-            let bootstrap =
-              if snapshot_requested then Snapshot {src = snapshot_uri}
-              else Genesis
-            in
-            let req : node_request =
-              {
-                instance;
-                network;
-                history_mode;
-                data_dir;
-                rpc_addr;
-                net_addr;
-                service_user;
-                app_bin_dir;
-                extra_args;
-                auto_enable = not no_enable;
-                logging_mode;
-                bootstrap;
-                preserve_data = false;
-                snapshot_no_check;
-              }
-            in
-            match Installer.install_node req with
-            | Ok service ->
-                Format.printf
-                  "Installed %s (%s)\n"
-                  service.S.instance
-                  service.network ;
-                `Ok ()
-            | Error (`Msg msg) -> cmdliner_error msg))
+    let res =
+      let ( let* ) = Result.bind in
+      let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
+      let* instance =
+        match normalize_opt_string instance_opt with
+        | Some inst -> Ok inst
+        | None ->
+            if is_interactive () then
+              Ok (prompt_required_string "Instance name")
+            else Error "Instance name is required in non-interactive mode"
+      in
+      let* network =
+        match normalize_opt_string network_opt with
+        | Some net -> Ok net
+        | None ->
+            if is_interactive () then
+              match Teztnets.list_networks () with
+              | Ok infos ->
+                  let aliases =
+                    List.map (fun Teztnets.{alias; _} -> alias) infos
+                  in
+                  let rec loop () =
+                    match prompt_with_completion "Network" aliases with
+                    | Some sel -> sel
+                    | None ->
+                        prerr_endline "Please enter a network." ;
+                        loop ()
+                  in
+                  Ok (loop ())
+              | Error (`Msg err) -> Error err
+            else Ok "mainnet"
+      in
+      let history_mode =
+        match history_mode_opt with
+        | Some hm -> hm
+        | None -> prompt_history_mode History_mode.default
+      in
+      let snapshot_requested_initial =
+        snapshot_flag || Option.is_some snapshot_uri
+      in
+      let snapshot_requested =
+        if snapshot_requested_initial then true
+        else if is_interactive () then
+          prompt_yes_no
+            "Download and import a tzinit snapshot before starting?"
+            ~default:true
+        else false
+      in
+      let snapshot_uri = normalize_opt_string snapshot_uri in
+      let snapshot_requested =
+        snapshot_requested || Option.is_some snapshot_uri
+      in
+      let bootstrap =
+        if snapshot_requested then Snapshot {src = snapshot_uri} else Genesis
+      in
+      let req : node_request =
+        {
+          instance;
+          network;
+          history_mode;
+          data_dir;
+          rpc_addr;
+          net_addr;
+          service_user;
+          app_bin_dir;
+          extra_args;
+          auto_enable = not no_enable;
+          logging_mode;
+          bootstrap;
+          preserve_data = false;
+          snapshot_no_check;
+        }
+      in
+      match Installer.install_node req with
+      | Ok service ->
+          Format.printf "Installed %s (%s)\n" service.S.instance service.network ;
+          Ok ()
+      | Error (`Msg msg) -> Error msg
+    in
+    match res with Ok () -> `Ok () | Error msg -> cmdliner_error msg
   in
   let term =
     Term.(
