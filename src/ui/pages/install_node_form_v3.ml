@@ -420,7 +420,10 @@ let spec =
             in
             {m with core = new_core; node = new_node})
           ~validate:(fun m ->
-            let states = Form_builder_common.cached_service_states () in
+            (* Use non-blocking cache to avoid syscalls during typing *)
+            let states =
+              Form_builder_common.cached_service_states_nonblocking ()
+            in
             if not (Form_builder_common.is_nonempty m.core.instance_name) then
               Error "Instance name is required"
             else if

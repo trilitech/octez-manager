@@ -15,7 +15,13 @@ open Octez_manager_lib
 let service_states_cache =
   Cache.create ~name:"service_states" ~ttl:0.5 Data.load_service_states
 
+(** Get service states, refreshing cache if expired. Use for initial form setup. *)
 let cached_service_states () = Cache.get service_states_cache
+
+(** Get service states from cache without blocking. Use in validators during typing.
+    Returns empty list if cache is empty (rare - only before first load). *)
+let cached_service_states_nonblocking () =
+  match Cache.get_cached service_states_cache with Some v -> v | None -> []
 
 let invalidate_service_states_cache () = Cache.invalidate service_states_cache
 
