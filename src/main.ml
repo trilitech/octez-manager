@@ -1875,6 +1875,8 @@ let ui_cmd =
       ret
         (const (fun page log logfile ->
              Capabilities.register () ;
+             (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
+             Sys.set_signal Sys.sigpipe Sys.Signal_ignore ;
              let result =
                Eio_main.run @@ fun env ->
                Eio.Switch.run @@ fun sw ->
