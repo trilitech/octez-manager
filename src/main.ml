@@ -59,13 +59,14 @@ let print_service_details svc =
           find_match services
   in
   let print_node_endpoint () =
-    let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
-    match resolve_instance_for_endpoint node_ep ~roles:["node"] with
-    | Some inst -> Format.printf "Node instance : %s@." inst
-    | None ->
-        Format.printf
-          "Node endpoint : %s@."
-          (if node_ep = "" then svc.rpc_addr else node_ep)
+    let node_inst = lookup "OCTEZ_NODE_INSTANCE" in
+    if String.trim node_inst <> "" then
+      Format.printf "Node instance : %s@." node_inst
+    else
+      let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
+      Format.printf
+        "Node endpoint : %s@."
+        (if node_ep = "" then svc.rpc_addr else node_ep)
   in
   (* Common fields *)
   Format.printf "Instance      : %s@." svc.S.instance ;
