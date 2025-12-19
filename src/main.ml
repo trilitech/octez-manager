@@ -766,17 +766,14 @@ let install_baker_cmd =
                       services
                   in
                   if dal_services = [] then
-                    let response =
-                      prompt_string_with_default
-                        "DAL node endpoint (or 'none' to opt-out)"
-                        "none"
+                    let choice =
+                      prompt_with_completion_inline "DAL Node endpoint" ["none"]
+                      |> Option.map (fun choice ->
+                          String.lowercase_ascii @@ String.trim choice)
                     in
-                    let normalized =
-                      String.lowercase_ascii (String.trim response)
-                    in
-                    if normalized = "none" || normalized = "disabled" then
-                      Ok Dal_disabled
-                    else Ok (Dal_endpoint response)
+                    match choice with
+                    | Some "" | Some "none" | None -> Ok Dal_disabled
+                    | Some endpoint -> Ok (Dal_endpoint endpoint)
                   else
                     let instance_names =
                       List.map
@@ -798,9 +795,10 @@ let install_baker_cmd =
                             instance_map)) ;
                     match
                       prompt_with_completion
-                        "DAL node instance (press Enter for default: none)"
-                        instance_names
+                        "DAL node instance"
+                        ("none" :: instance_names)
                     with
+                    | Some "none" | Some "" | None -> Ok Dal_disabled
                     | Some selected -> (
                         (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
                         match
@@ -817,8 +815,7 @@ let install_baker_cmd =
                         | None ->
                             Ok
                               (Dal_endpoint (Installer.endpoint_of_rpc selected))
-                        )
-                    | None -> Ok Dal_disabled)
+                        ))
             else Ok Dal_disabled
       in
       let req : baker_request =
