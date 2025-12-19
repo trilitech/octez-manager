@@ -72,7 +72,10 @@ let node_selection_field =
       match m.client.node with
       | `None -> false
       | `Service inst ->
-          let states = Form_builder_common.cached_service_states () in
+          (* Use non-blocking cache to avoid syscalls during typing *)
+          let states =
+            Form_builder_common.cached_service_states_nonblocking ()
+          in
           List.exists
             (fun (s : Data.Service_state.t) ->
               s.service.Service.role = "node"
@@ -85,7 +88,10 @@ let node_selection_field =
       match m.client.node with
       | `None -> Some "Node selection is required"
       | `Service inst ->
-          let states = Form_builder_common.cached_service_states () in
+          (* Use non-blocking cache to avoid syscalls during typing *)
+          let states =
+            Form_builder_common.cached_service_states_nonblocking ()
+          in
           let exists =
             List.exists
               (fun (s : Data.Service_state.t) ->
@@ -103,6 +109,7 @@ let node_selection_field =
                127.0.0.1:8732)"
           else None)
     ~edit:(fun model_ref ->
+      (* edit uses blocking version - only called when opening modal *)
       let states = Form_builder_common.cached_service_states () in
       let nodes =
         List.filter
