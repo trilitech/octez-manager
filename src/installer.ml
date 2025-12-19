@@ -858,6 +858,7 @@ let install_baker (request : baker_request) =
         [
           ("OCTEZ_BAKER_BASE_DIR", base_dir);
           ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+          ("OCTEZ_NODE_INSTANCE", (match node_mode with Local svc -> svc.Service.instance | Remote _ -> ""));
           ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
           ( "OCTEZ_DAL_CONFIG",
             match dal_config with
@@ -922,6 +923,7 @@ let install_accuser (request : accuser_request) =
         [
           ("OCTEZ_CLIENT_BASE_DIR", base_dir);
           ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+          ("OCTEZ_NODE_INSTANCE", (match node_mode with Local svc -> svc.Service.instance | Remote _ -> ""));
           ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
         ];
       extra_paths = [base_dir];
