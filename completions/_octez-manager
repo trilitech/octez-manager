@@ -47,14 +47,6 @@ _octez-manager() {
     'rolling:Rolling mode'
   )
 
-  local -a snapshot_kinds
-  snapshot_kinds=(
-    'rolling:Rolling snapshot'
-    'full:Full snapshot'
-    'full\:50:Full snapshot with 50 cycles'
-    'archive:Archive snapshot'
-  )
-
   local -a lb_votes
   lb_votes=(
     'on:Vote for liquidity baking'
@@ -117,15 +109,11 @@ _octez-manager() {
               refresh-from-new-snapshot)
                 _arguments \
                   '--snapshot-uri=[Snapshot URI]:uri:_urls' \
-                  '--snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds' \
                   '--network=[Network]:network:' \
                   '--history-mode=[History mode]:mode:->history-modes' \
                   '--no-check[Skip validation during snapshot import]' \
                   '(- *)'{-h,--help}'[Show help information]'
                 case $state in
-                  snapshot-kinds)
-                    _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds
-                    ;;
                   history-modes)
                     _describe -t history-modes 'history modes' history_modes
                     ;;
@@ -153,7 +141,6 @@ _octez-manager() {
             '--extra-arg=[Additional node arguments]:arg:' \
             '--snapshot[Enable snapshot import]' \
             '--snapshot-uri=[Snapshot URI]:uri:_urls' \
-            '--snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds' \
             '--snapshot-no-check[Skip snapshot validation]' \
             '--no-enable[Do not enable service on boot]' \
             '--journald[Send logs to journald]' \
@@ -161,9 +148,6 @@ _octez-manager() {
             '--log-rotate[Enable log rotation]' \
             '(- *)'{-h,--help}'[Show help information]'
           case $state in
-            snapshot-kinds)
-              _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds
-              ;;
             history-modes)
               _describe -t history-modes 'history modes' history_modes
               ;;
@@ -251,15 +235,11 @@ _octez-manager() {
                 _arguments \
                   '--instance=[Instance name]:instance:' \
                   '--snapshot-uri=[Snapshot URI]:uri:_urls' \
-                  '--snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds' \
                   '--network=[Network]:network:' \
                   '--history-mode=[History mode]:mode:->history-modes' \
                   '--no-check[Skip validation]' \
                   '(- *)'{-h,--help}'[Show help information]'
                 case $state in
-                  snapshot-kinds)
-                    _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds
-                    ;;
                   history-modes)
                     _describe -t history-modes 'history modes' history_modes
                     ;;
