@@ -10,6 +10,7 @@ open Installer_types
 module Binary_help_explorer = Octez_manager_ui.Binary_help_explorer
 module Install_node_form_v3 = Octez_manager_ui.Install_node_form_v3
 module Install_baker_form_v3 = Octez_manager_ui.Install_baker_form_v3
+module Cache = Octez_manager_ui.Cache
 
 let option_string = Alcotest.(option string)
 
@@ -2704,6 +2705,156 @@ let make_absolute_path_whitespace_error () =
   | Ok _ -> Alcotest.fail "whitespace-only path should fail"
   | Error _ -> ()
 
+(* ========== Cache module tests ========== *)
+
+let cache_ttl_basic () =
+  let counter = ref 0 in
+  let cache =
+    Cache.create ~name:"test_ttl" ~ttl:0.1 (fun () ->
+        incr counter ;
+        !counter)
+  in
+  (* First get should fetch *)
+  let v1 = Cache.get cache in
+  Alcotest.(check int) "first fetch" 1 v1 ;
+  (* Second get within TTL should return cached *)
+  let v2 = Cache.get cache in
+  Alcotest.(check int) "cached value" 1 v2 ;
+  Alcotest.(check int) "fetch count unchanged" 1 !counter ;
+  (* Wait for TTL to expire *)
+  Unix.sleepf 0.15 ;
+  (* Third get should re-fetch *)
+  let v3 = Cache.get cache in
+  Alcotest.(check int) "re-fetched value" 2 v3 ;
+  Alcotest.(check int) "fetch count incremented" 2 !counter
+
+let cache_invalidate () =
+  let counter = ref 0 in
+  let cache =
+    Cache.create ~name:"test_invalidate" ~ttl:60.0 (fun () ->
+        incr counter ;
+        !counter)
+  in
+  let v1 = Cache.get cache in
+  Alcotest.(check int) "first fetch" 1 v1 ;
+  Cache.invalidate cache ;
+  let v2 = Cache.get cache in
+  Alcotest.(check int) "after invalidate" 2 v2
+
+let cache_result_only_caches_success () =
+  let counter = ref 0 in
+  let cache =
+    Cache.create_result ~name:"test_result" ~ttl:60.0 (fun () ->
+        incr counter ;
+        if !counter < 3 then Error "not yet" else Ok "success")
+  in
+  (* First two calls should fail and not cache *)
+  (match Cache.get_result cache with
+  | Error _ -> ()
+  | Ok _ -> Alcotest.fail "expected error") ;
+  (match Cache.get_result cache with
+  | Error _ -> ()
+  | Ok _ -> Alcotest.fail "expected error") ;
+  (* Third call should succeed and cache *)
+  (match Cache.get_result cache with
+  | Ok v -> Alcotest.(check string) "success value" "success" v
+  | Error _ -> Alcotest.fail "expected success") ;
+  (* Fourth call should return cached success *)
+  let count_before = !counter in
+  (match Cache.get_result cache with
+  | Ok v -> Alcotest.(check string) "cached success" "success" v
+  | Error _ -> Alcotest.fail "expected cached success") ;
+  Alcotest.(check int) "no re-fetch" count_before !counter
+
+let cache_keyed_basic () =
+  let counter = ref 0 in
+  let cache =
+    Cache.create_keyed ~name:"test_keyed" ~ttl:60.0 (fun key ->
+        incr counter ;
+        key ^ "_value")
+  in
+  let v1 = Cache.get_keyed cache "a" in
+  Alcotest.(check string) "key a" "a_value" v1 ;
+  let v2 = Cache.get_keyed cache "b" in
+  Alcotest.(check string) "key b" "b_value" v2 ;
+  Alcotest.(check int) "two fetches" 2 !counter ;
+  (* Re-fetch cached key *)
+  let v3 = Cache.get_keyed cache "a" in
+  Alcotest.(check string) "key a cached" "a_value" v3 ;
+  Alcotest.(check int) "no additional fetch" 2 !counter
+
+let cache_safe_keyed_basic () =
+  let cache = Cache.create_safe_keyed ~name:"test_safe" ~ttl:60.0 () in
+  Cache.set_safe_keyed cache "key1" "value1" ;
+  let v1 = Cache.get_safe_keyed_cached cache "key1" in
+  Alcotest.(check (option string)) "cached value" (Some "value1") v1 ;
+  let v2 = Cache.get_safe_keyed_cached cache "missing" in
+  Alcotest.(check (option string)) "missing key" None v2
+
+let cache_safe_keyed_fetch () =
+  let counter = ref 0 in
+  let cache = Cache.create_safe_keyed ~name:"test_safe_fetch" ~ttl:60.0 () in
+  let v1 =
+    Cache.get_safe_keyed cache "key1" ~fetch:(fun () ->
+        incr counter ;
+        "fetched")
+  in
+  Alcotest.(check string) "fetched value" "fetched" v1 ;
+  Alcotest.(check int) "fetch called" 1 !counter ;
+  (* Second get should use cache *)
+  let v2 =
+    Cache.get_safe_keyed cache "key1" ~fetch:(fun () ->
+        incr counter ;
+        "fetched again")
+  in
+  Alcotest.(check string) "cached value" "fetched" v2 ;
+  Alcotest.(check int) "no re-fetch" 1 !counter
+
+let cache_safe_keyed_per_key_ttl () =
+  let cache = Cache.create_safe_keyed ~name:"test_per_key_ttl" ~ttl:0.1 () in
+  Cache.set_safe_keyed cache "key1" "value1" ;
+  (* Wait for TTL to expire *)
+  Unix.sleepf 0.15 ;
+  (* Fetch should be called since entry expired *)
+  let counter = ref 0 in
+  let v =
+    Cache.get_safe_keyed cache "key1" ~fetch:(fun () ->
+        incr counter ;
+        "new_value")
+  in
+  Alcotest.(check string) "new value after expiry" "new_value" v ;
+  Alcotest.(check int) "fetch called due to expiry" 1 !counter
+
+let cache_registry_no_duplicates () =
+  (* Create same-named cache twice, should not duplicate in registry *)
+  let _c1 = Cache.create ~name:"duplicate_test" ~ttl:60.0 (fun () -> 1) in
+  let _c2 = Cache.create ~name:"duplicate_test" ~ttl:60.0 (fun () -> 2) in
+  let stats = Cache.get_stats () in
+  let count =
+    List.length
+      (List.filter
+         (fun (name, _, _, _, _, _, _) -> name = "duplicate_test")
+         stats)
+  in
+  Alcotest.(check int) "only one registry entry" 1 count
+
+let cache_stats_hit_miss () =
+  let cache = Cache.create ~name:"test_stats" ~ttl:60.0 (fun () -> 42) in
+  let _ = Cache.get cache in
+  (* miss *)
+  let _ = Cache.get cache in
+  (* hit *)
+  let _ = Cache.get cache in
+  (* hit *)
+  let stats = Cache.get_stats () in
+  match
+    List.find_opt (fun (name, _, _, _, _, _, _) -> name = "test_stats") stats
+  with
+  | None -> Alcotest.fail "cache not in stats"
+  | Some (_, hits, misses, _, _, _, _) ->
+      Alcotest.(check int) "hits" 2 hits ;
+      Alcotest.(check int) "misses" 1 misses
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -3116,5 +3267,26 @@ let () =
             "remove account root"
             `Quick
             system_user_remove_account_commands;
+        ] );
+      ( "cache",
+        [
+          Alcotest.test_case "ttl basic" `Quick cache_ttl_basic;
+          Alcotest.test_case "invalidate" `Quick cache_invalidate;
+          Alcotest.test_case
+            "result only success"
+            `Quick
+            cache_result_only_caches_success;
+          Alcotest.test_case "keyed basic" `Quick cache_keyed_basic;
+          Alcotest.test_case "safe_keyed basic" `Quick cache_safe_keyed_basic;
+          Alcotest.test_case "safe_keyed fetch" `Quick cache_safe_keyed_fetch;
+          Alcotest.test_case
+            "safe_keyed per-key ttl"
+            `Quick
+            cache_safe_keyed_per_key_ttl;
+          Alcotest.test_case
+            "registry no duplicates"
+            `Quick
+            cache_registry_no_duplicates;
+          Alcotest.test_case "stats hit/miss" `Quick cache_stats_hit_miss;
         ] );
     ]
