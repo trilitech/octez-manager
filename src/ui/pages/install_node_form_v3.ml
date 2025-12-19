@@ -225,7 +225,7 @@ let next_free_port ~start ~avoid =
 
 let ensure_ports_initialized model_ref =
   let states =
-    try Data.load_service_states () with _ -> []
+    try Form_builder_common.cached_service_states () with _ -> []
     (* In tests/early init, capability may be absent; default to empty. *)
   in
   let rpc_ports, p2p_ports = ports_from_states states in
@@ -430,7 +430,7 @@ let spec =
             in
             {m with core = new_core; node = new_node})
           ~validate:(fun m ->
-            let states = Data.load_service_states () in
+            let states = Form_builder_common.cached_service_states () in
             if not (Form_builder_common.is_nonempty m.core.instance_name) then
               Error "Instance name is required"
             else if

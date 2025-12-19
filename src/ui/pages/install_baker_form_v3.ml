@@ -172,7 +172,7 @@ let parent_node_field =
     ~label:"Parent Node"
     ~get:(fun m -> if m.parent_node = "" then "External" else m.parent_node)
     ~edit:(fun model_ref ->
-      let states = Data.load_service_states () in
+      let states = Form_builder_common.cached_service_states () in
       let nodes = node_services states in
       let items = `External :: List.map (fun n -> `Node n) nodes in
       let to_string = function
@@ -250,13 +250,13 @@ let dal_node_field =
       match m.dal with
       | Dal_none -> true
       | Dal_instance inst ->
-          let states = Data.load_service_states () in
+          let states = Form_builder_common.cached_service_states () in
           Option.is_some (find_dal states inst)
       | Dal_endpoint ep ->
           Option.is_some
             (Form_builder_common.parse_host_port (endpoint_host_port ep)))
     ~edit:(fun model_ref ->
-      let states = Data.load_service_states () in
+      let states = Form_builder_common.cached_service_states () in
       let dal_nodes = dal_services states in
       let items =
         [`None] @ (dal_nodes |> List.map (fun n -> `Dal n)) @ [`Custom]
@@ -307,7 +307,7 @@ let node_data_dir_field =
     ~label:"Node Data Dir"
     ~get:(fun m -> m.node_data_dir)
     ~validate:(fun m ->
-      let states = Data.load_service_states () in
+      let states = Form_builder_common.cached_service_states () in
       let selected_node = find_node states m.parent_node in
       let node_mode = baker_node_mode m states in
       match node_mode with
@@ -316,13 +316,13 @@ let node_data_dir_field =
           || Option.is_some selected_node
       | `Remote -> true)
     ~validate_msg:(fun m ->
-      let states = Data.load_service_states () in
+      let states = Form_builder_common.cached_service_states () in
       let node_mode = baker_node_mode m states in
       match node_mode with
       | `Local -> Some "Node data directory is required for local mode"
       | `Remote -> None)
     ~edit:(fun model_ref ->
-      let states = Data.load_service_states () in
+      let states = Form_builder_common.cached_service_states () in
       match find_node states !model_ref.parent_node with
       | Some _ ->
           Modal_helpers.show_error
@@ -349,7 +349,7 @@ let node_endpoint_field =
     ~validate_msg:(fun _ ->
       Some "Format must be host:port (e.g., 127.0.0.1:8732)")
     ~edit:(fun model_ref ->
-      let states = Data.load_service_states () in
+      let states = Form_builder_common.cached_service_states () in
       match find_node states !model_ref.parent_node with
       | Some _ ->
           Modal_helpers.show_error
@@ -378,7 +378,8 @@ let spec =
   let open Form_builder in
   let open Form_builder_bundles in
   let baker_mode_for_help model =
-    try baker_node_mode model (Data.load_service_states ()) with _ -> `Remote
+    try baker_node_mode model (Form_builder_common.cached_service_states ())
+    with _ -> `Remote
   in
   {
     title = " Install Baker ";
@@ -409,7 +410,7 @@ let spec =
             in
             {m with core = new_core; client = new_client})
           ~validate:(fun m ->
-            let states = Data.load_service_states () in
+            let states = Form_builder_common.cached_service_states () in
             if not (Form_builder_common.is_nonempty m.core.instance_name) then
               Error "Instance name is required"
             else if
@@ -462,7 +463,7 @@ let spec =
     pre_submit_modal = None;
     on_submit =
       (fun model ->
-        let states = Data.load_service_states () in
+        let states = Form_builder_common.cached_service_states () in
         let selected_node = find_node states model.parent_node in
         let node_endpoint = resolve_node_endpoint model states in
         let dal_config = resolve_dal_config model states in

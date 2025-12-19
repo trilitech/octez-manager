@@ -72,7 +72,7 @@ let node_selection_field =
       match m.client.node with
       | `None -> false
       | `Service inst ->
-          let states = Data.load_service_states () in
+          let states = Form_builder_common.cached_service_states () in
           List.exists
             (fun (s : Data.Service_state.t) ->
               s.service.Service.role = "node"
@@ -85,7 +85,7 @@ let node_selection_field =
       match m.client.node with
       | `None -> Some "Node selection is required"
       | `Service inst ->
-          let states = Data.load_service_states () in
+          let states = Form_builder_common.cached_service_states () in
           let exists =
             List.exists
               (fun (s : Data.Service_state.t) ->
@@ -103,7 +103,7 @@ let node_selection_field =
                127.0.0.1:8732)"
           else None)
     ~edit:(fun model_ref ->
-      let states = Data.load_service_states () in
+      let states = Form_builder_common.cached_service_states () in
       let nodes =
         List.filter
           (fun (s : Data.Service_state.t) -> s.service.Service.role = "node")
@@ -214,7 +214,7 @@ let spec =
           match model.client.node with
           | `None -> Error (`Msg "Node selection is required for accuser")
           | `Service inst ->
-              let states = Data.load_service_states () in
+              let states = Form_builder_common.cached_service_states () in
               let node_exists =
                 List.exists
                   (fun (s : Data.Service_state.t) ->
@@ -234,7 +234,7 @@ let spec =
     pre_submit_modal = None;
     on_submit =
       (fun model ->
-        let states = Data.load_service_states () in
+        let states = Form_builder_common.cached_service_states () in
 
         (* Resolve node endpoint *)
         let node_endpoint =

@@ -7,6 +7,28 @@
 
 open Octez_manager_lib
 
+(** {1 Cached Service States}
+
+    Forms call validators frequently (on every render). To avoid repeated
+    syscalls, we cache service states with a short TTL. *)
+
+let service_states_cache : Data.Service_state.t list ref = ref []
+
+let service_states_cache_time : float ref = ref 0.0
+
+let service_states_cache_ttl = 0.5 (* 500ms *)
+
+let cached_service_states () =
+  let now = Unix.gettimeofday () in
+  if now -. !service_states_cache_time > service_states_cache_ttl then (
+    service_states_cache := Data.load_service_states () ;
+    service_states_cache_time := now) ;
+  !service_states_cache
+
+let invalidate_service_states_cache () =
+  service_states_cache_time := 0.0 ;
+  service_states_cache := []
+
 (** {1 Configuration Types} *)
 
 type core_service_config = {
@@ -46,9 +68,31 @@ let instance_in_use ~states name =
          String.equal target (normalize s.service.Service.instance))
        states
 
+(** Cache for service user validation results.
+    User existence rarely changes during a form session. *)
+let user_valid_cache : (string, bool) Hashtbl.t = Hashtbl.create 17
+
+let user_valid_cache_time : float ref = ref 0.0
+
+let user_valid_cache_ttl = 5.0 (* 5 seconds - users don't change often *)
+
 let service_user_valid ~user =
   if Common.is_root () then true
-  else Result.is_ok (System_user.validate_user_for_service ~user)
+  else
+    let now = Unix.gettimeofday () in
+    (* Invalidate cache if TTL expired *)
+    if now -. !user_valid_cache_time > user_valid_cache_ttl then (
+      Hashtbl.clear user_valid_cache ;
+      user_valid_cache_time := now) ;
+    (* Check cache first *)
+    match Hashtbl.find_opt user_valid_cache user with
+    | Some result -> result
+    | None ->
+        let result =
+          Result.is_ok (System_user.validate_user_for_service ~user)
+        in
+        Hashtbl.replace user_valid_cache user result ;
+        result
 
 let parse_host_port (s : string) : (string * int) option =
   match String.split_on_char ':' s with
