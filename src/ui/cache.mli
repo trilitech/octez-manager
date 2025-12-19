@@ -39,6 +39,11 @@ val create : name:string -> ttl:float -> (unit -> 'a) -> 'a t
 (** Get cached value, refreshing if expired. *)
 val get : 'a t -> 'a
 
+(** Get cached value without triggering refresh, even if expired.
+    Returns None only if nothing has ever been cached.
+    Use for validators during typing to avoid blocking syscalls. *)
+val get_cached : 'a t -> 'a option
+
 (** Manually invalidate this cache. *)
 val invalidate : 'a t -> unit
 

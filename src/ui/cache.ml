@@ -99,6 +99,10 @@ let invalidate cache =
   cache.value <- None ;
   cache.cache_time <- 0.0
 
+(** Return cached value without triggering refresh, even if expired.
+    Returns None only if nothing has ever been cached. *)
+let get_cached cache = cache.value
+
 (** {1 Generic TTL Cache with Result} *)
 
 type 'a result_cache = {

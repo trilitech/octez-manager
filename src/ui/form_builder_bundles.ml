@@ -83,7 +83,10 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
             let core = get_core m in
             set_core {core with instance_name} m)
           ~validate:(fun m ->
-            let states = Form_builder_common.cached_service_states () in
+            (* Use non-blocking cache to avoid syscalls during typing *)
+            let states =
+              Form_builder_common.cached_service_states_nonblocking ()
+            in
             let name = (get_core m).instance_name in
             if not (is_nonempty name) then Error "Instance name is required"
             else if instance_in_use ~states name then
@@ -174,7 +177,10 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
         match (get_client m).node with
         | `None -> false
         | `Service inst ->
-            let states = Form_builder_common.cached_service_states () in
+            (* Use non-blocking cache to avoid syscalls during typing *)
+            let states =
+              Form_builder_common.cached_service_states_nonblocking ()
+            in
             List.exists
               (fun (s : Data.Service_state.t) ->
                 s.service.Service.role = "node"
@@ -185,7 +191,10 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
         match (get_client m).node with
         | `None -> Some "Node selection is required"
         | `Service inst ->
-            let states = Form_builder_common.cached_service_states () in
+            (* Use non-blocking cache to avoid syscalls during typing *)
+            let states =
+              Form_builder_common.cached_service_states_nonblocking ()
+            in
             let exists =
               List.exists
                 (fun (s : Data.Service_state.t) ->
@@ -203,6 +212,7 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
                  127.0.0.1:8732)"
             else None)
       ~edit:(fun model_ref ->
+        (* edit uses blocking version - only called when opening modal *)
         let states = Form_builder_common.cached_service_states () in
         let nodes =
           List.filter
@@ -449,7 +459,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
         let node = get_node m in
         set_node {node with data_dir} m)
       ~validate:(fun m ->
-        let states = Form_builder_common.cached_service_states () in
+        (* Use non-blocking cache to avoid syscalls during typing *)
+        let states = Form_builder_common.cached_service_states_nonblocking () in
         let data_dir = (get_node m).data_dir in
         is_nonempty data_dir
         && not
@@ -472,7 +483,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
         set_node {node with rpc_addr} m)
       ~validate:(fun m ->
         let addr = (get_node m).rpc_addr in
-        let states = Form_builder_common.cached_service_states () in
+        (* Use non-blocking cache to avoid syscalls during typing *)
+        let states = Form_builder_common.cached_service_states_nonblocking () in
         validate_port addr states ~label:"RPC Address" ~example:"127.0.0.1:8732")
     |> with_hint
          "RPC endpoint for clients (bakers, wallets). Use 127.0.0.1 for local \
@@ -486,7 +498,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
         set_node {node with p2p_addr} m)
       ~validate:(fun m ->
         let addr = (get_node m).p2p_addr in
-        let states = Form_builder_common.cached_service_states () in
+        (* Use non-blocking cache to avoid syscalls during typing *)
+        let states = Form_builder_common.cached_service_states_nonblocking () in
         validate_port addr states ~label:"P2P Address" ~example:"0.0.0.0:9732")
     |> with_hint
          "P2P port for peer discovery. Use 0.0.0.0 to accept connections from \

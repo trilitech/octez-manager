@@ -250,12 +250,16 @@ let dal_node_field =
       match m.dal with
       | Dal_none -> true
       | Dal_instance inst ->
-          let states = Form_builder_common.cached_service_states () in
+          (* Use non-blocking cache to avoid syscalls during typing *)
+          let states =
+            Form_builder_common.cached_service_states_nonblocking ()
+          in
           Option.is_some (find_dal states inst)
       | Dal_endpoint ep ->
           Option.is_some
             (Form_builder_common.parse_host_port (endpoint_host_port ep)))
     ~edit:(fun model_ref ->
+      (* edit uses blocking version - only called when opening modal *)
       let states = Form_builder_common.cached_service_states () in
       let dal_nodes = dal_services states in
       let items =
@@ -307,7 +311,8 @@ let node_data_dir_field =
     ~label:"Node Data Dir"
     ~get:(fun m -> m.node_data_dir)
     ~validate:(fun m ->
-      let states = Form_builder_common.cached_service_states () in
+      (* Use non-blocking cache to avoid syscalls during typing *)
+      let states = Form_builder_common.cached_service_states_nonblocking () in
       let selected_node = find_node states m.parent_node in
       let node_mode = baker_node_mode m states in
       match node_mode with
@@ -316,12 +321,14 @@ let node_data_dir_field =
           || Option.is_some selected_node
       | `Remote -> true)
     ~validate_msg:(fun m ->
-      let states = Form_builder_common.cached_service_states () in
+      (* Use non-blocking cache to avoid syscalls during typing *)
+      let states = Form_builder_common.cached_service_states_nonblocking () in
       let node_mode = baker_node_mode m states in
       match node_mode with
       | `Local -> Some "Node data directory is required for local mode"
       | `Remote -> None)
     ~edit:(fun model_ref ->
+      (* edit uses blocking version - only called when opening modal *)
       let states = Form_builder_common.cached_service_states () in
       match find_node states !model_ref.parent_node with
       | Some _ ->
