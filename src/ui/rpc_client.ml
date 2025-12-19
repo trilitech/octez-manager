@@ -256,7 +256,12 @@ let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
   let running = ref true in
   let ic_ref = ref None in
   let url = absolutize_url s "/monitor/heads/main" in
-  let cmd = Printf.sprintf "curl -sN --connect-timeout 2 --no-buffer %s" url in
+  (* Use --max-time to ensure curl doesn't hang forever *)
+  let cmd =
+    Printf.sprintf
+      "curl -sN --connect-timeout 2 --max-time 86400 --no-buffer %s"
+      url
+  in
   let run () =
     let ic = Unix.open_process_in cmd in
     ic_ref := Some ic ;
@@ -296,10 +301,10 @@ let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
   Bg.submit_blocking run ;
   let stop () =
     stopped := true ;
-    (* Close the channel to unblock input_line and kill the curl process *)
-    (match !ic_ref with
-    | Some ic -> ( try close_in_noerr ic with _ -> ())
-    | None -> ()) ;
+    (* Just set the flag - don't try to close the channel or wait.
+       The background worker will exit on next input_line timeout/error
+       and clean up the process. Since we're exiting anyway, orphaned
+       curl processes will be cleaned up by the OS. *)
     ()
   in
   let alive () = !running in
