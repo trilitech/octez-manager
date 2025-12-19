@@ -346,8 +346,12 @@ let node_version (s : Service.t) : string option =
     res)
   else
     let bin = Filename.concat s.app_bin_dir "octez-node" in
+    (* Use shell to avoid SIGPIPE issues - octez-node doesn't handle broken pipes gracefully *)
+    let cmd =
+      Printf.sprintf "timeout 2s %s --version 2>/dev/null" (Common.sh_quote bin)
+    in
     let v =
-      match Common.run_out ["timeout"; "2s"; bin; "--version"] with
+      match Common.run_out ["sh"; "-c"; cmd] with
       | Ok out ->
           clear_error s ;
           Some (String.trim out)
