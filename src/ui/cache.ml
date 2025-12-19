@@ -25,35 +25,37 @@ type cache_entry = {
   mutable misses : int;
 }
 
-let registry : cache_entry list ref = ref []
+let registry : (string, cache_entry) Hashtbl.t = Hashtbl.create 31
 
 let register ~name ~invalidate ~get_age ~get_ttl ~get_sub_entries =
-  registry :=
+  Hashtbl.replace
+    registry
+    name
     {name; invalidate; get_age; get_ttl; get_sub_entries; hits = 0; misses = 0}
-    :: !registry
 
-let invalidate_all () = List.iter (fun e -> e.invalidate ()) !registry
+let invalidate_all () = Hashtbl.iter (fun _ e -> e.invalidate ()) registry
 
 let get_stats () =
-  !registry
-  |> List.map (fun e ->
+  Hashtbl.fold
+    (fun _ e acc ->
       let age = e.get_age () in
       let ttl = e.get_ttl () in
       let expired = match age with Some a -> a > ttl | None -> false in
       let sub_entries = e.get_sub_entries () in
-      (e.name, e.hits, e.misses, age, ttl, expired, sub_entries))
+      (e.name, e.hits, e.misses, age, ttl, expired, sub_entries) :: acc)
+    registry
+    []
 
 let reset_stats () =
-  List.iter
-    (fun e ->
+  Hashtbl.iter
+    (fun _ e ->
       e.hits <- 0 ;
       e.misses <- 0)
-    !registry
+    registry
 
 (** {1 Generic TTL Cache} *)
 
 type 'a t = {
-  name : string; [@warning "-69"]
   mutable value : 'a option;
   mutable cache_time : float;
   ttl : float;
@@ -62,9 +64,7 @@ type 'a t = {
 }
 
 let create ~name ~ttl fetch =
-  let cache =
-    {name; value = None; cache_time = 0.0; ttl; fetch; entry = None}
-  in
+  let cache = {value = None; cache_time = 0.0; ttl; fetch; entry = None} in
   let invalidate () =
     cache.value <- None ;
     cache.cache_time <- 0.0
@@ -78,8 +78,7 @@ let create ~name ~ttl fetch =
   (* simple cache has no sub-entries *)
   register ~name ~invalidate ~get_age ~get_ttl ~get_sub_entries ;
   (* Store entry reference for stats *)
-  let entries = !registry in
-  cache.entry <- List.find_opt (fun (e : cache_entry) -> e.name = name) entries ;
+  cache.entry <- Hashtbl.find_opt registry name ;
   cache
 
 let get cache =
@@ -103,7 +102,6 @@ let invalidate cache =
 (** {1 Generic TTL Cache with Result} *)
 
 type 'a result_cache = {
-  name : string; [@warning "-69"]
   mutable value : 'a option;
   mutable cache_time : float;
   ttl : float;
@@ -112,9 +110,7 @@ type 'a result_cache = {
 }
 
 let create_result ~name ~ttl fetch =
-  let cache =
-    {name; value = None; cache_time = 0.0; ttl; fetch; entry = None}
-  in
+  let cache = {value = None; cache_time = 0.0; ttl; fetch; entry = None} in
   let invalidate () =
     cache.value <- None ;
     cache.cache_time <- 0.0
@@ -127,8 +123,7 @@ let create_result ~name ~ttl fetch =
   let get_sub_entries () = [] in
   (* result cache has no sub-entries *)
   register ~name ~invalidate ~get_age ~get_ttl ~get_sub_entries ;
-  let entries = !registry in
-  cache.entry <- List.find_opt (fun (e : cache_entry) -> e.name = name) entries ;
+  cache.entry <- Hashtbl.find_opt registry name ;
   cache
 
 let get_result cache =
@@ -154,7 +149,6 @@ let invalidate_result cache =
 (** {1 Keyed Cache (for per-value caching like user validation)} *)
 
 type ('k, 'v) keyed_cache = {
-  name : string; [@warning "-69"]
   table : ('k, 'v) Hashtbl.t;
   mutable cache_time : float;
   ttl : float;
@@ -165,7 +159,6 @@ type ('k, 'v) keyed_cache = {
 let create_keyed ~name ~ttl fetch =
   let cache =
     {
-      name;
       table = Hashtbl.create 17;
       cache_time = Unix.gettimeofday ();
       ttl;
@@ -185,8 +178,7 @@ let create_keyed ~name ~ttl fetch =
   let get_sub_entries () = [] in
   (* keyed cache expires all at once, no per-key info *)
   register ~name ~invalidate ~get_age ~get_ttl ~get_sub_entries ;
-  let entries = !registry in
-  cache.entry <- List.find_opt (fun (e : cache_entry) -> e.name = name) entries ;
+  cache.entry <- Hashtbl.find_opt registry name ;
   cache
 
 let get_keyed cache key =
@@ -223,7 +215,6 @@ let key_to_string : type k. k key_serializer -> k -> string = function
   | Custom_key f -> f
 
 type ('k, 'v) safe_keyed_cache = {
-  name : string; [@warning "-69"]
   table : ('k, 'v * float) Hashtbl.t; (* value * timestamp *)
   lock : Mutex.t;
   ttl : float;
@@ -234,7 +225,6 @@ type ('k, 'v) safe_keyed_cache = {
 let create_safe_keyed_with ~key_ser ~name ~ttl () =
   let cache =
     {
-      name;
       table = Hashtbl.create 31;
       lock = Mutex.create ();
       ttl;
@@ -276,8 +266,7 @@ let create_safe_keyed_with ~key_ser ~name ~ttl () =
     List.sort (fun a b -> String.compare a.key b.key) entries
   in
   register ~name ~invalidate ~get_age ~get_ttl ~get_sub_entries ;
-  let entries = !registry in
-  cache.entry <- List.find_opt (fun (e : cache_entry) -> e.name = name) entries ;
+  cache.entry <- Hashtbl.find_opt registry name ;
   cache
 
 (** Create a string-keyed cache (most common case) *)

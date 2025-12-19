@@ -165,7 +165,11 @@ let start () =
            refresh_config ~instance ;
            Baker_highwatermarks.refresh ~instance)
          bakers
-     with _ -> ()) ;
+     with exn ->
+       prerr_endline
+         (Printf.sprintf
+            "delegate_scheduler: startup refresh failed: %s"
+            (Printexc.to_string exn))) ;
     (* Spawn dedicated domain for delegate polling - no Eio needed for simple I/O *)
     ignore
       (Domain.spawn (fun () ->
