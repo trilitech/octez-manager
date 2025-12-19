@@ -269,7 +269,11 @@ let ensure_valid_column state =
     if current_indices <> [] then state
     else
       (* Current column is empty, find a non-empty one *)
-      match find_non_empty_column ~num_columns:state.num_columns ~services:state.services with
+      match
+        find_non_empty_column
+          ~num_columns:state.num_columns
+          ~services:state.services
+      with
       | None ->
           (* All columns empty (shouldn't happen if services <> []) *)
           {state with selected = 0; active_column = 0}
@@ -309,7 +313,9 @@ let init_state () =
 let force_refresh state =
   let services = load_services_fresh () in
   let selected = clamp_selection services state.selected in
-  let state = {state with services; selected; last_updated = Unix.gettimeofday ()} in
+  let state =
+    {state with services; selected; last_updated = Unix.gettimeofday ()}
+  in
   ensure_valid_column state
 
 let maybe_refresh state =
@@ -737,7 +743,8 @@ let render_column ~col_width ~state ~column_groups =
               String.split_on_char '\n' line |> List.map (pad_line ~col_width)
             in
             (false, acc @ instance_lines))
-      (true, []) items
+      (true, [])
+      items
   in
   lines
 
@@ -754,7 +761,8 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
   let non_empty_cols =
     Array.fold_left
       (fun acc col -> if col <> [] then acc + 1 else acc)
-      0 columns_content
+      0
+      columns_content
   in
   (* Apply scroll offset to each column and take visible_height lines *)
   let scrolled_columns =
@@ -767,7 +775,8 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
         (* Take visible_height lines starting from scroll offset *)
         let visible =
           col
-          |> List.filteri (fun i _ -> i >= scroll && i < scroll + visible_height)
+          |> List.filteri (fun i _ ->
+              i >= scroll && i < scroll + visible_height)
         in
         (* Dim inactive columns to make active column stand out (only if multiple non-empty columns) *)
         let visible =
@@ -777,7 +786,8 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
         in
         (* Pad to visible_height if needed *)
         let pad_count = visible_height - List.length visible in
-        if pad_count > 0 then visible @ List.init pad_count (fun _ -> empty_line)
+        if pad_count > 0 then
+          visible @ List.init pad_count (fun _ -> empty_line)
         else visible)
       columns_content
   in
@@ -853,8 +863,12 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
   in
   let instance_rows =
-    merge_columns ~col_width ~visible_height ~column_scroll
-      ~active_column:state.active_column ~columns_content
+    merge_columns
+      ~col_width
+      ~visible_height
+      ~column_scroll
+      ~active_column:state.active_column
+      ~columns_content
   in
   install_row :: manage_wallet_row :: "" :: instance_rows
 
@@ -876,7 +890,11 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
   else
     (* For matrix layout, subtract 3 for menu rows (install, wallet, separator) *)
     let matrix_height = max 5 (visible_height - 3) in
-    table_lines_matrix ~cols ~visible_height:matrix_height ~column_scroll:state.column_scroll state
+    table_lines_matrix
+      ~cols
+      ~visible_height:matrix_height
+      ~column_scroll:state.column_scroll
+      state
 
 let summary_line state =
   let total = List.length state.services in
@@ -1485,7 +1503,8 @@ Press **Enter** to open instance menu.|}
           let visible_lines =
             all_lines
             |> List.mapi (fun i l -> (i, l))
-            |> List.filter (fun (i, _) -> i >= scroll && i < scroll + avail_rows)
+            |> List.filter (fun (i, _) ->
+                i >= scroll && i < scroll + avail_rows)
             |> List.map snd
           in
           let up_indicator =
