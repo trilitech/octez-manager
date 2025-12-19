@@ -19,6 +19,11 @@ let normalize_string s = String.lowercase_ascii (String.trim s)
 
 let network_cache : Teztnets.network_info list ref = ref []
 
+let network_cache_time : float ref = ref 0.0
+
+(* 5 minutes - networks don't change often, but weeklynet rotates *)
+let network_cache_ttl = 300.0
+
 let fetch_network_infos () =
   let fallback () = of_rresult (Teztnets.list_networks ()) in
   match
@@ -33,7 +38,11 @@ let fetch_network_infos () =
   | None -> fallback ()
 
 let get_network_infos () =
-  if !network_cache <> [] then Ok !network_cache
+  let now = Unix.gettimeofday () in
+  let cache_valid =
+    !network_cache <> [] && now -. !network_cache_time < network_cache_ttl
+  in
+  if cache_valid then Ok !network_cache
   else
     let* infos = fetch_network_infos () in
     let seen = Hashtbl.create 31 in
@@ -47,6 +56,7 @@ let get_network_infos () =
             true))
     in
     network_cache := deduped ;
+    network_cache_time := now ;
     Ok deduped
 
 let network_display_name value =
@@ -83,7 +93,7 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
             let core = get_core m in
             set_core {core with instance_name} m)
           ~validate:(fun m ->
-            let states = Data.load_service_states () in
+            let states = Form_builder_common.cached_service_states () in
             let name = (get_core m).instance_name in
             if not (is_nonempty name) then Error "Instance name is required"
             else if instance_in_use ~states name then
@@ -174,7 +184,7 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
         match (get_client m).node with
         | `None -> false
         | `Service inst ->
-            let states = Data.load_service_states () in
+            let states = Form_builder_common.cached_service_states () in
             List.exists
               (fun (s : Data.Service_state.t) ->
                 s.service.Service.role = "node"
@@ -185,7 +195,7 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
         match (get_client m).node with
         | `None -> Some "Node selection is required"
         | `Service inst ->
-            let states = Data.load_service_states () in
+            let states = Form_builder_common.cached_service_states () in
             let exists =
               List.exists
                 (fun (s : Data.Service_state.t) ->
@@ -203,7 +213,7 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
                  127.0.0.1:8732)"
             else None)
       ~edit:(fun model_ref ->
-        let states = Data.load_service_states () in
+        let states = Form_builder_common.cached_service_states () in
         let nodes =
           List.filter
             (fun (s : Data.Service_state.t) -> s.service.Service.role = "node")
@@ -449,7 +459,7 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
         let node = get_node m in
         set_node {node with data_dir} m)
       ~validate:(fun m ->
-        let states = Data.load_service_states () in
+        let states = Form_builder_common.cached_service_states () in
         let data_dir = (get_node m).data_dir in
         is_nonempty data_dir
         && not
@@ -472,7 +482,7 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
         set_node {node with rpc_addr} m)
       ~validate:(fun m ->
         let addr = (get_node m).rpc_addr in
-        let states = Data.load_service_states () in
+        let states = Form_builder_common.cached_service_states () in
         validate_port addr states ~label:"RPC Address" ~example:"127.0.0.1:8732")
     |> with_hint
          "RPC endpoint for clients (bakers, wallets). Use 127.0.0.1 for local \
@@ -486,7 +496,7 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
         set_node {node with p2p_addr} m)
       ~validate:(fun m ->
         let addr = (get_node m).p2p_addr in
-        let states = Data.load_service_states () in
+        let states = Form_builder_common.cached_service_states () in
         validate_port addr states ~label:"P2P Address" ~example:"0.0.0.0:9732")
     |> with_hint
          "P2P port for peer discovery. Use 0.0.0.0 to accept connections from \

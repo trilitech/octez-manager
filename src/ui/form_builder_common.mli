@@ -9,6 +9,18 @@
 
 open Octez_manager_lib
 
+(** {1 Cached Service States}
+
+    Forms call validators frequently (on every render). To avoid repeated
+    syscalls, we cache service states with a short TTL. *)
+
+(** Get cached service states (refreshed every 500ms). Use this in validators
+    instead of [Data.load_service_states] for better performance. *)
+val cached_service_states : unit -> Data.Service_state.t list
+
+(** Force cache invalidation. Call after installing/removing services. *)
+val invalidate_service_states_cache : unit -> unit
+
 (** {1 Configuration Types} *)
 
 (** Core service configuration shared by all Octez tools. *)

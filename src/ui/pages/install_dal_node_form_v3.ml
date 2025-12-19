@@ -101,7 +101,7 @@ let spec =
           match model.client.node with
           | `None -> Error (`Msg "Node selection is required for DAL node")
           | `Service inst ->
-              let states = Data.load_service_states () in
+              let states = Form_builder_common.cached_service_states () in
               let node_exists =
                 List.exists
                   (fun (s : Data.Service_state.t) ->
@@ -121,7 +121,7 @@ let spec =
     pre_submit_modal = None;
     on_submit =
       (fun model ->
-        let states = Data.load_service_states () in
+        let states = Form_builder_common.cached_service_states () in
 
         (* Resolve node endpoint *)
         let node_endpoint =

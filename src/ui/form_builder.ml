@@ -270,7 +270,7 @@ let service_or_endpoint ~label ~role ~get ~set
   let edit model_ref =
     (* Get list of services with matching role *)
     let open Octez_manager_lib in
-    let services = Data.load_service_states () in
+    let services = Form_builder_common.cached_service_states () in
     let matching_services =
       services
       |> List.filter (fun s -> s.Data.Service_state.service.Service.role = role)
@@ -511,10 +511,8 @@ struct
 
   let view s ~focus:_ ~size =
     let model = !(s.model_ref) in
-    let all_valid =
-      List.for_all (fun (Field f) -> f.validate model) S.spec.fields
-    in
-    let rows =
+    (* Validate each field once and collect results *)
+    let field_results =
       S.spec.fields
       |> List.map (fun (Field f) ->
           let value = f.get model in
@@ -523,7 +521,13 @@ struct
           let formatted_value =
             if ok then value_str else Widgets.fg 214 (Widgets.bold value_str)
           in
-          (f.label, formatted_value, if ok then "✓" else "✗"))
+          (f.label, formatted_value, ok))
+    in
+    let all_valid = List.for_all (fun (_, _, ok) -> ok) field_results in
+    let rows =
+      field_results
+      |> List.map (fun (label, value, ok) ->
+          (label, value, if ok then "✓" else "✗"))
     in
     let confirm_row =
       ( "Confirm & Install",
