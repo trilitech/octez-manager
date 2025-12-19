@@ -62,7 +62,10 @@ let maybe_refresh state =
         state (* Don't clear next_page - it may have been set by handle_key *)
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
-    force_refresh state
+    (* Use cached data + schedule background refresh to avoid blocking UI *)
+    let services = load_services () in
+    let selected = clamp_selection services state.selected in
+    {state with services; selected; last_updated = now}
   else state
 
 let current_service state =
