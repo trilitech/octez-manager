@@ -124,7 +124,6 @@ let service_equal a b =
   && Bool.equal a.snapshot_auto b.snapshot_auto
   && Option.equal String.equal a.snapshot_uri b.snapshot_uri
   && Option.equal String.equal a.snapshot_network_slug b.snapshot_network_slug
-  && Option.equal String.equal a.snapshot_kind b.snapshot_kind
   && Bool.equal a.snapshot_no_check b.snapshot_no_check
   && List.equal String.equal a.extra_args b.extra_args
 
@@ -147,7 +146,6 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     snapshot_auto = false;
     snapshot_uri = None;
     snapshot_network_slug = None;
-    snapshot_kind = None;
     snapshot_no_check = false;
     extra_args = [];
   }
@@ -361,7 +359,7 @@ let installer_build_run_args_journald () =
 let installer_snapshot_plan_direct_uri () =
   let request =
     sample_node_request
-      ~bootstrap:(Snapshot {src = Some "file:///tmp/snapshot"; kind = None})
+      ~bootstrap:(Snapshot {src = Some "file:///tmp/snapshot"})
       ()
   in
   match Installer.For_tests.snapshot_plan_of_request request with
@@ -380,11 +378,7 @@ let installer_snapshot_plan_tzinit () =
     else Ok (404, "missing")
   in
   Snapshots.For_tests.with_fetch fetch (fun () ->
-      let request =
-        sample_node_request
-          ~bootstrap:(Snapshot {src = None; kind = Some "rolling"})
-          ()
-      in
+      let request = sample_node_request ~bootstrap:(Snapshot {src = None}) () in
       match Installer.For_tests.snapshot_plan_of_request request with
       | Ok (Tzinit_snapshot res) ->
           Alcotest.(check string)
@@ -523,7 +517,6 @@ let installer_snapshot_history_mode_mismatch () =
         Installer.For_tests.resolve_snapshot_download
           ~network:"mainnet"
           ~history_mode:History_mode.Rolling
-          ~snapshot_kind:(Some "rolling")
       with
       | Error (`Msg msg) ->
           Alcotest.(check bool)
@@ -548,7 +541,6 @@ let installer_snapshot_history_mode_match () =
         Installer.For_tests.resolve_snapshot_download
           ~network:"mainnet"
           ~history_mode:History_mode.Rolling
-          ~snapshot_kind:(Some "rolling")
       with
       | Ok res ->
           Alcotest.(check string)

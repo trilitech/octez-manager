@@ -20,7 +20,6 @@ type t = {
   snapshot_auto : bool;
   snapshot_uri : string option;
   snapshot_network_slug : string option;
-  snapshot_kind : string option;
   snapshot_no_check : bool;
   extra_args : string list;
 }
@@ -39,7 +38,7 @@ let now () =
 let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     ~service_user ~app_bin_dir ~logging_mode ?(snapshot_auto = false)
     ?(snapshot_uri = None) ?(snapshot_network_slug = None)
-    ?(snapshot_kind = None) ?(snapshot_no_check = false) ?(extra_args = []) () =
+    ?(snapshot_no_check = false) ?(extra_args = []) () =
   {
     instance;
     role;
@@ -55,7 +54,6 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     snapshot_auto;
     snapshot_uri;
     snapshot_network_slug;
-    snapshot_kind;
     snapshot_no_check;
     extra_args;
   }
@@ -85,8 +83,6 @@ let to_yojson t =
       ( "snapshot_network_slug",
         match t.snapshot_network_slug with Some s -> `String s | None -> `Null
       );
-      ( "snapshot_kind",
-        match t.snapshot_kind with Some s -> `String s | None -> `Null );
       ("snapshot_no_check", `Bool t.snapshot_no_check);
       ("extra_args", `List (List.map (fun s -> `String s) t.extra_args));
     ]
@@ -122,11 +118,6 @@ let of_yojson json =
       | `String s when s <> "" -> Some s
       | _ -> None
     in
-    let snapshot_kind =
-      match json |> member "snapshot_kind" with
-      | `String s when s <> "" -> Some s
-      | _ -> None
-    in
     let snapshot_no_check =
       match json |> member "snapshot_no_check" with `Bool b -> b | _ -> false
     in
@@ -156,7 +147,6 @@ let of_yojson json =
                 snapshot_auto;
                 snapshot_uri;
                 snapshot_network_slug;
-                snapshot_kind;
                 snapshot_no_check;
                 extra_args;
               }

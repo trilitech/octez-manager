@@ -45,7 +45,6 @@ module type Tezos_node_manager = sig
   val schedule_refresh :
     instance:string ->
     frequency:string ->
-    snapshot_kind:string ->
     no_check:bool ->
     (unit, [`Msg of string]) result
 
@@ -57,7 +56,6 @@ module type Tezos_node_manager = sig
   val import_snapshot_for_instance :
     instance:string ->
     ?snapshot_uri:string ->
-    ?snapshot_kind:string ->
     ?network:string ->
     ?history_mode:History_mode.t ->
     no_check:bool ->
@@ -67,7 +65,6 @@ module type Tezos_node_manager = sig
   val refresh_instance_from_snapshot :
     instance:string ->
     ?snapshot_uri:string ->
-    ?snapshot_kind:string ->
     ?network:string ->
     ?history_mode:History_mode.t ->
     ?on_download_progress:(int -> int option -> unit) ->
