@@ -135,9 +135,24 @@ let change_duration s =
       Context.toast_info (Printf.sprintf "Recording duration set to %s" label)) ;
   s
 
+let clear_caches s =
+  Cache.invalidate_all () ;
+  Context.toast_success "All caches cleared" ;
+  s
+
 let handled_keys () =
   Miaou.Core.Keys.
-    [Escape; Char "r"; Char "m"; Char "a"; Char "R"; Char "d"; Up; Down]
+    [
+      Escape;
+      Char "r";
+      Char "m";
+      Char "a";
+      Char "R";
+      Char "d";
+      Char "c";
+      Up;
+      Down;
+    ]
 
 let keymap _ =
   [
@@ -147,6 +162,7 @@ let keymap _ =
     ("a", edit_metrics_addr, "Edit address");
     ("R", toggle_recorder, "Toggle recorder");
     ("d", change_duration, "Change duration");
+    ("c", clear_caches, "Clear caches");
     ("Up", scroll_up, "Scroll up");
     ("Down", scroll_down, "Scroll down");
   ]
@@ -160,8 +176,8 @@ let header =
 let footer =
   [
     Widgets.dim
-      "↑/↓: scroll  r: refresh  m: toggle metrics  R: toggle recorder  d: \
-       duration  Esc: back";
+      "↑/↓: scroll  r: refresh  c: clear caches  m: metrics  R: recorder  Esc: \
+       back";
   ]
 
 let view s ~focus:_ ~size =
@@ -197,6 +213,50 @@ let view s ~focus:_ ~size =
             in
             add line)
           s.services ;
+
+      add "" ;
+      add (Widgets.fg 13 (Widgets.bold "━━━ Caches ━━━")) ;
+      add "" ;
+      let cache_stats = Cache.get_stats () in
+      if cache_stats = [] then add (Widgets.dim "  No caches registered")
+      else
+        List.iter
+          (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
+            let age_str =
+              match age with
+              | None -> Widgets.dim "empty"
+              | Some a ->
+                  let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
+                  if expired then Widgets.red s else Widgets.green s
+            in
+            let stats_str =
+              if hits + misses > 0 then
+                Printf.sprintf " hits:%d misses:%d" hits misses
+              else ""
+            in
+            let count_str =
+              if sub_entries <> [] then
+                Printf.sprintf " (%d)" (List.length sub_entries)
+              else ""
+            in
+            add
+              (Printf.sprintf
+                 "  %-20s  %s%s%s"
+                 name
+                 age_str
+                 count_str
+                 (Widgets.dim stats_str)) ;
+            (* Show sub-entries for keyed caches *)
+            List.iter
+              (fun (entry : Cache.sub_entry) ->
+                let sub_age_str =
+                  let s = Printf.sprintf "%.1fs" entry.age in
+                  if entry.expired then Widgets.red s else Widgets.green s
+                in
+                add (Printf.sprintf "    └─ %-16s  %s" entry.key sub_age_str))
+              sub_entries)
+          cache_stats ;
+      add (Widgets.dim "  (press 'c' to clear all caches)") ;
 
       add "" ;
       add (Widgets.fg 12 (Widgets.bold "━━━ Real-Time Metrics ━━━")) ;
@@ -457,6 +517,7 @@ let handle_key s key ~size =
     | Some (Keys.Char "a") -> edit_metrics_addr s
     | Some (Keys.Char "R") -> toggle_recorder s
     | Some (Keys.Char "d") -> change_duration s
+    | Some (Keys.Char "c") -> clear_caches s
     | Some Keys.Up -> scroll_up s
     | Some Keys.Down -> scroll_down s
     | Some (Keys.Char "k") -> scroll_up s

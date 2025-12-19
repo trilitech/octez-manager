@@ -17,14 +17,7 @@ let of_rresult = function Ok v -> Ok v | Error (`Msg msg) -> Error msg
 
 let normalize_string s = String.lowercase_ascii (String.trim s)
 
-let network_cache : Teztnets.network_info list ref = ref []
-
-let network_cache_time : float ref = ref 0.0
-
-(* 5 minutes - networks don't change often, but weeklynet rotates *)
-let network_cache_ttl = 300.0
-
-let fetch_network_infos () =
+let fetch_network_infos_raw () =
   let fallback () = of_rresult (Teztnets.list_networks ()) in
   match
     Miaou_interfaces.Capability.get
@@ -37,36 +30,33 @@ let fetch_network_infos () =
       | Error _ -> fallback ())
   | None -> fallback ()
 
-let get_network_infos () =
-  let now = Unix.gettimeofday () in
-  let cache_valid =
-    !network_cache <> [] && now -. !network_cache_time < network_cache_ttl
-  in
-  if cache_valid then Ok !network_cache
-  else
-    let* infos = fetch_network_infos () in
-    let seen = Hashtbl.create 31 in
-    let deduped =
-      infos
-      |> List.filter (fun (i : Teztnets.network_info) ->
-          let key = normalize_string i.network_url in
-          if Hashtbl.mem seen key then false
-          else (
-            Hashtbl.add seen key () ;
-            true))
-    in
-    network_cache := deduped ;
-    network_cache_time := now ;
-    Ok deduped
+let dedupe_networks infos =
+  let seen = Hashtbl.create 31 in
+  infos
+  |> List.filter (fun (i : Teztnets.network_info) ->
+      let key = normalize_string i.network_url in
+      if Hashtbl.mem seen key then false
+      else (
+        Hashtbl.add seen key () ;
+        true))
+
+(* 5 minutes - networks don't change often, but weeklynet rotates *)
+let network_cache =
+  Cache.create_result ~name:"networks" ~ttl:300.0 (fun () ->
+      let* infos = fetch_network_infos_raw () in
+      Ok (dedupe_networks infos))
+
+let get_network_infos () = Cache.get_result network_cache
 
 let network_display_name value =
   let normalized_value = normalize_string value in
+  let networks = match get_network_infos () with Ok l -> l | Error _ -> [] in
   match
     List.find_opt
       (fun (info : Teztnets.network_info) ->
         normalize_string info.network_url = normalized_value
         || normalize_string info.alias = normalized_value)
-      !network_cache
+      networks
   with
   | Some info -> info.human_name
   | None -> value
@@ -328,7 +318,7 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
       ~label:"Network"
       ~get:(fun m ->
         let value = (get_node m).network in
-        if !network_cache = [] then value else network_display_name value)
+        network_display_name value)
       ~edit:(fun model_ref ->
         let fallback () =
           Modal_helpers.prompt_text_modal

@@ -135,69 +135,30 @@ let http_get_url (s : Service.t) (path : string) =
   in
   try_fetch_methods None (http_fetch_methods ~url ~rpc_path s)
 
-let chain_id_cache : (string, string option) Hashtbl.t = Hashtbl.create 31
+(* RPC caches with per-key TTL *)
+let head_level_cache =
+  Cache.create_safe_keyed ~name:"rpc_head_level" ~ttl:3.5 ()
 
-let head_level_cache : (string, int option) Hashtbl.t = Hashtbl.create 31
+let bootstrapped_cache =
+  Cache.create_safe_keyed ~name:"rpc_bootstrapped" ~ttl:5.5 ()
 
-let bootstrapped_cache : (string, bool option) Hashtbl.t = Hashtbl.create 31
+let chain_id_cache = Cache.create_safe_keyed ~name:"rpc_chain_id" ~ttl:3600.0 ()
 
-let version_cache : (string, string option) Hashtbl.t = Hashtbl.create 31
+let version_cache = Cache.create_safe_keyed ~name:"rpc_version" ~ttl:3600.0 ()
 
-let last_refresh_chain_id : (string, float) Hashtbl.t = Hashtbl.create 31
-
-let last_refresh_head : (string, float) Hashtbl.t = Hashtbl.create 31
-
-let last_refresh_boot : (string, float) Hashtbl.t = Hashtbl.create 31
-
-let last_refresh_version : (string, float) Hashtbl.t = Hashtbl.create 31
-
-let last_error : (string, string) Hashtbl.t = Hashtbl.create 31
-
-let refresh_period_head = 3.5
-
-let refresh_period_boot = 5.5
-
-let refresh_period_version = 3600.0
-
-let refresh_period_chain = 3600.0
-
-let cache_lock = Mutex.create ()
+let last_error_cache = Cache.create_safe_keyed ~name:"rpc_errors" ~ttl:60.0 ()
 
 let set_error (s : Service.t) msg =
-  Mutex.lock cache_lock ;
-  Hashtbl.replace last_error s.rpc_addr msg ;
-  Mutex.unlock cache_lock
+  Cache.set_safe_keyed last_error_cache s.rpc_addr (Some msg)
 
 let clear_error (s : Service.t) =
-  Mutex.lock cache_lock ;
-  Hashtbl.remove last_error s.rpc_addr ;
-  Mutex.unlock cache_lock
+  Cache.remove_safe_keyed last_error_cache s.rpc_addr
 
 let rpc_last_error (s : Service.t) =
-  Mutex.lock cache_lock ;
-  let v = Hashtbl.find_opt last_error s.rpc_addr in
-  Mutex.unlock cache_lock ;
-  v
+  Cache.get_safe_keyed_cached last_error_cache s.rpc_addr |> Option.join
 
 let rpc_head_header (s : Service.t) : int option =
-  let now = Unix.gettimeofday () in
-  let fresh =
-    Mutex.lock cache_lock ;
-    let res =
-      match Hashtbl.find_opt last_refresh_head s.rpc_addr with
-      | Some t when now -. t < refresh_period_head -> true
-      | _ -> false
-    in
-    Mutex.unlock cache_lock ;
-    res
-  in
-  if fresh then (
-    Mutex.lock cache_lock ;
-    let res = Hashtbl.find_opt head_level_cache s.rpc_addr |> Option.join in
-    Mutex.unlock cache_lock ;
-    res)
-  else
-    let v =
+  Cache.get_safe_keyed head_level_cache s.rpc_addr ~fetch:(fun () ->
       match http_get_string s "/chains/main/blocks/head/header" with
       | Ok out -> (
           clear_error s ;
@@ -208,39 +169,13 @@ let rpc_head_header (s : Service.t) : int option =
           with _ -> None)
       | Error m ->
           set_error s m ;
-          None
-    in
-    Mutex.lock cache_lock ;
-    Hashtbl.replace head_level_cache s.rpc_addr v ;
-    Hashtbl.replace last_refresh_head s.rpc_addr now ;
-    Mutex.unlock cache_lock ;
-    v
+          None)
 
 let rpc_head_header_cached (s : Service.t) : int option =
-  Mutex.lock cache_lock ;
-  let v = Hashtbl.find_opt head_level_cache s.rpc_addr in
-  Mutex.unlock cache_lock ;
-  match v with Some v -> v | None -> None
+  Cache.get_safe_keyed_cached head_level_cache s.rpc_addr |> Option.join
 
 let rpc_chain_id (s : Service.t) : string option =
-  let now = Unix.gettimeofday () in
-  let fresh =
-    Mutex.lock cache_lock ;
-    let res =
-      match Hashtbl.find_opt last_refresh_chain_id s.rpc_addr with
-      | Some t when now -. t < refresh_period_chain -> true
-      | _ -> false
-    in
-    Mutex.unlock cache_lock ;
-    res
-  in
-  if fresh then (
-    Mutex.lock cache_lock ;
-    let res = Hashtbl.find_opt chain_id_cache s.rpc_addr |> Option.join in
-    Mutex.unlock cache_lock ;
-    res)
-  else
-    let v =
+  Cache.get_safe_keyed chain_id_cache s.rpc_addr ~fetch:(fun () ->
       match http_get_string s "/chains/main/chain_id" with
       | Ok out -> (
           clear_error s ;
@@ -251,19 +186,10 @@ let rpc_chain_id (s : Service.t) : string option =
           with _ -> None)
       | Error m ->
           set_error s m ;
-          None
-    in
-    Mutex.lock cache_lock ;
-    Hashtbl.replace chain_id_cache s.rpc_addr v ;
-    Hashtbl.replace last_refresh_chain_id s.rpc_addr now ;
-    Mutex.unlock cache_lock ;
-    v
+          None)
 
 let rpc_chain_id_cached (s : Service.t) : string option =
-  Mutex.lock cache_lock ;
-  let v = Hashtbl.find_opt chain_id_cache s.rpc_addr in
-  Mutex.unlock cache_lock ;
-  match v with Some v -> v | None -> None
+  Cache.get_safe_keyed_cached chain_id_cache s.rpc_addr |> Option.join
 
 let rpc_protocol (s : Service.t) : string option =
   match http_get_string s "/chains/main/blocks/head/metadata" with
@@ -284,24 +210,7 @@ let rpc_protocol (s : Service.t) : string option =
       None
 
 let rpc_is_bootstrapped (s : Service.t) : bool option =
-  let now = Unix.gettimeofday () in
-  let fresh =
-    Mutex.lock cache_lock ;
-    let res =
-      match Hashtbl.find_opt last_refresh_boot s.rpc_addr with
-      | Some t when now -. t < refresh_period_boot -> true
-      | _ -> false
-    in
-    Mutex.unlock cache_lock ;
-    res
-  in
-  if fresh then (
-    Mutex.lock cache_lock ;
-    let res = Hashtbl.find_opt bootstrapped_cache s.rpc_addr |> Option.join in
-    Mutex.unlock cache_lock ;
-    res)
-  else
-    let v =
+  Cache.get_safe_keyed bootstrapped_cache s.rpc_addr ~fetch:(fun () ->
       match http_get_string s "/chains/main/is_bootstrapped" with
       | Ok out -> (
           clear_error s ;
@@ -312,60 +221,28 @@ let rpc_is_bootstrapped (s : Service.t) : bool option =
             | `Bool b -> Some b
             | _ -> (
                 match member "sync_state" j with
-                | `String s when String.lowercase_ascii s = "synced" ->
+                | `String ss when String.lowercase_ascii ss = "synced" ->
                     Some true
                 | _ -> None)
           with _ -> None)
       | Error m ->
           set_error s m ;
-          None
-    in
-    Mutex.lock cache_lock ;
-    Hashtbl.replace bootstrapped_cache s.rpc_addr v ;
-    Hashtbl.replace last_refresh_boot s.rpc_addr now ;
-    Mutex.unlock cache_lock ;
-    v
+          None)
 
 let node_version (s : Service.t) : string option =
-  let now = Unix.gettimeofday () in
   let key = s.Service.instance in
-  let fresh =
-    Mutex.lock cache_lock ;
-    let res =
-      match Hashtbl.find_opt last_refresh_version key with
-      | Some t when now -. t < refresh_period_version -> true
-      | _ -> false
-    in
-    Mutex.unlock cache_lock ;
-    res
-  in
-  if fresh then (
-    Mutex.lock cache_lock ;
-    let res = Hashtbl.find_opt version_cache key |> Option.join in
-    Mutex.unlock cache_lock ;
-    res)
-  else
-    let bin = Filename.concat s.app_bin_dir "octez-node" in
-    let v =
+  Cache.get_safe_keyed version_cache key ~fetch:(fun () ->
+      let bin = Filename.concat s.app_bin_dir "octez-node" in
       match Common.run_out ["timeout"; "2s"; bin; "--version"] with
       | Ok out ->
           clear_error s ;
           Some (String.trim out)
       | Error (`Msg m) ->
           set_error s m ;
-          None
-    in
-    Mutex.lock cache_lock ;
-    Hashtbl.replace version_cache key v ;
-    Hashtbl.replace last_refresh_version key now ;
-    Mutex.unlock cache_lock ;
-    v
+          None)
 
 let rpc_is_bootstrapped_cached (s : Service.t) : bool option =
-  Mutex.lock cache_lock ;
-  let v = Hashtbl.find_opt bootstrapped_cache s.rpc_addr in
-  Mutex.unlock cache_lock ;
-  match v with Some v -> v | None -> None
+  Cache.get_safe_keyed_cached bootstrapped_cache s.rpc_addr |> Option.join
 
 (* Head monitor stream: keep a single connection per node to reduce socket
   churn. We stream /monitor/heads/main and push level/protocol/chain updates
