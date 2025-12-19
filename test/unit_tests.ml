@@ -6,6 +6,7 @@
 (******************************************************************************)
 
 open Octez_manager_lib
+module Help_parser = Octez_manager_lib.Help_parser
 open Installer_types
 module Binary_help_explorer = Octez_manager_ui.Binary_help_explorer
 module Install_node_form_v3 = Octez_manager_ui.Install_node_form_v3
@@ -922,7 +923,8 @@ SEE ALSO
 |}
 
 let binary_help_parses_options () =
-  let opts =
+  let open Help_parser in
+  let opts : option_entry list =
     Binary_help_explorer.For_tests.parse_help octez_node_run_help_plain
   in
   (* Parser stops at ENVIRONMENT section, so we get 47 options instead of 49 *)
@@ -1023,7 +1025,10 @@ Commands related to the agnostic baker daemon.:
 |}
 
 let baker_help_parses_local () =
-  let opts = Binary_help_explorer.For_tests.parse_baker_help baker_local_help in
+  let open Help_parser in
+  let opts : option_entry list =
+    Binary_help_explorer.For_tests.parse_baker_help baker_local_help
+  in
   Alcotest.(check bool) "has options" true (List.length opts > 5) ;
   let find name =
     List.find_opt (fun o -> List.exists (( = ) name) o.names) opts |> Option.get
@@ -1044,16 +1049,15 @@ let baker_help_parses_local () =
   Alcotest.(check bool)
     "operations-pool arg"
     true
-    (ops_pool.Binary_help_explorer.arg = Some "<file|uri>") ;
+    (ops_pool.arg = Some "<file|uri>") ;
   Alcotest.(check bool)
     "operations-pool doc"
     true
-    (string_contains
-       ~needle:"fetch operations from this file"
-       ops_pool.Binary_help_explorer.doc)
+    (string_contains ~needle:"fetch operations from this file" ops_pool.doc)
 
 let baker_help_parses_remote () =
-  let opts =
+  let open Help_parser in
+  let opts : option_entry list =
     Binary_help_explorer.For_tests.parse_baker_help baker_remote_help
   in
   Alcotest.(check bool) "has options" true (List.length opts > 5) ;
@@ -1063,6 +1067,7 @@ let baker_help_parses_remote () =
   Alcotest.(check bool) "has without-dal" true (has "--without-dal")
 
 let parse_help_skips_dividers () =
+  let open Help_parser in
   let sample =
     {|
 ------
@@ -1071,7 +1076,9 @@ let parse_help_skips_dividers () =
   -b --bravo: second
 |}
   in
-  let opts = Binary_help_explorer.For_tests.parse_help sample in
+  let opts : option_entry list =
+    Binary_help_explorer.For_tests.parse_help sample
+  in
   Alcotest.(check int) "only options" 2 (List.length opts) ;
   let names = List.map (fun o -> List.hd o.names) opts in
   Alcotest.(check (list string)) "names" ["-a"; "-b"] names
