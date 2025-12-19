@@ -741,8 +741,14 @@ let render_column ~col_width ~state ~column_groups =
   in
   lines
 
+(** Dim inactive column lines to make active column stand out *)
+let dim_inactive_column line =
+  (* Wrap entire line in dim formatting *)
+  Printf.sprintf "\027[2m%s\027[22m" line
+
 (** Merge multiple column renders into combined lines with per-column scrolling *)
-let merge_columns ~col_width ~visible_height ~column_scroll ~columns_content =
+let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
+    ~columns_content =
   let empty_line = String.make col_width ' ' in
   (* Apply scroll offset to each column and take visible_height lines *)
   let scrolled_columns =
@@ -756,6 +762,11 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~columns_content =
         let visible =
           col
           |> List.filteri (fun i _ -> i >= scroll && i < scroll + visible_height)
+        in
+        (* Dim inactive columns to make active column stand out *)
+        let visible =
+          if col_idx <> active_column then List.map dim_inactive_column visible
+          else visible
         in
         (* Pad to visible_height if needed *)
         let pad_count = visible_height - List.length visible in
@@ -835,7 +846,8 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
   in
   let instance_rows =
-    merge_columns ~col_width ~visible_height ~column_scroll ~columns_content
+    merge_columns ~col_width ~visible_height ~column_scroll
+      ~active_column:state.active_column ~columns_content
   in
   install_row :: manage_wallet_row :: "" :: instance_rows
 
