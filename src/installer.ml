@@ -73,7 +73,7 @@ let history_mode_matches ~requested ~snapshot_mode =
   let snapshot_lower = String.lowercase_ascii (String.trim snapshot_mode) in
   requested_lower = snapshot_lower
 
-let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
+let resolve_snapshot_download ~network ~history_mode =
   let* network_slug =
     match Snapshots.slug_of_network network with
     | Some slug -> Ok slug
@@ -83,21 +83,15 @@ let resolve_snapshot_download ~network ~history_mode ~snapshot_kind =
            either a known alias (mainnet/ghostnet/...) or a teztnets JSON URL."
   in
   let* kind_slug, kind_label =
-    match snapshot_kind with
-    | Some raw -> (
-        match Snapshots.sanitize_kind_input raw with
-        | Some slug -> Ok (slug, raw)
-        | None -> R.error_msgf "Snapshot kind '%s' cannot be parsed." raw)
-    | None -> (
-        match history_mode with
-        | History_mode.Rolling -> Ok ("rolling", "rolling")
-        | History_mode.Full -> Ok ("full", "full")
-        | History_mode.Archive ->
-            R.error_msg
-              "Snapshots are not provided for archive history mode. Download a \
-               full archive manually, extract it into your target data \
-               directory, then rerun octez-manager without --snapshot but with \
-               --data-dir pointing to that directory.")
+    match history_mode with
+    | History_mode.Rolling -> Ok ("rolling", "rolling")
+    | History_mode.Full -> Ok ("full", "full")
+    | History_mode.Archive ->
+        R.error_msg
+          "Snapshots are not provided for archive history mode. Download a \
+           full archive manually, extract it into your target data directory, \
+           then rerun octez-manager without --snapshot but with --data-dir \
+           pointing to that directory."
   in
   let* entry_opt =
     Snapshots.fetch_entry ~network_slug ~slug:kind_slug ~label:kind_label
@@ -183,14 +177,13 @@ let prepare_snapshot_source ?progress src =
 let snapshot_plan_of_request request =
   match request.bootstrap with
   | Genesis -> Ok No_snapshot
-  | Snapshot {src; kind} -> (
+  | Snapshot {src} -> (
       match normalize_optional_string src with
       | Some uri -> Ok (Direct_snapshot {uri})
       | None ->
           resolve_snapshot_download
             ~network:request.network
             ~history_mode:request.history_mode
-            ~snapshot_kind:kind
           |> Result.map (fun res -> Tzinit_snapshot res))
 
 let snapshot_metadata_of_plan ~no_check = function
@@ -380,7 +373,7 @@ let reown_runtime_paths ~owner ~group ~paths ~logging_mode:_ =
     normalize
 
 let snapshot_plan_for_service ~(service : Service.t) ~history_mode
-    ~network_override ~snapshot_uri_override ~snapshot_kind_override =
+    ~network_override ~snapshot_uri_override =
   let chosen_uri =
     match normalize_optional_string snapshot_uri_override with
     | Some uri -> Some uri
@@ -397,16 +390,11 @@ let snapshot_plan_for_service ~(service : Service.t) ~history_mode
             | Some slug when String.trim slug <> "" -> slug
             | _ -> service.network)
       in
-      let snapshot_kind =
-        match normalize_optional_string snapshot_kind_override with
-        | Some kind -> Some kind
-        | None -> service.snapshot_kind
-      in
-      resolve_snapshot_download ~network ~history_mode ~snapshot_kind
+      resolve_snapshot_download ~network ~history_mode
       |> Result.map (fun res -> Tzinit_snapshot res)
 
-let import_snapshot_for_instance ~(instance : string) ?snapshot_uri
-    ?snapshot_kind ?network ?history_mode ~no_check () =
+let import_snapshot_for_instance ~(instance : string) ?snapshot_uri ?network
+    ?history_mode ~no_check () =
   let* service = lookup_node_service instance in
   let history_mode =
     match history_mode with Some hm -> hm | None -> service.history_mode
@@ -417,7 +405,6 @@ let import_snapshot_for_instance ~(instance : string) ?snapshot_uri
       ~history_mode
       ~network_override:network
       ~snapshot_uri_override:snapshot_uri
-      ~snapshot_kind_override:snapshot_kind
   in
   let* was_active = Systemd.is_active ~role:"node" ~instance:service.instance in
   let* () = Systemd.stop ~role:"node" ~instance:service.instance in
@@ -445,8 +432,8 @@ let import_snapshot_for_instance ~(instance : string) ?snapshot_uri
   in
   Ok ()
 
-let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
-    ?snapshot_kind ?network ?history_mode ?on_download_progress ~no_check () =
+let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri ?network
+    ?history_mode ?on_download_progress ~no_check () =
   let* service = lookup_node_service instance in
   let history_mode =
     match history_mode with Some hm -> hm | None -> service.history_mode
@@ -457,7 +444,6 @@ let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri
       ~history_mode
       ~network_override:network
       ~snapshot_uri_override:snapshot_uri
-      ~snapshot_kind_override:snapshot_kind
   in
   let no_check_flag = no_check || service.snapshot_no_check in
   let progress = {on_download_progress} in
@@ -656,7 +642,6 @@ let install_node (request : node_request) =
       ~snapshot_auto:snapshot_meta.auto
       ~snapshot_uri:snapshot_meta.uri
       ~snapshot_network_slug:snapshot_meta.network_slug
-      ~snapshot_kind:snapshot_meta.kind_slug
       ~snapshot_no_check:snapshot_meta.no_check
       ~extra_args:request.extra_args
       ()
@@ -858,7 +843,10 @@ let install_baker (request : baker_request) =
         [
           ("OCTEZ_BAKER_BASE_DIR", base_dir);
           ("OCTEZ_NODE_ENDPOINT", node_endpoint);
-          ("OCTEZ_NODE_INSTANCE", (match node_mode with Local svc -> svc.Service.instance | Remote _ -> ""));
+          ( "OCTEZ_NODE_INSTANCE",
+            match node_mode with
+            | Local svc -> svc.Service.instance
+            | Remote _ -> "" );
           ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
           ( "OCTEZ_DAL_CONFIG",
             match dal_config with
@@ -923,7 +911,10 @@ let install_accuser (request : accuser_request) =
         [
           ("OCTEZ_CLIENT_BASE_DIR", base_dir);
           ("OCTEZ_NODE_ENDPOINT", node_endpoint);
-          ("OCTEZ_NODE_INSTANCE", (match node_mode with Local svc -> svc.Service.instance | Remote _ -> ""));
+          ( "OCTEZ_NODE_INSTANCE",
+            match node_mode with
+            | Local svc -> svc.Service.instance
+            | Remote _ -> "" );
           ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
         ];
       extra_paths = [base_dir];
@@ -1137,7 +1128,7 @@ let cleanup_orphans ~dry_run =
   List.iter process_path orphan_logs ;
   Ok (List.rev !removed, List.rev !errors)
 
-let schedule_refresh ~instance ~frequency ~snapshot_kind ~no_check =
+let schedule_refresh ~instance ~frequency ~no_check =
   let* service = lookup_node_service instance in
   let manager_bin =
     if Filename.is_relative Sys.executable_name then
@@ -1148,10 +1139,9 @@ let schedule_refresh ~instance ~frequency ~snapshot_kind ~no_check =
   in
   let cmd =
     Printf.sprintf
-      "%s instance %s refresh-from-new-snapshot --snapshot-kind=%s%s"
+      "%s instance %s refresh-from-new-snapshot%s"
       manager_bin
       instance
-      snapshot_kind
       (if no_check then " --snapshot-no-check" else "")
   in
   Systemd.install_refresh_timer

@@ -65,7 +65,7 @@ let create_node_flow ~on_success =
                     let bootstrap =
                       match bootstrap_choice with
                       | `Genesis -> Genesis
-                      | `Snapshot -> Snapshot {src = None; kind = None}
+                      | `Snapshot -> Snapshot {src = None}
                     in
                     let request =
                       {

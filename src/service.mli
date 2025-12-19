@@ -20,7 +20,6 @@ type t = {
   snapshot_auto : bool;
   snapshot_uri : string option;
   snapshot_network_slug : string option;
-  snapshot_kind : string option;
   snapshot_no_check : bool;
   extra_args : string list;
 }
@@ -39,7 +38,6 @@ val make :
   ?snapshot_auto:bool ->
   ?snapshot_uri:string option ->
   ?snapshot_network_slug:string option ->
-  ?snapshot_kind:string option ->
   ?snapshot_no_check:bool ->
   ?extra_args:string list ->
   unit ->

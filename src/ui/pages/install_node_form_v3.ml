@@ -521,8 +521,8 @@ let spec =
         let bootstrap =
           match model.snapshot with
           | `None -> Genesis
-          | `Url url -> Snapshot {src = Some url; kind = None}
-          | `Tzinit snap -> Snapshot {src = None; kind = Some snap.kind_slug}
+          | `Url url -> Snapshot {src = Some url}
+          | `Tzinit _snap -> Snapshot {src = None}
         in
 
         let req : Installer_types.node_request =

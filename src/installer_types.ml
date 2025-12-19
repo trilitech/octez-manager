@@ -5,9 +5,7 @@
 (*                                                                            *)
 (******************************************************************************)
 
-type bootstrap =
-  | Genesis
-  | Snapshot of {src : string option; kind : string option}
+type bootstrap = Genesis | Snapshot of {src : string option}
 
 type node_request = {
   instance : string;

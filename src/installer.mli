@@ -24,7 +24,6 @@ val install_signer : signer_request -> (Service.t, [`Msg of string]) result
 val import_snapshot_for_instance :
   instance:string ->
   ?snapshot_uri:string ->
-  ?snapshot_kind:string ->
   ?network:string ->
   ?history_mode:History_mode.t ->
   no_check:bool ->
@@ -34,7 +33,6 @@ val import_snapshot_for_instance :
 val refresh_instance_from_snapshot :
   instance:string ->
   ?snapshot_uri:string ->
-  ?snapshot_kind:string ->
   ?network:string ->
   ?history_mode:History_mode.t ->
   no_check:bool ->
@@ -68,7 +66,6 @@ val cleanup_orphans :
 val schedule_refresh :
   instance:string ->
   frequency:string ->
-  snapshot_kind:string ->
   no_check:bool ->
   (unit, [`Msg of string]) result
 
@@ -88,7 +85,6 @@ val add_authorized_key :
 val import_snapshot_for_instance :
   instance:string ->
   ?snapshot_uri:string ->
-  ?snapshot_kind:string ->
   ?network:string ->
   ?history_mode:History_mode.t ->
   no_check:bool ->
@@ -98,7 +94,6 @@ val import_snapshot_for_instance :
 val refresh_instance_from_snapshot :
   instance:string ->
   ?snapshot_uri:string ->
-  ?snapshot_kind:string ->
   ?network:string ->
   ?history_mode:History_mode.t ->
   ?on_download_progress:(int -> int option -> unit) ->
@@ -167,7 +162,6 @@ module For_tests : sig
   val resolve_snapshot_download :
     network:string ->
     history_mode:History_mode.t ->
-    snapshot_kind:string option ->
     (snapshot_resolution, [`Msg of string]) result
 
   val history_mode_matches :

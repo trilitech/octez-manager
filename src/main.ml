@@ -315,10 +315,12 @@ let prompt_history_mode default =
                   match History_mode.of_string p with
                   | Ok hm -> hm
                   | Error _ ->
-                      prerr_endline "Please enter rolling, full, or archive." ;
+                      prerr_endline
+                        "Please enter rolling, full, full:50 or archive." ;
                       loop ())
               | None ->
-                  prerr_endline "Please enter rolling, full, or archive." ;
+                  prerr_endline
+                    "Please enter rolling, full, full:50 or archive." ;
                   loop ()))
       | None -> default
     in
@@ -522,14 +524,6 @@ let install_node_cmd =
     Arg.(
       value & opt (some string) None & info ["snapshot-uri"] ~doc ~docv:"URI")
   in
-  let snapshot_kind =
-    let doc =
-      "Snapshot variant from snapshots.tzinit.org (rolling, full, full:50, \
-       ...)."
-    in
-    Arg.(
-      value & opt (some string) None & info ["snapshot-kind"] ~doc ~docv:"KIND")
-  in
   let snapshot_no_check =
     let doc =
       "Pass --no-check to octez-node snapshot import during bootstrap."
@@ -542,7 +536,7 @@ let install_node_cmd =
   in
   let make instance_opt network_opt history_mode_opt data_dir rpc_addr net_addr
       service_user app_bin_dir extra_args snapshot_flag snapshot_uri
-      snapshot_kind snapshot_no_check no_enable logging_mode =
+      snapshot_no_check no_enable logging_mode =
     match resolve_app_bin_dir app_bin_dir with
     | Error msg -> cmdliner_error msg
     | Ok app_bin_dir -> (
@@ -579,9 +573,7 @@ let install_node_cmd =
               | None -> prompt_history_mode History_mode.default
             in
             let snapshot_requested_initial =
-              snapshot_flag
-              || Option.is_some snapshot_uri
-              || Option.is_some snapshot_kind
+              snapshot_flag || Option.is_some snapshot_uri
             in
             let snapshot_requested =
               if snapshot_requested_initial then true
@@ -591,32 +583,12 @@ let install_node_cmd =
                   ~default:true
               else false
             in
-            let snapshot_kind =
-              match normalize_opt_string snapshot_kind with
-              | Some _ as provided -> provided
-              | None when snapshot_requested && is_interactive () ->
-                  prompt_input
-                    "Snapshot kind (rolling/full/full:50, leave blank for auto)"
-                  |> normalize_opt_string
-              | None -> None
-            in
-            let snapshot_uri =
-              match normalize_opt_string snapshot_uri with
-              | Some _ as provided -> provided
-              | None when snapshot_requested && is_interactive () ->
-                  prompt_input
-                    "Snapshot URI (path or URL, leave blank to auto-select)"
-                  |> normalize_opt_string
-              | None -> None
-            in
+            let snapshot_uri = normalize_opt_string snapshot_uri in
             let snapshot_requested =
-              snapshot_requested
-              || Option.is_some snapshot_uri
-              || Option.is_some snapshot_kind
+              snapshot_requested || Option.is_some snapshot_uri
             in
             let bootstrap =
-              if snapshot_requested then
-                Snapshot {src = snapshot_uri; kind = snapshot_kind}
+              if snapshot_requested then Snapshot {src = snapshot_uri}
               else Genesis
             in
             let req : node_request =
@@ -651,8 +623,8 @@ let install_node_cmd =
       ret
         (const make $ instance $ network $ history_mode_opt_term $ data_dir
        $ rpc_addr $ net_addr $ service_user $ app_bin_dir $ extra_args
-       $ snapshot_flag $ snapshot_uri $ snapshot_kind $ snapshot_no_check
-       $ auto_enable $ logging_mode_term))
+       $ snapshot_flag $ snapshot_uri $ snapshot_no_check $ auto_enable
+       $ logging_mode_term))
   in
   let info =
     Cmd.info "install-node" ~doc:"Install an octez-node systemd instance"
@@ -1338,16 +1310,6 @@ let instance_term =
           ~doc:"Snapshot URI used by the refresh-from-new-snapshot action."
           ~docv:"URI")
   in
-  let snapshot_kind_override =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["snapshot-kind"]
-          ~doc:
-            "Snapshot slug (rolling, full:50, ...) when refreshing from tzinit."
-          ~docv:"KIND")
-  in
   let snapshot_network_override =
     Arg.(
       value
@@ -1359,6 +1321,7 @@ let instance_term =
              refresh-from-new-snapshot."
           ~docv:"NET")
   in
+
   let snapshot_history_mode_override =
     Arg.(
       value
@@ -1380,8 +1343,8 @@ let instance_term =
              refresh-from-new-snapshot.")
   in
   let run instance action delete_data_dir snapshot_uri_override
-      snapshot_kind_override snapshot_network_override
-      snapshot_history_mode_override snapshot_no_check =
+      snapshot_network_override snapshot_history_mode_override snapshot_no_check
+      =
     match (instance, action) with
     | None, _ -> `Help (`Pager, None)
     | Some _, None ->
@@ -1402,7 +1365,6 @@ let instance_term =
               (Installer.refresh_instance_from_snapshot
                  ~instance:inst
                  ?snapshot_uri:snapshot_uri_override
-                 ?snapshot_kind:snapshot_kind_override
                  ?network:snapshot_network_override
                  ?history_mode:snapshot_history_mode_override
                  ~no_check:snapshot_no_check
@@ -1464,8 +1426,8 @@ let instance_term =
   Term.(
     ret
       (const run $ instance $ action $ delete_data_dir $ snapshot_uri_override
-     $ snapshot_kind_override $ snapshot_network_override
-     $ snapshot_history_mode_override $ snapshot_no_check))
+     $ snapshot_network_override $ snapshot_history_mode_override
+     $ snapshot_no_check))
 
 let instance_cmd =
   let info = Cmd.info "instance" ~doc:"Manage existing Octez services." in
@@ -1706,15 +1668,6 @@ let snapshots_import_cmd =
           ~doc:"Path or URL to a snapshot archive"
           ~docv:"URI")
   in
-  let snapshot_kind =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["snapshot-kind"]
-          ~doc:"Snapshot slug to fetch from tzinit (rolling, full, full50, ...)"
-          ~docv:"KIND")
-  in
   let network =
     Arg.(
       value
@@ -1738,12 +1691,11 @@ let snapshots_import_cmd =
       value & flag
       & info ["no-check"] ~doc:"Pass --no-check to octez-node snapshot import")
   in
-  let make instance snapshot_uri snapshot_kind network history_mode no_check =
+  let make instance snapshot_uri network history_mode no_check =
     run_result
       (Installer.import_snapshot_for_instance
          ~instance
          ?snapshot_uri
-         ?snapshot_kind
          ?network
          ?history_mode
          ~no_check
@@ -1752,8 +1704,8 @@ let snapshots_import_cmd =
   let term =
     Term.(
       ret
-        (const make $ instance $ snapshot_uri $ snapshot_kind $ network
-       $ history_mode $ no_check))
+        (const make $ instance $ snapshot_uri $ network $ history_mode
+       $ no_check))
   in
   let info =
     Cmd.info
