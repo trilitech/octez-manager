@@ -8,53 +8,23 @@
 open Octez_manager_lib
 module Rpc_m = Rpc_metrics
 module Rpc = Rpc_client
-module Bg = Background_runner
-
-let submit_blocking_ref = ref Bg.submit_blocking
 
 let now_ref = ref Unix.gettimeofday
-
-let bg_inflight = ref 0
-
-let bg_inflight_cap = ref 4
-
-let bg_lock = Mutex.create ()
 
 (* Polling cadence *)
 let boot_pending_interval = 6.0
 
 let boot_ok_interval = 10.0
 
-(* Enforce a global pacing so different nodes do not fire at the exact same
-  moment. *)
-let min_spacing = 1.0
-
 let last_boot_at : (string, float) Hashtbl.t = Hashtbl.create 17
 
 let last_boot_state : (string, bool option) Hashtbl.t = Hashtbl.create 17
 
-let last_global_rpc = ref 0.0
-
 let head_monitors : (string, Rpc_client.monitor_handle) Hashtbl.t =
   Hashtbl.create 17
 
-let schedule (f : unit -> unit) : bool =
-  let allowed =
-    Mutex.lock bg_lock ;
-    let allowed = !bg_inflight < !bg_inflight_cap in
-    if allowed then incr bg_inflight ;
-    Mutex.unlock bg_lock ;
-    allowed
-  in
-  if allowed then (
-    !submit_blocking_ref
-      ~on_complete:(fun () ->
-        Mutex.lock bg_lock ;
-        decr bg_inflight ;
-        Mutex.unlock bg_lock)
-      (fun () -> try f () with _ -> ()) ;
-    true)
-  else false
+(** Worker queue for processing RPC requests one at a time with dedup *)
+let worker : unit Worker_queue.t = Worker_queue.create ~name:"rpc" ()
 
 let poll_boot (svc : Service.t) now =
   let boot = Rpc.rpc_is_bootstrapped svc in
@@ -192,75 +162,59 @@ let poll_interval instance =
   | Some true -> boot_ok_interval
   | _ -> boot_pending_interval
 
-let due_polls now nodes =
-  nodes
-  |> List.filter (fun (svc : Service.t) ->
-      match Hashtbl.find_opt last_boot_at svc.Service.instance with
-      | None -> true
-      | Some last -> now -. last >= poll_interval svc.Service.instance)
+let is_due_for_poll now (svc : Service.t) =
+  match Hashtbl.find_opt last_boot_at svc.Service.instance with
+  | None -> true
+  | Some last -> now -. last >= poll_interval svc.Service.instance
 
 let poll_boot_ref = ref poll_boot
 
-let dispatch polls =
-  let rec loop = function
-    | [] -> ()
-    | svc :: rest ->
-        let now = !now_ref () in
-        let since_last = now -. !last_global_rpc in
-        if since_last < min_spacing then loop rest
-        else
-          let submitted = schedule (fun () -> !poll_boot_ref svc now) in
-          if submitted then (
-            Hashtbl.replace last_boot_at svc.Service.instance now ;
-            last_global_rpc := now) ;
-          loop rest
-  in
-  loop polls
+(** Submit a poll request to the worker queue *)
+let submit_poll (svc : Service.t) =
+  let key = Printf.sprintf "rpc-poll:%s" svc.Service.instance in
+  let now = !now_ref () in
+  Worker_queue.submit_unit worker ~key ~work:(fun () ->
+      try
+        !poll_boot_ref svc now ;
+        Hashtbl.replace last_boot_at svc.Service.instance (!now_ref ())
+      with _ -> ())
 
 let tick () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Service_manager_capability.key
-  with
-  | Some cap ->
-      let module SM =
-        (val (cap : Manager_interfaces.Service_manager_capability.t))
-      in
-      let nodes = match SM.list () with Ok l -> l | Error _ -> [] in
-      let nodes =
-        nodes
+  let nodes =
+    match
+      Miaou_interfaces.Capability.get
+        Manager_interfaces.Service_manager_capability.key
+    with
+    | Some cap ->
+        let module SM =
+          (val (cap : Manager_interfaces.Service_manager_capability.t))
+        in
+        (match SM.list () with Ok l -> l | Error _ -> [])
         |> List.filter (fun (svc : Service.t) -> String.equal svc.role "node")
-      in
-      let now = !now_ref () in
-      List.iter (fun (svc : Service.t) -> start_head_monitor svc) nodes ;
-      dispatch (due_polls now nodes)
-  | None ->
-      let nodes =
+    | None ->
         Data.load_service_states ()
         |> List.map (fun st -> st.Data.Service_state.service)
         |> List.filter (fun (svc : Service.t) -> String.equal svc.role "node")
-      in
-      let now = !now_ref () in
-      List.iter (fun (svc : Service.t) -> start_head_monitor svc) nodes ;
-      List.iter
-        (fun svc ->
-          let submitted = schedule (fun () -> !poll_boot_ref svc now) in
-          if submitted then (
-            Hashtbl.replace last_boot_at svc.Service.instance now ;
-            last_global_rpc := now))
-        nodes
+  in
+  let now = !now_ref () in
+  (* Start head monitors for all nodes *)
+  List.iter (fun (svc : Service.t) -> start_head_monitor svc) nodes ;
+  (* Submit poll requests for nodes that are due *)
+  List.iter (fun svc -> if is_due_for_poll now svc then submit_poll svc) nodes
 
 let started = ref false
 
 let start () =
   if not !started then (
     started := true ;
-    (* Use dedicated domain instead of blocking a Background_runner worker *)
+    (* Start the worker that processes RPC requests *)
+    Worker_queue.start worker ;
+    (* Spawn scheduler domain that submits poll requests *)
     ignore
       (Domain.spawn (fun () ->
            (* Brief delay to let UI initialize *)
            Unix.sleepf 0.2 ;
-           (* Simple polling loop *)
+           (* Submit poll requests periodically *)
            while true do
              Metrics.record_scheduler_tick ~scheduler:"rpc" tick ;
              Unix.sleepf 1.0
@@ -271,22 +225,16 @@ let stop_all_monitors () =
   Hashtbl.iter (fun _ handle -> handle.Rpc_client.stop ()) head_monitors ;
   Hashtbl.clear head_monitors
 
+(** Get worker queue stats *)
+let get_worker_stats () = Worker_queue.get_stats worker
+
 module For_tests = struct
   let reset_state () =
     stop_all_monitors () ;
-    bg_inflight := 0 ;
     Hashtbl.reset last_boot_at ;
     Hashtbl.reset last_boot_state ;
-    last_global_rpc := 0.0 ;
-    bg_inflight_cap := 4 ;
     now_ref := Unix.gettimeofday ;
-    submit_blocking_ref := Bg.submit_blocking ;
     poll_boot_ref := poll_boot
-
-  let with_submit_blocking stub f =
-    let original = !submit_blocking_ref in
-    submit_blocking_ref := stub ;
-    Fun.protect ~finally:(fun () -> submit_blocking_ref := original) f
 
   let with_now now f =
     let original = !now_ref in
@@ -297,10 +245,4 @@ module For_tests = struct
     let original = !poll_boot_ref in
     poll_boot_ref := stub ;
     Fun.protect ~finally:(fun () -> poll_boot_ref := original) f
-
-  let set_bg_cap n = bg_inflight_cap := n
-
-  let set_last_global_rpc t = last_global_rpc := t
-
-  let dispatch = dispatch
 end
