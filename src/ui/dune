@@ -8,7 +8,7 @@
   miaou-core.lib
   miaou-core.internals
   miaou-core.widgets.display
-  miaou-driver-term.driver
+  miaou-runner.tui
   lambda-term
   eio
   eio_main)

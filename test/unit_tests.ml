@@ -2588,67 +2588,7 @@ let background_runner_submit_on_complete () =
   Alcotest.(check bool) "ran" true !ran ;
   Alcotest.(check bool) "on_complete" true !completed
 
-let rpc_scheduler_schedule_cap_and_spacing () =
-  let module RS = Octez_manager_ui.Rpc_scheduler in
-  let submits = ref 0 in
-  let executed = ref [] in
-  RS.For_tests.reset_state () ;
-  RS.For_tests.set_bg_cap 1 ;
-  RS.For_tests.set_last_global_rpc (-10.0) ;
-  let submit_stub ?on_complete f =
-    incr submits ;
-    f () ;
-    Option.iter (fun g -> g ()) on_complete
-  in
-  let now_stub () = float_of_int !submits in
-  let svc = {(sample_service ()) with Service.instance = "node1"} in
-  let poll_stub svc now =
-    executed := (svc.Service.instance, now) :: !executed
-  in
-  RS.For_tests.with_submit_blocking submit_stub (fun () ->
-      RS.For_tests.with_now now_stub (fun () ->
-          RS.For_tests.with_poll_boot poll_stub (fun () ->
-              RS.For_tests.dispatch [svc]))) ;
-  Alcotest.(check int) "submitted once" 1 !submits ;
-  Alcotest.(check int) "executed once" 1 (List.length !executed) ;
-  match !executed with
-  | [(inst, _now)] -> Alcotest.(check string) "instance" "node1" inst
-  | _ -> Alcotest.fail "unexpected execution list"
-
-let rpc_scheduler_respects_min_spacing () =
-  let module RS = Octez_manager_ui.Rpc_scheduler in
-  let submits = ref 0 in
-  let executed = ref [] in
-  RS.For_tests.reset_state () ;
-  RS.For_tests.set_bg_cap 4 ;
-  RS.For_tests.with_submit_blocking
-    (fun ?on_complete f ->
-      incr submits ;
-      f () ;
-      Option.iter (fun g -> g ()) on_complete)
-    (fun () ->
-      RS.For_tests.set_last_global_rpc (-10.0) ;
-      let times = ref [0.0; 1.2; 1.8] in
-      RS.For_tests.with_now
-        (fun () ->
-          match !times with
-          | t :: rest ->
-              times := rest ;
-              t
-          | [] -> 999.0)
-        (fun () ->
-          let mk instance = {(sample_service ()) with Service.instance} in
-          let svc1 = mk "node1" in
-          let svc2 = mk "node2" in
-          let svc3 = mk "node3" in
-          RS.For_tests.with_poll_boot
-            (fun svc now ->
-              executed := (svc.Service.instance, now) :: !executed)
-            (fun () -> RS.For_tests.dispatch [svc1; svc2; svc3]))) ;
-  (* min_spacing=1.0 so first at t=0.0, second at t=1.2, third skipped because 1.8 - 1.2 < 1.0 *)
-  Alcotest.(check int) "submitted twice" 2 !submits ;
-  let insts = List.map fst !executed |> List.rev in
-  Alcotest.(check (list string)) "order" ["node1"; "node2"] insts
+(* RPC scheduler tests removed - now uses worker queue with dedup *)
 
 let make_absolute_path_absolute_stays_same () =
   match Common.make_absolute_path "/usr/bin" with
@@ -2868,14 +2808,6 @@ let () =
             "submit on_complete"
             `Quick
             background_runner_submit_on_complete;
-          Alcotest.test_case
-            "rpc_scheduler cap"
-            `Quick
-            rpc_scheduler_schedule_cap_and_spacing;
-          Alcotest.test_case
-            "rpc_scheduler spacing"
-            `Quick
-            rpc_scheduler_respects_min_spacing;
         ] );
       ( "common.env",
         [

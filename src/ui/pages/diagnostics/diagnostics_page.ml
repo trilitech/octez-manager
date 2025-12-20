@@ -405,6 +405,51 @@ let view s ~focus:_ ~size =
                  snap.count))
           scheduler_snapshots ;
 
+      (* Worker Queue Stats Section *)
+      add "" ;
+      add (Widgets.fg 12 (Widgets.bold "━━━ Worker Queue Stats ━━━")) ;
+      add "" ;
+      let format_stats (stats : Worker_queue.stats) =
+        let dedup_pct =
+          if stats.requests_total > 0 then
+            100.0
+            *. float_of_int stats.requests_deduped
+            /. float_of_int stats.requests_total
+          else 0.0
+        in
+        let color =
+          if stats.p90_ms > 100. then 9 (* red if p90 > 100ms *)
+          else if stats.p90_ms > 50. then 11 (* yellow if p90 > 50ms *)
+          else 10 (* green *)
+        in
+        add
+          (Printf.sprintf
+             "  %s %-16s  %s reqs:%d dedup:%d(%.0f%%)  p50:%.1fms p90:%.1fms \
+              p95:%.1fms p99:%.1fms"
+             (Widgets.fg color "●")
+             stats.name
+             (Widgets.dim "|")
+             stats.requests_total
+             stats.requests_deduped
+             dedup_pct
+             stats.p50_ms
+             stats.p90_ms
+             stats.p95_ms
+             stats.p99_ms) ;
+        (* Show top deduped keys if any *)
+        let top_keys = List.filteri (fun i _ -> i < 5) stats.deduped_by_key in
+        List.iter
+          (fun (kd : Worker_queue.key_dedup) ->
+            add
+              (Printf.sprintf
+                 "      └─ %s %s"
+                 (Widgets.dim (Printf.sprintf "%5d×" kd.count))
+                 kd.key))
+          top_keys
+      in
+      format_stats (System_metrics_scheduler.get_worker_stats ()) ;
+      format_stats (Rpc_scheduler.get_worker_stats ()) ;
+
       add "" ;
       add (Widgets.fg 14 (Widgets.bold "━━━ Metrics Server Configuration ━━━")) ;
       add "" ;

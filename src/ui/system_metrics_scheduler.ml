@@ -307,76 +307,64 @@ let get_disk_size ~role ~instance =
       | None -> None
       | Some state -> state.data_dir_size)
 
-(** Tick - poll all node, baker, and dal instances *)
-let tick () =
-  let states = Data.load_service_states () in
-  (* Poll nodes *)
-  let nodes =
-    states
-    |> List.filter (fun (st : Data.Service_state.t) ->
-        st.service.Service.role = "node")
-  in
-  List.iter
-    (fun (st : Data.Service_state.t) ->
-      let svc = st.service in
-      let binary = Filename.concat svc.Service.app_bin_dir "octez-node" in
-      let data_dir = svc.Service.data_dir in
-      try
-        poll
-          ~role:svc.Service.role
-          ~instance:svc.Service.instance
-          ~binary
-          ~data_dir
-      with _ -> ())
-    nodes ;
-  (* Poll bakers *)
-  let bakers =
-    states
-    |> List.filter (fun (st : Data.Service_state.t) ->
-        st.service.Service.role = "baker")
-  in
-  List.iter
-    (fun (st : Data.Service_state.t) ->
-      let svc = st.service in
-      let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
-      try
-        poll
-          ~role:svc.Service.role
-          ~instance:svc.Service.instance
-          ~binary
-          ~data_dir:""
-      with _ -> ())
-    bakers ;
-  (* Poll DAL nodes *)
-  let dal_nodes =
-    states
-    |> List.filter (fun (st : Data.Service_state.t) ->
-        st.service.Service.role = "dal-node")
-  in
-  List.iter
-    (fun (st : Data.Service_state.t) ->
-      let svc = st.service in
-      let binary = Filename.concat svc.Service.app_bin_dir "octez-dal-node" in
-      let data_dir = svc.Service.data_dir in
-      (try
-         poll
-           ~role:svc.Service.role
-           ~instance:svc.Service.instance
-           ~binary
-           ~data_dir
-       with _ -> ()) ;
-      (* Also poll DAL health *)
-      let rpc_endpoint =
-        if String.starts_with ~prefix:"http" svc.Service.rpc_addr then
-          svc.Service.rpc_addr
-        else "http://" ^ svc.Service.rpc_addr
-      in
+(** Worker queue for processing poll requests one at a time with dedup *)
+let worker : unit Worker_queue.t = Worker_queue.create ~name:"system_metrics" ()
+
+(** Submit a poll request to the worker queue *)
+let submit_poll ~role ~instance ~binary ~data_dir =
+  let key = Printf.sprintf "poll:%s/%s" role instance in
+  Worker_queue.submit_unit worker ~key ~work:(fun () ->
+      try poll ~role ~instance ~binary ~data_dir with _ -> ())
+
+(** Submit a DAL health check to the worker queue *)
+let submit_dal_health ~instance ~rpc_endpoint =
+  let key = Printf.sprintf "dal-health:%s" instance in
+  Worker_queue.submit_unit worker ~key ~work:(fun () ->
       try
         match Dal_health.fetch ~rpc_endpoint with
-        | Some health -> Dal_health.set ~instance:svc.Service.instance health
+        | Some health -> Dal_health.set ~instance health
         | None -> ()
       with _ -> ())
-    dal_nodes
+
+(** Tick - submit poll requests for all instances *)
+let tick () =
+  let states = Data.load_service_states () in
+  (* Submit poll requests for nodes *)
+  states
+  |> List.iter (fun (st : Data.Service_state.t) ->
+      let svc = st.service in
+      match svc.Service.role with
+      | "node" ->
+          let binary = Filename.concat svc.Service.app_bin_dir "octez-node" in
+          submit_poll
+            ~role:svc.Service.role
+            ~instance:svc.Service.instance
+            ~binary
+            ~data_dir:svc.Service.data_dir
+      | "baker" ->
+          let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
+          submit_poll
+            ~role:svc.Service.role
+            ~instance:svc.Service.instance
+            ~binary
+            ~data_dir:""
+      | "dal-node" ->
+          let binary =
+            Filename.concat svc.Service.app_bin_dir "octez-dal-node"
+          in
+          submit_poll
+            ~role:svc.Service.role
+            ~instance:svc.Service.instance
+            ~binary
+            ~data_dir:svc.Service.data_dir ;
+          (* Also submit DAL health check *)
+          let rpc_endpoint =
+            if String.starts_with ~prefix:"http" svc.Service.rpc_addr then
+              svc.Service.rpc_addr
+            else "http://" ^ svc.Service.rpc_addr
+          in
+          submit_dal_health ~instance:svc.Service.instance ~rpc_endpoint
+      | _ -> ())
 
 let started = ref false
 
@@ -527,14 +515,16 @@ let () = check_version_toast_ref := check_version_toast_for
 let start () =
   if not !started then (
     started := true ;
-    (* Spawn dedicated domain for metrics polling - no Eio needed for simple I/O *)
+    (* Start the worker that processes poll requests *)
+    Worker_queue.start worker ;
+    (* Spawn scheduler domain that submits poll requests *)
     ignore
       (Domain.spawn (fun () ->
            (* Brief delay to let main UI initialize *)
            Unix.sleepf 0.2 ;
            (* Fetch latest version first *)
            (try fetch_latest_version () with _ -> ()) ;
-           (* Simple polling loop *)
+           (* Submit poll requests periodically *)
            while true do
              Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick ;
              Unix.sleepf 0.5
@@ -542,3 +532,6 @@ let start () =
 
 (** Clear all state *)
 let clear () = with_lock (fun () -> Hashtbl.clear table)
+
+(** Get worker queue stats *)
+let get_worker_stats () = Worker_queue.get_stats worker
