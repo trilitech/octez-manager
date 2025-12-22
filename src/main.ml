@@ -495,8 +495,7 @@ let install_node_cmd =
   in
   let app_bin_dir =
     let doc =
-      "Directory containing Octez binaries (defaults to the directory holding \
-       octez-node found in $PATH)."
+      {|Directory containing Octez binaries (defaults to the directory holding octez-node found in \$PATH).|}
     in
     Arg.(value & opt (some string) None & info ["app-bin-dir"] ~doc ~docv:"DIR")
   in
