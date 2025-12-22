@@ -499,7 +499,7 @@ let install_node_cmd =
     Arg.(value & opt (some string) None & info ["app-bin-dir"] ~doc ~docv:"DIR")
   in
   let extra_args =
-    let doc = "Extra --flag passed to octez-node." in
+    let doc = "Additional arguments appended to the node command." in
     Arg.(value & opt_all string [] & info ["extra-arg"] ~doc ~docv:"ARG")
   in
   let snapshot_flag =
@@ -870,7 +870,10 @@ let install_accuser_cmd =
   let extra_args =
     Arg.(
       value & opt_all string []
-      & info ["extra-arg"] ~doc:"Additional octez-accuser arguments" ~docv:"ARG")
+      & info
+          ["extra-arg"]
+          ~doc:"Additional arguments appended to the accuser command."
+          ~docv:"ARG")
   in
   let default_user =
     if Common.is_root () then "octez"
@@ -1133,7 +1136,10 @@ let install_dal_node_cmd =
   let extra_args =
     Arg.(
       value & opt_all string []
-      & info ["extra-arg"] ~doc:"Additional dal-node arguments" ~docv:"ARG")
+      & info
+          ["extra-arg"]
+          ~doc:"Additional arguments appended to the dal-node command."
+          ~docv:"ARG")
   in
   let default_user =
     if Common.is_root () then "octez"
