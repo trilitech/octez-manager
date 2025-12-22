@@ -661,7 +661,7 @@ let install_baker_cmd =
   in
   let liquidity_baking_vote =
     let doc =
-      "Liquidity baking toggle vote (on, off, or pass). Defaults to 'pass'."
+      "Liquidity baking toggle vote (on, off or pass). Defaults to 'pass'."
     in
     Arg.(
       value
