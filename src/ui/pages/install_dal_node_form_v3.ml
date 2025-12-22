@@ -139,17 +139,9 @@ let spec =
                   let addr =
                     String.trim n.Data.Service_state.service.Service.rpc_addr
                   in
-                  if
-                    String.starts_with
-                      ~prefix:"http://"
-                      (String.lowercase_ascii addr)
-                    || String.starts_with
-                         ~prefix:"https://"
-                         (String.lowercase_ascii addr)
-                  then addr
-                  else "http://" ^ addr
+                  Installer.endpoint_of_rpc addr
               | None -> "http://127.0.0.1:8732")
-          | `Endpoint ep -> ep
+          | `Endpoint ep -> Installer.endpoint_of_rpc ep
           | `None -> "http://127.0.0.1:8732"
         in
 
