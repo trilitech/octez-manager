@@ -1048,12 +1048,35 @@ let remove_service ~delete_data_dir ~instance =
       let* services = Service_registry.list () in
       Systemd.sync_logrotate (logrotate_specs_of services)
 
-let purge_service ~instance =
+let purge_service ~prompt_yes_no ~instance =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
       let* () = remove_service ~delete_data_dir:true ~instance in
+      let* () =
+        let is_baker = svc.role = "baker" in
+        let is_accuser = svc.role = "accuser" in
+        if is_baker || is_accuser then
+          let env =
+            match Node_env.read ~inst:svc.instance with
+            | Ok pairs -> pairs
+            | Error _ -> []
+          in
+          let base_dir =
+            List.assoc
+              (if is_baker then "OCTEZ_BAKER_BASE_DIR"
+               else "OCTEZ_CLIENT_BASE_DIR")
+              env
+          in
+          let remove_base_dir =
+            prompt_yes_no
+              (Format.sprintf "Purge base-dir %S?" base_dir)
+              ~default:false
+          in
+          if remove_base_dir then Common.remove_tree base_dir else Ok ()
+        else Ok ()
+      in
       (* Also remove per-instance env files under XDG_CONFIG_HOME or /etc when purging *)
       let env_dir =
         Filename.concat (Common.env_instances_base_dir ()) instance

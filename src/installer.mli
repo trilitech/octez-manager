@@ -48,7 +48,10 @@ val restart_service : instance:string -> (unit, [`Msg of string]) result
 val remove_service :
   delete_data_dir:bool -> instance:string -> (unit, [`Msg of string]) result
 
-val purge_service : instance:string -> (unit, [`Msg of string]) result
+val purge_service :
+  prompt_yes_no:(string -> default:bool -> bool) ->
+  instance:string ->
+  (unit, [`Msg of string]) result
 
 val list_services : unit -> (Service.t list, [`Msg of string]) result
 

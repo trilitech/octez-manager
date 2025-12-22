@@ -1348,7 +1348,13 @@ let instance_term =
         | Remove ->
             run_result
               (Installer.remove_service ~delete_data_dir ~instance:inst)
-        | Purge -> run_result (Installer.purge_service ~instance:inst)
+        | Purge ->
+            run_result
+              (Installer.purge_service
+                 ~prompt_yes_no:
+                   (if is_interactive () then prompt_yes_no
+                    else fun _ ~default:_ -> false)
+                 ~instance:inst)
         | Refresh_snapshot ->
             run_result
               (Installer.refresh_instance_from_snapshot
@@ -1468,7 +1474,13 @@ let purge_all_cmd =
                 let instance = svc.S.instance in
                 let role = svc.S.role in
                 Format.printf "Purging instance '%s' (%s)...@." instance role ;
-                match Installer.purge_service ~instance with
+                match
+                  Installer.purge_service
+                    ~prompt_yes_no:
+                      (if is_interactive () then prompt_yes_no
+                       else fun _ ~default:_ -> false)
+                    ~instance
+                with
                 | Ok () ->
                     Format.printf "  ✓ Successfully purged '%s'@." instance
                 | Error (`Msg msg) ->
