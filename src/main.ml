@@ -105,9 +105,7 @@ let print_service_details svc =
       Format.printf "Base dir      : %s@." base_dir ;
       print_node_endpoint ()
   | "dal-node" | "dal" ->
-      let client_base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
       let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
-      Format.printf "Client dir    : %s@." client_base_dir ;
       Format.printf "DAL data dir  : %s@." dal_data_dir ;
       print_node_endpoint () ;
       if svc.rpc_addr <> "" then
@@ -1210,20 +1208,6 @@ let install_dal_node_cmd =
                 match maybe_network with
                 | Error (`Msg msg) -> cmdliner_error msg
                 | Ok network -> (
-                    let service_args =
-                      [
-                        "run";
-                        "--data-dir";
-                        data_dir;
-                        "--rpc-addr";
-                        rpc_addr;
-                        "--net-addr";
-                        net_addr;
-                        "--endpoint";
-                        node_endpoint;
-                      ]
-                      @ extra_args
-                    in
                     let req : daemon_request =
                       {
                         role = "dal-node";
@@ -1236,8 +1220,14 @@ let install_dal_node_cmd =
                         service_user;
                         app_bin_dir;
                         logging_mode;
-                        service_args;
-                        extra_env = [];
+                        service_args = extra_args;
+                        extra_env =
+                          [
+                            ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+                            ("OCTEZ_DAL_DATA_DIR", data_dir);
+                            ("OCTEZ_DAL_RPC_ADDR", rpc_addr);
+                            ("OCTEZ_DAL_NET_ADDR", net_addr);
+                          ];
                         extra_paths = [];
                         auto_enable = not no_enable;
                       }
