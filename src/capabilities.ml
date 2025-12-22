@@ -141,7 +141,8 @@ module Installer : Installer = struct
 
   let restart_service = Installer.restart_service
 
-  let purge_service = Installer.purge_service
+  let purge_service =
+    Installer.purge_service ~prompt_yes_no:(fun _ ~default:_ -> false)
 end
 
 let register () =
