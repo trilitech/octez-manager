@@ -462,8 +462,7 @@ let history_mode_conv : History_mode.t Cmdliner.Arg.conv =
 let install_node_cmd =
   let instance =
     let doc = "Instance name used for node.env and systemd units." in
-    Arg.(
-      value & opt (some string) None & info ["instance"; "i"] ~doc ~docv:"NAME")
+    Arg.(value & opt (some string) None & info ["instance"] ~doc ~docv:"NAME")
   in
   let network =
     let doc = "Chain network (default: mainnet)." in
@@ -627,8 +626,7 @@ let install_node_cmd =
 let install_baker_cmd =
   let instance =
     let doc = "Instance name for the baker systemd unit." in
-    Arg.(
-      value & opt (some string) None & info ["instance"; "i"] ~doc ~docv:"NAME")
+    Arg.(value & opt (some string) None & info ["instance"] ~doc ~docv:"NAME")
   in
   let node_instance =
     let doc =
@@ -1105,8 +1103,7 @@ let install_signer_cmd =
 let install_dal_node_cmd =
   let instance =
     let doc = "Instance name used for dal-node.env and systemd units." in
-    Arg.(
-      value & opt (some string) None & info ["instance"; "i"] ~doc ~docv:"NAME")
+    Arg.(value & opt (some string) None & info ["instance"] ~doc ~docv:"NAME")
   in
   let data_dir_opt =
     Arg.(
