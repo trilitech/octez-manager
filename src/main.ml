@@ -651,8 +651,8 @@ let install_baker_cmd =
   in
   let dal_endpoint =
     let doc =
-      "DAL node endpoint (e.g., http://localhost:10732). Use 'none' or \
-       'disabled' to opt-out with --without-dal flag. Defaults to 'none'."
+      "DAL node endpoint (e.g., http://localhost:10732). Use 'none' to opt-out \
+       with --without-dal flag. Defaults to 'none'."
     in
     Arg.(
       value
@@ -737,8 +737,7 @@ let install_baker_cmd =
         match normalize_opt_string dal_endpoint_opt with
         | Some ep ->
             let normalized = String.lowercase_ascii (String.trim ep) in
-            if normalized = "none" || normalized = "disabled" then
-              Ok Dal_disabled
+            if normalized = "none" then Ok Dal_disabled
             else Ok (Dal_endpoint ep)
         | None ->
             if is_interactive () then
