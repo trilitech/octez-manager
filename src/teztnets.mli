@@ -28,6 +28,9 @@ val list_networks :
 
 val fallback_pairs : (string * string) list
 
+val resolve_network_from_node_chain :
+  string -> (network_info, [> Rresult.R.msg]) result
+
 val resolve_network_for_octez_node :
   ?fetch:(unit -> (network_info list, Rresult.R.msg) result) ->
   string ->

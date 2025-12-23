@@ -7,6 +7,23 @@
 
 type bootstrap = Genesis | Snapshot of {src : string option}
 
+type resolved_data_dir_config = {
+  network : string;
+  history_mode : History_mode.t;
+  rpc_addr : string;
+  net_addr : string;
+}
+
+let pp_resolved_data_dir_config fmt {network; history_mode; rpc_addr; net_addr}
+    =
+  Format.fprintf
+    fmt
+    "Network: %s, History-mode: %s, Rpc-addr: %s, Net-addr: %s"
+    network
+    (History_mode.to_string history_mode)
+    rpc_addr
+    net_addr
+
 type node_request = {
   instance : string;
   network : string;

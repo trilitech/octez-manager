@@ -532,7 +532,14 @@ let install_node_cmd =
     let res =
       let ( let* ) = Result.bind in
       let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
-      let* instance =
+      let* data_dir_config =
+        match data_dir with
+        | None -> Ok None
+        | Some data_dir ->
+            let* r = Installer.resolve_from_data_dir data_dir in
+            Ok (Some r)
+      in
+      let instance () =
         match normalize_opt_string instance_opt with
         | Some inst -> Ok inst
         | None ->
@@ -540,75 +547,143 @@ let install_node_cmd =
               Ok (prompt_required_string "Instance name")
             else Error "Instance name is required in non-interactive mode"
       in
-      let* network =
-        match normalize_opt_string network_opt with
-        | Some net -> Ok net
-        | None ->
-            if is_interactive () then
-              match Teztnets.list_networks () with
-              | Ok infos ->
-                  let aliases =
-                    List.map (fun Teztnets.{alias; _} -> alias) infos
-                  in
-                  let rec loop () =
-                    match prompt_with_completion "Network" aliases with
-                    | Some sel -> sel
-                    | None ->
-                        prerr_endline "Please enter a network." ;
-                        loop ()
-                  in
-                  Ok (loop ())
-              | Error (`Msg err) -> Error err
-            else Ok "mainnet"
-      in
-      let history_mode =
-        match history_mode_opt with
-        | Some hm -> hm
-        | None -> prompt_history_mode History_mode.default
-      in
-      let snapshot_requested_initial =
-        snapshot_flag || Option.is_some snapshot_uri
-      in
-      let snapshot_requested =
-        if snapshot_requested_initial then true
-        else if is_interactive () then
-          prompt_yes_no
-            "Download and import a tzinit snapshot before starting?"
-            ~default:true
-        else false
-      in
-      let snapshot_uri = normalize_opt_string snapshot_uri in
-      let snapshot_requested =
-        snapshot_requested || Option.is_some snapshot_uri
-      in
-      let bootstrap =
-        if snapshot_requested then Snapshot {src = snapshot_uri} else Genesis
-      in
-      let req : node_request =
-        {
-          instance;
-          network;
-          history_mode;
-          data_dir;
-          rpc_addr;
-          net_addr;
-          service_user;
-          app_bin_dir;
-          extra_args;
-          auto_enable = not no_enable;
-          logging_mode;
-          bootstrap;
-          preserve_data = false;
-          snapshot_no_check;
-        }
-      in
-      match Installer.install_node req with
-      | Ok service ->
-          Format.printf "Installed %s (%s)\n" service.S.instance service.network ;
-          Ok ()
-      | Error (`Msg msg) -> Error msg
+      match data_dir_config with
+      | Some
+          (`Data_dir
+             {
+               network;
+               history_mode;
+               rpc_addr = config_rpc_addr;
+               net_addr = config_net_addr;
+             }) ->
+          let* instance = instance () in
+          let* () =
+            match (history_mode, history_mode_opt) with
+            | history_mode, Some history_mode'
+              when history_mode <> history_mode' ->
+                Error
+                  (Format.asprintf
+                     "History mode found in the configuration incompatible \
+                      with the arguments: %a <> %a"
+                     History_mode.pp
+                     history_mode
+                     History_mode.pp
+                     history_mode')
+            | _ -> Ok ()
+          in
+          let* () =
+            match (network, network_opt) with
+            | network, Some network' when network <> network' ->
+                Error
+                  (Format.asprintf
+                     "Network found in the configuration incompatible with the \
+                      arguments: %s <> %s"
+                     network
+                     network')
+            | _ -> Ok ()
+          in
+          let rpc_addr =
+            if rpc_addr <> "127.0.0.1:8732" then rpc_addr else config_rpc_addr
+          in
+          let net_addr =
+            if net_addr <> "0.0.0.0:9732" then net_addr else config_net_addr
+          in
+          let* () =
+            if snapshot_flag || Option.is_some snapshot_uri then
+              Error "Snapshot cannot be imported, the data-dir already exist"
+            else Ok ()
+          in
+          let req : node_request =
+            {
+              instance;
+              network;
+              history_mode;
+              data_dir;
+              rpc_addr;
+              net_addr;
+              service_user;
+              app_bin_dir;
+              extra_args;
+              auto_enable = not no_enable;
+              logging_mode;
+              bootstrap = Genesis;
+              preserve_data = false;
+              snapshot_no_check;
+            }
+          in
+          Result.map_error (fun (`Msg s) -> s) @@ Installer.install_node req
+      | Some (`Path _) | None ->
+          let* instance = instance () in
+          let* network =
+            match normalize_opt_string network_opt with
+            | Some net -> Ok net
+            | None ->
+                if is_interactive () then
+                  match Teztnets.list_networks () with
+                  | Ok infos ->
+                      let aliases =
+                        List.map (fun Teztnets.{alias; _} -> alias) infos
+                      in
+                      let rec loop () =
+                        match prompt_with_completion "Network" aliases with
+                        | Some sel -> sel
+                        | None ->
+                            prerr_endline "Please enter a network." ;
+                            loop ()
+                      in
+                      Ok (loop ())
+                  | Error (`Msg err) -> Error err
+                else Ok "mainnet"
+          in
+          let history_mode =
+            match history_mode_opt with
+            | Some hm -> hm
+            | None -> prompt_history_mode History_mode.default
+          in
+          let snapshot_requested_initial =
+            snapshot_flag || Option.is_some snapshot_uri
+          in
+          let snapshot_requested =
+            if snapshot_requested_initial then true
+            else if is_interactive () then
+              prompt_yes_no
+                "Download and import a tzinit snapshot before starting?"
+                ~default:true
+            else false
+          in
+          let snapshot_uri = normalize_opt_string snapshot_uri in
+          let snapshot_requested =
+            snapshot_requested || Option.is_some snapshot_uri
+          in
+          let bootstrap =
+            if snapshot_requested then Snapshot {src = snapshot_uri}
+            else Genesis
+          in
+          let req : node_request =
+            {
+              instance;
+              network;
+              history_mode;
+              data_dir;
+              rpc_addr;
+              net_addr;
+              service_user;
+              app_bin_dir;
+              extra_args;
+              auto_enable = not no_enable;
+              logging_mode;
+              bootstrap;
+              preserve_data = false;
+              snapshot_no_check;
+            }
+          in
+          Result.map_error (fun (`Msg s) -> s) @@ Installer.install_node req
     in
-    match res with Ok () -> `Ok () | Error msg -> cmdliner_error msg
+    match res with
+    | Ok service ->
+        Format.printf "Installed %s (%s)\n" service.S.instance service.network ;
+        `Ok ()
+    | Error msg -> cmdliner_error msg
   in
   let term =
     Term.(
