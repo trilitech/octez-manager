@@ -554,6 +554,58 @@ let validate_instance_name ~instance =
   let* () = validate_instance_name_chars ~instance in
   validate_instance_name_unique ~instance
 
+let resolve_from_data_dir data_dir =
+  let ( let* ) = Result.bind in
+  let config_path = Filename.concat data_dir "config.json" in
+  if not (Sys.file_exists config_path) then Ok (`Path data_dir)
+  else
+    let json = Yojson.Safe.from_file config_path in
+    let open Yojson.Safe.Util in
+    let fail field =
+      Error (Format.sprintf "Cannot read %S from %S" field config_path)
+    in
+    let* network =
+      try
+        match member "network" json |> member "chain_name" with
+        | `String s ->
+            let* network =
+              Result.map_error (fun (`Msg s) -> s)
+              @@ Teztnets.resolve_network_from_node_chain s
+            in
+            Ok network.human_name
+        | _ -> fail ".network.chain_name"
+      with _ -> Ok "mainnet"
+    in
+    let* history_mode =
+      try
+        match member "shell" json |> member "history_mode" with
+        | `String s ->
+            Result.map_error (fun (`Msg s) -> s) @@ History_mode.of_string s
+        | `Assoc [("full", _)] -> Ok History_mode.Full
+        | `Assoc [("rolling", _)] -> Ok History_mode.Rolling
+        | `Assoc [("archive", _)] -> Ok History_mode.Archive
+        | _ -> fail ".p2p.shell.history_mode"
+      with _ -> Ok History_mode.default
+    in
+    let* rpc_addr =
+      try
+        match member "rpc" json |> member "listen-addrs" with
+        | `List [`String s] -> Ok s
+        | `List _ ->
+            Error
+              (Format.sprintf
+                 "Multiple rpc addresses listed in %S are not supported"
+                 config_path)
+        | _ -> Ok "127.0.0.1:8732"
+      with _ -> Ok "127.0.0.1:8732"
+    in
+    let net_addr =
+      match member "p2p" json |> member "listen-addr" with
+      | `String s -> s
+      | _ -> "0.0.0.0:9732"
+    in
+    Ok (`Data_dir {network; history_mode; rpc_addr; net_addr})
+
 let install_node (request : node_request) =
   let* () = validate_instance_name ~instance:request.instance in
   let* resolved_network =

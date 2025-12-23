@@ -11,6 +11,10 @@ open Installer_types
 
 val invalid_instance_name_chars_msg : string
 
+val resolve_from_data_dir :
+  string ->
+  ([`Path of string | `Data_dir of resolved_data_dir_config], string) result
+
 val install_node : node_request -> (Service.t, [`Msg of string]) result
 
 val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
