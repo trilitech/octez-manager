@@ -250,6 +250,16 @@ let resolve_network_for_octez_node :
               network)
     | Error (`Msg m) -> R.error_msg m
 
+let resolve_network_from_node_chain node_chain_name =
+  let ( let* ) = Result.bind in
+  let* networks = list_networks () in
+  try
+    Ok
+      (List.find (fun network -> network.chain_name = node_chain_name) networks)
+  with Not_found ->
+    Error
+      (`Msg (Format.sprintf "Node chain name is unknown: %S" node_chain_name))
+
 let resolve_octez_node_chain ~endpoint =
   let res =
     let ( let* ) = Result.bind in
@@ -268,15 +278,7 @@ let resolve_octez_node_chain ~endpoint =
           with exn -> Error (`Msg (Printexc.to_string exn)))
       | Error s -> Error s
     in
-    let* networks = list_networks () in
-    try
-      Ok
-        (List.find
-           (fun network -> network.chain_name = node_chain_name)
-           networks)
-    with Not_found ->
-      Error
-        (`Msg (Format.sprintf "Node chain name is unknown: %S" node_chain_name))
+    resolve_network_from_node_chain node_chain_name
   in
   match res with
   | Ok network -> Ok network.human_name
