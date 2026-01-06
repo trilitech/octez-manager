@@ -27,7 +27,7 @@ This document describes how to test the shell completion scripts for octez-manag
    ```zsh
    octez-manager instance mynode <TAB>
    ```
-   Should show instance actions (start, stop, restart, remove, purge, show, show-service, refresh-from-new-snapshot)
+   Should show instance actions (start, stop, restart, remove, purge, show, show-service)
 
 4. **Test value completion**:
    ```zsh
@@ -40,11 +40,6 @@ This document describes how to test the shell completion scripts for octez-manag
    ```
    Should show voting options (on, off, pass)
 
-5. **Test snapshots subcommand**:
-   ```zsh
-   octez-manager snapshots <TAB>
-   ```
-   Should show 'import' as the only subcommand
 
 ### Bash Basic Testing
 
@@ -64,7 +59,7 @@ This document describes how to test the shell completion scripts for octez-manag
    ```bash
    octez-manager instance mynode <TAB>
    ```
-   Should show instance actions (start, stop, restart, remove, purge, show, show-service, refresh-from-new-snapshot)
+   Should show instance actions (start, stop, restart, remove, purge, show, show-service)
 
 4. **Test value completion**:
    ```bash
@@ -76,12 +71,6 @@ This document describes how to test the shell completion scripts for octez-manag
    octez-manager install-baker --liquidity-baking-vote <TAB>
    ```
    Should show voting options (on, off, pass)
-
-5. **Test snapshots subcommand**:
-   ```bash
-   octez-manager snapshots <TAB>
-   ```
-   Should show 'import' as the only subcommand
 
 ### Syntax Validation
 

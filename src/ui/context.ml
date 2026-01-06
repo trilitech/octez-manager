@@ -68,14 +68,15 @@ let toast_error msg = push_toast Error msg
 
 let tick_toasts () =
   Mutex.lock toasts_lock ;
-  toasts := Miaou_widgets_layout.Toast_widget.tick !toasts ;
-  Mutex.unlock toasts_lock
+  Fun.protect
+    ~finally:(fun () -> Mutex.unlock toasts_lock)
+    (fun () -> toasts := Miaou_widgets_layout.Toast_widget.tick !toasts)
 
 let render_toasts ~cols =
   Mutex.lock toasts_lock ;
-  let rendered = Miaou_widgets_layout.Toast_widget.render !toasts ~cols in
-  Mutex.unlock toasts_lock ;
-  rendered
+  Fun.protect
+    ~finally:(fun () -> Mutex.unlock toasts_lock)
+    (fun () -> Miaou_widgets_layout.Toast_widget.render !toasts ~cols)
 
 (* Global spinner for loading states *)
 let spinner = ref (Miaou_widgets_layout.Spinner_widget.open_centered ())
