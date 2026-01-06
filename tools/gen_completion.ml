@@ -123,7 +123,7 @@ let render_zsh_options name (options : HP.option_entry list) =
   Buffer.add_string buf "  )\n\n" ;
   Buffer.contents buf
 
-let render_zsh ~commands ~instance_actions ~snapshot_commands ~options_map =
+let render_zsh ~commands ~instance_actions ~options_map =
   let sanitize_var s =
     let buf = Bytes.of_string s in
     for i = 0 to Bytes.length buf - 1 do
@@ -140,7 +140,6 @@ let render_zsh ~commands ~instance_actions ~snapshot_commands ~options_map =
   Buffer.add_string buf "_octez-manager() {\n" ;
   Buffer.add_string buf (render_zsh_list "commands" commands) ;
   Buffer.add_string buf (render_zsh_list "instance_actions" instance_actions) ;
-  Buffer.add_string buf (render_zsh_list "snapshot_commands" snapshot_commands) ;
   Buffer.add_string buf "  local -a history_modes\n" ;
   Buffer.add_string buf "  history_modes=(\n" ;
   Buffer.add_string buf "    'archive:Full archive mode'\n" ;
@@ -213,27 +212,6 @@ let render_zsh ~commands ~instance_actions ~snapshot_commands ~options_map =
     "            _describe -t actions 'instance actions' instance_actions\n" ;
   Buffer.add_string buf "          else\n" ;
   Buffer.add_string buf "            case $words[3] in\n" ;
-  Buffer.add_string buf "              refresh-from-new-snapshot)\n" ;
-  Buffer.add_string buf "                _arguments \\\n" ;
-  Buffer.add_string buf "                  --help[Show help information] \\\n" ;
-  Buffer.add_string
-    buf
-    "                  --snapshot-uri=[Snapshot URI]:uri:_files \\\n" ;
-  Buffer.add_string
-    buf
-    "                  --snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds \\\n" ;
-  Buffer.add_string
-    buf
-    "                  --snapshot-network=[Network]:network: \\\n" ;
-  Buffer.add_string
-    buf
-    "                  --snapshot-history-mode=[History \
-     mode]:mode:->history-modes \\\n" ;
-  Buffer.add_string
-    buf
-    "                  --snapshot-no-check[Skip validation during snapshot \
-     import] \\\n" ;
-  Buffer.add_string buf "                ;;\n" ;
   Buffer.add_string buf "              remove)\n" ;
   Buffer.add_string buf "                _arguments \\\n" ;
   Buffer.add_string buf "                  --help[Show help information] \\\n" ;
@@ -250,27 +228,9 @@ let render_zsh ~commands ~instance_actions ~snapshot_commands ~options_map =
   Buffer.add_string buf "            esac\n" ;
   Buffer.add_string buf "          fi\n" ;
   Buffer.add_string buf "          ;;\n" ;
-  Buffer.add_string buf "        snapshots)\n" ;
-  Buffer.add_string buf "          if (( CURRENT == 2 )); then\n" ;
-  Buffer.add_string
-    buf
-    "            _describe -t snapshot-commands 'snapshot commands' \
-     snapshot_commands\n" ;
-  Buffer.add_string buf "          else\n" ;
-  Buffer.add_string buf "            case $words[2] in\n" ;
-  Buffer.add_string buf "              import)\n" ;
-  Buffer.add_string buf "                _arguments \\\n" ;
-  Buffer.add_string
-    buf
-    ("                  $" ^ opts_var "snapshots_import" ^ "\n") ;
-  Buffer.add_string buf "                ;;\n" ;
-  Buffer.add_string buf "            esac\n" ;
-  Buffer.add_string buf "          fi\n" ;
-  Buffer.add_string buf "          ;;\n" ;
   String_map.iter
     (fun cmd _ ->
-      if cmd <> "instance" && cmd <> "snapshots" && cmd <> "snapshots_import"
-      then (
+      if cmd <> "instance" then (
         Buffer.add_string buf ("        " ^ cmd ^ ")\n") ;
         Buffer.add_string buf "          _arguments \\\n" ;
         Buffer.add_string buf ("            $" ^ opts_var cmd ^ "\n") ;
@@ -285,8 +245,7 @@ let render_zsh ~commands ~instance_actions ~snapshot_commands ~options_map =
   Buffer.add_string buf "fi\n" ;
   Buffer.contents buf
 
-let render_bash ~commands ~instance_actions ~snapshot_commands ~options_map
-    ~kinds =
+let render_bash ~commands ~instance_actions ~options_map ~kinds =
   let unique_list items =
     let seen = Hashtbl.create 32 in
     let add acc item =
@@ -333,11 +292,7 @@ let render_bash ~commands ~instance_actions ~snapshot_commands ~options_map
   Buffer.add_string
     buf
     ("  local instance_actions=\"" ^ String.concat " " instance_actions ^ "\"\n") ;
-  Buffer.add_string
-    buf
-    ("  local snapshot_commands=\""
-    ^ String.concat " " snapshot_commands
-    ^ "\"\n\n") ;
+
   Buffer.add_string buf "  local history_modes=\"archive full rolling\"\n" ;
   Buffer.add_string
     buf
@@ -447,12 +402,6 @@ let render_bash ~commands ~instance_actions ~snapshot_commands ~options_map
   Buffer.add_string buf "        case \"$action\" in\n" ;
   Buffer.add_string
     buf
-    "          refresh-from-new-snapshot)\n\
-    \            opts=\"--snapshot-uri --snapshot-kind --snapshot-network \
-     --snapshot-history-mode --snapshot-no-check --help\"\n\
-    \            ;;\n" ;
-  Buffer.add_string
-    buf
     "          remove)\n\
     \            opts=\"--delete-data-dir --help\"\n\
     \            ;;\n" ;
@@ -468,37 +417,9 @@ let render_bash ~commands ~instance_actions ~snapshot_commands ~options_map
     \      fi\n\
     \      return 0\n\
     \      ;;\n" ;
-  Buffer.add_string buf "    snapshots)\n" ;
-  Buffer.add_string buf "      if [[ $COMP_CWORD -eq 2 ]]; then\n" ;
-  Buffer.add_string
-    buf
-    "        COMPREPLY=( $(compgen -W \"$snapshot_commands --help\" -- \
-     \"$cur\") )\n\
-    \        return 0\n\
-    \      fi\n" ;
-  Buffer.add_string buf "      action=\"${COMP_WORDS[2]}\"\n" ;
-  Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
-  Buffer.add_string buf "        case \"$action\" in\n" ;
-  Buffer.add_string
-    buf
-    "          import)\n\
-    \            opts=\"--instance --snapshot-uri --snapshot-kind --network \
-     --history-mode --no-check --help\"\n\
-    \            ;;\n" ;
-  Buffer.add_string
-    buf
-    "          *)\n            opts=\"--help\"\n            ;;\n" ;
-  Buffer.add_string buf "        esac\n" ;
-  Buffer.add_string
-    buf
-    "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n\
-    \      fi\n\
-    \      return 0\n\
-    \      ;;\n" ;
   String_map.iter
     (fun cmd opts ->
-      if cmd <> "instance" && cmd <> "snapshots" && cmd <> "snapshots_import"
-      then (
+      if cmd <> "instance" then (
         Buffer.add_string buf ("    " ^ cmd ^ ")\n") ;
         Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
         Buffer.add_string
@@ -562,15 +483,7 @@ let () =
         (Ok String_map.empty)
         cmd_names
     in
-    let* snapshot_help = run_help binary ["snapshots"; "--help=plain"] in
-    let snapshot_commands = HP.parse_cmdliner_commands snapshot_help in
-    let* snapshots_import_opts = load_options binary ["snapshots"; "import"] in
-    let options_map =
-      options_by_cmd
-      |> String_map.add
-           "snapshots_import"
-           (dedupe_options snapshots_import_opts)
-    in
+    let options_map = options_by_cmd in
     let zsh_commands = List.map (fun c -> (c.HP.name, c.HP.doc)) cmds in
     let instance_actions =
       [
@@ -581,19 +494,10 @@ let () =
         ("purge", "Remove service and delete all data");
         ("show", "Display service configuration");
         ("show-service", "Display systemd unit and status");
-        ( "refresh-from-new-snapshot",
-          "Re-import a fresh snapshot for the service" );
       ]
     in
-    let snapshot_commands =
-      List.map (fun c -> (c.HP.name, c.HP.doc)) snapshot_commands
-    in
     let zsh =
-      render_zsh
-        ~commands:zsh_commands
-        ~instance_actions
-        ~snapshot_commands
-        ~options_map
+      render_zsh ~commands:zsh_commands ~instance_actions ~options_map
     in
     let bash_options_map =
       String_map.map
@@ -608,7 +512,6 @@ let () =
       render_bash
         ~commands:cmd_names
         ~instance_actions:(List.map fst instance_actions)
-        ~snapshot_commands:(List.map fst snapshot_commands)
         ~options_map:bash_options_map
         ~kinds
     in

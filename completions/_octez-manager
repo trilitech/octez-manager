@@ -10,13 +10,11 @@ _octez-manager() {
     'install-baker:Install an octez-baker service'
     'install-dal-node:Install an octez-dal-node service'
     'install-node:Install an octez-node systemd instance'
-    'install-signer:Install an octez-signer service'
     'instance:Manage existing Octez services.'
     'list:Show registered services'
     'list-available-networks:Show networks advertised on teztnets.com (with fallbacks).'
     'list-snapshots:List downloads published on snapshots.tzinit.org for a network.'
     'purge-all:Purge all registered instances. This removes each service, deletes data directories, log files, and (when run as root) drops service users that are no longer referenced by other services.'
-    'snapshots:Snapshot management helpers'
     'ui:Launch the Miaou-based interactive interface (experimental)'
   )
 
@@ -29,12 +27,6 @@ _octez-manager() {
     'purge:Remove service and delete all data'
     'show:Display service configuration'
     'show-service:Display systemd unit and status'
-    'refresh-from-new-snapshot:Re-import a fresh snapshot for the service'
-  )
-
-  local -a snapshot_commands
-  snapshot_commands=(
-    'import:Stop the node, (re)import a snapshot, and restart the service if it was running.'
   )
 
   local -a history_modes
@@ -70,12 +62,10 @@ _octez-manager() {
   opts_install_accuser=(
     '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
     '--base-dir[Accuser base directory]:DIR:_directories'
-    '--data-dir[State directory (defaults to a role-specific path)]:DIR:_directories'
-    '--endpoint[RPC endpoint to monitor]:URI:_urls'
-    '--extra-arg[Additional octez-accuser arguments]:ARG:'
+    '--extra-arg[Additional arguments appended to the accuser command.]:ARG:'
     '--instance[Accuser instance name]:NAME:'
-    '--network[Target Tezos network]:NET:'
     '--no-enable[Disable automatic enable --now]'
+    '--node-instance[Existing octez-manager node instance to reuse for endpoint; can also be a custom RPC endpoint]:NODE:'
     '--service-user[System user]:USER:_users'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
   )
@@ -84,12 +74,11 @@ _octez-manager() {
   opts_install_baker=(
     '--app-bin-dir[Directory containing Octez binaries.]:DIR:_directories'
     '--base-dir[Baker base directory for wallets (defaults to an instance-specific path).]:DIR:_directories'
-    '--dal-endpoint[DAL node endpoint (e.g., http://localhost:10732). Use '\''none'\'' or '\''disabled'\'' to opt-out with --without-dal flag. Defaults to '\''none'\''.]:ENDPOINT:_urls'
+    '--dal-endpoint[DAL node endpoint (e.g., http://localhost:10732). Use '\''none'\'' to opt-out with --without-dal flag. Defaults to '\''none'\''.]:ENDPOINT:_urls'
     '--delegate[Delegate key hash or alias passed as --delegate.]:KEY:'
     '--extra-arg[Additional arguments appended to the baker command.]:ARG:'
-    '-i[Instance name for the baker systemd unit.]:NAME:'
     '--instance[Instance name for the baker systemd unit.]:NAME:'
-    '--liquidity-baking-vote[Liquidity baking toggle vote (on, off, or pass). Defaults to '\''pass'\''.]:VOTE:->lb-votes'
+    '--liquidity-baking-vote[Liquidity baking toggle vote (on, off or pass). Defaults to '\''pass'\''.]:VOTE:->lb-votes'
     '--no-enable[Disable automatic systemctl enable --now]'
     '--node-instance[Existing octez-manager node instance to reuse for data-dir and network. Use '\''octez-manager list'\'' to see available node instances. It can also be a custom RPC endpoint for the baker to contact. Defaults to http://127.0.0.1:8732]:NODE:'
     '--service-user[System user owning the service]:USER:_users'
@@ -100,8 +89,7 @@ _octez-manager() {
   opts_install_dal_node=(
     '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
     '--data-dir[DAL node data directory]:DIR:_directories'
-    '--extra-arg[Additional dal-node arguments]:ARG:'
-    '-i[Instance name used for dal-node.env and systemd units.]:NAME:'
+    '--extra-arg[Additional arguments appended to the dal-node command.]:ARG:'
     '--instance[Instance name used for dal-node.env and systemd units.]:NAME:'
     '--net-addr[DAL node P2P address]:ADDR:'
     '--no-enable[Disable automatic enable --now]'
@@ -115,9 +103,8 @@ _octez-manager() {
   opts_install_node=(
     '--app-bin-dir[Directory containing Octez binaries (defaults to the directory holding octez-node found in $PATH).]:DIR:_directories'
     '--data-dir[Custom data directory (defaults to /var/lib/octez/<inst>).]:DIR:_directories'
-    '--extra-arg[Extra --flag passed to octez-node.]:ARG:'
+    '--extra-arg[Additional arguments appended to the node command.]:ARG:'
     '--history-mode[History mode to configure on octez-node (rolling|full|archive).]:MODE:->history-modes'
-    '-i[Instance name used for node.env and systemd units.]:NAME:'
     '--instance[Instance name used for node.env and systemd units.]:NAME:'
     '--net-addr[P2P address]:ADDR:'
     '--network[Chain network (default: mainnet).]:NET:'
@@ -125,36 +112,14 @@ _octez-manager() {
     '--rpc-addr[RPC address]:ADDR:'
     '--service-user[System user owning the service.]:USER:_users'
     '--snapshot[Bootstrap by importing a snapshot before enabling the node service.]'
-    '--snapshot-kind[Snapshot variant from snapshots.tzinit.org (rolling, full, full:50, ...).]:KIND:->snapshot-kinds'
     '--snapshot-no-check[Pass --no-check to octez-node snapshot import during bootstrap.]'
     '--snapshot-uri[Snapshot URI (path, file://, or http(s)) to import when --snapshot is set.]:URI:'
-    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
-  )
-
-  local -a opts_install_signer
-  opts_install_signer=(
-    '--address[Listening address for the socket signer]:ADDR:'
-    '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
-    '--authorize[Authorize NAME:PUBLIC_KEY (multiple allowed).]:SPEC:'
-    '--base-dir[Signer data directory]:DIR:_directories'
-    '--instance[Signer instance name]:NAME:'
-    '--network[Label stored in the registry]:NET:'
-    '--no-auth[Disable --require-authentication]'
-    '--no-enable[Disable automatic enable --now]'
-    '--password-file[Path to the password file passed to octez-signer]:FILE:_files'
-    '--port[TCP port for the signer]:PORT:'
-    '--service-user[System user]:USER:_users'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
   )
 
   local -a opts_instance
   opts_instance=(
     '--delete-data-dir[Also delete the recorded data directory when removing.]'
-    '--snapshot-history-mode[History-mode hint used when auto-selecting snapshot kinds during refresh.]:MODE:->history-modes'
-    '--snapshot-kind[Snapshot slug (rolling, full:50, ...) when refreshing from tzinit.]:KIND:->snapshot-kinds'
-    '--snapshot-network[Override the tzinit network slug/URL for refresh-from-new-snapshot.]:NET:'
-    '--snapshot-no-check[Pass --no-check to octez-node snapshot import during refresh-from-new-snapshot.]'
-    '--snapshot-uri[Snapshot URI used by the refresh-from-new-snapshot action.]:URI:'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
   )
 
@@ -178,22 +143,6 @@ _octez-manager() {
 
   local -a opts_purge_all
   opts_purge_all=(
-    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
-  )
-
-  local -a opts_snapshots
-  opts_snapshots=(
-    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
-  )
-
-  local -a opts_snapshots_import
-  opts_snapshots_import=(
-    '--history-mode[Override history mode when resolving --snapshot-kind]:MODE:->history-modes'
-    '--instance[Node instance to refresh]:NAME:'
-    '--network[Override the network alias/URL used to reach tzinit]:NET:'
-    '--no-check[Pass --no-check to octez-node snapshot import]'
-    '--snapshot-kind[Snapshot slug to fetch from tzinit (rolling, full, full50, ...)]:KIND:->snapshot-kinds'
-    '--snapshot-uri[Path or URL to a snapshot archive]:URI:_files'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
   )
 
@@ -249,15 +198,6 @@ _octez-manager() {
             _describe -t actions 'instance actions' instance_actions
           else
             case $words[3] in
-              refresh-from-new-snapshot)
-                _arguments \
-                  --help[Show help information] \
-                  --snapshot-uri=[Snapshot URI]:uri:_files \
-                  --snapshot-kind=[Snapshot kind]:kind:->snapshot-kinds \
-                  --snapshot-network=[Network]:network: \
-                  --snapshot-history-mode=[History mode]:mode:->history-modes \
-                  --snapshot-no-check[Skip validation during snapshot import] \
-                ;;
               remove)
                 _arguments \
                   --help[Show help information] \
@@ -266,18 +206,6 @@ _octez-manager() {
               start|stop|restart|purge|show|show-service)
                 _arguments \
                   --help[Show help information] \
-                ;;
-            esac
-          fi
-          ;;
-        snapshots)
-          if (( CURRENT == 2 )); then
-            _describe -t snapshot-commands 'snapshot commands' snapshot_commands
-          else
-            case $words[2] in
-              import)
-                _arguments \
-                  $opts_snapshots_import
                 ;;
             esac
           fi
@@ -301,10 +229,6 @@ _octez-manager() {
         install-node)
           _arguments \
             $opts_install_node
-          ;;
-        install-signer)
-          _arguments \
-            $opts_install_signer
           ;;
         list)
           _arguments \
