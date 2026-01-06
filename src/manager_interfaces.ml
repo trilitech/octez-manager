@@ -30,8 +30,6 @@ module type Package_manager = sig
   val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
 
   val install_baker : baker_request -> (Service.t, [`Msg of string]) result
-
-  val install_signer : signer_request -> (Service.t, [`Msg of string]) result
 end
 
 module Package_manager_capability = struct
@@ -49,9 +47,6 @@ module type Tezos_node_manager = sig
     (unit, [`Msg of string]) result
 
   val unschedule_refresh : instance:string -> unit
-
-  val generate_secret_key :
-    instance:string -> alias:string -> (unit, [`Msg of string]) result
 
   val import_snapshot_for_instance :
     instance:string ->
@@ -80,15 +75,7 @@ module Tezos_node_manager_capability = struct
     Miaou_interfaces.Capability.create ~name:"tezos_node_manager"
 end
 
-module type Tezos_client_manager = sig
-  val list_keys : instance:string -> (string, [`Msg of string]) result
-
-  val add_authorized_key :
-    instance:string ->
-    key:string ->
-    name:string option ->
-    (unit, [`Msg of string]) result
-end
+module type Tezos_client_manager = sig end
 
 module Tezos_client_manager_capability = struct
   type t = (module Tezos_client_manager)
