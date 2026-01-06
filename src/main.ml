@@ -446,9 +446,6 @@ let history_mode_opt_term =
     & opt (some (enum history_mode_choices)) None
     & info ["history-mode"] ~doc:history_mode_doc ~docv:"MODE")
 
-let history_mode_conv : History_mode.t Cmdliner.Arg.conv =
-  Arg.conv (History_mode.of_string, History_mode.pp)
-
 let install_node_cmd =
   let instance =
     let doc = "Instance name used for node.env and systemd units." in
@@ -1176,7 +1173,6 @@ type instance_action =
   | Purge
   | Show
   | Show_service
-  | Refresh_snapshot
 
 let instance_term =
   let instance =
@@ -1192,7 +1188,6 @@ let instance_term =
         ("purge", Purge);
         ("show", Show);
         ("show-service", Show_service);
-        ("refresh-from-new-snapshot", Refresh_snapshot);
       ]
     in
     Arg.(value & pos 1 (some (enum actions)) None & info [] ~docv:"ACTION")
@@ -1204,56 +1199,12 @@ let instance_term =
           ["delete-data-dir"]
           ~doc:"Also delete the recorded data directory when removing.")
   in
-  let snapshot_uri_override =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["snapshot-uri"]
-          ~doc:"Snapshot URI used by the refresh-from-new-snapshot action."
-          ~docv:"URI")
-  in
-  let snapshot_network_override =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["snapshot-network"]
-          ~doc:
-            "Override the tzinit network slug/URL for \
-             refresh-from-new-snapshot."
-          ~docv:"NET")
-  in
-
-  let snapshot_history_mode_override =
-    Arg.(
-      value
-      & opt (some history_mode_conv) None
-      & info
-          ["snapshot-history-mode"]
-          ~doc:
-            "History-mode hint used when auto-selecting snapshot kinds during \
-             refresh."
-          ~docv:"MODE")
-  in
-  let snapshot_no_check =
-    Arg.(
-      value & flag
-      & info
-          ["snapshot-no-check"]
-          ~doc:
-            "Pass --no-check to octez-node snapshot import during \
-             refresh-from-new-snapshot.")
-  in
-  let run instance action delete_data_dir snapshot_uri_override
-      snapshot_network_override snapshot_history_mode_override snapshot_no_check
-      =
+  let run instance action delete_data_dir =
     match (instance, action) with
     | None, _ -> `Help (`Pager, None)
     | Some _, None ->
         cmdliner_error
-          "ACTION required \
-           (start|stop|restart|remove|purge|show|show-service|refresh-from-new-snapshot)"
+          "ACTION required (start|stop|restart|remove|purge|show|show-service)"
     | Some inst, Some action -> (
         match action with
         | Start -> run_result (Installer.start_service ~instance:inst)
@@ -1269,15 +1220,6 @@ let instance_term =
                    (if is_interactive () then prompt_yes_no
                     else fun _ ~default:_ -> false)
                  ~instance:inst)
-        | Refresh_snapshot ->
-            run_result
-              (Installer.refresh_instance_from_snapshot
-                 ~instance:inst
-                 ?snapshot_uri:snapshot_uri_override
-                 ?network:snapshot_network_override
-                 ?history_mode:snapshot_history_mode_override
-                 ~no_check:snapshot_no_check
-                 ())
         | Show -> (
             match Service_registry.find ~instance:inst with
             | Ok (Some svc) ->
@@ -1332,11 +1274,7 @@ let instance_term =
                 in
                 `Ok ()))
   in
-  Term.(
-    ret
-      (const run $ instance $ action $ delete_data_dir $ snapshot_uri_override
-     $ snapshot_network_override $ snapshot_history_mode_override
-     $ snapshot_no_check))
+  Term.(ret (const run $ instance $ action $ delete_data_dir))
 
 let instance_cmd =
   let info = Cmd.info "instance" ~doc:"Manage existing Octez services." in
@@ -1567,74 +1505,6 @@ let list_snapshots_cmd =
   in
   Cmd.v info term
 
-let snapshots_import_cmd =
-  let instance =
-    Arg.(
-      required
-      & opt (some string) None
-      & info ["instance"] ~doc:"Node instance to refresh" ~docv:"NAME")
-  in
-  let snapshot_uri =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["snapshot-uri"]
-          ~doc:"Path or URL to a snapshot archive"
-          ~docv:"URI")
-  in
-  let network =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["network"]
-          ~doc:"Override the network alias/URL used to reach tzinit"
-          ~docv:"NET")
-  in
-  let history_mode =
-    Arg.(
-      value
-      & opt (some history_mode_conv) None
-      & info
-          ["history-mode"]
-          ~doc:"Override history mode when resolving --snapshot-kind"
-          ~docv:"MODE")
-  in
-  let no_check =
-    Arg.(
-      value & flag
-      & info ["no-check"] ~doc:"Pass --no-check to octez-node snapshot import")
-  in
-  let make instance snapshot_uri network history_mode no_check =
-    run_result
-      (Installer.import_snapshot_for_instance
-         ~instance
-         ?snapshot_uri
-         ?network
-         ?history_mode
-         ~no_check
-         ())
-  in
-  let term =
-    Term.(
-      ret
-        (const make $ instance $ snapshot_uri $ network $ history_mode
-       $ no_check))
-  in
-  let info =
-    Cmd.info
-      "import"
-      ~doc:
-        "Stop the node, (re)import a snapshot, and restart the service if it \
-         was running."
-  in
-  Cmd.v info term
-
-let snapshots_cmd =
-  let info = Cmd.info "snapshots" ~doc:"Snapshot management helpers" in
-  Cmd.group info [snapshots_import_cmd]
-
 let ui_cmd =
   let open Cmdliner in
   let term =
@@ -1693,7 +1563,6 @@ let root_cmd =
       cleanup_orphans_cmd;
       list_networks_cmd;
       list_snapshots_cmd;
-      snapshots_cmd;
       ui_cmd;
     ]
 

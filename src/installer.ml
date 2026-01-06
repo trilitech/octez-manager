@@ -222,16 +222,6 @@ let import_snapshot ~app_bin_dir ~data_dir ~snapshot_path ~no_check =
   in
   Common.run args
 
-let materialize_snapshot_plan ?progress ~plan () :
-    (snapshot_file option, R.msg) result =
-  match plan with
-  | No_snapshot -> Ok None
-  | Direct_snapshot {uri} ->
-      prepare_snapshot_source ?progress uri |> Result.map Option.some
-  | Tzinit_snapshot res ->
-      download_snapshot_to_tmp ?progress res.download_url
-      |> Result.map Option.some
-
 let import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check =
   import_snapshot
     ~app_bin_dir
@@ -371,153 +361,6 @@ let reown_runtime_paths ~owner ~group ~paths ~logging_mode:_ =
       Common.ensure_tree_owner ~owner ~group dir)
     (Ok ())
     normalize
-
-let snapshot_plan_for_service ~(service : Service.t) ~history_mode
-    ~network_override ~snapshot_uri_override =
-  let chosen_uri =
-    match normalize_optional_string snapshot_uri_override with
-    | Some uri -> Some uri
-    | None -> service.snapshot_uri
-  in
-  match chosen_uri with
-  | Some uri -> Ok (Direct_snapshot {uri})
-  | None ->
-      let network =
-        match normalize_optional_string network_override with
-        | Some net -> net
-        | None -> (
-            match service.snapshot_network_slug with
-            | Some slug when String.trim slug <> "" -> slug
-            | _ -> service.network)
-      in
-      resolve_snapshot_download ~network ~history_mode
-      |> Result.map (fun res -> Tzinit_snapshot res)
-
-let import_snapshot_for_instance ~(instance : string) ?snapshot_uri ?network
-    ?history_mode ~no_check () =
-  let* service = lookup_node_service instance in
-  let history_mode =
-    match history_mode with Some hm -> hm | None -> service.history_mode
-  in
-  let* plan =
-    snapshot_plan_for_service
-      ~service
-      ~history_mode
-      ~network_override:network
-      ~snapshot_uri_override:snapshot_uri
-  in
-  let* was_active = Systemd.is_active ~role:"node" ~instance:service.instance in
-  let* () = Systemd.stop ~role:"node" ~instance:service.instance in
-  let* () =
-    perform_snapshot_plan
-      ~plan
-      ~app_bin_dir:service.app_bin_dir
-      ~data_dir:service.data_dir
-      ~no_check
-  in
-  let owner, group =
-    if Common.is_root () then (service.service_user, service.service_user)
-    else Common.current_user_group_names ()
-  in
-  let* () =
-    reown_runtime_paths
-      ~owner
-      ~group
-      ~paths:[service.data_dir]
-      ~logging_mode:service.logging_mode
-  in
-  let* () =
-    if was_active then Systemd.start ~role:"node" ~instance:service.instance
-    else Ok ()
-  in
-  Ok ()
-
-let refresh_instance_from_snapshot ~(instance : string) ?snapshot_uri ?network
-    ?history_mode ?on_download_progress ~no_check () =
-  let* service = lookup_node_service instance in
-  let history_mode =
-    match history_mode with Some hm -> hm | None -> service.history_mode
-  in
-  let* plan =
-    snapshot_plan_for_service
-      ~service
-      ~history_mode
-      ~network_override:network
-      ~snapshot_uri_override:snapshot_uri
-  in
-  let no_check_flag = no_check || service.snapshot_no_check in
-  let progress = {on_download_progress} in
-  let* snapshot_file_opt = materialize_snapshot_plan ~progress ~plan () in
-  let identity_path = Filename.concat service.data_dir "identity.json" in
-  (* Logging is via journald - no log file to backup *)
-  let* identity_backup = backup_file_if_exists identity_path in
-  let owner, group =
-    if Common.is_root () then (service.service_user, service.service_user)
-    else Common.current_user_group_names ()
-  in
-  let restore_once =
-    let restored = ref false in
-    fun () ->
-      if !restored then Ok ()
-      else
-        let* () = restore_backup ~owner ~group identity_backup in
-        restored := true ;
-        Ok ()
-  in
-  let* was_active = Systemd.is_active ~role:"node" ~instance:service.instance in
-  let* () = Systemd.stop ~role:"node" ~instance:service.instance in
-  let result =
-    Fun.protect
-      ~finally:(fun () ->
-        match snapshot_file_opt with
-        | Some file when file.cleanup -> Common.remove_path file.path
-        | _ -> ())
-      (fun () ->
-        let* () = Common.remove_tree service.data_dir in
-        let* () = ensure_directories ~owner ~group [service.data_dir] in
-        let* () =
-          ensure_logging_base_directory ~owner ~group service.logging_mode
-        in
-        let* () =
-          ensure_runtime_log_directory ~owner ~group service.logging_mode
-        in
-        let* () =
-          ensure_node_config
-            ~app_bin_dir:service.app_bin_dir
-            ~data_dir:service.data_dir
-            ~network:service.network
-            ~history_mode:service.history_mode
-        in
-        let* () =
-          match snapshot_file_opt with
-          | None -> Ok ()
-          | Some snapshot_file ->
-              import_snapshot_file
-                ~app_bin_dir:service.app_bin_dir
-                ~data_dir:service.data_dir
-                ~snapshot_file
-                ~no_check:no_check_flag
-        in
-        let* () = restore_once () in
-        let* () =
-          reown_runtime_paths
-            ~owner
-            ~group
-            ~paths:[service.data_dir]
-            ~logging_mode:service.logging_mode
-        in
-        let* () =
-          if was_active then
-            Systemd.start ~role:"node" ~instance:service.instance
-          else Ok ()
-        in
-        Ok ())
-  in
-  match result with
-  | Ok () -> Ok ()
-  | Error _ as e ->
-      let (_ : (unit, _) result) = restore_once () in
-      e
 
 let is_valid_instance_char c =
   match c with
@@ -1109,30 +952,6 @@ let cleanup_orphans ~dry_run =
   List.iter process_path orphan_dirs ;
   List.iter process_path orphan_logs ;
   Ok (List.rev !removed, List.rev !errors)
-
-let schedule_refresh ~instance ~frequency ~no_check =
-  let* service = lookup_node_service instance in
-  let manager_bin =
-    if Filename.is_relative Sys.executable_name then
-      match Common.which "octez-manager" with
-      | Some path -> path
-      | None -> Sys.executable_name (* Fallback *)
-    else Sys.executable_name
-  in
-  let cmd =
-    Printf.sprintf
-      "%s instance %s refresh-from-new-snapshot%s"
-      manager_bin
-      instance
-      (if no_check then " --snapshot-no-check" else "")
-  in
-  Systemd.install_refresh_timer
-    ~instance
-    ~frequency
-    ~cmd
-    ~user:service.service_user
-
-let unschedule_refresh ~instance = Systemd.remove_refresh_timer ~instance
 
 let backup_file_if_exists_for_tests = backup_file_if_exists
 

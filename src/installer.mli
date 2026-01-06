@@ -23,24 +23,6 @@ val install_baker : baker_request -> (Service.t, [`Msg of string]) result
 
 val install_accuser : accuser_request -> (Service.t, [`Msg of string]) result
 
-val import_snapshot_for_instance :
-  instance:string ->
-  ?snapshot_uri:string ->
-  ?network:string ->
-  ?history_mode:History_mode.t ->
-  no_check:bool ->
-  unit ->
-  (unit, [`Msg of string]) result
-
-val refresh_instance_from_snapshot :
-  instance:string ->
-  ?snapshot_uri:string ->
-  ?network:string ->
-  ?history_mode:History_mode.t ->
-  no_check:bool ->
-  unit ->
-  (unit, [`Msg of string]) result
-
 val start_service : instance:string -> (unit, [`Msg of string]) result
 
 val stop_service : instance:string -> (unit, [`Msg of string]) result
@@ -67,33 +49,6 @@ val find_orphan_directories :
 val cleanup_orphans :
   dry_run:bool ->
   (string list * (string * string) list, [`Msg of string]) result
-
-val schedule_refresh :
-  instance:string ->
-  frequency:string ->
-  no_check:bool ->
-  (unit, [`Msg of string]) result
-
-val unschedule_refresh : instance:string -> unit
-
-val import_snapshot_for_instance :
-  instance:string ->
-  ?snapshot_uri:string ->
-  ?network:string ->
-  ?history_mode:History_mode.t ->
-  no_check:bool ->
-  unit ->
-  (unit, [`Msg of string]) result
-
-val refresh_instance_from_snapshot :
-  instance:string ->
-  ?snapshot_uri:string ->
-  ?network:string ->
-  ?history_mode:History_mode.t ->
-  ?on_download_progress:(int -> int option -> unit) ->
-  no_check:bool ->
-  unit ->
-  (unit, [`Msg of string]) result
 
 val endpoint_of_rpc : string -> string
 
