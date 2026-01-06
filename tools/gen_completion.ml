@@ -18,8 +18,9 @@ let escape_zsh_single s =
 
 let write_file path contents =
   let oc = open_out_bin path in
-  output_string oc contents ;
-  close_out oc
+  Fun.protect
+    ~finally:(fun () -> close_out oc)
+    (fun () -> output_string oc contents)
 
 let run_help binary args =
   let argv = ["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ args in
