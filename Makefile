@@ -27,7 +27,13 @@ fmt-check:
 	@$(DUNE) build @fmt >/dev/null
 	@git --no-pager diff --exit-code || (echo "Formatting changes required. Run 'make fmt' and commit." && false)
 
-test: fmt-check
+completions:
+	$(DUNE) exec -- octez-manager-gen-completion
+
+completions-check: completions
+	@git --no-pager diff --exit-code completions/ || (echo "Completions are out of date. Run 'make completions' and commit." && false)
+
+test: fmt-check completions-check
 	$(DUNE) runtest
 
 clean:
