@@ -59,7 +59,7 @@ jobs:
         run: |
           chown -R opam:opam /home/opam/.opam
           chown -R opam:opam .
-          su -s /bin/sh opam -c "dune runtest"
+          su -s /bin/sh opam -c "git checkout -- static_flags.sexp && make test"
 
       - name: Upload binary (main branch only)
         if: github.ref == 'refs/heads/main'
