@@ -189,6 +189,21 @@ let cmd_to_string argv = String.concat " " (List.map sh_quote argv)
 let run argv =
   append_debug_log ("RUN " ^ cmd_to_string argv) ;
   let cmd = Bos.Cmd.of_list argv in
+  (* Capture output to avoid polluting TUI, log it if error *)
+  match Bos.OS.Cmd.(run_out ~err:err_run_out cmd |> out_string) with
+  | Ok (_, (_, `Exited 0)) -> Ok ()
+  | Ok (out, _) ->
+      let msg =
+        Printf.sprintf "Command failed: %s\nOutput: %s" (cmd_to_string argv) out
+      in
+      append_debug_log ("RUN ERROR: " ^ msg) ;
+      Error (`Msg msg)
+  | Error (`Msg m) -> Error (`Msg m)
+
+(* Kept as a utility for potential future debugging/verbose logging needs. *)
+let _run_verbose argv =
+  append_debug_log ("RUN_VERBOSE " ^ cmd_to_string argv) ;
+  let cmd = Bos.Cmd.of_list argv in
   match Bos.OS.Cmd.run cmd with
   | Ok () -> Ok ()
   | Error (`Msg m) -> Error (`Msg m)

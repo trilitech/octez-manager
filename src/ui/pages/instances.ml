@@ -901,14 +901,24 @@ let summary_line state =
   Printf.sprintf "Total instances: %d" total
 
 let run_unit_action ~verb ~instance action =
-  let title = Printf.sprintf "%s %s" (String.capitalize_ascii verb) instance in
-  match action () with
-  | Ok () ->
-      Context.toast_success (Printf.sprintf "%s: %s" instance verb) ;
-      Context.mark_instances_dirty ()
-  | Error (`Msg msg) ->
-      Context.toast_error (Printf.sprintf "%s: %s failed" instance verb) ;
-      Modal_helpers.show_error ~title msg
+  let description =
+    Printf.sprintf "%s %s" (String.capitalize_ascii verb) instance
+  in
+  (* Toast immediately that it started *)
+  Context.toast_info (Printf.sprintf "Started: %s %s" instance verb) ;
+  (* Submit to background job manager *)
+  Job_manager.submit
+    ~description
+    (fun () -> action ())
+    ~on_complete:(fun status ->
+      match status with
+      | Job_manager.Succeeded ->
+          Context.toast_success (Printf.sprintf "%s: %s finished" instance verb) ;
+          Context.mark_instances_dirty ()
+      | Job_manager.Failed msg ->
+          Context.toast_error
+            (Printf.sprintf "%s: %s failed: %s" instance verb msg)
+      | _ -> ())
 
 let require_installer () =
   match
