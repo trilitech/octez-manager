@@ -91,21 +91,6 @@ type accuser_request = {
   auto_enable : bool;
 }
 
-type signer_request = {
-  instance : string;
-  network : string;
-  base_dir : string option;
-  address : string;
-  port : int;
-  service_user : string;
-  app_bin_dir : string;
-  logging_mode : Logging_mode.t;
-  require_auth : bool;
-  password_file : string option;
-  auto_enable : bool;
-  authorized_keys : (string option * string) list;
-}
-
 type snapshot_file = {path : string; cleanup : bool}
 
 type snapshot_resolution = {

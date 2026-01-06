@@ -105,8 +105,6 @@ module Package_manager : Package_manager = struct
   let install_daemon = Installer.install_daemon
 
   let install_baker = Installer.install_baker
-
-  let install_signer = Installer.install_signer
 end
 
 module Tezos_node_manager : Tezos_node_manager = struct
@@ -114,18 +112,12 @@ module Tezos_node_manager : Tezos_node_manager = struct
 
   let unschedule_refresh = Installer.unschedule_refresh
 
-  let generate_secret_key = Installer.generate_secret_key
-
   let import_snapshot_for_instance = Installer.import_snapshot_for_instance
 
   let refresh_instance_from_snapshot = Installer.refresh_instance_from_snapshot
 end
 
-module Tezos_client_manager : Tezos_client_manager = struct
-  let list_keys = Installer.list_keys
-
-  let add_authorized_key = Installer.add_authorized_key
-end
+module Tezos_client_manager : Tezos_client_manager = struct end
 
 module Installer : Installer = struct
   include Package_manager

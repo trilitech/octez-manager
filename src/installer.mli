@@ -23,8 +23,6 @@ val install_baker : baker_request -> (Service.t, [`Msg of string]) result
 
 val install_accuser : accuser_request -> (Service.t, [`Msg of string]) result
 
-val install_signer : signer_request -> (Service.t, [`Msg of string]) result
-
 val import_snapshot_for_instance :
   instance:string ->
   ?snapshot_uri:string ->
@@ -77,17 +75,6 @@ val schedule_refresh :
   (unit, [`Msg of string]) result
 
 val unschedule_refresh : instance:string -> unit
-
-val generate_secret_key :
-  instance:string -> alias:string -> (unit, [`Msg of string]) result
-
-val list_keys : instance:string -> (string, [`Msg of string]) result
-
-val add_authorized_key :
-  instance:string ->
-  key:string ->
-  name:string option ->
-  (unit, [`Msg of string]) result
 
 val import_snapshot_for_instance :
   instance:string ->

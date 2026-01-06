@@ -1237,19 +1237,17 @@ let create_menu_modal state =
   let open Modal_helpers in
   open_choice_modal
     ~title:"Create Service"
-    ~items:[`Node; `Baker; `Accuser; `DalNode; `Signer]
+    ~items:[`Node; `Baker; `Accuser; `DalNode]
     ~to_string:(function
       | `Node -> "Node"
       | `Baker -> "Baker"
       | `Accuser -> "Accuser"
-      | `DalNode -> "DAL Node"
-      | `Signer -> "Signer")
+      | `DalNode -> "DAL Node")
     ~on_select:(function
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
       | `Accuser -> Context.navigate Install_accuser_form_v3.name
-      | `DalNode -> Context.navigate Install_dal_node_form_v3.name
-      | `Signer -> Context.navigate Install_signer_form_v3.name) ;
+      | `DalNode -> Context.navigate Install_dal_node_form_v3.name) ;
   state
 
 let go_to_diagnostics state =

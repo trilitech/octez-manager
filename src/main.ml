@@ -112,16 +112,6 @@ let print_service_details svc =
         Format.printf "DAL RPC addr  : %s@." svc.rpc_addr ;
       if svc.net_addr <> "" then
         Format.printf "DAL P2P addr  : %s@." svc.net_addr
-  | "signer" ->
-      let base_dir = lookup "OCTEZ_SIGNER_BASE_DIR" in
-      let address = lookup "OCTEZ_SIGNER_ADDRESS" in
-      let port = lookup "OCTEZ_SIGNER_PORT" in
-      let global_args = lookup "OCTEZ_SIGNER_GLOBAL_ARGS" in
-      Format.printf "Base dir      : %s@." base_dir ;
-      Format.printf "Listen addr   : %s@." address ;
-      Format.printf "Listen port   : %s@." port ;
-      if String.contains global_args 'A' then
-        Format.printf "Require auth  : yes@."
   | _ ->
       (* Fallback for unknown roles *)
       Format.printf "Data dir      : %s@." svc.data_dir ;
@@ -1026,157 +1016,6 @@ let install_accuser_cmd =
   in
   Cmd.v info term
 
-let install_signer_cmd =
-  let instance =
-    Arg.(
-      required
-      & opt (some string) None
-      & info ["instance"] ~doc:"Signer instance name" ~docv:"NAME")
-  in
-  let network =
-    Arg.(
-      value & opt string "generic"
-      & info ["network"] ~doc:"Label stored in the registry" ~docv:"NET")
-  in
-  let base_dir =
-    Arg.(
-      value
-      & opt (some string) None
-      & info ["base-dir"] ~doc:"Signer data directory" ~docv:"DIR")
-  in
-  let address =
-    Arg.(
-      value & opt string "127.0.0.1"
-      & info
-          ["address"]
-          ~doc:"Listening address for the socket signer"
-          ~docv:"ADDR")
-  in
-  let port =
-    Arg.(
-      value & opt int 6732
-      & info ["port"] ~doc:"TCP port for the signer" ~docv:"PORT")
-  in
-  let password_file =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["password-file"]
-          ~doc:"Path to the password file passed to octez-signer"
-          ~docv:"FILE")
-  in
-  let authorize =
-    let doc = "Authorize NAME:PUBLIC_KEY (multiple allowed)." in
-    Arg.(value & opt_all string [] & info ["authorize"] ~doc ~docv:"SPEC")
-  in
-  let no_auth =
-    Arg.(
-      value & flag & info ["no-auth"] ~doc:"Disable --require-authentication")
-  in
-  let default_user =
-    if Common.is_root () then "octez"
-    else fst (Common.current_user_group_names ())
-  in
-  let service_user =
-    Arg.(
-      value & opt string default_user
-      & info ["service-user"] ~doc:"System user" ~docv:"USER")
-  in
-  let app_bin_dir =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          ["app-bin-dir"]
-          ~doc:"Directory containing Octez binaries"
-          ~docv:"DIR")
-  in
-  let auto_enable =
-    Arg.(
-      value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
-  in
-  let parse_authorize specs =
-    let rec loop acc = function
-      | [] -> Ok (List.rev acc)
-      | raw :: rest ->
-          let trimmed = String.trim raw in
-          if trimmed = "" then loop acc rest
-          else
-            let name_opt, key =
-              match String.split_on_char ':' trimmed with
-              | [] -> (None, "")
-              | [key] -> (None, key)
-              | name :: tail -> (Some name, String.concat ":" tail)
-            in
-            let key = String.trim key in
-            if key = "" then
-              Error (`Msg (Printf.sprintf "Invalid --authorize entry '%s'" raw))
-            else
-              let name_opt =
-                match name_opt with
-                | None -> None
-                | Some name ->
-                    let n = String.trim name in
-                    if n = "" then None else Some n
-              in
-              loop ((name_opt, key) :: acc) rest
-    in
-    loop [] specs
-  in
-  let make instance network base_dir address port password_file authorize_specs
-      no_auth service_user app_bin_dir no_enable logging_mode =
-    match resolve_app_bin_dir app_bin_dir with
-    | Error msg -> cmdliner_error msg
-    | Ok app_bin_dir -> (
-        match parse_authorize authorize_specs with
-        | Error (`Msg msg) -> cmdliner_error msg
-        | Ok authorized_keys -> (
-            let req : signer_request =
-              {
-                instance;
-                network;
-                base_dir;
-                address;
-                port;
-                service_user;
-                app_bin_dir;
-                logging_mode;
-                require_auth = not no_auth;
-                password_file;
-                auto_enable = not no_enable;
-                authorized_keys;
-              }
-            in
-            match Installer.install_signer req with
-            | Ok service ->
-                Format.printf
-                  "Signer %s listening on %s (%s)\n"
-                  service.S.instance
-                  service.S.rpc_addr
-                  service.S.data_dir ;
-                Format.printf
-                  "Authorize more keys with: %s --base-dir %s add authorized \
-                   key <pk> --name <alias>\n"
-                  (Filename.concat app_bin_dir "octez-signer")
-                  service.S.data_dir ;
-                Format.printf
-                  "Point bakers at it via: octez-client -d <baker-base-dir> -R \
-                   %s config update\n"
-                  service.S.rpc_addr ;
-                `Ok ()
-            | Error (`Msg msg) -> cmdliner_error msg))
-  in
-  let term =
-    Term.(
-      ret
-        (const make $ instance $ network $ base_dir $ address $ port
-       $ password_file $ authorize $ no_auth $ service_user $ app_bin_dir
-       $ auto_enable $ logging_mode_term))
-  in
-  let info = Cmd.info "install-signer" ~doc:"Install an octez-signer service" in
-  Cmd.v info term
-
 let install_dal_node_cmd =
   let instance =
     let doc = "Instance name used for dal-node.env and systemd units." in
@@ -1848,7 +1687,6 @@ let root_cmd =
       install_node_cmd;
       install_baker_cmd;
       install_accuser_cmd;
-      install_signer_cmd;
       install_dal_node_cmd;
       list_cmd;
       purge_all_cmd;
