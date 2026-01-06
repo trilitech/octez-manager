@@ -910,35 +910,6 @@ let run_unit_action ~verb ~instance action =
       Context.toast_error (Printf.sprintf "%s: %s failed" instance verb) ;
       Modal_helpers.show_error ~title msg
 
-(* Long-running actions (snapshot refresh) run asynchronously via Job_manager *)
-let run_async_action ?on_complete ~verb ~instance action =
-  let description =
-    Printf.sprintf "%s %s" (String.capitalize_ascii verb) instance
-  in
-  Context.toast_info (Printf.sprintf "%s: starting %s..." instance verb) ;
-  Job_manager.submit
-    ~description
-    (fun () ->
-      match action () with
-      | Ok () ->
-          Context.toast_success (Printf.sprintf "%s: %s done" instance verb) ;
-          Context.mark_instances_dirty () ;
-          Ok ()
-      | Error (`Msg msg) ->
-          Context.toast_error (Printf.sprintf "%s: %s failed" instance verb) ;
-          Modal_helpers.show_error
-            ~title:
-              (Printf.sprintf "%s %s" (String.capitalize_ascii verb) instance)
-            msg ;
-          Context.mark_instances_dirty () ;
-          Error (`Msg msg))
-    ~on_complete:(function
-      | Job_manager.Succeeded -> (
-          match on_complete with Some f -> f () | None -> ())
-      | Job_manager.Failed _ -> (
-          match on_complete with Some f -> f () | None -> ())
-      | _ -> ())
-
 let require_installer () =
   match
     Miaou_interfaces.Capability.get Manager_interfaces.Installer_capability.key
@@ -947,18 +918,6 @@ let require_installer () =
       let module I = (val (cap : Manager_interfaces.Installer_capability.t)) in
       Ok (module I : Manager_interfaces.Installer)
   | None -> Error (`Msg "Installer capability not available")
-
-let require_tezos_node_manager () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Tezos_node_manager_capability.key
-  with
-  | Some cap ->
-      let module I =
-        (val (cap : Manager_interfaces.Tezos_node_manager_capability.t))
-      in
-      Ok (module I : Manager_interfaces.Tezos_node_manager)
-  | None -> Error (`Msg "Tezos node manager capability not available")
 
 let remove_modal state =
   with_service state (fun svc_state ->
@@ -1112,87 +1071,17 @@ let _view_logs_old state =
           show_journald () ;
           state)
 
-let refresh_modal state =
-  with_service state (fun svc_state ->
-      let svc = svc_state.Service_state.service in
-      Modal_helpers.open_choice_modal
-        ~title:(Printf.sprintf "Refresh snapshot · %s" svc.Service.instance)
-        ~items:[`Auto; `AutoNoCheck; `CustomUri]
-        ~to_string:(function
-          | `Auto -> "Auto (latest tzinit snapshot)"
-          | `AutoNoCheck -> "Auto (--no-check)"
-          | `CustomUri -> "Custom URI")
-        ~on_select:(fun choice ->
-          let instance = svc.Service.instance in
-          let run_refresh ?snapshot_uri ?(no_check = false) () =
-            let now = Unix.gettimeofday () in
-            Rpc_metrics.set
-              ~instance
-              {
-                Rpc_metrics.chain_id = None;
-                head_level = None;
-                bootstrapped = None;
-                last_rpc_refresh = Some now;
-                node_version = None;
-                data_size = None;
-                proto = None;
-                last_error = None;
-                last_block_time = None;
-              } ;
-            Context.mark_instances_dirty () ;
-            (* Stop RPC monitor while refreshing to avoid stale connections *)
-            Rpc_scheduler.stop_head_monitor instance ;
-            Context.progress_start
-              ~label:"Downloading snapshot"
-              ~estimate_secs:120.
-              ~width:48 ;
-            run_async_action
-              ~verb:"refresh"
-              ~instance
-              ~on_complete:(fun () -> Context.progress_finish ())
-              (fun () ->
-                let* (module NM) = require_tezos_node_manager () in
-                NM.refresh_instance_from_snapshot
-                  ~instance
-                  ?snapshot_uri
-                  ~no_check
-                  ~on_download_progress:(fun pct _ ->
-                    Context.progress_set
-                      ~label:"Downloading snapshot"
-                      ~progress:(float_of_int pct /. 100.)
-                      ())
-                  ())
-          in
-          match choice with
-          | `Auto -> run_refresh ()
-          | `AutoNoCheck -> run_refresh ~no_check:true ()
-          | `CustomUri ->
-              Modal_helpers.prompt_text_modal
-                ~title:"Snapshot URI"
-                ~placeholder:(Some "file:///path/to/snapshot or https://...")
-                ~on_submit:(fun text ->
-                  let trimmed = String.trim text in
-                  if trimmed = "" then
-                    Modal_helpers.show_error
-                      ~title:"Snapshot URI"
-                      "Snapshot URI cannot be empty"
-                  else run_refresh ~snapshot_uri:trimmed ())
-                ()) ;
-      state)
-
 let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
       Modal_helpers.open_choice_modal
         ~title:("Actions · " ^ svc.Service.instance)
-        ~items:
-          [`Details; `Start; `Stop; `Restart; `RefreshSnapshot; `Logs; `Remove]
+        ~items:[`Details; `Start; `Stop; `Restart; `Logs; `Remove]
         ~to_string:(function
           | `Details -> "Details"
           | `Start -> "Start"
           | `Stop -> "Stop"
           | `Restart -> "Restart"
-          | `RefreshSnapshot -> "Refresh from snapshot"
           | `Logs -> "View Logs"
           | `Remove -> "Remove")
         ~on_select:(fun choice ->
@@ -1226,7 +1115,6 @@ let instance_actions_modal state =
                     ~role
                     ~service:instance
                   |> Result.map_error (fun e -> `Msg e))
-          | `RefreshSnapshot -> refresh_modal state |> ignore
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
@@ -1312,8 +1200,6 @@ struct
     [
       ("Enter", activate_selection, "Open");
       ("c", create_menu_modal, "Create service");
-      ("r", refresh_modal, "Refresh snapshot");
-      ("R", refresh_modal, "Refresh snapshot");
       ("d", go_to_diagnostics, "Diagnostics");
     ]
 
@@ -1680,8 +1566,6 @@ Press **Enter** to open instance menu.|}
         | Some Keys.Enter -> activate_selection s
         | Some (Keys.Char "c") -> create_menu_modal s
         | Some (Keys.Char " ") -> force_refresh_cmd s
-        | Some (Keys.Char "r") -> refresh_modal s
-        | Some (Keys.Char "R") -> refresh_modal s
         | Some (Keys.Char "Esc")
         | Some (Keys.Char "Escape")
         | Some (Keys.Char "q")

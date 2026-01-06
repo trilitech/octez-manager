@@ -39,34 +39,7 @@ module Package_manager_capability = struct
     Miaou_interfaces.Capability.create ~name:"package_manager"
 end
 
-module type Tezos_node_manager = sig
-  val schedule_refresh :
-    instance:string ->
-    frequency:string ->
-    no_check:bool ->
-    (unit, [`Msg of string]) result
-
-  val unschedule_refresh : instance:string -> unit
-
-  val import_snapshot_for_instance :
-    instance:string ->
-    ?snapshot_uri:string ->
-    ?network:string ->
-    ?history_mode:History_mode.t ->
-    no_check:bool ->
-    unit ->
-    (unit, [`Msg of string]) result
-
-  val refresh_instance_from_snapshot :
-    instance:string ->
-    ?snapshot_uri:string ->
-    ?network:string ->
-    ?history_mode:History_mode.t ->
-    ?on_download_progress:(int -> int option -> unit) ->
-    no_check:bool ->
-    unit ->
-    (unit, [`Msg of string]) result
-end
+module type Tezos_node_manager = sig end
 
 module Tezos_node_manager_capability = struct
   type t = (module Tezos_node_manager)

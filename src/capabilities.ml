@@ -107,15 +107,7 @@ module Package_manager : Package_manager = struct
   let install_baker = Installer.install_baker
 end
 
-module Tezos_node_manager : Tezos_node_manager = struct
-  let schedule_refresh = Installer.schedule_refresh
-
-  let unschedule_refresh = Installer.unschedule_refresh
-
-  let import_snapshot_for_instance = Installer.import_snapshot_for_instance
-
-  let refresh_instance_from_snapshot = Installer.refresh_instance_from_snapshot
-end
+module Tezos_node_manager : Tezos_node_manager = struct end
 
 module Tezos_client_manager : Tezos_client_manager = struct end
 

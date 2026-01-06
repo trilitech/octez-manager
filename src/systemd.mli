@@ -35,15 +35,6 @@ val write_dropin_node :
 
 val remove_dropin : role:string -> instance:string -> unit
 
-val install_refresh_timer :
-  instance:string ->
-  frequency:string ->
-  cmd:string ->
-  user:string ->
-  (unit, [`Msg of string]) result
-
-val remove_refresh_timer : instance:string -> unit
-
 type logrotate_spec = {role : string; paths : string list}
 
 val sync_logrotate : logrotate_spec list -> (unit, [`Msg of string]) result
