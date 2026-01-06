@@ -13,7 +13,6 @@ deps-ci:
 		echo "Pinning miaou from $$MIAOU_GIT_URL"; \
 		opam pin add -y miaou "$$MIAOU_GIT_URL" || { echo "ERROR: Failed to pin miaou package" >&2; exit 1; }; \
 		opam pin add -y miaou-driver-matrix "$$MIAOU_GIT_URL" || { echo "ERROR: Failed to pin miaou-driver-matrix package" >&2; exit 1; }; \
-		opam install -y miaou-driver-matrix || { echo "ERROR: Failed to install miaou-driver-matrix package" >&2; exit 1; }; \
 	fi
 	$(MAKE) deps
 
