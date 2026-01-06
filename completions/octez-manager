@@ -27,10 +27,8 @@ _octez_manager() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="cleanup-orphans install-accuser install-baker install-dal-node install-node install-signer instance list list-available-networks list-snapshots purge-all snapshots ui"
-  local instance_actions="start stop restart remove purge show show-service refresh-from-new-snapshot"
-  local snapshot_commands="import"
-
+  local commands="cleanup-orphans install-accuser install-baker install-dal-node install-node instance list list-available-networks list-snapshots purge-all ui"
+  local instance_actions="start stop restart remove purge show show-service"
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
   local lb_votes="on off pass"
@@ -69,10 +67,6 @@ _octez_manager() {
       COMPREPLY=( $(compgen -f -- "$cur") )
       return 0
       ;;
-    --password-file)
-      COMPREPLY=( $(compgen -f -- "$cur") )
-      return 0
-      ;;
   esac
 
   if [[ $COMP_CWORD -eq 1 ]]; then
@@ -103,32 +97,10 @@ _octez_manager() {
       action="${COMP_WORDS[3]}"
       if [[ $cur == -* ]]; then
         case "$action" in
-          refresh-from-new-snapshot)
-            opts="--snapshot-uri --snapshot-kind --snapshot-network --snapshot-history-mode --snapshot-no-check --help"
-            ;;
           remove)
             opts="--delete-data-dir --help"
             ;;
           start|stop|restart|purge|show|show-service)
-            opts="--help"
-            ;;
-        esac
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
-      fi
-      return 0
-      ;;
-    snapshots)
-      if [[ $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W "$snapshot_commands --help" -- "$cur") )
-        return 0
-      fi
-      action="${COMP_WORDS[2]}"
-      if [[ $cur == -* ]]; then
-        case "$action" in
-          import)
-            opts="--instance --snapshot-uri --snapshot-kind --network --history-mode --no-check --help"
-            ;;
-          *)
             opts="--help"
             ;;
         esac
@@ -145,35 +117,28 @@ _octez_manager() {
       ;;
     install-accuser)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --base-dir --data-dir --endpoint --extra-arg --instance --network --no-enable --service-user --help"
+        opts="--app-bin-dir --base-dir --extra-arg --instance --no-enable --node-instance --service-user --help"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-baker)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --base-dir --dal-endpoint --delegate --extra-arg -i --instance --liquidity-baking-vote --no-enable --node-instance --service-user --help"
+        opts="--app-bin-dir --base-dir --dal-endpoint --delegate --extra-arg --instance --liquidity-baking-vote --no-enable --node-instance --service-user --help"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-dal-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg -i --instance --net-addr --no-enable --node-instance --rpc-addr --service-user --help"
+        opts="--app-bin-dir --data-dir --extra-arg --instance --net-addr --no-enable --node-instance --rpc-addr --service-user --help"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg --history-mode -i --instance --net-addr --network --no-enable --rpc-addr --service-user --snapshot --snapshot-kind --snapshot-no-check --snapshot-uri --help"
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
-      fi
-      return 0
-      ;;
-    install-signer)
-      if [[ $cur == -* ]]; then
-        opts="--address --app-bin-dir --authorize --base-dir --instance --network --no-auth --no-enable --password-file --port --service-user --help"
+        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --net-addr --network --no-enable --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --help"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
