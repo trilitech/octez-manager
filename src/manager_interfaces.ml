@@ -87,7 +87,11 @@ module type Installer = sig
     ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
 
   val purge_service :
-    ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
+    ?quiet:bool ->
+    prompt_yes_no:(string -> default:bool -> bool) ->
+    instance:string ->
+    unit ->
+    (unit, [`Msg of string]) result
 end
 
 module Installer_capability = struct

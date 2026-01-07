@@ -968,7 +968,11 @@ let remove_modal state =
                   fun () ->
                     Rpc_scheduler.stop_head_monitor instance ;
                     let* (module I) = require_installer () in
-                    I.purge_service ~quiet:true ~instance () )
+                    I.purge_service
+                      ~quiet:true
+                      ~prompt_yes_no:(fun _ ~default:_ -> true)
+                      ~instance
+                      () )
           in
           run_unit_action ~verb ~instance action) ;
       state)
