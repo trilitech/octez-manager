@@ -1236,6 +1236,7 @@ type instance_action =
   | Purge
   | Show
   | Show_service
+  | Logs
 
 let instance_term =
   let instance =
@@ -1251,6 +1252,7 @@ let instance_term =
         ("purge", Purge);
         ("show", Show);
         ("show-service", Show_service);
+        ("logs", Logs);
       ]
     in
     Arg.(value & pos 1 (some (enum actions)) None & info [] ~docv:"ACTION")
@@ -1345,6 +1347,26 @@ let instance_term =
                   | Error (`Msg msg) ->
                       prerr_endline ("systemctl status failed: " ^ msg)
                 in
+                `Ok ())
+        | Logs -> (
+            match Service_registry.find ~instance:inst with
+            | Error (`Msg msg) -> cmdliner_error msg
+            | Ok None ->
+                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+            | Ok (Some svc) ->
+                let role = svc.S.role in
+                let user_flag = if Common.is_root () then "" else "--user " in
+                let unit = Systemd.unit_name role inst in
+
+                Format.printf "# Monitor logs via journald:@." ;
+                Format.printf "journalctl %s-u %s -f@." user_flag unit ;
+
+                (match Log_viewer.get_daily_log_file ~role ~instance:inst with
+                | Ok path ->
+                    Format.printf "@.# Monitor daily logs via tail:@." ;
+                    Format.printf "tail -f %s@." path
+                | Error _ -> ()) ;
+
                 `Ok ()))
   in
   Term.(ret (const run $ instance $ action $ delete_data_dir))
