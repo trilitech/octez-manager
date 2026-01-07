@@ -576,9 +576,16 @@ let install_node_cmd =
     let doc = "Disable automatic systemctl enable --now." in
     Arg.(value & flag & info ["no-enable"] ~doc)
   in
+  let preserve_data =
+    let doc =
+      "Preserve existing data in data-dir instead of clearing it. When set, no \
+       snapshot will be imported even if --snapshot is specified."
+    in
+    Arg.(value & flag & info ["preserve-data"] ~doc)
+  in
   let make instance_opt network_opt history_mode_opt data_dir rpc_addr net_addr
       service_user app_bin_dir extra_args snapshot_flag snapshot_uri
-      snapshot_no_check no_enable logging_mode =
+      snapshot_no_check no_enable preserve_data logging_mode =
     let res =
       let ( let* ) = Result.bind in
       let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
@@ -657,7 +664,7 @@ let install_node_cmd =
               auto_enable = not no_enable;
               logging_mode;
               bootstrap = Genesis;
-              preserve_data = false;
+              preserve_data;
               snapshot_no_check;
             }
           in
@@ -706,7 +713,8 @@ let install_node_cmd =
             snapshot_requested || Option.is_some snapshot_uri
           in
           let bootstrap =
-            if snapshot_requested then Snapshot {src = snapshot_uri}
+            if preserve_data then Genesis
+            else if snapshot_requested then Snapshot {src = snapshot_uri}
             else Genesis
           in
           let req : node_request =
@@ -723,7 +731,7 @@ let install_node_cmd =
               auto_enable = not no_enable;
               logging_mode;
               bootstrap;
-              preserve_data = false;
+              preserve_data;
               snapshot_no_check;
             }
           in
@@ -741,7 +749,7 @@ let install_node_cmd =
         (const make $ instance $ network $ history_mode_opt_term $ data_dir
        $ rpc_addr $ net_addr $ service_user $ app_bin_dir $ extra_args
        $ snapshot_flag $ snapshot_uri $ snapshot_no_check $ auto_enable
-       $ logging_mode_term))
+       $ preserve_data $ logging_mode_term))
   in
   let info =
     Cmd.info "install-node" ~doc:"Install an octez-node systemd instance"
