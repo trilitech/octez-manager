@@ -25,11 +25,14 @@ module Service_manager_capability = struct
 end
 
 module type Package_manager = sig
-  val install_node : node_request -> (Service.t, [`Msg of string]) result
+  val install_node :
+    ?quiet:bool -> node_request -> (Service.t, [`Msg of string]) result
 
-  val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
+  val install_daemon :
+    ?quiet:bool -> daemon_request -> (Service.t, [`Msg of string]) result
 
-  val install_baker : baker_request -> (Service.t, [`Msg of string]) result
+  val install_baker :
+    ?quiet:bool -> baker_request -> (Service.t, [`Msg of string]) result
 end
 
 module Package_manager_capability = struct
@@ -68,15 +71,27 @@ module type Installer = sig
 
   (* Legacy monolithic interface, to be deprecated or kept for CLI convenience *)
   val remove_service :
-    delete_data_dir:bool -> instance:string -> (unit, [`Msg of string]) result
+    ?quiet:bool ->
+    delete_data_dir:bool ->
+    instance:string ->
+    unit ->
+    (unit, [`Msg of string]) result
 
-  val start_service : instance:string -> (unit, [`Msg of string]) result
+  val start_service :
+    ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
 
-  val stop_service : instance:string -> (unit, [`Msg of string]) result
+  val stop_service :
+    ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
 
-  val restart_service : instance:string -> (unit, [`Msg of string]) result
+  val restart_service :
+    ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
 
-  val purge_service : instance:string -> (unit, [`Msg of string]) result
+  val purge_service :
+    ?quiet:bool ->
+    prompt_yes_no:(string -> default:bool -> bool) ->
+    instance:string ->
+    unit ->
+    (unit, [`Msg of string]) result
 end
 
 module Installer_capability = struct
@@ -114,11 +129,12 @@ module type System = sig
     string ->
     (unit, [`Msg of string]) result
 
-  val run : string list -> (unit, [`Msg of string]) result
+  val run : ?quiet:bool -> string list -> (unit, [`Msg of string]) result
 
   val run_out : string list -> (string, [`Msg of string]) result
 
-  val run_as : user:string -> string list -> (unit, [`Msg of string]) result
+  val run_as :
+    ?quiet:bool -> user:string -> string list -> (unit, [`Msg of string]) result
 
   val copy_file : string -> string -> (unit, [`Msg of string]) result
 

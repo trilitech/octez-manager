@@ -17,9 +17,14 @@ let escape_zsh_single s =
   String.concat "'\\''" parts
 
 let write_file path contents =
-  let oc = open_out_bin path in
-  output_string oc contents ;
-  close_out oc
+  try
+    let oc = open_out_bin path in
+    Fun.protect
+      ~finally:(fun () -> close_out oc)
+      (fun () -> output_string oc contents) ;
+    Ok ()
+  with Sys_error msg ->
+    Error (`Msg ("Failed to write to file '" ^ path ^ "': " ^ msg))
 
 let run_help binary args =
   let argv = ["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ args in
@@ -517,8 +522,8 @@ let () =
     in
     let zsh_path = Filename.concat !out_dir "_octez-manager" in
     let bash_path = Filename.concat !out_dir "octez-manager" in
-    write_file zsh_path zsh ;
-    write_file bash_path bash ;
+    let* () = write_file zsh_path zsh in
+    let* () = write_file bash_path bash in
     Ok ()
   in
   match result with

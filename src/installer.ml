@@ -143,7 +143,7 @@ type snapshot_progress = {
   on_download_progress : (int -> int option -> unit) option;
 }
 
-let download_snapshot_to_tmp ?progress src =
+let download_snapshot_to_tmp ?(quiet = false) ?progress src =
   let tmp = Filename.temp_file "octez-manager.snapshot" ".snap" in
   let res =
     match progress with
@@ -155,7 +155,7 @@ let download_snapshot_to_tmp ?progress src =
             match on_download_progress with
             | Some f -> f pct (Some 100)
             | None -> ())
-    | None -> Common.download_file ~url:src ~dest_path:tmp
+    | None -> Common.download_file ~quiet ~url:src ~dest_path:tmp ()
   in
   match res with
   | Ok () -> Ok {path = tmp; cleanup = true}
@@ -163,7 +163,7 @@ let download_snapshot_to_tmp ?progress src =
       Common.remove_path tmp ;
       e
 
-let prepare_snapshot_source ?progress src =
+let prepare_snapshot_source ?(quiet = false) ?progress src =
   let trimmed = String.trim src in
   if trimmed = "" then R.error_msg "Snapshot URI is empty"
   else
@@ -172,7 +172,7 @@ let prepare_snapshot_source ?progress src =
     | None when not (is_http_url trimmed) ->
         if Sys.file_exists trimmed then Ok {path = trimmed; cleanup = false}
         else R.error_msgf "Snapshot file %s does not exist" trimmed
-    | _ -> download_snapshot_to_tmp ?progress trimmed
+    | _ -> download_snapshot_to_tmp ~quiet ?progress trimmed
 
 let snapshot_plan_of_request request =
   match request.bootstrap with
@@ -212,7 +212,8 @@ let snapshot_metadata_of_plan ~no_check = function
         no_check;
       }
 
-let import_snapshot ~app_bin_dir ~data_dir ~snapshot_path ~no_check =
+let import_snapshot ?(quiet = false) ~app_bin_dir ~data_dir ~snapshot_path
+    ~no_check () =
   let octez_node = Filename.concat app_bin_dir "octez-node" in
   let args =
     let base =
@@ -220,46 +221,67 @@ let import_snapshot ~app_bin_dir ~data_dir ~snapshot_path ~no_check =
     in
     if no_check then base @ ["--no-check"] else base
   in
-  Common.run args
+  Common.run ~quiet args
 
-let import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check =
+let import_snapshot_file ?(quiet = false) ~app_bin_dir ~data_dir ~snapshot_file
+    ~no_check () =
   import_snapshot
+    ~quiet
     ~app_bin_dir
     ~data_dir
     ~snapshot_path:snapshot_file.path
     ~no_check
+    ()
 
-let perform_snapshot_plan ~plan ~app_bin_dir ~data_dir ~no_check =
+let perform_snapshot_plan ?(quiet = false) ~plan ~app_bin_dir ~data_dir
+    ~no_check () =
   match plan with
   | No_snapshot -> Ok ()
   | Direct_snapshot {uri} ->
-      let* snapshot_file = prepare_snapshot_source uri in
+      let* snapshot_file = prepare_snapshot_source ~quiet uri in
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
         (fun () ->
-          import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check)
+          import_snapshot_file
+            ~quiet
+            ~app_bin_dir
+            ~data_dir
+            ~snapshot_file
+            ~no_check
+            ())
   | Tzinit_snapshot res ->
-      let* snapshot_file = download_snapshot_to_tmp res.download_url in
+      let* snapshot_file = download_snapshot_to_tmp ~quiet res.download_url in
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
         (fun () ->
-          import_snapshot_file ~app_bin_dir ~data_dir ~snapshot_file ~no_check)
+          import_snapshot_file
+            ~quiet
+            ~app_bin_dir
+            ~data_dir
+            ~snapshot_file
+            ~no_check
+            ())
 
-let perform_bootstrap ~plan ~(request : node_request) ~data_dir =
+let perform_bootstrap ?(quiet = false) ~plan ~(request : node_request) ~data_dir
+    () =
   perform_snapshot_plan
+    ~quiet
     ~plan
     ~app_bin_dir:request.app_bin_dir
     ~data_dir
     ~no_check:request.snapshot_no_check
+    ()
 
-let ensure_node_config ~app_bin_dir ~data_dir ~network ~history_mode =
+let ensure_node_config ?(quiet = false) ~app_bin_dir ~data_dir ~network
+    ~history_mode () =
   let config_path = Filename.concat data_dir "config.json" in
   if Sys.file_exists config_path then Ok ()
   else
     let octez_node = Filename.concat app_bin_dir "octez-node" in
     Common.run
+      ~quiet
       [
         octez_node;
         "config";
@@ -449,7 +471,7 @@ let resolve_from_data_dir data_dir =
     in
     Ok (`Data_dir {network; history_mode; rpc_addr; net_addr})
 
-let install_node (request : node_request) =
+let install_node ?(quiet = false) (request : node_request) =
   let* () = validate_instance_name ~instance:request.instance in
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
@@ -477,12 +499,15 @@ let install_node (request : node_request) =
   let snapshot_meta =
     snapshot_metadata_of_plan ~no_check:request.snapshot_no_check snapshot_plan
   in
-  let* () = System_user.ensure_service_account ~name:request.service_user in
+  let* () =
+    System_user.ensure_service_account ~quiet ~name:request.service_user ()
+  in
   let* () =
     if Common.is_root () then
       System_user.ensure_system_directories
         ~user:request.service_user
         ~group:request.service_user
+        ()
     else Ok ()
   in
   let* () =
@@ -512,14 +537,16 @@ let install_node (request : node_request) =
   let* () = ensure_runtime_log_directory ~owner ~group logging_mode in
   let* () =
     ensure_node_config
+      ~quiet
       ~app_bin_dir:request.app_bin_dir
       ~data_dir
       ~network:resolved_network
       ~history_mode:request.history_mode
+      ()
   in
   let* () =
     if request.preserve_data then Ok ()
-    else perform_bootstrap ~plan:snapshot_plan ~request ~data_dir
+    else perform_bootstrap ~quiet ~plan:snapshot_plan ~request ~data_dir ()
   in
   let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
   let service =
@@ -543,9 +570,11 @@ let install_node (request : node_request) =
   in
   let* () =
     Systemd.install_unit
+      ~quiet
       ~role:"node"
       ~app_bin_dir:request.app_bin_dir
       ~user:request.service_user
+      ()
   in
   let extra_env =
     [
@@ -563,19 +592,29 @@ let install_node (request : node_request) =
     Node_env.write ~inst:request.instance ~data_dir ~run_args ~extra_env
   in
   let* () =
-    Systemd.write_dropin_node ~inst:request.instance ~data_dir ~logging_mode
+    Systemd.write_dropin_node
+      ~quiet
+      ~inst:request.instance
+      ~data_dir
+      ~logging_mode
+      ()
   in
   let* () = Service_registry.write service in
   let* services = Service_registry.list () in
   let* () = Systemd.sync_logrotate (logrotate_specs_of services) in
   let* () =
     if request.auto_enable then
-      Systemd.enable ~role:"node" ~instance:request.instance ~start_now:true
+      Systemd.enable
+        ~quiet
+        ~role:"node"
+        ~instance:request.instance
+        ~start_now:true
+        ()
     else Ok ()
   in
   Ok service
 
-let install_daemon (request : daemon_request) =
+let install_daemon ?(quiet = false) (request : daemon_request) =
   let* () = validate_instance_name ~instance:request.instance in
   let logging_mode =
     prepare_logging
@@ -583,12 +622,15 @@ let install_daemon (request : daemon_request) =
       ~role:request.role
       ~logging_mode:request.logging_mode
   in
-  let* () = System_user.ensure_service_account ~name:request.service_user in
+  let* () =
+    System_user.ensure_service_account ~quiet ~name:request.service_user ()
+  in
   let* () =
     if Common.is_root () then
       System_user.ensure_system_directories
         ~user:request.service_user
         ~group:request.service_user
+        ()
     else Ok ()
   in
   let* () =
@@ -616,9 +658,11 @@ let install_daemon (request : daemon_request) =
   let* () = Node_env.write_pairs ~inst:request.instance extra_env in
   let* () =
     Systemd.install_unit
+      ~quiet
       ~role:request.role
       ~app_bin_dir:request.app_bin_dir
       ~user:request.service_user
+      ()
   in
   let* () =
     Systemd.write_dropin
@@ -653,14 +697,16 @@ let install_daemon (request : daemon_request) =
   let* () =
     if request.auto_enable then
       Systemd.enable
+        ~quiet
         ~role:request.role
         ~instance:request.instance
         ~start_now:true
+        ()
     else Ok ()
   in
   Ok service
 
-let install_baker (request : baker_request) =
+let install_baker ?(quiet = false) (request : baker_request) =
   let* node_mode : Installer_types.resolved_baker_node_mode =
     match request.node_mode with
     | Remote_endpoint endpoint -> Ok (Remote endpoint)
@@ -722,6 +768,7 @@ let install_baker (request : baker_request) =
   let delegate_args = String.concat " " request.delegates |> String.trim in
   let extra_args_str = String.concat " " request.extra_args |> String.trim in
   install_daemon
+    ~quiet
     {
       role = "baker";
       instance = request.instance;
@@ -757,7 +804,7 @@ let install_baker (request : baker_request) =
       auto_enable = request.auto_enable;
     }
 
-let install_accuser (request : accuser_request) =
+let install_accuser ?(quiet = false) (request : accuser_request) =
   let* node_mode : Installer_types.resolved_baker_node_mode =
     match request.node_mode with
     | Remote_endpoint endpoint -> Ok (Remote endpoint)
@@ -790,6 +837,7 @@ let install_accuser (request : accuser_request) =
   in
   let extra_args_str = String.concat " " request.extra_args |> String.trim in
   install_daemon
+    ~quiet
     {
       role = "accuser";
       instance = request.instance;
@@ -816,30 +864,32 @@ let install_accuser (request : accuser_request) =
       auto_enable = request.auto_enable;
     }
 
-let start_service ~instance =
+let start_service ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc -> Systemd.start ~role:svc.role ~instance
+  | Some svc -> Systemd.start ?quiet ~role:svc.role ~instance ()
   | None -> R.error_msgf "Instance '%s' not found" instance
 
-let stop_service ~instance =
+let stop_service ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc -> Systemd.stop ~role:svc.role ~instance
+  | Some svc -> Systemd.stop ?quiet ~role:svc.role ~instance ()
   | None -> R.error_msgf "Instance '%s' not found" instance
 
-let restart_service ~instance =
+let restart_service ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc -> Systemd.restart ~role:svc.role ~instance
+  | Some svc -> Systemd.restart ?quiet ~role:svc.role ~instance ()
   | None -> R.error_msgf "Instance '%s' not found" instance
 
-let remove_service ~delete_data_dir ~instance =
+let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
-      let* () = Systemd.disable ~role:svc.role ~instance ~stop_now:true in
+      let* () =
+        Systemd.disable ~quiet ~role:svc.role ~instance ~stop_now:true ()
+      in
       Systemd.remove_dropin ~role:svc.role ~instance ;
       let* () =
         match delete_data_dir with
@@ -850,12 +900,12 @@ let remove_service ~delete_data_dir ~instance =
       let* services = Service_registry.list () in
       Systemd.sync_logrotate (logrotate_specs_of services)
 
-let purge_service ~prompt_yes_no ~instance =
+let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
-      let* () = remove_service ~delete_data_dir:true ~instance in
+      let* () = remove_service ~quiet ~delete_data_dir:true ~instance () in
       let* () =
         let is_baker = svc.role = "baker" in
         let is_accuser = svc.role = "accuser" in
@@ -895,7 +945,7 @@ let purge_service ~prompt_yes_no ~instance =
         should_drop_service_user
           ~user:svc.service_user
           ~remaining_services:remaining
-      then System_user.remove_service_account ~name:svc.service_user
+      then System_user.remove_service_account ~quiet ~name:svc.service_user ()
       else Ok ()
 
 let list_services () = Service_registry.list ()

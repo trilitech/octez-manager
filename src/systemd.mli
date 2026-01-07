@@ -13,12 +13,15 @@ val cat_unit :
   role:string -> instance:string -> (string, [`Msg of string]) result
 
 val install_unit :
+  ?quiet:bool ->
   role:string ->
   app_bin_dir:string ->
   user:string ->
+  unit ->
   (unit, [`Msg of string]) result
 
 val write_dropin :
+  ?quiet:bool ->
   role:string ->
   inst:string ->
   data_dir:string ->
@@ -28,9 +31,11 @@ val write_dropin :
   (unit, [`Msg of string]) result
 
 val write_dropin_node :
+  ?quiet:bool ->
   inst:string ->
   data_dir:string ->
   logging_mode:Logging_mode.t ->
+  unit ->
   (unit, [`Msg of string]) result
 
 val remove_dropin : role:string -> instance:string -> unit

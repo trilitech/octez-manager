@@ -15,26 +15,39 @@ val resolve_from_data_dir :
   string ->
   ([`Path of string | `Data_dir of resolved_data_dir_config], string) result
 
-val install_node : node_request -> (Service.t, [`Msg of string]) result
+val install_node :
+  ?quiet:bool -> node_request -> (Service.t, [`Msg of string]) result
 
-val install_daemon : daemon_request -> (Service.t, [`Msg of string]) result
+val install_daemon :
+  ?quiet:bool -> daemon_request -> (Service.t, [`Msg of string]) result
 
-val install_baker : baker_request -> (Service.t, [`Msg of string]) result
+val install_baker :
+  ?quiet:bool -> baker_request -> (Service.t, [`Msg of string]) result
 
-val install_accuser : accuser_request -> (Service.t, [`Msg of string]) result
+val install_accuser :
+  ?quiet:bool -> accuser_request -> (Service.t, [`Msg of string]) result
 
-val start_service : instance:string -> (unit, [`Msg of string]) result
+val start_service :
+  ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
 
-val stop_service : instance:string -> (unit, [`Msg of string]) result
+val stop_service :
+  ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
 
-val restart_service : instance:string -> (unit, [`Msg of string]) result
+val restart_service :
+  ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
 
 val remove_service :
-  delete_data_dir:bool -> instance:string -> (unit, [`Msg of string]) result
+  ?quiet:bool ->
+  delete_data_dir:bool ->
+  instance:string ->
+  unit ->
+  (unit, [`Msg of string]) result
 
 val purge_service :
+  ?quiet:bool ->
   prompt_yes_no:(string -> default:bool -> bool) ->
   instance:string ->
+  unit ->
   (unit, [`Msg of string]) result
 
 val list_services : unit -> (Service.t list, [`Msg of string]) result
