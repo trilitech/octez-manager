@@ -9,11 +9,7 @@ val ensure_service_account :
   ?quiet:bool -> name:string -> unit -> (unit, Rresult.R.msg) result
 
 val ensure_system_directories :
-  ?quiet:bool ->
-  user:string ->
-  group:string ->
-  unit ->
-  (unit, Rresult.R.msg) result
+  user:string -> group:string -> unit -> (unit, Rresult.R.msg) result
 
 val validate_user_for_service : user:string -> (unit, Rresult.R.msg) result
 

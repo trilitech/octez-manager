@@ -505,7 +505,6 @@ let install_node ?(quiet = false) (request : node_request) =
   let* () =
     if Common.is_root () then
       System_user.ensure_system_directories
-        ~quiet
         ~user:request.service_user
         ~group:request.service_user
         ()
@@ -629,7 +628,6 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
   let* () =
     if Common.is_root () then
       System_user.ensure_system_directories
-        ~quiet
         ~user:request.service_user
         ~group:request.service_user
         ()

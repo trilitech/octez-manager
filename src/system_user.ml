@@ -72,8 +72,7 @@ let ensure_service_account ?(quiet = false) ~name () =
     | Ok () -> Ok ()
     | Error (`Msg e) -> R.error_msgf "Failed to create user %s: %s" name e
 
-let ensure_system_directories ?(quiet = false) ~user ~group () =
-  let _ = quiet in
+let ensure_system_directories ~user ~group () =
   if not (is_root ()) then Ok ()
   else
     let dirs =
