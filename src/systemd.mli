@@ -40,6 +40,8 @@ val write_dropin_node :
 
 val remove_dropin : role:string -> instance:string -> unit
 
+val get_service_paths : role:string -> instance:string -> (string * string) list
+
 type logrotate_spec = {role : string; paths : string list}
 
 val sync_logrotate : logrotate_spec list -> (unit, [`Msg of string]) result

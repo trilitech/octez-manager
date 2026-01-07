@@ -87,37 +87,63 @@ let view_details svc =
           (Widgets.dim (Printf.sprintf "%-*s" width label))
           value)
   in
-  match svc.Service.role with
-  | "baker" ->
-      let env =
-        match Node_env.read ~inst:svc.Service.instance with
-        | Ok pairs -> pairs
-        | Error _ -> []
-      in
-      let lookup key =
-        match List.assoc_opt key env with Some v -> String.trim v | None -> ""
-      in
-      let delegates =
-        match lookup "OCTEZ_BAKER_DELEGATES_CSV" with
-        | "" -> "(none)"
-        | csv ->
-            csv |> String.split_on_char ',' |> List.map String.trim
-            |> List.filter (( <> ) "")
-            |> ( function [] -> ["(none)"] | xs -> xs )
-            |> String.concat ", "
-      in
-      let node_mode = lookup "OCTEZ_BAKER_NODE_MODE" in
-      let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
-      let dal_config = lookup "OCTEZ_DAL_CONFIG" in
-      let dal_display =
-        if dal_config = "disabled" then "(opt-out: --without-dal)"
-        else if dal_config = "" then "(auto)"
-        else dal_config
-      in
-      let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-      let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
-      let logging = Logging_mode.to_string svc.Service.logging_mode in
-      render_fields
+  let service_paths =
+    Systemd.get_service_paths
+      ~role:svc.Service.role
+      ~instance:svc.Service.instance
+  in
+  let log_file =
+    match
+      Log_viewer.get_daily_log_file
+        ~role:svc.Service.role
+        ~instance:svc.Service.instance
+    with
+    | Ok path -> [("Log File (Latest)", path)]
+    | Error _ -> []
+  in
+  let config_file = Filename.concat svc.Service.data_dir "config.json" in
+  let identity_file = Filename.concat svc.Service.data_dir "identity.json" in
+  let paths =
+    [
+      ("Data Directory", svc.Service.data_dir);
+      ("Config File", config_file);
+      ("Identity File", identity_file);
+    ]
+    @ service_paths @ log_file
+  in
+  let details =
+    match svc.Service.role with
+    | "baker" ->
+        let env =
+          match Node_env.read ~inst:svc.Service.instance with
+          | Ok pairs -> pairs
+          | Error _ -> []
+        in
+        let lookup key =
+          match List.assoc_opt key env with
+          | Some v -> String.trim v
+          | None -> ""
+        in
+        let delegates =
+          match lookup "OCTEZ_BAKER_DELEGATES_CSV" with
+          | "" -> "(none)"
+          | csv ->
+              csv |> String.split_on_char ',' |> List.map String.trim
+              |> List.filter (( <> ) "")
+              |> ( function [] -> ["(none)"] | xs -> xs )
+              |> String.concat ", "
+        in
+        let node_mode = lookup "OCTEZ_BAKER_NODE_MODE" in
+        let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+        let dal_config = lookup "OCTEZ_DAL_CONFIG" in
+        let dal_display =
+          if dal_config = "disabled" then "(opt-out: --without-dal)"
+          else if dal_config = "" then "(auto)"
+          else dal_config
+        in
+        let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
+        let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
+        let logging = Logging_mode.to_string svc.Service.logging_mode in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -129,21 +155,18 @@ let view_details svc =
           ( "Node Endpoint",
             if node_endpoint = "" then "(unset)" else node_endpoint );
           ("DAL Config", dal_display);
-          ("Data Dir", svc.Service.data_dir);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
           ("Created At", svc.Service.created_at);
           ("Logging", logging);
           ("Extra Args", if extra_args = "" then "(none)" else extra_args);
         ]
-  | _ ->
-      render_fields
+    | _ ->
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
           ("Network", svc.Service.network);
           ("History Mode", History_mode.to_string svc.Service.history_mode);
-          ("Data Dir", svc.Service.data_dir);
           ("RPC Addr", svc.Service.rpc_addr);
           ("P2P Addr", svc.Service.net_addr);
           ("Service User", svc.Service.service_user);
@@ -152,6 +175,10 @@ let view_details svc =
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
           ("Extra Args", String.concat " " svc.Service.extra_args);
         ]
+  in
+  render_fields details
+  @ [""; Widgets.bold "Files & Paths"]
+  @ render_fields paths
 
 let view s ~focus:_ ~size =
   let body =
