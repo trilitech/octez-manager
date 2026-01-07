@@ -699,3 +699,30 @@ module For_tests = struct
 
   let exec_line = exec_line
 end
+
+let get_service_paths ~role ~instance =
+  let unit_file = unit_path role in
+  (* Unit file is template, but helpful to know *)
+  let dropin = dropin_path role instance in
+  let env_file =
+    let tmpl = env_file_template (not (Common.is_root ())) in
+    (* Replace %i with instance name *)
+    let len = String.length tmpl in
+    let buf = Buffer.create len in
+    let rec loop i =
+      if i >= len then ()
+      else if i + 1 < len && tmpl.[i] = '%' && tmpl.[i + 1] = 'i' then (
+        Buffer.add_string buf instance ;
+        loop (i + 2))
+      else (
+        Buffer.add_char buf tmpl.[i] ;
+        loop (i + 1))
+    in
+    loop 0 ;
+    Buffer.contents buf
+  in
+  [
+    ("Service Unit", unit_file);
+    ("Drop-in Override", dropin);
+    ("Environment File", env_file);
+  ]
