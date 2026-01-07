@@ -300,13 +300,17 @@ let view s ~focus ~size =
   let help =
     Widgets.dim
       (Printf.sprintf
-         "Source: %s · r: refresh · t: toggle source · /: search · f: follow · \
-          Esc: back"
+         "Source: %s · r: refresh · t: toggle · /: search · f: follow · w: \
+          wrap · ?: help · Esc: back"
          source_str)
   in
   let header = [title; help] in
   Vsection.render ~size ~header ~footer:[] ~child:(fun inner_size ->
-      Pager.render ~win:inner_size.LTerm_geom.rows (get_pager s.pager) ~focus)
+      Pager.render
+        ~cols:inner_size.LTerm_geom.cols
+        ~win:inner_size.LTerm_geom.rows
+        (get_pager s.pager)
+        ~focus)
 
 let handle_modal_key s key ~size =
   (* Forward keys to pager when in modal/search mode *)
@@ -327,7 +331,7 @@ let handle_key s key ~size =
   (* Check if pager is in input mode *)
   let pager_in_input_mode =
     match current_pager.Pager.input_mode with
-    | `Search_edit | `Lookup -> true
+    | `Search_edit | `Lookup | `Help -> true
     | `None -> false
   in
 
@@ -388,7 +392,7 @@ let next_page s =
 
 let has_modal s =
   match (get_pager s.pager).Pager.input_mode with
-  | `Search_edit | `Lookup -> true
+  | `Search_edit | `Lookup | `Help -> true
   | `None -> false
 
 module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
