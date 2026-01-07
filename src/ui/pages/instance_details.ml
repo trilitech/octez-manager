@@ -87,6 +87,14 @@ let view_details svc =
           (Widgets.dim (Printf.sprintf "%-*s" width label))
           value)
   in
+  let env =
+    match Node_env.read ~inst:svc.Service.instance with
+    | Ok pairs -> pairs
+    | Error _ -> []
+  in
+  let lookup key =
+    match List.assoc_opt key env with Some v -> String.trim v | None -> ""
+  in
   let service_paths =
     Systemd.get_service_paths
       ~role:svc.Service.role
@@ -101,29 +109,49 @@ let view_details svc =
     | Ok path -> [("Log File (Latest)", path)]
     | Error _ -> []
   in
-  let config_file = Filename.concat svc.Service.data_dir "config.json" in
-  let identity_file = Filename.concat svc.Service.data_dir "identity.json" in
-  let paths =
-    [
-      ("Data Directory", svc.Service.data_dir);
-      ("Config File", config_file);
-      ("Identity File", identity_file);
-    ]
-    @ service_paths @ log_file
+  let service_metadata =
+    let path =
+      Filename.concat
+        (Service_registry.services_dir ())
+        (svc.Service.instance ^ ".json")
+    in
+    [("Service Metadata", path)]
   in
+  let specific_paths =
+    match svc.Service.role with
+    | "node" ->
+        let config_file = Filename.concat svc.Service.data_dir "config.json" in
+        let identity_file =
+          Filename.concat svc.Service.data_dir "identity.json"
+        in
+        [
+          ("Data Directory", svc.Service.data_dir);
+          ("Config File", config_file);
+          ("Identity File", identity_file);
+        ]
+    | "baker" ->
+        let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
+        let client_config = Filename.concat base_dir "config" in
+        [("Base Directory", base_dir); ("Client Config", client_config)]
+    | "accuser" ->
+        let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+        let client_config = Filename.concat base_dir "config" in
+        [("Base Directory", base_dir); ("Client Config", client_config)]
+    | "dal-node" | "dal" ->
+        let data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
+        let config_file = Filename.concat data_dir "config.json" in
+        let identity_file = Filename.concat data_dir "identity.json" in
+        [
+          ("DAL Data Dir", data_dir);
+          ("Config File", config_file);
+          ("Identity File", identity_file);
+        ]
+    | _ -> [("Data Directory", svc.Service.data_dir)]
+  in
+  let paths = specific_paths @ service_paths @ log_file @ service_metadata in
   let details =
     match svc.Service.role with
     | "baker" ->
-        let env =
-          match Node_env.read ~inst:svc.Service.instance with
-          | Ok pairs -> pairs
-          | Error _ -> []
-        in
-        let lookup key =
-          match List.assoc_opt key env with
-          | Some v -> String.trim v
-          | None -> ""
-        in
         let delegates =
           match lookup "OCTEZ_BAKER_DELEGATES_CSV" with
           | "" -> "(none)"
