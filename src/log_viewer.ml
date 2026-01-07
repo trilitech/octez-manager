@@ -81,45 +81,23 @@ let get_daily_log_file ~role ~instance =
         else
           Error (`Msg (Printf.sprintf "Log file does not exist: %s" log_file))
 
-let read_logs ~role ~instance ~source ~lines =
+let get_log_cmd ~role ~instance ~source =
   match source with
-  | Journald -> (
+  | Journald ->
       let user_flag = if Common.is_root () then "" else "--user " in
       let unit = unit_name ~role ~instance in
       let cmd =
         Printf.sprintf
-          "journalctl %s-u %s -n %d --no-pager"
+          "journalctl %s-u %s -f -n 100 --no-pager"
           user_flag
           (Filename.quote unit)
-          lines
       in
-      let ic = Unix.open_process_in cmd in
-      let rec read_all acc =
-        match input_line ic with
-        | line -> read_all (line :: acc)
-        | exception End_of_file -> List.rev acc
-      in
-      let logs = read_all [] in
-      match Unix.close_process_in ic with
-      | Unix.WEXITED 0 -> Ok logs
-      | _ -> Error (`Msg "Failed to read journald logs"))
+      Ok cmd
   | DailyLogs -> (
       match get_daily_log_file ~role ~instance with
       | Error e -> Error e
-      | Ok log_file -> (
+      | Ok log_file ->
           let cmd =
-            Printf.sprintf "tail -n %d %s" lines (Filename.quote log_file)
+            Printf.sprintf "tail -f -n 100 %s" (Filename.quote log_file)
           in
-          let ic = Unix.open_process_in cmd in
-          let rec read_all acc =
-            match input_line ic with
-            | line -> read_all (line :: acc)
-            | exception End_of_file -> List.rev acc
-          in
-          let logs = read_all [] in
-          match Unix.close_process_in ic with
-          | Unix.WEXITED 0 -> Ok logs
-          | _ -> Error (`Msg "Failed to read daily log file")))
-
-(* Unused - File_pager handles tailing for daily logs *)
-(* let tail_logs ~role ~instance ~source = ... *)
+          Ok cmd)
