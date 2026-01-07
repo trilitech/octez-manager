@@ -121,7 +121,70 @@ let print_service_details svc =
   Format.printf "Service user  : %s@." svc.service_user ;
   Format.printf "Octez bin dir : %s@." svc.app_bin_dir ;
   Format.printf "Created at    : %s@." svc.created_at ;
-  Format.printf "Logging       : %a@." pp_logging svc.logging_mode
+  Format.printf "Logging       : %a@." pp_logging svc.logging_mode ;
+
+  (* Files & Paths Section *)
+  Format.printf "@.Files & Paths:@." ;
+
+  let service_paths =
+    Systemd.get_service_paths ~role:svc.role ~instance:svc.instance
+  in
+  List.iter
+    (fun (label, path) -> Format.printf "  %-16s: %s@." label path)
+    service_paths ;
+
+  Format.printf
+    "  %-16s: %s@."
+    "Service Metadata"
+    (Filename.concat
+       (Service_registry.services_dir ())
+       (svc.instance ^ ".json")) ;
+
+  (match
+     Log_viewer.get_daily_log_file ~role:svc.role ~instance:svc.instance
+   with
+  | Ok path -> Format.printf "  %-16s: %s@." "Log File" path
+  | Error _ -> ()) ;
+
+  match svc.role with
+  | "node" ->
+      Format.printf
+        "  %-16s: %s@."
+        "Config File"
+        (Filename.concat svc.data_dir "config.json") ;
+      Format.printf
+        "  %-16s: %s@."
+        "Identity File"
+        (Filename.concat svc.data_dir "identity.json")
+  | "baker" ->
+      let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
+      if base_dir <> "" then (
+        Format.printf "  %-16s: %s@." "Base Directory" base_dir ;
+        Format.printf
+          "  %-16s: %s@."
+          "Client Config"
+          (Filename.concat base_dir "config"))
+  | "accuser" ->
+      let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+      if base_dir <> "" then (
+        Format.printf "  %-16s: %s@." "Base Directory" base_dir ;
+        Format.printf
+          "  %-16s: %s@."
+          "Client Config"
+          (Filename.concat base_dir "config"))
+  | "dal-node" | "dal" ->
+      let dal_dir = lookup "OCTEZ_DAL_DATA_DIR" in
+      if dal_dir <> "" then (
+        Format.printf "  %-16s: %s@." "DAL Data Dir" dal_dir ;
+        Format.printf
+          "  %-16s: %s@."
+          "Config File"
+          (Filename.concat dal_dir "config.json") ;
+        Format.printf
+          "  %-16s: %s@."
+          "Identity File"
+          (Filename.concat dal_dir "identity.json"))
+  | _ -> ()
 
 let print_snapshot_entry (entry : Snapshots.entry) =
   Format.printf "%s (%s)@." entry.Snapshots.label entry.slug ;
