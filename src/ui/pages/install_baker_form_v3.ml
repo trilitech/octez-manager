@@ -514,11 +514,14 @@ let spec =
 
         let* () =
           if Common.is_root () then
-            System_user.ensure_service_account ~name:model.core.service_user
+            System_user.ensure_service_account
+              ~quiet:true
+              ~name:model.core.service_user
+              ()
           else Ok ()
         in
         let* (module PM) = require_package_manager () in
-        let* _ = PM.install_baker req in
+        let* _ = PM.install_baker ~quiet:true req in
         if model.core.start_now then
           match Miaou_interfaces.Service_lifecycle.get () with
           | Some sl ->

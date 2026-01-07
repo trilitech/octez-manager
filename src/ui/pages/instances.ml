@@ -948,19 +948,27 @@ let remove_modal state =
                   fun () ->
                     Rpc_scheduler.stop_head_monitor instance ;
                     let* (module I) = require_installer () in
-                    I.remove_service ~delete_data_dir:false ~instance )
+                    I.remove_service
+                      ~quiet:true
+                      ~delete_data_dir:false
+                      ~instance
+                      () )
             | `RemoveData ->
                 ( "remove",
                   fun () ->
                     Rpc_scheduler.stop_head_monitor instance ;
                     let* (module I) = require_installer () in
-                    I.remove_service ~delete_data_dir:true ~instance )
+                    I.remove_service
+                      ~quiet:true
+                      ~delete_data_dir:true
+                      ~instance
+                      () )
             | `Purge ->
                 ( "purge",
                   fun () ->
                     Rpc_scheduler.stop_head_monitor instance ;
                     let* (module I) = require_installer () in
-                    I.purge_service ~instance )
+                    I.purge_service ~quiet:true ~instance () )
           in
           run_unit_action ~verb ~instance action) ;
       state)

@@ -15,7 +15,6 @@
   bos
   miaou-core
   miaou-driver-term
-  miaou-driver-matrix
   miaou-runner
   eio
   eio_main

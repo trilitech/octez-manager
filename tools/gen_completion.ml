@@ -17,10 +17,13 @@ let escape_zsh_single s =
   String.concat "'\\''" parts
 
 let write_file path contents =
-  let oc = open_out_bin path in
-  Fun.protect
-    ~finally:(fun () -> close_out oc)
-    (fun () -> output_string oc contents)
+  try
+    let oc = open_out_bin path in
+    Fun.protect
+      ~finally:(fun () -> close_out oc)
+      (fun () -> output_string oc contents)
+  with Sys_error msg ->
+    prerr_endline ("Failed to write to file '" ^ path ^ "': " ^ msg)
 
 let run_help binary args =
   let argv = ["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ args in
