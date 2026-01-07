@@ -11,6 +11,7 @@ module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Widgets = Miaou_widgets_display.Widgets
 open Octez_manager_lib
+module Render_notify = Miaou_helpers.Render_notify
 
 let name = "log_viewer"
 
@@ -33,6 +34,19 @@ let close_pager s =
   (match s.pager with Static _ -> () | FileTail fp -> File_pager.close fp) ;
   List.iter (fun f -> try Sys.remove f with _ -> ()) s.cleanup_files
 
+let open_file_with_tail path =
+  match
+    File_pager.open_file
+      ~follow:true
+      ~notify_render:Render_notify.request_render
+      path
+  with
+  | Ok fp ->
+      let p = File_pager.pager fp in
+      let _ = Pager.handle_key p ~key:"G" in
+      Ok fp
+  | Error e -> Error e
+
 let open_stream_via_file cmd =
   let temp_file = Filename.temp_file "octez_log_" ".txt" in
   (* Start background process to feed the file *)
@@ -43,7 +57,7 @@ let open_stream_via_file cmd =
   | 0 -> (
       (* Give it a moment to create/write *)
       Unix.sleepf 0.1 ;
-      match File_pager.open_file ~follow:true temp_file with
+      match open_file_with_tail temp_file with
       | Ok fp -> Ok (fp, temp_file)
       | Error e -> Error (`Msg e))
   | _ -> Error (`Msg "Failed to start background logger")
@@ -59,7 +73,7 @@ let init () =
               Log_viewer.get_daily_log_file ~role:svc.Service.role ~instance
             with
             | Ok log_file -> (
-                match File_pager.open_file ~follow:true log_file with
+                match open_file_with_tail log_file with
                 | Ok fp -> (Log_viewer.DailyLogs, FileTail fp, [])
                 | Error _ -> (
                     (* Fall back to journald via temp file *)
@@ -157,7 +171,7 @@ let refresh s =
               ~instance:s.instance
           with
           | Ok log_file -> (
-              match File_pager.open_file ~follow:true log_file with
+              match open_file_with_tail log_file with
               | Ok fp -> {s with pager = FileTail fp}
               | Error msg ->
                   let pager = Static (Pager.open_text ~title:"Error" msg) in
@@ -226,7 +240,7 @@ let toggle_source s =
           with
           | Ok log_file -> (
               (* Restoring File_pager with follow:true *)
-              match File_pager.open_file ~follow:true log_file with
+              match open_file_with_tail log_file with
               | Ok fp -> {s with source = new_source; pager = FileTail fp}
               | Error msg ->
                   let pager = Static (Pager.open_text ~title:"Error" msg) in
