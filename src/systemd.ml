@@ -42,11 +42,11 @@ let unit_name role inst = Printf.sprintf "octez-%s@%s" role inst
 let systemctl_cmd () =
   if Common.is_root () then ["systemctl"] else ["systemctl"; "--user"]
 
-let run_systemctl args = Common.run (systemctl_cmd () @ args)
+let run_systemctl ?quiet args = Common.run ?quiet (systemctl_cmd () @ args)
 
-let run_systemctl_timeout args =
+let run_systemctl_timeout ?quiet args =
   (* Keep systemctl calls bounded to avoid UI stalls. Shorten to 2s. *)
-  Common.run (("timeout" :: "2s" :: systemctl_cmd ()) @ args)
+  Common.run ?quiet (("timeout" :: "2s" :: systemctl_cmd ()) @ args)
 
 let run_systemctl_out_timeout args =
   (* Keep systemctl calls bounded to avoid UI stalls. Shorten to 2s. *)
@@ -284,7 +284,7 @@ let validate_bin_dir ~user ~app_bin_dir ~role =
     | Ok () -> Ok ()
     | Error (`Msg m) -> R.error_msgf "Cannot execute %s: %s" binary m
 
-let install_unit ~role ~app_bin_dir ~user =
+let install_unit ?(quiet = false) ~role ~app_bin_dir ~user () =
   let path = unit_path role in
   let owner, group =
     if Common.is_root () then ("root", "root")
@@ -305,7 +305,7 @@ let install_unit ~role ~app_bin_dir ~user =
       ()
   in
   let* () = Common.write_file ~mode:0o644 ~owner ~group path body in
-  let* () = run_systemctl_timeout ["daemon-reload"] in
+  let* () = run_systemctl_timeout ~quiet ["daemon-reload"] in
   Ok ()
 
 module StringSet = Set.Make (String)
@@ -481,7 +481,8 @@ let logrotate_binary () =
         "logrotate binary not found in PATH. Install the 'logrotate' package \
          to enable file log rotation."
 
-let ensure_user_logrotate_timer ~owner ~group ~logrotate_bin =
+let ensure_user_logrotate_timer ?(quiet = false) ~owner ~group ~logrotate_bin ()
+    =
   let service_body =
     Printf.sprintf
       "[Unit]\n\
@@ -519,17 +520,17 @@ let ensure_user_logrotate_timer ~owner ~group ~logrotate_bin =
       (user_logrotate_timer_path ())
       timer_body
   in
-  let* () = run_systemctl_timeout ["daemon-reload"] in
-  run_systemctl ["enable"; "--now"; user_logrotate_unit ^ ".timer"]
+  let* () = run_systemctl_timeout ~quiet ["daemon-reload"] in
+  run_systemctl ~quiet ["enable"; "--now"; user_logrotate_unit ^ ".timer"]
 
-let disable_user_logrotate_timer () =
+let disable_user_logrotate_timer ?(quiet = false) () =
   let timer = user_logrotate_unit ^ ".timer" in
   (* Only disable the timer - the service is triggered by timer and has no [Install] section *)
-  ignore (run_systemctl ["disable"; "--now"; timer]) ;
+  ignore (run_systemctl ~quiet ["disable"; "--now"; timer]) ;
   (* Stop the service if running, but don't try to disable it *)
   let service = user_logrotate_unit ^ ".service" in
-  ignore (run_systemctl ["stop"; service]) ;
-  ignore (run_systemctl_timeout ["daemon-reload"]) ;
+  ignore (run_systemctl ~quiet ["stop"; service]) ;
+  ignore (run_systemctl_timeout ~quiet ["daemon-reload"]) ;
   ()
 
 let cleanup_user_logrotate_files () =
@@ -572,7 +573,7 @@ let _sync_user_logrotate specs =
     let* () = remove_unused_user_role_configs active_roles in
     let state_dir = Filename.dirname (user_logrotate_state_file ()) in
     let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 state_dir in
-    ensure_user_logrotate_timer ~owner ~group ~logrotate_bin
+    ensure_user_logrotate_timer ~owner ~group ~logrotate_bin ()
 
 (* Logging is via journald - no logrotate needed *)
 let sync_logrotate _specs = Ok ()
@@ -617,7 +618,8 @@ let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths =
     @ List.map (fun p -> Printf.sprintf "ReadWritePaths=%s" p) rw_paths)
   ^ "\n"
 
-let write_dropin ~role ~inst ~data_dir ~logging_mode ?(extra_paths = []) () =
+let write_dropin ?(quiet = false) ~role ~inst ~data_dir ~logging_mode
+    ?(extra_paths = []) () =
   let dir = dropin_dir role inst in
   let path = dropin_path role inst in
   let owner, group =
@@ -627,29 +629,32 @@ let write_dropin ~role ~inst ~data_dir ~logging_mode ?(extra_paths = []) () =
   let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
   let body = write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths in
   let* () = Common.write_file ~mode:0o644 ~owner ~group path body in
-  run_systemctl_timeout ["daemon-reload"]
+  run_systemctl_timeout ~quiet ["daemon-reload"]
 
-let write_dropin_node ~inst ~data_dir ~logging_mode =
-  write_dropin ~role:"node" ~inst ~data_dir ~logging_mode ()
+let write_dropin_node ?quiet ~inst ~data_dir ~logging_mode () =
+  write_dropin ?quiet ~role:"node" ~inst ~data_dir ~logging_mode ()
 
 let render_logging_lines logging_mode =
   (logging_resources ~role:"node" ~logging_mode).extra_lines
 
-let enable ~role ~instance ~start_now =
+let enable ?(quiet = false) ~role ~instance ~start_now () =
   let unit = unit_name role instance in
   let action = if start_now then ["enable"; "--now"] else ["enable"] in
-  run_systemctl (action @ [unit])
+  run_systemctl ~quiet (action @ [unit])
 
-let disable ~role ~instance ~stop_now =
+let disable ?(quiet = false) ~role ~instance ~stop_now () =
   let unit = unit_name role instance in
   let action = if stop_now then ["disable"; "--now"] else ["disable"] in
-  run_systemctl (action @ [unit])
+  run_systemctl ~quiet (action @ [unit])
 
-let start ~role ~instance = run_systemctl ["start"; unit_name role instance]
+let start ?(quiet = false) ~role ~instance () =
+  run_systemctl ~quiet ["start"; unit_name role instance]
 
-let stop ~role ~instance = run_systemctl ["stop"; unit_name role instance]
+let stop ?(quiet = false) ~role ~instance () =
+  run_systemctl ~quiet ["stop"; unit_name role instance]
 
-let restart ~role ~instance = run_systemctl ["restart"; unit_name role instance]
+let restart ?(quiet = false) ~role ~instance () =
+  run_systemctl ~quiet ["restart"; unit_name role instance]
 
 let remove_dropin ~role ~instance =
   let path = dropin_dir role instance in

@@ -218,11 +218,14 @@ let spec =
         (* Execute installation *)
         let* () =
           if Common.is_root () then
-            System_user.ensure_service_account ~name:model.core.service_user
+            System_user.ensure_service_account
+              ~quiet:true
+              ~name:model.core.service_user
+              ()
           else Ok ()
         in
         let* (module PM) = require_package_manager () in
-        let* _service = PM.install_daemon req in
+        let* _service = PM.install_daemon ~quiet:true req in
         if model.core.start_now then
           match Miaou_interfaces.Service_lifecycle.get () with
           | Some sl ->

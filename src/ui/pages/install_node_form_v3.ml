@@ -546,11 +546,14 @@ let spec =
 
         let* () =
           if Common.is_root () then
-            System_user.ensure_service_account ~name:model.core.service_user
+            System_user.ensure_service_account
+              ~quiet:true
+              ~name:model.core.service_user
+              ()
           else Ok ()
         in
         let* (module PM) = require_package_manager () in
-        let* _service = PM.install_node req in
+        let* _service = PM.install_node ~quiet:true req in
         (* Start the service if requested, even if not enabling on boot *)
         if model.core.start_now && not model.core.enable_on_boot then
           match Miaou_interfaces.Service_lifecycle.get () with

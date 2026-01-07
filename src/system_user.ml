@@ -33,26 +33,27 @@ end
 
 let is_root () = !Hooks.is_root ()
 
-let run_cmd argv = !Hooks.run argv
+let run_cmd ?quiet argv = !Hooks.run ?quiet argv
 
 let user_exists name = !Hooks.user_exists name
 
 let group_exists name = !Hooks.group_exists name
 
-let ensure_group ~name =
+let ensure_group ?(quiet = false) ~name () =
   if group_exists name then Ok ()
   else
-    match run_cmd ["groupadd"; "--system"; name] with
+    match run_cmd ~quiet ["groupadd"; "--system"; name] with
     | Ok () -> Ok ()
     | Error (`Msg e) -> R.error_msgf "Failed to create group %s: %s" name e
 
-let ensure_service_account ~name =
+let ensure_service_account ?(quiet = false) ~name () =
   if not (is_root ()) then Ok ()
   else if user_exists name then Ok ()
   else
-    let* () = ensure_group ~name in
+    let* () = ensure_group ~quiet ~name () in
     match
       run_cmd
+        ~quiet
         [
           "useradd";
           "--system";
@@ -71,7 +72,7 @@ let ensure_service_account ~name =
     | Ok () -> Ok ()
     | Error (`Msg e) -> R.error_msgf "Failed to create user %s: %s" name e
 
-let ensure_system_directories ~user ~group =
+let ensure_system_directories ~user ~group () =
   if not (is_root ()) then Ok ()
   else
     let dirs =
@@ -101,21 +102,21 @@ let validate_user_for_service ~user =
        root."
       user
 
-let remove_service_account ~name =
+let remove_service_account ?(quiet = false) ~name () =
   let trimmed = String.trim name in
   if trimmed = "" then Ok ()
   else if not (is_root ()) then Ok ()
   else
     let* () =
       if user_exists trimmed then
-        match run_cmd ["userdel"; "--remove"; trimmed] with
+        match run_cmd ~quiet ["userdel"; "--remove"; trimmed] with
         | Ok () -> Ok ()
         | Error (`Msg e) ->
             R.error_msgf "Failed to delete user %s: %s" trimmed e
       else Ok ()
     in
     if group_exists trimmed then
-      match run_cmd ["groupdel"; trimmed] with
+      match run_cmd ~quiet ["groupdel"; trimmed] with
       | Ok () -> Ok ()
       | Error (`Msg e) -> R.error_msgf "Failed to delete group %s: %s" trimmed e
     else Ok ()

@@ -49,14 +49,23 @@ val write_file :
 
 val append_debug_log : string -> unit
 
-val run : string list -> (unit, [> `Msg of string]) result
+val run : ?quiet:bool -> string list -> (unit, [> `Msg of string]) result
+
+val run_silent : string list -> (unit, [> `Msg of string]) result
+
+val run_verbose : string list -> (unit, [> `Msg of string]) result
 
 val run_out : string list -> (string, [> `Msg of string]) result
 
-val run_as : user:string -> string list -> (unit, [> `Msg of string]) result
+val run_as :
+  ?quiet:bool -> user:string -> string list -> (unit, [> `Msg of string]) result
 
 val download_file :
-  url:string -> dest_path:string -> (unit, [> `Msg of string]) result
+  ?quiet:bool ->
+  url:string ->
+  dest_path:string ->
+  unit ->
+  (unit, [> `Msg of string]) result
 
 val download_file_with_progress :
   url:string ->

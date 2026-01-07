@@ -186,12 +186,32 @@ let sh_quote s =
 
 let cmd_to_string argv = String.concat " " (List.map sh_quote argv)
 
-let run argv =
-  append_debug_log ("RUN " ^ cmd_to_string argv) ;
+let run ?(quiet = false) argv =
+  append_debug_log ("RUN " ^ (if quiet then "[Q] " else "") ^ cmd_to_string argv) ;
   let cmd = Bos.Cmd.of_list argv in
-  match Bos.OS.Cmd.run cmd with
-  | Ok () -> Ok ()
-  | Error (`Msg m) -> Error (`Msg m)
+  if quiet then
+    (* Capture output to avoid polluting TUI, log it if error *)
+    match Bos.OS.Cmd.(run_out ~err:err_run_out cmd |> out_string) with
+    | Ok (_, (_, `Exited 0)) -> Ok ()
+    | Ok (out, _) ->
+        let msg =
+          Printf.sprintf
+            "Command failed: %s\nOutput: %s"
+            (cmd_to_string argv)
+            out
+        in
+        append_debug_log ("RUN ERROR: " ^ msg) ;
+        Error (`Msg msg)
+    | Error (`Msg m) -> Error (`Msg m)
+  else
+    (* Stream command output to stdout/stderr (CLI-friendly) *)
+    match Bos.OS.Cmd.run cmd with
+    | Ok () -> Ok ()
+    | Error (`Msg m) -> Error (`Msg m)
+
+let run_silent = run ~quiet:true
+
+let run_verbose = run ~quiet:false
 
 let run_out argv =
   append_debug_log ("RUN_OUT " ^ cmd_to_string argv) ;
@@ -200,14 +220,14 @@ let run_out argv =
   | Ok (out, _) -> Ok out
   | Error (`Msg m) -> Error (`Msg m)
 
-let run_as ~user argv =
+let run_as ?(quiet = false) ~user argv =
   let trimmed = String.trim user in
   let current_user, _ = current_user_group_names () in
   if trimmed = "" || (not (is_root ())) || String.equal trimmed current_user
-  then run argv
+  then run ~quiet argv
   else
     let command = cmd_to_string argv in
-    run ["su"; "-s"; "/bin/sh"; "-c"; command; trimmed]
+    run ~quiet ["su"; "-s"; "/bin/sh"; "-c"; command; trimmed]
 
 let ensure_tree_owner ~owner ~group path =
   if not (is_root ()) then Ok ()
@@ -218,10 +238,11 @@ let ensure_tree_owner ~owner ~group path =
     | Error (`Msg e) ->
         R.error_msgf "Failed to set ownership recursively on %s: %s" path e
 
-let download_file ~url ~dest_path =
+let download_file ?(quiet = false) ~url ~dest_path () =
   append_debug_log (Printf.sprintf "DOWNLOAD %s -> %s" url dest_path) ;
   (* Connection timeout 30s, speed limit 100KB/s for at least 60s before abort *)
   run
+    ~quiet
     [
       "curl";
       "-fSL";

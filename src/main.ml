@@ -1207,19 +1207,29 @@ let instance_term =
           "ACTION required (start|stop|restart|remove|purge|show|show-service)"
     | Some inst, Some action -> (
         match action with
-        | Start -> run_result (Installer.start_service ~instance:inst)
-        | Stop -> run_result (Installer.stop_service ~instance:inst)
-        | Restart -> run_result (Installer.restart_service ~instance:inst)
+        | Start ->
+            run_result (Installer.start_service ~quiet:false ~instance:inst ())
+        | Stop ->
+            run_result (Installer.stop_service ~quiet:false ~instance:inst ())
+        | Restart ->
+            run_result
+              (Installer.restart_service ~quiet:false ~instance:inst ())
         | Remove ->
             run_result
-              (Installer.remove_service ~delete_data_dir ~instance:inst)
+              (Installer.remove_service
+                 ~quiet:false
+                 ~delete_data_dir
+                 ~instance:inst
+                 ())
         | Purge ->
             run_result
               (Installer.purge_service
+                 ~quiet:false
                  ~prompt_yes_no:
                    (if is_interactive () then prompt_yes_no
                     else fun _ ~default:_ -> false)
-                 ~instance:inst)
+                 ~instance:inst
+                 ())
         | Show -> (
             match Service_registry.find ~instance:inst with
             | Ok (Some svc) ->
@@ -1328,10 +1338,12 @@ let purge_all_cmd =
                 Format.printf "Purging instance '%s' (%s)...@." instance role ;
                 match
                   Installer.purge_service
+                    ~quiet:false
                     ~prompt_yes_no:
                       (if is_interactive () then prompt_yes_no
                        else fun _ ~default:_ -> false)
                     ~instance
+                    ()
                 with
                 | Ok () ->
                     Format.printf "  ✓ Successfully purged '%s'@." instance

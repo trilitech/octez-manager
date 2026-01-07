@@ -56,15 +56,15 @@ end
 
 module Service_lifecycle_impl = struct
   let start ~role ~service =
-    Systemd.start ~role ~instance:service
+    Systemd.start ~role ~instance:service ()
     |> Result.map_error (function `Msg m -> m)
 
   let stop ~role ~service =
-    Systemd.stop ~role ~instance:service
+    Systemd.stop ~role ~instance:service ()
     |> Result.map_error (function `Msg m -> m)
 
   let restart ~role ~service =
-    Systemd.restart ~role ~instance:service
+    Systemd.restart ~role ~instance:service ()
     |> Result.map_error (function `Msg m -> m)
 
   let status ~role ~service =
@@ -75,27 +75,31 @@ module Service_lifecycle_impl = struct
 
   let install_unit ~role ~app_bin_dir ~user =
     let app_bin_dir = Option.value ~default:"" app_bin_dir in
-    Systemd.install_unit ~role ~app_bin_dir ~user
+    Systemd.install_unit ~role ~app_bin_dir ~user ()
     |> Result.map_error (function `Msg m -> m)
 
   let write_dropin_node ~inst ~data_dir ~app_bin_dir:_ =
-    Systemd.write_dropin_node ~inst ~data_dir ~logging_mode:Logging_mode.default
+    Systemd.write_dropin_node
+      ~inst
+      ~data_dir
+      ~logging_mode:Logging_mode.default
+      ()
     |> Result.map_error (function `Msg m -> m)
 
   let enable_start ~role ~inst =
-    Systemd.enable ~role ~instance:inst ~start_now:true
+    Systemd.enable ~role ~instance:inst ~start_now:true ()
     |> Result.map_error (function `Msg m -> m)
 
   let enable ~role ~inst =
-    Systemd.enable ~role ~instance:inst ~start_now:false
+    Systemd.enable ~role ~instance:inst ~start_now:false ()
     |> Result.map_error (function `Msg m -> m)
 
   let disable ~role ~inst =
-    Systemd.disable ~role ~instance:inst ~stop_now:false
+    Systemd.disable ~role ~instance:inst ~stop_now:false ()
     |> Result.map_error (function `Msg m -> m)
 
   let remove_instance_files ~inst ~remove_data =
-    Installer.remove_service ~delete_data_dir:remove_data ~instance:inst
+    Installer.remove_service ~delete_data_dir:remove_data ~instance:inst ()
     |> Result.map_error (function `Msg m -> m)
 end
 
@@ -125,8 +129,7 @@ module Installer : Installer = struct
 
   let restart_service = Installer.restart_service
 
-  let purge_service =
-    Installer.purge_service ~prompt_yes_no:(fun _ ~default:_ -> false)
+  let purge_service = Installer.purge_service
 end
 
 let register () =

@@ -2298,7 +2298,8 @@ let systemd_install_dropin_and_service_commands () =
                   (Systemd.install_unit
                      ~role:"node"
                      ~app_bin_dir:bin_dir
-                     ~user:owner)
+                     ~user:owner
+                     ())
               in
               let unit_path = Systemd.For_tests.unit_path "node" in
               let unit_body = read_file unit_path in
@@ -2314,7 +2315,8 @@ let systemd_install_dropin_and_service_commands () =
                   (Systemd.write_dropin_node
                      ~inst:"alpha"
                      ~data_dir
-                     ~logging_mode)
+                     ~logging_mode
+                     ())
               in
               let dropin_path = Systemd.For_tests.dropin_path "node" "alpha" in
               let dropin_body = read_file dropin_path in
@@ -2334,23 +2336,25 @@ let systemd_install_dropin_and_service_commands () =
                   (Systemd.enable
                      ~role:"node"
                      ~instance:"alpha"
-                     ~start_now:true)
+                     ~start_now:true
+                     ())
               in
               let () =
                 expect_ok
                   (Systemd.disable
                      ~role:"node"
                      ~instance:"alpha"
-                     ~stop_now:true)
+                     ~stop_now:true
+                     ())
               in
               let () =
-                expect_ok (Systemd.start ~role:"node" ~instance:"alpha")
+                expect_ok (Systemd.start ~role:"node" ~instance:"alpha" ())
               in
               let () =
-                expect_ok (Systemd.stop ~role:"node" ~instance:"alpha")
+                expect_ok (Systemd.stop ~role:"node" ~instance:"alpha" ())
               in
               let () =
-                expect_ok (Systemd.restart ~role:"node" ~instance:"alpha")
+                expect_ok (Systemd.restart ~role:"node" ~instance:"alpha" ())
               in
               Systemd.remove_dropin ~role:"node" ~instance:"alpha" ;
               Alcotest.(check bool)
@@ -2385,7 +2389,8 @@ let systemd_dropin_extra_paths () =
                   (Systemd.install_unit
                      ~role:"baker"
                      ~app_bin_dir:bin_dir
-                     ~user:owner)
+                     ~user:owner
+                     ())
               in
               let () =
                 expect_ok
@@ -2466,19 +2471,19 @@ let system_user_validate_missing () =
   | Error _ -> ()
 
 let system_user_service_account_non_root () =
-  match System_user.ensure_service_account ~name:"octez-manager-test" with
+  match System_user.ensure_service_account ~name:"octez-manager-test" () with
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "service account error: %s" msg
 
 let system_user_system_directories_non_root () =
   let user, group = current_user_group () in
-  match System_user.ensure_system_directories ~user ~group with
+  match System_user.ensure_system_directories ~user ~group () with
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "system directories error: %s" msg
 
 let system_user_service_account_root_path () =
   let commands = ref [] in
-  let record argv =
+  let record ?quiet:_ argv =
     commands := !commands @ [argv] ;
     Ok ()
   in
@@ -2488,7 +2493,7 @@ let system_user_service_account_root_path () =
     ~user_exists:(fun _ -> false)
     ~group_exists:(fun _ -> false)
     (fun () ->
-      expect_ok (System_user.ensure_service_account ~name:"octez-manager-ci")) ;
+      expect_ok (System_user.ensure_service_account ~name:"octez-manager-ci" ())) ;
   let expected =
     [
       ["groupadd"; "--system"; "octez-manager-ci"];
@@ -2512,7 +2517,7 @@ let system_user_service_account_root_path () =
 
 let system_user_remove_account_commands () =
   let commands = ref [] in
-  let record argv =
+  let record ?quiet:_ argv =
     commands := !commands @ [argv] ;
     Ok ()
   in
@@ -2522,7 +2527,7 @@ let system_user_remove_account_commands () =
     ~user_exists:(fun _ -> true)
     ~group_exists:(fun _ -> true)
     (fun () ->
-      expect_ok (System_user.remove_service_account ~name:"octez-test")) ;
+      expect_ok (System_user.remove_service_account ~name:"octez-test" ())) ;
   let expected =
     [["userdel"; "--remove"; "octez-test"]; ["groupdel"; "octez-test"]]
   in
