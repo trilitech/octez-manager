@@ -55,10 +55,10 @@ let open_text_modal ~title ~lines =
     let handled_keys () = []
 
     let handle_modal_key s key ~size =
-      (* Check if pager is in input mode (search/lookup) *)
+      (* Check if pager is in input mode (search/lookup/help) *)
       let pager_in_input_mode =
         match s.Pager.input_mode with
-        | `Search_edit | `Lookup -> true
+        | `Search_edit | `Lookup | `Help -> true
         | `None -> false
       in
 
