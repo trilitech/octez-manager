@@ -212,8 +212,8 @@ let snapshot_metadata_of_plan ~no_check = function
         no_check;
       }
 
-let import_snapshot ?(quiet = false) ~app_bin_dir ~data_dir ~snapshot_path
-    ~no_check () =
+let import_snapshot ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
+    ~snapshot_path ~no_check () =
   let octez_node = Filename.concat app_bin_dir "octez-node" in
   let args =
     let base =
@@ -221,19 +221,20 @@ let import_snapshot ?(quiet = false) ~app_bin_dir ~data_dir ~snapshot_path
     in
     if no_check then base @ ["--no-check"] else base
   in
-  Common.run ~quiet args
+  Common.run ~quiet ?on_log args
 
-let import_snapshot_file ?(quiet = false) ~app_bin_dir ~data_dir ~snapshot_file
-    ~no_check () =
+let import_snapshot_file ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
+    ~snapshot_file ~no_check () =
   import_snapshot
     ~quiet
+    ?on_log
     ~app_bin_dir
     ~data_dir
     ~snapshot_path:snapshot_file.path
     ~no_check
     ()
 
-let perform_snapshot_plan ?(quiet = false) ~plan ~app_bin_dir ~data_dir
+let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
     ~no_check () =
   match plan with
   | No_snapshot -> Ok ()
@@ -245,6 +246,7 @@ let perform_snapshot_plan ?(quiet = false) ~plan ~app_bin_dir ~data_dir
         (fun () ->
           import_snapshot_file
             ~quiet
+            ?on_log
             ~app_bin_dir
             ~data_dir
             ~snapshot_file
@@ -258,16 +260,18 @@ let perform_snapshot_plan ?(quiet = false) ~plan ~app_bin_dir ~data_dir
         (fun () ->
           import_snapshot_file
             ~quiet
+            ?on_log
             ~app_bin_dir
             ~data_dir
             ~snapshot_file
             ~no_check
             ())
 
-let perform_bootstrap ?(quiet = false) ~plan ~(request : node_request) ~data_dir
-    () =
+let perform_bootstrap ?(quiet = false) ?on_log ~plan ~(request : node_request)
+    ~data_dir () =
   perform_snapshot_plan
     ~quiet
+    ?on_log
     ~plan
     ~app_bin_dir:request.app_bin_dir
     ~data_dir
@@ -471,7 +475,7 @@ let resolve_from_data_dir data_dir =
     in
     Ok (`Data_dir {network; history_mode; rpc_addr; net_addr})
 
-let install_node ?(quiet = false) (request : node_request) =
+let install_node ?(quiet = false) ?on_log (request : node_request) =
   let* () = validate_instance_name ~instance:request.instance in
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
@@ -546,7 +550,8 @@ let install_node ?(quiet = false) (request : node_request) =
   in
   let* () =
     if request.preserve_data then Ok ()
-    else perform_bootstrap ~quiet ~plan:snapshot_plan ~request ~data_dir ()
+    else
+      perform_bootstrap ~quiet ?on_log ~plan:snapshot_plan ~request ~data_dir ()
   in
   let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
   let service =
