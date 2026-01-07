@@ -2483,7 +2483,7 @@ let system_user_system_directories_non_root () =
 
 let system_user_service_account_root_path () =
   let commands = ref [] in
-  let record ?quiet:_ argv =
+  let record ?quiet:_ ?on_log:_ argv =
     commands := !commands @ [argv] ;
     Ok ()
   in
@@ -2517,7 +2517,7 @@ let system_user_service_account_root_path () =
 
 let system_user_remove_account_commands () =
   let commands = ref [] in
-  let record ?quiet:_ argv =
+  let record ?quiet:_ ?on_log:_ argv =
     commands := !commands @ [argv] ;
     Ok ()
   in
@@ -2562,7 +2562,7 @@ let job_manager_submit_and_list () =
   Job_manager.clear_finished () ;
   let jobs = Job_manager.list () in
   Alcotest.(check int) "empty initially" 0 (List.length jobs) ;
-  Job_manager.submit ~description:"test job" (fun () -> Ok ()) ;
+  Job_manager.submit ~description:"test job" (fun ~append_log:_ () -> Ok ()) ;
   let jobs_after = Job_manager.list () in
   Alcotest.(check int) "one job" 1 (List.length jobs_after) ;
   let job = List.hd jobs_after in

@@ -26,7 +26,10 @@ end
 
 module type Package_manager = sig
   val install_node :
-    ?quiet:bool -> node_request -> (Service.t, [`Msg of string]) result
+    ?quiet:bool ->
+    ?on_log:(string -> unit) ->
+    node_request ->
+    (Service.t, [`Msg of string]) result
 
   val install_daemon :
     ?quiet:bool -> daemon_request -> (Service.t, [`Msg of string]) result
@@ -129,12 +132,20 @@ module type System = sig
     string ->
     (unit, [`Msg of string]) result
 
-  val run : ?quiet:bool -> string list -> (unit, [`Msg of string]) result
+  val run :
+    ?quiet:bool ->
+    ?on_log:(string -> unit) ->
+    string list ->
+    (unit, [`Msg of string]) result
 
   val run_out : string list -> (string, [`Msg of string]) result
 
   val run_as :
-    ?quiet:bool -> user:string -> string list -> (unit, [`Msg of string]) result
+    ?quiet:bool ->
+    ?on_log:(string -> unit) ->
+    user:string ->
+    string list ->
+    (unit, [`Msg of string]) result
 
   val copy_file : string -> string -> (unit, [`Msg of string]) result
 
