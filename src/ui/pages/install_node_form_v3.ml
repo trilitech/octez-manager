@@ -544,27 +544,52 @@ let spec =
           }
         in
 
-        let* () =
-          if Common.is_root () then
-            System_user.ensure_service_account
-              ~quiet:true
-              ~name:model.core.service_user
-              ()
-          else Ok ()
+        let description =
+          Printf.sprintf "Install node %s" model.core.instance_name
         in
-        let* (module PM) = require_package_manager () in
-        let* _service = PM.install_node ~quiet:true req in
-        (* Start the service if requested, even if not enabling on boot *)
-        if model.core.start_now && not model.core.enable_on_boot then
-          match Miaou_interfaces.Service_lifecycle.get () with
-          | Some sl ->
-              Miaou_interfaces.Service_lifecycle.start
-                sl
-                ~role:"node"
-                ~service:model.core.instance_name
-              |> Result.map_error (fun e -> `Msg e)
-          | None -> Error (`Msg "Service lifecycle capability not available")
-        else Ok ());
+        Job_manager.submit
+          ~description
+          (fun ~append_log () ->
+            let* () =
+              if Common.is_root () then
+                System_user.ensure_service_account
+                  ~quiet:true
+                  ~name:model.core.service_user
+                  ()
+              else Ok ()
+            in
+            let* (module PM) = require_package_manager () in
+            let* _service =
+              PM.install_node ~quiet:true ~on_log:append_log req
+            in
+            (* Start the service if requested, even if not enabling on boot *)
+            if model.core.start_now && not model.core.enable_on_boot then
+              match Miaou_interfaces.Service_lifecycle.get () with
+              | Some sl ->
+                  Miaou_interfaces.Service_lifecycle.start
+                    sl
+                    ~role:"node"
+                    ~service:model.core.instance_name
+                  |> Result.map_error (fun e -> `Msg e)
+              | None ->
+                  Error (`Msg "Service lifecycle capability not available")
+            else Ok ())
+          ~on_complete:(fun status ->
+            match status with
+            | Job_manager.Succeeded ->
+                Context.toast_success
+                  (Printf.sprintf
+                     "Node %s installed successfully"
+                     model.core.instance_name) ;
+                Context.mark_instances_dirty ()
+            | Job_manager.Failed msg ->
+                Context.toast_error
+                  (Printf.sprintf
+                     "Failed to install node %s: %s"
+                     model.core.instance_name
+                     msg)
+            | _ -> ()) ;
+        Ok ());
   }
 
 module Page = Form_builder.Make (struct

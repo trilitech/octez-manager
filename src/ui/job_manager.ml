@@ -38,8 +38,10 @@ let submit ?(on_complete = fun _ -> ()) ~description action =
   in
   jobs := job :: !jobs ;
   Bg.submit_blocking (fun () ->
+      let append_log line = job.log <- line :: job.log in
       let result =
-        try action () with exn -> Error (`Msg (Printexc.to_string exn))
+        try action ~append_log ()
+        with exn -> Error (`Msg (Printexc.to_string exn))
       in
       job.finished_at <- Some (Unix.gettimeofday ()) ;
       match result with
@@ -54,3 +56,7 @@ let list () = !jobs
 
 let clear_finished () =
   jobs := List.filter (fun j -> j.status = Running || j.status = Pending) !jobs
+
+let get_running_job () = List.find_opt (fun j -> j.status = Running) !jobs
+
+let get_latest_job () = match !jobs with [] -> None | job :: _ -> Some job

@@ -21,7 +21,11 @@ module For_tests : sig
 
   val with_overrides :
     ?is_root:(unit -> bool) ->
-    ?run:(?quiet:bool -> string list -> (unit, Rresult.R.msg) result) ->
+    ?run:
+      (?quiet:bool ->
+      ?on_log:(string -> unit) ->
+      string list ->
+      (unit, Rresult.R.msg) result) ->
     ?user_exists:(string -> bool) ->
     ?group_exists:(string -> bool) ->
     (unit -> 'a) ->
