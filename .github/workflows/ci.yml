@@ -46,9 +46,8 @@ jobs:
           fi
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner
+          opam install miaou-core miaou-driver-term miaou-runner
 
       - name: Build
         run: |
@@ -101,9 +100,8 @@ jobs:
         run: |
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner
+          opam install miaou-core miaou-driver-term miaou-runner
 
       - name: Build static binary
         run: |

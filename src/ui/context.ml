@@ -33,24 +33,30 @@ let consume_navigation () =
   value
 
 (* Global toast state *)
+let toasts_lock = Mutex.create ()
+
 let toasts =
   ref (Miaou_widgets_layout.Toast_widget.empty ~position:`Bottom_right ())
 
 (* Avoid duplicate consecutive toasts with the same severity/message. *)
 let push_toast severity msg =
-  let current = !toasts in
-  let last =
-    match Miaou_widgets_layout.Toast_widget.to_list current |> List.rev with
-    | [] -> None
-    | t :: _ -> Some (t.severity, t.message)
-  in
-  let duplicate =
-    match last with
-    | Some (sev, m) -> sev = severity && String.equal m msg
-    | None -> false
-  in
-  if not duplicate then
-    toasts := Miaou_widgets_layout.Toast_widget.enqueue current severity msg
+  Mutex.lock toasts_lock ;
+  Fun.protect
+    ~finally:(fun () -> Mutex.unlock toasts_lock)
+    (fun () ->
+      let current = !toasts in
+      let last =
+        match Miaou_widgets_layout.Toast_widget.to_list current |> List.rev with
+        | [] -> None
+        | t :: _ -> Some (t.severity, t.message)
+      in
+      let duplicate =
+        match last with
+        | Some (sev, m) -> sev = severity && String.equal m msg
+        | None -> false
+      in
+      if not duplicate then
+        toasts := Miaou_widgets_layout.Toast_widget.enqueue current severity msg)
 
 let toast_info msg = push_toast Info msg
 
@@ -60,9 +66,17 @@ let toast_warn msg = push_toast Warn msg
 
 let toast_error msg = push_toast Error msg
 
-let tick_toasts () = toasts := Miaou_widgets_layout.Toast_widget.tick !toasts
+let tick_toasts () =
+  Mutex.lock toasts_lock ;
+  Fun.protect
+    ~finally:(fun () -> Mutex.unlock toasts_lock)
+    (fun () -> toasts := Miaou_widgets_layout.Toast_widget.tick !toasts)
 
-let render_toasts ~cols = Miaou_widgets_layout.Toast_widget.render !toasts ~cols
+let render_toasts ~cols =
+  Mutex.lock toasts_lock ;
+  Fun.protect
+    ~finally:(fun () -> Mutex.unlock toasts_lock)
+    (fun () -> Miaou_widgets_layout.Toast_widget.render !toasts ~cols)
 
 (* Global spinner for loading states *)
 let spinner = ref (Miaou_widgets_layout.Spinner_widget.open_centered ())
