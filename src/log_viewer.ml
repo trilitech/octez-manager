@@ -88,7 +88,7 @@ let get_log_cmd ~role ~instance ~source =
       let unit = unit_name ~role ~instance in
       let cmd =
         Printf.sprintf
-          "journalctl %s-u %s -f -n 100 --no-pager"
+          "stdbuf -oL journalctl %s-u %s -f -n 100 --no-pager"
           user_flag
           (Filename.quote unit)
       in
@@ -98,6 +98,8 @@ let get_log_cmd ~role ~instance ~source =
       | Error e -> Error e
       | Ok log_file ->
           let cmd =
-            Printf.sprintf "tail -f -n 100 %s" (Filename.quote log_file)
+            Printf.sprintf
+              "stdbuf -oL tail -f -n 100 %s"
+              (Filename.quote log_file)
           in
           Ok cmd)
