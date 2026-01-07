@@ -16,7 +16,10 @@ val resolve_from_data_dir :
   ([`Path of string | `Data_dir of resolved_data_dir_config], string) result
 
 val install_node :
-  ?quiet:bool -> node_request -> (Service.t, [`Msg of string]) result
+  ?quiet:bool ->
+  ?on_log:(string -> unit) ->
+  node_request ->
+  (Service.t, [`Msg of string]) result
 
 val install_daemon :
   ?quiet:bool -> daemon_request -> (Service.t, [`Msg of string]) result

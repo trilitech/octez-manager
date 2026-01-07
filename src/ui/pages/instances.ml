@@ -327,7 +327,7 @@ let maybe_refresh state =
     | None -> {state with next_page = None}
     (* Clear next_page after navigation consumed *)
   in
-  if Context.consume_instances_dirty () || now -. state.last_updated > 5. then
+  if Context.consume_instances_dirty () || now -. state.last_updated > 1. then
     force_refresh state
   else ensure_valid_column state
 
@@ -909,7 +909,7 @@ let run_unit_action ~verb ~instance action =
   (* Submit to background job manager *)
   Job_manager.submit
     ~description
-    (fun () -> action ())
+    (fun ~append_log:_ () -> action ())
     ~on_complete:(fun status ->
       match status with
       | Job_manager.Succeeded ->
@@ -1321,6 +1321,14 @@ Press **Enter** to open instance menu.|}
   (* Mutable scroll offset - updated during view to keep selection visible *)
   let scroll_offset_ref = ref 0
 
+  let take n l =
+    let rec loop acc n = function
+      | [] -> List.rev acc
+      | _ when n <= 0 -> List.rev acc
+      | x :: xs -> loop (x :: acc) (n - 1) xs
+    in
+    loop [] n l
+
   let view s ~focus:_ ~size =
     (* Set contextual help hint based on selection *)
     (match current_service s with
@@ -1336,6 +1344,41 @@ Press **Enter** to open instance menu.|}
     Context.tick_toasts () ;
     let cols = size.LTerm_geom.cols in
     let progress = Context.render_progress ~cols in
+    (* Render active or recent job logs *)
+    let job_logs =
+      match Job_manager.get_latest_job () with
+      | Some job ->
+          let is_relevant =
+            match job.status with
+            | Job_manager.Running | Job_manager.Pending -> true
+            | _ -> (
+                match job.finished_at with
+                | Some t -> Unix.gettimeofday () -. t < 10.0
+                | None -> true)
+          in
+          if not is_relevant then ""
+          else
+            let log_lines = job.Job_manager.log in
+            let tail =
+              if log_lines = [] then Widgets.dim "(starting...)"
+              else log_lines |> take 5 |> List.rev |> String.concat "\n"
+            in
+            let status_str =
+              match job.status with
+              | Job_manager.Running -> "Running"
+              | Job_manager.Pending -> "Pending"
+              | Job_manager.Succeeded -> Widgets.green "Done"
+              | Job_manager.Failed _ -> Widgets.red "Failed"
+            in
+            "\n"
+            ^ Widgets.dim
+                (Printf.sprintf
+                   "--- Job: %s (%s) ---"
+                   job.description
+                   status_str)
+            ^ "\n" ^ tail
+      | None -> ""
+    in
     let toast_lines_str = Context.render_toasts ~cols in
     let footer_lines = footer ~cols in
     Vsection.render
@@ -1343,17 +1386,22 @@ Press **Enter** to open instance menu.|}
       ~header:(header s)
       ~footer:footer_lines
       ~child:(fun inner_size ->
-        (* Available rows for content (reserve space for progress/toasts) *)
+        (* Available rows for content (reserve space for progress/toasts/logs) *)
         let progress_lines =
           if String.trim progress = "" then 0
           else List.length (String.split_on_char '\n' progress)
+        in
+        let log_lines_count =
+          if job_logs = "" then 0
+          else List.length (String.split_on_char '\n' job_logs)
         in
         let toast_lines =
           if String.length toast_lines_str = 0 then 0
           else List.length (String.split_on_char '\n' toast_lines_str)
         in
         let avail_rows =
-          inner_size.LTerm_geom.rows - progress_lines - toast_lines - 1
+          inner_size.LTerm_geom.rows - progress_lines - log_lines_count
+          - toast_lines - 1
         in
         let avail_rows = max 5 avail_rows in
         (* Update visible height for scroll calculations *)
@@ -1367,6 +1415,7 @@ Press **Enter** to open instance menu.|}
           let body =
             if String.trim progress = "" then body else progress ^ "\n" ^ body
           in
+          let body = if job_logs = "" then body else body ^ job_logs in
           if String.length toast_lines_str > 0 then
             body ^ "\n" ^ toast_lines_str
           else body
@@ -1397,6 +1446,7 @@ Press **Enter** to open instance menu.|}
           in
           (* Adjust scroll offset to keep selection visible *)
           let scroll = !scroll_offset_ref in
+          (* Adjust scroll to keep selection visible with the current available height *)
           let scroll =
             if selection_line_start < scroll then selection_line_start
             else if
@@ -1404,6 +1454,7 @@ Press **Enter** to open instance menu.|}
             then selection_line_start + selection_line_count - avail_rows
             else scroll
           in
+          (* Clamp scroll to valid range *)
           let scroll = max 0 (min scroll (max 0 (total_lines - avail_rows))) in
           scroll_offset_ref := scroll ;
           let visible_lines =
@@ -1425,6 +1476,7 @@ Press **Enter** to open instance menu.|}
           let body =
             if String.trim progress = "" then base else progress ^ "\n" ^ base
           in
+          let body = if job_logs = "" then body else body ^ job_logs in
           if String.length toast_lines_str > 0 then
             body ^ "\n" ^ toast_lines_str
           else body)

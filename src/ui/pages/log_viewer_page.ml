@@ -7,7 +7,9 @@
 
 module Pager = Miaou_widgets_display.Pager_widget
 module File_pager = Miaou_widgets_display.File_pager
+module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
+module Widgets = Miaou_widgets_display.Widgets
 open Octez_manager_lib
 
 let name = "log_viewer"
@@ -215,16 +217,26 @@ let view s ~focus ~size =
     | Log_viewer.Journald -> "journald"
     | Log_viewer.DailyLogs -> "daily logs"
   in
-  let title = Printf.sprintf "Logs · %s (source: %s)" s.instance source_str in
-  let help =
-    "r: refresh  t: toggle source  /: search  n/p: next/prev  f: follow  Esc: \
-     back"
+  let privilege =
+    if Common.is_root () then Widgets.red "● SYSTEM" else Widgets.green "● USER"
   in
-  let header_lines = [title; help; ""] in
-  let header_height = List.length header_lines in
-  let pager_height = size.LTerm_geom.rows - header_height in
-  let pager_view = Pager.render ~win:pager_height (get_pager s.pager) ~focus in
-  String.concat "\n" header_lines ^ pager_view
+  let title =
+    Printf.sprintf
+      "%s   %s"
+      (Widgets.title_highlight
+         (Printf.sprintf " Logs: %s " (String.capitalize_ascii s.instance)))
+      privilege
+  in
+  let help =
+    Widgets.dim
+      (Printf.sprintf
+         "Source: %s · r: refresh · t: toggle source · /: search · f: follow · \
+          Esc: back"
+         source_str)
+  in
+  let header = [title; help] in
+  Vsection.render ~size ~header ~footer:[] ~child:(fun inner_size ->
+      Pager.render ~win:inner_size.LTerm_geom.rows (get_pager s.pager) ~focus)
 
 let handle_modal_key s key ~size =
   (* Forward keys to pager when in modal/search mode *)

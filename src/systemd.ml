@@ -44,9 +44,9 @@ let systemctl_cmd () =
 
 let run_systemctl ?quiet args = Common.run ?quiet (systemctl_cmd () @ args)
 
-let run_systemctl_timeout ?quiet args =
-  (* Keep systemctl calls bounded to avoid UI stalls. Shorten to 2s. *)
-  Common.run ?quiet (("timeout" :: "2s" :: systemctl_cmd ()) @ args)
+let run_systemctl_timeout ?quiet ?(duration = "2s") args =
+  (* Keep systemctl calls bounded to avoid UI stalls. *)
+  Common.run ?quiet (("timeout" :: duration :: systemctl_cmd ()) @ args)
 
 let run_systemctl_out_timeout args =
   (* Keep systemctl calls bounded to avoid UI stalls. Shorten to 2s. *)
@@ -637,24 +637,40 @@ let write_dropin_node ?quiet ~inst ~data_dir ~logging_mode () =
 let render_logging_lines logging_mode =
   (logging_resources ~role:"node" ~logging_mode).extra_lines
 
-let enable ?(quiet = false) ~role ~instance ~start_now () =
+let enable ?quiet:_ ~role ~instance ~start_now () =
   let unit = unit_name role instance in
   let action = if start_now then ["enable"; "--now"] else ["enable"] in
-  run_systemctl ~quiet (action @ [unit])
+  (* Enable can trigger start, which might take time if deps are slow. *)
+  (* Force quiet=false so output is captured in logs if running in background job *)
+  run_systemctl_timeout ~quiet:false ~duration:"30s" (action @ [unit])
 
-let disable ?(quiet = false) ~role ~instance ~stop_now () =
+let disable ?quiet:_ ~role ~instance ~stop_now () =
   let unit = unit_name role instance in
   let action = if stop_now then ["disable"; "--now"] else ["disable"] in
-  run_systemctl ~quiet (action @ [unit])
+  (* Disable with --now triggers stop, which can take time for node shutdown. *)
+  (* Force quiet=false so output is captured in logs if running in background job *)
+  run_systemctl_timeout ~quiet:false ~duration:"30s" (action @ [unit])
 
-let start ?(quiet = false) ~role ~instance () =
-  run_systemctl ~quiet ["start"; unit_name role instance]
+let start ?quiet:_ ~role ~instance () =
+  (* Start can take time (e.g. node initialization/upgrade). *)
+  run_systemctl_timeout
+    ~quiet:false
+    ~duration:"30s"
+    ["start"; unit_name role instance]
 
-let stop ?(quiet = false) ~role ~instance () =
-  run_systemctl ~quiet ["stop"; unit_name role instance]
+let stop ?quiet:_ ~role ~instance () =
+  (* Stop needs time for graceful shutdown. *)
+  run_systemctl_timeout
+    ~quiet:false
+    ~duration:"30s"
+    ["stop"; unit_name role instance]
 
-let restart ?(quiet = false) ~role ~instance () =
-  run_systemctl ~quiet ["restart"; unit_name role instance]
+let restart ?quiet:_ ~role ~instance () =
+  (* Restart = stop + start. *)
+  run_systemctl_timeout
+    ~quiet:false
+    ~duration:"60s"
+    ["restart"; unit_name role instance]
 
 let remove_dropin ~role ~instance =
   let path = dropin_dir role instance in
