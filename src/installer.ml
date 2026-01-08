@@ -441,7 +441,7 @@ let resolve_from_data_dir data_dir =
               Result.map_error (fun (`Msg s) -> s)
               @@ Teztnets.resolve_network_from_node_chain s
             in
-            Ok network.human_name
+            Ok network.alias
         | _ -> fail ".network.chain_name"
       with _ -> Ok "mainnet"
     in
