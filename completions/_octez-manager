@@ -20,13 +20,14 @@ _octez-manager() {
 
   local -a instance_actions
   instance_actions=(
-    'start:Start the service'
-    'stop:Stop the service'
-    'restart:Restart the service'
-    'remove:Unregister and remove the service'
-    'purge:Remove service and delete all data'
-    'show:Display service configuration'
-    'show-service:Display systemd unit and status'
+    'start'
+    'stop'
+    'restart'
+    'remove'
+    'purge'
+    'show'
+    'show-service'
+    'logs'
   )
 
   local -a history_modes

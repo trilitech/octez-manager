@@ -50,6 +50,26 @@ let load_options binary args =
   let* help = run_help binary (args @ ["--help=plain"]) in
   Ok (HP.parse_cmdliner_options help)
 
+let load_instance_actions binary =
+  (* Run with an invalid action to get the error message listing valid actions.
+     We use sh -c to redirect stderr to stdout so we can capture the error message. *)
+  let placeholder = "__invalid_action_placeholder__" in
+  let cmd = Printf.sprintf "%s instance _ %s 2>&1" binary placeholder in
+  let argv = ["sh"; "-c"; cmd] in
+  match Common.run_out argv with
+  | Ok output | Error (`Msg output) ->
+      (* Parse: "expected one of 'start', 'stop', ... or 'logs'" *)
+      let extract_actions s =
+        match String.split_on_char '\'' s with
+        | parts ->
+            parts
+            |> List.filteri (fun i _ -> i mod 2 = 1)
+              (* Odd indices are inside quotes *)
+            |> List.filter (fun s ->
+                s <> "" && s <> placeholder && not (String.contains s ' '))
+      in
+      Ok (extract_actions output)
+
 let dedupe_options entries =
   let seen = Hashtbl.create 32 in
   let add acc entry =
@@ -490,17 +510,8 @@ let () =
     in
     let options_map = options_by_cmd in
     let zsh_commands = List.map (fun c -> (c.HP.name, c.HP.doc)) cmds in
-    let instance_actions =
-      [
-        ("start", "Start the service");
-        ("stop", "Stop the service");
-        ("restart", "Restart the service");
-        ("remove", "Unregister and remove the service");
-        ("purge", "Remove service and delete all data");
-        ("show", "Display service configuration");
-        ("show-service", "Display systemd unit and status");
-      ]
-    in
+    let* action_names = load_instance_actions binary in
+    let instance_actions = List.map (fun name -> (name, "")) action_names in
     let zsh =
       render_zsh ~commands:zsh_commands ~instance_actions ~options_map
     in

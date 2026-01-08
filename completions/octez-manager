@@ -28,7 +28,7 @@ _octez_manager() {
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
   local commands="cleanup-orphans install-accuser install-baker install-dal-node install-node instance list list-available-networks list-snapshots purge-all ui"
-  local instance_actions="start stop restart remove purge show show-service"
+  local instance_actions="start stop restart remove purge show show-service logs"
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
   local lb_votes="on off pass"
