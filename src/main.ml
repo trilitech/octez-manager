@@ -608,6 +608,16 @@ let install_node_cmd =
             let* r = Installer.resolve_from_data_dir data_dir in
             Ok (Some r)
       in
+      (* When preserving data, config.json must exist in the data directory *)
+      let* () =
+        match (preserve_data, data_dir_config) with
+        | true, Some (`Path dir) ->
+            Error
+              (Printf.sprintf
+                 "Cannot preserve data: no config.json found in '%s'"
+                 dir)
+        | _ -> Ok ()
+      in
       let instance () =
         match normalize_opt_string instance_opt with
         | Some inst -> Ok inst
