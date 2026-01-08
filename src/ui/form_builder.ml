@@ -381,41 +381,41 @@ let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
 (*                                  FUNCTOR                                  *)
 (*****************************************************************************)
 
+module Navigation = Miaou.Core.Navigation
+
 module Make (S : sig
   type model
 
   val spec : model spec
 end) =
 struct
-  type state = {
-    model_ref : S.model ref;
-    cursor : int;
-    mutable next_page : string option;
-  }
+  type state = {model_ref : S.model ref; cursor : int}
 
   type msg = unit
 
+  type pstate = state Navigation.t
+
   let init () =
-    let s =
-      {model_ref = ref (S.spec.initial_model ()); cursor = 0; next_page = None}
-    in
+    let s = {model_ref = ref (S.spec.initial_model ()); cursor = 0} in
     (* Call on_init hook if provided *)
     (match S.spec.on_init with Some f -> f !(s.model_ref) | None -> ()) ;
-    s
+    Navigation.make s
 
-  let update s _ = s
+  let update ps _ = ps
 
-  let refresh s =
-    (* Only update next_page if there's a pending navigation from Context,
-       don't clear it - submit may have set it directly *)
-    (match Context.consume_navigation () with
-    | Some p -> s.next_page <- Some p
-    | None -> ()) ;
+  let refresh ps =
+    (* Check for pending navigation from Context (set by modal callbacks) *)
+    let ps =
+      match Context.consume_navigation () with
+      | Some p -> Navigation.goto p ps
+      | None -> ps
+    in
     (* Call on_refresh hook if provided *)
+    let s = ps.Navigation.s in
     (match S.spec.on_refresh with Some f -> f !(s.model_ref) | None -> ()) ;
-    s
+    ps
 
-  let move s delta =
+  let move_state s delta =
     let max_cursor = List.length S.spec.fields in
     let cursor = max 0 (min max_cursor (s.cursor + delta)) in
     {s with cursor}
@@ -481,8 +481,8 @@ struct
                 Context.mark_instances_dirty () ;
                 (* Reset form to fresh initial values for next use *)
                 s.model_ref := S.spec.initial_model () ;
-                (* Navigate back to instances page *)
-                s.next_page <- Some "instances" ;
+                (* Navigate back to instances page via Context *)
+                Context.navigate "instances" ;
                 s
             | Error (`Msg msg) ->
                 Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -501,8 +501,8 @@ struct
             Context.mark_instances_dirty () ;
             (* Reset form to fresh initial values for next use *)
             s.model_ref := S.spec.initial_model () ;
-            (* Navigate back to instances page *)
-            s.next_page <- Some "instances" ;
+            (* Navigate back to instances page via Context *)
+            Context.navigate "instances" ;
             s
         | Error (`Msg msg) ->
             Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -515,7 +515,8 @@ struct
       s)
     else submit s
 
-  let view s ~focus:_ ~size =
+  let view ps ~focus:_ ~size =
+    let s = ps.Navigation.s in
     let model = !(s.model_ref) in
     (* Validate each field once and collect results *)
     let field_results =
@@ -548,7 +549,7 @@ struct
           to_string = (fun (l, _, _) -> l);
         };
         {header = "Value"; to_string = (fun (_, v, _) -> v)};
-        {header = "S"; to_string = (fun (_, _, s) -> s)};
+        {header = "S"; to_string = (fun (_, _, st) -> st)};
       ]
     in
     let table =
@@ -580,43 +581,42 @@ struct
     Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
         Table_widget.Table.render table)
 
-  let handle_modal_key s key ~size:_ =
+  let handle_modal_key ps key ~size:_ =
     Miaou.Core.Modal_manager.handle_key key ;
-    refresh s
+    refresh ps
 
-  let handle_key s key ~size:_ =
+  let handle_key ps key ~size:_ =
     if Miaou.Core.Modal_manager.has_active () then (
       Miaou.Core.Modal_manager.handle_key key ;
-      refresh s)
+      refresh ps)
     else
       match Miaou.Core.Keys.of_string key with
       | Some (Miaou.Core.Keys.Char "Esc") | Some (Miaou.Core.Keys.Char "Escape")
         ->
-          s.next_page <- Some "__BACK__" ;
-          s
-      | Some Miaou.Core.Keys.Up -> move s (-1)
-      | Some Miaou.Core.Keys.Down -> move s 1
-      | Some Miaou.Core.Keys.Enter -> enter s
-      | _ -> s
-
-  let next_page s = s.next_page
+          Navigation.back ps
+      | Some Miaou.Core.Keys.Up ->
+          Navigation.update (fun s -> move_state s (-1)) ps
+      | Some Miaou.Core.Keys.Down ->
+          Navigation.update (fun s -> move_state s 1) ps
+      | Some Miaou.Core.Keys.Enter -> Navigation.update enter ps
+      | _ -> ps
 
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
-  let service_select s _ = s
+  let service_select ps _ = ps
 
-  let service_cycle s _ = s
+  let service_cycle ps _ = refresh ps
 
-  let back s =
-    s.next_page <- Some "__BACK__" ;
-    s
+  let back ps = Navigation.back ps
 
-  let keymap _ =
+  let move ps delta = Navigation.update (fun s -> move_state s delta) ps
+
+  let keymap _ps =
     [
-      ("Up", (fun s -> s), "Move up");
-      ("Down", (fun s -> s), "Move down");
-      ("Enter", (fun s -> s), "Edit field / Submit");
-      ("Esc", (fun s -> s), "Back to instances");
+      ("Up", (fun ps -> move ps (-1)), "Move up");
+      ("Down", (fun ps -> move ps 1), "Move down");
+      ("Enter", (fun ps -> Navigation.update enter ps), "Edit field / Submit");
+      ("Esc", back, "Back to instances");
     ]
 
   let handled_keys () =

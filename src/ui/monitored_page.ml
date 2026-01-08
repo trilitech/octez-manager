@@ -18,6 +18,8 @@ struct
 
   type msg = P.msg
 
+  type pstate = P.pstate
+
   let init = P.init
 
   let update = P.update
@@ -31,8 +33,6 @@ struct
 
   let refresh = P.refresh
 
-  let enter = P.enter
-
   let service_select = P.service_select
 
   let service_cycle = P.service_cycle
@@ -42,8 +42,6 @@ struct
   let handle_modal_key = P.handle_modal_key
 
   let handle_key = P.handle_key
-
-  let next_page = P.next_page
 
   let keymap = P.keymap
 

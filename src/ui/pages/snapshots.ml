@@ -8,6 +8,7 @@
 module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
+module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
 
 let name = "snapshots"
@@ -17,10 +18,11 @@ type state = {
   entries : Snapshots.entry list;
   selected : int;
   error : string option;
-  next_page : string option;
 }
 
 type msg = unit
+
+type pstate = state Navigation.t
 
 let load_snapshots network =
   match Snapshots.list ~network_slug:network with
@@ -30,21 +32,19 @@ let load_snapshots network =
 let init () =
   let network = "mainnet" in
   let entries = load_snapshots network in
-  {network; entries; selected = 0; error = None; next_page = None}
+  Navigation.make {network; entries; selected = 0; error = None}
 
-let update s _ = s
+let update ps _ = ps
 
-let refresh s = s
+let refresh ps = ps
 
-let move s _ = s
+let move ps _ = ps
 
-let enter s = s
+let service_select ps _ = ps
 
-let service_select s _ = s
+let service_cycle ps _ = ps
 
-let service_cycle s _ = s
-
-let back s = {s with next_page = Some "__BACK__"}
+let back ps = Navigation.back ps
 
 let handled_keys () = Miaou.Core.Keys.[Escape]
 
@@ -58,13 +58,14 @@ let header s =
 
 let footer = [Widgets.dim "Enter: import  n: network  Esc: back"]
 
-let view s ~focus:_ ~size =
+let view ps ~focus:_ ~size =
+  let s = ps.Navigation.s in
   let body =
     if s.entries = [] then ["No snapshots found or error loading."]
     else
       s.entries
       |> List.mapi (fun i (entry : Snapshots.entry) ->
-          let marker = if i = s.selected then Widgets.bold "➤" else " " in
+          let marker = if i = s.selected then Widgets.bold ">" else " " in
           Printf.sprintf
             "%s %-20s %s"
             marker
@@ -74,58 +75,53 @@ let view s ~focus:_ ~size =
   Vsection.render ~size ~header:(header s) ~footer ~child:(fun _ ->
       String.concat "\n" body)
 
-let handle_modal_key s key ~size:_ =
+let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
-  s
+  ps
 
-let move_selection s delta =
-  let len = List.length s.entries in
-  if len = 0 then s
-  else
-    let selected = max 0 (min (len - 1) (s.selected + delta)) in
-    {s with selected}
+let move_selection ps delta =
+  Navigation.update
+    (fun s ->
+      let len = List.length s.entries in
+      if len = 0 then s
+      else
+        let selected = max 0 (min (len - 1) (s.selected + delta)) in
+        {s with selected})
+    ps
 
-let select_network s =
+let select_network ps =
   Modal_helpers.open_choice_modal
     ~title:"Select Network"
     ~items:["mainnet"; "ghostnet"; "weeklynet"]
     ~to_string:(fun x -> x)
     ~on_select:(fun _network ->
-      (* We can't update state here directly, but we can navigate to self with new param?
-         Or we need a way to signal update.
-         For now, we can't easily update state from modal callback without message passing.
-         But we can use a mutable ref or Context?
-         Or we can just reload in refresh if we store network in Context?
-      *)
-      ()
-      (* TODO: Implement network selection properly *)) ;
-  s
+      (* TODO: Implement network selection properly *)
+      ()) ;
+  ps
 
-let import_snapshot s =
-  if s.entries = [] then s
+let import_snapshot ps =
+  let s = ps.Navigation.s in
+  if s.entries = [] then ps
   else
     let entry = List.nth s.entries s.selected in
     (* TODO: Implement import flow *)
     Modal_helpers.show_error
       ~title:"Not Implemented"
       ("Import " ^ entry.label ^ " not implemented yet") ;
-    s
+    ps
 
-let handle_key s key ~size:_ =
+let handle_key ps key ~size:_ =
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
-    s)
+    ps)
   else
     match Keys.of_string key with
-    | Some (Keys.Char "Esc") | Some (Keys.Char "q") ->
-        {s with next_page = Some "__BACK__"}
-    | Some Keys.Up | Some (Keys.Char "k") -> move_selection s (-1)
-    | Some Keys.Down | Some (Keys.Char "j") -> move_selection s 1
-    | Some (Keys.Char "n") -> select_network s
-    | Some Keys.Enter -> import_snapshot s
-    | _ -> s
-
-let next_page s = s.next_page
+    | Some (Keys.Char "Esc") | Some (Keys.Char "q") -> Navigation.back ps
+    | Some Keys.Up | Some (Keys.Char "k") -> move_selection ps (-1)
+    | Some Keys.Down | Some (Keys.Char "j") -> move_selection ps 1
+    | Some (Keys.Char "n") -> select_network ps
+    | Some Keys.Enter -> import_snapshot ps
+    | _ -> ps
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
@@ -134,6 +130,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   type nonrec msg = msg
 
+  type nonrec pstate = pstate
+
   let init = init
 
   let update = update
@@ -141,8 +139,6 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let refresh = refresh
 
   let move = move
-
-  let enter = enter
 
   let service_select = service_select
 
@@ -159,8 +155,6 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let handle_key = handle_key
 
   let handle_modal_key = handle_modal_key
-
-  let next_page = next_page
 
   let has_modal = has_modal
 end

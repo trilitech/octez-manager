@@ -8,6 +8,7 @@
 module Widgets = Miaou_widgets_display.Widgets
 module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Keys = Miaou.Core.Keys
+module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
 
 let name = "diagnostics"
@@ -21,10 +22,11 @@ type state = {
   scroll_offset : int;
   content_height : int;
   last_visible_height : int; (* Track terminal height *)
-  next_page : string option;
 }
 
 type msg = unit
+
+type pstate = state Navigation.t
 
 let init () =
   (* Check if metrics is already running from env *)
@@ -34,22 +36,25 @@ let init () =
       match Sys.getenv_opt "OCTEZ_MANAGER_METRICS_ADDR" with
       | Some addr -> metrics_addr_ref := addr
       | None -> ())) ;
-  {
-    services = Data.load_service_states ();
-    bg_queue_spark = Sparkline.create ~width:40 ~max_points:60 ();
-    scroll_offset = 0;
-    content_height = 0;
-    last_visible_height = 20;
-    next_page = None;
-  }
+  Navigation.make
+    {
+      services = Data.load_service_states ();
+      bg_queue_spark = Sparkline.create ~width:40 ~max_points:60 ();
+      scroll_offset = 0;
+      content_height = 0;
+      last_visible_height = 20;
+    }
 
-let update s _ = s
+let update ps _ = ps
 
-let refresh s =
-  (* Update sparklines with current metrics *)
-  let bg_depth = Metrics.get_bg_queue_depth () in
-  Sparkline.push s.bg_queue_spark (float_of_int bg_depth) ;
-  {s with services = Data.load_service_states ()}
+let refresh ps =
+  Navigation.update
+    (fun s ->
+      (* Update sparklines with current metrics *)
+      let bg_depth = Metrics.get_bg_queue_depth () in
+      Sparkline.push s.bg_queue_spark (float_of_int bg_depth) ;
+      {s with services = Data.load_service_states ()})
+    ps
 
 (* Called to update content height - we'll calculate it in view and store via this hack *)
 let content_height_ref = ref 0
@@ -69,19 +74,20 @@ let scroll_down_impl s ~max_height =
 (* For keymap - uses last known visible height *)
 let scroll_down s = scroll_down_impl s ~max_height:s.last_visible_height
 
-let move s _ = s
+let move ps _ = ps
 
-let enter s = s
+let service_select ps _ = ps
 
-let service_select s _ = s
+let service_cycle ps _ =
+  Navigation.update
+    (fun s ->
+      (* Auto-refresh sparkline and services *)
+      let bg_depth = Metrics.get_bg_queue_depth () in
+      Sparkline.push s.bg_queue_spark (float_of_int bg_depth) ;
+      {s with services = Data.load_service_states ()})
+    ps
 
-let service_cycle s _ =
-  (* Auto-refresh sparkline and services *)
-  let bg_depth = Metrics.get_bg_queue_depth () in
-  Sparkline.push s.bg_queue_spark (float_of_int bg_depth) ;
-  {s with services = Data.load_service_states ()}
-
-let back s = {s with next_page = Some "__BACK__"}
+let back ps = Navigation.back ps
 
 let toggle_recorder s =
   if Metrics.is_recording () then (
@@ -158,13 +164,13 @@ let keymap _ =
   [
     ("Esc", back, "Back");
     ("r", refresh, "Refresh");
-    ("m", toggle_metrics, "Toggle metrics");
-    ("a", edit_metrics_addr, "Edit address");
-    ("R", toggle_recorder, "Toggle recorder");
-    ("d", change_duration, "Change duration");
-    ("c", clear_caches, "Clear caches");
-    ("Up", scroll_up, "Scroll up");
-    ("Down", scroll_down, "Scroll down");
+    ("m", (fun ps -> Navigation.update toggle_metrics ps), "Toggle metrics");
+    ("a", (fun ps -> Navigation.update edit_metrics_addr ps), "Edit address");
+    ("R", (fun ps -> Navigation.update toggle_recorder ps), "Toggle recorder");
+    ("d", (fun ps -> Navigation.update change_duration ps), "Change duration");
+    ("c", (fun ps -> Navigation.update clear_caches ps), "Clear caches");
+    ("Up", (fun ps -> Navigation.update scroll_up ps), "Scroll up");
+    ("Down", (fun ps -> Navigation.update scroll_down ps), "Scroll down");
   ]
 
 let header =
@@ -180,7 +186,8 @@ let footer =
        back";
   ]
 
-let view s ~focus:_ ~size =
+let view ps ~focus:_ ~size =
+  let s = ps.Navigation.s in
   Metrics.record_render ~page:name (fun () ->
       let lines = ref [] in
       let add line = lines := line :: !lines in
@@ -541,35 +548,34 @@ let view s ~focus:_ ~size =
         ~footer
         ~child:(fun _ -> body))
 
-let handle_modal_key s key ~size:_ =
+let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
-  s
+  ps
 
-let handle_key s key ~size =
+let handle_key ps key ~size =
   Metrics.mark_input_event () ;
+  let s = ps.Navigation.s in
   let s = update_content_height s in
   (* Update with latest height from view *)
   let s = {s with last_visible_height = size.LTerm_geom.rows - 4} in
+  let ps = Navigation.update (fun _ -> s) ps in
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
-    s)
+    ps)
   else
     match Keys.of_string key with
-    | Some (Keys.Char "Esc") | Some (Keys.Char "q") ->
-        {s with next_page = Some "__BACK__"}
-    | Some (Keys.Char "r") -> refresh s
-    | Some (Keys.Char "m") -> toggle_metrics s
-    | Some (Keys.Char "a") -> edit_metrics_addr s
-    | Some (Keys.Char "R") -> toggle_recorder s
-    | Some (Keys.Char "d") -> change_duration s
-    | Some (Keys.Char "c") -> clear_caches s
-    | Some Keys.Up -> scroll_up s
-    | Some Keys.Down -> scroll_down s
-    | Some (Keys.Char "k") -> scroll_up s
-    | Some (Keys.Char "j") -> scroll_down s
-    | _ -> s
-
-let next_page s = s.next_page
+    | Some (Keys.Char "Esc") | Some (Keys.Char "q") -> Navigation.back ps
+    | Some (Keys.Char "r") -> refresh ps
+    | Some (Keys.Char "m") -> Navigation.update toggle_metrics ps
+    | Some (Keys.Char "a") -> Navigation.update edit_metrics_addr ps
+    | Some (Keys.Char "R") -> Navigation.update toggle_recorder ps
+    | Some (Keys.Char "d") -> Navigation.update change_duration ps
+    | Some (Keys.Char "c") -> Navigation.update clear_caches ps
+    | Some Keys.Up -> Navigation.update scroll_up ps
+    | Some Keys.Down -> Navigation.update scroll_down ps
+    | Some (Keys.Char "k") -> Navigation.update scroll_up ps
+    | Some (Keys.Char "j") -> Navigation.update scroll_down ps
+    | _ -> ps
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
@@ -578,6 +584,8 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   type nonrec msg = msg
 
+  type nonrec pstate = pstate
+
   let init = init
 
   let update = update
@@ -585,8 +593,6 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
   let refresh = refresh
 
   let move = move
-
-  let enter = enter
 
   let service_select = service_select
 
@@ -603,8 +609,6 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
   let handle_key = handle_key
 
   let handle_modal_key = handle_modal_key
-
-  let next_page = next_page
 
   let has_modal = has_modal
 end
