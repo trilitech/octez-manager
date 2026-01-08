@@ -23,6 +23,7 @@ type t = {
   snapshot_no_check : bool;
   extra_args : string list;
   depends_on : string option;
+  dependents : string list;
 }
 
 val make :
@@ -42,6 +43,7 @@ val make :
   ?snapshot_no_check:bool ->
   ?extra_args:string list ->
   ?depends_on:string option ->
+  ?dependents:string list ->
   unit ->
   t
 

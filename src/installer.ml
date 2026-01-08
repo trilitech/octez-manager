@@ -694,6 +694,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~app_bin_dir:request.app_bin_dir
       ~logging_mode
       ~extra_args:request.service_args
+      ~depends_on:request.depends_on
       ()
   in
   let* () = Service_registry.write service in
@@ -772,42 +773,64 @@ let install_baker ?(quiet = false) (request : baker_request) =
   (* Delegates are positional arguments, not --delegate flags *)
   let delegate_args = String.concat " " request.delegates |> String.trim in
   let extra_args_str = String.concat " " request.extra_args |> String.trim in
-  install_daemon
-    ~quiet
-    {
-      role = "baker";
-      instance = request.instance;
-      network;
-      history_mode;
-      data_dir = node_data_dir;
-      rpc_addr = node_endpoint;
-      net_addr = "";
-      service_user = request.service_user;
-      app_bin_dir = request.app_bin_dir;
-      logging_mode = request.logging_mode;
-      service_args = [];
-      extra_env =
-        [
-          ("OCTEZ_BAKER_BASE_DIR", base_dir);
-          ("OCTEZ_NODE_ENDPOINT", node_endpoint);
-          ( "OCTEZ_NODE_INSTANCE",
-            match node_mode with
-            | Local svc -> svc.Service.instance
-            | Remote _ -> "" );
-          ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
-          ( "OCTEZ_DAL_CONFIG",
-            match dal_config with
-            | Dal_disabled -> "disabled"
-            | Dal_endpoint ep -> ep
-            | Dal_auto -> "" );
-          ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
-          ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
-          ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
-          ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
-        ];
-      extra_paths = [base_dir];
-      auto_enable = request.auto_enable;
-    }
+  let depends_on =
+    match node_mode with
+    | Local svc -> Some svc.Service.instance
+    | Remote _ -> None
+  in
+  let* service =
+    install_daemon
+      ~quiet
+      {
+        role = "baker";
+        instance = request.instance;
+        network;
+        history_mode;
+        data_dir = node_data_dir;
+        rpc_addr = node_endpoint;
+        net_addr = "";
+        service_user = request.service_user;
+        app_bin_dir = request.app_bin_dir;
+        logging_mode = request.logging_mode;
+        service_args = [];
+        extra_env =
+          [
+            ("OCTEZ_BAKER_BASE_DIR", base_dir);
+            ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+            ( "OCTEZ_NODE_INSTANCE",
+              match node_mode with
+              | Local svc -> svc.Service.instance
+              | Remote _ -> "" );
+            ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
+            ( "OCTEZ_DAL_CONFIG",
+              match dal_config with
+              | Dal_disabled -> "disabled"
+              | Dal_endpoint ep -> ep
+              | Dal_auto -> "" );
+            ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
+            ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
+            ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
+            ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
+          ];
+        extra_paths = [base_dir];
+        auto_enable = request.auto_enable;
+        depends_on;
+      }
+  in
+  (* Register as dependent on parent node *)
+  let* () =
+    match node_mode with
+    | Local parent_svc ->
+        let updated_parent =
+          {
+            parent_svc with
+            dependents = request.instance :: parent_svc.dependents;
+          }
+        in
+        Service_registry.write updated_parent
+    | Remote _ -> Ok ()
+  in
+  Ok service
 
 let install_accuser ?(quiet = false) (request : accuser_request) =
   let* node_mode : Installer_types.resolved_baker_node_mode =
@@ -841,45 +864,119 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
     | _ -> Common.default_role_dir "accuser" request.instance
   in
   let extra_args_str = String.concat " " request.extra_args |> String.trim in
-  install_daemon
-    ~quiet
-    {
-      role = "accuser";
-      instance = request.instance;
-      network;
-      history_mode;
-      data_dir = node_data_dir;
-      rpc_addr = node_endpoint;
-      net_addr = "";
-      service_user = request.service_user;
-      app_bin_dir = request.app_bin_dir;
-      logging_mode = request.logging_mode;
-      service_args = [];
-      extra_env =
-        [
-          ("OCTEZ_CLIENT_BASE_DIR", base_dir);
-          ("OCTEZ_NODE_ENDPOINT", node_endpoint);
-          ( "OCTEZ_NODE_INSTANCE",
-            match node_mode with
-            | Local svc -> svc.Service.instance
-            | Remote _ -> "" );
-          ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
-        ];
-      extra_paths = [base_dir];
-      auto_enable = request.auto_enable;
-    }
+  let depends_on =
+    match node_mode with
+    | Local svc -> Some svc.Service.instance
+    | Remote _ -> None
+  in
+  let* service =
+    install_daemon
+      ~quiet
+      {
+        role = "accuser";
+        instance = request.instance;
+        network;
+        history_mode;
+        data_dir = node_data_dir;
+        rpc_addr = node_endpoint;
+        net_addr = "";
+        service_user = request.service_user;
+        app_bin_dir = request.app_bin_dir;
+        logging_mode = request.logging_mode;
+        service_args = [];
+        extra_env =
+          [
+            ("OCTEZ_CLIENT_BASE_DIR", base_dir);
+            ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+            ( "OCTEZ_NODE_INSTANCE",
+              match node_mode with
+              | Local svc -> svc.Service.instance
+              | Remote _ -> "" );
+            ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
+          ];
+        extra_paths = [base_dir];
+        auto_enable = request.auto_enable;
+        depends_on;
+      }
+  in
+  (* Register as dependent on parent node *)
+  let* () =
+    match node_mode with
+    | Local parent_svc ->
+        let updated_parent =
+          {
+            parent_svc with
+            dependents = request.instance :: parent_svc.dependents;
+          }
+        in
+        Service_registry.write updated_parent
+    | Remote _ -> Ok ()
+  in
+  Ok service
 
 let start_service ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc -> Systemd.start ?quiet ~role:svc.role ~instance ()
   | None -> R.error_msgf "Instance '%s' not found" instance
+  | Some svc ->
+      (* Check parent dependency is running *)
+      let* () =
+        match svc.depends_on with
+        | None -> Ok ()
+        | Some parent_instance -> (
+            match Service_registry.find ~instance:parent_instance with
+            | Ok (Some parent) -> (
+                match
+                  Systemd.is_active ~role:parent.role ~instance:parent_instance
+                with
+                | Ok true -> Ok ()
+                | Ok false ->
+                    R.error_msgf
+                      "Cannot start %s: dependency '%s' is not running.\n\
+                       Start it first with: octez-manager instance %s start"
+                      instance
+                      parent_instance
+                      parent_instance
+                | Error _ ->
+                    R.error_msgf
+                      "Cannot start %s: dependency '%s' is not running.\n\
+                       Start it first with: octez-manager instance %s start"
+                      instance
+                      parent_instance
+                      parent_instance)
+            | _ ->
+                (* Parent not found in registry, skip check *)
+                Ok ())
+      in
+      Systemd.start ?quiet ~role:svc.role ~instance ()
 
-let stop_service ?quiet ~instance () =
+let stop_service_cascade ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
-  | Some svc -> Systemd.stop ?quiet ~role:svc.role ~instance ()
   | None -> R.error_msgf "Instance '%s' not found" instance
+  | Some svc ->
+      (* Stop dependents first *)
+      let* () =
+        if svc.dependents <> [] then (
+          if not (Option.value ~default:false quiet) then
+            Printf.printf
+              "Stopping dependents: %s\n"
+              (String.concat ", " svc.dependents) ;
+          List.fold_left
+            (fun acc dep ->
+              let* () = acc in
+              (* Silently ignore missing dependents during cascade *)
+              match Service_registry.find ~instance:dep with
+              | Ok (Some dep_svc) ->
+                  Systemd.stop ?quiet ~role:dep_svc.role ~instance:dep ()
+              | _ -> Ok ())
+            (Ok ())
+            svc.dependents)
+        else Ok ()
+      in
+      Systemd.stop ?quiet ~role:svc.role ~instance ()
+
+let stop_service ?quiet ~instance () = stop_service_cascade ?quiet ~instance ()
 
 let restart_service ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
@@ -892,6 +989,20 @@ let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
   match svc_opt with
   | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
+      (* Unregister from parent's dependents list *)
+      let* () =
+        match svc.depends_on with
+        | None -> Ok ()
+        | Some parent_instance -> (
+            match Service_registry.find ~instance:parent_instance with
+            | Ok (Some parent) ->
+                let updated_deps =
+                  List.filter (( <> ) instance) parent.dependents
+                in
+                let updated_parent = {parent with dependents = updated_deps} in
+                Service_registry.write updated_parent
+            | _ -> Ok ())
+      in
       let* () =
         Systemd.disable ~quiet ~role:svc.role ~instance ~stop_now:true ()
       in
@@ -954,6 +1065,41 @@ let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
       else Ok ()
 
 let list_services () = Service_registry.list ()
+
+let cleanup_dependencies () =
+  let* services = Service_registry.list () in
+  let all_instances =
+    List.map (fun svc -> svc.Service.instance) services
+    |> List.sort_uniq String.compare
+  in
+  let is_valid_dependent dep = List.mem dep all_instances in
+  let updates =
+    List.filter_map
+      (fun svc ->
+        let valid_deps =
+          List.filter is_valid_dependent svc.Service.dependents
+        in
+        let stale_deps =
+          List.filter (fun d -> not (is_valid_dependent d)) svc.dependents
+        in
+        if stale_deps <> [] then Some (svc, valid_deps, stale_deps) else None)
+      services
+  in
+  let* cleaned_count =
+    List.fold_left
+      (fun acc (svc, valid_deps, stale_deps) ->
+        let* count = acc in
+        Printf.printf
+          "Cleaning %s: removing stale dependents: %s\n"
+          svc.Service.instance
+          (String.concat ", " stale_deps) ;
+        let updated_svc : Service.t = {svc with dependents = valid_deps} in
+        let* () = Service_registry.write updated_svc in
+        Ok (count + List.length stale_deps))
+      (Ok 0)
+      updates
+  in
+  Ok cleaned_count
 
 let find_orphan_directories () =
   let* services = Service_registry.list () in

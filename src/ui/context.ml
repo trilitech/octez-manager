@@ -16,6 +16,24 @@ let take_pending_instance_detail () =
   pending_instance_detail := None ;
   value
 
+(* Edit mode: service being edited and list of stopped dependents *)
+type edit_context = {
+  service : Octez_manager_lib.Service.t;
+  stopped_dependents : string list;
+}
+
+let pending_edit_service : edit_context option ref = ref None
+
+let set_pending_edit_service ~service ~stopped_dependents =
+  pending_edit_service := Some {service; stopped_dependents}
+
+let take_pending_edit_service () =
+  let value = !pending_edit_service in
+  pending_edit_service := None ;
+  value
+
+let has_pending_edit_service () = Option.is_some !pending_edit_service
+
 let mark_instances_dirty () = instances_dirty := true
 
 let consume_instances_dirty () =

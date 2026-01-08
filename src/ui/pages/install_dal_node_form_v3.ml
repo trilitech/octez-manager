@@ -187,6 +187,9 @@ let spec =
         let service_args = extra_args in
 
         (* Build daemon request *)
+        let depends_on =
+          match model.client.node with `Service inst -> Some inst | _ -> None
+        in
         let req : Installer_types.daemon_request =
           {
             role = "dal-node";
@@ -212,6 +215,7 @@ let spec =
               ];
             extra_paths = [client_base_dir; dal_data_dir];
             auto_enable = model.core.enable_on_boot;
+            depends_on;
           }
         in
 

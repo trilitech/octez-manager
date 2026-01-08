@@ -55,6 +55,11 @@ val purge_service :
 
 val list_services : unit -> (Service.t list, [`Msg of string]) result
 
+(** Clean up stale dependency entries.
+    Scans all services and removes dependents that no longer exist in the registry.
+    @return Number of stale entries removed *)
+val cleanup_dependencies : unit -> (int, [`Msg of string]) result
+
 (** Find directories and files not associated with registered services. *)
 val find_orphan_directories :
   unit -> (string list * string list, [`Msg of string]) result
