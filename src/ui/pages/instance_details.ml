@@ -60,9 +60,9 @@ let service_cycle ps _ = refresh ps
 
 let back ps = Navigation.back ps
 
-let handled_keys () = Miaou.Core.Keys.[Escape]
+let handled_keys () = Miaou.Core.Keys.[Escape; Enter]
 
-let keymap _ = [("Esc", back, "Back")]
+let keymap _ = [("Enter", (fun s -> s), "Actions"); ("Esc", back, "Back")]
 
 let header s =
   [
