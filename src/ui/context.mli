@@ -9,6 +9,19 @@ val set_pending_instance_detail : string -> unit
 
 val take_pending_instance_detail : unit -> string option
 
+(** Edit mode context *)
+type edit_context = {
+  service : Octez_manager_lib.Service.t;
+  stopped_dependents : string list;
+}
+
+val set_pending_edit_service :
+  service:Octez_manager_lib.Service.t -> stopped_dependents:string list -> unit
+
+val take_pending_edit_service : unit -> edit_context option
+
+val has_pending_edit_service : unit -> bool
+
 val mark_instances_dirty : unit -> unit
 
 val consume_instances_dirty : unit -> bool

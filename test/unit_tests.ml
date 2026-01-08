@@ -150,6 +150,7 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     snapshot_no_check = false;
     extra_args = [];
     depends_on = None;
+    dependents = [];
   }
 
 let sort_services =
