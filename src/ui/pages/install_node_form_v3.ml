@@ -597,6 +597,26 @@ let spec =
         Job_manager.submit
           ~description
           (fun ~append_log () ->
+            (* In edit mode, stop the service and dependents before applying changes *)
+            let* () =
+              if model.edit_mode then (
+                append_log
+                  (Printf.sprintf
+                     "Stopping service %s before applying changes...\n"
+                     model.core.instance_name) ;
+                match
+                  Installer.stop_service
+                    ~quiet:true
+                    ~instance:model.core.instance_name
+                    ()
+                with
+                | Ok () -> Ok ()
+                | Error (`Msg msg) ->
+                    append_log (Printf.sprintf "Warning: %s\n" msg) ;
+                    Ok ()
+                (* Continue anyway - service might already be stopped *))
+              else Ok ()
+            in
             let* () =
               if Common.is_root () then
                 System_user.ensure_service_account
