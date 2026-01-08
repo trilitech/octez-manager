@@ -27,6 +27,7 @@ val write_dropin :
   data_dir:string ->
   logging_mode:Logging_mode.t ->
   ?extra_paths:string list ->
+  ?depends_on:string * string ->
   unit ->
   (unit, [`Msg of string]) result
 

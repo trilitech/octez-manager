@@ -149,6 +149,7 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     snapshot_network_slug = None;
     snapshot_no_check = false;
     extra_args = [];
+    depends_on = None;
   }
 
 let sort_services =
