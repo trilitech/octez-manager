@@ -598,7 +598,8 @@ let read_write_paths_for ~data_dir ~logging_paths ~extra_paths =
   in
   unique_non_empty (base @ logging_paths @ extra_paths)
 
-let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths =
+let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?depends_on ()
+    =
   let resources = logging_resources ~role ~logging_mode in
   let rw_paths =
     read_write_paths_for
@@ -606,20 +607,34 @@ let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths =
       ~logging_paths:resources.extra_paths
       ~extra_paths
   in
+  (* Add dependency directives if depends_on is set *)
+  let unit_section =
+    match depends_on with
+    | Some (parent_role, parent_instance) ->
+        let parent_unit =
+          Printf.sprintf "octez-%s@%s.service" parent_role parent_instance
+        in
+        Printf.sprintf
+          "[Unit]\nBindsTo=%s\nAfter=%s\n\n"
+          parent_unit
+          parent_unit
+    | None -> ""
+  in
   let header =
     let base = ref ["[Service]"] in
     if Common.is_root () then base := !base @ ["PermissionsStartOnly=true"] ;
     !base @ resources.extra_lines
   in
-  String.concat
-    "\n"
-    (header
-    @ [Printf.sprintf "Environment=OCTEZ_DATA_DIR=%s" data_dir]
-    @ List.map (fun p -> Printf.sprintf "ReadWritePaths=%s" p) rw_paths)
+  unit_section
+  ^ String.concat
+      "\n"
+      (header
+      @ [Printf.sprintf "Environment=OCTEZ_DATA_DIR=%s" data_dir]
+      @ List.map (fun p -> Printf.sprintf "ReadWritePaths=%s" p) rw_paths)
   ^ "\n"
 
 let write_dropin ?(quiet = false) ~role ~inst ~data_dir ~logging_mode
-    ?(extra_paths = []) () =
+    ?(extra_paths = []) ?depends_on () =
   let dir = dropin_dir role inst in
   let path = dropin_path role inst in
   let owner, group =
@@ -627,7 +642,9 @@ let write_dropin ?(quiet = false) ~role ~inst ~data_dir ~logging_mode
     else Common.current_user_group_names ()
   in
   let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
-  let body = write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths in
+  let body =
+    write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?depends_on ()
+  in
   let* () = Common.write_file ~mode:0o644 ~owner ~group path body in
   run_systemctl_timeout ~quiet ["daemon-reload"]
 
