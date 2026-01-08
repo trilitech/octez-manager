@@ -204,6 +204,7 @@ let create_accuser_flow ~on_success =
                   ];
                 extra_paths = [base_dir];
                 auto_enable = true;
+                depends_on = None;
               }
             in
             let res =
@@ -267,6 +268,7 @@ let create_dal_node_flow ~on_success =
                   ];
                 extra_paths = [client_base_dir; dal_data_dir];
                 auto_enable = true;
+                depends_on = None;
               }
             in
             let res =

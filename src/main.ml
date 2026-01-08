@@ -1213,6 +1213,11 @@ let install_dal_node_cmd =
                 match maybe_network with
                 | Error (`Msg msg) -> cmdliner_error msg
                 | Ok network -> (
+                    let depends_on =
+                      match node_mode with
+                      | `Instance inst -> Some inst
+                      | _ -> None
+                    in
                     let req : daemon_request =
                       {
                         role = "dal-node";
@@ -1235,6 +1240,7 @@ let install_dal_node_cmd =
                           ];
                         extra_paths = [];
                         auto_enable = not no_enable;
+                        depends_on;
                       }
                     in
                     match Installer.install_daemon req with
@@ -1267,6 +1273,7 @@ type instance_action =
   | Show
   | Show_service
   | Logs
+  | Edit
 
 let instance_term =
   let instance =
@@ -1283,6 +1290,7 @@ let instance_term =
         ("show", Show);
         ("show-service", Show_service);
         ("logs", Logs);
+        ("edit", Edit);
       ]
     in
     Arg.(value & pos 1 (some (enum actions)) None & info [] ~docv:"ACTION")
@@ -1299,7 +1307,8 @@ let instance_term =
     | None, _ -> `Help (`Pager, None)
     | Some _, None ->
         cmdliner_error
-          "ACTION required (start|stop|restart|remove|purge|show|show-service)"
+          "ACTION required \
+           (start|stop|restart|remove|purge|show|show-service|logs|edit)"
     | Some inst, Some action -> (
         match action with
         | Start ->
@@ -1397,7 +1406,72 @@ let instance_term =
                     Format.printf "tail -f %s@." path
                 | Error _ -> ()) ;
 
-                `Ok ()))
+                `Ok ())
+        | Edit -> (
+            match Service_registry.find ~instance:inst with
+            | Error (`Msg msg) -> cmdliner_error msg
+            | Ok None ->
+                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+            | Ok (Some svc) ->
+                let role = svc.S.role in
+                (* List dependents that will be stopped *)
+                let () =
+                  if svc.S.dependents <> [] then
+                    Format.printf
+                      "@[<v>@,\
+                       This will stop the following dependents:@,\
+                      \  %s@,\
+                       @]"
+                      (String.concat ", " svc.dependents)
+                in
+                (* Confirm before proceeding in interactive mode *)
+                let proceed =
+                  if not (is_interactive ()) then true
+                  else prompt_yes_no "Proceed with edit?" ~default:true
+                in
+                if not proceed then (
+                  print_endline "Cancelled." ;
+                  `Ok ())
+                else (
+                  (* Stop the instance (cascade stops dependents) *)
+                  (match
+                     Installer.stop_service ~quiet:false ~instance:inst ()
+                   with
+                  | Ok () -> ()
+                  | Error (`Msg msg) ->
+                      Format.eprintf "Warning: failed to stop service: %s@." msg) ;
+                  (* Show current values and prompt for editable fields *)
+                  Format.printf "@.Editing instance '%s' (role: %s)@." inst role ;
+                  Format.printf "@.Current configuration:@." ;
+                  Format.printf "  Network: %s@." svc.network ;
+                  Format.printf
+                    "  History mode: %s@."
+                    (History_mode.to_string svc.history_mode) ;
+                  Format.printf "  Data dir: %s@." svc.data_dir ;
+                  Format.printf "  RPC addr: %s@." svc.rpc_addr ;
+                  Format.printf "  Net addr: %s@." svc.net_addr ;
+                  Format.printf "  Service user: %s@." svc.service_user ;
+                  Format.printf "  App bin dir: %s@." svc.app_bin_dir ;
+                  Format.printf
+                    "  Extra args: %s@."
+                    (String.concat " " svc.extra_args) ;
+                  if svc.depends_on <> None then
+                    Format.printf
+                      "  Depends on: %s@."
+                      (Option.value ~default:"(none)" svc.depends_on) ;
+                  if svc.dependents <> [] then
+                    Format.printf
+                      "  Dependents: %s@."
+                      (String.concat ", " svc.dependents) ;
+                  (* For now, just show a message that edit is not yet fully implemented *)
+                  Format.printf
+                    "@.@[<v>Edit functionality is partially implemented.@,\
+                     For now, you can manually edit the service configuration.@,\
+                     @,\
+                     To restart the stopped instances:@,\
+                    \  octez-manager instance %s start@]@."
+                    inst ;
+                  `Ok ())))
   in
   Term.(ret (const run $ instance $ action $ delete_data_dir))
 
@@ -1549,6 +1623,30 @@ let cleanup_orphans_cmd =
   in
   Cmd.v info term
 
+let cleanup_dependencies_cmd =
+  let term =
+    let run () =
+      Capabilities.register () ;
+      match Installer.cleanup_dependencies () with
+      | Error (`Msg msg) -> cmdliner_error msg
+      | Ok 0 ->
+          print_endline "No stale dependency entries found." ;
+          `Ok ()
+      | Ok count ->
+          Format.printf "Cleaned up %d stale dependency entrie(s).@." count ;
+          `Ok ()
+    in
+    Term.(ret (const run $ const ()))
+  in
+  let info =
+    Cmd.info
+      "cleanup-dependencies"
+      ~doc:
+        "Remove stale dependency entries from service configurations. This \
+         cleans up references to services that have been removed."
+  in
+  Cmd.v info term
+
 let list_networks_cmd =
   let output_json =
     Arg.(value & flag & info ["json"] ~doc:"Emit JSON output instead of text.")
@@ -1688,6 +1786,7 @@ let root_cmd =
       list_cmd;
       purge_all_cmd;
       cleanup_orphans_cmd;
+      cleanup_dependencies_cmd;
       list_networks_cmd;
       list_snapshots_cmd;
       ui_cmd;
