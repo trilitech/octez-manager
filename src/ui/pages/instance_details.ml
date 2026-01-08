@@ -62,7 +62,7 @@ let back ps = Navigation.back ps
 
 let handled_keys () = Miaou.Core.Keys.[Escape; Enter]
 
-let keymap _ = [("Enter", (fun s -> s), "Actions"); ("Esc", back, "Back")]
+let keymap _ = [("Enter", (fun ps -> ps), "Actions"); ("Esc", back, "Back")]
 
 let header s =
   [
