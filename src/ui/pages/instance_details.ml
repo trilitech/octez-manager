@@ -304,17 +304,12 @@ let edit_config_modal ps =
           () ;
         ps
 
-(* Perform edit instance side effects and navigate via Context *)
+(* Set edit context and navigate to form - service is stopped on submit *)
 let do_edit_instance svc =
-  (* Stop the service (cascade stops dependents) *)
-  let stopped_dependents = svc.Service.dependents in
-  (match
-     Installer.stop_service ~quiet:true ~instance:svc.Service.instance ()
-   with
-  | Ok () -> ()
-  | Error (`Msg msg) -> Context.toast_warn ("Failed to stop service: " ^ msg)) ;
-  (* Set the edit context *)
-  Context.set_pending_edit_service ~service:svc ~stopped_dependents ;
+  (* Set the edit context (service will be stopped when form is submitted) *)
+  Context.set_pending_edit_service
+    ~service:svc
+    ~stopped_dependents:svc.Service.dependents ;
   (* Navigate to the appropriate install form based on role *)
   let form_page =
     match svc.Service.role with
