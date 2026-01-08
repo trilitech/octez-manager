@@ -589,6 +589,18 @@ let install_node_cmd =
     let res =
       let ( let* ) = Result.bind in
       let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
+      (* When preserve_data is set, require data_dir to be specified *)
+      let* data_dir =
+        match (preserve_data, data_dir) with
+        | true, None ->
+            if is_interactive () then
+              Ok (Some (prompt_required_string "Data directory to preserve"))
+            else
+              Error
+                "--data-dir is required when using --preserve-data in \
+                 non-interactive mode"
+        | _, dir -> Ok dir
+      in
       let* data_dir_config =
         match data_dir with
         | None -> Ok None
