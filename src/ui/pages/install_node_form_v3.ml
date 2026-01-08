@@ -460,42 +460,50 @@ let spec =
     pre_submit_modal =
       Some
         (fun model ->
-          (* Check if data_dir exists and has content *)
-          let trimmed_dir = String.trim model.node.data_dir in
-          let effective_dir =
-            if trimmed_dir = "" then
-              Common.default_data_dir model.core.instance_name
-            else trimmed_dir
-          in
-          let data_exists = Sys.file_exists effective_dir in
-          if data_exists && Sys.is_directory effective_dir then
-            let is_empty =
-              try
-                let entries = Sys.readdir effective_dir in
-                Array.length entries = 0
-              with _ -> false
-            in
-            if is_empty then None
-            else
-              Some
-                (Form_builder.PreSubmitModal
-                   {
-                     title = "Data Directory Exists";
-                     message =
-                       Some
-                         (Printf.sprintf
-                            "Directory '%s' already exists with data."
-                            effective_dir);
-                     choices = [`Refresh; `Keep];
-                     to_string =
-                       (function
-                       | `Refresh -> "Refresh (import snapshot)"
-                       | `Keep -> "Keep (preserve existing)");
-                     on_choice =
-                       (fun (choice : [`Refresh | `Keep]) model ->
-                         {model with preserve_data = (choice :> preserve_data)});
-                   })
-          else None);
+          (* Only show modal if user hasn't already made a choice *)
+          match model.preserve_data with
+          | `Keep | `Refresh ->
+              None (* User already chose, proceed with submit *)
+          | `Auto ->
+              (* Check if data_dir exists and has content *)
+              let trimmed_dir = String.trim model.node.data_dir in
+              let effective_dir =
+                if trimmed_dir = "" then
+                  Common.default_data_dir model.core.instance_name
+                else trimmed_dir
+              in
+              let data_exists = Sys.file_exists effective_dir in
+              if data_exists && Sys.is_directory effective_dir then
+                let is_empty =
+                  try
+                    let entries = Sys.readdir effective_dir in
+                    Array.length entries = 0
+                  with _ -> false
+                in
+                if is_empty then None
+                else
+                  Some
+                    (Form_builder.PreSubmitModal
+                       {
+                         title = "Data Directory Exists";
+                         message =
+                           Some
+                             (Printf.sprintf
+                                "Directory '%s' already exists with data."
+                                effective_dir);
+                         choices = [`Refresh; `Keep];
+                         to_string =
+                           (function
+                           | `Refresh -> "Refresh (import snapshot)"
+                           | `Keep -> "Keep (preserve existing)");
+                         on_choice =
+                           (fun (choice : [`Refresh | `Keep]) model ->
+                             {
+                               model with
+                               preserve_data = (choice :> preserve_data);
+                             });
+                       })
+              else None);
     on_submit =
       (fun model ->
         let history_mode =
