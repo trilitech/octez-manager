@@ -446,16 +446,22 @@ struct
         | Some modal_fn -> (
             match modal_fn model with
             | Some (PreSubmitModal modal_config) ->
-                (* Show choice modal and update model based on selection *)
+                (* Show choice modal, update model, and auto-submit on selection *)
                 let on_select choice =
-                  s.model_ref := modal_config.on_choice choice !(s.model_ref)
+                  let updated_model =
+                    modal_config.on_choice choice !(s.model_ref)
+                  in
+                  s.model_ref := updated_model ;
+                  (* Auto-submit after choice - ignore returned state since we
+                     can't update it from this callback *)
+                  ignore (proceed_with_submission s updated_model)
                 in
                 Modal_helpers.open_choice_modal
                   ~title:modal_config.title
                   ~items:modal_config.choices
                   ~to_string:modal_config.to_string
                   ~on_select ;
-                s (* Don't proceed with submission - user must submit again *)
+                s
             | None ->
                 (* No modal needed, proceed with normal submission *)
                 proceed_with_submission s model)
