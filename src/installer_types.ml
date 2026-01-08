@@ -56,6 +56,7 @@ type daemon_request = {
   extra_env : (string * string) list;
   extra_paths : string list;
   auto_enable : bool;
+  depends_on : string option;
 }
 
 type baker_node_mode =

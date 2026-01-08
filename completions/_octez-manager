@@ -5,6 +5,7 @@
 _octez-manager() {
   local -a commands
   commands=(
+    'cleanup-dependencies:Remove stale dependency entries from service configurations. This cleans up references to services that have been removed.'
     'cleanup-orphans:Remove orphan data directories and log files not associated with any registered service. Use --dry-run to preview what would be removed.'
     'install-accuser:Install an octez-accuser service'
     'install-baker:Install an octez-baker service'
@@ -28,6 +29,7 @@ _octez-manager() {
     'show'
     'show-service'
     'logs'
+    'edit'
   )
 
   local -a history_modes
@@ -50,6 +52,11 @@ _octez-manager() {
     'on:Vote for liquidity baking'
     'off:Vote against liquidity baking'
     'pass:Abstain from voting (default)'
+  )
+
+  local -a opts_cleanup_dependencies
+  opts_cleanup_dependencies=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
   )
 
   local -a opts_cleanup_orphans
@@ -211,6 +218,10 @@ _octez-manager() {
                 ;;
             esac
           fi
+          ;;
+        cleanup-dependencies)
+          _arguments \
+            $opts_cleanup_dependencies
           ;;
         cleanup-orphans)
           _arguments \

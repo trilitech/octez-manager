@@ -23,6 +23,7 @@ type t = {
   snapshot_no_check : bool;
   extra_args : string list;
   depends_on : string option;
+  dependents : string list;
 }
 
 let now () =
@@ -39,7 +40,8 @@ let now () =
 let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     ~service_user ~app_bin_dir ~logging_mode ?(snapshot_auto = false)
     ?(snapshot_uri = None) ?(snapshot_network_slug = None)
-    ?(snapshot_no_check = false) ?(extra_args = []) ?(depends_on = None) () =
+    ?(snapshot_no_check = false) ?(extra_args = []) ?(depends_on = None)
+    ?(dependents = []) () =
   {
     instance;
     role;
@@ -58,6 +60,7 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     snapshot_no_check;
     extra_args;
     depends_on;
+    dependents;
   }
 
 let logging_mode_to_yojson = Logging_mode.to_yojson
@@ -89,6 +92,7 @@ let to_yojson t =
       ("extra_args", `List (List.map (fun s -> `String s) t.extra_args));
       ( "depends_on",
         match t.depends_on with Some s -> `String s | None -> `Null );
+      ("dependents", `List (List.map (fun s -> `String s) t.dependents));
     ]
 
 let of_yojson json =
@@ -135,6 +139,11 @@ let of_yojson json =
       | `String s when s <> "" -> Some s
       | _ -> None
     in
+    let dependents =
+      match json |> member "dependents" with
+      | `List l -> List.map to_string l
+      | _ -> []
+    in
     match history_mode with
     | Error _ as err -> err
     | Ok history_mode -> (
@@ -159,6 +168,7 @@ let of_yojson json =
                 snapshot_no_check;
                 extra_args;
                 depends_on;
+                dependents;
               }
         | Error _ as err -> err)
   with Yojson.Json_error msg -> Error (`Msg msg)

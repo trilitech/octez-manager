@@ -40,6 +40,10 @@ type model = {
   (* Node-specific fields *)
   snapshot : snapshot_selection;
   preserve_data : preserve_data;
+  (* Edit mode *)
+  edit_mode : bool;
+  original_instance : string option;
+  stopped_dependents : string list;
 }
 
 let base_initial_model () =
@@ -65,6 +69,9 @@ let base_initial_model () =
       };
     snapshot = `None;
     preserve_data = `Auto;
+    edit_mode = false;
+    original_instance = None;
+    stopped_dependents = [];
   }
 
 (** {1 Helper Functions} *)
@@ -261,9 +268,39 @@ let ensure_ports_initialized model_ref =
         })
 
 let make_initial_model () =
-  let model_ref = ref (base_initial_model ()) in
-  ensure_ports_initialized model_ref ;
-  !model_ref
+  match Context.take_pending_edit_service () with
+  | Some edit_ctx when edit_ctx.service.Service.role = "node" ->
+      let svc = edit_ctx.service in
+      {
+        core =
+          {
+            instance_name = svc.Service.instance;
+            service_user = svc.Service.service_user;
+            app_bin_dir = svc.Service.app_bin_dir;
+            enable_on_boot = true;
+            start_now = false;
+            (* Don't auto-start after edit *)
+            extra_args = String.concat " " svc.Service.extra_args;
+          };
+        node =
+          {
+            network = svc.Service.network;
+            history_mode = History_mode.to_string svc.Service.history_mode;
+            data_dir = svc.Service.data_dir;
+            rpc_addr = svc.Service.rpc_addr;
+            p2p_addr = svc.Service.net_addr;
+          };
+        snapshot = `None;
+        preserve_data = `Keep;
+        (* Always preserve data in edit mode *)
+        edit_mode = true;
+        original_instance = Some svc.Service.instance;
+        stopped_dependents = edit_ctx.stopped_dependents;
+      }
+  | _ ->
+      let model_ref = ref (base_initial_model ()) in
+      ensure_ports_initialized model_ref ;
+      !model_ref
 
 let history_snapshot_conflict ~history_mode ~snapshot ~network =
   match snapshot with
@@ -553,7 +590,9 @@ let spec =
         in
 
         let description =
-          Printf.sprintf "Install node %s" model.core.instance_name
+          if model.edit_mode then
+            Printf.sprintf "Edit node %s" model.core.instance_name
+          else Printf.sprintf "Install node %s" model.core.instance_name
         in
         Job_manager.submit
           ~description
@@ -570,6 +609,12 @@ let spec =
             let* _service =
               PM.install_node ~quiet:true ~on_log:append_log req
             in
+            (* Show restart message in edit mode *)
+            if model.edit_mode && model.stopped_dependents <> [] then
+              Context.toast_info
+                (Printf.sprintf
+                   "Restart stopped dependents: %s"
+                   (String.concat ", " model.stopped_dependents)) ;
             (* Start the service if requested, even if not enabling on boot *)
             if model.core.start_now && not model.core.enable_on_boot then
               match Miaou_interfaces.Service_lifecycle.get () with

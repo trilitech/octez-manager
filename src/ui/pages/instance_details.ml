@@ -47,13 +47,16 @@ let init () =
 
 let update ps _ = ps
 
-let refresh ps = ps
+let refresh ps =
+  match Context.consume_navigation () with
+  | Some p -> Navigation.goto p ps
+  | None -> ps
 
 let move ps _ = ps
 
 let service_select ps _ = ps
 
-let service_cycle ps _ = ps
+let service_cycle ps _ = refresh ps
 
 let back ps = Navigation.back ps
 
@@ -294,6 +297,48 @@ let edit_config_modal ps =
           () ;
         ps
 
+(* Perform edit instance side effects and navigate via Context *)
+let do_edit_instance svc =
+  (* Stop the service (cascade stops dependents) *)
+  let stopped_dependents = svc.Service.dependents in
+  (match
+     Installer.stop_service ~quiet:true ~instance:svc.Service.instance ()
+   with
+  | Ok () -> ()
+  | Error (`Msg msg) -> Context.toast_warn ("Failed to stop service: " ^ msg)) ;
+  (* Set the edit context *)
+  Context.set_pending_edit_service ~service:svc ~stopped_dependents ;
+  (* Navigate to the appropriate install form based on role *)
+  let form_page =
+    match svc.Service.role with
+    | "node" -> "install_node_form_v3"
+    | "baker" -> "install_baker_form_v3"
+    | "accuser" -> "install_accuser_form_v3"
+    | "dal-node" | "dal" -> "install_dal_node_form_v3"
+    | _ -> "instances"
+  in
+  Context.navigate form_page
+
+let confirm_edit_modal ps svc =
+  if svc.Service.dependents = [] then (
+    do_edit_instance svc ;
+    ps)
+  else (
+    Modal_helpers.open_choice_modal
+      ~title:"Confirm Edit"
+      ~items:[`Confirm; `Cancel]
+      ~to_string:(function
+        | `Confirm ->
+            Printf.sprintf
+              "Proceed (will stop: %s)"
+              (String.concat ", " svc.Service.dependents)
+        | `Cancel -> "Cancel")
+      ~on_select:(fun choice ->
+        match choice with
+        | `Confirm -> do_edit_instance svc
+        | `Cancel -> ()) ;
+    ps)
+
 let open_actions_modal ps =
   let s = ps.Navigation.s in
   match s.service with
@@ -301,12 +346,14 @@ let open_actions_modal ps =
   | Some svc ->
       Modal_helpers.open_choice_modal
         ~title:("Actions . " ^ svc.Service.instance)
-        ~items:[`EditConfig; `Overrides]
+        ~items:[`Edit; `EditConfig; `Overrides]
         ~to_string:(function
+          | `Edit -> "Edit Instance"
           | `EditConfig -> "Edit Configuration"
           | `Overrides -> "Service Overrides")
         ~on_select:(fun choice ->
           match choice with
+          | `Edit -> ignore (confirm_edit_modal ps svc)
           | `EditConfig -> ignore (edit_config_modal ps)
           | `Overrides ->
               Modal_helpers.show_error
