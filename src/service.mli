@@ -22,6 +22,7 @@ type t = {
   snapshot_network_slug : string option;
   snapshot_no_check : bool;
   extra_args : string list;
+  depends_on : string option;
 }
 
 val make :
@@ -40,6 +41,7 @@ val make :
   ?snapshot_network_slug:string option ->
   ?snapshot_no_check:bool ->
   ?extra_args:string list ->
+  ?depends_on:string option ->
   unit ->
   t
 
