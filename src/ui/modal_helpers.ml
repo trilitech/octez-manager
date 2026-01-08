@@ -9,6 +9,7 @@ module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
 module Widgets = Miaou_widgets_display.Widgets
+module Navigation = Miaou.Core.Navigation
 
 let first_nonempty_line lines =
   List.find_opt (fun l -> String.trim l <> "") lines
@@ -25,11 +26,14 @@ let open_text_modal ~title ~lines =
 
     type msg = unit
 
-    let init () = Pager.open_lines ~title:"" lines
+    type pstate = state Navigation.t
 
-    let update s _ = s
+    let init () = Navigation.make (Pager.open_lines ~title:"" lines)
 
-    let view s ~focus ~size =
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      let s = ps.Navigation.s in
       let rows = max 1 (size.LTerm_geom.rows - 4) in
       (* Clamp columns so rendered content never exceeds the modal's inner width *)
       let cols =
@@ -38,23 +42,22 @@ let open_text_modal ~title ~lines =
       in
       Pager.render ~win:rows ~cols s ~focus
 
-    let move s _ = s
+    let move ps _ = ps
 
-    let refresh s = s
+    let refresh ps = ps
 
-    let enter s = s
+    let service_select ps _ = ps
 
-    let service_select s _ = s
+    let service_cycle ps _ = ps
 
-    let service_cycle s _ = s
-
-    let back s = s
+    let back ps = ps
 
     let keymap _ = []
 
     let handled_keys () = []
 
-    let handle_modal_key s key ~size =
+    let handle_modal_key ps key ~size =
+      let s = ps.Navigation.s in
       (* Check if pager is in input mode (search/lookup/help) *)
       let pager_in_input_mode =
         match s.Pager.input_mode with
@@ -80,16 +83,14 @@ let open_text_modal ~title ~lines =
       in
       (* Don't call close_top here - Modal_manager.handle_key handles it via
          cancel_on. Just return state unchanged for Esc when not in input mode. *)
-      if key = "Esc" && not pager_in_input_mode then s
+      if key = "Esc" && not pager_in_input_mode then ps
       else
         let rows = max 1 (size.LTerm_geom.rows - 4) in
         let win = rows in
         let pager, _ = Pager.handle_key ~win s ~key in
-        pager
+        Navigation.update (fun _ -> pager) ps
 
     let handle_key = handle_modal_key
-
-    let next_page _ = None
 
     let has_modal _ = true
   end in
@@ -110,29 +111,31 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
 
     type msg = unit
 
+    type pstate = state Navigation.t
+
     let init () = failwith "choice modal init provided by caller"
 
-    let update s _ = s
+    let update ps _ = ps
 
-    let view s ~focus ~size = Select_widget.render_with_size s ~focus ~size
+    let view ps ~focus ~size =
+      Select_widget.render_with_size ps.Navigation.s ~focus ~size
 
-    let move s _ = s
+    let move ps _ = ps
 
-    let refresh s = s
+    let refresh ps = ps
 
-    let enter s = s
+    let service_select ps _ = ps
 
-    let service_select s _ = s
+    let service_cycle ps _ = ps
 
-    let service_cycle s _ = s
-
-    let back s = s
+    let back ps = ps
 
     let keymap _ = []
 
     let handled_keys () = []
 
-    let handle_modal_key s key ~size:_ =
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
       let key =
         match Miaou.Core.Keys.of_string key with
         | Some Miaou.Core.Keys.Up -> "Up"
@@ -153,12 +156,10 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
       (* Don't call close_top here - Modal_manager.handle_key already handles
          commit/cancel based on commit_on/cancel_on keys. Only handle selection
          navigation here. *)
-      if key = "Enter" || key = "Esc" then s
-      else Select_widget.handle_key s ~key
+      if key = "Enter" || key = "Esc" then ps
+      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
 
     let handle_key = handle_modal_key
-
-    let next_page _ = None
 
     let has_modal _ = true
   end in
@@ -168,11 +169,11 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
   in
   Miaou.Core.Modal_manager.push_default
     (module Modal)
-    ~init:widget
+    ~init:(Navigation.make widget)
     ~ui
-    ~on_close:(fun state -> function
+    ~on_close:(fun pstate -> function
       | `Commit -> (
-          match Select_widget.get_selection state with
+          match Select_widget.get_selection pstate.Navigation.s with
           | Some choice -> on_select choice
           | None -> ())
       | `Cancel -> ())
@@ -205,28 +206,30 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
 
     type msg = unit
 
+    type pstate = state Navigation.t
+
     let init () = failwith "choice modal init provided by caller"
 
-    let update s _ = s
+    let update ps _ = ps
 
-    let view s ~focus ~size =
+    let view ps ~focus ~size =
+      let s = ps.Navigation.s in
       (* Update Help_hint whenever rendering so ? shows current selection's doc *)
       update_help_hint s ;
       Select_widget.render_with_size s ~focus ~size
 
-    let move s _ = s
+    let move ps _ = ps
 
-    let refresh s = s
+    let refresh ps = ps
 
-    let enter s = s
+    let service_select ps _ = ps
 
-    let service_select s _ = s
+    let service_cycle ps _ = ps
 
-    let service_cycle s _ = s
+    let back ps = ps
 
-    let back s = s
-
-    let keymap s =
+    let keymap ps =
+      let s = ps.Navigation.s in
       let doc_lines =
         match Select_widget.get_selection s with
         | Some choice -> describe_fn choice
@@ -236,25 +239,26 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
         doc_lines
         |> List.filter (fun l -> String.trim l <> "")
         |> List.mapi (fun idx line ->
-            (Printf.sprintf "doc%d" (idx + 1), (fun s -> s), line))
+            (Printf.sprintf "doc%d" (idx + 1), (fun ps -> ps), line))
       in
       (* Keep keymap mostly for displaying help; handlers are no-op to avoid
          interfering with handle_modal_key. *)
       [
-        ("Enter", (fun s -> s), "Select");
-        ("Up", (fun s -> s), "Up");
-        ("Down", (fun s -> s), "Down");
-        ("PageUp", (fun s -> s), "Page up");
-        ("PageDown", (fun s -> s), "Page down");
-        ("Home", (fun s -> s), "Top");
-        ("End", (fun s -> s), "Bottom");
-        ("?", (fun s -> s), "Show description");
+        ("Enter", (fun ps -> ps), "Select");
+        ("Up", (fun ps -> ps), "Up");
+        ("Down", (fun ps -> ps), "Down");
+        ("PageUp", (fun ps -> ps), "Page up");
+        ("PageDown", (fun ps -> ps), "Page down");
+        ("Home", (fun ps -> ps), "Top");
+        ("End", (fun ps -> ps), "Bottom");
+        ("?", (fun ps -> ps), "Show description");
       ]
       @ doc_entries
 
     let handled_keys () = []
 
-    let handle_modal_key s key ~size:_ =
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
       let mapped =
         match Miaou.Core.Keys.of_string key with
         | Some Miaou.Core.Keys.Up -> "Up"
@@ -277,21 +281,19 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
       if key = "Enter" then (
         Miaou.Core.Modal_manager.set_consume_next_key () ;
         Miaou.Core.Modal_manager.close_top `Commit ;
-        s)
+        ps)
       else if key = "Hint" then (
         (match Select_widget.get_selection s with
         | Some choice -> hint choice
         | None -> ( match items with hd :: _ -> hint hd | [] -> ())) ;
-        s)
+        ps)
       else if key = "Esc" then (
         Miaou.Core.Modal_manager.set_consume_next_key () ;
         Miaou.Core.Modal_manager.close_top `Cancel ;
-        s)
-      else Select_widget.handle_key s ~key
+        ps)
+      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
 
     let handle_key = handle_modal_key
-
-    let next_page _ = None
 
     let has_modal _ = true
   end in
@@ -305,14 +307,14 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
      in handle_modal_key. This prevents double-close when used as nested modal. *)
   Miaou.Core.Modal_manager.push
     (module Modal)
-    ~init:widget
+    ~init:(Navigation.make widget)
     ~ui
     ~commit_on:[]
     ~cancel_on:[]
-    ~on_close:(fun state -> function
+    ~on_close:(fun pstate -> function
       | `Commit -> (
           Miaou.Core.Help_hint.clear () ;
-          match Select_widget.get_selection state with
+          match Select_widget.get_selection pstate.Navigation.s with
           | Some choice -> on_select choice
           | None -> ())
       | `Cancel -> Miaou.Core.Help_hint.clear ())
@@ -323,40 +325,39 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
 
     type msg = unit
 
+    type pstate = state Navigation.t
+
     let init () = failwith "textbox modal init provided by caller"
 
-    let update s _ = s
+    let update ps _ = ps
 
-    let view s ~focus ~size:_ = Textbox_widget.render s ~focus
+    let view ps ~focus ~size:_ = Textbox_widget.render ps.Navigation.s ~focus
 
-    let move s _ = s
+    let move ps _ = ps
 
-    let refresh s = s
+    let refresh ps = ps
 
-    let enter s = s
+    let service_select ps _ = ps
 
-    let service_select s _ = s
+    let service_cycle ps _ = ps
 
-    let service_cycle s _ = s
-
-    let back s = s
+    let back ps = ps
 
     let keymap _ = []
 
     let handled_keys () = []
 
-    let handle_modal_key s key ~size:_ =
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
       if key = "Enter" then (
         Miaou.Core.Modal_manager.close_top `Commit ;
-        s)
+        ps)
       else if key = "Esc" || key = "Escape" then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
-        s)
-      else Textbox_widget.handle_key s ~key
+        ps)
+      else Navigation.update (fun _ -> Textbox_widget.handle_key s ~key) ps
 
     let handle_key = handle_modal_key
-
-    let next_page _ = None
 
     let has_modal _ = true
   end in
@@ -366,9 +367,9 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
   let modal_title = Option.value ~default:"Input" title in
   Miaou.Core.Modal_manager.prompt
     (module Modal)
-    ~init:widget
+    ~init:(Navigation.make widget)
     ~title:modal_title
-    ~extract:(fun state -> Some (Textbox_widget.get_text state))
+    ~extract:(fun pstate -> Some (Textbox_widget.get_text pstate.Navigation.s))
     ~on_result:(function Some text -> on_submit text | None -> ())
     ()
 
@@ -379,29 +380,31 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
 
     type msg = unit
 
+    type pstate = state Navigation.t
+
     let init () = failwith "multiselect modal init provided by caller"
 
-    let update s _ = s
+    let update ps _ = ps
 
-    let view s ~focus ~size = Select_widget.render_with_size s ~focus ~size
+    let view ps ~focus ~size =
+      Select_widget.render_with_size ps.Navigation.s ~focus ~size
 
-    let move s _ = s
+    let move ps _ = ps
 
-    let refresh s = s
+    let refresh ps = ps
 
-    let enter s = s
+    let service_select ps _ = ps
 
-    let service_select s _ = s
+    let service_cycle ps _ = ps
 
-    let service_cycle s _ = s
-
-    let back s = s
+    let back ps = ps
 
     let keymap _ = []
 
     let handled_keys () = []
 
-    let handle_modal_key s key ~size:_ =
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
       let key =
         match Miaou.Core.Keys.of_string key with
         | Some Miaou.Core.Keys.Up -> "Up"
@@ -426,24 +429,25 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
             | `KeepOpen ->
                 (* Rebuild widget with updated items from the callback *)
                 let updated_items = items () in
-                Select_widget.open_centered
-                  ~title
-                  ~items:updated_items
-                  ~to_string
-                  ()
+                Navigation.update
+                  (fun _ ->
+                    Select_widget.open_centered
+                      ~title
+                      ~items:updated_items
+                      ~to_string
+                      ())
+                  ps
             | `Close ->
                 (* Close modal *)
                 Miaou.Core.Modal_manager.close_top `Commit ;
-                s)
-        | None -> s
+                ps)
+        | None -> ps
       else if key = "Esc" then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
-        s)
-      else Select_widget.handle_key s ~key
+        ps)
+      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
 
     let handle_key = handle_modal_key
-
-    let next_page _ = None
 
     let has_modal _ = true
   end in
@@ -457,7 +461,7 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
      in handle_modal_key. This prevents the modal from auto-closing on Enter. *)
   Miaou.Core.Modal_manager.push
     (module Modal)
-    ~init:widget
+    ~init:(Navigation.make widget)
     ~ui
     ~commit_on:[]
     ~cancel_on:[]
@@ -482,32 +486,35 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
 
     type msg = unit
 
+    type pstate = state Navigation.t
+
     let init () = failwith "validated textbox modal init provided by caller"
 
-    let update s _ = s
+    let update ps _ = ps
 
-    let view s ~focus ~size:_ =
-      Miaou_widgets_input.Validated_textbox_widget.render s ~focus
+    let view ps ~focus ~size:_ =
+      Miaou_widgets_input.Validated_textbox_widget.render ps.Navigation.s ~focus
 
-    let move s _ = s
+    let move ps _ = ps
 
-    let refresh s = s
+    let refresh ps = ps
 
-    let enter s = s
+    let service_select ps _ = ps
 
-    let service_select s _ = s
-
-    let service_cycle s _ =
+    let service_cycle ps _ =
       (* Tick debounced validation *)
-      Miaou_widgets_input.Validated_textbox_widget.tick s
+      Navigation.update
+        (fun s -> Miaou_widgets_input.Validated_textbox_widget.tick s)
+        ps
 
-    let back s = s
+    let back ps = ps
 
     let keymap _ = []
 
     let handled_keys () = []
 
-    let handle_modal_key s key ~size:_ =
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
       if key = "Enter" then
         (* Flush any pending validation before checking validity *)
         let s =
@@ -515,16 +522,18 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
         in
         if Miaou_widgets_input.Validated_textbox_widget.is_valid s then (
           Miaou.Core.Modal_manager.close_top `Commit ;
-          s)
-        else s
+          Navigation.update (fun _ -> s) ps)
+        else Navigation.update (fun _ -> s) ps
       else if key = "Esc" || key = "Escape" then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
-        s)
-      else Miaou_widgets_input.Validated_textbox_widget.handle_key s ~key
+        ps)
+      else
+        Navigation.update
+          (fun _ ->
+            Miaou_widgets_input.Validated_textbox_widget.handle_key s ~key)
+          ps
 
     let handle_key = handle_modal_key
-
-    let next_page _ = None
 
     let has_modal _ = true
   end in
@@ -546,10 +555,11 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
   let modal_title = Option.value ~default:"Input" title in
   Miaou.Core.Modal_manager.prompt
     (module Modal)
-    ~init:widget
+    ~init:(Navigation.make widget)
     ~title:modal_title
-    ~extract:(fun state ->
-      Some (Miaou_widgets_input.Validated_textbox_widget.value state))
+    ~extract:(fun pstate ->
+      Some
+        (Miaou_widgets_input.Validated_textbox_widget.value pstate.Navigation.s))
     ~on_result:(function Some text -> on_submit text | None -> ())
     ()
 
@@ -596,34 +606,37 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
 
     type msg = unit
 
+    type pstate = state Navigation.t
+
     let init () =
-      File_browser.open_centered
-        ?path:initial_path
-        ~dirs_only
-        ~require_writable
-        ()
+      Navigation.make
+        (File_browser.open_centered
+           ?path:initial_path
+           ~dirs_only
+           ~require_writable
+           ())
 
-    let update s _ = s
+    let update ps _ = ps
 
-    let view s ~focus ~size = File_browser.render_with_size s ~focus ~size
+    let view ps ~focus ~size =
+      File_browser.render_with_size ps.Navigation.s ~focus ~size
 
-    let move s _ = s
+    let move ps _ = ps
 
-    let refresh s = s
+    let refresh ps = ps
 
-    let enter s = s
+    let service_select ps _ = ps
 
-    let service_select s _ = s
+    let service_cycle ps _ = ps
 
-    let service_cycle s _ = s
-
-    let back s = s
+    let back ps = ps
 
     let keymap _ = []
 
     let handled_keys () = []
 
-    let handle_modal_key s key ~size:_ =
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
       (* Let browser handle the key first and get updated state *)
       let browser' = File_browser.handle_key s ~key in
       (* Apply any pending updates from modal callbacks *)
@@ -632,7 +645,7 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
       (* Check for cancellation after browser processes key *)
       if File_browser.is_cancelled browser'' then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
-        browser''
+        Navigation.update (fun _ -> browser'') ps
         (* Check for commit with 's' key (Enter is used for navigation) *))
       else
         let selected = File_browser.get_selected_entry browser'' in
@@ -655,13 +668,11 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
         in
         if should_commit then (
           Miaou.Core.Modal_manager.close_top `Commit ;
-          browser'')
+          Navigation.update (fun _ -> browser'') ps)
         (* Return the updated browser state *)
-          else browser''
+          else Navigation.update (fun _ -> browser'') ps
 
     let handle_key = handle_modal_key
-
-    let next_page _ = None
 
     let has_modal _ = true
   end in
@@ -682,10 +693,11 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     ~ui
     ~commit_on:[]
     ~cancel_on:[]
-    ~on_close:(fun state -> function
+    ~on_close:(fun pstate -> function
       | `Commit -> (
           match
-            Miaou_widgets_layout.File_browser_widget.get_selection state
+            Miaou_widgets_layout.File_browser_widget.get_selection
+              pstate.Navigation.s
           with
           | Some path -> on_select path
           | None -> ())

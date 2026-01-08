@@ -10,6 +10,7 @@ module File_pager = Miaou_widgets_display.File_pager
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Widgets = Miaou_widgets_display.Widgets
+module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
 module Render_notify = Miaou_helpers.Render_notify
 
@@ -22,11 +23,12 @@ type state = {
   role : string;
   source : Log_viewer.log_source;
   pager : pager_type;
-  next_page : string option;
   cleanup_files : string list;
 }
 
 type msg = unit
+
+type pstate = state Navigation.t
 
 let get_pager = function Static p -> p | FileTail fp -> File_pager.pager fp
 
@@ -63,6 +65,9 @@ let open_stream_via_file cmd =
   | _ -> Error (`Msg "Failed to start background logger")
 
 let init () =
+  let make_state instance role source pager cleanup_files =
+    Navigation.make {instance; role; source; pager; cleanup_files}
+  in
   match Context.take_pending_instance_detail () with
   | Some instance -> (
       match Service_registry.find ~instance with
@@ -111,114 +116,90 @@ let init () =
                     let p = Pager.open_text ~title:"Error" e in
                     (Log_viewer.Journald, Static p, []))
           in
-          {
-            instance;
-            role = svc.Service.role;
-            source;
-            pager;
-            next_page = None;
-            cleanup_files = cleanup;
-          }
+          make_state instance svc.Service.role source pager cleanup
       | Ok None ->
           let pager =
             Static (Pager.open_text ~title:"Error" "Instance not found")
           in
-          {
-            instance;
-            role = "";
-            source = Journald;
-            pager;
-            next_page = None;
-            cleanup_files = [];
-          }
+          make_state instance "" Journald pager []
       | Error (`Msg e) ->
           let pager = Static (Pager.open_text ~title:"Error" e) in
-          {
-            instance;
-            role = "";
-            source = Journald;
-            pager;
-            next_page = None;
-            cleanup_files = [];
-          })
+          make_state instance "" Journald pager [])
   | None ->
       let pager =
         Static (Pager.open_text ~title:"Error" "No instance selected")
       in
-      {
-        instance = "";
-        role = "";
-        source = Journald;
-        pager;
-        next_page = None;
-        cleanup_files = [];
-      }
+      make_state "" "" Journald pager []
 
-let update s _ = s
+let update ps _ = ps
 
-let refresh s =
+let refresh ps =
+  let s = ps.Navigation.s in
   (* Close the old pager and cleanup *)
   close_pager s ;
   let s = {s with cleanup_files = []} in
 
-  match s.source with
-  | Log_viewer.DailyLogs -> (
-      match Service_registry.find ~instance:s.instance with
-      | Ok (Some svc) -> (
-          match
-            Log_viewer.get_daily_log_file
-              ~role:svc.Service.role
-              ~instance:s.instance
-          with
-          | Ok log_file -> (
-              match open_file_with_tail log_file with
-              | Ok fp -> {s with pager = FileTail fp}
-              | Error msg ->
-                  let pager = Static (Pager.open_text ~title:"Error" msg) in
-                  {s with pager})
-          | Error (`Msg msg) ->
-              let pager = Static (Pager.open_text ~title:"Error" msg) in
-              {s with pager})
-      | _ ->
-          let pager =
-            Static (Pager.open_text ~title:"Error" "Instance not found")
-          in
-          {s with pager})
-  | Log_viewer.Journald -> (
-      (* Refresh Journald - restart the stream *)
-      match
-        Log_viewer.get_log_cmd
-          ~role:s.role
-          ~instance:s.instance
-          ~source:s.source
-      with
-      | Ok cmd -> (
-          match open_stream_via_file cmd with
-          | Ok (fp, tmp) -> {s with pager = FileTail fp; cleanup_files = [tmp]}
-          | Error (`Msg msg) ->
-              let pager = Static (Pager.open_text ~title:"Error" msg) in
-              {s with pager})
-      | Error (`Msg msg) ->
-          let pager = Static (Pager.open_text ~title:"Error" msg) in
-          {s with pager})
+  let new_state =
+    match s.source with
+    | Log_viewer.DailyLogs -> (
+        match Service_registry.find ~instance:s.instance with
+        | Ok (Some svc) -> (
+            match
+              Log_viewer.get_daily_log_file
+                ~role:svc.Service.role
+                ~instance:s.instance
+            with
+            | Ok log_file -> (
+                match open_file_with_tail log_file with
+                | Ok fp -> {s with pager = FileTail fp}
+                | Error msg ->
+                    let pager = Static (Pager.open_text ~title:"Error" msg) in
+                    {s with pager})
+            | Error (`Msg msg) ->
+                let pager = Static (Pager.open_text ~title:"Error" msg) in
+                {s with pager})
+        | _ ->
+            let pager =
+              Static (Pager.open_text ~title:"Error" "Instance not found")
+            in
+            {s with pager})
+    | Log_viewer.Journald -> (
+        (* Refresh Journald - restart the stream *)
+        match
+          Log_viewer.get_log_cmd
+            ~role:s.role
+            ~instance:s.instance
+            ~source:s.source
+        with
+        | Ok cmd -> (
+            match open_stream_via_file cmd with
+            | Ok (fp, tmp) ->
+                {s with pager = FileTail fp; cleanup_files = [tmp]}
+            | Error (`Msg msg) ->
+                let pager = Static (Pager.open_text ~title:"Error" msg) in
+                {s with pager})
+        | Error (`Msg msg) ->
+            let pager = Static (Pager.open_text ~title:"Error" msg) in
+            {s with pager})
+  in
+  Navigation.update (fun _ -> new_state) ps
 
-let move s _ = s
+let move ps _ = ps
 
-let enter s = s
+let service_select ps _ = ps
 
-let service_select s _ = s
-
-let service_cycle s _ = s
+let service_cycle ps _ = ps
 
 let close_pager_and_cleanup s =
   (match s.pager with Static _ -> () | FileTail fp -> File_pager.close fp) ;
   List.iter (fun f -> try Sys.remove f with _ -> ()) s.cleanup_files
 
-let back s =
-  close_pager_and_cleanup s ;
-  {s with next_page = Some "__BACK__"}
+let back ps =
+  close_pager_and_cleanup ps.Navigation.s ;
+  Navigation.back ps
 
-let toggle_source s =
+let toggle_source ps =
+  let s = ps.Navigation.s in
   (* Close the old pager - ignore EBADF from double-close bug in FilePager *)
   (try close_pager s with
   | Unix.Unix_error (Unix.EBADF, "close", _) -> ()
@@ -229,66 +210,70 @@ let toggle_source s =
     | Log_viewer.Journald -> Log_viewer.DailyLogs
     | Log_viewer.DailyLogs -> Log_viewer.Journald
   in
-  match new_source with
-  | Log_viewer.DailyLogs -> (
-      match Service_registry.find ~instance:s.instance with
-      | Ok (Some svc) -> (
-          match
-            Log_viewer.get_daily_log_file
-              ~role:svc.Service.role
-              ~instance:s.instance
-          with
-          | Ok log_file -> (
-              (* Restoring File_pager with follow:true *)
-              match open_file_with_tail log_file with
-              | Ok fp -> {s with source = new_source; pager = FileTail fp}
-              | Error msg ->
-                  let pager = Static (Pager.open_text ~title:"Error" msg) in
-                  {s with source = new_source; pager})
-          | Error (`Msg msg) ->
-              let pager = Static (Pager.open_text ~title:"Error" msg) in
-              {s with source = new_source; pager})
-      | _ ->
-          let pager =
-            Static (Pager.open_text ~title:"Error" "Instance not found")
-          in
-          {s with source = new_source; pager})
-  | Log_viewer.Journald -> (
-      (* Switch to Journald - use open_stream_via_file *)
-      match
-        Log_viewer.get_log_cmd
-          ~role:s.role
-          ~instance:s.instance
-          ~source:new_source
-      with
-      | Ok cmd -> (
-          match open_stream_via_file cmd with
-          | Ok (fp, tmp) ->
-              {
-                s with
-                source = new_source;
-                pager = FileTail fp;
-                cleanup_files = [tmp];
-              }
-          | Error (`Msg msg) ->
-              let pager = Static (Pager.open_text ~title:"Error" msg) in
-              {s with source = new_source; pager})
-      | Error (`Msg msg) ->
-          let pager = Static (Pager.open_text ~title:"Error" msg) in
-          {s with source = new_source; pager})
+  let new_state =
+    match new_source with
+    | Log_viewer.DailyLogs -> (
+        match Service_registry.find ~instance:s.instance with
+        | Ok (Some svc) -> (
+            match
+              Log_viewer.get_daily_log_file
+                ~role:svc.Service.role
+                ~instance:s.instance
+            with
+            | Ok log_file -> (
+                (* Restoring File_pager with follow:true *)
+                match open_file_with_tail log_file with
+                | Ok fp -> {s with source = new_source; pager = FileTail fp}
+                | Error msg ->
+                    let pager = Static (Pager.open_text ~title:"Error" msg) in
+                    {s with source = new_source; pager})
+            | Error (`Msg msg) ->
+                let pager = Static (Pager.open_text ~title:"Error" msg) in
+                {s with source = new_source; pager})
+        | _ ->
+            let pager =
+              Static (Pager.open_text ~title:"Error" "Instance not found")
+            in
+            {s with source = new_source; pager})
+    | Log_viewer.Journald -> (
+        (* Switch to Journald - use open_stream_via_file *)
+        match
+          Log_viewer.get_log_cmd
+            ~role:s.role
+            ~instance:s.instance
+            ~source:new_source
+        with
+        | Ok cmd -> (
+            match open_stream_via_file cmd with
+            | Ok (fp, tmp) ->
+                {
+                  s with
+                  source = new_source;
+                  pager = FileTail fp;
+                  cleanup_files = [tmp];
+                }
+            | Error (`Msg msg) ->
+                let pager = Static (Pager.open_text ~title:"Error" msg) in
+                {s with source = new_source; pager})
+        | Error (`Msg msg) ->
+            let pager = Static (Pager.open_text ~title:"Error" msg) in
+            {s with source = new_source; pager})
+  in
+  Navigation.update (fun _ -> new_state) ps
 
 let handled_keys () = []
 
-let keymap _s = []
+let keymap _ps = []
 
-let view s ~focus ~size =
+let view ps ~focus ~size =
+  let s = ps.Navigation.s in
   let source_str =
     match s.source with
     | Log_viewer.Journald -> "journald"
     | Log_viewer.DailyLogs -> "daily logs"
   in
   let privilege =
-    if Common.is_root () then Widgets.red "● SYSTEM" else Widgets.green "● USER"
+    if Common.is_root () then Widgets.red "@ SYSTEM" else Widgets.green "@ USER"
   in
   let title =
     Printf.sprintf
@@ -300,8 +285,8 @@ let view s ~focus ~size =
   let help =
     Widgets.dim
       (Printf.sprintf
-         "Source: %s · r: refresh · t: toggle · /: search · f: follow · w: \
-          wrap · ?: help · Esc: back"
+         "Source: %s . r: refresh . t: toggle . /: search . f: follow . w: \
+          wrap . ?: help . Esc: back"
          source_str)
   in
   let header = [title; help] in
@@ -312,7 +297,8 @@ let view s ~focus ~size =
         (get_pager s.pager)
         ~focus)
 
-let handle_modal_key s key ~size =
+let handle_modal_key ps key ~size =
+  let s = ps.Navigation.s in
   (* Forward keys to pager when in modal/search mode *)
   let win = size.LTerm_geom.rows in
   let current_pager = get_pager s.pager in
@@ -322,9 +308,10 @@ let handle_modal_key s key ~size =
     | Static _ -> Static pager'
     | FileTail _fp -> if current_pager == pager' then s.pager else Static pager'
   in
-  {s with pager = new_pager}
+  Navigation.update (fun s -> {s with pager = new_pager}) ps
 
-let handle_key s key ~size =
+let handle_key ps key ~size =
+  let s = ps.Navigation.s in
   let current_pager = get_pager s.pager in
   let win = size.LTerm_geom.rows in
 
@@ -346,11 +333,11 @@ let handle_key s key ~size =
         | FileTail _ ->
             if current_pager == pager' then s.pager else Static pager'
       in
-      {s with pager = new_pager}
+      Navigation.update (fun s -> {s with pager = new_pager}) ps
     else (
       (* Otherwise, Esc goes back - IMPORTANT: close the pager first! *)
       close_pager_and_cleanup s ;
-      {s with next_page = Some "__BACK__"})
+      Navigation.back ps)
   else
     match Keys.of_string key with
     | Some Keys.Escape ->
@@ -363,12 +350,12 @@ let handle_key s key ~size =
             | FileTail _ ->
                 if current_pager == pager' then s.pager else Static pager'
           in
-          {s with pager = new_pager}
+          Navigation.update (fun s -> {s with pager = new_pager}) ps
         else (
           close_pager_and_cleanup s ;
-          {s with next_page = Some "__BACK__"})
-    | Some (Keys.Char "r") when not pager_in_input_mode -> refresh s
-    | Some (Keys.Char "t") when not pager_in_input_mode -> toggle_source s
+          Navigation.back ps)
+    | Some (Keys.Char "r") when not pager_in_input_mode -> refresh ps
+    | Some (Keys.Char "t") when not pager_in_input_mode -> toggle_source ps
     | _ ->
         (* Delegate all other keys to pager *)
         let pager', consumed = Pager.handle_key ~win current_pager ~key in
@@ -379,18 +366,11 @@ let handle_key s key ~size =
             | FileTail _ ->
                 if current_pager == pager' then s.pager else Static pager'
           in
-          {s with pager = new_pager}
-        else s
+          Navigation.update (fun s -> {s with pager = new_pager}) ps
+        else ps
 
-let next_page s =
-  match s.next_page with
-  | Some _ ->
-      (* Close pager before navigating away *)
-      close_pager_and_cleanup s ;
-      s.next_page
-  | None -> None
-
-let has_modal s =
+let has_modal ps =
+  let s = ps.Navigation.s in
   match (get_pager s.pager).Pager.input_mode with
   | `Search_edit | `Lookup | `Help -> true
   | `None -> false
@@ -400,6 +380,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   type nonrec msg = msg
 
+  type nonrec pstate = pstate
+
   let init = init
 
   let update = update
@@ -407,8 +389,6 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let refresh = refresh
 
   let move = move
-
-  let enter = enter
 
   let service_select = service_select
 
@@ -425,8 +405,6 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let handle_key = handle_key
 
   let handle_modal_key = handle_modal_key
-
-  let next_page = next_page
 
   let has_modal = has_modal
 end
