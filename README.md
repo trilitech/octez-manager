@@ -21,7 +21,7 @@ A command-line tool and terminal UI for managing Octez services (nodes, bakers, 
 
 ```sh
 # Pin miaou (not yet on opam)
-opam pin add miaou https://github.com/trilitech/miaou.git
+opam pin add https://github.com/trilitech/miaou.git
 
 # Install dependencies and build
 opam install . --deps-only --with-test
