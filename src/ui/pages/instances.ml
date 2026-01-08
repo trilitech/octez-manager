@@ -10,6 +10,7 @@ module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Service_state = Data.Service_state
 module Metrics = Rpc_metrics
+module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
 open Rresult
 
@@ -29,7 +30,6 @@ type state = {
   selected : int;
   folded : StringSet.t; (* instance names that are folded *)
   last_updated : float;
-  next_page : string option;
   (* Matrix layout state *)
   num_columns : int; (* number of columns based on terminal width *)
   active_column : int; (* which column has focus, 0-indexed *)
@@ -37,6 +37,8 @@ type state = {
 }
 
 type msg = unit
+
+type pstate = state Navigation.t
 
 let clamp_selection services idx =
   let len = List.length services + 3 in
@@ -298,17 +300,17 @@ let init_state () =
   in
   (* Default to 1 column, will be updated on first render with actual cols *)
   let num_columns = 1 in
-  {
-    services;
-    selected = 0;
-    folded = all_folded;
-    last_updated = Unix.gettimeofday ();
-    next_page = None;
-    num_columns;
-    active_column = 0;
-    column_scroll = Array.make 10 0;
-    (* max practical columns based on terminal width; 10 is a safe upper bound *)
-  }
+  Navigation.make
+    {
+      services;
+      selected = 0;
+      folded = all_folded;
+      last_updated = Unix.gettimeofday ();
+      num_columns;
+      active_column = 0;
+      column_scroll = Array.make 10 0;
+      (* max practical columns based on terminal width; 10 is a safe upper bound *)
+    }
 
 let force_refresh state =
   let services = load_services_fresh () in
@@ -318,18 +320,16 @@ let force_refresh state =
   in
   ensure_valid_column state
 
-let maybe_refresh state =
+let maybe_refresh ps =
+  let state = ps.Navigation.s in
   let now = Unix.gettimeofday () in
   let pending_nav = Context.consume_navigation () in
-  let state =
-    match pending_nav with
-    | Some p -> {state with next_page = Some p}
-    | None -> {state with next_page = None}
-    (* Clear next_page after navigation consumed *)
+  let ps =
+    match pending_nav with Some p -> Navigation.goto p ps | None -> ps
   in
   if Context.consume_instances_dirty () || now -. state.last_updated > 1. then
-    force_refresh state
-  else ensure_valid_column state
+    Navigation.update (fun s -> force_refresh s) ps
+  else Navigation.update ensure_valid_column ps
 
 let current_service state =
   if state.selected < 3 then None
@@ -1199,30 +1199,33 @@ struct
 
   type nonrec msg = msg
 
+  type nonrec pstate = pstate
+
   let init () = init_state ()
 
-  let update s _ = s
+  let update ps _ = ps
 
   let refresh = maybe_refresh
 
-  let move s _ = s
+  let move ps _ = ps
 
-  let enter s = activate_selection s
+  let service_select ps _ = ps
 
-  let service_select s _ = s
+  let service_cycle ps _ = refresh ps
 
-  let service_cycle s _ = refresh s
-
-  let back s = s
+  let back ps = Navigation.back ps
 
   let handled_keys () =
     Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"]
 
-  let keymap _ =
+  let keymap _ps =
+    let activate ps = Navigation.update activate_selection ps in
+    let create ps = Navigation.update create_menu_modal ps in
+    let diag ps = Navigation.update go_to_diagnostics ps in
     [
-      ("Enter", activate_selection, "Open");
-      ("c", create_menu_modal, "Create service");
-      ("d", go_to_diagnostics, "Diagnostics");
+      ("Enter", activate, "Open");
+      ("c", create, "Create service");
+      ("d", diag, "Diagnostics");
     ]
 
   let header s =
@@ -1329,7 +1332,8 @@ Press **Enter** to open instance menu.|}
     in
     loop [] n l
 
-  let view s ~focus:_ ~size =
+  let view ps ~focus:_ ~size =
+    let s = ps.Navigation.s in
     (* Set contextual help hint based on selection *)
     (match current_service s with
     | Some st when st.service.Service.role = "node" ->
@@ -1481,14 +1485,14 @@ Press **Enter** to open instance menu.|}
             body ^ "\n" ^ toast_lines_str
           else body)
 
-  let check_navigation s =
+  let check_navigation ps =
     match Context.consume_navigation () with
-    | Some p -> {s with next_page = Some p}
-    | None -> s
+    | Some p -> Navigation.goto p ps
+    | None -> ps
 
-  let handle_modal_key s key ~size:_ =
+  let handle_modal_key ps key ~size:_ =
     Miaou.Core.Modal_manager.handle_key key ;
-    check_navigation s
+    check_navigation ps
 
   let is_quit_key key =
     let lower = String.lowercase_ascii key in
@@ -1616,53 +1620,58 @@ Press **Enter** to open instance menu.|}
         let target_idx = List.nth target_col_indices target_pos in
         {s with active_column = new_col; selected = target_idx + 3}
 
-  let handle_key s key ~size =
+  let handle_key ps key ~size =
+    let s = ps.Navigation.s in
     (* Update num_columns based on current terminal size *)
     let cols = size.LTerm_geom.cols in
     let num_columns = calc_num_columns ~cols in
     let s = {s with num_columns} in
-    let s =
-      if Miaou.Core.Modal_manager.has_active () then (
-        Miaou.Core.Modal_manager.handle_key key ;
-        s)
-      else if is_quit_key key then {s with next_page = Some "__BACK__"}
-      else
+    let ps = Navigation.update (fun _ -> s) ps in
+    if Miaou.Core.Modal_manager.has_active () then (
+      Miaou.Core.Modal_manager.handle_key key ;
+      check_navigation ps)
+    else if is_quit_key key then Navigation.back ps
+    else
+      let ps =
         match Keys.of_string key with
-        | Some Keys.Up -> move_selection s (-1)
-        | Some Keys.Down -> move_selection s 1
-        | Some (Keys.Char "k") -> move_selection s (-1)
-        | Some (Keys.Char "j") -> move_selection s 1
-        | Some Keys.Left -> move_column s (-1)
-        | Some Keys.Right -> move_column s 1
-        | Some (Keys.Char "h") -> move_column s (-1)
-        | Some (Keys.Char "l") -> move_column s 1
-        | Some Keys.Tab -> toggle_fold s
-        | Some Keys.Enter -> activate_selection s
-        | Some (Keys.Char "c") -> create_menu_modal s
-        | Some (Keys.Char " ") -> force_refresh_cmd s
+        | Some Keys.Up -> Navigation.update (fun s -> move_selection s (-1)) ps
+        | Some Keys.Down -> Navigation.update (fun s -> move_selection s 1) ps
+        | Some (Keys.Char "k") ->
+            Navigation.update (fun s -> move_selection s (-1)) ps
+        | Some (Keys.Char "j") ->
+            Navigation.update (fun s -> move_selection s 1) ps
+        | Some Keys.Left -> Navigation.update (fun s -> move_column s (-1)) ps
+        | Some Keys.Right -> Navigation.update (fun s -> move_column s 1) ps
+        | Some (Keys.Char "h") ->
+            Navigation.update (fun s -> move_column s (-1)) ps
+        | Some (Keys.Char "l") ->
+            Navigation.update (fun s -> move_column s 1) ps
+        | Some Keys.Tab -> Navigation.update toggle_fold ps
+        | Some Keys.Enter -> Navigation.update activate_selection ps
+        | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
+        | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
         | Some (Keys.Char "Esc")
         | Some (Keys.Char "Escape")
         | Some (Keys.Char "q")
         | Some (Keys.Char "C-c") ->
-            {s with next_page = Some "__BACK__"}
-        | _ -> s
-    in
-    (* Keep active_column in sync with selection *)
-    let s =
-      if s.selected >= 3 && s.num_columns > 1 then
-        let svc_idx = s.selected - 3 in
-        let col =
-          column_for_service
-            ~num_columns:s.num_columns
-            ~services:s.services
-            svc_idx
-        in
-        {s with active_column = col}
-      else s
-    in
-    check_navigation s
-
-  let next_page s = s.next_page
+            Navigation.back ps
+        | _ -> ps
+      in
+      (* Keep active_column in sync with selection *)
+      let ps =
+        let s = ps.Navigation.s in
+        if s.selected >= 3 && s.num_columns > 1 then
+          let svc_idx = s.selected - 3 in
+          let col =
+            column_for_service
+              ~num_columns:s.num_columns
+              ~services:s.services
+              svc_idx
+          in
+          Navigation.update (fun s -> {s with active_column = col}) ps
+        else ps
+      in
+      check_navigation ps
 
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 end

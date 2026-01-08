@@ -8,6 +8,7 @@
 module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
+module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
 open Installer_types
 open Rresult
@@ -20,10 +21,11 @@ type state = {
   instance : string;
   service : Service.t option;
   error : string option;
-  next_page : string option;
 }
 
 type msg = unit
+
+type pstate = state Navigation.t
 
 let load_service instance =
   match Service_registry.find ~instance with
@@ -32,33 +34,28 @@ let load_service instance =
   | Error (`Msg e) -> Error e
 
 let init () =
-  match Context.take_pending_instance_detail () with
-  | Some instance -> (
-      match load_service instance with
-      | Ok service ->
-          {instance; service = Some service; error = None; next_page = None}
-      | Error e -> {instance; service = None; error = Some e; next_page = None})
-  | None ->
-      {
-        instance = "";
-        service = None;
-        error = Some "No instance selected";
-        next_page = None;
-      }
+  let state =
+    match Context.take_pending_instance_detail () with
+    | Some instance -> (
+        match load_service instance with
+        | Ok service -> {instance; service = Some service; error = None}
+        | Error e -> {instance; service = None; error = Some e})
+    | None ->
+        {instance = ""; service = None; error = Some "No instance selected"}
+  in
+  Navigation.make state
 
-let update s _ = s
+let update ps _ = ps
 
-let refresh s = s
+let refresh ps = ps
 
-let move s _ = s
+let move ps _ = ps
 
-let enter s = s
+let service_select ps _ = ps
 
-let service_select s _ = s
+let service_cycle ps _ = ps
 
-let service_cycle s _ = s
-
-let back s = {s with next_page = Some "__BACK__"}
+let back ps = Navigation.back ps
 
 let handled_keys () = Miaou.Core.Keys.[Escape]
 
@@ -66,7 +63,7 @@ let keymap _ = [("Esc", back, "Back")]
 
 let header s =
   [
-    Widgets.title_highlight (" Instance Details · " ^ s.instance);
+    Widgets.title_highlight (" Instance Details . " ^ s.instance);
     (match s.service with
     | Some svc -> Widgets.dim (svc.Service.role ^ " @ " ^ svc.Service.network)
     | None -> "");
@@ -208,7 +205,8 @@ let view_details svc =
   @ [""; Widgets.bold "Files & Paths"]
   @ render_fields paths
 
-let view s ~focus:_ ~size =
+let view ps ~focus:_ ~size =
+  let s = ps.Navigation.s in
   let body =
     match (s.error, s.service) with
     | Some err, _ -> [Widgets.red ("Error: " ^ err)]
@@ -218,9 +216,9 @@ let view s ~focus:_ ~size =
   Vsection.render ~size ~header:(header s) ~footer ~child:(fun _ ->
       String.concat "\n" body)
 
-let handle_modal_key s key ~size:_ =
+let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
-  s
+  ps
 
 let require_package_manager () =
   match
@@ -234,9 +232,10 @@ let require_package_manager () =
       Ok (module I : Manager_interfaces.Package_manager)
   | None -> Error (`Msg "Package manager capability not available")
 
-let apply_node_update s update_fn =
+let apply_node_update ps update_fn =
+  let s = ps.Navigation.s in
   match s.service with
-  | None -> s
+  | None -> ps
   | Some svc -> (
       let req =
         {
@@ -264,25 +263,26 @@ let apply_node_update s update_fn =
       match res with
       | Ok new_svc ->
           Modal_helpers.show_success ~title:"Success" "Configuration updated." ;
-          {s with service = Some new_svc}
+          Navigation.update (fun s -> {s with service = Some new_svc}) ps
       | Error (`Msg e) ->
           Modal_helpers.show_error ~title:"Error" e ;
-          s)
+          ps)
 
-let edit_config_modal s =
+let edit_config_modal ps =
+  let s = ps.Navigation.s in
   match s.service with
-  | None -> s
+  | None -> ps
   | Some svc ->
       if svc.Service.role <> "node" then (
         Modal_helpers.show_error
           ~title:"Not Supported"
           "Editing is currently only supported for nodes." ;
-        s)
+        ps)
       else
         (* Only extra args can be edited - logging is always journald *)
         let initial = String.concat " " svc.Service.extra_args in
         Modal_helpers.prompt_text_modal
-          ~title:("Extra Arguments · " ^ svc.Service.instance)
+          ~title:("Extra Arguments . " ^ svc.Service.instance)
           ~initial
           ~on_submit:(fun text ->
             let extra_args =
@@ -290,41 +290,39 @@ let edit_config_modal s =
               |> List.map String.trim
               |> List.filter (( <> ) "")
             in
-            ignore (apply_node_update s (fun req -> {req with extra_args})))
+            ignore (apply_node_update ps (fun req -> {req with extra_args})))
           () ;
-        s
+        ps
 
-let open_actions_modal s =
+let open_actions_modal ps =
+  let s = ps.Navigation.s in
   match s.service with
-  | None -> s
+  | None -> ps
   | Some svc ->
       Modal_helpers.open_choice_modal
-        ~title:("Actions · " ^ svc.Service.instance)
+        ~title:("Actions . " ^ svc.Service.instance)
         ~items:[`EditConfig; `Overrides]
         ~to_string:(function
           | `EditConfig -> "Edit Configuration"
           | `Overrides -> "Service Overrides")
         ~on_select:(fun choice ->
           match choice with
-          | `EditConfig -> ignore (edit_config_modal s)
+          | `EditConfig -> ignore (edit_config_modal ps)
           | `Overrides ->
               Modal_helpers.show_error
                 ~title:"Not Implemented"
                 "Overrides not implemented yet") ;
-      s
+      ps
 
-let handle_key s key ~size:_ =
+let handle_key ps key ~size:_ =
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
-    s)
+    ps)
   else
     match Keys.of_string key with
-    | Some (Keys.Char "Esc") | Some (Keys.Char "q") ->
-        {s with next_page = Some "__BACK__"}
-    | Some Keys.Enter -> open_actions_modal s
-    | _ -> s
-
-let next_page s = s.next_page
+    | Some (Keys.Char "Esc") | Some (Keys.Char "q") -> Navigation.back ps
+    | Some Keys.Enter -> open_actions_modal ps
+    | _ -> ps
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
@@ -333,6 +331,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   type nonrec msg = msg
 
+  type nonrec pstate = pstate
+
   let init = init
 
   let update = update
@@ -340,8 +340,6 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let refresh = refresh
 
   let move = move
-
-  let enter = enter
 
   let service_select = service_select
 
@@ -358,8 +356,6 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let handle_key = handle_key
 
   let handle_modal_key = handle_modal_key
-
-  let next_page = next_page
 
   let has_modal = has_modal
 end
