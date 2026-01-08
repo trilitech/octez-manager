@@ -138,7 +138,7 @@ _octez_manager() {
       ;;
     install-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --net-addr --network --no-enable --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --help"
+        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --net-addr --network --no-enable --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --help"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0

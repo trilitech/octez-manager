@@ -109,6 +109,7 @@ _octez-manager() {
     '--net-addr[P2P address]:ADDR:'
     '--network[Chain network (default: mainnet).]:NET:'
     '--no-enable[Disable automatic systemctl enable --now.]'
+    '--preserve-data[Preserve existing data in data-dir instead of clearing it. When set, no snapshot will be imported even if --snapshot is specified.]'
     '--rpc-addr[RPC address]:ADDR:'
     '--service-user[System user owning the service.]:USER:_users'
     '--snapshot[Bootstrap by importing a snapshot before enabling the node service.]'
