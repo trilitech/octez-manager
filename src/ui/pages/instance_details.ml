@@ -62,7 +62,14 @@ let back ps = Navigation.back ps
 
 let handled_keys () = Miaou.Core.Keys.[Escape; Enter]
 
-let keymap _ = [("Enter", (fun ps -> ps), "Actions"); ("Esc", back, "Back")]
+(* Forward reference for keymap - set after open_actions_modal is defined *)
+let open_actions_modal_ref : (pstate -> pstate) ref = ref (fun ps -> ps)
+
+let keymap _ =
+  [
+    ("Enter", (fun ps -> !open_actions_modal_ref ps), "Actions");
+    ("Esc", back, "Back");
+  ]
 
 let header s =
   [
@@ -334,9 +341,7 @@ let confirm_edit_modal ps svc =
               (String.concat ", " svc.Service.dependents)
         | `Cancel -> "Cancel")
       ~on_select:(fun choice ->
-        match choice with
-        | `Confirm -> do_edit_instance svc
-        | `Cancel -> ()) ;
+        match choice with `Confirm -> do_edit_instance svc | `Cancel -> ()) ;
     ps)
 
 let open_actions_modal ps =
@@ -360,6 +365,9 @@ let open_actions_modal ps =
                 ~title:"Not Implemented"
                 "Overrides not implemented yet") ;
       ps
+
+(* Set the forward reference now that open_actions_modal is defined *)
+let () = open_actions_modal_ref := open_actions_modal
 
 let handle_key ps key ~size:_ =
   if Miaou.Core.Modal_manager.has_active () then (
