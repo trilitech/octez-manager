@@ -36,11 +36,12 @@ let close_pager s =
   (match s.pager with Static _ -> () | FileTail fp -> File_pager.close fp) ;
   List.iter (fun f -> try Sys.remove f with _ -> ()) s.cleanup_files
 
-let open_file_with_tail path =
+let open_file_with_tail ?title path =
   match
     File_pager.open_file
       ~follow:true
       ~notify_render:Render_notify.request_render
+      ?title
       path
   with
   | Ok fp ->
@@ -49,7 +50,7 @@ let open_file_with_tail path =
       Ok fp
   | Error e -> Error e
 
-let open_stream_via_file cmd =
+let open_stream_via_file ~title cmd =
   let temp_file = Filename.temp_file "octez_log_" ".txt" in
   (* Start background process to feed the file *)
   let full_cmd =
@@ -59,7 +60,7 @@ let open_stream_via_file cmd =
   | 0 -> (
       (* Give it a moment to create/write *)
       Unix.sleepf 0.1 ;
-      match open_file_with_tail temp_file with
+      match open_file_with_tail ~title temp_file with
       | Ok fp -> Ok (fp, temp_file)
       | Error e -> Error (`Msg e))
   | _ -> Error (`Msg "Failed to start background logger")
@@ -72,49 +73,47 @@ let init () =
   | Some instance -> (
       match Service_registry.find ~instance with
       | Ok (Some svc) ->
-          (* Try to open daily logs first, fall back to journald *)
+          (* Try journalctl first (primary source), fall back to daily logs *)
           let source, pager, cleanup =
             match
-              Log_viewer.get_daily_log_file ~role:svc.Service.role ~instance
+              Log_viewer.get_log_cmd
+                ~role:svc.Service.role
+                ~instance
+                ~source:Journald
             with
-            | Ok log_file -> (
-                match open_file_with_tail log_file with
-                | Ok fp -> (Log_viewer.DailyLogs, FileTail fp, [])
+            | Ok cmd -> (
+                match open_stream_via_file ~title:"journalctl" cmd with
+                | Ok (fp, tmp) -> (Log_viewer.Journald, FileTail fp, [tmp])
                 | Error _ -> (
-                    (* Fall back to journald via temp file *)
+                    (* Fall back to daily logs *)
                     match
-                      Log_viewer.get_log_cmd
+                      Log_viewer.get_daily_log_file
                         ~role:svc.Service.role
                         ~instance
-                        ~source:Journald
                     with
-                    | Ok cmd -> (
-                        match open_stream_via_file cmd with
-                        | Ok (fp, tmp) ->
-                            (Log_viewer.Journald, FileTail fp, [tmp])
-                        | Error (`Msg e) ->
+                    | Ok log_file -> (
+                        match open_file_with_tail log_file with
+                        | Ok fp -> (Log_viewer.DailyLogs, FileTail fp, [])
+                        | Error e ->
                             let p = Pager.open_text ~title:"Error" e in
-                            (Log_viewer.Journald, Static p, []))
+                            (Log_viewer.DailyLogs, Static p, []))
                     | Error (`Msg e) ->
                         let p = Pager.open_text ~title:"Error" e in
-                        (Log_viewer.Journald, Static p, [])))
+                        (Log_viewer.DailyLogs, Static p, [])))
             | Error _ -> (
-                (* Fall back to journald via temp file *)
+                (* Fall back to daily logs *)
                 match
-                  Log_viewer.get_log_cmd
-                    ~role:svc.Service.role
-                    ~instance
-                    ~source:Journald
+                  Log_viewer.get_daily_log_file ~role:svc.Service.role ~instance
                 with
-                | Ok cmd -> (
-                    match open_stream_via_file cmd with
-                    | Ok (fp, tmp) -> (Log_viewer.Journald, FileTail fp, [tmp])
-                    | Error (`Msg e) ->
+                | Ok log_file -> (
+                    match open_file_with_tail log_file with
+                    | Ok fp -> (Log_viewer.DailyLogs, FileTail fp, [])
+                    | Error e ->
                         let p = Pager.open_text ~title:"Error" e in
-                        (Log_viewer.Journald, Static p, []))
+                        (Log_viewer.DailyLogs, Static p, []))
                 | Error (`Msg e) ->
                     let p = Pager.open_text ~title:"Error" e in
-                    (Log_viewer.Journald, Static p, []))
+                    (Log_viewer.DailyLogs, Static p, []))
           in
           make_state instance svc.Service.role source pager cleanup
       | Ok None ->
@@ -134,55 +133,15 @@ let init () =
 let update ps _ = ps
 
 let refresh ps =
-  let s = ps.Navigation.s in
-  (* Close the old pager and cleanup *)
-  close_pager s ;
-  let s = {s with cleanup_files = []} in
+  (* Don't recreate the pager on periodic refresh - File_pager already handles tailing.
+     This preserves user settings like follow mode and wrap mode. *)
+  ps
 
-  let new_state =
-    match s.source with
-    | Log_viewer.DailyLogs -> (
-        match Service_registry.find ~instance:s.instance with
-        | Ok (Some svc) -> (
-            match
-              Log_viewer.get_daily_log_file
-                ~role:svc.Service.role
-                ~instance:s.instance
-            with
-            | Ok log_file -> (
-                match open_file_with_tail log_file with
-                | Ok fp -> {s with pager = FileTail fp}
-                | Error msg ->
-                    let pager = Static (Pager.open_text ~title:"Error" msg) in
-                    {s with pager})
-            | Error (`Msg msg) ->
-                let pager = Static (Pager.open_text ~title:"Error" msg) in
-                {s with pager})
-        | _ ->
-            let pager =
-              Static (Pager.open_text ~title:"Error" "Instance not found")
-            in
-            {s with pager})
-    | Log_viewer.Journald -> (
-        (* Refresh Journald - restart the stream *)
-        match
-          Log_viewer.get_log_cmd
-            ~role:s.role
-            ~instance:s.instance
-            ~source:s.source
-        with
-        | Ok cmd -> (
-            match open_stream_via_file cmd with
-            | Ok (fp, tmp) ->
-                {s with pager = FileTail fp; cleanup_files = [tmp]}
-            | Error (`Msg msg) ->
-                let pager = Static (Pager.open_text ~title:"Error" msg) in
-                {s with pager})
-        | Error (`Msg msg) ->
-            let pager = Static (Pager.open_text ~title:"Error" msg) in
-            {s with pager})
-  in
-  Navigation.update (fun _ -> new_state) ps
+let manual_refresh ps =
+  (* Manual refresh (r key) - flush pending lines without recreating pager *)
+  let s = ps.Navigation.s in
+  Pager.flush_pending_if_needed ~force:true (get_pager s.pager) ;
+  ps
 
 let move ps _ = ps
 
@@ -244,7 +203,7 @@ let toggle_source ps =
             ~source:new_source
         with
         | Ok cmd -> (
-            match open_stream_via_file cmd with
+            match open_stream_via_file ~title:"journalctl" cmd with
             | Ok (fp, tmp) ->
                 {
                   s with
@@ -354,7 +313,7 @@ let handle_key ps key ~size =
         else (
           close_pager_and_cleanup s ;
           Navigation.back ps)
-    | Some (Keys.Char "r") when not pager_in_input_mode -> refresh ps
+    | Some (Keys.Char "r") when not pager_in_input_mode -> manual_refresh ps
     | Some (Keys.Char "t") when not pager_in_input_mode -> toggle_source ps
     | _ ->
         (* Delegate all other keys to pager *)

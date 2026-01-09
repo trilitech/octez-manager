@@ -81,6 +81,18 @@ let get_daily_log_file ~role ~instance =
         else
           Error (`Msg (Printf.sprintf "Log file does not exist: %s" log_file))
 
+(* Colorize log levels in output:
+   - ERROR/Error/error -> bright red (91)
+   - WARNING/Warning/warn -> magenta (35)
+   Note: Search highlighting uses yellow (33), so we avoid that color. *)
+let colorize_cmd =
+  "sed -u -e 's/\\bERROR\\b/\\x1b[91mERROR\\x1b[0m/g' -e \
+   's/\\bError\\b/\\x1b[91mError\\x1b[0m/g' -e \
+   's/\\berror\\b/\\x1b[91merror\\x1b[0m/g' -e \
+   's/\\bWARNING\\b/\\x1b[35mWARNING\\x1b[0m/g' -e \
+   's/\\bWarning\\b/\\x1b[35mWarning\\x1b[0m/g' -e \
+   's/\\bwarn\\b/\\x1b[35mwarn\\x1b[0m/g'"
+
 let get_log_cmd ~role ~instance ~source =
   match source with
   | Journald ->
@@ -88,9 +100,11 @@ let get_log_cmd ~role ~instance ~source =
       let unit = unit_name ~role ~instance in
       let cmd =
         Printf.sprintf
-          "stdbuf -oL journalctl %s-u %s -f -n 100 --no-pager"
+          "stdbuf -oL journalctl %s-u %s -f -n 1000 --no-pager -o cat \
+           2>/dev/null | %s"
           user_flag
           (Filename.quote unit)
+          colorize_cmd
       in
       Ok cmd
   | DailyLogs -> (
