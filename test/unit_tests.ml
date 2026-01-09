@@ -2918,10 +2918,15 @@ let port_validation_pp_error () =
   check_contains
     (Port_validation.pp_error Port_validation.Port_out_of_range)
     "1024" ;
-  (* Used_by_other_instance mentions the port *)
+  (* Used_by_other_instance mentions the port and instance name *)
   check_contains
-    (Port_validation.pp_error (Port_validation.Used_by_other_instance 8732))
+    (Port_validation.pp_error
+       (Port_validation.Used_by_other_instance (8732, "my-node")))
     "8732" ;
+  check_contains
+    (Port_validation.pp_error
+       (Port_validation.Used_by_other_instance (8732, "my-node")))
+    "my-node" ;
   (* Port_in_use mentions the port *)
   check_contains
     (Port_validation.pp_error (Port_validation.Port_in_use 9732))

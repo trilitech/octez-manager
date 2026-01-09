@@ -14,9 +14,10 @@ val parse_host_port : string -> (string * int) option
 val parse_port : string -> int option
 
 (** Collect RPC and P2P ports from registered node services.
+    Returns (port, instance_name) pairs.
     @param exclude_instance Optional instance to exclude from the list. *)
 val ports_from_services :
-  ?exclude_instance:string -> unit -> int list * int list
+  ?exclude_instance:string -> unit -> (int * string) list * (int * string) list
 
 (** Check if a port is owned by a specific instance. *)
 val port_owned_by_instance : instance:string -> int -> bool
@@ -28,7 +29,7 @@ val is_port_in_use : int -> bool
 type validation_error =
   | Invalid_format of string  (** Invalid host:port format *)
   | Port_out_of_range  (** Port not in 1024-65535 range *)
-  | Used_by_other_instance of int  (** Port used by another Octez instance *)
+  | Used_by_other_instance of int * string  (** Port and instance name *)
   | Port_in_use of int  (** Port in use by some process *)
 
 (** Pretty-print a validation error. *)

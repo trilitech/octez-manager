@@ -24,7 +24,8 @@ let parse_port addr =
   | _ -> None
 
 (** Collect RPC and P2P ports from registered services (nodes and DAL nodes),
-    optionally excluding a specific instance. *)
+    optionally excluding a specific instance.
+    Returns (port, instance_name) pairs. *)
 let ports_from_services ?(exclude_instance : string option) () =
   match Service_registry.list () with
   | Error _ -> ([], [])
@@ -37,10 +38,16 @@ let ports_from_services ?(exclude_instance : string option) () =
             && Some s.instance <> exclude_instance)
       in
       let rpc_ports =
-        with_ports |> List.filter_map (fun s -> parse_port s.Service.rpc_addr)
+        with_ports
+        |> List.filter_map (fun s ->
+            parse_port s.Service.rpc_addr
+            |> Option.map (fun p -> (p, s.Service.instance)))
       in
       let p2p_ports =
-        with_ports |> List.filter_map (fun s -> parse_port s.Service.net_addr)
+        with_ports
+        |> List.filter_map (fun s ->
+            parse_port s.Service.net_addr
+            |> Option.map (fun p -> (p, s.Service.instance)))
       in
       (rpc_ports, p2p_ports)
 
@@ -78,15 +85,15 @@ let is_port_in_use port =
 type validation_error =
   | Invalid_format of string
   | Port_out_of_range
-  | Used_by_other_instance of int
+  | Used_by_other_instance of int * string
   | Port_in_use of int
 
 let pp_error = function
   | Invalid_format example ->
       Printf.sprintf "Must be host:port (e.g., %s)" example
   | Port_out_of_range -> "Port must be between 1024 and 65535"
-  | Used_by_other_instance port ->
-      Printf.sprintf "Port %d is used by another Octez instance" port
+  | Used_by_other_instance (port, instance) ->
+      Printf.sprintf "Port %d is used by instance '%s'" port instance
   | Port_in_use port -> Printf.sprintf "Port %d is in use" port
 
 (** Validate a port address.
@@ -97,21 +104,25 @@ let pp_error = function
 let validate_addr ~addr ?exclude_instance ~example () =
   match parse_host_port addr with
   | None -> Error (Invalid_format example)
-  | Some (_host, port) ->
+  | Some (_host, port) -> (
       if port < 1024 || port > 65535 then Error Port_out_of_range
       else
         let rpc_ports, p2p_ports = ports_from_services ?exclude_instance () in
-        if List.mem port rpc_ports || List.mem port p2p_ports then
-          Error (Used_by_other_instance port)
-        else
-          let owned_by_self =
-            match exclude_instance with
-            | Some inst -> port_owned_by_instance ~instance:inst port
-            | None -> false
-          in
-          if is_port_in_use port && not owned_by_self then
-            Error (Port_in_use port)
-          else Ok ()
+        let all_ports = rpc_ports @ p2p_ports in
+        let find_instance p =
+          List.find_opt (fun (pt, _) -> pt = p) all_ports |> Option.map snd
+        in
+        match find_instance port with
+        | Some instance -> Error (Used_by_other_instance (port, instance))
+        | None ->
+            let owned_by_self =
+              match exclude_instance with
+              | Some inst -> port_owned_by_instance ~instance:inst port
+              | None -> false
+            in
+            if is_port_in_use port && not owned_by_self then
+              Error (Port_in_use port)
+            else Ok ())
 
 (** Validate an RPC address. *)
 let validate_rpc_addr ?exclude_instance addr =
