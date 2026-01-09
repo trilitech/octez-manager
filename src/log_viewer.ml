@@ -88,7 +88,7 @@ let get_log_cmd ~role ~instance ~source =
       let unit = unit_name ~role ~instance in
       let cmd =
         Printf.sprintf
-          "stdbuf -oL journalctl %s-u %s -f -n 100 --no-pager"
+          "stdbuf -oL journalctl %s-u %s -f -n 1000 --no-pager"
           user_flag
           (Filename.quote unit)
       in
