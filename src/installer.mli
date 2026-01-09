@@ -55,6 +55,18 @@ val purge_service :
 
 val list_services : unit -> (Service.t list, [`Msg of string]) result
 
+(** Clean up old instance after rename.
+    Stops and disables old service, removes dropin and registry entry,
+    updates dependent env files to point to new instance name,
+    and transfers dependents list to the new service.
+    Does NOT delete data directory (data is preserved in the renamed instance). *)
+val cleanup_renamed_instance :
+  ?quiet:bool ->
+  old_instance:string ->
+  new_instance:string ->
+  unit ->
+  (unit, [`Msg of string]) result
+
 (** Clean up stale dependency entries.
     Scans all services and removes dependents that no longer exist in the registry.
     @return Number of stale entries removed *)

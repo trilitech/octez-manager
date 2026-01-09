@@ -1601,6 +1601,12 @@ let instance_term =
                   (* Interactive edit based on role *)
                   Format.printf
                     "@.Enter new values (press Enter to keep current):@." ;
+                  (* Prompt for new instance name first *)
+                  let new_instance =
+                    prompt_input ~default:(inst, inst) "Instance name"
+                    |> Option.value ~default:inst
+                  in
+                  let is_rename = new_instance <> inst in
                   let result =
                     match role with
                     | "node" ->
@@ -1648,7 +1654,7 @@ let instance_term =
                         in
                         let req : Installer_types.node_request =
                           {
-                            instance = inst;
+                            instance = new_instance;
                             network = svc.network;
                             history_mode = svc.history_mode;
                             data_dir = Some svc.data_dir;
@@ -1717,7 +1723,7 @@ let instance_term =
                         in
                         let req : Installer_types.baker_request =
                           {
-                            instance = inst;
+                            instance = new_instance;
                             node_mode;
                             dal_config;
                             base_dir = Some (lookup "OCTEZ_BAKER_BASE_DIR");
@@ -1759,7 +1765,7 @@ let instance_term =
                         in
                         let req : Installer_types.accuser_request =
                           {
-                            instance = inst;
+                            instance = new_instance;
                             node_mode;
                             base_dir = Some (lookup "OCTEZ_CLIENT_BASE_DIR");
                             service_user = svc.service_user;
@@ -1824,7 +1830,7 @@ let instance_term =
                         let req : Installer_types.daemon_request =
                           {
                             role = "dal-node";
-                            instance = inst;
+                            instance = new_instance;
                             network = svc.network;
                             history_mode = svc.history_mode;
                             data_dir = dal_data_dir;
@@ -1858,15 +1864,38 @@ let instance_term =
                              role)
                   in
                   match result with
-                  | Ok _service ->
-                      Format.printf
-                        "@.Instance '%s' updated successfully.@."
-                        inst ;
-                      Format.printf
-                        "@.To restart the stopped instances:@.  octez-manager \
-                         instance %s start@."
-                        inst ;
-                      `Ok ()
+                  | Ok _service -> (
+                      (* Handle rename: clean up old instance if name changed *)
+                      let cleanup_result =
+                        if is_rename then (
+                          Format.printf
+                            "@.Renaming instance from '%s' to '%s'...@."
+                            inst
+                            new_instance ;
+                          Installer.cleanup_renamed_instance
+                            ~quiet:false
+                            ~old_instance:inst
+                            ~new_instance
+                            ())
+                        else Ok ()
+                      in
+                      match cleanup_result with
+                      | Ok () ->
+                          Format.printf
+                            "@.Instance '%s' updated successfully.@."
+                            new_instance ;
+                          Format.printf
+                            "@.To restart the stopped instances:@.  \
+                             octez-manager instance %s start@."
+                            new_instance ;
+                          `Ok ()
+                      | Error (`Msg msg) ->
+                          Format.printf
+                            "@.Instance '%s' updated but rename cleanup \
+                             failed: %s@."
+                            new_instance
+                            msg ;
+                          `Ok ())
                   | Error msg ->
                       cmdliner_error (Printf.sprintf "Edit failed: %s" msg))))
   in
