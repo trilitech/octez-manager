@@ -11,6 +11,7 @@
   miaou-runner.tui
   lambda-term
   eio
-  eio_main)
+  eio_main
+  eio_posix)
  (preprocess
   (pps ppx_deriving.show)))

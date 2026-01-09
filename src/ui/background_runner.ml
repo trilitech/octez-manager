@@ -31,7 +31,8 @@ let start () =
   if Atomic.compare_and_set started false true then
     ignore
       (Domain.spawn (fun () ->
-           Eio_main.run (fun env ->
+           (* Use POSIX backend to avoid io_uring resource exhaustion *)
+           Eio_posix.run (fun env ->
                let stream = Lazy.force stream in
                Eio.Switch.run (fun sw ->
                    for _ = 1 to num_workers do

@@ -36,6 +36,7 @@
   mirage-crypto-rng.unix
   uri
   eio_main
+  eio_posix
   eio
   miaou-core.lib)
  (instrumentation
