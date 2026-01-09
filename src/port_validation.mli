@@ -30,7 +30,7 @@ type validation_error =
   | Invalid_format of string  (** Invalid host:port format *)
   | Port_out_of_range  (** Port not in 1024-65535 range *)
   | Used_by_other_instance of int * string  (** Port and instance name *)
-  | Port_in_use of int  (** Port in use by some process *)
+  | Port_in_use of int * string option  (** Port and optional process name *)
 
 (** Pretty-print a validation error. *)
 val pp_error : validation_error -> string

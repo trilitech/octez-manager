@@ -2929,8 +2929,17 @@ let port_validation_pp_error () =
     "my-node" ;
   (* Port_in_use mentions the port *)
   check_contains
-    (Port_validation.pp_error (Port_validation.Port_in_use 9732))
-    "9732"
+    (Port_validation.pp_error (Port_validation.Port_in_use (9732, None)))
+    "9732" ;
+  (* Port_in_use with process name mentions both *)
+  check_contains
+    (Port_validation.pp_error
+       (Port_validation.Port_in_use (9732, Some "nginx")))
+    "9732" ;
+  check_contains
+    (Port_validation.pp_error
+       (Port_validation.Port_in_use (9732, Some "nginx")))
+    "nginx"
 
 (* ============================================================================
    Service dependents field tests
