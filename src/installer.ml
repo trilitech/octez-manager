@@ -876,17 +876,19 @@ let install_baker ?(quiet = false) (request : baker_request) =
         preserve_data = request.preserve_data;
       }
   in
-  (* Register as dependent on parent node *)
+  (* Register as dependent on parent node (avoid duplicates) *)
   let* () =
     match node_mode with
     | Local parent_svc ->
-        let updated_parent =
-          {
-            parent_svc with
-            dependents = request.instance :: parent_svc.dependents;
-          }
-        in
-        Service_registry.write updated_parent
+        if List.mem request.instance parent_svc.dependents then Ok ()
+        else
+          let updated_parent =
+            {
+              parent_svc with
+              dependents = request.instance :: parent_svc.dependents;
+            }
+          in
+          Service_registry.write updated_parent
     | Remote _ -> Ok ()
   in
   Ok service
@@ -959,17 +961,19 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         preserve_data = request.preserve_data;
       }
   in
-  (* Register as dependent on parent node *)
+  (* Register as dependent on parent node (avoid duplicates) *)
   let* () =
     match node_mode with
     | Local parent_svc ->
-        let updated_parent =
-          {
-            parent_svc with
-            dependents = request.instance :: parent_svc.dependents;
-          }
-        in
-        Service_registry.write updated_parent
+        if List.mem request.instance parent_svc.dependents then Ok ()
+        else
+          let updated_parent =
+            {
+              parent_svc with
+              dependents = request.instance :: parent_svc.dependents;
+            }
+          in
+          Service_registry.write updated_parent
     | Remote _ -> Ok ()
   in
   Ok service
@@ -1169,17 +1173,16 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
           (Ok ())
           old_svc.dependents
       in
-      (* Transfer dependents to new service *)
+      (* Transfer dependents to new service (deduplicate) *)
       let* new_svc_opt = Service_registry.find ~instance:new_instance in
       let* () =
         match new_svc_opt with
         | Some new_svc ->
-            let updated_new =
-              {
-                new_svc with
-                dependents = old_svc.dependents @ new_svc.dependents;
-              }
+            let merged_deps =
+              old_svc.dependents @ new_svc.dependents
+              |> List.sort_uniq String.compare
             in
+            let updated_new = {new_svc with dependents = merged_deps} in
             Service_registry.write updated_new
         | None -> Ok ()
       in
