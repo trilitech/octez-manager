@@ -1194,6 +1194,24 @@ let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
   match svc_opt with
   | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
+      (* Stop dependents first (cascade stop) *)
+      let* () =
+        if svc.dependents <> [] then (
+          if not quiet then
+            Format.printf
+              "Stopping dependents: %s@."
+              (String.concat ", " svc.dependents) ;
+          List.fold_left
+            (fun acc dep ->
+              let* () = acc in
+              match Service_registry.find ~instance:dep with
+              | Ok (Some dep_svc) ->
+                  Systemd.stop ~quiet ~role:dep_svc.role ~instance:dep ()
+              | _ -> Ok ())
+            (Ok ())
+            svc.dependents)
+        else Ok ()
+      in
       (* Unregister from parent's dependents list *)
       let* () =
         match svc.depends_on with
