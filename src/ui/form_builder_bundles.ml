@@ -172,7 +172,7 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
 (** {1 Client-based Tool Bundle with Auto-naming} *)
 
 let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
-    ~set_core ~get_client ~set_client () =
+    ~set_core ~get_client ~set_client ?(edit_mode = false) () =
   let open Form_builder in
   [
     (* Node Selection with auto-naming *)
@@ -315,17 +315,22 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
     |> with_hint
          "Node providing RPC. Select a managed instance or enter external \
           endpoint.";
-    (* Base Directory *)
-    client_base_dir
-      ~label:"Base Dir"
-      ~get:(fun m -> (get_client m).base_dir)
-      ~set:(fun base_dir m ->
-        let client = get_client m in
-        set_client {client with base_dir} m)
-      ~validate:(fun m -> is_nonempty (get_client m).base_dir)
-      ()
-    |> with_hint
-         "Client configuration directory. Stores keys and operation receipts.";
+    (* Base Directory - readonly in edit mode *)
+    (if edit_mode then
+       readonly ~label:"Base Dir" ~get:(fun m -> (get_client m).base_dir)
+       |> with_hint "Base directory cannot be changed after creation."
+     else
+       client_base_dir
+         ~label:"Base Dir"
+         ~get:(fun m -> (get_client m).base_dir)
+         ~set:(fun base_dir m ->
+           let client = get_client m in
+           set_client {client with base_dir} m)
+         ~validate:(fun m -> is_nonempty (get_client m).base_dir)
+         ()
+       |> with_hint
+            "Client configuration directory. Stores keys and operation \
+             receipts.");
   ]
 
 (** {1 Node-specific Bundle} *)
