@@ -125,13 +125,14 @@ let spec =
     initial_model = make_initial_model;
     (* Compose fields from bundles with auto-naming support *)
     fields =
-      (fun _model ->
+      (fun model ->
         core_service_fields
           ~get_core:(fun m -> m.core)
           ~set_core:(fun core m -> {m with core})
           ~binary:"octez-baker"
           ~subcommand:["run"; "dal"]
           ~binary_validator:Form_builder_common.has_octez_baker_binary
+          ~edit_mode:model.edit_mode
           ()
         @ client_fields_with_autoname
             ~role:"dal"
