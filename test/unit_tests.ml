@@ -2790,6 +2790,212 @@ let cache_stats_hit_miss () =
       Alcotest.(check int) "hits" 2 hits ;
       Alcotest.(check int) "misses" 1 misses
 
+(* ============================================================================
+   Port validation tests
+   ============================================================================ *)
+
+let port_validation_parse_host_port_valid () =
+  (* Standard host:port *)
+  (match Port_validation.parse_host_port "127.0.0.1:8732" with
+  | Some (host, port) ->
+      Alcotest.(check string) "host" "127.0.0.1" host ;
+      Alcotest.(check int) "port" 8732 port
+  | None -> Alcotest.fail "failed to parse 127.0.0.1:8732") ;
+  (* All interfaces *)
+  (match Port_validation.parse_host_port "0.0.0.0:9732" with
+  | Some (host, port) ->
+      Alcotest.(check string) "host" "0.0.0.0" host ;
+      Alcotest.(check int) "port" 9732 port
+  | None -> Alcotest.fail "failed to parse 0.0.0.0:9732") ;
+  (* Localhost *)
+  match Port_validation.parse_host_port "localhost:8733" with
+  | Some (host, port) ->
+      Alcotest.(check string) "host localhost" "localhost" host ;
+      Alcotest.(check int) "port" 8733 port
+  | None -> Alcotest.fail "failed to parse localhost:8733"
+
+let port_validation_parse_host_port_invalid () =
+  (* No colon *)
+  Alcotest.(check (option (pair string int)))
+    "no colon"
+    None
+    (Port_validation.parse_host_port "invalid") ;
+  (* Missing port *)
+  Alcotest.(check (option (pair string int)))
+    "missing port"
+    None
+    (Port_validation.parse_host_port "127.0.0.1:") ;
+  (* Non-numeric port *)
+  Alcotest.(check (option (pair string int)))
+    "non-numeric"
+    None
+    (Port_validation.parse_host_port "127.0.0.1:abc") ;
+  (* Negative port *)
+  Alcotest.(check (option (pair string int)))
+    "negative"
+    None
+    (Port_validation.parse_host_port "127.0.0.1:-1")
+
+let port_validation_parse_port () =
+  (* parse_port only extracts port from host:port format *)
+  Alcotest.(check (option int))
+    "host:port"
+    (Some 9732)
+    (Port_validation.parse_port "127.0.0.1:9732") ;
+  Alcotest.(check (option int))
+    "localhost:port"
+    (Some 8732)
+    (Port_validation.parse_port "localhost:8732") ;
+  (* Just a number without colon returns None *)
+  Alcotest.(check (option int))
+    "no colon"
+    None
+    (Port_validation.parse_port "8732") ;
+  Alcotest.(check (option int))
+    "invalid"
+    None
+    (Port_validation.parse_port "abc") ;
+  Alcotest.(check (option int)) "empty" None (Port_validation.parse_port "")
+
+let port_validation_validate_addr_format () =
+  (* Invalid format fails - this doesn't depend on system state *)
+  (match
+     Port_validation.validate_addr ~addr:"invalid" ~example:"127.0.0.1:8732" ()
+   with
+  | Error (Port_validation.Invalid_format _) -> ()
+  | Ok () -> Alcotest.fail "expected Invalid_format error"
+  | Error e ->
+      Alcotest.failf "wrong error type: %s" (Port_validation.pp_error e)) ;
+  (* Empty host fails *)
+  match
+    Port_validation.validate_addr ~addr:":8732" ~example:"127.0.0.1:8732" ()
+  with
+  | Error (Port_validation.Invalid_format _) -> ()
+  | Ok () -> Alcotest.fail "expected Invalid_format error for empty host"
+  | Error e ->
+      Alcotest.failf "wrong error type: %s" (Port_validation.pp_error e)
+
+let port_validation_out_of_range () =
+  (* Port below 1024 - parse_host_port returns None for port 80 because p < 1024 check *)
+  (* Actually the implementation validates port > 0 && port < 65536 in parse_host_port,
+     so 80 would parse fine but validate_addr checks 1024-65535 range separately *)
+  (match
+     Port_validation.validate_addr
+       ~addr:"127.0.0.1:80"
+       ~example:"127.0.0.1:8732"
+       ()
+   with
+  | Error Port_validation.Port_out_of_range -> ()
+  | Ok () -> Alcotest.fail "expected Port_out_of_range error for port 80"
+  | Error (Port_validation.Invalid_format _) ->
+      (* This is also acceptable - implementation rejects low ports in parse *)
+      ()
+  | Error e -> Alcotest.failf "wrong error: %s" (Port_validation.pp_error e)) ;
+  (* Port above 65535 - parse_host_port validates p < 65536 *)
+  match
+    Port_validation.validate_addr
+      ~addr:"127.0.0.1:70000"
+      ~example:"127.0.0.1:8732"
+      ()
+  with
+  | Error Port_validation.Port_out_of_range -> ()
+  | Error (Port_validation.Invalid_format _) ->
+      (* Acceptable - parse_host_port rejects it *)
+      ()
+  | Ok () -> Alcotest.fail "expected error for port 70000"
+  | Error e -> Alcotest.failf "wrong error: %s" (Port_validation.pp_error e)
+
+let port_validation_pp_error () =
+  let check_contains msg needle =
+    if not (string_contains ~needle msg) then
+      Alcotest.failf "expected '%s' in '%s'" needle msg
+  in
+  (* Invalid_format includes the example *)
+  check_contains
+    (Port_validation.pp_error (Port_validation.Invalid_format "127.0.0.1:8732"))
+    "127.0.0.1:8732" ;
+  (* Port_out_of_range mentions 1024 *)
+  check_contains
+    (Port_validation.pp_error Port_validation.Port_out_of_range)
+    "1024" ;
+  (* Used_by_other_instance mentions the port *)
+  check_contains
+    (Port_validation.pp_error (Port_validation.Used_by_other_instance 8732))
+    "8732" ;
+  (* Port_in_use mentions the port *)
+  check_contains
+    (Port_validation.pp_error (Port_validation.Port_in_use 9732))
+    "9732"
+
+(* ============================================================================
+   Service dependents field tests
+   ============================================================================ *)
+
+let service_roundtrip_with_dependents () =
+  let service =
+    {
+      (sample_service ()) with
+      Service.dependents = ["baker-1"; "accuser-1"; "dal-1"];
+    }
+  in
+  match Service.to_yojson service |> Service.of_yojson with
+  | Ok decoded ->
+      Alcotest.(check (list string))
+        "dependents preserved"
+        ["baker-1"; "accuser-1"; "dal-1"]
+        decoded.Service.dependents
+  | Error (`Msg msg) -> Alcotest.failf "roundtrip failed: %s" msg
+
+let service_roundtrip_with_depends_on () =
+  let service =
+    {(sample_service ()) with Service.depends_on = Some "my-node"}
+  in
+  match Service.to_yojson service |> Service.of_yojson with
+  | Ok decoded ->
+      Alcotest.(check (option string))
+        "depends_on preserved"
+        (Some "my-node")
+        decoded.Service.depends_on
+  | Error (`Msg msg) -> Alcotest.failf "roundtrip failed: %s" msg
+
+let service_dependents_default_empty () =
+  let service = sample_service () in
+  Alcotest.(check (list string))
+    "dependents default empty"
+    []
+    service.Service.dependents ;
+  Alcotest.(check (option string))
+    "depends_on default none"
+    None
+    service.Service.depends_on
+
+(* ============================================================================
+   Instance name validation tests (edit mode)
+   ============================================================================ *)
+
+let instance_name_valid_chars () =
+  (* These should all be valid *)
+  let valid_names = ["my-node"; "node_1"; "Node.Main"; "abc123"; "a-b_c.d"] in
+  List.iter
+    (fun name ->
+      match Installer.For_tests.validate_instance_name_chars ~instance:name with
+      | Ok () -> ()
+      | Error (`Msg msg) ->
+          Alcotest.failf "name '%s' should be valid but got: %s" name msg)
+    valid_names
+
+let instance_name_invalid_chars () =
+  (* These should all be invalid *)
+  let invalid_names =
+    ["my node"; "node@host"; "node:1"; "node/path"; "node\\path"]
+  in
+  List.iter
+    (fun name ->
+      match Installer.For_tests.validate_instance_name_chars ~instance:name with
+      | Ok () -> Alcotest.failf "name '%s' should be invalid" name
+      | Error (`Msg _) -> ())
+    invalid_names
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -3215,5 +3421,46 @@ let () =
             `Quick
             cache_registry_no_duplicates;
           Alcotest.test_case "stats hit/miss" `Quick cache_stats_hit_miss;
+        ] );
+      ( "port_validation",
+        [
+          Alcotest.test_case
+            "parse host:port valid"
+            `Quick
+            port_validation_parse_host_port_valid;
+          Alcotest.test_case
+            "parse host:port invalid"
+            `Quick
+            port_validation_parse_host_port_invalid;
+          Alcotest.test_case "parse port" `Quick port_validation_parse_port;
+          Alcotest.test_case
+            "validate addr format"
+            `Quick
+            port_validation_validate_addr_format;
+          Alcotest.test_case
+            "port out of range"
+            `Quick
+            port_validation_out_of_range;
+          Alcotest.test_case "pp_error" `Quick port_validation_pp_error;
+        ] );
+      ( "service.dependents",
+        [
+          Alcotest.test_case
+            "roundtrip with dependents"
+            `Quick
+            service_roundtrip_with_dependents;
+          Alcotest.test_case
+            "roundtrip with depends_on"
+            `Quick
+            service_roundtrip_with_depends_on;
+          Alcotest.test_case
+            "defaults empty"
+            `Quick
+            service_dependents_default_empty;
+        ] );
+      ( "instance_name",
+        [
+          Alcotest.test_case "valid chars" `Quick instance_name_valid_chars;
+          Alcotest.test_case "invalid chars" `Quick instance_name_invalid_chars;
         ] );
     ]
