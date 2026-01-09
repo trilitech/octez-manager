@@ -1987,10 +1987,15 @@ let instance_term =
                           |> Option.value ~default:delegates
                         in
                         let new_lb_vote =
-                          prompt_input
-                            ~default:(lb_vote, lb_vote)
-                            "LB vote (pass/on/off)"
-                          |> Option.value ~default:lb_vote
+                          let completions = ["pass"; "on"; "off"] in
+                          let default_val =
+                            if lb_vote = "" then "pass" else lb_vote
+                          in
+                          match
+                            prompt_with_completion "LB vote" completions
+                          with
+                          | Some "" | None -> default_val
+                          | Some v -> String.trim v
                         in
                         let new_extra =
                           prompt_input
