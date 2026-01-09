@@ -1126,6 +1126,74 @@ let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
 
 let list_services () = Service_registry.list ()
 
+(** Clean up old instance after rename.
+    Removes service registry entry and systemd dropin but preserves data. *)
+let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
+  let* svc_opt = Service_registry.find ~instance:old_instance in
+  match svc_opt with
+  | None -> Ok () (* Old instance already gone, nothing to clean *)
+  | Some old_svc ->
+      (* Stop the old service if still running *)
+      let _ = Systemd.stop ~role:old_svc.role ~instance:old_instance () in
+      (* Disable old service *)
+      let* () =
+        Systemd.disable
+          ~quiet
+          ~role:old_svc.role
+          ~instance:old_instance
+          ~stop_now:true
+          ()
+      in
+      (* Remove old dropin *)
+      Systemd.remove_dropin ~role:old_svc.role ~instance:old_instance ;
+      (* Update dependents to point to new instance *)
+      let* () =
+        List.fold_left
+          (fun acc dep_inst ->
+            let* () = acc in
+            (* Update OCTEZ_NODE_INSTANCE in dependent's env file *)
+            match Node_env.read ~inst:dep_inst with
+            | Ok pairs ->
+                let updated_pairs =
+                  List.map
+                    (fun (k, v) ->
+                      if
+                        k = "OCTEZ_NODE_INSTANCE"
+                        && String.trim v = old_instance
+                      then (k, new_instance)
+                      else (k, v))
+                    pairs
+                in
+                Node_env.write_pairs ~inst:dep_inst updated_pairs
+            | Error _ -> Ok () (* Skip if can't read env *))
+          (Ok ())
+          old_svc.dependents
+      in
+      (* Transfer dependents to new service *)
+      let* new_svc_opt = Service_registry.find ~instance:new_instance in
+      let* () =
+        match new_svc_opt with
+        | Some new_svc ->
+            let updated_new =
+              {
+                new_svc with
+                dependents = old_svc.dependents @ new_svc.dependents;
+              }
+            in
+            Service_registry.write updated_new
+        | None -> Ok ()
+      in
+      (* Remove old registry entry *)
+      let* () = Service_registry.remove ~instance:old_instance in
+      (* Remove old env files directory *)
+      let old_env_dir =
+        Filename.concat (Common.env_instances_base_dir ()) old_instance
+      in
+      let _ = Common.remove_tree old_env_dir in
+      (* Sync logrotate *)
+      let* services = Service_registry.list () in
+      Systemd.sync_logrotate (logrotate_specs_of services)
+
 let cleanup_dependencies () =
   let* services = Service_registry.list () in
   let all_instances =
