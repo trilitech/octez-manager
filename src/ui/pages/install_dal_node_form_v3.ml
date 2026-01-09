@@ -144,16 +144,52 @@ let spec =
             ~set_client:(fun client m -> {m with client})
             ()
         @ [
-            (* DAL node's own RPC address *)
-            Form_builder.text
+            (* DAL node's own RPC address - with port validation *)
+            Form_builder.validated_text
               ~label:"DAL RPC Addr"
               ~get:(fun m -> m.rpc_addr)
-              ~set:(fun rpc_addr m -> {m with rpc_addr});
-            (* DAL node's P2P address *)
-            Form_builder.text
+              ~set:(fun rpc_addr m -> {m with rpc_addr})
+              ~validate:(fun m ->
+                let addr = m.rpc_addr in
+                let exclude_instance =
+                  if m.edit_mode then m.original_instance else None
+                in
+                match
+                  Port_validation.validate_addr
+                    ~addr
+                    ?exclude_instance
+                    ~example:"127.0.0.1:10732"
+                    ()
+                with
+                | Ok () -> Ok ()
+                | Error err ->
+                    Error
+                      (Printf.sprintf
+                         "DAL RPC Addr: %s"
+                         (Port_validation.pp_error err)));
+            (* DAL node's P2P address - with port validation *)
+            Form_builder.validated_text
               ~label:"DAL P2P Addr"
               ~get:(fun m -> m.net_addr)
-              ~set:(fun net_addr m -> {m with net_addr});
+              ~set:(fun net_addr m -> {m with net_addr})
+              ~validate:(fun m ->
+                let addr = m.net_addr in
+                let exclude_instance =
+                  if m.edit_mode then m.original_instance else None
+                in
+                match
+                  Port_validation.validate_addr
+                    ~addr
+                    ?exclude_instance
+                    ~example:"0.0.0.0:11732"
+                    ()
+                with
+                | Ok () -> Ok ()
+                | Error err ->
+                    Error
+                      (Printf.sprintf
+                         "DAL P2P Addr: %s"
+                         (Port_validation.pp_error err)));
           ]);
     pre_submit =
       Some
