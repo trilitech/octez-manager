@@ -23,29 +23,34 @@ let parse_port addr =
       try Some (int_of_string (String.trim port_str)) with _ -> None)
   | _ -> None
 
-(** Collect RPC and P2P ports from registered node services, optionally
-    excluding a specific instance. *)
+(** Collect RPC and P2P ports from registered services (nodes and DAL nodes),
+    optionally excluding a specific instance. *)
 let ports_from_services ?(exclude_instance : string option) () =
   match Service_registry.list () with
   | Error _ -> ([], [])
   | Ok services ->
-      let dominated =
+      (* Filter services that have RPC/P2P ports: nodes and DAL nodes *)
+      let with_ports =
         services
         |> List.filter (fun (s : Service.t) ->
-            s.role = "node" && Some s.instance <> exclude_instance)
+            (s.role = "node" || s.role = "dal-node" || s.role = "dal")
+            && Some s.instance <> exclude_instance)
       in
       let rpc_ports =
-        dominated |> List.filter_map (fun s -> parse_port s.Service.rpc_addr)
+        with_ports |> List.filter_map (fun s -> parse_port s.Service.rpc_addr)
       in
       let p2p_ports =
-        dominated |> List.filter_map (fun s -> parse_port s.Service.net_addr)
+        with_ports |> List.filter_map (fun s -> parse_port s.Service.net_addr)
       in
       (rpc_ports, p2p_ports)
 
 (** Check if a port is owned by a specific instance (used for edit mode). *)
 let port_owned_by_instance ~instance port =
   match Service_registry.find ~instance with
-  | Ok (Some svc) when svc.Service.role = "node" ->
+  | Ok (Some svc)
+    when svc.Service.role = "node"
+         || svc.Service.role = "dal-node"
+         || svc.Service.role = "dal" ->
       parse_port svc.Service.rpc_addr = Some port
       || parse_port svc.Service.net_addr = Some port
   | _ -> false
