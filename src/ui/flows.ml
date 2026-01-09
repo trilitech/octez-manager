@@ -148,6 +148,7 @@ let create_baker_flow ~services ~on_success =
                           ~binary_name:"octez-baker";
                       logging_mode = Logging_mode.Journald;
                       auto_enable = true;
+                      preserve_data = false;
                     }
                   in
                   let res =
@@ -205,6 +206,7 @@ let create_accuser_flow ~on_success =
                 extra_paths = [base_dir];
                 auto_enable = true;
                 depends_on = None;
+                preserve_data = false;
               }
             in
             let res =
@@ -269,6 +271,7 @@ let create_dal_node_flow ~on_success =
                 extra_paths = [client_base_dir; dal_data_dir];
                 auto_enable = true;
                 depends_on = None;
+                preserve_data = false;
               }
             in
             let res =

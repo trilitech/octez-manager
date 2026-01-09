@@ -584,6 +584,7 @@ let spec =
             app_bin_dir = model.core.app_bin_dir;
             logging_mode;
             auto_enable = model.core.enable_on_boot;
+            preserve_data = model.edit_mode;
           }
         in
 

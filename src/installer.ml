@@ -653,7 +653,12 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   Ok service
 
 let install_daemon ?(quiet = false) (request : daemon_request) =
-  let* () = validate_instance_name ~instance:request.instance () in
+  let* () =
+    validate_instance_name
+      ~allow_existing:request.preserve_data
+      ~instance:request.instance
+      ()
+  in
   let logging_mode =
     prepare_logging
       ~instance:request.instance
@@ -848,6 +853,7 @@ let install_baker ?(quiet = false) (request : baker_request) =
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;
         depends_on;
+        preserve_data = request.preserve_data;
       }
   in
   (* Register as dependent on parent node *)
@@ -930,6 +936,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;
         depends_on;
+        preserve_data = request.preserve_data;
       }
   in
   (* Register as dependent on parent node *)

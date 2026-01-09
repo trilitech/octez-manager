@@ -392,6 +392,7 @@ let spec =
             extra_paths = [base_dir];
             auto_enable = model.core.enable_on_boot;
             depends_on;
+            preserve_data = model.edit_mode;
           }
         in
 
