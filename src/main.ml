@@ -1035,6 +1035,7 @@ let install_baker_cmd =
           app_bin_dir;
           logging_mode;
           auto_enable = not no_enable;
+          preserve_data = false;
         }
       in
       (* Installer.install_baker returns an Rresult-style error; convert it to a string-error Result *)
@@ -1137,6 +1138,7 @@ let install_accuser_cmd =
           service_user;
           logging_mode;
           auto_enable = not no_enable;
+          preserve_data = false;
         }
       in
       match Installer.install_accuser req with
@@ -1314,6 +1316,7 @@ let install_dal_node_cmd =
                                 extra_paths = [];
                                 auto_enable = not no_enable;
                                 depends_on;
+                                preserve_data = false;
                               }
                             in
                             match Installer.install_daemon req with

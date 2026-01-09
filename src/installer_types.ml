@@ -57,6 +57,7 @@ type daemon_request = {
   extra_paths : string list;
   auto_enable : bool;
   depends_on : string option;
+  preserve_data : bool;
 }
 
 type baker_node_mode =
@@ -79,6 +80,7 @@ type baker_request = {
   app_bin_dir : string;
   logging_mode : Logging_mode.t;
   auto_enable : bool;
+  preserve_data : bool;
 }
 
 type accuser_request = {
@@ -90,6 +92,7 @@ type accuser_request = {
   app_bin_dir : string;
   logging_mode : Logging_mode.t;
   auto_enable : bool;
+  preserve_data : bool;
 }
 
 type snapshot_file = {path : string; cleanup : bool}
