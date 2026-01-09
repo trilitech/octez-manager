@@ -519,7 +519,16 @@ let spec =
           parent_node_field;
           dal_node_field;
           node_endpoint_field;
-          node_data_dir_field;
+          (* Node data dir - readonly in edit mode, interactive in create mode *)
+          (if model.edit_mode then
+             readonly ~label:"Node Data Dir" ~get:(fun m ->
+                 let states =
+                   Form_builder_common.cached_service_states_nonblocking ()
+                 in
+                 resolve_node_data_dir m states)
+             |> with_hint
+                  "Node data directory cannot be changed after creation."
+           else node_data_dir_field);
           base_dir_field;
           string_list
             ~label:"Delegates"
