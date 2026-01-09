@@ -454,7 +454,7 @@ let rec validate_port_addr ~label ~addr ~default ?exclude_instance () =
   | Ok () -> Ok addr
   | Error err ->
       if is_interactive () then (
-        Printf.eprintf "%s: %s\n" label (Port_validation.pp_error err) ;
+        Printf.eprintf "%s: %s\n%!" label (Port_validation.pp_error err) ;
         let new_addr =
           prompt_input ~default:(default, default) label
           |> Option.value ~default
