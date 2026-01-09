@@ -133,6 +133,7 @@ let spec =
           ~subcommand:["run"; "dal"]
           ~binary_validator:Form_builder_common.has_octez_baker_binary
           ~edit_mode:model.edit_mode
+          ~original_instance:model.original_instance
           ()
         @ client_fields_with_autoname
             ~role:"dal"

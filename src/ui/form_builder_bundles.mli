@@ -38,6 +38,7 @@ val core_service_fields :
   ?binary_validator:(string -> bool) ->
   ?skip_instance_name:bool ->
   ?edit_mode:bool ->
+  ?original_instance:string option ->
   unit ->
   'model Form_builder.field list
 
