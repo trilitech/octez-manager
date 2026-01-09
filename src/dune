@@ -22,7 +22,8 @@
   service_backend
   installer_types
   manager_interfaces
-  capabilities)
+  capabilities
+  port_validation)
  (libraries
   rresult
   yojson

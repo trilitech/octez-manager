@@ -43,7 +43,9 @@ type 'model pre_submit_modal_config =
 type 'model spec = {
   title : string;
   initial_model : unit -> 'model;  (** Called to get fresh initial values *)
-  fields : 'model field list;
+  fields : 'model -> 'model field list;
+      (** Dynamic field generation - called with current model to allow
+          conditional fields (e.g., read-only in edit mode) *)
   on_init : ('model -> unit) option;
   on_refresh : ('model -> unit) option;
   pre_submit :
@@ -416,18 +418,20 @@ struct
     ps
 
   let move_state s delta =
-    let max_cursor = List.length S.spec.fields in
+    let fields = S.spec.fields !(s.model_ref) in
+    let max_cursor = List.length fields in
     let cursor = max 0 (min max_cursor (s.cursor + delta)) in
     {s with cursor}
 
   let rec submit s =
     let model = !(s.model_ref) in
+    let fields = S.spec.fields model in
     (* Check all validations before submitting *)
     let validation_errors =
       List.filter_map
         (fun (Field f) ->
           if f.validate model then None else Some (f.label, f.validate_msg model))
-        S.spec.fields
+        fields
     in
     match validation_errors with
     | (label, Some msg) :: _ ->
@@ -509,8 +513,9 @@ struct
             s)
 
   let enter s =
-    if s.cursor < List.length S.spec.fields then (
-      let (Field field) = List.nth S.spec.fields s.cursor in
+    let fields = S.spec.fields !(s.model_ref) in
+    if s.cursor < List.length fields then (
+      let (Field field) = List.nth fields s.cursor in
       field.edit s.model_ref ;
       s)
     else submit s
@@ -518,9 +523,10 @@ struct
   let view ps ~focus:_ ~size =
     let s = ps.Navigation.s in
     let model = !(s.model_ref) in
+    let fields = S.spec.fields model in
     (* Validate each field once and collect results *)
     let field_results =
-      S.spec.fields
+      fields
       |> List.map (fun (Field f) ->
           let value = f.get model in
           let ok = f.validate model in
@@ -567,8 +573,8 @@ struct
     in
     (* Get hint for current field and set it for Help_hint modal *)
     let current_hint =
-      if s.cursor < List.length S.spec.fields then
-        let (Field f) = List.nth S.spec.fields s.cursor in
+      if s.cursor < List.length fields then
+        let (Field f) = List.nth fields s.cursor in
         f.hint
       else Some "Press Enter to install the service"
     in

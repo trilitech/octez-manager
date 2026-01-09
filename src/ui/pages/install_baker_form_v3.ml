@@ -35,9 +35,13 @@ type model = {
   dal : dal_selection;
   delegates : string list;
   liquidity_baking_vote : string;
+  (* Edit mode fields *)
+  edit_mode : bool;
+  original_instance : string option;
+  stopped_dependents : string list;
 }
 
-let make_initial_model () =
+let base_initial_model () =
   {
     core =
       {
@@ -60,7 +64,73 @@ let make_initial_model () =
     dal = Dal_none;
     delegates = [];
     liquidity_baking_vote = "pass";
+    edit_mode = false;
+    original_instance = None;
+    stopped_dependents = [];
   }
+
+let make_initial_model () =
+  match Context.take_pending_edit_service () with
+  | Some edit_ctx when edit_ctx.service.Service.role = "baker" ->
+      let svc = edit_ctx.service in
+      (* Read baker env to get delegates and other config *)
+      let env =
+        match Node_env.read ~inst:svc.Service.instance with
+        | Ok pairs -> pairs
+        | Error _ -> []
+      in
+      let lookup key =
+        match List.assoc_opt key env with Some v -> String.trim v | None -> ""
+      in
+      let delegates =
+        match lookup "OCTEZ_BAKER_DELEGATES_CSV" with
+        | "" -> []
+        | csv ->
+            csv |> String.split_on_char ',' |> List.map String.trim
+            |> List.filter (( <> ) "")
+      in
+      let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+      let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
+      let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
+      let dal_config = lookup "OCTEZ_DAL_CONFIG" in
+      let dal =
+        if dal_config = "disabled" then Dal_none
+        else if dal_config = "" then Dal_none
+        else Dal_endpoint dal_config
+      in
+      let lb_vote = lookup "OCTEZ_BAKER_LIQUIDITY_BAKING_VOTE" in
+      {
+        core =
+          {
+            instance_name = svc.Service.instance;
+            service_user = svc.Service.service_user;
+            app_bin_dir = svc.Service.app_bin_dir;
+            enable_on_boot = true;
+            start_now = false;
+            (* Don't auto-start after edit *)
+            extra_args;
+          };
+        client =
+          {
+            base_dir =
+              (if base_dir = "" then
+                 Common.default_role_dir "baker" svc.Service.instance
+               else base_dir);
+            node = `None;
+            node_endpoint =
+              (if node_endpoint = "" then "127.0.0.1:8732" else node_endpoint);
+          };
+        parent_node = "";
+        (* TODO: Could try to detect from depends_on *)
+        node_data_dir = "";
+        dal;
+        delegates;
+        liquidity_baking_vote = (if lb_vote = "" then "pass" else lb_vote);
+        edit_mode = true;
+        original_instance = Some svc.Service.instance;
+        stopped_dependents = edit_ctx.stopped_dependents;
+      }
+  | _ -> base_initial_model ()
 
 (** {1 Helper Functions} *)
 
@@ -392,78 +462,83 @@ let spec =
     title = " Install Baker ";
     initial_model = make_initial_model;
     fields =
-      [
-        (* Instance name with auto-update of base_dir *)
-        validated_text
-          ~label:"Instance Name"
-          ~get:(fun m -> m.core.instance_name)
-          ~set:(fun instance_name m ->
-            let old = m.core.instance_name in
-            let default_dir = Common.default_role_dir "baker" instance_name in
-            let keep_base_dir =
-              String.trim m.client.base_dir <> ""
-              && not
-                   (String.equal
-                      m.client.base_dir
-                      (Common.default_role_dir "baker" old))
-            in
-            let new_core = {m.core with instance_name} in
-            let new_client =
-              {
-                m.client with
-                base_dir =
-                  (if keep_base_dir then m.client.base_dir else default_dir);
-              }
-            in
-            {m with core = new_core; client = new_client})
-          ~validate:(fun m ->
-            let states = Form_builder_common.cached_service_states () in
-            if not (Form_builder_common.is_nonempty m.core.instance_name) then
-              Error "Instance name is required"
-            else if
-              Form_builder_common.instance_in_use ~states m.core.instance_name
-            then Error "Instance name already exists"
-            else Ok ());
-        parent_node_field;
-        dal_node_field;
-        node_endpoint_field;
-        node_data_dir_field;
-        client_base_dir
-          ~label:"Baker Base Dir"
-          ~get:(fun m -> m.client.base_dir)
-          ~set:(fun base_dir m -> {m with client = {m.client with base_dir}})
-          ~validate:(fun m -> Form_builder_common.is_nonempty m.client.base_dir)
-          ();
-        string_list
-          ~label:"Delegates"
-          ~get:(fun m -> m.delegates)
-          ~set:(fun delegates m -> {m with delegates})
-          ~get_suggestions:(fun m ->
-            if String.trim m.client.base_dir = "" then []
-            else
-              match
-                Keys_reader.read_public_key_hashes ~base_dir:m.client.base_dir
-              with
-              | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
-              | Error _ -> [])
-          ();
-        choice
-          ~label:"Liquidity Baking Vote"
-          ~get:(fun m -> m.liquidity_baking_vote)
-          ~set:(fun liquidity_baking_vote m -> {m with liquidity_baking_vote})
-          ~items:["pass"; "on"; "off"]
-          ~to_string:(fun x -> x);
-      ]
-      @ core_service_fields
-          ~get_core:(fun m -> m.core)
-          ~set_core:(fun core m -> {m with core})
-          ~binary:"octez-baker"
-          ~subcommand:["run"]
-          ~baker_mode:baker_mode_for_help
-          ~binary_validator:has_octez_baker_binary
-          ~skip_instance_name:true
-            (* We define instance_name manually above with custom logic *)
-          ();
+      (fun _model ->
+        [
+          (* Instance name with auto-update of base_dir *)
+          validated_text
+            ~label:"Instance Name"
+            ~get:(fun m -> m.core.instance_name)
+            ~set:(fun instance_name m ->
+              let old = m.core.instance_name in
+              let default_dir = Common.default_role_dir "baker" instance_name in
+              let keep_base_dir =
+                String.trim m.client.base_dir <> ""
+                && not
+                     (String.equal
+                        m.client.base_dir
+                        (Common.default_role_dir "baker" old))
+              in
+              let new_core = {m.core with instance_name} in
+              let new_client =
+                {
+                  m.client with
+                  base_dir =
+                    (if keep_base_dir then m.client.base_dir else default_dir);
+                }
+              in
+              {m with core = new_core; client = new_client})
+            ~validate:(fun m ->
+              let states = Form_builder_common.cached_service_states () in
+              if not (Form_builder_common.is_nonempty m.core.instance_name) then
+                Error "Instance name is required"
+              else if
+                Form_builder_common.instance_in_use ~states m.core.instance_name
+                && not
+                     (m.edit_mode
+                     && m.original_instance = Some m.core.instance_name)
+              then Error "Instance name already exists"
+              else Ok ());
+          parent_node_field;
+          dal_node_field;
+          node_endpoint_field;
+          node_data_dir_field;
+          client_base_dir
+            ~label:"Baker Base Dir"
+            ~get:(fun m -> m.client.base_dir)
+            ~set:(fun base_dir m -> {m with client = {m.client with base_dir}})
+            ~validate:(fun m ->
+              Form_builder_common.is_nonempty m.client.base_dir)
+            ();
+          string_list
+            ~label:"Delegates"
+            ~get:(fun m -> m.delegates)
+            ~set:(fun delegates m -> {m with delegates})
+            ~get_suggestions:(fun m ->
+              if String.trim m.client.base_dir = "" then []
+              else
+                match
+                  Keys_reader.read_public_key_hashes ~base_dir:m.client.base_dir
+                with
+                | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
+                | Error _ -> [])
+            ();
+          choice
+            ~label:"Liquidity Baking Vote"
+            ~get:(fun m -> m.liquidity_baking_vote)
+            ~set:(fun liquidity_baking_vote m -> {m with liquidity_baking_vote})
+            ~items:["pass"; "on"; "off"]
+            ~to_string:(fun x -> x);
+        ]
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"]
+            ~baker_mode:baker_mode_for_help
+            ~binary_validator:has_octez_baker_binary
+            ~skip_instance_name:true
+              (* We define instance_name manually above with custom logic *)
+            ());
     pre_submit = None;
     on_init = None;
     on_refresh = None;
@@ -512,6 +587,20 @@ let spec =
           }
         in
 
+        (* In edit mode, stop the service before applying changes *)
+        let* () =
+          if model.edit_mode then
+            match
+              Installer.stop_service
+                ~quiet:true
+                ~instance:model.core.instance_name
+                ()
+            with
+            | Ok () -> Ok ()
+            | Error (`Msg _) ->
+                Ok () (* Continue anyway - service might be stopped *)
+          else Ok ()
+        in
         let* () =
           if Common.is_root () then
             System_user.ensure_service_account
@@ -522,6 +611,9 @@ let spec =
         in
         let* (module PM) = require_package_manager () in
         let* _ = PM.install_baker ~quiet:true req in
+        (* Queue restart dependents for modal on instances page *)
+        if model.edit_mode && model.stopped_dependents <> [] then
+          Context.set_pending_restart_dependents model.stopped_dependents ;
         if model.core.start_now then
           match Miaou_interfaces.Service_lifecycle.get () with
           | Some sl ->

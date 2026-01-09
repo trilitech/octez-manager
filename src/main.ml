@@ -440,6 +440,28 @@ let prompt_with_completion question completions =
     LNoise.set_hints_callback (fun _ -> None) ;
     res
 
+(** Validate a port address, re-prompting in interactive mode if invalid.
+    @param label Label for error messages (e.g., "RPC address")
+    @param addr The address to validate
+    @param default Default address if none provided (also used as example in error messages)
+    @param exclude_instance Instance to exclude from "in use" checks (for edit mode)
+    @return Ok addr if valid, Error msg if invalid in non-interactive mode *)
+let rec validate_port_addr ~label ~addr ~default ?exclude_instance () =
+  let validate a =
+    Port_validation.validate_addr ~addr:a ?exclude_instance ~example:default ()
+  in
+  match validate addr with
+  | Ok () -> Ok addr
+  | Error err ->
+      if is_interactive () then (
+        Printf.eprintf "%s: %s\n" label (Port_validation.pp_error err) ;
+        let new_addr =
+          prompt_input ~default:(default, default) label
+          |> Option.value ~default
+        in
+        validate_port_addr ~label ~addr:new_addr ~default ?exclude_instance ())
+      else Error (Printf.sprintf "%s: %s" label (Port_validation.pp_error err))
+
 let rec resolve_node_instance_or_endpoint ~node_instance =
   let ( let* ) = Result.bind in
   let* services = Service_registry.list () in
@@ -667,6 +689,23 @@ let install_node_cmd =
           let net_addr =
             if net_addr <> "0.0.0.0:9732" then net_addr else config_net_addr
           in
+          (* Validate ports - exclude self in edit/preserve-data mode *)
+          let* rpc_addr =
+            validate_port_addr
+              ~label:"RPC address"
+              ~addr:rpc_addr
+              ~default:"127.0.0.1:8732"
+              ~exclude_instance:instance
+              ()
+          in
+          let* net_addr =
+            validate_port_addr
+              ~label:"P2P address"
+              ~addr:net_addr
+              ~default:"0.0.0.0:9732"
+              ~exclude_instance:instance
+              ()
+          in
           let* () =
             if snapshot_flag || Option.is_some snapshot_uri then
               Error "Snapshot cannot be imported, the data-dir already exist"
@@ -738,6 +777,21 @@ let install_node_cmd =
             if preserve_data then Genesis
             else if snapshot_requested then Snapshot {src = snapshot_uri}
             else Genesis
+          in
+          (* Validate ports for new install *)
+          let* rpc_addr =
+            validate_port_addr
+              ~label:"RPC address"
+              ~addr:rpc_addr
+              ~default:"127.0.0.1:8732"
+              ()
+          in
+          let* net_addr =
+            validate_port_addr
+              ~label:"P2P address"
+              ~addr:net_addr
+              ~default:"0.0.0.0:9732"
+              ()
           in
           let req : node_request =
             {
@@ -1218,39 +1272,58 @@ let install_dal_node_cmd =
                       | `Instance inst -> Some inst
                       | _ -> None
                     in
-                    let req : daemon_request =
-                      {
-                        role = "dal-node";
-                        instance;
-                        network;
-                        history_mode = History_mode.default;
-                        data_dir;
-                        rpc_addr;
-                        net_addr;
-                        service_user;
-                        app_bin_dir;
-                        logging_mode;
-                        service_args = extra_args;
-                        extra_env =
-                          [
-                            ("OCTEZ_NODE_ENDPOINT", node_endpoint);
-                            ("OCTEZ_DAL_DATA_DIR", data_dir);
-                            ("OCTEZ_DAL_RPC_ADDR", rpc_addr);
-                            ("OCTEZ_DAL_NET_ADDR", net_addr);
-                          ];
-                        extra_paths = [];
-                        auto_enable = not no_enable;
-                        depends_on;
-                      }
-                    in
-                    match Installer.install_daemon req with
-                    | Ok service ->
-                        Format.printf
-                          "Installed %s (%s)\n"
-                          service.S.instance
-                          service.network ;
-                        `Ok ()
-                    | Error (`Msg msg) -> cmdliner_error msg))))
+                    (* Validate DAL node ports *)
+                    match
+                      validate_port_addr
+                        ~label:"DAL RPC address"
+                        ~addr:rpc_addr
+                        ~default:"127.0.0.1:10732"
+                        ()
+                    with
+                    | Error msg -> cmdliner_error msg
+                    | Ok rpc_addr -> (
+                        match
+                          validate_port_addr
+                            ~label:"DAL P2P address"
+                            ~addr:net_addr
+                            ~default:"0.0.0.0:11732"
+                            ()
+                        with
+                        | Error msg -> cmdliner_error msg
+                        | Ok net_addr -> (
+                            let req : daemon_request =
+                              {
+                                role = "dal-node";
+                                instance;
+                                network;
+                                history_mode = History_mode.default;
+                                data_dir;
+                                rpc_addr;
+                                net_addr;
+                                service_user;
+                                app_bin_dir;
+                                logging_mode;
+                                service_args = extra_args;
+                                extra_env =
+                                  [
+                                    ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+                                    ("OCTEZ_DAL_DATA_DIR", data_dir);
+                                    ("OCTEZ_DAL_RPC_ADDR", rpc_addr);
+                                    ("OCTEZ_DAL_NET_ADDR", net_addr);
+                                  ];
+                                extra_paths = [];
+                                auto_enable = not no_enable;
+                                depends_on;
+                              }
+                            in
+                            match Installer.install_daemon req with
+                            | Ok service ->
+                                Format.printf
+                                  "Installed %s (%s)\n"
+                                  service.S.instance
+                                  service.network ;
+                                `Ok ()
+                            | Error (`Msg msg) -> cmdliner_error msg))))))
   in
   let term =
     Term.(

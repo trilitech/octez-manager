@@ -22,6 +22,11 @@ val take_pending_edit_service : unit -> edit_context option
 
 val has_pending_edit_service : unit -> bool
 
+(** Pending restart: dependents stopped during edit that need restart *)
+val set_pending_restart_dependents : string list -> unit
+
+val take_pending_restart_dependents : unit -> string list
+
 val mark_instances_dirty : unit -> unit
 
 val consume_instances_dirty : unit -> bool

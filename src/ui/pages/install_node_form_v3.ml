@@ -432,65 +432,71 @@ let spec =
     title = " Install Node ";
     initial_model = make_initial_model;
     fields =
-      [
-        (* Instance name with auto-update of data_dir *)
-        validated_text
-          ~label:"Instance Name"
-          ~get:(fun m -> m.core.instance_name)
-          ~set:(fun instance_name m ->
-            let old = m.core.instance_name in
-            let default_dir = Common.default_role_dir "node" instance_name in
-            let keep_data_dir =
-              String.trim m.node.data_dir <> ""
-              && not
-                   (String.equal
-                      m.node.data_dir
-                      (Common.default_role_dir "node" old))
-            in
-            let new_core = {m.core with instance_name} in
-            let new_node =
-              {
-                m.node with
-                data_dir =
-                  (if keep_data_dir then m.node.data_dir else default_dir);
-              }
-            in
-            {m with core = new_core; node = new_node})
-          ~validate:(fun m ->
-            (* Use non-blocking cache to avoid syscalls during typing *)
-            let states =
-              Form_builder_common.cached_service_states_nonblocking ()
-            in
-            if not (Form_builder_common.is_nonempty m.core.instance_name) then
-              Error "Instance name is required"
-            else if
-              Form_builder_common.instance_in_use ~states m.core.instance_name
-            then Error "Instance name already exists"
-            else Ok ())
-        |> with_hint
-             "Unique identifier for this node. Used in systemd unit and \
-              default paths.";
-      ]
-      @ node_fields
-          ~get_node:(fun m -> m.node)
-          ~set_node:(fun node m -> {m with node})
-          ~on_network_selected:prefetch_snapshot_list
-          ()
-      @ [
-          snapshot_field
+      (fun model ->
+        [
+          (* Instance name with auto-update of data_dir *)
+          validated_text
+            ~label:"Instance Name"
+            ~get:(fun m -> m.core.instance_name)
+            ~set:(fun instance_name m ->
+              let old = m.core.instance_name in
+              let default_dir = Common.default_role_dir "node" instance_name in
+              let keep_data_dir =
+                String.trim m.node.data_dir <> ""
+                && not
+                     (String.equal
+                        m.node.data_dir
+                        (Common.default_role_dir "node" old))
+              in
+              let new_core = {m.core with instance_name} in
+              let new_node =
+                {
+                  m.node with
+                  data_dir =
+                    (if keep_data_dir then m.node.data_dir else default_dir);
+                }
+              in
+              {m with core = new_core; node = new_node})
+            ~validate:(fun m ->
+              (* Use non-blocking cache to avoid syscalls during typing *)
+              let states =
+                Form_builder_common.cached_service_states_nonblocking ()
+              in
+              if not (Form_builder_common.is_nonempty m.core.instance_name) then
+                Error "Instance name is required"
+              else if
+                Form_builder_common.instance_in_use ~states m.core.instance_name
+                && not
+                     (m.edit_mode
+                     && m.original_instance = Some m.core.instance_name)
+              then Error "Instance name already exists"
+              else Ok ())
           |> with_hint
-               "Import a snapshot for faster sync. None = sync from genesis \
-                (slow).";
+               "Unique identifier for this node. Used in systemd unit and \
+                default paths.";
         ]
-      @ core_service_fields
-          ~get_core:(fun m -> m.core)
-          ~set_core:(fun core m -> {m with core})
-          ~binary:"octez-node"
-          ~subcommand:["run"]
-          ~binary_validator:has_octez_node_binary
-          ~skip_instance_name:true
-            (* We define instance_name manually above with custom logic *)
-          ();
+        @ node_fields
+            ~get_node:(fun m -> m.node)
+            ~set_node:(fun node m -> {m with node})
+            ~on_network_selected:prefetch_snapshot_list
+            ~edit_mode:model.edit_mode
+            ?editing_instance:model.original_instance
+            ()
+        @ [
+            snapshot_field
+            |> with_hint
+                 "Import a snapshot for faster sync. None = sync from genesis \
+                  (slow).";
+          ]
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-node"
+            ~subcommand:["run"]
+            ~binary_validator:has_octez_node_binary
+            ~skip_instance_name:true
+              (* We define instance_name manually above with custom logic *)
+            ());
     pre_submit = None;
     on_init = Some (fun model -> prefetch_snapshot_list model.node.network);
     on_refresh = None;
@@ -629,12 +635,9 @@ let spec =
             let* _service =
               PM.install_node ~quiet:true ~on_log:append_log req
             in
-            (* Show restart message in edit mode *)
+            (* Queue restart dependents for modal on instances page *)
             if model.edit_mode && model.stopped_dependents <> [] then
-              Context.toast_info
-                (Printf.sprintf
-                   "Restart stopped dependents: %s"
-                   (String.concat ", " model.stopped_dependents)) ;
+              Context.set_pending_restart_dependents model.stopped_dependents ;
             (* Start the service if requested, even if not enabling on boot *)
             if model.core.start_now && not model.core.enable_on_boot then
               match Miaou_interfaces.Service_lifecycle.get () with
