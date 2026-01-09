@@ -964,52 +964,89 @@ let require_installer () =
       Ok (module I : Manager_interfaces.Installer)
   | None -> Error (`Msg "Installer capability not available")
 
+let do_remove ~instance ~delete_data_dir () =
+  Rpc_scheduler.stop_head_monitor instance ;
+  let* (module I) = require_installer () in
+  I.remove_service ~quiet:true ~delete_data_dir ~instance ()
+
+let do_purge ~instance () =
+  Rpc_scheduler.stop_head_monitor instance ;
+  let* (module I) = require_installer () in
+  I.purge_service
+    ~quiet:true
+    ~prompt_yes_no:(fun _ ~default:_ -> true)
+    ~instance
+    ()
+
+let remove_with_dependents_confirm ~instance ~dependents ~delete_data_dir =
+  Modal_helpers.open_choice_modal
+    ~title:"Confirm Removal"
+    ~items:[`Confirm; `Cancel]
+    ~to_string:(function
+      | `Confirm ->
+          Printf.sprintf
+            "Proceed (will stop: %s)"
+            (String.concat ", " dependents)
+      | `Cancel -> "Cancel")
+    ~on_select:(function
+      | `Confirm ->
+          run_unit_action ~verb:"remove" ~instance (fun () ->
+              do_remove ~instance ~delete_data_dir ())
+      | `Cancel -> ())
+
+let purge_with_dependents_confirm ~instance ~dependents =
+  Modal_helpers.open_choice_modal
+    ~title:"Confirm Purge"
+    ~items:[`Confirm; `Cancel]
+    ~to_string:(function
+      | `Confirm ->
+          Printf.sprintf
+            "Proceed (will stop: %s)"
+            (String.concat ", " dependents)
+      | `Cancel -> "Cancel")
+    ~on_select:(function
+      | `Confirm ->
+          run_unit_action ~verb:"purge" ~instance (fun () ->
+              do_purge ~instance ())
+      | `Cancel -> ())
+
 let remove_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
+      let instance = svc.Service.instance in
+      let dependents = svc.Service.dependents in
       Modal_helpers.open_choice_modal
-        ~title:(Printf.sprintf "Remove · %s" svc.Service.instance)
+        ~title:(Printf.sprintf "Remove · %s" instance)
         ~items:[`Remove; `RemoveData; `Purge]
         ~to_string:(function
           | `Remove -> "Remove (keep data)"
           | `RemoveData -> "Remove + delete data"
           | `Purge -> "Purge (also drop user/logs)")
         ~on_select:(fun choice ->
-          let instance = svc.Service.instance in
-          let verb, action =
-            match choice with
-            | `Remove ->
-                ( "remove",
-                  fun () ->
-                    Rpc_scheduler.stop_head_monitor instance ;
-                    let* (module I) = require_installer () in
-                    I.remove_service
-                      ~quiet:true
-                      ~delete_data_dir:false
-                      ~instance
-                      () )
-            | `RemoveData ->
-                ( "remove",
-                  fun () ->
-                    Rpc_scheduler.stop_head_monitor instance ;
-                    let* (module I) = require_installer () in
-                    I.remove_service
-                      ~quiet:true
-                      ~delete_data_dir:true
-                      ~instance
-                      () )
-            | `Purge ->
-                ( "purge",
-                  fun () ->
-                    Rpc_scheduler.stop_head_monitor instance ;
-                    let* (module I) = require_installer () in
-                    I.purge_service
-                      ~quiet:true
-                      ~prompt_yes_no:(fun _ ~default:_ -> true)
-                      ~instance
-                      () )
-          in
-          run_unit_action ~verb ~instance action) ;
+          match choice with
+          | `Remove ->
+              if dependents = [] then
+                run_unit_action ~verb:"remove" ~instance (fun () ->
+                    do_remove ~instance ~delete_data_dir:false ())
+              else
+                remove_with_dependents_confirm
+                  ~instance
+                  ~dependents
+                  ~delete_data_dir:false
+          | `RemoveData ->
+              if dependents = [] then
+                run_unit_action ~verb:"remove" ~instance (fun () ->
+                    do_remove ~instance ~delete_data_dir:true ())
+              else
+                remove_with_dependents_confirm
+                  ~instance
+                  ~dependents
+                  ~delete_data_dir:true
+          | `Purge ->
+              if dependents = [] then
+                run_unit_action ~verb:"purge" ~instance (fun () ->
+                    do_purge ~instance ())
+              else purge_with_dependents_confirm ~instance ~dependents) ;
       state)
 
 let journalctl_args unit_name =
