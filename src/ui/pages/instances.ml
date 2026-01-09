@@ -77,8 +77,8 @@ let sort_services services =
 
 let load_services () = Data.load_service_states () |> sort_services
 
-let load_services_fresh () =
-  Data.load_service_states ~detail:false () |> sort_services
+(* Use cached values - background refresh happens automatically when cache is stale *)
+let load_services_fresh () = load_services ()
 
 (** Calculate number of columns based on terminal width *)
 let calc_num_columns ~cols =
