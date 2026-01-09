@@ -22,9 +22,13 @@ let name = "install_accuser_form_v3"
 type model = {
   core : Form_builder_common.core_service_config;
   client : Form_builder_common.client_config;
+  (* Edit mode fields *)
+  edit_mode : bool;
+  original_instance : string option; [@warning "-69"]
+  stopped_dependents : string list;
 }
 
-let make_initial_model () =
+let base_initial_model () =
   {
     core =
       {
@@ -45,7 +49,56 @@ let make_initial_model () =
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };
+    edit_mode = false;
+    original_instance = None;
+    stopped_dependents = [];
   }
+
+let make_initial_model () =
+  match Context.take_pending_edit_service () with
+  | Some edit_ctx when edit_ctx.service.Service.role = "accuser" ->
+      let svc = edit_ctx.service in
+      (* Read accuser env to get config *)
+      let env =
+        match Node_env.read ~inst:svc.Service.instance with
+        | Ok pairs -> pairs
+        | Error _ -> []
+      in
+      let lookup key =
+        match List.assoc_opt key env with Some v -> String.trim v | None -> ""
+      in
+      let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+      let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+      let extra_args = lookup "OCTEZ_ACCUSER_EXTRA_ARGS" in
+      {
+        core =
+          {
+            instance_name = svc.Service.instance;
+            service_user = svc.Service.service_user;
+            app_bin_dir = svc.Service.app_bin_dir;
+            enable_on_boot = true;
+            start_now = false;
+            (* Don't auto-start after edit *)
+            extra_args;
+          };
+        client =
+          {
+            base_dir =
+              (if base_dir = "" then
+                 Common.default_role_dir "accuser" svc.Service.instance
+               else base_dir);
+            node =
+              (match svc.Service.depends_on with
+              | Some inst -> `Service inst
+              | None -> `Endpoint node_endpoint);
+            node_endpoint =
+              (if node_endpoint = "" then "127.0.0.1:8732" else node_endpoint);
+          };
+        edit_mode = true;
+        original_instance = Some svc.Service.instance;
+        stopped_dependents = edit_ctx.stopped_dependents;
+      }
+  | _ -> base_initial_model ()
 
 let require_package_manager () =
   match
@@ -133,7 +186,8 @@ let node_selection_field =
               Form_builder_common.normalize !model_ref.core.instance_name
             in
             let should_autoname =
-              current_name = "" || String.equal current_name "accuser"
+              (current_name = "" || String.equal current_name "accuser")
+              && not !model_ref.edit_mode
             in
             let endpoint = Form_builder_common.endpoint_of_service svc in
             let new_client =
@@ -151,7 +205,8 @@ let node_selection_field =
               let new_client =
                 {!model_ref.client with base_dir = default_dir}
               in
-              model_ref := {core = new_core; client = new_client} ;
+              model_ref :=
+                {!model_ref with core = new_core; client = new_client} ;
               (* Maybe use app_bin_dir from node *)
               if
                 Form_builder_common.has_octez_baker_binary
@@ -197,23 +252,25 @@ let spec =
     title = " Install Accuser ";
     initial_model = make_initial_model;
     fields =
-      core_service_fields
-        ~get_core:(fun m -> m.core)
-        ~set_core:(fun core m -> {m with core})
-        ~binary:"octez-baker"
-        ~subcommand:["run"; "accuser"]
-        ~binary_validator:Form_builder_common.has_octez_baker_binary
-        ()
-      @ [
-          node_selection_field;
-          client_base_dir
-            ~label:"Base Dir"
-            ~get:(fun m -> m.client.base_dir)
-            ~set:(fun base_dir m -> {m with client = {m.client with base_dir}})
-            ~validate:(fun m ->
-              Form_builder_common.is_nonempty m.client.base_dir)
-            ();
-        ];
+      (fun _model ->
+        core_service_fields
+          ~get_core:(fun m -> m.core)
+          ~set_core:(fun core m -> {m with core})
+          ~binary:"octez-baker"
+          ~subcommand:["run"; "accuser"]
+          ~binary_validator:Form_builder_common.has_octez_baker_binary
+          ()
+        @ [
+            node_selection_field;
+            client_base_dir
+              ~label:"Base Dir"
+              ~get:(fun m -> m.client.base_dir)
+              ~set:(fun base_dir m ->
+                {m with client = {m.client with base_dir}})
+              ~validate:(fun m ->
+                Form_builder_common.is_nonempty m.client.base_dir)
+              ();
+          ]);
     pre_submit =
       Some
         (fun model ->
@@ -338,6 +395,20 @@ let spec =
           }
         in
 
+        (* In edit mode, stop the service before applying changes *)
+        let* () =
+          if model.edit_mode then
+            match
+              Installer.stop_service
+                ~quiet:true
+                ~instance:model.core.instance_name
+                ()
+            with
+            | Ok () -> Ok ()
+            | Error (`Msg _) ->
+                Ok () (* Continue anyway - service might be stopped *)
+          else Ok ()
+        in
         (* Execute installation *)
         let* () =
           if Common.is_root () then
@@ -349,6 +420,9 @@ let spec =
         in
         let* (module PM) = require_package_manager () in
         let* _service = PM.install_daemon ~quiet:true req in
+        (* Queue restart dependents for modal on instances page *)
+        if model.edit_mode && model.stopped_dependents <> [] then
+          Context.set_pending_restart_dependents model.stopped_dependents ;
         if model.core.start_now then
           match Miaou_interfaces.Service_lifecycle.get () with
           | Some sl ->

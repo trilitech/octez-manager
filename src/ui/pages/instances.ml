@@ -320,6 +320,38 @@ let force_refresh state =
   in
   ensure_valid_column state
 
+let show_restart_dependents_modal dependents =
+  let restart_all () =
+    let cap = Miaou_interfaces.Service_lifecycle.require () in
+    dependents
+    |> List.iter (fun instance ->
+        (* Find the service to get its role *)
+        match Service_registry.find ~instance with
+        | Ok (Some svc) -> (
+            Context.toast_info (Printf.sprintf "Starting %s..." instance) ;
+            match
+              Miaou_interfaces.Service_lifecycle.start
+                cap
+                ~role:svc.Service.role
+                ~service:instance
+            with
+            | Ok () ->
+                Context.toast_success (Printf.sprintf "%s started" instance)
+            | Error msg ->
+                Context.toast_error (Printf.sprintf "%s: %s" instance msg))
+        | _ ->
+            Context.toast_error (Printf.sprintf "Service %s not found" instance)) ;
+    Context.mark_instances_dirty ()
+  in
+  Modal_helpers.open_choice_modal
+    ~title:"Restart Stopped Dependents"
+    ~items:[`RestartAll; `Dismiss]
+    ~to_string:(function
+      | `RestartAll ->
+          Printf.sprintf "Restart all (%s)" (String.concat ", " dependents)
+      | `Dismiss -> "Dismiss (restart later)")
+    ~on_select:(function `RestartAll -> restart_all () | `Dismiss -> ())
+
 let maybe_refresh ps =
   let state = ps.Navigation.s in
   let now = Unix.gettimeofday () in
@@ -327,6 +359,9 @@ let maybe_refresh ps =
   let ps =
     match pending_nav with Some p -> Navigation.goto p ps | None -> ps
   in
+  (* Check for pending restart dependents after edit *)
+  let pending_restart = Context.take_pending_restart_dependents () in
+  if pending_restart <> [] then show_restart_dependents_modal pending_restart ;
   if Context.consume_instances_dirty () || now -. state.last_updated > 1. then
     Navigation.update (fun s -> force_refresh s) ps
   else Navigation.update ensure_valid_column ps

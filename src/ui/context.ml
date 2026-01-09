@@ -34,6 +34,16 @@ let take_pending_edit_service () =
 
 let has_pending_edit_service () = Option.is_some !pending_edit_service
 
+(* Pending restart: list of dependents that were stopped during edit and need restart *)
+let pending_restart_dependents : string list ref = ref []
+
+let set_pending_restart_dependents deps = pending_restart_dependents := deps
+
+let take_pending_restart_dependents () =
+  let value = !pending_restart_dependents in
+  pending_restart_dependents := [] ;
+  value
+
 let mark_instances_dirty () = instances_dirty := true
 
 let consume_instances_dirty () =

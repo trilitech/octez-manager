@@ -21,9 +21,13 @@ type model = {
   client : Form_builder_common.client_config;
   rpc_addr : string;  (** DAL node's own RPC address *)
   net_addr : string;  (** DAL node's P2P address *)
+  (* Edit mode fields *)
+  edit_mode : bool;
+  original_instance : string option; [@warning "-69"]
+  stopped_dependents : string list;
 }
 
-let make_initial_model () =
+let base_initial_model () =
   {
     core =
       {
@@ -44,7 +48,62 @@ let make_initial_model () =
       };
     rpc_addr = "127.0.0.1:10732";
     net_addr = "0.0.0.0:11732";
+    edit_mode = false;
+    original_instance = None;
+    stopped_dependents = [];
   }
+
+let make_initial_model () =
+  match Context.take_pending_edit_service () with
+  | Some edit_ctx
+    when edit_ctx.service.Service.role = "dal-node"
+         || edit_ctx.service.Service.role = "dal" ->
+      let svc = edit_ctx.service in
+      (* Read DAL env to get config *)
+      let env =
+        match Node_env.read ~inst:svc.Service.instance with
+        | Ok pairs -> pairs
+        | Error _ -> []
+      in
+      let lookup key =
+        match List.assoc_opt key env with Some v -> String.trim v | None -> ""
+      in
+      let client_base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+      let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+      let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
+      let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
+      let extra_args = lookup "OCTEZ_DAL_EXTRA_ARGS" in
+      {
+        core =
+          {
+            instance_name = svc.Service.instance;
+            service_user = svc.Service.service_user;
+            app_bin_dir = svc.Service.app_bin_dir;
+            enable_on_boot = true;
+            start_now = false;
+            (* Don't auto-start after edit *)
+            extra_args;
+          };
+        client =
+          {
+            base_dir =
+              (if client_base_dir = "" then
+                 Common.default_role_dir "dal-node" svc.Service.instance
+               else client_base_dir);
+            node =
+              (match svc.Service.depends_on with
+              | Some inst -> `Service inst
+              | None -> `Endpoint node_endpoint);
+            node_endpoint =
+              (if node_endpoint = "" then "127.0.0.1:8732" else node_endpoint);
+          };
+        rpc_addr = (if dal_rpc = "" then "127.0.0.1:10732" else dal_rpc);
+        net_addr = (if dal_net = "" then "0.0.0.0:11732" else dal_net);
+        edit_mode = true;
+        original_instance = Some svc.Service.instance;
+        stopped_dependents = edit_ctx.stopped_dependents;
+      }
+  | _ -> base_initial_model ()
 
 let require_package_manager () =
   match
@@ -66,34 +125,35 @@ let spec =
     initial_model = make_initial_model;
     (* Compose fields from bundles with auto-naming support *)
     fields =
-      core_service_fields
-        ~get_core:(fun m -> m.core)
-        ~set_core:(fun core m -> {m with core})
-        ~binary:"octez-baker"
-        ~subcommand:["run"; "dal"]
-        ~binary_validator:Form_builder_common.has_octez_baker_binary
-        ()
-      @ client_fields_with_autoname
-          ~role:"dal"
-          ~binary:"octez-baker"
-          ~binary_validator:Form_builder_common.has_octez_baker_binary
+      (fun _model ->
+        core_service_fields
           ~get_core:(fun m -> m.core)
           ~set_core:(fun core m -> {m with core})
-          ~get_client:(fun m -> m.client)
-          ~set_client:(fun client m -> {m with client})
+          ~binary:"octez-baker"
+          ~subcommand:["run"; "dal"]
+          ~binary_validator:Form_builder_common.has_octez_baker_binary
           ()
-      @ [
-          (* DAL node's own RPC address *)
-          Form_builder.text
-            ~label:"DAL RPC Addr"
-            ~get:(fun m -> m.rpc_addr)
-            ~set:(fun rpc_addr m -> {m with rpc_addr});
-          (* DAL node's P2P address *)
-          Form_builder.text
-            ~label:"DAL P2P Addr"
-            ~get:(fun m -> m.net_addr)
-            ~set:(fun net_addr m -> {m with net_addr});
-        ];
+        @ client_fields_with_autoname
+            ~role:"dal"
+            ~binary:"octez-baker"
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~get_client:(fun m -> m.client)
+            ~set_client:(fun client m -> {m with client})
+            ()
+        @ [
+            (* DAL node's own RPC address *)
+            Form_builder.text
+              ~label:"DAL RPC Addr"
+              ~get:(fun m -> m.rpc_addr)
+              ~set:(fun rpc_addr m -> {m with rpc_addr});
+            (* DAL node's P2P address *)
+            Form_builder.text
+              ~label:"DAL P2P Addr"
+              ~get:(fun m -> m.net_addr)
+              ~set:(fun net_addr m -> {m with net_addr});
+          ]);
     pre_submit =
       Some
         (fun model ->
@@ -219,6 +279,20 @@ let spec =
           }
         in
 
+        (* In edit mode, stop the service before applying changes *)
+        let* () =
+          if model.edit_mode then
+            match
+              Installer.stop_service
+                ~quiet:true
+                ~instance:model.core.instance_name
+                ()
+            with
+            | Ok () -> Ok ()
+            | Error (`Msg _) ->
+                Ok () (* Continue anyway - service might be stopped *)
+          else Ok ()
+        in
         (* Execute installation *)
         let* () =
           if Common.is_root () then
@@ -230,6 +304,9 @@ let spec =
         in
         let* (module PM) = require_package_manager () in
         let* _service = PM.install_daemon ~quiet:true req in
+        (* Queue restart dependents for modal on instances page *)
+        if model.edit_mode && model.stopped_dependents <> [] then
+          Context.set_pending_restart_dependents model.stopped_dependents ;
         if model.core.start_now then
           match Miaou_interfaces.Service_lifecycle.get () with
           | Some sl ->

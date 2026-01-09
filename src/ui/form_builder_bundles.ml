@@ -320,157 +320,141 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
 
 (** {1 Node-specific Bundle} *)
 
-let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ()) () =
+let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
+    ?(edit_mode = false) ?editing_instance () =
   let open Form_builder in
   (* Helper for network field - needs special handling for dynamic fetch *)
   let network_field =
-    custom
-      ~label:"Network"
-      ~get:(fun m ->
-        let value = (get_node m).network in
-        network_display_name value)
-      ~edit:(fun model_ref ->
-        let fallback () =
-          Modal_helpers.prompt_text_modal
-            ~title:"Network"
-            ~initial:(get_node !model_ref).network
-            ~on_submit:(fun network ->
-              let node = get_node !model_ref in
-              model_ref := set_node {node with network} !model_ref ;
-              on_network_selected network)
-            ()
-        in
-        match get_network_infos () with
-        | Error msg ->
-            Modal_helpers.show_error ~title:"Network" msg ;
-            fallback ()
-        | Ok nets ->
-            let sorted =
-              nets
-              |> List.sort
-                   (fun
-                     (a : Teztnets.network_info) (b : Teztnets.network_info) ->
-                     String.compare
-                       (normalize_string a.human_name)
-                       (normalize_string b.human_name))
-            in
-            let items = (sorted |> List.map (fun n -> `Net n)) @ [`Custom] in
-            let to_string = function
-              | `Net n -> format_network_choice n
-              | `Custom -> "Custom URL or slug..."
-            in
-            let on_select = function
-              | `Net n ->
-                  let network = n.Teztnets.network_url in
-                  let node = get_node !model_ref in
-                  model_ref := set_node {node with network} !model_ref ;
-                  on_network_selected network
-              | `Custom ->
-                  Modal_helpers.prompt_text_modal
-                    ~title:"Network"
-                    ~initial:(get_node !model_ref).network
-                    ~on_submit:(fun network ->
-                      let node = get_node !model_ref in
-                      model_ref := set_node {node with network} !model_ref ;
-                      on_network_selected network)
-                    ()
-            in
-            Modal_helpers.open_choice_modal
+    if edit_mode then
+      readonly ~label:"Network" ~get:(fun m ->
+          let value = (get_node m).network in
+          network_display_name value)
+    else
+      custom
+        ~label:"Network"
+        ~get:(fun m ->
+          let value = (get_node m).network in
+          network_display_name value)
+        ~edit:(fun model_ref ->
+          let fallback () =
+            Modal_helpers.prompt_text_modal
               ~title:"Network"
-              ~items
-              ~to_string
-              ~on_select)
-      ()
+              ~initial:(get_node !model_ref).network
+              ~on_submit:(fun network ->
+                let node = get_node !model_ref in
+                model_ref := set_node {node with network} !model_ref ;
+                on_network_selected network)
+              ()
+          in
+          match get_network_infos () with
+          | Error msg ->
+              Modal_helpers.show_error ~title:"Network" msg ;
+              fallback ()
+          | Ok nets ->
+              let sorted =
+                nets
+                |> List.sort
+                     (fun
+                       (a : Teztnets.network_info)
+                       (b : Teztnets.network_info)
+                     ->
+                       String.compare
+                         (normalize_string a.human_name)
+                         (normalize_string b.human_name))
+              in
+              let items = (sorted |> List.map (fun n -> `Net n)) @ [`Custom] in
+              let to_string = function
+                | `Net n -> format_network_choice n
+                | `Custom -> "Custom URL or slug..."
+              in
+              let on_select = function
+                | `Net n ->
+                    let network = n.Teztnets.network_url in
+                    let node = get_node !model_ref in
+                    model_ref := set_node {node with network} !model_ref ;
+                    on_network_selected network
+                | `Custom ->
+                    Modal_helpers.prompt_text_modal
+                      ~title:"Network"
+                      ~initial:(get_node !model_ref).network
+                      ~on_submit:(fun network ->
+                        let node = get_node !model_ref in
+                        model_ref := set_node {node with network} !model_ref ;
+                        on_network_selected network)
+                      ()
+              in
+              Modal_helpers.open_choice_modal
+                ~title:"Network"
+                ~items
+                ~to_string
+                ~on_select)
+        ()
   in
-  let parse_port addr =
-    match String.split_on_char ':' addr with
-    | [_; port_str] -> (
-        try Some (int_of_string (String.trim port_str)) with _ -> None)
-    | _ -> None
-  in
-
-  let ports_from_states states =
-    let rpc_ports =
-      states
-      |> List.filter_map (fun (s : Data.Service_state.t) ->
-          match s.service.Service.role with
-          | "node" -> parse_port s.service.Service.rpc_addr
-          | _ -> None)
-    in
-    let p2p_ports =
-      states
-      |> List.filter_map (fun (s : Data.Service_state.t) ->
-          match s.service.Service.role with
-          | "node" -> parse_port s.service.Service.net_addr
-          | _ -> None)
-    in
-    (rpc_ports, p2p_ports)
-  in
-
-  let is_port_in_use (port : int) : bool =
+  (* Use shared port validation from lib *)
+  let validate_port addr _states ~label ~example =
     match
-      Miaou_interfaces.Capability.get Manager_interfaces.System_capability.key
+      Port_validation.validate_addr
+        ~addr
+        ?exclude_instance:editing_instance
+        ~example
+        ()
     with
-    | Some cap ->
-        let module Sys = (val cap : Manager_interfaces.System) in
-        Sys.is_port_in_use port
-    | None -> false
+    | Ok () -> Ok ()
+    | Error err ->
+        Error (Printf.sprintf "%s: %s" label (Port_validation.pp_error err))
   in
 
-  let validate_port addr states ~label ~example =
-    match parse_host_port addr with
-    | None ->
-        Error (Printf.sprintf "%s must be host:port (e.g., %s)" label example)
-    | Some (_host, port) ->
-        if port < 1024 || port > 65535 then
-          Error (Printf.sprintf "%s port must be 1024-65535" label)
-        else
-          let rpc_ports, p2p_ports = ports_from_states states in
-          if List.mem port rpc_ports || List.mem port p2p_ports then
-            Error
-              (Printf.sprintf "Port %d is used by another Octez instance" port)
-          else if is_port_in_use port then
-            Error (Printf.sprintf "Port %d is in use" port)
-          else Ok ()
+  (* History mode field - read-only in edit mode *)
+  let history_mode_field =
+    if edit_mode then
+      readonly ~label:"History Mode" ~get:(fun m -> (get_node m).history_mode)
+    else
+      choice
+        ~label:"History Mode"
+        ~get:(fun m -> (get_node m).history_mode)
+        ~set:(fun history_mode m ->
+          let node = get_node m in
+          set_node {node with history_mode} m)
+        ~items:["rolling"; "full"; "archive"]
+        ~to_string:(fun x -> x)
   in
-
+  (* Data dir field - read-only in edit mode *)
+  let data_dir_field =
+    if edit_mode then
+      readonly ~label:"Data Dir" ~get:(fun m -> (get_node m).data_dir)
+    else
+      node_data_dir
+        ~label:"Data Dir"
+        ~get:(fun m -> (get_node m).data_dir)
+        ~set:(fun data_dir m ->
+          let node = get_node m in
+          set_node {node with data_dir} m)
+        ~validate:(fun m ->
+          (* Use non-blocking cache to avoid syscalls during typing *)
+          let states =
+            Form_builder_common.cached_service_states_nonblocking ()
+          in
+          let data_dir = (get_node m).data_dir in
+          is_nonempty data_dir
+          && not
+               (List.exists
+                  (fun (st : Data.Service_state.t) ->
+                    String.equal
+                      (String.trim st.service.Service.data_dir)
+                      (String.trim data_dir))
+                  states))
+        ()
+  in
   [
     network_field
     |> with_hint
          "Tezos network to connect to. Mainnet for production, testnets for \
           development.";
-    (* History Mode *)
-    choice
-      ~label:"History Mode"
-      ~get:(fun m -> (get_node m).history_mode)
-      ~set:(fun history_mode m ->
-        let node = get_node m in
-        set_node {node with history_mode} m)
-      ~items:["rolling"; "full"; "archive"]
-      ~to_string:(fun x -> x)
+    history_mode_field
     |> with_hint
          "Rolling: minimal disk (~50GB). Full: all blocks. Archive: all states \
           (1TB+).";
-    (* Data Directory *)
-    node_data_dir
-      ~label:"Data Dir"
-      ~get:(fun m -> (get_node m).data_dir)
-      ~set:(fun data_dir m ->
-        let node = get_node m in
-        set_node {node with data_dir} m)
-      ~validate:(fun m ->
-        (* Use non-blocking cache to avoid syscalls during typing *)
-        let states = Form_builder_common.cached_service_states_nonblocking () in
-        let data_dir = (get_node m).data_dir in
-        is_nonempty data_dir
-        && not
-             (List.exists
-                (fun (st : Data.Service_state.t) ->
-                  String.equal
-                    (String.trim st.service.Service.data_dir)
-                    (String.trim data_dir))
-                states))
-      ()
+    data_dir_field
     |> with_hint
          "Directory where blockchain data is stored. Must be writable by \
           service user.";
