@@ -63,27 +63,27 @@ type 'model spec = {
   fields : 'model -> 'model field list;
       (** Dynamic field generation - called with current model to allow
           conditional fields (e.g., read-only in edit mode) *)
-      (** Optional initialization hook called once when page is first loaded.
-      Use for prefetching data, starting background tasks, etc. *)
   on_init : ('model -> unit) option;
-      (** Optional refresh hook called on every refresh cycle.
-      WARNING: Keep this lightweight - it's called frequently (on every keystroke).
-      Avoid spawning subprocesses or expensive operations here. *)
+      (** Optional initialization hook called once when page is first loaded.
+          Use for prefetching data, starting background tasks, etc. *)
   on_refresh : ('model -> unit) option;
-      (** Pre-submission validation with custom error handling.
-      Return Ok() to proceed with submission, or Error to show modal and abort. *)
+      (** Optional refresh hook called on every refresh cycle.
+          WARNING: Keep this lightweight - it's called frequently (on every keystroke).
+          Avoid spawning subprocesses or expensive operations here. *)
   pre_submit :
     ('model ->
     (unit, [`Msg of string | `Modal of string * (unit -> unit)]) result)
     option;
-      (** Optional conditional modal shown before submission.
-      If the function returns Some modal_config, shows a choice modal and updates
-      the model based on user's choice. User must then submit again to proceed.
-      If returns None, proceeds directly to on_submit. *)
+      (** Pre-submission validation with custom error handling.
+          Return Ok() to proceed with submission, or Error to show modal and abort. *)
   pre_submit_modal : ('model -> 'model pre_submit_modal_config option) option;
-      (** Main submission handler. Can perform async operations, show progress modals, etc.
-      Return Ok() for success (navigates to instances), Error for failure (shows error modal). *)
+      (** Optional conditional modal shown before submission.
+          If the function returns Some modal_config, shows a choice modal and updates
+          the model based on user's choice. User must then submit again to proceed.
+          If returns None, proceeds directly to on_submit. *)
   on_submit : 'model -> (unit, [`Msg of string]) result;
+      (** Main submission handler. Can perform async operations, show progress modals, etc.
+          Return Ok() for success (navigates to instances), Error for failure (shows error modal). *)
 }
 
 (** Functor to generate a full page module from a specification.
