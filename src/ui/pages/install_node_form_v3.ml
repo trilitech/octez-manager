@@ -482,12 +482,15 @@ let spec =
             ~edit_mode:model.edit_mode
             ?editing_instance:model.original_instance
             ()
-        @ [
-            snapshot_field
-            |> with_hint
-                 "Import a snapshot for faster sync. None = sync from genesis \
-                  (slow).";
-          ]
+        (* Snapshot field only shown for new installs, not edit mode *)
+        @ (if model.edit_mode then []
+           else
+             [
+               snapshot_field
+               |> with_hint
+                    "Import a snapshot for faster sync. None = sync from \
+                     genesis (slow).";
+             ])
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
@@ -495,7 +498,7 @@ let spec =
             ~subcommand:["run"]
             ~binary_validator:has_octez_node_binary
             ~skip_instance_name:true
-              (* We define instance_name manually above with custom logic *)
+            ~edit_mode:model.edit_mode
             ());
     pre_submit = None;
     on_init = Some (fun model -> prefetch_snapshot_list model.node.network);
