@@ -60,6 +60,17 @@ let consume_navigation () =
   pending_navigation := None ;
   value
 
+(* Flag to indicate that navigation.back should be skipped once.
+   Used when form exits to prevent back-navigation loop. *)
+let skip_back_once = ref false
+
+let set_skip_back_once () = skip_back_once := true
+
+let consume_skip_back_once () =
+  let value = !skip_back_once in
+  skip_back_once := false ;
+  value
+
 (* Global toast state *)
 let toasts_lock = Mutex.create ()
 

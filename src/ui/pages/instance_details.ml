@@ -50,7 +50,17 @@ let update ps _ = ps
 let refresh ps =
   match Context.consume_navigation () with
   | Some p -> Navigation.goto p ps
-  | None -> ps
+  | None ->
+      (* Reload service data in case it was updated *)
+      if Context.consume_instances_dirty () then
+        let s = ps.Navigation.s in
+        match load_service s.instance with
+        | Ok service ->
+            Navigation.update
+              (fun s -> {s with service = Some service; error = None})
+              ps
+        | Error e -> Navigation.update (fun s -> {s with error = Some e}) ps
+      else ps
 
 let move ps _ = ps
 
