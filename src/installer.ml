@@ -143,11 +143,12 @@ type snapshot_progress = {
   on_download_progress : (int -> int option -> unit) option;
 }
 
-let download_snapshot_to_tmp ?(quiet = false) ?progress src =
+let download_snapshot_to_tmp ?(quiet = false) ?on_log ?progress src =
   let tmp = Filename.temp_file "octez-manager.snapshot" ".snap" in
+  let last_log_time = ref 0. in
   let res =
-    match progress with
-    | Some {on_download_progress} ->
+    match (progress, on_log) with
+    | Some {on_download_progress}, _ ->
         Common.download_file_with_progress
           ~url:src
           ~dest_path:tmp
@@ -155,7 +156,18 @@ let download_snapshot_to_tmp ?(quiet = false) ?progress src =
             match on_download_progress with
             | Some f -> f pct (Some 100)
             | None -> ())
-    | None -> Common.download_file ~quiet ~url:src ~dest_path:tmp ()
+    | None, Some log ->
+        (* Use progress download and convert to log messages *)
+        Common.download_file_with_progress
+          ~url:src
+          ~dest_path:tmp
+          ~on_progress:(fun pct _ ->
+            (* Log every 5 seconds to avoid flooding *)
+            let now = Unix.gettimeofday () in
+            if now -. !last_log_time >= 5. then (
+              last_log_time := now ;
+              log (Printf.sprintf "Download progress: %d%%\n" pct)))
+    | None, None -> Common.download_file ~quiet ~url:src ~dest_path:tmp ()
   in
   match res with
   | Ok () -> Ok {path = tmp; cleanup = true}
@@ -163,7 +175,7 @@ let download_snapshot_to_tmp ?(quiet = false) ?progress src =
       Common.remove_path tmp ;
       e
 
-let prepare_snapshot_source ?(quiet = false) ?progress src =
+let prepare_snapshot_source ?(quiet = false) ?on_log ?progress src =
   let trimmed = String.trim src in
   if trimmed = "" then R.error_msg "Snapshot URI is empty"
   else
@@ -172,7 +184,7 @@ let prepare_snapshot_source ?(quiet = false) ?progress src =
     | None when not (is_http_url trimmed) ->
         if Sys.file_exists trimmed then Ok {path = trimmed; cleanup = false}
         else R.error_msgf "Snapshot file %s does not exist" trimmed
-    | _ -> download_snapshot_to_tmp ~quiet ?progress trimmed
+    | _ -> download_snapshot_to_tmp ~quiet ?on_log ?progress trimmed
 
 let snapshot_plan_of_request request =
   match request.bootstrap with
@@ -221,7 +233,10 @@ let import_snapshot ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
     in
     if no_check then base @ ["--no-check"] else base
   in
-  Common.run ~quiet ?on_log args
+  (* Use streaming for real-time output when on_log is provided *)
+  match on_log with
+  | Some log -> Common.run_streaming ~on_log:log args
+  | None -> Common.run ~quiet args
 
 let import_snapshot_file ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
     ~snapshot_file ~no_check () =
@@ -236,10 +251,13 @@ let import_snapshot_file ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
 
 let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
     ~no_check () =
+  let log msg = match on_log with Some f -> f msg | None -> () in
   match plan with
   | No_snapshot -> Ok ()
   | Direct_snapshot {uri} ->
-      let* snapshot_file = prepare_snapshot_source ~quiet uri in
+      log (Printf.sprintf "Downloading snapshot from %s...\n" uri) ;
+      let* snapshot_file = prepare_snapshot_source ~quiet ?on_log uri in
+      log "Download complete. Importing snapshot...\n" ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
@@ -253,7 +271,11 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
             ~no_check
             ())
   | Tzinit_snapshot res ->
-      let* snapshot_file = download_snapshot_to_tmp ~quiet res.download_url in
+      log (Printf.sprintf "Downloading snapshot from %s...\n" res.download_url) ;
+      let* snapshot_file =
+        download_snapshot_to_tmp ~quiet ?on_log res.download_url
+      in
+      log "Download complete. Importing snapshot...\n" ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
