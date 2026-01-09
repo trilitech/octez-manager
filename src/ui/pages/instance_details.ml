@@ -185,6 +185,11 @@ let view_details svc =
         let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
         let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
         let logging = Logging_mode.to_string svc.Service.logging_mode in
+        let depends_on =
+          match svc.Service.depends_on with
+          | Some inst -> inst
+          | None -> "(none)"
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -195,6 +200,7 @@ let view_details svc =
           ("Node Mode", if node_mode = "" then "remote" else node_mode);
           ( "Node Endpoint",
             if node_endpoint = "" then "(unset)" else node_endpoint );
+          ("Depends On", depends_on);
           ("DAL Config", dal_display);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
@@ -202,7 +208,61 @@ let view_details svc =
           ("Logging", logging);
           ("Extra Args", if extra_args = "" then "(none)" else extra_args);
         ]
+    | "accuser" ->
+        let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+        let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+        let extra_args = lookup "OCTEZ_ACCUSER_EXTRA_ARGS" in
+        let depends_on =
+          match svc.Service.depends_on with
+          | Some inst -> inst
+          | None -> "(none)"
+        in
+        [
+          ("Instance", svc.Service.instance);
+          ("Role", svc.Service.role);
+          ("Network", svc.Service.network);
+          ("Base Dir", if base_dir = "" then "(unset)" else base_dir);
+          ( "Node Endpoint",
+            if node_endpoint = "" then "(unset)" else node_endpoint );
+          ("Depends On", depends_on);
+          ("Service User", svc.Service.service_user);
+          ("Bin Dir", svc.Service.app_bin_dir);
+          ("Created At", svc.Service.created_at);
+          ("Logging", Logging_mode.to_string svc.Service.logging_mode);
+          ("Extra Args", if extra_args = "" then "(none)" else extra_args);
+        ]
+    | "dal-node" | "dal" ->
+        let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+        let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
+        let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
+        let extra_args = lookup "OCTEZ_DAL_EXTRA_ARGS" in
+        let depends_on =
+          match svc.Service.depends_on with
+          | Some inst -> inst
+          | None -> "(none)"
+        in
+        [
+          ("Instance", svc.Service.instance);
+          ("Role", svc.Service.role);
+          ("Network", svc.Service.network);
+          ( "Node Endpoint",
+            if node_endpoint = "" then "(unset)" else node_endpoint );
+          ("Depends On", depends_on);
+          ("DAL RPC Addr", if dal_rpc = "" then "(unset)" else dal_rpc);
+          ("DAL P2P Addr", if dal_net = "" then "(unset)" else dal_net);
+          ("Service User", svc.Service.service_user);
+          ("Bin Dir", svc.Service.app_bin_dir);
+          ("Created At", svc.Service.created_at);
+          ("Logging", Logging_mode.to_string svc.Service.logging_mode);
+          ("Extra Args", if extra_args = "" then "(none)" else extra_args);
+        ]
     | _ ->
+        (* Default case - typically node *)
+        let dependents =
+          match svc.Service.dependents with
+          | [] -> "(none)"
+          | deps -> String.concat ", " deps
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -210,6 +270,7 @@ let view_details svc =
           ("History Mode", History_mode.to_string svc.Service.history_mode);
           ("RPC Addr", svc.Service.rpc_addr);
           ("P2P Addr", svc.Service.net_addr);
+          ("Dependents", dependents);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
           ("Created At", svc.Service.created_at);

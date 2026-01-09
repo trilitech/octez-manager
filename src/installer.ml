@@ -736,6 +736,26 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ()
   in
   let* () = Service_registry.write service in
+  (* Register as dependent on parent if depends_on is set *)
+  let* () =
+    match request.depends_on with
+    | Some parent_instance -> (
+        match Service_registry.find ~instance:parent_instance with
+        | Ok (Some parent_svc) ->
+            (* Only add if not already in dependents list *)
+            if List.mem request.instance parent_svc.dependents then Ok ()
+            else
+              let updated_parent =
+                {
+                  parent_svc with
+                  dependents = request.instance :: parent_svc.dependents;
+                }
+              in
+              Service_registry.write updated_parent
+        | Ok None -> Ok () (* Parent not found, skip *)
+        | Error _ -> Ok () (* Error finding parent, skip *))
+    | None -> Ok ()
+  in
   let* services = Service_registry.list () in
   let* () = Systemd.sync_logrotate (logrotate_specs_of services) in
   let* () =
