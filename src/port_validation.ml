@@ -62,31 +62,59 @@ let port_owned_by_instance ~instance port =
       || parse_port svc.Service.net_addr = Some port
   | _ -> false
 
+(** Extract process name from ss output line.
+    Example: "users:(("nginx",pid=1234,fd=5))" -> Some "nginx" *)
+let extract_process_name line =
+  (* Look for pattern: users:(("process_name", ... *)
+  let re = Str.regexp {|users:(("\([^"]+\)"|} in
+  try
+    if Str.search_forward re line 0 >= 0 then Some (Str.matched_group 1 line)
+    else None
+  with Not_found -> None
+
 (** Check if a port is in use by any running process.
-    Uses netstat/ss to check. *)
-let is_port_in_use port =
-  (* Try ss first, fall back to netstat *)
-  let check_with cmd =
+    Returns Some process_name if in use, None otherwise.
+    Uses ss (with -p for process info) or falls back to netstat. *)
+let get_port_process port =
+  let port_str = string_of_int port in
+  (* Try ss with process info first (-p requires root or same user) *)
+  let ss_cmd =
+    Printf.sprintf "ss -tulnp 2>/dev/null | grep -w ':%s'" port_str
+  in
+  let try_cmd cmd =
     try
       let ic = Unix.open_process_in cmd in
       let output = In_channel.input_all ic in
       let _ = Unix.close_process_in ic in
-      String.contains output ':'
-      && String.contains output (Char.chr (48 + (port mod 10)))
-    with _ -> false
+      if String.trim output <> "" then Some output else None
+    with _ -> None
   in
-  let port_str = string_of_int port in
-  let ss_cmd = Printf.sprintf "ss -tuln 2>/dev/null | grep -w ':%s'" port_str in
-  let netstat_cmd =
-    Printf.sprintf "netstat -tuln 2>/dev/null | grep -w ':%s'" port_str
-  in
-  check_with ss_cmd || check_with netstat_cmd
+  match try_cmd ss_cmd with
+  | Some output -> (
+      match extract_process_name output with
+      | Some proc -> Some (Some proc)
+      | None -> Some None (* Port in use but can't get process name *))
+  | None -> (
+      (* Fall back to basic ss/netstat without process info *)
+      let ss_basic =
+        Printf.sprintf "ss -tuln 2>/dev/null | grep -w ':%s'" port_str
+      in
+      let netstat_cmd =
+        Printf.sprintf "netstat -tuln 2>/dev/null | grep -w ':%s'" port_str
+      in
+      match try_cmd ss_basic with
+      | Some _ -> Some None
+      | None -> (
+          match try_cmd netstat_cmd with Some _ -> Some None | None -> None))
+
+(** Check if a port is in use by any running process. *)
+let is_port_in_use port = Option.is_some (get_port_process port)
 
 type validation_error =
   | Invalid_format of string
   | Port_out_of_range
   | Used_by_other_instance of int * string
-  | Port_in_use of int
+  | Port_in_use of int * string option
 
 let pp_error = function
   | Invalid_format example ->
@@ -94,7 +122,9 @@ let pp_error = function
   | Port_out_of_range -> "Port must be between 1024 and 65535"
   | Used_by_other_instance (port, instance) ->
       Printf.sprintf "Port %d is used by instance '%s'" port instance
-  | Port_in_use port -> Printf.sprintf "Port %d is in use" port
+  | Port_in_use (port, Some proc) ->
+      Printf.sprintf "Port %d is used by process '%s'" port proc
+  | Port_in_use (port, None) -> Printf.sprintf "Port %d is in use" port
 
 (** Validate a port address.
     @param addr The address in host:port format
@@ -114,15 +144,17 @@ let validate_addr ~addr ?exclude_instance ~example () =
         in
         match find_instance port with
         | Some instance -> Error (Used_by_other_instance (port, instance))
-        | None ->
+        | None -> (
             let owned_by_self =
               match exclude_instance with
               | Some inst -> port_owned_by_instance ~instance:inst port
               | None -> false
             in
-            if is_port_in_use port && not owned_by_self then
-              Error (Port_in_use port)
-            else Ok ())
+            if owned_by_self then Ok ()
+            else
+              match get_port_process port with
+              | Some proc_opt -> Error (Port_in_use (port, proc_opt))
+              | None -> Ok ()))
 
 (** Validate an RPC address. *)
 let validate_rpc_addr ?exclude_instance addr =
