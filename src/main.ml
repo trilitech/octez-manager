@@ -1586,9 +1586,9 @@ let instance_term =
                         Format.printf "  P2P addr: %s@." net_addr
                   | _ -> ()) ;
                   (* Extra args for all roles *)
-                  let extra_args = String.concat " " svc.extra_args in
-                  if extra_args <> "" then
-                    Format.printf "  Extra args: %s@." extra_args ;
+                  let extra_args_str = String.concat " " svc.extra_args in
+                  if extra_args_str <> "" then
+                    Format.printf "  Extra args: %s@." extra_args_str ;
                   (* Dependencies *)
                   if svc.depends_on <> None then
                     Format.printf
@@ -1598,15 +1598,277 @@ let instance_term =
                     Format.printf
                       "  Dependents: %s@."
                       (String.concat ", " svc.dependents) ;
-                  (* For now, just show a message that edit is not yet fully implemented *)
+                  (* Interactive edit based on role *)
                   Format.printf
-                    "@.@[<v>Edit functionality is partially implemented.@,\
-                     For now, you can manually edit the service configuration.@,\
-                     @,\
-                     To restart the stopped instances:@,\
-                    \  octez-manager instance %s start@]@."
-                    inst ;
-                  `Ok ())))
+                    "@.Enter new values (press Enter to keep current):@." ;
+                  let result =
+                    match role with
+                    | "node" ->
+                        (* Node: edit RPC addr, P2P addr, extra args *)
+                        let new_rpc =
+                          prompt_input
+                            ~default:(svc.rpc_addr, svc.rpc_addr)
+                            "RPC address"
+                          |> Option.value ~default:svc.rpc_addr
+                        in
+                        let new_net =
+                          prompt_input
+                            ~default:(svc.net_addr, svc.net_addr)
+                            "P2P address"
+                          |> Option.value ~default:svc.net_addr
+                        in
+                        let new_extra =
+                          prompt_input
+                            ~default:(extra_args_str, extra_args_str)
+                            "Extra args"
+                          |> Option.value ~default:extra_args_str
+                        in
+                        let new_extra_args =
+                          String.split_on_char ' ' new_extra
+                          |> List.map String.trim
+                          |> List.filter (( <> ) "")
+                        in
+                        (* Validate ports *)
+                        let ( let* ) = Result.bind in
+                        let* new_rpc =
+                          validate_port_addr
+                            ~label:"RPC address"
+                            ~addr:new_rpc
+                            ~default:svc.rpc_addr
+                            ~exclude_instance:inst
+                            ()
+                        in
+                        let* new_net =
+                          validate_port_addr
+                            ~label:"P2P address"
+                            ~addr:new_net
+                            ~default:svc.net_addr
+                            ~exclude_instance:inst
+                            ()
+                        in
+                        let req : Installer_types.node_request =
+                          {
+                            instance = inst;
+                            network = svc.network;
+                            history_mode = svc.history_mode;
+                            data_dir = Some svc.data_dir;
+                            rpc_addr = new_rpc;
+                            net_addr = new_net;
+                            service_user = svc.service_user;
+                            app_bin_dir = svc.app_bin_dir;
+                            extra_args = new_extra_args;
+                            auto_enable = true;
+                            logging_mode = svc.logging_mode;
+                            bootstrap = Installer_types.Genesis;
+                            preserve_data = true;
+                            snapshot_no_check = false;
+                          }
+                        in
+                        Result.map_error
+                          (fun (`Msg s) -> s)
+                          (Installer.install_node req)
+                    | "baker" ->
+                        (* Baker: edit delegates, LB vote, extra args *)
+                        let delegates = lookup "OCTEZ_BAKER_DELEGATES_CSV" in
+                        let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
+                        let new_delegates =
+                          prompt_input
+                            ~default:(delegates, delegates)
+                            "Delegates (comma-separated)"
+                          |> Option.value ~default:delegates
+                        in
+                        let new_lb_vote =
+                          prompt_input
+                            ~default:(lb_vote, lb_vote)
+                            "LB vote (pass/on/off)"
+                          |> Option.value ~default:lb_vote
+                        in
+                        let new_extra =
+                          prompt_input
+                            ~default:(extra_args_str, extra_args_str)
+                            "Extra args"
+                          |> Option.value ~default:extra_args_str
+                        in
+                        let new_extra_args =
+                          String.split_on_char ' ' new_extra
+                          |> List.map String.trim
+                          |> List.filter (( <> ) "")
+                        in
+                        let delegates_list =
+                          String.split_on_char ',' new_delegates
+                          |> List.map String.trim
+                          |> List.filter (( <> ) "")
+                        in
+                        let node_mode =
+                          match svc.depends_on with
+                          | Some node_inst ->
+                              Installer_types.Local_instance node_inst
+                          | None ->
+                              let ep = lookup "OCTEZ_NODE_ENDPOINT" in
+                              Installer_types.Remote_endpoint ep
+                        in
+                        let dal_config =
+                          match
+                            String.lowercase_ascii (lookup "OCTEZ_DAL_CONFIG")
+                          with
+                          | "disabled" -> Installer_types.Dal_disabled
+                          | "" -> Installer_types.Dal_auto
+                          | ep -> Installer_types.Dal_endpoint ep
+                        in
+                        let req : Installer_types.baker_request =
+                          {
+                            instance = inst;
+                            node_mode;
+                            dal_config;
+                            base_dir = Some (lookup "OCTEZ_BAKER_BASE_DIR");
+                            delegates = delegates_list;
+                            liquidity_baking_vote =
+                              (if new_lb_vote = "" then None
+                               else Some new_lb_vote);
+                            service_user = svc.service_user;
+                            app_bin_dir = svc.app_bin_dir;
+                            logging_mode = svc.logging_mode;
+                            extra_args = new_extra_args;
+                            auto_enable = true;
+                            preserve_data = true;
+                          }
+                        in
+                        Result.map_error
+                          (fun (`Msg s) -> s)
+                          (Installer.install_baker req)
+                    | "accuser" ->
+                        (* Accuser: edit extra args *)
+                        let new_extra =
+                          prompt_input
+                            ~default:(extra_args_str, extra_args_str)
+                            "Extra args"
+                          |> Option.value ~default:extra_args_str
+                        in
+                        let new_extra_args =
+                          String.split_on_char ' ' new_extra
+                          |> List.map String.trim
+                          |> List.filter (( <> ) "")
+                        in
+                        let node_mode =
+                          match svc.depends_on with
+                          | Some node_inst ->
+                              Installer_types.Local_instance node_inst
+                          | None ->
+                              let ep = lookup "OCTEZ_NODE_ENDPOINT" in
+                              Installer_types.Remote_endpoint ep
+                        in
+                        let req : Installer_types.accuser_request =
+                          {
+                            instance = inst;
+                            node_mode;
+                            base_dir = Some (lookup "OCTEZ_CLIENT_BASE_DIR");
+                            service_user = svc.service_user;
+                            app_bin_dir = svc.app_bin_dir;
+                            logging_mode = svc.logging_mode;
+                            extra_args = new_extra_args;
+                            auto_enable = true;
+                            preserve_data = true;
+                          }
+                        in
+                        Result.map_error
+                          (fun (`Msg s) -> s)
+                          (Installer.install_accuser req)
+                    | "dal-node" | "dal" ->
+                        (* DAL node: edit RPC addr, P2P addr, extra args *)
+                        let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
+                        let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
+                        let new_rpc =
+                          prompt_input
+                            ~default:(dal_rpc, dal_rpc)
+                            "DAL RPC address"
+                          |> Option.value ~default:dal_rpc
+                        in
+                        let new_net =
+                          prompt_input
+                            ~default:(dal_net, dal_net)
+                            "DAL P2P address"
+                          |> Option.value ~default:dal_net
+                        in
+                        let new_extra =
+                          prompt_input
+                            ~default:(extra_args_str, extra_args_str)
+                            "Extra args"
+                          |> Option.value ~default:extra_args_str
+                        in
+                        let new_extra_args =
+                          String.split_on_char ' ' new_extra
+                          |> List.map String.trim
+                          |> List.filter (( <> ) "")
+                        in
+                        (* Validate ports *)
+                        let ( let* ) = Result.bind in
+                        let* new_rpc =
+                          validate_port_addr
+                            ~label:"DAL RPC address"
+                            ~addr:new_rpc
+                            ~default:dal_rpc
+                            ~exclude_instance:inst
+                            ()
+                        in
+                        let* new_net =
+                          validate_port_addr
+                            ~label:"DAL P2P address"
+                            ~addr:new_net
+                            ~default:dal_net
+                            ~exclude_instance:inst
+                            ()
+                        in
+                        let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
+                        let client_base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+                        let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+                        let req : Installer_types.daemon_request =
+                          {
+                            role = "dal-node";
+                            instance = inst;
+                            network = svc.network;
+                            history_mode = svc.history_mode;
+                            data_dir = dal_data_dir;
+                            rpc_addr = new_rpc;
+                            net_addr = new_net;
+                            service_user = svc.service_user;
+                            app_bin_dir = svc.app_bin_dir;
+                            logging_mode = svc.logging_mode;
+                            service_args = new_extra_args;
+                            extra_env =
+                              [
+                                ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
+                                ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+                                ("OCTEZ_DAL_DATA_DIR", dal_data_dir);
+                                ("OCTEZ_DAL_RPC_ADDR", new_rpc);
+                                ("OCTEZ_DAL_NET_ADDR", new_net);
+                              ];
+                            extra_paths = [client_base_dir; dal_data_dir];
+                            auto_enable = true;
+                            depends_on = svc.depends_on;
+                            preserve_data = true;
+                          }
+                        in
+                        Result.map_error
+                          (fun (`Msg s) -> s)
+                          (Installer.install_daemon req)
+                    | _ ->
+                        Error
+                          (Printf.sprintf
+                             "Edit not supported for role '%s'"
+                             role)
+                  in
+                  match result with
+                  | Ok _service ->
+                      Format.printf
+                        "@.Instance '%s' updated successfully.@."
+                        inst ;
+                      Format.printf
+                        "@.To restart the stopped instances:@.  octez-manager \
+                         instance %s start@."
+                        inst ;
+                      `Ok ()
+                  | Error msg ->
+                      cmdliner_error (Printf.sprintf "Edit failed: %s" msg))))
   in
   Term.(ret (const run $ instance $ action $ delete_data_dir))
 
