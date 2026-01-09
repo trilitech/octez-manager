@@ -440,6 +440,86 @@ let prompt_with_completion question completions =
     LNoise.set_hints_callback (fun _ -> None) ;
     res
 
+(* Prompt with linenoise for comma-separated multi-value autocompletion.
+   Each value after a comma gets its own completion. *)
+let prompt_with_multi_completion question completions =
+  if not (is_interactive ()) then None
+  else
+    (* Pre-compute lowercase versions for efficient matching *)
+    let completions_lower =
+      List.map (fun c -> (c, String.lowercase_ascii c)) completions
+    in
+    (* Helper to get prefix (text after last comma) and already-entered values *)
+    let split_at_last_comma line =
+      match String.rindex_opt line ',' with
+      | None -> ("", String.trim line)
+      | Some idx ->
+          let before = String.sub line 0 (idx + 1) in
+          let after =
+            String.trim
+              (String.sub line (idx + 1) (String.length line - idx - 1))
+          in
+          (before, after)
+    in
+    (* Set up completions - complete based on text after last comma *)
+    LNoise.set_completion_callback (fun line_so_far ln_completions ->
+        let before, current = split_at_last_comma line_so_far in
+        let prefix = String.lowercase_ascii current in
+        (* Get already-selected values to exclude them *)
+        let already_selected =
+          String.split_on_char ',' before
+          |> List.map (fun s -> String.lowercase_ascii (String.trim s))
+          |> List.filter (fun s -> s <> "")
+        in
+        List.iter
+          (fun (candidate, candidate_lower) ->
+            if
+              String.starts_with ~prefix candidate_lower
+              && not (List.mem candidate_lower already_selected)
+            then LNoise.add_completion ln_completions (before ^ candidate))
+          completions_lower) ;
+    (* Set hints - show hint based on text after last comma *)
+    LNoise.set_hints_callback (fun line_so_far ->
+        let _before, current = split_at_last_comma line_so_far in
+        let prefix = String.lowercase_ascii current in
+        (* Get already-selected values to exclude them *)
+        let already_selected =
+          String.split_on_char ',' line_so_far
+          |> List.map (fun s -> String.lowercase_ascii (String.trim s))
+          |> List.filter (fun s -> s <> "")
+        in
+        match
+          List.find_opt
+            (fun (_, candidate_lower) ->
+              String.starts_with ~prefix candidate_lower
+              && not (List.mem candidate_lower already_selected))
+            completions_lower
+        with
+        | Some (hint, _) when String.length hint > String.length current ->
+            Some
+              ( String.sub
+                  hint
+                  (String.length current)
+                  (String.length hint - String.length current),
+                LNoise.Yellow,
+                false )
+        | _ -> None) ;
+    (* Read a line, then clear callbacks *)
+    let res =
+      match LNoise.linenoise (question ^ ": ") with
+      | exception Sys.Break ->
+          prerr_endline "" ;
+          exit 130
+      | None -> None
+      | Some line ->
+          let trimmed = String.trim line in
+          if String.equal trimmed "" then None else Some trimmed
+    in
+    (* Clear callbacks *)
+    LNoise.set_completion_callback (fun _ _ -> ()) ;
+    LNoise.set_hints_callback (fun _ -> None) ;
+    res
+
 (** Validate a port address, re-prompting in interactive mode if invalid.
     @param label Label for error messages (e.g., "RPC address")
     @param addr The address to validate
@@ -2003,7 +2083,7 @@ let instance_term =
                               "  Known delegates: %s@."
                               (String.concat ", " known_delegates) ;
                             match
-                              prompt_with_completion
+                              prompt_with_multi_completion
                                 "Delegates (comma-separated)"
                                 known_delegates
                             with
