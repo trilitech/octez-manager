@@ -794,6 +794,73 @@ let open_baker_run_help ~app_bin_dir ~mode ~initial_args ~on_apply =
         open_modal ~title ~options:filtered ~initial_args ~on_apply
     | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
 
+let excluded_accuser_options =
+  ["--help"; "-help"; "--version"; "--base-dir"; "--endpoint"]
+
+let load_accuser_options ~binary =
+  let cache_key = Printf.sprintf "%s:accuser" binary in
+  match Cache.get_safe_keyed_cached cache cache_key with
+  | Some opts -> Ok opts
+  | None ->
+      let* output = run_help_cmd binary ["run"; "accuser"; "--help"] in
+      let opts = parse_help_baker (strip_ansi output) in
+      if opts = [] then
+        Error (`Msg "No options parsed from accuser help output")
+      else (
+        Cache.set_safe_keyed cache cache_key opts ;
+        Ok opts)
+
+let open_accuser_run_help ~app_bin_dir ~initial_args ~on_apply =
+  let app_bin_dir = String.trim app_bin_dir in
+  let title = "Accuser Flags" in
+  if app_bin_dir = "" then
+    Modal_helpers.show_error ~title "Octez bin directory is empty"
+  else
+    let binary = Filename.concat app_bin_dir "octez-baker" in
+    match load_accuser_options ~binary with
+    | Ok options ->
+        let filtered =
+          List.filter
+            (fun opt ->
+              not (is_excluded_option opt ~excluded:excluded_accuser_options))
+            options
+        in
+        open_modal ~title ~options:filtered ~initial_args ~on_apply
+    | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
+
+let excluded_dal_options =
+  ["--help"; "-help"; "--version"; "--base-dir"; "--endpoint"; "--dal-node"]
+
+let load_dal_options ~binary =
+  let cache_key = Printf.sprintf "%s:dal" binary in
+  match Cache.get_safe_keyed_cached cache cache_key with
+  | Some opts -> Ok opts
+  | None ->
+      let* output = run_help_cmd binary ["run"; "dal"; "--help"] in
+      let opts = parse_help_baker (strip_ansi output) in
+      if opts = [] then Error (`Msg "No options parsed from DAL help output")
+      else (
+        Cache.set_safe_keyed cache cache_key opts ;
+        Ok opts)
+
+let open_dal_run_help ~app_bin_dir ~initial_args ~on_apply =
+  let app_bin_dir = String.trim app_bin_dir in
+  let title = "DAL Flags" in
+  if app_bin_dir = "" then
+    Modal_helpers.show_error ~title "Octez bin directory is empty"
+  else
+    let binary = Filename.concat app_bin_dir "octez-baker" in
+    match load_dal_options ~binary with
+    | Ok options ->
+        let filtered =
+          List.filter
+            (fun opt ->
+              not (is_excluded_option opt ~excluded:excluded_dal_options))
+            options
+        in
+        open_modal ~title ~options:filtered ~initial_args ~on_apply
+    | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
+
 module For_tests = struct
   let parse_help = parse_help_node
 
