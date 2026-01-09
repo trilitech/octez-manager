@@ -3010,6 +3010,74 @@ let instance_name_invalid_chars () =
       | Error (`Msg _) -> ())
     invalid_names
 
+(* ============================================================================
+   Log viewer tests
+   ============================================================================ *)
+
+let assert_contains ~msg cmd needle =
+  if not (string_contains ~needle cmd) then
+    Alcotest.failf "%s: expected '%s' in command:\n%s" msg needle cmd
+
+let log_viewer_journalctl_cmd_contains_cat () =
+  (* Test that journalctl command uses -o cat for clean output *)
+  match
+    Log_viewer.get_log_cmd ~role:"node" ~instance:"test" ~source:Journald
+  with
+  | Ok cmd -> assert_contains ~msg:"-o cat" cmd "-o cat"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
+let log_viewer_journalctl_cmd_contains_n_1000 () =
+  (* Test that journalctl command shows 1000 lines of history *)
+  match
+    Log_viewer.get_log_cmd ~role:"node" ~instance:"test" ~source:Journald
+  with
+  | Ok cmd -> assert_contains ~msg:"-n 1000" cmd "-n 1000"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
+let log_viewer_journalctl_cmd_colorizes_error () =
+  (* Test that ERROR is colorized in red (ANSI 91) *)
+  match
+    Log_viewer.get_log_cmd ~role:"node" ~instance:"test" ~source:Journald
+  with
+  | Ok cmd ->
+      assert_contains ~msg:"ERROR" cmd "ERROR" ;
+      assert_contains ~msg:"91m (bright red)" cmd "91m"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
+let log_viewer_journalctl_cmd_colorizes_warning () =
+  (* Test that WARNING is colorized in magenta (ANSI 35) *)
+  match
+    Log_viewer.get_log_cmd ~role:"node" ~instance:"test" ~source:Journald
+  with
+  | Ok cmd ->
+      assert_contains ~msg:"WARNING" cmd "WARNING" ;
+      assert_contains ~msg:"35m (magenta)" cmd "35m"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
+let log_viewer_journalctl_cmd_redirects_stderr () =
+  (* Test that stderr is redirected to suppress warnings *)
+  match
+    Log_viewer.get_log_cmd ~role:"node" ~instance:"test" ~source:Journald
+  with
+  | Ok cmd -> assert_contains ~msg:"stderr redirect" cmd "2>/dev/null"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
+let log_viewer_journalctl_unit_name () =
+  (* Test that unit name is correctly formed *)
+  match
+    Log_viewer.get_log_cmd ~role:"node" ~instance:"my-node" ~source:Journald
+  with
+  | Ok cmd -> assert_contains ~msg:"unit name" cmd "octez-node@my-node"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
+let log_viewer_journalctl_baker_unit_name () =
+  (* Test baker unit name *)
+  match
+    Log_viewer.get_log_cmd ~role:"baker" ~instance:"my-baker" ~source:Journald
+  with
+  | Ok cmd -> assert_contains ~msg:"baker unit name" cmd "octez-baker@my-baker"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -3476,5 +3544,36 @@ let () =
         [
           Alcotest.test_case "valid chars" `Quick instance_name_valid_chars;
           Alcotest.test_case "invalid chars" `Quick instance_name_invalid_chars;
+        ] );
+      ( "log_viewer",
+        [
+          Alcotest.test_case
+            "journalctl -o cat"
+            `Quick
+            log_viewer_journalctl_cmd_contains_cat;
+          Alcotest.test_case
+            "journalctl -n 1000"
+            `Quick
+            log_viewer_journalctl_cmd_contains_n_1000;
+          Alcotest.test_case
+            "colorize ERROR"
+            `Quick
+            log_viewer_journalctl_cmd_colorizes_error;
+          Alcotest.test_case
+            "colorize WARNING"
+            `Quick
+            log_viewer_journalctl_cmd_colorizes_warning;
+          Alcotest.test_case
+            "stderr redirect"
+            `Quick
+            log_viewer_journalctl_cmd_redirects_stderr;
+          Alcotest.test_case
+            "node unit name"
+            `Quick
+            log_viewer_journalctl_unit_name;
+          Alcotest.test_case
+            "baker unit name"
+            `Quick
+            log_viewer_journalctl_baker_unit_name;
         ] );
     ]
