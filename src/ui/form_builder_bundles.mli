@@ -71,6 +71,7 @@ val client_fields_with_autoname :
   set_core:(Form_builder_common.core_service_config -> 'model -> 'model) ->
   get_client:('model -> Form_builder_common.client_config) ->
   set_client:(Form_builder_common.client_config -> 'model -> 'model) ->
+  ?edit_mode:bool ->
   unit ->
   'model Form_builder.field list
 
