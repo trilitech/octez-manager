@@ -83,7 +83,10 @@ module For_tests : sig
     instance:string -> (unit, [`Msg of string]) result
 
   val validate_instance_name :
-    instance:string -> (unit, [`Msg of string]) result
+    ?allow_existing:bool ->
+    instance:string ->
+    unit ->
+    (unit, [`Msg of string]) result
 
   val ensure_logging_base_directory :
     owner:string ->
