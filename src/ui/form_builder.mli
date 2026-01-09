@@ -60,7 +60,9 @@ type 'model pre_submit_modal_config =
 type 'model spec = {
   title : string;
   initial_model : unit -> 'model;  (** Called to get fresh initial values *)
-  fields : 'model field list;
+  fields : 'model -> 'model field list;
+      (** Dynamic field generation - called with current model to allow
+          conditional fields (e.g., read-only in edit mode) *)
       (** Optional initialization hook called once when page is first loaded.
       Use for prefetching data, starting background tasks, etc. *)
   on_init : ('model -> unit) option;
