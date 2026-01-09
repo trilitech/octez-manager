@@ -419,9 +419,9 @@ let validate_instance_name_unique ~instance =
         svc.Service.role
   | None -> Ok ()
 
-let validate_instance_name ~instance =
+let validate_instance_name ?(allow_existing = false) ~instance () =
   let* () = validate_instance_name_chars ~instance in
-  validate_instance_name_unique ~instance
+  if allow_existing then Ok () else validate_instance_name_unique ~instance
 
 let resolve_from_data_dir data_dir =
   let ( let* ) = Result.bind in
@@ -478,7 +478,12 @@ let resolve_from_data_dir data_dir =
 let install_node ?(quiet = false) ?on_log (request : node_request) =
   let log msg = match on_log with Some f -> f msg | None -> () in
   log "Validating instance name...\n" ;
-  let* () = validate_instance_name ~instance:request.instance in
+  let* () =
+    validate_instance_name
+      ~allow_existing:request.preserve_data
+      ~instance:request.instance
+      ()
+  in
   log "Resolving network...\n" ;
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
@@ -648,7 +653,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   Ok service
 
 let install_daemon ?(quiet = false) (request : daemon_request) =
-  let* () = validate_instance_name ~instance:request.instance in
+  let* () = validate_instance_name ~instance:request.instance () in
   let logging_mode =
     prepare_logging
       ~instance:request.instance

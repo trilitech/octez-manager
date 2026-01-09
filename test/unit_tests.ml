@@ -2125,7 +2125,7 @@ let installer_instance_name_full_validation () =
       let () = expect_ok (Service_registry.write node_service) in
       (* Test that validate_instance_name checks both chars and uniqueness *)
       (* 1. Invalid characters should fail before uniqueness check *)
-      (match Installer.For_tests.validate_instance_name ~instance:"théo" with
+      (match Installer.For_tests.validate_instance_name ~instance:"théo" () with
       | Ok () -> Alcotest.fail "Instance name with invalid chars was accepted"
       | Error (`Msg msg) ->
           Alcotest.(check bool)
@@ -2133,7 +2133,7 @@ let installer_instance_name_full_validation () =
             true
             (string_contains ~needle:"invalid characters" msg)) ;
       (* 2. Duplicate valid name should fail with uniqueness error *)
-      (match Installer.For_tests.validate_instance_name ~instance:"foo" with
+      (match Installer.For_tests.validate_instance_name ~instance:"foo" () with
       | Ok () -> Alcotest.fail "Duplicate instance name was accepted"
       | Error (`Msg msg) ->
           Alcotest.(check bool)
@@ -2141,7 +2141,7 @@ let installer_instance_name_full_validation () =
             true
             (string_contains ~needle:"already in use" msg)) ;
       (* 3. Valid unique name should succeed *)
-      match Installer.For_tests.validate_instance_name ~instance:"bar" with
+      match Installer.For_tests.validate_instance_name ~instance:"bar" () with
       | Ok () -> ()
       | Error (`Msg msg) ->
           Alcotest.failf "Valid unique name was rejected: %s" msg)
