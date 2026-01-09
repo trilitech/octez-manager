@@ -484,19 +484,21 @@ let spec =
               ()
         in
         [
-          (* Instance name with auto-update of base_dir *)
+          (* Instance name with auto-update of base_dir (only in create mode) *)
           validated_text
             ~label:"Instance Name"
             ~get:(fun m -> m.core.instance_name)
             ~set:(fun instance_name m ->
               let old = m.core.instance_name in
               let default_dir = Common.default_role_dir "baker" instance_name in
+              (* In edit mode, never auto-change base_dir - data is already there *)
               let keep_base_dir =
-                String.trim m.client.base_dir <> ""
-                && not
-                     (String.equal
-                        m.client.base_dir
-                        (Common.default_role_dir "baker" old))
+                m.edit_mode
+                || String.trim m.client.base_dir <> ""
+                   && not
+                        (String.equal
+                           m.client.base_dir
+                           (Common.default_role_dir "baker" old))
               in
               let new_core = {m.core with instance_name} in
               let new_client =

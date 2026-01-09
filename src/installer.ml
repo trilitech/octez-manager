@@ -611,6 +611,14 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   log "Reowning runtime paths...\n" ;
   let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
   log "Creating service record...\n" ;
+  (* In edit mode, preserve existing dependents list *)
+  let existing_dependents =
+    if request.preserve_data then
+      match Service_registry.find ~instance:request.instance with
+      | Ok (Some existing) -> existing.Service.dependents
+      | _ -> []
+    else []
+  in
   let service =
     Service.make
       ~instance:request.instance
@@ -628,6 +636,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~snapshot_network_slug:snapshot_meta.network_slug
       ~snapshot_no_check:snapshot_meta.no_check
       ~extra_args:request.extra_args
+      ~dependents:existing_dependents
       ()
   in
   log "Installing systemd unit...\n" ;
@@ -763,6 +772,14 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
   let* () =
     reown_runtime_paths ~owner ~group ~paths:directories ~logging_mode
   in
+  (* In edit mode, preserve existing dependents list *)
+  let existing_dependents =
+    if request.preserve_data then
+      match Service_registry.find ~instance:request.instance with
+      | Ok (Some existing) -> existing.Service.dependents
+      | _ -> []
+    else []
+  in
   let service =
     Service.make
       ~instance:request.instance
@@ -777,6 +794,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~logging_mode
       ~extra_args:request.service_args
       ~depends_on:request.depends_on
+      ~dependents:existing_dependents
       ()
   in
   let* () = Service_registry.write service in
@@ -1295,6 +1313,40 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
             | Error _ -> Ok () (* Skip if can't read env *))
           (Ok ())
           old_svc.dependents
+      in
+      (* Remove old instance from parent's dependents list *)
+      let* () =
+        match old_svc.depends_on with
+        | None -> Ok ()
+        | Some parent_inst -> (
+            match Service_registry.find ~instance:parent_inst with
+            | Ok (Some parent) ->
+                let updated_deps =
+                  List.filter (( <> ) old_instance) parent.dependents
+                in
+                let updated_parent = {parent with dependents = updated_deps} in
+                Service_registry.write updated_parent
+            | _ -> Ok ())
+      in
+      (* Also check if old instance was in DAL node's dependents via env file *)
+      let* () =
+        match Node_env.read ~inst:old_instance with
+        | Ok pairs -> (
+            let dal_inst =
+              List.assoc_opt "OCTEZ_DAL_INSTANCE" pairs
+              |> Option.map String.trim |> Option.value ~default:""
+            in
+            if dal_inst = "" then Ok ()
+            else
+              match Service_registry.find ~instance:dal_inst with
+              | Ok (Some dal_svc) ->
+                  let updated_deps =
+                    List.filter (( <> ) old_instance) dal_svc.dependents
+                  in
+                  let updated_dal = {dal_svc with dependents = updated_deps} in
+                  Service_registry.write updated_dal
+              | _ -> Ok ())
+        | Error _ -> Ok ()
       in
       (* Transfer dependents to new service (deduplicate) *)
       let* new_svc_opt = Service_registry.find ~instance:new_instance in
