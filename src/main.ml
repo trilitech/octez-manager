@@ -1980,11 +1980,35 @@ let instance_term =
                         (* Baker: edit delegates, LB vote, extra args *)
                         let delegates = lookup "OCTEZ_BAKER_DELEGATES_CSV" in
                         let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
+                        let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
+                        (* Get known delegate addresses for completion *)
+                        let known_delegates =
+                          if base_dir <> "" then
+                            match
+                              Keys_reader.read_public_key_hashes ~base_dir
+                            with
+                            | Ok keys ->
+                                List.map (fun k -> k.Keys_reader.value) keys
+                            | Error _ -> []
+                          else []
+                        in
                         let new_delegates =
-                          prompt_input
-                            ~default:(delegates, delegates)
-                            "Delegates (comma-separated)"
-                          |> Option.value ~default:delegates
+                          if known_delegates = [] then
+                            prompt_input
+                              ~default:(delegates, delegates)
+                              "Delegates (comma-separated)"
+                            |> Option.value ~default:delegates
+                          else (
+                            Format.printf
+                              "  Known delegates: %s@."
+                              (String.concat ", " known_delegates) ;
+                            match
+                              prompt_with_completion
+                                "Delegates (comma-separated)"
+                                known_delegates
+                            with
+                            | Some "" | None -> delegates
+                            | Some v -> String.trim v)
                         in
                         let new_lb_vote =
                           let completions = ["pass"; "on"; "off"] in
@@ -2013,26 +2037,126 @@ let instance_term =
                           |> List.map String.trim
                           |> List.filter (( <> ) "")
                         in
-                        let node_mode =
+                        (* Node instance selection with completion *)
+                        let current_node =
                           match svc.depends_on with
-                          | Some node_inst ->
-                              Installer_types.Local_instance node_inst
-                          | None ->
-                              let ep = lookup "OCTEZ_NODE_ENDPOINT" in
-                              Installer_types.Remote_endpoint ep
+                          | Some inst -> inst
+                          | None -> lookup "OCTEZ_NODE_ENDPOINT"
                         in
-                        let dal_config =
-                          match
-                            String.lowercase_ascii (lookup "OCTEZ_DAL_CONFIG")
-                          with
-                          | "disabled" -> Installer_types.Dal_disabled
-                          | "" -> Installer_types.Dal_auto
-                          | ep -> Installer_types.Dal_endpoint ep
+                        let node_services =
+                          match Service_registry.list () with
+                          | Ok svcs ->
+                              List.filter
+                                (fun (s : Service.t) -> s.role = "node")
+                                svcs
+                          | Error _ -> []
                         in
-                        let dal_node =
-                          match lookup "OCTEZ_DAL_INSTANCE" with
-                          | "" -> None
-                          | inst -> Some inst
+                        let node_names =
+                          List.map
+                            (fun (s : Service.t) -> s.instance)
+                            node_services
+                        in
+                        let new_node =
+                          if node_names = [] then current_node
+                          else (
+                            Format.printf
+                              "  Available nodes: %s@."
+                              (String.concat ", " node_names) ;
+                            match
+                              prompt_with_completion "Node instance" node_names
+                            with
+                            | Some "" | None -> current_node
+                            | Some v -> String.trim v)
+                        in
+                        let node_mode =
+                          if List.mem new_node node_names then
+                            Installer_types.Local_instance new_node
+                          else Installer_types.Remote_endpoint new_node
+                        in
+                        (* DAL node selection with completion *)
+                        let current_dal = lookup "OCTEZ_DAL_INSTANCE" in
+                        let current_dal_config = lookup "OCTEZ_DAL_CONFIG" in
+                        let dal_services =
+                          match Service_registry.list () with
+                          | Ok svcs ->
+                              List.filter
+                                (fun (s : Service.t) ->
+                                  s.role = "dal-node" || s.role = "dal")
+                                svcs
+                          | Error _ -> []
+                        in
+                        let dal_names =
+                          List.map
+                            (fun (s : Service.t) -> s.instance)
+                            dal_services
+                        in
+                        let dal_config, dal_node =
+                          if dal_names = [] then
+                            (* No DAL nodes, keep current config *)
+                            let cfg =
+                              match
+                                String.lowercase_ascii current_dal_config
+                              with
+                              | "disabled" -> Installer_types.Dal_disabled
+                              | "" -> Installer_types.Dal_auto
+                              | ep -> Installer_types.Dal_endpoint ep
+                            in
+                            ( cfg,
+                              if current_dal = "" then None
+                              else Some current_dal )
+                          else (
+                            Format.printf
+                              "  Available DAL nodes: %s@."
+                              (String.concat ", " ("none" :: dal_names)) ;
+                            match
+                              prompt_with_completion
+                                "DAL node"
+                                ("none" :: "auto" :: dal_names)
+                            with
+                            | Some "" | None ->
+                                if current_dal <> "" then
+                                  ( Installer_types.Dal_endpoint
+                                      (Installer.endpoint_of_rpc
+                                         (match
+                                            List.find_opt
+                                              (fun (s : Service.t) ->
+                                                s.instance = current_dal)
+                                              dal_services
+                                          with
+                                         | Some s -> s.rpc_addr
+                                         | None -> "127.0.0.1:10732")),
+                                    Some current_dal )
+                                else
+                                  let cfg =
+                                    match
+                                      String.lowercase_ascii current_dal_config
+                                    with
+                                    | "disabled" -> Installer_types.Dal_disabled
+                                    | "" -> Installer_types.Dal_auto
+                                    | ep -> Installer_types.Dal_endpoint ep
+                                  in
+                                  (cfg, None)
+                            | Some "none" -> (Installer_types.Dal_disabled, None)
+                            | Some "auto" -> (Installer_types.Dal_auto, None)
+                            | Some selected ->
+                                if List.mem selected dal_names then
+                                  let rpc =
+                                    match
+                                      List.find_opt
+                                        (fun (s : Service.t) ->
+                                          s.instance = selected)
+                                        dal_services
+                                    with
+                                    | Some s -> s.rpc_addr
+                                    | None -> "127.0.0.1:10732"
+                                  in
+                                  ( Installer_types.Dal_endpoint
+                                      (Installer.endpoint_of_rpc rpc),
+                                    Some selected )
+                                else
+                                  ( Installer_types.Dal_endpoint
+                                      (Installer.endpoint_of_rpc selected),
+                                    None ))
                         in
                         let req : Installer_types.baker_request =
                           {
@@ -2057,7 +2181,43 @@ let instance_term =
                           (fun (`Msg s) -> s)
                           (Installer.install_baker req)
                     | "accuser" ->
-                        (* Accuser: edit extra args *)
+                        (* Accuser: edit node instance, extra args *)
+                        (* Node instance selection with completion *)
+                        let current_node =
+                          match svc.depends_on with
+                          | Some inst -> inst
+                          | None -> lookup "OCTEZ_NODE_ENDPOINT"
+                        in
+                        let node_services =
+                          match Service_registry.list () with
+                          | Ok svcs ->
+                              List.filter
+                                (fun (s : Service.t) -> s.role = "node")
+                                svcs
+                          | Error _ -> []
+                        in
+                        let node_names =
+                          List.map
+                            (fun (s : Service.t) -> s.instance)
+                            node_services
+                        in
+                        let new_node =
+                          if node_names = [] then current_node
+                          else (
+                            Format.printf
+                              "  Available nodes: %s@."
+                              (String.concat ", " node_names) ;
+                            match
+                              prompt_with_completion "Node instance" node_names
+                            with
+                            | Some "" | None -> current_node
+                            | Some v -> String.trim v)
+                        in
+                        let node_mode =
+                          if List.mem new_node node_names then
+                            Installer_types.Local_instance new_node
+                          else Installer_types.Remote_endpoint new_node
+                        in
                         let new_extra =
                           prompt_input
                             ~default:(extra_args_str, extra_args_str)
@@ -2068,14 +2228,6 @@ let instance_term =
                           String.split_on_char ' ' new_extra
                           |> List.map String.trim
                           |> List.filter (( <> ) "")
-                        in
-                        let node_mode =
-                          match svc.depends_on with
-                          | Some node_inst ->
-                              Installer_types.Local_instance node_inst
-                          | None ->
-                              let ep = lookup "OCTEZ_NODE_ENDPOINT" in
-                              Installer_types.Remote_endpoint ep
                         in
                         let req : Installer_types.accuser_request =
                           {
@@ -2094,7 +2246,56 @@ let instance_term =
                           (fun (`Msg s) -> s)
                           (Installer.install_accuser req)
                     | "dal-node" | "dal" ->
-                        (* DAL node: edit RPC addr, P2P addr, extra args *)
+                        (* DAL node: edit node instance, RPC addr, P2P addr, extra args *)
+                        (* Node instance selection with completion *)
+                        let current_node =
+                          match svc.depends_on with
+                          | Some inst -> inst
+                          | None -> lookup "OCTEZ_NODE_ENDPOINT"
+                        in
+                        let node_services =
+                          match Service_registry.list () with
+                          | Ok svcs ->
+                              List.filter
+                                (fun (s : Service.t) -> s.role = "node")
+                                svcs
+                          | Error _ -> []
+                        in
+                        let node_names =
+                          List.map
+                            (fun (s : Service.t) -> s.instance)
+                            node_services
+                        in
+                        let new_node =
+                          if node_names = [] then current_node
+                          else (
+                            Format.printf
+                              "  Available nodes: %s@."
+                              (String.concat ", " node_names) ;
+                            match
+                              prompt_with_completion "Node instance" node_names
+                            with
+                            | Some "" | None -> current_node
+                            | Some v -> String.trim v)
+                        in
+                        let new_depends_on, new_node_endpoint =
+                          if List.mem new_node node_names then
+                            (* Local node instance *)
+                            let node_svc =
+                              List.find_opt
+                                (fun (s : Service.t) -> s.instance = new_node)
+                                node_services
+                            in
+                            let ep =
+                              match node_svc with
+                              | Some s -> Installer.endpoint_of_rpc s.rpc_addr
+                              | None -> "http://127.0.0.1:8732"
+                            in
+                            (Some new_node, ep)
+                          else
+                            (* Remote endpoint *)
+                            (None, Installer.endpoint_of_rpc new_node)
+                        in
                         let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
                         let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
                         let new_rpc =
@@ -2140,7 +2341,6 @@ let instance_term =
                         in
                         let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
                         let client_base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
-                        let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
                         let req : Installer_types.daemon_request =
                           {
                             role = "dal-node";
@@ -2157,14 +2357,14 @@ let instance_term =
                             extra_env =
                               [
                                 ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
-                                ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+                                ("OCTEZ_NODE_ENDPOINT", new_node_endpoint);
                                 ("OCTEZ_DAL_DATA_DIR", dal_data_dir);
                                 ("OCTEZ_DAL_RPC_ADDR", new_rpc);
                                 ("OCTEZ_DAL_NET_ADDR", new_net);
                               ];
                             extra_paths = [client_base_dir; dal_data_dir];
                             auto_enable = true;
-                            depends_on = svc.depends_on;
+                            depends_on = new_depends_on;
                             preserve_data = true;
                           }
                         in
