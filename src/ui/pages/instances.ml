@@ -1243,12 +1243,12 @@ let do_restart_service ~instance ~role =
   Miaou_interfaces.Service_lifecycle.restart cap ~role ~service:instance
   |> Result.map_error (fun e -> `Msg e)
 
-(* Offer to restart stopped dependents after restarting a service *)
+(* Offer to restart dependents after restarting a service *)
+(* Shows ALL dependents, not just stopped ones - they need restart to reconnect *)
 let offer_restart_dependents ~instance =
-  match Installer.get_stopped_dependents ~instance () with
-  | Ok [] -> ()
-  | Ok stopped ->
-      let dep_names = List.map (fun s -> s.Service.instance) stopped in
+  match Service_registry.find ~instance with
+  | Ok (Some svc) when svc.Service.dependents <> [] ->
+      let dep_names = svc.Service.dependents in
       Modal_helpers.open_choice_modal
         ~title:"Restart Dependents?"
         ~items:[`RestartAll; `Dismiss]
@@ -1258,24 +1258,41 @@ let offer_restart_dependents ~instance =
           | `Dismiss -> "Dismiss (restart later)")
         ~on_select:(function
           | `RestartAll ->
-              stopped
-              |> List.iter (fun dep ->
-                  Context.toast_info
-                    (Printf.sprintf "Restarting %s..." dep.Service.instance) ;
-                  match
-                    do_restart_service
-                      ~instance:dep.Service.instance
-                      ~role:dep.Service.role
-                  with
-                  | Ok () ->
-                      Context.toast_success
-                        (Printf.sprintf "%s restarted" dep.Service.instance)
-                  | Error (`Msg e) ->
+              (* Wait a bit for parent service to be fully ready *)
+              Unix.sleepf 1.0 ;
+              dep_names
+              |> List.iter (fun dep_inst ->
+                  match Service_registry.find ~instance:dep_inst with
+                  | Ok (Some dep) ->
+                      Context.toast_info
+                        (Printf.sprintf "Restarting %s..." dep.Service.instance) ;
+                      (* Retry logic: try up to 3 times with delay *)
+                      let rec try_restart retries =
+                        match
+                          do_restart_service
+                            ~instance:dep.Service.instance
+                            ~role:dep.Service.role
+                        with
+                        | Ok () ->
+                            Context.toast_success
+                              (Printf.sprintf
+                                 "%s restarted"
+                                 dep.Service.instance)
+                        | Error (`Msg e) ->
+                            if retries > 0 then (
+                              Unix.sleepf 2.0 ;
+                              try_restart (retries - 1))
+                            else
+                              Context.toast_error
+                                (Printf.sprintf "%s: %s" dep.Service.instance e)
+                      in
+                      try_restart 2
+                  | _ ->
                       Context.toast_error
-                        (Printf.sprintf "%s: %s" dep.Service.instance e)) ;
+                        (Printf.sprintf "Service %s not found" dep_inst)) ;
               Context.mark_instances_dirty ()
           | `Dismiss -> ())
-  | Error _ -> ()
+  | _ -> ()
 
 (* Restart with cascade: check dependencies first, then offer to restart dependents *)
 let restart_with_cascade ~instance ~role =
