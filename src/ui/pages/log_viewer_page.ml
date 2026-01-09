@@ -133,55 +133,15 @@ let init () =
 let update ps _ = ps
 
 let refresh ps =
-  let s = ps.Navigation.s in
-  (* Close the old pager and cleanup *)
-  close_pager s ;
-  let s = {s with cleanup_files = []} in
+  (* Don't recreate the pager on periodic refresh - File_pager already handles tailing.
+     This preserves user settings like follow mode and wrap mode. *)
+  ps
 
-  let new_state =
-    match s.source with
-    | Log_viewer.DailyLogs -> (
-        match Service_registry.find ~instance:s.instance with
-        | Ok (Some svc) -> (
-            match
-              Log_viewer.get_daily_log_file
-                ~role:svc.Service.role
-                ~instance:s.instance
-            with
-            | Ok log_file -> (
-                match open_file_with_tail log_file with
-                | Ok fp -> {s with pager = FileTail fp}
-                | Error msg ->
-                    let pager = Static (Pager.open_text ~title:"Error" msg) in
-                    {s with pager})
-            | Error (`Msg msg) ->
-                let pager = Static (Pager.open_text ~title:"Error" msg) in
-                {s with pager})
-        | _ ->
-            let pager =
-              Static (Pager.open_text ~title:"Error" "Instance not found")
-            in
-            {s with pager})
-    | Log_viewer.Journald -> (
-        (* Refresh Journald - restart the stream *)
-        match
-          Log_viewer.get_log_cmd
-            ~role:s.role
-            ~instance:s.instance
-            ~source:s.source
-        with
-        | Ok cmd -> (
-            match open_stream_via_file ~title:"journalctl" cmd with
-            | Ok (fp, tmp) ->
-                {s with pager = FileTail fp; cleanup_files = [tmp]}
-            | Error (`Msg msg) ->
-                let pager = Static (Pager.open_text ~title:"Error" msg) in
-                {s with pager})
-        | Error (`Msg msg) ->
-            let pager = Static (Pager.open_text ~title:"Error" msg) in
-            {s with pager})
-  in
-  Navigation.update (fun _ -> new_state) ps
+let manual_refresh ps =
+  (* Manual refresh (r key) - flush pending lines without recreating pager *)
+  let s = ps.Navigation.s in
+  Pager.flush_pending_if_needed ~force:true (get_pager s.pager) ;
+  ps
 
 let move ps _ = ps
 
@@ -353,7 +313,7 @@ let handle_key ps key ~size =
         else (
           close_pager_and_cleanup s ;
           Navigation.back ps)
-    | Some (Keys.Char "r") when not pager_in_input_mode -> refresh ps
+    | Some (Keys.Char "r") when not pager_in_input_mode -> manual_refresh ps
     | Some (Keys.Char "t") when not pager_in_input_mode -> toggle_source ps
     | _ ->
         (* Delegate all other keys to pager *)
