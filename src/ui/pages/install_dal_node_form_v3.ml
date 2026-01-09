@@ -143,6 +143,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~get_client:(fun m -> m.client)
             ~set_client:(fun client m -> {m with client})
+            ~edit_mode:model.edit_mode
             ()
         @ [
             (* DAL node's own RPC address - with port validation *)
