@@ -1469,27 +1469,98 @@ Press **Enter** to open instance menu.|}
             List.concat_map (fun s -> String.split_on_char '\n' s) table
           in
           let total_lines = List.length all_lines in
-          (* Calculate line index where current selection starts *)
-          let selection_line_start =
-            let rec count_lines idx acc =
-              if idx >= s.selected then acc
-              else if idx >= List.length table then acc
-              else
-                let entry = List.nth table idx in
-                let lines = String.split_on_char '\n' entry in
-                count_lines (idx + 1) (acc + List.length lines)
-            in
-            count_lines 0 0
-          in
-          let selection_line_count =
-            if s.selected >= List.length table then 1
+          (* Calculate line index where current selection starts.
+             s.selected meanings:
+               0 -> install menu
+               1 -> wallet menu
+               2 -> separator (skipped in navigation)
+               3+ -> service at index (s.selected - 3)
+
+             Table structure from table_lines_single:
+               [install; wallet; ""; ...instance_rows...]
+             where instance_rows = headers interleaved with services.
+
+             We need to find where the selected item starts in all_lines.
+          *)
+          let selection_line_start, selection_line_count =
+            if s.selected < 3 then
+              (* Menu items: count lines for entries 0..s.selected-1 *)
+              let line_start =
+                let rec count idx acc =
+                  if idx >= s.selected then acc
+                  else if idx >= List.length table then acc
+                  else
+                    let entry = List.nth table idx in
+                    let lines = String.split_on_char '\n' entry in
+                    count (idx + 1) (acc + List.length lines)
+                in
+                count 0 0
+              in
+              let line_count =
+                if s.selected >= List.length table then 1
+                else
+                  List.length
+                    (String.split_on_char '\n' (List.nth table s.selected))
+              in
+              (line_start, line_count)
             else
-              let entry = List.nth table s.selected in
-              List.length (String.split_on_char '\n' entry)
+              (* Service selection: s.selected = 3 + service_index.
+                 Count menu lines (3 entries), then iterate through services
+                 adding header lines when role changes. *)
+              let target_svc_idx = s.selected - 3 in
+              (* Menu lines: install + wallet + "" *)
+              let menu_lines =
+                let rec count idx acc =
+                  if idx >= 3 then acc
+                  else if idx >= List.length table then acc
+                  else
+                    let entry = List.nth table idx in
+                    count
+                      (idx + 1)
+                      (acc + List.length (String.split_on_char '\n' entry))
+                in
+                count 0 0
+              in
+              (* Count lines through services until target *)
+              let rec count_service_lines svc_idx prev_role acc services =
+                match services with
+                | [] -> (acc, 1) (* fallback *)
+                | (st : Service_state.t) :: rest ->
+                    let role = st.service.Service.role in
+                    (* Add header lines if role changed *)
+                    let header_lines =
+                      if Some role <> prev_role then
+                        (* Role header + empty line before it (except first) *)
+                        if prev_role = None then 1 else 2
+                      else 0
+                    in
+                    let acc = acc + header_lines in
+                    if svc_idx = target_svc_idx then
+                      (* Found target service *)
+                      let is_folded =
+                        StringSet.mem st.service.Service.instance s.folded
+                      in
+                      let line_count = if is_folded then 2 else 6 in
+                      (acc, line_count)
+                    else
+                      (* Count this service's lines and continue *)
+                      let is_folded =
+                        StringSet.mem st.service.Service.instance s.folded
+                      in
+                      let svc_lines = if is_folded then 2 else 6 in
+                      count_service_lines
+                        (svc_idx + 1)
+                        (Some role)
+                        (acc + svc_lines)
+                        rest
+              in
+              let svc_line_start, line_count =
+                count_service_lines 0 None 0 s.services
+              in
+              (menu_lines + svc_line_start, line_count)
           in
           (* Adjust scroll offset to keep selection visible *)
           let scroll = !scroll_offset_ref in
-          (* Adjust scroll to keep selection visible with the current available height *)
           let scroll =
             if selection_line_start < scroll then selection_line_start
             else if
