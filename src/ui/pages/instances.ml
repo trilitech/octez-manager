@@ -1258,39 +1258,49 @@ let offer_restart_dependents ~instance =
           | `Dismiss -> "Dismiss (restart later)")
         ~on_select:(function
           | `RestartAll ->
-              (* Wait a bit for parent service to be fully ready *)
-              Unix.sleepf 1.0 ;
-              dep_names
-              |> List.iter (fun dep_inst ->
-                  match Service_registry.find ~instance:dep_inst with
-                  | Ok (Some dep) ->
-                      Context.toast_info
-                        (Printf.sprintf "Restarting %s..." dep.Service.instance) ;
-                      (* Retry logic: try up to 3 times with delay *)
-                      let rec try_restart retries =
-                        match
-                          do_restart_service
-                            ~instance:dep.Service.instance
-                            ~role:dep.Service.role
-                        with
-                        | Ok () ->
-                            Context.toast_success
-                              (Printf.sprintf
-                                 "%s restarted"
-                                 dep.Service.instance)
-                        | Error (`Msg e) ->
-                            if retries > 0 then (
-                              Unix.sleepf 2.0 ;
-                              try_restart (retries - 1))
-                            else
-                              Context.toast_error
-                                (Printf.sprintf "%s: %s" dep.Service.instance e)
-                      in
-                      try_restart 2
-                  | _ ->
-                      Context.toast_error
-                        (Printf.sprintf "Service %s not found" dep_inst)) ;
-              Context.mark_instances_dirty ()
+              (* Run in background to avoid blocking UI *)
+              Job_manager.submit
+                ~description:"Restarting dependents"
+                (fun ~append_log () ->
+                  (* Wait a bit for parent service to be fully ready *)
+                  Unix.sleepf 1.0 ;
+                  dep_names
+                  |> List.iter (fun dep_inst ->
+                      match Service_registry.find ~instance:dep_inst with
+                      | Ok (Some dep) ->
+                          append_log
+                            (Printf.sprintf
+                               "Restarting %s..."
+                               dep.Service.instance) ;
+                          (* Retry logic: try up to 3 times with delay *)
+                          let rec try_restart retries =
+                            match
+                              do_restart_service
+                                ~instance:dep.Service.instance
+                                ~role:dep.Service.role
+                            with
+                            | Ok () ->
+                                append_log
+                                  (Printf.sprintf
+                                     "%s restarted"
+                                     dep.Service.instance)
+                            | Error (`Msg e) ->
+                                if retries > 0 then (
+                                  Unix.sleepf 2.0 ;
+                                  try_restart (retries - 1))
+                                else
+                                  append_log
+                                    (Printf.sprintf
+                                       "Failed: %s: %s"
+                                       dep.Service.instance
+                                       e)
+                          in
+                          try_restart 2
+                      | _ ->
+                          append_log
+                            (Printf.sprintf "Service %s not found" dep_inst)) ;
+                  Ok ())
+                ~on_complete:(fun _ -> Context.mark_instances_dirty ())
           | `Dismiss -> ())
   | _ -> ()
 
