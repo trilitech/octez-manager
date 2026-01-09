@@ -9,6 +9,11 @@ TODO.md
 TODO_CAPABILITIES.md
 octez-manager
 
-# Internal docs
-docs/
+# Internal/private docs
+internal_docs/
 AGENTS.md
+
+# Docs site build output
+docs/dist/
+docs/node_modules/
+docs/.astro/

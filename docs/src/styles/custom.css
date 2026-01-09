@@ -1,0 +1,31 @@
+/* Octez Manager custom styles */
+
+:root {
+  /* Tezos blue accent */
+  --sl-color-accent-low: #1a3a5c;
+  --sl-color-accent: #2c7df7;
+  --sl-color-accent-high: #5a9cff;
+
+  /* Better code block colors */
+  --sl-color-bg-inline-code: #1e293b;
+}
+
+/* Hero section styling */
+.hero {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+/* Table improvements */
+table {
+  width: 100%;
+}
+
+th {
+  text-align: left;
+}
+
+/* Code blocks */
+pre {
+  border-radius: 8px;
+}

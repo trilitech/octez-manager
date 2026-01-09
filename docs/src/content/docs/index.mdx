@@ -1,0 +1,60 @@
+---
+title: Octez Manager
+description: CLI and TUI for managing Tezos infrastructure
+template: splash
+hero:
+  tagline: Simplify your Tezos node, baker, and DAL operations
+  actions:
+    - text: Get Started
+      link: /octez-manager/getting-started/introduction/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/mathiasbourgoin/octez-manager
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid stagger>
+	<Card title="Easy Installation" icon="rocket">
+		Install nodes, bakers, accusers, and DAL nodes with guided wizards - no manual config file editing.
+	</Card>
+	<Card title="Interactive TUI" icon="laptop">
+		Beautiful terminal interface to monitor and manage all your services in one place.
+	</Card>
+	<Card title="Systemd Integration" icon="setting">
+		Automatic systemd service management with proper user isolation and security.
+	</Card>
+	<Card title="Snapshot Support" icon="document">
+		Bootstrap nodes quickly with automatic snapshot downloading from trusted sources.
+	</Card>
+	<Card title="Multi-Instance" icon="list-format">
+		Run multiple nodes, bakers, and services on the same machine with isolated configurations.
+	</Card>
+	<Card title="CLI & TUI" icon="seti:shell">
+		Use the interactive TUI or script everything with the comprehensive CLI.
+	</Card>
+</CardGrid>
+
+## Quick Start
+
+```bash
+# Install and launch the TUI
+octez-manager
+
+# Or use CLI directly
+octez-manager install-node --instance my-node --network mainnet
+```
+
+## Supported Services
+
+| Service | Description |
+|---------|-------------|
+| **Node** | Tezos L1 node |
+| **Baker** | Block production and attestations |
+| **Accuser** | Double-baking/endorsing detection |
+| **DAL Node** | Data Availability Layer |
+| **Signer** | Remote signing service |

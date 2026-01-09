@@ -1,0 +1,53 @@
+---
+title: Introduction
+description: What is Octez Manager and why use it
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+# What is Octez Manager?
+
+**Octez Manager** is a CLI and TUI (Terminal User Interface) tool for managing Tezos blockchain infrastructure. It simplifies the installation, configuration, and monitoring of Octez services.
+
+## Features
+
+<CardGrid stagger>
+  <Card title="Easy Installation" icon="rocket">
+    Install and configure Tezos nodes, bakers, accusers, and DAL nodes with guided wizards
+  </Card>
+  <Card title="Interactive TUI" icon="laptop">
+    Monitor and manage your services through a beautiful terminal interface
+  </Card>
+  <Card title="Systemd Integration" icon="setting">
+    Automatic systemd service management with proper user isolation
+  </Card>
+  <Card title="Snapshot Support" icon="document">
+    Bootstrap nodes quickly with automatic snapshot downloading from trusted sources
+  </Card>
+</CardGrid>
+
+## Supported Services
+
+| Service | Description |
+|---------|-------------|
+| **Node** | Octez node for participating in the Tezos network |
+| **Baker** | Baking service for block production and attestations |
+| **Accuser** | Monitors the network for double-baking/endorsing |
+| **DAL Node** | Data Availability Layer node for scalability |
+| **Signer** | Remote signing service for secure key management |
+
+## Why Octez Manager?
+
+Managing Tezos infrastructure traditionally requires:
+- Manual configuration of multiple config files
+- Creating and managing systemd unit files
+- Handling user permissions and directories
+- Downloading and importing snapshots manually
+- Monitoring logs across multiple services
+
+Octez Manager handles all of this through a unified interface, whether you prefer the command line or an interactive TUI.
+
+## Next Steps
+
+- [Install Octez Manager](/octez-manager/getting-started/installation)
+- [Quick Start Guide](/octez-manager/getting-started/quick-start)
