@@ -237,6 +237,94 @@ let run ?(quiet = false) ?on_log argv =
 
 let run_silent = run ~quiet:true
 
+(* Streaming run that reads stdout and stderr concurrently using Unix.select.
+   This ensures output is captured as it's produced, not blocked waiting for
+   one stream to complete before reading the other. Handles both \n and \r
+   as line delimiters to capture progress updates that use carriage returns. *)
+let run_streaming ~on_log argv =
+  append_debug_log ("RUN_STREAMING " ^ cmd_to_string argv) ;
+  let cmd_str = cmd_to_string argv in
+  let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
+  close_out oc ;
+  let ic_fd = Unix.descr_of_in_channel ic in
+  let ec_fd = Unix.descr_of_in_channel ec in
+  let log_lines = ref [] in
+  let ic_buf = Buffer.create 256 in
+  let ec_buf = Buffer.create 256 in
+  let ic_open = ref true in
+  let ec_open = ref true in
+  (* Find first occurrence of \n or \r *)
+  let find_line_end s pos =
+    let len = String.length s in
+    let rec loop i =
+      if i >= len then None
+      else if s.[i] = '\n' || s.[i] = '\r' then Some i
+      else loop (i + 1)
+    in
+    loop pos
+  in
+  let read_available fd buf =
+    let tmp = Bytes.create 1024 in
+    let n = Unix.read fd tmp 0 1024 in
+    if n = 0 then `Eof
+    else (
+      Buffer.add_subbytes buf tmp 0 n ;
+      (* Extract complete lines (delimited by \n or \r) *)
+      let content = Buffer.contents buf in
+      let rec extract_lines pos =
+        match find_line_end content pos with
+        | Some end_pos ->
+            let line = String.sub content pos (end_pos - pos) in
+            if String.length line > 0 then (
+              on_log (line ^ "\n") ;
+              log_lines := line :: !log_lines) ;
+            extract_lines (end_pos + 1)
+        | None ->
+            (* Keep remaining partial line in buffer *)
+            Buffer.clear buf ;
+            if pos < String.length content then
+              Buffer.add_substring buf content pos (String.length content - pos)
+      in
+      extract_lines 0 ;
+      `Ok)
+  in
+  (* Main loop using select *)
+  while !ic_open || !ec_open do
+    let read_fds =
+      (if !ic_open then [ic_fd] else []) @ if !ec_open then [ec_fd] else []
+    in
+    if read_fds <> [] then
+      let ready, _, _ = Unix.select read_fds [] [] 0.1 in
+      List.iter
+        (fun fd ->
+          let buf = if fd = ic_fd then ic_buf else ec_buf in
+          let is_open = if fd = ic_fd then ic_open else ec_open in
+          match read_available fd buf with
+          | `Eof -> is_open := false
+          | `Ok -> ())
+        ready
+  done ;
+  (* Flush any remaining partial lines *)
+  let flush_buf buf =
+    let remaining = Buffer.contents buf in
+    if remaining <> "" then (
+      on_log (remaining ^ "\n") ;
+      log_lines := remaining :: !log_lines)
+  in
+  flush_buf ic_buf ;
+  flush_buf ec_buf ;
+  match Unix.close_process_full (ic, oc, ec) with
+  | Unix.WEXITED 0 -> Ok ()
+  | _status ->
+      let msg =
+        Printf.sprintf
+          "Command failed: %s\nOutput:\n%s"
+          cmd_str
+          (String.concat "\n" (List.rev !log_lines))
+      in
+      append_debug_log ("RUN_STREAMING ERROR: " ^ msg) ;
+      Error (`Msg msg)
+
 let run_verbose = run ~quiet:false
 
 let run_out argv =

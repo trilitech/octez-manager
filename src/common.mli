@@ -61,6 +61,12 @@ val run_silent :
 val run_verbose :
   ?on_log:(string -> unit) -> string list -> (unit, [> `Msg of string]) result
 
+(** Run command with streaming output. Reads stdout and stderr concurrently
+    using Unix.select, ensuring output is captured as produced. Use this for
+    long-running commands where real-time output is needed. *)
+val run_streaming :
+  on_log:(string -> unit) -> string list -> (unit, [> `Msg of string]) result
+
 val run_out : string list -> (string, [> `Msg of string]) result
 
 val run_as :
