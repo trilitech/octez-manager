@@ -322,11 +322,14 @@ let spec =
         (* In edit mode, stop the service before applying changes *)
         let* () =
           if model.edit_mode then
+            (* Use original instance name when stopping (may be different if renaming) *)
+            let stop_instance =
+              Option.value
+                ~default:model.core.instance_name
+                model.original_instance
+            in
             match
-              Installer.stop_service
-                ~quiet:true
-                ~instance:model.core.instance_name
-                ()
+              Installer.stop_service ~quiet:true ~instance:stop_instance ()
             with
             | Ok () -> Ok ()
             | Error (`Msg _) ->
@@ -344,6 +347,17 @@ let spec =
         in
         let* (module PM) = require_package_manager () in
         let* _service = PM.install_daemon ~quiet:true req in
+        (* Handle rename: clean up old instance if name changed *)
+        let* () =
+          match (model.edit_mode, model.original_instance) with
+          | true, Some old_name when old_name <> model.core.instance_name ->
+              Installer.cleanup_renamed_instance
+                ~quiet:true
+                ~old_instance:old_name
+                ~new_instance:model.core.instance_name
+                ()
+          | _ -> Ok ()
+        in
         (* Queue restart dependents for modal on instances page *)
         if model.edit_mode && model.stopped_dependents <> [] then
           Context.set_pending_restart_dependents model.stopped_dependents ;
