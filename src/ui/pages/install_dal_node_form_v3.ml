@@ -24,6 +24,7 @@ type model = {
   (* Edit mode fields *)
   edit_mode : bool;
   original_instance : string option; [@warning "-69"]
+  original_dal_data_dir : string option;  (** Preserved in edit mode *)
   stopped_dependents : string list;
 }
 
@@ -50,6 +51,7 @@ let base_initial_model () =
     net_addr = "0.0.0.0:11732";
     edit_mode = false;
     original_instance = None;
+    original_dal_data_dir = None;
     stopped_dependents = [];
   }
 
@@ -72,6 +74,7 @@ let make_initial_model () =
       let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
       let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
       let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
+      let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
       let extra_args = lookup "OCTEZ_DAL_EXTRA_ARGS" in
       {
         core =
@@ -101,6 +104,8 @@ let make_initial_model () =
         net_addr = (if dal_net = "" then "0.0.0.0:11732" else dal_net);
         edit_mode = true;
         original_instance = Some svc.Service.instance;
+        original_dal_data_dir =
+          (if dal_data_dir = "" then None else Some dal_data_dir);
         stopped_dependents = edit_ctx.stopped_dependents;
       }
   | _ -> base_initial_model ()
@@ -270,6 +275,7 @@ let spec =
         in
 
         (* Build base_dir (client base dir for global --base-dir) *)
+        (* In edit mode, always preserve existing base_dir *)
         let client_base_dir =
           let trimmed = String.trim model.client.base_dir in
           if trimmed = "" then
@@ -278,8 +284,11 @@ let spec =
         in
 
         (* DAL data dir (for --data-dir command option) *)
+        (* In edit mode, preserve existing data dir to avoid data loss *)
         let dal_data_dir =
-          Common.default_role_dir "dal-node" model.core.instance_name
+          match model.original_dal_data_dir with
+          | Some dir when model.edit_mode -> dir
+          | _ -> Common.default_role_dir "dal-node" model.core.instance_name
         in
 
         (* Service args are command options only (after "run dal --data-dir") *)

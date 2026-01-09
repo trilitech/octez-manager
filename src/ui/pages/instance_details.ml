@@ -185,10 +185,16 @@ let view_details svc =
         let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
         let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
         let logging = Logging_mode.to_string svc.Service.logging_mode in
+        let node_depends =
+          match svc.Service.depends_on with Some inst -> inst | None -> ""
+        in
+        let dal_depends = lookup "OCTEZ_DAL_INSTANCE" in
         let depends_on =
-          match svc.Service.depends_on with
-          | Some inst -> inst
-          | None -> "(none)"
+          match (node_depends, dal_depends) with
+          | "", "" -> "(none)"
+          | n, "" -> n
+          | "", d -> d
+          | n, d -> n ^ ", " ^ d
         in
         [
           ("Instance", svc.Service.instance);
@@ -241,6 +247,11 @@ let view_details svc =
           | Some inst -> inst
           | None -> "(none)"
         in
+        let dependents =
+          match svc.Service.dependents with
+          | [] -> "(none)"
+          | deps -> String.concat ", " deps
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -248,6 +259,7 @@ let view_details svc =
           ( "Node Endpoint",
             if node_endpoint = "" then "(unset)" else node_endpoint );
           ("Depends On", depends_on);
+          ("Dependents", dependents);
           ("DAL RPC Addr", if dal_rpc = "" then "(unset)" else dal_rpc);
           ("DAL P2P Addr", if dal_net = "" then "(unset)" else dal_net);
           ("Service User", svc.Service.service_user);
