@@ -865,6 +865,7 @@ let install_baker ?(quiet = false) (request : baker_request) =
               | Dal_disabled -> "disabled"
               | Dal_endpoint ep -> ep
               | Dal_auto -> "" );
+            ("OCTEZ_DAL_INSTANCE", Option.value ~default:"" request.dal_node);
             ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
             ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
             ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
@@ -890,6 +891,24 @@ let install_baker ?(quiet = false) (request : baker_request) =
           in
           Service_registry.write updated_parent
     | Remote _ -> Ok ()
+  in
+  (* Register as dependent on DAL node if using local DAL (avoid duplicates) *)
+  let* () =
+    match request.dal_node with
+    | Some dal_inst -> (
+        match Service_registry.find ~instance:dal_inst with
+        | Ok (Some dal_svc) ->
+            if List.mem request.instance dal_svc.dependents then Ok ()
+            else
+              let updated_dal =
+                {
+                  dal_svc with
+                  dependents = request.instance :: dal_svc.dependents;
+                }
+              in
+              Service_registry.write updated_dal
+        | _ -> Ok ())
+    | None -> Ok ()
   in
   Ok service
 
@@ -1155,14 +1174,14 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
         List.fold_left
           (fun acc dep_inst ->
             let* () = acc in
-            (* Update OCTEZ_NODE_INSTANCE in dependent's env file *)
+            (* Update OCTEZ_NODE_INSTANCE and OCTEZ_DAL_INSTANCE in dependent's env file *)
             match Node_env.read ~inst:dep_inst with
             | Ok pairs ->
                 let updated_pairs =
                   List.map
                     (fun (k, v) ->
                       if
-                        k = "OCTEZ_NODE_INSTANCE"
+                        (k = "OCTEZ_NODE_INSTANCE" || k = "OCTEZ_DAL_INSTANCE")
                         && String.trim v = old_instance
                       then (k, new_instance)
                       else (k, v))
