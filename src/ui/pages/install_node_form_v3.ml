@@ -610,19 +610,30 @@ let spec =
                   (Printf.sprintf
                      "Stopping service %s before applying changes...\n"
                      model.core.instance_name) ;
-                match
-                  Installer.stop_service
-                    ~quiet:true
-                    ~instance:model.core.instance_name
-                    ()
-                with
-                | Ok () -> Ok ()
+                let stop_result =
+                  try
+                    Installer.stop_service
+                      ~quiet:true
+                      ~instance:model.core.instance_name
+                      ()
+                  with exn ->
+                    append_log
+                      (Printf.sprintf
+                         "Exception in stop_service: %s\n"
+                         (Printexc.to_string exn)) ;
+                    Ok () (* Continue anyway *)
+                in
+                match stop_result with
+                | Ok () ->
+                    append_log "Stop service completed OK\n" ;
+                    Ok ()
                 | Error (`Msg msg) ->
                     append_log (Printf.sprintf "Warning: %s\n" msg) ;
                     Ok ()
                 (* Continue anyway - service might already be stopped *))
               else Ok ()
             in
+            append_log "Ensuring service account...\n" ;
             let* () =
               if Common.is_root () then
                 System_user.ensure_service_account
@@ -631,10 +642,15 @@ let spec =
                   ()
               else Ok ()
             in
+            append_log "Getting package manager...\n" ;
             let* (module PM) = require_package_manager () in
-            let* _service =
-              PM.install_node ~quiet:true ~on_log:append_log req
-            in
+            append_log "Starting install_node...\n" ;
+            let result = PM.install_node ~quiet:true ~on_log:append_log req in
+            (match result with
+            | Ok _ -> append_log "install_node succeeded\n"
+            | Error (`Msg e) ->
+                append_log (Printf.sprintf "install_node failed: %s\n" e)) ;
+            let* _service = result in
             (* Queue restart dependents for modal on instances page *)
             if model.edit_mode && model.stopped_dependents <> [] then
               Context.set_pending_restart_dependents model.stopped_dependents ;
@@ -659,11 +675,22 @@ let spec =
                      model.core.instance_name) ;
                 Context.mark_instances_dirty ()
             | Job_manager.Failed msg ->
+                (* Log to debug file for troubleshooting *)
+                let log_msg =
+                  match Job_manager.get_latest_job () with
+                  | Some job -> String.concat "" (List.rev job.log)
+                  | None -> "(no job log)"
+                in
+                Common.append_debug_log
+                  (Printf.sprintf
+                     "Install failed: %s\nJob log:\n%s"
+                     msg
+                     log_msg) ;
                 Context.toast_error
                   (Printf.sprintf
                      "Failed to install node %s: %s"
                      model.core.instance_name
-                     msg)
+                     (if msg = "" then log_msg else msg))
             | _ -> ()) ;
         Ok ());
   }

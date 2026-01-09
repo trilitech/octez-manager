@@ -476,7 +476,10 @@ let resolve_from_data_dir data_dir =
     Ok (`Data_dir {network; history_mode; rpc_addr; net_addr})
 
 let install_node ?(quiet = false) ?on_log (request : node_request) =
+  let log msg = match on_log with Some f -> f msg | None -> () in
+  log "Validating instance name...\n" ;
   let* () = validate_instance_name ~instance:request.instance in
+  log "Resolving network...\n" ;
   let* resolved_network =
     Teztnets.resolve_network_for_octez_node request.network
   in
@@ -499,13 +502,16 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
         Array.exists (fun e -> e <> "." && e <> "..") entries
       with Unix.Unix_error _ | Sys_error _ -> false
   in
+  log "Computing snapshot plan...\n" ;
   let* snapshot_plan = snapshot_plan_of_request request in
   let snapshot_meta =
     snapshot_metadata_of_plan ~no_check:request.snapshot_no_check snapshot_plan
   in
+  log "Ensuring service account...\n" ;
   let* () =
     System_user.ensure_service_account ~quiet ~name:request.service_user ()
   in
+  log "Ensuring system directories...\n" ;
   let* () =
     if Common.is_root () then
       System_user.ensure_system_directories
@@ -514,6 +520,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
         ()
     else Ok ()
   in
+  log "Ensuring logging destination...\n" ;
   let* () =
     ensure_logging_destination ~service_user:request.service_user logging_mode
   in
@@ -526,19 +533,26 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~extra_args:request.extra_args
       ~logging_mode
   in
+  log "Validating user for service...\n" ;
   let* () = System_user.validate_user_for_service ~user:request.service_user in
   let owner, group =
     if Common.is_root () then (request.service_user, request.service_user)
     else Common.current_user_group_names ()
   in
+  log (Printf.sprintf "Owner: %s, Group: %s\n" owner group) ;
   let* () =
-    if data_dir_nonempty && not request.preserve_data then
-      Common.remove_tree data_dir
+    if data_dir_nonempty && not request.preserve_data then (
+      log "Removing existing data directory...\n" ;
+      Common.remove_tree data_dir)
     else Ok ()
   in
+  log "Ensuring directories...\n" ;
   let* () = ensure_directories ~owner ~group [data_dir] in
+  log "Ensuring logging base directory...\n" ;
   let* () = ensure_logging_base_directory ~owner ~group logging_mode in
+  log "Ensuring runtime log directory...\n" ;
   let* () = ensure_runtime_log_directory ~owner ~group logging_mode in
+  log "Ensuring node config...\n" ;
   let* () =
     ensure_node_config
       ~quiet
@@ -548,12 +562,17 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~history_mode:request.history_mode
       ()
   in
+  log "Performing bootstrap...\n" ;
   let* () =
-    if request.preserve_data then Ok ()
+    if request.preserve_data then (
+      log "Skipping bootstrap (preserve_data=true)\n" ;
+      Ok ())
     else
       perform_bootstrap ~quiet ?on_log ~plan:snapshot_plan ~request ~data_dir ()
   in
+  log "Reowning runtime paths...\n" ;
   let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
+  log "Creating service record...\n" ;
   let service =
     Service.make
       ~instance:request.instance
@@ -573,6 +592,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~extra_args:request.extra_args
       ()
   in
+  log "Installing systemd unit...\n" ;
   let* () =
     Systemd.install_unit
       ~quiet
@@ -581,6 +601,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~user:request.service_user
       ()
   in
+  log "Building extra env...\n" ;
   let extra_env =
     [
       ("OCTEZ_NETWORK", request.network);
@@ -593,9 +614,11 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ("OCTEZ_SNAPSHOT_NO_CHECK", if snapshot_meta.no_check then "1" else "0");
     ]
   in
+  log "Writing node env...\n" ;
   let* () =
     Node_env.write ~inst:request.instance ~data_dir ~run_args ~extra_env
   in
+  log "Writing systemd dropin...\n" ;
   let* () =
     Systemd.write_dropin_node
       ~quiet
@@ -604,9 +627,13 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~logging_mode
       ()
   in
+  log "Writing service registry...\n" ;
   let* () = Service_registry.write service in
+  log "Listing services for logrotate...\n" ;
   let* services = Service_registry.list () in
+  log "Syncing logrotate...\n" ;
   let* () = Systemd.sync_logrotate (logrotate_specs_of services) in
+  log "Enabling service...\n" ;
   let* () =
     if request.auto_enable then
       Systemd.enable
@@ -617,6 +644,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
         ()
     else Ok ()
   in
+  log "Install complete!\n" ;
   Ok service
 
 let install_daemon ?(quiet = false) (request : daemon_request) =

@@ -1248,7 +1248,11 @@ struct
 
   let service_cycle ps _ = refresh ps
 
-  let back ps = Navigation.back ps
+  let back ps =
+    (* Instances is the home page - back/Esc should quit the TUI.
+       Navigate to special __EXIT__ page to signal quit to the framework. *)
+    Context.navigate "__EXIT__" ;
+    ps
 
   let handled_keys () =
     Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"]
@@ -1665,7 +1669,7 @@ Press **Enter** to open instance menu.|}
     if Miaou.Core.Modal_manager.has_active () then (
       Miaou.Core.Modal_manager.handle_key key ;
       check_navigation ps)
-    else if is_quit_key key then Navigation.back ps
+    else if is_quit_key key then back ps
     else
       let ps =
         match Keys.of_string key with
@@ -1689,7 +1693,7 @@ Press **Enter** to open instance menu.|}
         | Some (Keys.Char "Escape")
         | Some (Keys.Char "q")
         | Some (Keys.Char "C-c") ->
-            Navigation.back ps
+            back ps
         | _ -> ps
       in
       (* Keep active_column in sync with selection *)
