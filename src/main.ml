@@ -1777,13 +1777,34 @@ let instance_term =
                   (* Non-interactive mode - just fail like before *)
                   run_result
                     (Installer.restart_service ~quiet:false ~instance:inst ()))
-        | Remove ->
-            run_result
-              (Installer.remove_service
-                 ~quiet:false
-                 ~delete_data_dir
-                 ~instance:inst
-                 ())
+        | Remove -> (
+            (* Check for dependents and confirm if any *)
+            match Service_registry.find ~instance:inst with
+            | Error (`Msg msg) -> cmdliner_error msg
+            | Ok None ->
+                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+            | Ok (Some svc) ->
+                let proceed =
+                  if svc.S.dependents = [] then true
+                  else if is_interactive () then (
+                    Format.printf
+                      "This will stop dependent instances: %s@."
+                      (String.concat ", " svc.S.dependents) ;
+                    prompt_yes_no "Proceed with removal?" ~default:false)
+                  else (
+                    Format.printf
+                      "Instance has dependents: %s. Use --yes to confirm.@."
+                      (String.concat ", " svc.S.dependents) ;
+                    false)
+                in
+                if proceed then
+                  run_result
+                    (Installer.remove_service
+                       ~quiet:false
+                       ~delete_data_dir
+                       ~instance:inst
+                       ())
+                else `Ok ())
         | Purge ->
             run_result
               (Installer.purge_service
