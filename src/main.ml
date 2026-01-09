@@ -1516,21 +1516,80 @@ let instance_term =
                   | Ok () -> ()
                   | Error (`Msg msg) ->
                       Format.eprintf "Warning: failed to stop service: %s@." msg) ;
-                  (* Show current values and prompt for editable fields *)
+                  (* Show current values - role-specific configuration *)
                   Format.printf "@.Editing instance '%s' (role: %s)@." inst role ;
                   Format.printf "@.Current configuration:@." ;
-                  Format.printf "  Network: %s@." svc.network ;
-                  Format.printf
-                    "  History mode: %s@."
-                    (History_mode.to_string svc.history_mode) ;
-                  Format.printf "  Data dir: %s@." svc.data_dir ;
-                  Format.printf "  RPC addr: %s@." svc.rpc_addr ;
-                  Format.printf "  Net addr: %s@." svc.net_addr ;
+                  (* Read env file for role-specific values *)
+                  let env =
+                    match Node_env.read ~inst with
+                    | Ok pairs -> pairs
+                    | Error _ -> []
+                  in
+                  let lookup key =
+                    match List.assoc_opt key env with
+                    | Some v -> String.trim v
+                    | None -> ""
+                  in
+                  (* Common fields *)
                   Format.printf "  Service user: %s@." svc.service_user ;
                   Format.printf "  App bin dir: %s@." svc.app_bin_dir ;
-                  Format.printf
-                    "  Extra args: %s@."
-                    (String.concat " " svc.extra_args) ;
+                  (* Role-specific fields *)
+                  (match role with
+                  | "node" ->
+                      Format.printf "  Network: %s@." svc.network ;
+                      Format.printf
+                        "  History mode: %s@."
+                        (History_mode.to_string svc.history_mode) ;
+                      Format.printf "  Data dir: %s@." svc.data_dir ;
+                      Format.printf "  RPC addr: %s@." svc.rpc_addr ;
+                      Format.printf "  P2P addr: %s@." svc.net_addr
+                  | "baker" ->
+                      let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
+                      let node_inst = lookup "OCTEZ_NODE_INSTANCE" in
+                      let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
+                      let dal_cfg = lookup "OCTEZ_DAL_CONFIG" in
+                      let delegates = lookup "OCTEZ_BAKER_DELEGATES_CSV" in
+                      let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
+                      Format.printf "  Base dir: %s@." base_dir ;
+                      if node_inst <> "" then
+                        Format.printf "  Node instance: %s@." node_inst
+                      else Format.printf "  Node endpoint: %s@." node_ep ;
+                      (match String.lowercase_ascii dal_cfg with
+                      | "disabled" -> Format.printf "  DAL config: opt-out@."
+                      | "" -> Format.printf "  DAL config: auto@."
+                      | ep -> Format.printf "  DAL endpoint: %s@." ep) ;
+                      if delegates <> "" then
+                        Format.printf "  Delegates: %s@." delegates ;
+                      if lb_vote <> "" then
+                        Format.printf "  LB vote: %s@." lb_vote
+                  | "accuser" ->
+                      let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+                      let node_inst = lookup "OCTEZ_NODE_INSTANCE" in
+                      let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
+                      Format.printf "  Base dir: %s@." base_dir ;
+                      if node_inst <> "" then
+                        Format.printf "  Node instance: %s@." node_inst
+                      else Format.printf "  Node endpoint: %s@." node_ep
+                  | "dal-node" | "dal" ->
+                      let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
+                      let node_inst = lookup "OCTEZ_NODE_INSTANCE" in
+                      let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
+                      let rpc_addr = lookup "OCTEZ_DAL_RPC_ADDR" in
+                      let net_addr = lookup "OCTEZ_DAL_NET_ADDR" in
+                      Format.printf "  DAL data dir: %s@." dal_data_dir ;
+                      if node_inst <> "" then
+                        Format.printf "  Node instance: %s@." node_inst
+                      else Format.printf "  Node endpoint: %s@." node_ep ;
+                      if rpc_addr <> "" then
+                        Format.printf "  RPC addr: %s@." rpc_addr ;
+                      if net_addr <> "" then
+                        Format.printf "  P2P addr: %s@." net_addr
+                  | _ -> ()) ;
+                  (* Extra args for all roles *)
+                  let extra_args = String.concat " " svc.extra_args in
+                  if extra_args <> "" then
+                    Format.printf "  Extra args: %s@." extra_args ;
+                  (* Dependencies *)
                   if svc.depends_on <> None then
                     Format.printf
                       "  Depends on: %s@."
