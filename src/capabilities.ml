@@ -59,8 +59,9 @@ module Service_lifecycle_impl = struct
     Systemd.start ~role ~instance:service ()
     |> Result.map_error (function `Msg m -> m)
 
-  let stop ~role ~service =
-    Systemd.stop ~role ~instance:service ()
+  let stop ~role:_ ~service =
+    (* Use Installer.stop_service to cascade stop dependents first *)
+    Installer.stop_service ~quiet:true ~instance:service ()
     |> Result.map_error (function `Msg m -> m)
 
   let restart ~role ~service =
