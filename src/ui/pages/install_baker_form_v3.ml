@@ -93,8 +93,10 @@ let make_initial_model () =
       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
       let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
       let dal_config = lookup "OCTEZ_DAL_CONFIG" in
+      let dal_instance = lookup "OCTEZ_DAL_INSTANCE" in
       let dal =
         if dal_config = "disabled" then Dal_none
+        else if dal_instance <> "" then Dal_instance dal_instance
         else if dal_config = "" then Dal_none
         else Dal_endpoint dal_config
       in
@@ -585,6 +587,10 @@ let spec =
           else trimmed
         in
 
+        (* Extract DAL node instance name if using local DAL *)
+        let dal_node =
+          match model.dal with Dal_instance inst -> Some inst | _ -> None
+        in
         let req =
           {
             Installer_types.instance = model.core.instance_name;
@@ -597,6 +603,7 @@ let spec =
             base_dir = Some base_dir;
             delegates = model.delegates;
             dal_config;
+            dal_node;
             liquidity_baking_vote =
               (if String.trim model.liquidity_baking_vote = "" then None
                else Some (String.trim model.liquidity_baking_vote));

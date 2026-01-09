@@ -942,19 +942,20 @@ let install_baker_cmd =
               Error "Liquidity baking vote is required in non-interactive mode"
       in
       (* Prompt for dal_endpoint if not provided in interactive mode *)
-      let* dal_config =
+      (* Track both DAL config and DAL node instance name *)
+      let* dal_config, dal_node =
         match normalize_opt_string dal_endpoint_opt with
         | Some ep ->
             let normalized = String.lowercase_ascii (String.trim ep) in
-            if normalized = "none" then Ok Dal_disabled
-            else Ok (Dal_endpoint ep)
+            if normalized = "none" then Ok (Dal_disabled, None)
+            else Ok (Dal_endpoint ep, None)
         | None ->
             if is_interactive () then
               (* Get list of available DAL node instances *)
               match Service_registry.list () with
               | Error (`Msg msg) ->
                   prerr_endline ("Warning: Could not load services: " ^ msg) ;
-                  Ok Dal_disabled
+                  Ok (Dal_disabled, None)
               | Ok services ->
                   let dal_services =
                     List.filter
@@ -971,8 +972,8 @@ let install_baker_cmd =
                           String.lowercase_ascii @@ String.trim choice)
                     in
                     match choice with
-                    | Some "" | Some "none" | None -> Ok Dal_disabled
-                    | Some endpoint -> Ok (Dal_endpoint endpoint)
+                    | Some "" | Some "none" | None -> Ok (Dal_disabled, None)
+                    | Some endpoint -> Ok (Dal_endpoint endpoint, None)
                   else
                     let rec loop () =
                       let instance_names =
@@ -1000,7 +1001,7 @@ let install_baker_cmd =
                           ("none" :: instance_names)
                       with
                       | Some "" | None -> loop ()
-                      | Some "none" -> Ok Dal_disabled
+                      | Some "none" -> Ok (Dal_disabled, None)
                       | Some selected -> (
                           (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
                           match
@@ -1011,16 +1012,18 @@ let install_baker_cmd =
                           with
                           | Some svc ->
                               Ok
-                                (Dal_endpoint
-                                   (Installer.endpoint_of_rpc
-                                      svc.Service.rpc_addr))
+                                ( Dal_endpoint
+                                    (Installer.endpoint_of_rpc
+                                       svc.Service.rpc_addr),
+                                  Some svc.instance )
                           | None ->
                               Ok
-                                (Dal_endpoint
-                                   (Installer.endpoint_of_rpc selected)))
+                                ( Dal_endpoint
+                                    (Installer.endpoint_of_rpc selected),
+                                  None ))
                     in
                     loop ()
-            else Ok Dal_disabled
+            else Ok (Dal_disabled, None)
       in
       let req : baker_request =
         {
@@ -1029,6 +1032,7 @@ let install_baker_cmd =
           base_dir;
           delegates;
           dal_config;
+          dal_node;
           liquidity_baking_vote;
           extra_args;
           service_user;
@@ -1721,11 +1725,17 @@ let instance_term =
                           | "" -> Installer_types.Dal_auto
                           | ep -> Installer_types.Dal_endpoint ep
                         in
+                        let dal_node =
+                          match lookup "OCTEZ_DAL_INSTANCE" with
+                          | "" -> None
+                          | inst -> Some inst
+                        in
                         let req : Installer_types.baker_request =
                           {
                             instance = new_instance;
                             node_mode;
                             dal_config;
+                            dal_node;
                             base_dir = Some (lookup "OCTEZ_BAKER_BASE_DIR");
                             delegates = delegates_list;
                             liquidity_baking_vote =
