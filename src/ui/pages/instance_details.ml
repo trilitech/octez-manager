@@ -10,10 +10,6 @@ module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
-open Installer_types
-open Rresult
-
-let ( let* ) = Result.bind
 
 let name = "instance_details"
 
@@ -240,80 +236,6 @@ let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
   ps
 
-let require_package_manager () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Package_manager_capability.key
-  with
-  | Some cap ->
-      let module I =
-        (val (cap : Manager_interfaces.Package_manager_capability.t))
-      in
-      Ok (module I : Manager_interfaces.Package_manager)
-  | None -> Error (`Msg "Package manager capability not available")
-
-let apply_node_update ps update_fn =
-  let s = ps.Navigation.s in
-  match s.service with
-  | None -> ps
-  | Some svc -> (
-      let req =
-        {
-          instance = svc.Service.instance;
-          network = svc.Service.network;
-          history_mode = svc.Service.history_mode;
-          data_dir = Some svc.Service.data_dir;
-          rpc_addr = svc.Service.rpc_addr;
-          net_addr = svc.Service.net_addr;
-          service_user = svc.Service.service_user;
-          app_bin_dir = svc.Service.app_bin_dir;
-          logging_mode = svc.Service.logging_mode;
-          extra_args = svc.Service.extra_args;
-          auto_enable = true;
-          bootstrap = Genesis;
-          preserve_data = false;
-          snapshot_no_check = false;
-        }
-      in
-      let req = update_fn req in
-      let res =
-        let* (module PM) = require_package_manager () in
-        PM.install_node req
-      in
-      match res with
-      | Ok new_svc ->
-          Modal_helpers.show_success ~title:"Success" "Configuration updated." ;
-          Navigation.update (fun s -> {s with service = Some new_svc}) ps
-      | Error (`Msg e) ->
-          Modal_helpers.show_error ~title:"Error" e ;
-          ps)
-
-let edit_config_modal ps =
-  let s = ps.Navigation.s in
-  match s.service with
-  | None -> ps
-  | Some svc ->
-      if svc.Service.role <> "node" then (
-        Modal_helpers.show_error
-          ~title:"Not Supported"
-          "Editing is currently only supported for nodes." ;
-        ps)
-      else
-        (* Only extra args can be edited - logging is always journald *)
-        let initial = String.concat " " svc.Service.extra_args in
-        Modal_helpers.prompt_text_modal
-          ~title:("Extra Arguments . " ^ svc.Service.instance)
-          ~initial
-          ~on_submit:(fun text ->
-            let extra_args =
-              String.split_on_char ' ' text
-              |> List.map String.trim
-              |> List.filter (( <> ) "")
-            in
-            ignore (apply_node_update ps (fun req -> {req with extra_args})))
-          () ;
-        ps
-
 (* Set edit context and navigate to form - service is stopped on submit *)
 let do_edit_instance svc =
   (* Set the edit context (service will be stopped when form is submitted) *)
@@ -354,21 +276,8 @@ let open_actions_modal ps =
   match s.service with
   | None -> ps
   | Some svc ->
-      Modal_helpers.open_choice_modal
-        ~title:("Actions . " ^ svc.Service.instance)
-        ~items:[`Edit; `EditConfig; `Overrides]
-        ~to_string:(function
-          | `Edit -> "Edit Instance"
-          | `EditConfig -> "Edit Configuration"
-          | `Overrides -> "Service Overrides")
-        ~on_select:(fun choice ->
-          match choice with
-          | `Edit -> ignore (confirm_edit_modal ps svc)
-          | `EditConfig -> ignore (edit_config_modal ps)
-          | `Overrides ->
-              Modal_helpers.show_error
-                ~title:"Not Implemented"
-                "Overrides not implemented yet") ;
+      (* Directly open the edit confirmation modal - no need for action menu *)
+      ignore (confirm_edit_modal ps svc) ;
       ps
 
 (* Set the forward reference now that open_actions_modal is defined *)
