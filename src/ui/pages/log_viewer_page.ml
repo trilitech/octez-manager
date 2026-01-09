@@ -36,11 +36,12 @@ let close_pager s =
   (match s.pager with Static _ -> () | FileTail fp -> File_pager.close fp) ;
   List.iter (fun f -> try Sys.remove f with _ -> ()) s.cleanup_files
 
-let open_file_with_tail path =
+let open_file_with_tail ?title path =
   match
     File_pager.open_file
       ~follow:true
       ~notify_render:Render_notify.request_render
+      ?title
       path
   with
   | Ok fp ->
@@ -49,7 +50,7 @@ let open_file_with_tail path =
       Ok fp
   | Error e -> Error e
 
-let open_stream_via_file cmd =
+let open_stream_via_file ~title cmd =
   let temp_file = Filename.temp_file "octez_log_" ".txt" in
   (* Start background process to feed the file *)
   let full_cmd =
@@ -59,7 +60,7 @@ let open_stream_via_file cmd =
   | 0 -> (
       (* Give it a moment to create/write *)
       Unix.sleepf 0.1 ;
-      match open_file_with_tail temp_file with
+      match open_file_with_tail ~title temp_file with
       | Ok fp -> Ok (fp, temp_file)
       | Error e -> Error (`Msg e))
   | _ -> Error (`Msg "Failed to start background logger")
@@ -81,7 +82,7 @@ let init () =
                 ~source:Journald
             with
             | Ok cmd -> (
-                match open_stream_via_file cmd with
+                match open_stream_via_file ~title:"journalctl" cmd with
                 | Ok (fp, tmp) -> (Log_viewer.Journald, FileTail fp, [tmp])
                 | Error _ -> (
                     (* Fall back to daily logs *)
@@ -170,7 +171,7 @@ let refresh ps =
             ~source:s.source
         with
         | Ok cmd -> (
-            match open_stream_via_file cmd with
+            match open_stream_via_file ~title:"journalctl" cmd with
             | Ok (fp, tmp) ->
                 {s with pager = FileTail fp; cleanup_files = [tmp]}
             | Error (`Msg msg) ->
@@ -242,7 +243,7 @@ let toggle_source ps =
             ~source:new_source
         with
         | Ok cmd -> (
-            match open_stream_via_file cmd with
+            match open_stream_via_file ~title:"journalctl" cmd with
             | Ok (fp, tmp) ->
                 {
                   s with
