@@ -116,12 +116,15 @@ let make_initial_model () =
               (if base_dir = "" then
                  Common.default_role_dir "baker" svc.Service.instance
                else base_dir);
-            node = `None;
+            node =
+              (match svc.Service.depends_on with
+              | Some inst -> `Service inst
+              | None -> `None);
             node_endpoint =
               (if node_endpoint = "" then "127.0.0.1:8732" else node_endpoint);
           };
-        parent_node = "";
-        (* TODO: Could try to detect from depends_on *)
+        parent_node =
+          (match svc.Service.depends_on with Some inst -> inst | None -> "");
         node_data_dir = "";
         dal;
         delegates;
