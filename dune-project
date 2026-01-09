@@ -19,6 +19,7 @@
   miaou-runner
   eio
   eio_main
+  eio_posix
   cohttp-eio
   tls-eio
   tls

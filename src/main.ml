@@ -2795,8 +2795,13 @@ let ui_cmd =
              Capabilities.register () ;
              (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
              Sys.set_signal Sys.sigpipe Sys.Signal_ignore ;
+             (* Default to stable term driver if not explicitly set *)
+             (match Sys.getenv_opt "MIAOU_DRIVER" with
+             | None -> Unix.putenv "MIAOU_DRIVER" "term"
+             | Some _ -> ()) ;
              let result =
-               Eio_main.run @@ fun env ->
+               (* Use POSIX backend to avoid io_uring resource exhaustion *)
+               Eio_posix.run @@ fun env ->
                Eio.Switch.run @@ fun sw ->
                Miaou_helpers.Fiber_runtime.init ~env ~sw ;
                Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
