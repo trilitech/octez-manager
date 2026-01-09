@@ -235,7 +235,30 @@ let import_snapshot ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
   in
   (* Use streaming for real-time output when on_log is provided *)
   match on_log with
-  | Some log -> Common.run_streaming ~on_log:log args
+  | Some log ->
+      (* Wrap log to detect and announce phases *)
+      let current_phase = ref "" in
+      let phase_log line =
+        let announce phase =
+          if !current_phase <> phase then (
+            current_phase := phase ;
+            log (Printf.sprintf "\n=== %s ===\n" phase))
+        in
+        (if String.length line > 0 then
+           let lower = String.lowercase_ascii line in
+           if
+             String.sub lower 0 (min 10 (String.length lower)) |> fun s ->
+             String.ends_with ~suffix:"retrieving" s
+           then announce "Importing context"
+           else if
+             String.ends_with ~suffix:"integrity_check." lower
+             || String.ends_with ~suffix:"integrity check" lower
+           then announce "Integrity check"
+           else if String.starts_with ~prefix:"storing floating" lower then
+             announce "Storing blocks") ;
+        log line
+      in
+      Common.run_streaming ~on_log:phase_log args
   | None -> Common.run ~quiet args
 
 let import_snapshot_file ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
@@ -255,9 +278,9 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
   match plan with
   | No_snapshot -> Ok ()
   | Direct_snapshot {uri} ->
-      log (Printf.sprintf "Downloading snapshot from %s...\n" uri) ;
+      log "\n=== Downloading snapshot ===\n" ;
+      log (Printf.sprintf "From: %s\n" uri) ;
       let* snapshot_file = prepare_snapshot_source ~quiet ?on_log uri in
-      log "Download complete. Importing snapshot...\n" ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
@@ -271,11 +294,11 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
             ~no_check
             ())
   | Tzinit_snapshot res ->
-      log (Printf.sprintf "Downloading snapshot from %s...\n" res.download_url) ;
+      log "\n=== Downloading snapshot ===\n" ;
+      log (Printf.sprintf "From: %s\n" res.download_url) ;
       let* snapshot_file =
         download_snapshot_to_tmp ~quiet ?on_log res.download_url
       in
-      log "Download complete. Importing snapshot...\n" ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
