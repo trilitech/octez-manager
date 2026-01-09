@@ -74,6 +74,7 @@ type baker_request = {
   base_dir : string option;
   delegates : string list;
   dal_config : dal_config;
+  dal_node : string option;  (** DAL node instance name if using local DAL *)
   liquidity_baking_vote : string option;
   extra_args : string list;
   service_user : string;
