@@ -475,6 +475,39 @@ let resolve_from_data_dir data_dir =
     in
     Ok (`Data_dir {network; history_mode; rpc_addr; net_addr})
 
+(** Update endpoint references in dependent services when a service's RPC address changes.
+    For nodes: updates OCTEZ_NODE_ENDPOINT in baker/accuser/dal-node env files.
+    For DAL nodes: updates OCTEZ_DAL_CONFIG in baker env files. *)
+let update_dependent_endpoints ~instance ~role ~new_rpc_addr () =
+  let new_endpoint = endpoint_of_rpc new_rpc_addr in
+  let* svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | None -> Ok ()
+  | Some svc ->
+      List.fold_left
+        (fun acc dep_inst ->
+          let* () = acc in
+          match Node_env.read ~inst:dep_inst with
+          | Ok pairs ->
+              let updated_pairs =
+                List.map
+                  (fun (k, v) ->
+                    (* For node: update OCTEZ_NODE_ENDPOINT in dependents *)
+                    if role = "node" && k = "OCTEZ_NODE_ENDPOINT" then
+                      (k, new_endpoint)
+                      (* For DAL node: update OCTEZ_DAL_CONFIG in baker dependents *)
+                    else if
+                      (role = "dal-node" || role = "dal")
+                      && k = "OCTEZ_DAL_CONFIG"
+                    then (k, new_endpoint)
+                    else (k, v))
+                  pairs
+              in
+              Node_env.write_pairs ~inst:dep_inst updated_pairs
+          | Error _ -> Ok ())
+        (Ok ())
+        svc.dependents
+
 let install_node ?(quiet = false) ?on_log (request : node_request) =
   let log msg = match on_log with Some f -> f msg | None -> () in
   log "Validating instance name...\n" ;
@@ -634,6 +667,17 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   in
   log "Writing service registry...\n" ;
   let* () = Service_registry.write service in
+  (* In edit mode, update dependent endpoints if RPC address changed *)
+  let* () =
+    if request.preserve_data then (
+      log "Updating dependent endpoints...\n" ;
+      update_dependent_endpoints
+        ~instance:request.instance
+        ~role:"node"
+        ~new_rpc_addr:request.rpc_addr
+        ())
+    else Ok ()
+  in
   log "Listing services for logrotate...\n" ;
   let* services = Service_registry.list () in
   log "Syncing logrotate...\n" ;
@@ -736,6 +780,19 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ()
   in
   let* () = Service_registry.write service in
+  (* In edit mode, update dependent endpoints if RPC address changed (for DAL nodes) *)
+  let* () =
+    if
+      request.preserve_data
+      && (request.role = "dal-node" || request.role = "dal")
+    then
+      update_dependent_endpoints
+        ~instance:request.instance
+        ~role:request.role
+        ~new_rpc_addr:request.rpc_addr
+        ()
+    else Ok ()
+  in
   (* Register as dependent on parent if depends_on is set *)
   let* () =
     match request.depends_on with
