@@ -35,6 +35,11 @@ val navigate : string -> unit
 
 val consume_navigation : unit -> string option
 
+(** Skip navigation back once - used when form exits to prevent back-navigation loop *)
+val set_skip_back_once : unit -> unit
+
+val consume_skip_back_once : unit -> bool
+
 (** Toast notifications *)
 val toast_info : string -> unit
 

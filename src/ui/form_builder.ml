@@ -485,7 +485,9 @@ struct
                 Context.mark_instances_dirty () ;
                 (* Reset form to fresh initial values for next use *)
                 s.model_ref := S.spec.initial_model () ;
-                (* Navigate back to instances page via Context *)
+                (* Navigate back to instances page via Context.
+                   Set skip_back_once to prevent loop when user presses Esc on instances. *)
+                Context.set_skip_back_once () ;
                 Context.navigate "instances" ;
                 s
             | Error (`Msg msg) ->
@@ -505,7 +507,9 @@ struct
             Context.mark_instances_dirty () ;
             (* Reset form to fresh initial values for next use *)
             s.model_ref := S.spec.initial_model () ;
-            (* Navigate back to instances page via Context *)
+            (* Navigate back to instances page via Context.
+               Set skip_back_once to prevent loop when user presses Esc on instances. *)
+            Context.set_skip_back_once () ;
             Context.navigate "instances" ;
             s
         | Error (`Msg msg) ->
@@ -599,7 +603,12 @@ struct
       match Miaou.Core.Keys.of_string key with
       | Some (Miaou.Core.Keys.Char "Esc") | Some (Miaou.Core.Keys.Char "Escape")
         ->
-          Navigation.back ps
+          (* Go to instances page directly - Navigation.back would go to
+             details page which may have stale/consumed context.
+             Set skip_back_once to prevent loop when user presses Esc on instances. *)
+          Context.set_skip_back_once () ;
+          Context.navigate "instances" ;
+          ps
       | Some Miaou.Core.Keys.Up ->
           Navigation.update (fun s -> move_state s (-1)) ps
       | Some Miaou.Core.Keys.Down ->
@@ -613,7 +622,10 @@ struct
 
   let service_cycle ps _ = refresh ps
 
-  let back ps = Navigation.back ps
+  let back ps =
+    Context.set_skip_back_once () ;
+    Context.navigate "instances" ;
+    ps
 
   let move ps delta = Navigation.update (fun s -> move_state s delta) ps
 
