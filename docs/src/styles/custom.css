@@ -1,0 +1,85 @@
+/* Octez Manager - Tezos-inspired theme */
+
+:root {
+  /* Tezos blue palette */
+  --sl-color-accent-low: #0a2540;
+  --sl-color-accent: #0D61FF;
+  --sl-color-accent-high: #4d94ff;
+
+  /* Clean backgrounds */
+  --sl-color-bg: #0f1419;
+  --sl-color-bg-nav: #0a0f14;
+  --sl-color-bg-sidebar: #0a0f14;
+
+  /* Text */
+  --sl-color-white: #f0f6fc;
+  --sl-color-gray-1: #c9d1d9;
+  --sl-color-gray-2: #8b949e;
+
+  /* Code blocks */
+  --sl-color-bg-inline-code: #161b22;
+}
+
+/* Hero section */
+.hero {
+  padding-bottom: 2rem;
+}
+
+.hero .tagline {
+  font-size: 1.25rem;
+  color: var(--sl-color-gray-1);
+}
+
+/* Code blocks - terminal style */
+pre {
+  border-radius: 8px;
+  border: 1px solid #30363d;
+}
+
+pre code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.9rem;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  border-bottom: 2px solid var(--sl-color-accent);
+  padding: 0.75rem;
+}
+
+td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #30363d;
+}
+
+/* Cards */
+.card {
+  border: 1px solid #30363d;
+  background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+}
+
+/* Horizontal rules */
+hr {
+  border: none;
+  border-top: 1px solid #30363d;
+  margin: 2.5rem 0;
+}
+
+/* Command styling */
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  background: #161b22;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+}
+
+/* Logo styling */
+.site-title img {
+  height: 2rem;
+}

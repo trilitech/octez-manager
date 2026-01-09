@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- Central terminal/head -->
+  <rect x="35" y="30" width="50" height="40" rx="6" fill="#0f1419" stroke="#0D61FF" stroke-width="2"/>
+
+  <!-- Terminal header bar -->
+  <rect x="35" y="30" width="50" height="10" rx="6" fill="#0D61FF" opacity="0.2"/>
+  <rect x="35" y="37" width="50" height="3" fill="#0D61FF" opacity="0.1"/>
+
+  <!-- Terminal dots -->
+  <circle cx="42" cy="35" r="2" fill="#0D61FF" opacity="0.6"/>
+  <circle cx="49" cy="35" r="2" fill="#0D61FF" opacity="0.6"/>
+  <circle cx="56" cy="35" r="2" fill="#0D61FF" opacity="0.6"/>
+
+  <!-- Terminal content: OM -->
+  <text x="47" y="60" font-family="monospace" font-size="14" font-weight="bold" fill="#0D61FF">OM</text>
+
+  <!-- Cursor -->
+  <rect x="67" y="50" width="7" height="12" fill="#0D61FF" opacity="0.7"/>
+
+  <!-- Tentacle 1 - top left -->
+  <path d="M35 38 Q20 35 15 25 Q12 18 18 15" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="18" cy="15" r="3" fill="#0D61FF"/>
+
+  <!-- Tentacle 2 - top right -->
+  <path d="M85 38 Q100 35 105 25 Q108 18 102 15" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="102" cy="15" r="3" fill="#0D61FF"/>
+
+  <!-- Tentacle 3 - left -->
+  <path d="M35 50 Q20 50 12 55 Q5 60 8 68" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="8" cy="68" r="3" fill="#0D61FF"/>
+
+  <!-- Tentacle 4 - right -->
+  <path d="M85 50 Q100 50 108 55 Q115 60 112 68" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="112" cy="68" r="3" fill="#0D61FF"/>
+
+  <!-- Tentacle 5 - bottom left -->
+  <path d="M40 70 Q35 85 25 92 Q18 97 12 93" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="12" cy="93" r="3" fill="#0D61FF"/>
+
+  <!-- Tentacle 6 - bottom center-left -->
+  <path d="M52 70 Q50 88 45 98 Q42 106 48 110" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="48" cy="110" r="3" fill="#0D61FF"/>
+
+  <!-- Tentacle 7 - bottom center-right -->
+  <path d="M68 70 Q70 88 75 98 Q78 106 72 110" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="72" cy="110" r="3" fill="#0D61FF"/>
+
+  <!-- Tentacle 8 - bottom right -->
+  <path d="M80 70 Q85 85 95 92 Q102 97 108 93" stroke="#0D61FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="108" cy="93" r="3" fill="#0D61FF"/>
+</svg>

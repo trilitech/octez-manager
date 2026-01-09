@@ -1,0 +1,69 @@
+---
+title: Introduction
+description: What is Octez Manager
+---
+
+# What is Octez Manager?
+
+Octez Manager is a CLI and TUI tool for deploying and managing Tezos infrastructure.
+
+## The problem
+
+Setting up Tezos infrastructure requires:
+
+- Writing systemd unit files
+- Managing environment configurations
+- Handling user permissions
+- Downloading and importing snapshots
+- Monitoring logs across services
+
+## The solution
+
+One command:
+
+```bash
+octez-manager install-node --instance mainnet --network mainnet
+```
+
+Or an interactive TUI:
+
+```
+┌─ Install Node ───────────────────────────────────────────────────────┐
+│                                                                      │
+│  Instance name:     mainnet                                          │
+│  Network:           mainnet                                          │
+│  History mode:      ● rolling  ○ full  ○ archive                     │
+│  Bootstrap:         ● snapshot  ○ genesis                            │
+│                                                                      │
+│                              [ Install ]                             │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+## Services
+
+| Service | Description |
+|---------|-------------|
+| **Node** | L1 node with automatic snapshot bootstrap |
+| **Baker** | Block production and attestations |
+| **Accuser** | Double-baking/endorsing detection |
+| **DAL Node** | Data Availability Layer |
+| **Signer** | Remote signing service |
+
+## Modes
+
+**User mode** — Services run as your user. Good for testing.
+
+```bash
+octez-manager
+```
+
+**System mode** — Dedicated service users, proper isolation. For production.
+
+```bash
+sudo octez-manager
+```
+
+## Next
+
+- [Installation](/octez-manager/getting-started/installation/)
+- [Quick Start](/octez-manager/getting-started/quick-start/)
