@@ -70,7 +70,7 @@ let format_network_choice (info : Teztnets.network_info) =
 
 let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
     ?(binary_validator = fun _ -> true) ?(skip_instance_name = false)
-    ?(edit_mode = false) () =
+    ?(edit_mode = false) ?(original_instance : string option = None) () =
   let open Form_builder in
   let instance_name_field =
     if skip_instance_name then []
@@ -90,8 +90,10 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
             in
             let name = (get_core m).instance_name in
             if not (is_nonempty name) then Error "Instance name is required"
-            else if instance_in_use ~states name then
-              Error "Instance name already exists"
+            else if
+              instance_in_use ~states name
+              && not (edit_mode && original_instance = Some name)
+            then Error "Instance name already exists"
             else Ok ());
       ]
   in

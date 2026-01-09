@@ -260,6 +260,7 @@ let spec =
           ~subcommand:["run"; "accuser"]
           ~binary_validator:Form_builder_common.has_octez_baker_binary
           ~edit_mode:model.edit_mode
+          ~original_instance:model.original_instance
           ()
         @ [
             node_selection_field;
