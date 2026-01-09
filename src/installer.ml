@@ -1118,6 +1118,53 @@ let stop_service_cascade ?quiet ~instance () =
 
 let stop_service ?quiet ~instance () = stop_service_cascade ?quiet ~instance ()
 
+let get_stopped_dependencies ~instance () =
+  let* svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | None -> R.error_msgf "Instance '%s' not found" instance
+  | Some _svc ->
+      (* Collect all stopped parent dependencies *)
+      let rec collect_deps acc inst =
+        match Service_registry.find ~instance:inst with
+        | Ok (Some s) -> (
+            match s.depends_on with
+            | None -> Ok acc
+            | Some parent_inst -> (
+                match Service_registry.find ~instance:parent_inst with
+                | Ok (Some parent) -> (
+                    match
+                      Systemd.is_active ~role:parent.role ~instance:parent_inst
+                    with
+                    | Ok true -> collect_deps acc parent_inst
+                    | Ok false | Error _ ->
+                        (* Parent is stopped, add it and check its dependencies *)
+                        collect_deps (parent :: acc) parent_inst)
+                | _ -> Ok acc))
+        | _ -> Ok acc
+      in
+      let* deps = collect_deps [] instance in
+      (* Return in order: topmost parent first *)
+      Ok (List.rev deps)
+
+let get_stopped_dependents ~instance () =
+  let* svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | None -> R.error_msgf "Instance '%s' not found" instance
+  | Some svc ->
+      (* Collect all stopped dependents *)
+      let stopped =
+        List.filter_map
+          (fun dep_inst ->
+            match Service_registry.find ~instance:dep_inst with
+            | Ok (Some dep) -> (
+                match Systemd.is_active ~role:dep.role ~instance:dep_inst with
+                | Ok true -> None
+                | Ok false | Error _ -> Some dep)
+            | _ -> None)
+          svc.dependents
+      in
+      Ok stopped
+
 let restart_service ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with

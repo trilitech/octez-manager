@@ -1391,13 +1391,312 @@ let instance_term =
            (start|stop|restart|remove|purge|show|show-service|logs|edit)"
     | Some inst, Some action -> (
         match action with
-        | Start ->
-            run_result (Installer.start_service ~quiet:false ~instance:inst ())
+        | Start -> (
+            (* Check for stopped dependencies *)
+            let dep_check =
+              Installer.get_stopped_dependencies ~instance:inst ()
+            in
+            match dep_check with
+            | Error (`Msg e) ->
+                prerr_endline ("Error checking dependencies: " ^ e) ;
+                `Error (false, e)
+            | Ok [] -> (
+                (* No stopped dependencies, start directly *)
+                let result =
+                  Installer.start_service ~quiet:false ~instance:inst ()
+                in
+                match result with
+                | Ok () -> (
+                    (* Check for stopped dependents *)
+                    match
+                      Installer.get_stopped_dependents ~instance:inst ()
+                    with
+                    | Ok [] -> `Ok ()
+                    | Ok stopped_deps when is_interactive () ->
+                        let names =
+                          String.concat
+                            ", "
+                            (List.map
+                               (fun s -> s.Service.instance)
+                               stopped_deps)
+                        in
+                        let should_start =
+                          prompt_yes_no
+                            (Printf.sprintf "Start dependents? (%s)" names)
+                            ~default:true
+                        in
+                        if should_start then
+                          List.iter
+                            (fun dep ->
+                              match
+                                Installer.start_service
+                                  ~quiet:false
+                                  ~instance:dep.Service.instance
+                                  ()
+                              with
+                              | Ok () ->
+                                  Printf.printf
+                                    "Started %s\n%!"
+                                    dep.Service.instance
+                              | Error (`Msg e) ->
+                                  Printf.eprintf
+                                    "Failed to start %s: %s\n%!"
+                                    dep.Service.instance
+                                    e)
+                            stopped_deps ;
+                        `Ok ()
+                    | _ -> `Ok ())
+                | Error (`Msg e) -> `Error (false, e))
+            | Ok stopped_deps ->
+                let names =
+                  String.concat
+                    ", "
+                    (List.map (fun s -> s.Service.instance) stopped_deps)
+                in
+                if is_interactive () then
+                  let should_start_deps =
+                    prompt_yes_no
+                      (Printf.sprintf
+                         "Dependencies not running (%s). Start them first?"
+                         names)
+                      ~default:true
+                  in
+                  if should_start_deps then (
+                    (* Start dependencies in order *)
+                    let failed = ref false in
+                    List.iter
+                      (fun dep ->
+                        if not !failed then
+                          match
+                            Installer.start_service
+                              ~quiet:false
+                              ~instance:dep.Service.instance
+                              ()
+                          with
+                          | Ok () ->
+                              Printf.printf
+                                "Started %s\n%!"
+                                dep.Service.instance
+                          | Error (`Msg e) ->
+                              Printf.eprintf
+                                "Failed to start %s: %s\n%!"
+                                dep.Service.instance
+                                e ;
+                              failed := true)
+                      stopped_deps ;
+                    if !failed then
+                      `Error (false, "Failed to start dependencies")
+                    else
+                      (* Now start the target instance *)
+                      let result =
+                        Installer.start_service ~quiet:false ~instance:inst ()
+                      in
+                      match result with
+                      | Ok () -> (
+                          (* Check for stopped dependents *)
+                          match
+                            Installer.get_stopped_dependents ~instance:inst ()
+                          with
+                          | Ok [] -> `Ok ()
+                          | Ok stopped_deps ->
+                              let names =
+                                String.concat
+                                  ", "
+                                  (List.map
+                                     (fun s -> s.Service.instance)
+                                     stopped_deps)
+                              in
+                              let should_start =
+                                prompt_yes_no
+                                  (Printf.sprintf
+                                     "Start dependents? (%s)"
+                                     names)
+                                  ~default:true
+                              in
+                              if should_start then
+                                List.iter
+                                  (fun dep ->
+                                    match
+                                      Installer.start_service
+                                        ~quiet:false
+                                        ~instance:dep.Service.instance
+                                        ()
+                                    with
+                                    | Ok () ->
+                                        Printf.printf
+                                          "Started %s\n%!"
+                                          dep.Service.instance
+                                    | Error (`Msg e) ->
+                                        Printf.eprintf
+                                          "Failed to start %s: %s\n%!"
+                                          dep.Service.instance
+                                          e)
+                                  stopped_deps ;
+                              `Ok ()
+                          | _ -> `Ok ())
+                      | Error (`Msg e) -> `Error (false, e))
+                  else (
+                    prerr_endline
+                      "Cancelled - dependencies must be running first." ;
+                    `Ok ())
+                else
+                  (* Non-interactive mode - just fail like before *)
+                  run_result
+                    (Installer.start_service ~quiet:false ~instance:inst ()))
         | Stop ->
             run_result (Installer.stop_service ~quiet:false ~instance:inst ())
-        | Restart ->
-            run_result
-              (Installer.restart_service ~quiet:false ~instance:inst ())
+        | Restart -> (
+            (* Check for stopped dependencies *)
+            let dep_check =
+              Installer.get_stopped_dependencies ~instance:inst ()
+            in
+            match dep_check with
+            | Error (`Msg e) ->
+                prerr_endline ("Error checking dependencies: " ^ e) ;
+                `Error (false, e)
+            | Ok [] -> (
+                (* No stopped dependencies, restart directly *)
+                let result =
+                  Installer.restart_service ~quiet:false ~instance:inst ()
+                in
+                match result with
+                | Ok () -> (
+                    (* Check for stopped dependents *)
+                    match
+                      Installer.get_stopped_dependents ~instance:inst ()
+                    with
+                    | Ok [] -> `Ok ()
+                    | Ok stopped_deps when is_interactive () ->
+                        let names =
+                          String.concat
+                            ", "
+                            (List.map
+                               (fun s -> s.Service.instance)
+                               stopped_deps)
+                        in
+                        let should_restart =
+                          prompt_yes_no
+                            (Printf.sprintf "Restart dependents? (%s)" names)
+                            ~default:true
+                        in
+                        if should_restart then
+                          List.iter
+                            (fun dep ->
+                              match
+                                Installer.restart_service
+                                  ~quiet:false
+                                  ~instance:dep.Service.instance
+                                  ()
+                              with
+                              | Ok () ->
+                                  Printf.printf
+                                    "Restarted %s\n%!"
+                                    dep.Service.instance
+                              | Error (`Msg e) ->
+                                  Printf.eprintf
+                                    "Failed to restart %s: %s\n%!"
+                                    dep.Service.instance
+                                    e)
+                            stopped_deps ;
+                        `Ok ()
+                    | _ -> `Ok ())
+                | Error (`Msg e) -> `Error (false, e))
+            | Ok stopped_deps ->
+                let names =
+                  String.concat
+                    ", "
+                    (List.map (fun s -> s.Service.instance) stopped_deps)
+                in
+                if is_interactive () then
+                  let should_start_deps =
+                    prompt_yes_no
+                      (Printf.sprintf
+                         "Dependencies not running (%s). Start them first?"
+                         names)
+                      ~default:true
+                  in
+                  if should_start_deps then (
+                    (* Start dependencies in order *)
+                    let failed = ref false in
+                    List.iter
+                      (fun dep ->
+                        if not !failed then
+                          match
+                            Installer.start_service
+                              ~quiet:false
+                              ~instance:dep.Service.instance
+                              ()
+                          with
+                          | Ok () ->
+                              Printf.printf
+                                "Started %s\n%!"
+                                dep.Service.instance
+                          | Error (`Msg e) ->
+                              Printf.eprintf
+                                "Failed to start %s: %s\n%!"
+                                dep.Service.instance
+                                e ;
+                              failed := true)
+                      stopped_deps ;
+                    if !failed then
+                      `Error (false, "Failed to start dependencies")
+                    else
+                      (* Now restart the target instance *)
+                      let result =
+                        Installer.restart_service ~quiet:false ~instance:inst ()
+                      in
+                      match result with
+                      | Ok () -> (
+                          (* Check for stopped dependents *)
+                          match
+                            Installer.get_stopped_dependents ~instance:inst ()
+                          with
+                          | Ok [] -> `Ok ()
+                          | Ok stopped_deps ->
+                              let names =
+                                String.concat
+                                  ", "
+                                  (List.map
+                                     (fun s -> s.Service.instance)
+                                     stopped_deps)
+                              in
+                              let should_restart =
+                                prompt_yes_no
+                                  (Printf.sprintf
+                                     "Restart dependents? (%s)"
+                                     names)
+                                  ~default:true
+                              in
+                              if should_restart then
+                                List.iter
+                                  (fun dep ->
+                                    match
+                                      Installer.restart_service
+                                        ~quiet:false
+                                        ~instance:dep.Service.instance
+                                        ()
+                                    with
+                                    | Ok () ->
+                                        Printf.printf
+                                          "Restarted %s\n%!"
+                                          dep.Service.instance
+                                    | Error (`Msg e) ->
+                                        Printf.eprintf
+                                          "Failed to restart %s: %s\n%!"
+                                          dep.Service.instance
+                                          e)
+                                  stopped_deps ;
+                              `Ok ()
+                          | _ -> `Ok ())
+                      | Error (`Msg e) -> `Error (false, e))
+                  else (
+                    prerr_endline
+                      "Cancelled - dependencies must be running first." ;
+                    `Ok ())
+                else
+                  (* Non-interactive mode - just fail like before *)
+                  run_result
+                    (Installer.restart_service ~quiet:false ~instance:inst ()))
         | Remove ->
             run_result
               (Installer.remove_service

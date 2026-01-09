@@ -1128,6 +1128,224 @@ let _view_logs_old state =
           show_journald () ;
           state)
 
+(* Start a single service (internal helper) *)
+let do_start_service ~instance ~role =
+  let cap = Miaou_interfaces.Service_lifecycle.require () in
+  Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
+  |> Result.map_error (fun e -> `Msg e)
+
+(* Offer to start stopped dependents after starting a service *)
+let offer_start_dependents ~instance =
+  match Installer.get_stopped_dependents ~instance () with
+  | Ok [] -> ()
+  | Ok stopped ->
+      let dep_names = List.map (fun s -> s.Service.instance) stopped in
+      Modal_helpers.open_choice_modal
+        ~title:"Start Dependents?"
+        ~items:[`StartAll; `Dismiss]
+        ~to_string:(function
+          | `StartAll ->
+              Printf.sprintf "Start all (%s)" (String.concat ", " dep_names)
+          | `Dismiss -> "Dismiss (start later)")
+        ~on_select:(function
+          | `StartAll ->
+              stopped
+              |> List.iter (fun dep ->
+                  Context.toast_info
+                    (Printf.sprintf "Starting %s..." dep.Service.instance) ;
+                  match
+                    do_start_service
+                      ~instance:dep.Service.instance
+                      ~role:dep.Service.role
+                  with
+                  | Ok () ->
+                      Context.toast_success
+                        (Printf.sprintf "%s started" dep.Service.instance)
+                  | Error (`Msg e) ->
+                      Context.toast_error
+                        (Printf.sprintf "%s: %s" dep.Service.instance e)) ;
+              Context.mark_instances_dirty ()
+          | `Dismiss -> ())
+  | Error _ -> ()
+
+(* Start with cascade: check dependencies first, then offer to start dependents *)
+let start_with_cascade ~instance ~role =
+  match Installer.get_stopped_dependencies ~instance () with
+  | Error (`Msg e) ->
+      Context.toast_error (Printf.sprintf "Error checking dependencies: %s" e)
+  | Ok [] ->
+      (* No stopped dependencies, start directly *)
+      run_unit_action ~verb:"start" ~instance (fun () ->
+          do_start_service ~instance ~role) ;
+      (* After a short delay, offer to start dependents *)
+      Job_manager.submit
+        ~description:(Printf.sprintf "Check dependents for %s" instance)
+        (fun ~append_log:_ () ->
+          (* Small delay to let the start complete *)
+          Unix.sleepf 0.5 ;
+          Ok ())
+        ~on_complete:(fun _ -> offer_start_dependents ~instance)
+  | Ok stopped_deps ->
+      (* Dependencies are stopped, ask user to start them first *)
+      let dep_names = List.map (fun s -> s.Service.instance) stopped_deps in
+      Modal_helpers.open_choice_modal
+        ~title:"Dependencies Not Running"
+        ~items:[`StartDeps; `Cancel]
+        ~to_string:(function
+          | `StartDeps ->
+              Printf.sprintf
+                "Start dependencies first (%s)"
+                (String.concat ", " dep_names)
+          | `Cancel -> "Cancel")
+        ~on_select:(function
+          | `Cancel -> ()
+          | `StartDeps ->
+              (* Start dependencies in order (topmost parent first) *)
+              let success =
+                List.fold_left
+                  (fun acc dep ->
+                    if acc then (
+                      Context.toast_info
+                        (Printf.sprintf "Starting %s..." dep.Service.instance) ;
+                      match
+                        do_start_service
+                          ~instance:dep.Service.instance
+                          ~role:dep.Service.role
+                      with
+                      | Ok () ->
+                          Context.toast_success
+                            (Printf.sprintf "%s started" dep.Service.instance) ;
+                          true
+                      | Error (`Msg e) ->
+                          Context.toast_error
+                            (Printf.sprintf "%s: %s" dep.Service.instance e) ;
+                          false)
+                    else acc)
+                  true
+                  stopped_deps
+              in
+              if success then (
+                (* Now start the actual service *)
+                Context.toast_info (Printf.sprintf "Starting %s..." instance) ;
+                match do_start_service ~instance ~role with
+                | Ok () ->
+                    Context.toast_success (Printf.sprintf "%s started" instance) ;
+                    Context.mark_instances_dirty () ;
+                    (* Offer to start dependents *)
+                    offer_start_dependents ~instance
+                | Error (`Msg e) ->
+                    Context.toast_error (Printf.sprintf "%s: %s" instance e))
+              else Context.mark_instances_dirty ())
+
+(* Restart a single service (internal helper) *)
+let do_restart_service ~instance ~role =
+  let cap = Miaou_interfaces.Service_lifecycle.require () in
+  Miaou_interfaces.Service_lifecycle.restart cap ~role ~service:instance
+  |> Result.map_error (fun e -> `Msg e)
+
+(* Offer to restart stopped dependents after restarting a service *)
+let offer_restart_dependents ~instance =
+  match Installer.get_stopped_dependents ~instance () with
+  | Ok [] -> ()
+  | Ok stopped ->
+      let dep_names = List.map (fun s -> s.Service.instance) stopped in
+      Modal_helpers.open_choice_modal
+        ~title:"Restart Dependents?"
+        ~items:[`RestartAll; `Dismiss]
+        ~to_string:(function
+          | `RestartAll ->
+              Printf.sprintf "Restart all (%s)" (String.concat ", " dep_names)
+          | `Dismiss -> "Dismiss (restart later)")
+        ~on_select:(function
+          | `RestartAll ->
+              stopped
+              |> List.iter (fun dep ->
+                  Context.toast_info
+                    (Printf.sprintf "Restarting %s..." dep.Service.instance) ;
+                  match
+                    do_restart_service
+                      ~instance:dep.Service.instance
+                      ~role:dep.Service.role
+                  with
+                  | Ok () ->
+                      Context.toast_success
+                        (Printf.sprintf "%s restarted" dep.Service.instance)
+                  | Error (`Msg e) ->
+                      Context.toast_error
+                        (Printf.sprintf "%s: %s" dep.Service.instance e)) ;
+              Context.mark_instances_dirty ()
+          | `Dismiss -> ())
+  | Error _ -> ()
+
+(* Restart with cascade: check dependencies first, then offer to restart dependents *)
+let restart_with_cascade ~instance ~role =
+  match Installer.get_stopped_dependencies ~instance () with
+  | Error (`Msg e) ->
+      Context.toast_error (Printf.sprintf "Error checking dependencies: %s" e)
+  | Ok [] ->
+      (* No stopped dependencies, restart directly *)
+      run_unit_action ~verb:"restart" ~instance (fun () ->
+          do_restart_service ~instance ~role) ;
+      (* After a short delay, offer to restart dependents *)
+      Job_manager.submit
+        ~description:(Printf.sprintf "Check dependents for %s" instance)
+        (fun ~append_log:_ () ->
+          Unix.sleepf 0.5 ;
+          Ok ())
+        ~on_complete:(fun _ -> offer_restart_dependents ~instance)
+  | Ok stopped_deps ->
+      (* Dependencies are stopped, ask user to start them first *)
+      let dep_names = List.map (fun s -> s.Service.instance) stopped_deps in
+      Modal_helpers.open_choice_modal
+        ~title:"Dependencies Not Running"
+        ~items:[`StartDeps; `Cancel]
+        ~to_string:(function
+          | `StartDeps ->
+              Printf.sprintf
+                "Start dependencies first (%s)"
+                (String.concat ", " dep_names)
+          | `Cancel -> "Cancel")
+        ~on_select:(function
+          | `Cancel -> ()
+          | `StartDeps ->
+              (* Start dependencies in order (topmost parent first) *)
+              let success =
+                List.fold_left
+                  (fun acc dep ->
+                    if acc then (
+                      Context.toast_info
+                        (Printf.sprintf "Starting %s..." dep.Service.instance) ;
+                      match
+                        do_start_service
+                          ~instance:dep.Service.instance
+                          ~role:dep.Service.role
+                      with
+                      | Ok () ->
+                          Context.toast_success
+                            (Printf.sprintf "%s started" dep.Service.instance) ;
+                          true
+                      | Error (`Msg e) ->
+                          Context.toast_error
+                            (Printf.sprintf "%s: %s" dep.Service.instance e) ;
+                          false)
+                    else acc)
+                  true
+                  stopped_deps
+              in
+              if success then (
+                (* Now restart the actual service *)
+                Context.toast_info (Printf.sprintf "Restarting %s..." instance) ;
+                match do_restart_service ~instance ~role with
+                | Ok () ->
+                    Context.toast_success
+                      (Printf.sprintf "%s restarted" instance) ;
+                    Context.mark_instances_dirty () ;
+                    (* Offer to restart dependents *)
+                    offer_restart_dependents ~instance
+                | Error (`Msg e) ->
+                    Context.toast_error (Printf.sprintf "%s: %s" instance e))
+              else Context.mark_instances_dirty ())
+
 let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
@@ -1148,14 +1366,7 @@ let instance_actions_modal state =
           | `Details ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Instance_details.name
-          | `Start ->
-              run_unit_action ~verb:"start" ~instance (fun () ->
-                  let cap = Miaou_interfaces.Service_lifecycle.require () in
-                  Miaou_interfaces.Service_lifecycle.start
-                    cap
-                    ~role
-                    ~service:instance
-                  |> Result.map_error (fun e -> `Msg e))
+          | `Start -> start_with_cascade ~instance ~role
           | `Stop ->
               run_unit_action ~verb:"stop" ~instance (fun () ->
                   let cap = Miaou_interfaces.Service_lifecycle.require () in
@@ -1164,14 +1375,7 @@ let instance_actions_modal state =
                     ~role
                     ~service:instance
                   |> Result.map_error (fun e -> `Msg e))
-          | `Restart ->
-              run_unit_action ~verb:"restart" ~instance (fun () ->
-                  let cap = Miaou_interfaces.Service_lifecycle.require () in
-                  Miaou_interfaces.Service_lifecycle.restart
-                    cap
-                    ~role
-                    ~service:instance
-                  |> Result.map_error (fun e -> `Msg e))
+          | `Restart -> restart_with_cascade ~instance ~role
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
