@@ -69,7 +69,8 @@ let format_network_choice (info : Teztnets.network_info) =
 (** {1 Core Service Bundle} *)
 
 let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
-    ?(binary_validator = fun _ -> true) ?(skip_instance_name = false) () =
+    ?(binary_validator = fun _ -> true) ?(skip_instance_name = false)
+    ?(edit_mode = false) () =
   let open Form_builder in
   let instance_name_field =
     if skip_instance_name then []
@@ -94,9 +95,12 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
             else Ok ());
       ]
   in
-  instance_name_field
-  @ [
-      (* Service User *)
+  (* Service User - readonly in edit mode *)
+  let service_user_field =
+    if edit_mode then
+      readonly ~label:"Service User" ~get:(fun m -> (get_core m).service_user)
+      |> with_hint "Service user cannot be changed after creation."
+    else
       validated_text
         ~label:"Service User"
         ~get:(fun m -> (get_core m).service_user)
@@ -111,7 +115,11 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
           else Ok ())
       |> with_hint
            "Unix user that runs the service. Created automatically if running \
-            as root.";
+            as root."
+  in
+  instance_name_field
+  @ [
+      service_user_field;
       (* App Bin Dir *)
       app_bin_dir
         ~label:"App Bin Dir"

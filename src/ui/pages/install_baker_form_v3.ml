@@ -465,7 +465,22 @@ let spec =
     title = " Install Baker ";
     initial_model = make_initial_model;
     fields =
-      (fun _model ->
+      (fun model ->
+        (* Base dir field - readonly in edit mode *)
+        let base_dir_field =
+          if model.edit_mode then
+            readonly ~label:"Baker Base Dir" ~get:(fun m -> m.client.base_dir)
+            |> with_hint "Base directory cannot be changed after creation."
+          else
+            client_base_dir
+              ~label:"Baker Base Dir"
+              ~get:(fun m -> m.client.base_dir)
+              ~set:(fun base_dir m ->
+                {m with client = {m.client with base_dir}})
+              ~validate:(fun m ->
+                Form_builder_common.is_nonempty m.client.base_dir)
+              ()
+        in
         [
           (* Instance name with auto-update of base_dir *)
           validated_text
@@ -505,13 +520,7 @@ let spec =
           dal_node_field;
           node_endpoint_field;
           node_data_dir_field;
-          client_base_dir
-            ~label:"Baker Base Dir"
-            ~get:(fun m -> m.client.base_dir)
-            ~set:(fun base_dir m -> {m with client = {m.client with base_dir}})
-            ~validate:(fun m ->
-              Form_builder_common.is_nonempty m.client.base_dir)
-            ();
+          base_dir_field;
           string_list
             ~label:"Delegates"
             ~get:(fun m -> m.delegates)
@@ -540,7 +549,7 @@ let spec =
             ~baker_mode:baker_mode_for_help
             ~binary_validator:has_octez_baker_binary
             ~skip_instance_name:true
-              (* We define instance_name manually above with custom logic *)
+            ~edit_mode:model.edit_mode
             ());
     pre_submit = None;
     on_init = None;
