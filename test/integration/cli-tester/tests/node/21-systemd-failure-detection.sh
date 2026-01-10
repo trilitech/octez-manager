@@ -21,19 +21,27 @@ om install-node \
     --service-user tezos \
     --no-enable 2>&1
 
-# Corrupt the config to make the node fail to start
-# We'll create an invalid config.json that will cause the node to crash
-CONFIG_FILE="/var/lib/octez/$NODE_INSTANCE/data/config.json"
-if [ -f "$CONFIG_FILE" ]; then
-    echo "Corrupting config.json..."
-    echo '{"invalid": "config"}' > "$CONFIG_FILE"
-else
-    # Create data dir and corrupt config
-    mkdir -p "/var/lib/octez/$NODE_INSTANCE/data"
-    chown -R tezos:tezos "/var/lib/octez/$NODE_INSTANCE"
-    echo '{"invalid": "config"}' > "$CONFIG_FILE"
-    chown tezos:tezos "$CONFIG_FILE"
-fi
+# Create a wrapper script that always fails
+# This will make the node service fail to start
+echo "Creating failing wrapper..."
+REAL_BIN=$(which octez-node)
+WRAPPER="/tmp/octez-node-fail-wrapper"
+cat > "$WRAPPER" << 'FAILSCRIPT'
+#!/bin/bash
+echo "Simulated node failure" >&2
+exit 1
+FAILSCRIPT
+chmod +x "$WRAPPER"
+
+# Create a dropin to use the failing wrapper
+DROPIN_DIR="/etc/systemd/system/octez-node@$NODE_INSTANCE.service.d"
+mkdir -p "$DROPIN_DIR"
+cat > "$DROPIN_DIR/fail.conf" << EOF
+[Service]
+ExecStart=
+ExecStart=$WRAPPER
+EOF
+systemctl daemon-reload
 
 # Try to start the node (it should fail)
 echo "Starting node (expecting failure)..."
@@ -87,6 +95,8 @@ fi
 echo "Cleaning up..."
 systemctl stop "octez-node@$NODE_INSTANCE" || true
 systemctl reset-failed "octez-node@$NODE_INSTANCE" || true
+rm -f "$DROPIN_DIR/fail.conf"
+systemctl daemon-reload
 cleanup_instance "$NODE_INSTANCE"
 
 echo "Systemd failure detection test passed"

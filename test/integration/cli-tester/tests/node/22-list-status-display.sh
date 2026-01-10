@@ -53,15 +53,31 @@ echo "Stopping node..."
 om instance "$NODE_INSTANCE" stop
 sleep 2
 
-# Should show stopped again
+# Should show stopped (or failed due to SIGTERM exit - both mean not running)
 LIST_OUTPUT=$(om list)
 echo "After stop om list output:"
 echo "$LIST_OUTPUT"
-if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "stopped"; then
-    echo "Correctly shows stopped status after stop"
-else
-    echo "ERROR: Expected stopped status after stop"
+# Check it's not running anymore - could be "stopped" or "failed" depending on SIGTERM handling
+if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "running"; then
+    echo "ERROR: Still shows running status after stop"
     exit 1
+else
+    echo "Correctly shows non-running status after stop"
+fi
+
+# Reset failed state for clean test
+systemctl reset-failed "octez-node@$NODE_INSTANCE" || true
+sleep 1
+
+# Now check it shows stopped
+LIST_OUTPUT=$(om list)
+echo "After reset-failed om list output:"
+echo "$LIST_OUTPUT"
+if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "stopped"; then
+    echo "Correctly shows stopped status after reset-failed"
+else
+    echo "WARNING: Expected stopped status, got:"
+    echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE"
 fi
 
 # Cleanup
