@@ -764,6 +764,39 @@ module For_tests = struct
   let render_logging_lines = render_logging_lines
 
   let exec_line = exec_line
+
+  (** Parse systemd show output for unit state (for testing) *)
+  let parse_unit_state_output output =
+    let lines = String.split_on_char '\n' output in
+    let parse_prop prefix line =
+      if
+        String.length line > String.length prefix
+        && String.sub line 0 (String.length prefix) = prefix
+      then
+        Some
+          (String.sub
+             line
+             (String.length prefix)
+             (String.length line - String.length prefix)
+          |> String.trim)
+      else None
+    in
+    let active_state = ref "unknown" in
+    let sub_state = ref "unknown" in
+    let result = ref None in
+    List.iter
+      (fun line ->
+        (match parse_prop "ActiveState=" line with
+        | Some v -> active_state := v
+        | None -> ()) ;
+        (match parse_prop "SubState=" line with
+        | Some v -> sub_state := v
+        | None -> ()) ;
+        match parse_prop "Result=" line with
+        | Some v when v <> "" && v <> "success" -> result := Some v
+        | _ -> ())
+      lines ;
+    {active_state = !active_state; sub_state = !sub_state; result = !result}
 end
 
 let get_service_paths ~role ~instance =
