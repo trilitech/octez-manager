@@ -1377,6 +1377,9 @@ let install_dal_node_cmd =
                         with
                         | Error msg -> cmdliner_error msg
                         | Ok net_addr -> (
+                            let client_base_dir =
+                              Common.default_role_dir "dal-node" instance
+                            in
                             let req : daemon_request =
                               {
                                 role = "dal-node";
@@ -1392,12 +1395,13 @@ let install_dal_node_cmd =
                                 service_args = extra_args;
                                 extra_env =
                                   [
+                                    ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
                                     ("OCTEZ_NODE_ENDPOINT", node_endpoint);
                                     ("OCTEZ_DAL_DATA_DIR", data_dir);
                                     ("OCTEZ_DAL_RPC_ADDR", rpc_addr);
                                     ("OCTEZ_DAL_NET_ADDR", net_addr);
                                   ];
-                                extra_paths = [];
+                                extra_paths = [client_base_dir];
                                 auto_enable = not no_enable;
                                 depends_on;
                                 preserve_data = false;
