@@ -58,7 +58,8 @@ instance_exists() {
 service_exists() {
     local role="$1"
     local instance="$2"
-    systemctl list-unit-files "octez-${role}@${instance}.service" 2>/dev/null | grep -q "octez-${role}@"
+    # Template units are listed as role@.service, not role@instance.service
+    systemctl list-unit-files "octez-${role}@.service" 2>/dev/null | grep -q "octez-${role}@"
 }
 
 service_is_active() {
