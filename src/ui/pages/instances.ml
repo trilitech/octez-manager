@@ -501,6 +501,15 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let marker = if idx + 3 = selected then Widgets.bold "➤" else " " in
   let status = status_icon st in
   let enabled = enabled_badge st in
+  (* Add failure badge if service has failed *)
+  let has_failure =
+    match st.Service_state.status with
+    | Service_state.Unknown _ -> true
+    | Service_state.Stopped ->
+        Option.is_some (get_recent_failure ~instance:svc.Service.instance)
+    | Service_state.Running -> false
+  in
+  let failure_badge = if has_failure then Widgets.red " [!]" else "" in
   let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
   let history =
     Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
@@ -509,11 +518,12 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let fold_indicator = if folded then "▸" else "▾" in
   let first_line =
     Printf.sprintf
-      "%s %s %s %s %s %s %s"
+      "%s %s %s %s%s %s %s %s"
       marker
       fold_indicator
       status
       instance_str
+      failure_badge
       history
       network
       enabled
@@ -1536,6 +1546,16 @@ let activate_selection s =
     | Some _ -> instance_actions_modal s
     | None -> s
 
+let dismiss_failure s =
+  match current_service s with
+  | Some st ->
+      let instance = st.Service_state.service.Service.instance in
+      clear_failure ~instance ;
+      Context.toast_info (Printf.sprintf "Cleared failure for %s" instance) ;
+      Context.mark_instances_dirty () ;
+      s
+  | None -> s
+
 module Page_Impl :
   Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg =
 struct
@@ -1564,16 +1584,18 @@ struct
     ps
 
   let handled_keys () =
-    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"]
+    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
 
   let keymap _ps =
     let activate ps = Navigation.update activate_selection ps in
     let create ps = Navigation.update create_menu_modal ps in
     let diag ps = Navigation.update go_to_diagnostics ps in
+    let dismiss ps = Navigation.update dismiss_failure ps in
     [
       ("Enter", activate, "Open");
       ("c", create, "Create service");
       ("d", diag, "Diagnostics");
+      ("x", dismiss, "Clear failure");
     ]
 
   let header s =
@@ -2068,6 +2090,7 @@ Press **Enter** to open instance menu.|}
         | Some Keys.Tab -> Navigation.update toggle_fold ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
+        | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
         | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
         | Some (Keys.Char "Esc")
         | Some (Keys.Char "Escape")
