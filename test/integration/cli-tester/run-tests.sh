@@ -61,7 +61,7 @@ run_all_tests() {
     local tests=()
 
     # Collect tests in order
-    for category in node baker accuser; do
+    for category in node dal baker accuser; do
         if [ -d "$TESTS_DIR/$category" ]; then
             for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
                 tests+=("$test")

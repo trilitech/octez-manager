@@ -13,8 +13,8 @@ let role_binary role =
   match String.lowercase_ascii role with
   | "node" -> "octez-node"
   | "baker" -> "octez-baker"
-  | "accuser" -> "octez-accuser"
-  | "dal" | "dal-node" -> "octez-dal-node"
+  | "accuser" -> "octez-baker"
+  | "dal" | "dal-node" -> "octez-baker"
   | other -> "octez-" ^ other
 
 let system_unit_path role =
@@ -110,10 +110,12 @@ let exec_line role =
        \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
        accuser ${OCTEZ_SERVICE_ARGS:-}'"
   | "dal-node" | "dal" ->
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-dal-node\" run \
-       --data-dir \"${OCTEZ_DAL_DATA_DIR}\" --endpoint \
-       \"${OCTEZ_NODE_ENDPOINT}\" --rpc-addr \"${OCTEZ_DAL_RPC_ADDR}\" \
-       --net-addr \"${OCTEZ_DAL_NET_ADDR}\" ${OCTEZ_SERVICE_ARGS:-}'"
+      (* DAL node is a subcommand of octez-baker: octez-baker [global] run dal [opts] *)
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" --base-dir \
+       \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
+       dal --data-dir \"${OCTEZ_DAL_DATA_DIR}\" --rpc-addr \
+       \"${OCTEZ_DAL_RPC_ADDR}\" --net-addr \"${OCTEZ_DAL_NET_ADDR}\" \
+       ${OCTEZ_SERVICE_ARGS:-}'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \

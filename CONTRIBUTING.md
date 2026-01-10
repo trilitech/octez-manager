@@ -140,21 +140,47 @@ Public modules should have corresponding `.mli` interface files with:
 
 ## Testing
 
-### Running Tests
+### Unit Tests
 
 ```bash
-# Run all tests
+# Run unit tests
 make test
 
 # Run specific test
-dune exec -- test/test_installer.exe
+dune exec -- test/unit_tests.exe
 ```
 
-### Writing Tests
+Unit tests use [Alcotest](https://github.com/mirage/alcotest) and live in `test/unit_tests.ml`.
 
-- Tests live in the `test/` directory
-- Use [Alcotest](https://github.com/mirage/alcotest) for unit tests
-- Name test files `test_<module>.ml`
+### Integration Tests
+
+Integration tests run in Docker containers with real systemd, testing actual service management.
+
+```bash
+# Run integration tests locally
+cd test/integration
+./run.sh
+
+# Or use docker-compose directly
+docker compose up --build --abort-on-container-exit
+```
+
+Integration tests are located in `test/integration/cli-tester/tests/` organized by role:
+
+| Directory | Description |
+|-----------|-------------|
+| `node/` | Node installation, lifecycle, restart, cascading dependencies |
+| `baker/` | Baker installation, DAL config, remote endpoints, dependencies |
+| `accuser/` | Accuser installation and lifecycle |
+| `dal/` | DAL node installation and dependencies |
+
+**Test naming**: `XX-description.sh` where XX is a number for ordering.
+
+**Writing integration tests**:
+- Source `/tests/lib.sh` for helper functions
+- Use `cleanup_instance` for setup/teardown
+- Use `wait_for_service_active`, `wait_for_node_ready` for async operations
+- Tests run with real systemd as PID 1 in Docker
 
 ## Submitting Changes
 
