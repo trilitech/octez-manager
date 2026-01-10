@@ -30,14 +30,17 @@ services:
       sandbox:
         condition: service_healthy
     privileged: true
+    cgroup: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
     environment:
       - SANDBOX_URL=http://sandbox:8080
       - NODE_RPC=http://sandbox:8732
       - TEST_INSTANCE=test-node
-    # Keep container running for test execution
-    command: ["sleep", "infinity"]
+    # systemd runs as PID 1, no command override needed
 
 volumes:
   sandbox-data:
