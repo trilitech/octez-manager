@@ -47,8 +47,14 @@ case "$1" in
         exit 0
         ;;
     cat)
-        # Cannot cat non-existent units
-        exit 1
+        # Return a mock unit file
+        echo "[Unit]"
+        echo "Description=Octez Node"
+        echo ""
+        echo "[Service]"
+        echo "Type=simple"
+        echo "ExecStart=/usr/bin/octez-node run"
+        exit 0
         ;;
     *)
         # Unknown commands succeed by default
