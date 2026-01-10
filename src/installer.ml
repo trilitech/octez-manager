@@ -760,6 +760,15 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~user:request.service_user
       ()
   in
+  (* Resolve depends_on to (parent_role, parent_instance) tuple for systemd *)
+  let depends_on_for_systemd =
+    match request.depends_on with
+    | None -> None
+    | Some parent_instance -> (
+        match Service_registry.find ~instance:parent_instance with
+        | Ok (Some parent_svc) -> Some (parent_svc.Service.role, parent_instance)
+        | _ -> None)
+  in
   let* () =
     Systemd.write_dropin
       ~role:request.role
@@ -767,6 +776,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~data_dir:request.data_dir
       ~logging_mode
       ~extra_paths:request.extra_paths
+      ?depends_on:depends_on_for_systemd
       ()
   in
   let* () =
