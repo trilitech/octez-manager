@@ -72,6 +72,17 @@ else
     exit 1
 fi
 
+# Verify om list shows failed status
+LIST_OUTPUT=$(om list)
+echo "om list output:"
+echo "$LIST_OUTPUT"
+if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "failed"; then
+    echo "om list correctly shows failed status"
+else
+    echo "ERROR: om list does not show failed status"
+    exit 1
+fi
+
 # Cleanup
 echo "Cleaning up..."
 systemctl stop "octez-node@$NODE_INSTANCE" || true
