@@ -58,7 +58,8 @@ instance_exists() {
 service_exists() {
     local role="$1"
     local instance="$2"
-    systemctl list-unit-files "octez-${role}@${instance}.service" 2>/dev/null | grep -q "octez-${role}@"
+    # Template units are listed as role@.service, not role@instance.service
+    systemctl list-unit-files "octez-${role}@.service" 2>/dev/null | grep -q "octez-${role}@"
 }
 
 service_is_active() {
@@ -149,6 +150,52 @@ cleanup_instance() {
     # Remove and purge
     om instance "$instance" remove 2>/dev/null || true
     om instance "$instance" purge 2>/dev/null || true
+}
+
+# RPC helpers
+get_node_level() {
+    local rpc_addr="${1:-127.0.0.1:8732}"
+    curl -sf "http://${rpc_addr}/chains/main/blocks/head/header" 2>/dev/null | jq -r '.level // empty'
+}
+
+wait_for_node_ready() {
+    local rpc_addr="${1:-127.0.0.1:8732}"
+    local max_wait="${2:-60}"
+    local count=0
+
+    echo "Waiting for node RPC at $rpc_addr..."
+    while [ $count -lt $max_wait ]; do
+        if curl -sf "http://${rpc_addr}/chains/main/blocks/head/header" >/dev/null 2>&1; then
+            echo "Node RPC is ready"
+            return 0
+        fi
+        sleep 2
+        count=$((count + 2))
+    done
+
+    echo "Node RPC did not become ready after ${max_wait}s"
+    return 1
+}
+
+wait_for_level_increase() {
+    local initial_level="$1"
+    local rpc_addr="${2:-127.0.0.1:8732}"
+    local max_wait="${3:-120}"
+    local count=0
+
+    echo "Waiting for level to increase from $initial_level..."
+    while [ $count -lt $max_wait ]; do
+        local current_level=$(get_node_level "$rpc_addr")
+        if [ -n "$current_level" ] && [ "$current_level" -gt "$initial_level" ]; then
+            echo "Level increased: $initial_level -> $current_level"
+            return 0
+        fi
+        sleep 5
+        count=$((count + 5))
+    done
+
+    echo "Level did not increase after ${max_wait}s (still at $initial_level)"
+    return 1
 }
 
 # Debug helpers

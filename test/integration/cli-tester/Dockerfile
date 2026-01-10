@@ -35,6 +35,14 @@ RUN for binary in octez-node octez-client octez-baker; do \
         chmod +x /usr/local/bin/${binary}; \
     done
 
+# Download Zcash/Sapling parameters required for node operation
+ARG ZCASH_PARAMS_URL=https://download.z.cash/downloads
+RUN mkdir -p /usr/local/share/zcash-params && \
+    echo "Downloading sapling-output.params..." && \
+    curl -sfL "${ZCASH_PARAMS_URL}/sapling-output.params" -o /usr/local/share/zcash-params/sapling-output.params && \
+    echo "Downloading sapling-spend.params..." && \
+    curl -sfL "${ZCASH_PARAMS_URL}/sapling-spend.params" -o /usr/local/share/zcash-params/sapling-spend.params
+
 # Install octez-manager from build context
 COPY cli-tester/octez-manager /usr/local/bin/octez-manager
 RUN chmod +x /usr/local/bin/octez-manager

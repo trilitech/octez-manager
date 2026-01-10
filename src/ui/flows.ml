@@ -196,7 +196,7 @@ let create_accuser_flow ~on_success =
                 service_user = "octez";
                 app_bin_dir =
                   Form_builder_common.default_app_bin_dir
-                    ~binary_name:"octez-accuser";
+                    ~binary_name:"octez-baker";
                 logging_mode = Logging_mode.Journald;
                 service_args = [];
                 extra_env =
@@ -254,7 +254,7 @@ let create_dal_node_flow ~on_success =
                 service_user = "octez";
                 app_bin_dir =
                   Form_builder_common.default_app_bin_dir
-                    ~binary_name:"octez-dal-node";
+                    ~binary_name:"octez-baker";
                 logging_mode = Logging_mode.Journald;
                 service_args =
                   [
