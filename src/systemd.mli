@@ -9,6 +9,17 @@ include Service_backend.S
 
 val unit_name : string -> string -> string
 
+(** Detailed unit state from systemd *)
+type unit_state = {
+  active_state : string;  (** active, inactive, failed, etc. *)
+  sub_state : string;  (** running, dead, failed, etc. *)
+  result : string option;  (** exit-code, signal, timeout, etc. when failed *)
+}
+
+(** Get detailed unit state including failure information *)
+val get_unit_state :
+  role:string -> instance:string -> (unit_state, [`Msg of string]) result
+
 val cat_unit :
   role:string -> instance:string -> (string, [`Msg of string]) result
 

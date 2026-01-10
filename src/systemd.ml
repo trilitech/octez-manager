@@ -78,6 +78,53 @@ let is_active ~role ~instance =
       Ok (String.equal state "active")
   | Error _ as e -> e
 
+type unit_state = {
+  active_state : string; (* active, inactive, failed, etc. *)
+  sub_state : string; (* running, dead, failed, etc. *)
+  result : string option; (* exit-code, signal, timeout, etc. *)
+}
+
+let get_unit_state ~role ~instance =
+  let unit = unit_name role instance in
+  (* Get ActiveState, SubState, and Result properties *)
+  match
+    run_systemctl_out_timeout
+      ["show"; "--property=ActiveState,SubState,Result"; unit]
+  with
+  | Ok output ->
+      let lines = String.split_on_char '\n' output in
+      let parse_prop prefix line =
+        if
+          String.length line > String.length prefix
+          && String.sub line 0 (String.length prefix) = prefix
+        then
+          Some
+            (String.sub
+               line
+               (String.length prefix)
+               (String.length line - String.length prefix)
+            |> String.trim)
+        else None
+      in
+      let active_state = ref "unknown" in
+      let sub_state = ref "unknown" in
+      let result = ref None in
+      List.iter
+        (fun line ->
+          (match parse_prop "ActiveState=" line with
+          | Some v -> active_state := v
+          | None -> ()) ;
+          (match parse_prop "SubState=" line with
+          | Some v -> sub_state := v
+          | None -> ()) ;
+          match parse_prop "Result=" line with
+          | Some v when v <> "" && v <> "success" -> result := Some v
+          | _ -> ())
+        lines ;
+      Ok
+        {active_state = !active_state; sub_state = !sub_state; result = !result}
+  | Error _ as e -> e
+
 let env_file_template user_mode =
   let base =
     if user_mode then Common.env_instances_base_dir ()

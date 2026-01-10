@@ -51,17 +51,29 @@ let parse_enabled_response resp =
   | "disabled" -> Some false
   | _ -> None
 
-let classify_active result =
+(** Classify using detailed systemd state, detecting failed services *)
+let classify_unit_state result =
   match result with
-  | Ok true -> (Some true, Service_state.Running)
-  | Ok false -> (Some false, Service_state.Stopped)
+  | Ok Systemd.{active_state; result = failure_reason; _} -> (
+      match active_state with
+      | "active" -> (Some true, Service_state.Running)
+      | "failed" ->
+          let msg =
+            match failure_reason with
+            | Some reason -> reason
+            | None -> "service failed"
+          in
+          (Some false, Service_state.Unknown msg)
+      | "inactive" | "deactivating" -> (Some false, Service_state.Stopped)
+      | _ -> (None, Service_state.Stopped))
   | Error (`Msg msg) -> (None, Service_state.Unknown msg)
 
 let fetch_status ?(detail = false) service =
   let role = service.Service.role in
   let instance = service.Service.instance in
-  let active_raw = Systemd.is_active ~role ~instance in
-  let active, status = classify_active active_raw in
+  (* Use detailed state to detect failed services *)
+  let unit_state = Systemd.get_unit_state ~role ~instance in
+  let active, status = classify_unit_state unit_state in
   let enabled =
     match Systemd.is_enabled ~role ~instance with
     | Ok resp -> parse_enabled_response resp
