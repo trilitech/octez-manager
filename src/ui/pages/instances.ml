@@ -20,6 +20,27 @@ let name = "instances"
 
 module StringSet = Set.Make (String)
 
+(** Track recent start/restart failures for display.
+    Maps instance name to (error_message, timestamp) *)
+let recent_failures : (string, string * float) Hashtbl.t = Hashtbl.create 16
+
+let recent_failure_ttl = 30.0 (* seconds to keep showing failure *)
+
+let record_failure ~instance ~error =
+  Hashtbl.replace recent_failures instance (error, Unix.gettimeofday ())
+
+let clear_failure ~instance = Hashtbl.remove recent_failures instance
+
+let get_recent_failure ~instance =
+  match Hashtbl.find_opt recent_failures instance with
+  | Some (error, ts) when Unix.gettimeofday () -. ts < recent_failure_ttl ->
+      Some error
+  | Some _ ->
+      (* Expired, clean up *)
+      Hashtbl.remove recent_failures instance ;
+      None
+  | None -> None
+
 (** Matrix layout configuration *)
 let min_column_width = 50
 
@@ -394,11 +415,18 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
   let stopped =
     match service_status with Service_state.Running -> false | _ -> true
   in
-  (* Show service status when not running *)
+  (* Show service status when not running, prioritizing recent failures *)
   let service_prefix =
     match service_status with
-    | Service_state.Running -> None
-    | Service_state.Stopped -> Some (Widgets.yellow "stopped")
+    | Service_state.Running ->
+        (* Clear any stale failure on successful run *)
+        clear_failure ~instance:svc.Service.instance ;
+        None
+    | Service_state.Stopped -> (
+        (* Check for recent start failure first *)
+        match get_recent_failure ~instance:svc.Service.instance with
+        | Some error -> Some (Widgets.red ("failed: " ^ error))
+        | None -> Some (Widgets.yellow "stopped"))
     | Service_state.Unknown msg ->
         Some (Widgets.red ("failed" ^ if msg = "" then "" else ": " ^ msg))
   in
@@ -951,8 +979,11 @@ let run_unit_action ~verb ~instance action =
           Context.toast_success (Printf.sprintf "%s: %s finished" instance verb) ;
           Context.mark_instances_dirty ()
       | Job_manager.Failed msg ->
+          (* Record failure for display in status line *)
+          record_failure ~instance ~error:msg ;
           Context.toast_error
-            (Printf.sprintf "%s: %s failed: %s" instance verb msg)
+            (Printf.sprintf "%s: %s failed: %s" instance verb msg) ;
+          Context.mark_instances_dirty ()
       | _ -> ())
 
 let require_installer () =
@@ -1199,6 +1230,7 @@ let offer_start_dependents ~instance =
                       Context.toast_success
                         (Printf.sprintf "%s started" dep.Service.instance)
                   | Error (`Msg e) ->
+                      record_failure ~instance:dep.Service.instance ~error:e ;
                       Context.toast_error
                         (Printf.sprintf "%s: %s" dep.Service.instance e)) ;
               Context.mark_instances_dirty ()
@@ -1254,6 +1286,7 @@ let start_with_cascade ~instance ~role =
                             (Printf.sprintf "%s started" dep.Service.instance) ;
                           true
                       | Error (`Msg e) ->
+                          record_failure ~instance:dep.Service.instance ~error:e ;
                           Context.toast_error
                             (Printf.sprintf "%s: %s" dep.Service.instance e) ;
                           false)
@@ -1271,7 +1304,9 @@ let start_with_cascade ~instance ~role =
                     (* Offer to start dependents *)
                     offer_start_dependents ~instance
                 | Error (`Msg e) ->
-                    Context.toast_error (Printf.sprintf "%s: %s" instance e))
+                    record_failure ~instance ~error:e ;
+                    Context.toast_error (Printf.sprintf "%s: %s" instance e) ;
+                    Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
 
 (* Restart a single service (internal helper) *)
@@ -1325,12 +1360,15 @@ let offer_restart_dependents ~instance =
                                 if retries > 0 then (
                                   Unix.sleepf 2.0 ;
                                   try_restart (retries - 1))
-                                else
+                                else (
+                                  record_failure
+                                    ~instance:dep.Service.instance
+                                    ~error:e ;
                                   append_log
                                     (Printf.sprintf
                                        "Failed: %s: %s"
                                        dep.Service.instance
-                                       e)
+                                       e))
                           in
                           try_restart 2
                       | _ ->
@@ -1389,6 +1427,7 @@ let restart_with_cascade ~instance ~role =
                             (Printf.sprintf "%s started" dep.Service.instance) ;
                           true
                       | Error (`Msg e) ->
+                          record_failure ~instance:dep.Service.instance ~error:e ;
                           Context.toast_error
                             (Printf.sprintf "%s: %s" dep.Service.instance e) ;
                           false)
@@ -1407,7 +1446,9 @@ let restart_with_cascade ~instance ~role =
                     (* Offer to restart dependents *)
                     offer_restart_dependents ~instance
                 | Error (`Msg e) ->
-                    Context.toast_error (Printf.sprintf "%s: %s" instance e))
+                    record_failure ~instance ~error:e ;
+                    Context.toast_error (Printf.sprintf "%s: %s" instance e) ;
+                    Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
 
 let instance_actions_modal state =
