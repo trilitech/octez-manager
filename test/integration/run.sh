@@ -66,13 +66,17 @@ docker compose up -d sandbox
 echo "Waiting for sandbox to be ready..."
 timeout 180 bash -c 'until docker compose exec -T sandbox curl -sf http://localhost:8080/health; do sleep 5; done'
 
-# Start cli-tester container
+# Start cli-tester container (runs systemd as PID 1)
 echo "Starting cli-tester..."
 docker compose up -d cli-tester
 
-# Wait for container to be ready
-echo "Waiting for container to initialize..."
-sleep 5
+# Wait for systemd to be ready inside container
+echo "Waiting for systemd to initialize..."
+timeout 60 bash -c 'until docker compose exec -T cli-tester systemctl is-system-running --wait 2>/dev/null | grep -qE "running|degraded"; do sleep 2; done' || {
+    echo "Systemd status:"
+    docker compose exec -T cli-tester systemctl is-system-running || true
+    docker compose exec -T cli-tester systemctl --failed || true
+}
 
 # Run tests
 echo "Running integration tests..."
