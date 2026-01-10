@@ -1,5 +1,5 @@
 # CLI tester container for integration testing
-# Uses static octez-manager binary (built with musl libc)
+# Uses real systemd as PID 1 for testing actual service management
 FROM debian:bookworm-slim
 
 # Install systemd and dependencies
@@ -12,16 +12,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     gnupg \
     netbase \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Remove unnecessary systemd units
-RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
+# Remove unnecessary systemd units that cause issues in containers
+RUN rm -rf /lib/systemd/system/multi-user.target.wants/* \
     /etc/systemd/system/*.wants/* \
     /lib/systemd/system/local-fs.target.wants/* \
     /lib/systemd/system/sockets.target.wants/*udev* \
     /lib/systemd/system/sockets.target.wants/*initctl* \
     /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
-    /lib/systemd/system/systemd-update-utmp*
+    /lib/systemd/system/systemd-update-utmp* \
+    /lib/systemd/system/getty* \
+    2>/dev/null || true
 
 # Download Octez binaries directly (more reliable than packages)
 ARG OCTEZ_VERSION=v24.0
@@ -41,18 +44,16 @@ COPY cli-tester/tests/ /tests/
 COPY cli-tester/run-tests.sh /run-tests.sh
 RUN chmod +x /run-tests.sh /tests/*.sh /tests/**/*.sh 2>/dev/null || true
 
-# Ensure test user exists (octez packages may already create it)
+# Ensure test user exists
 RUN id tezos >/dev/null 2>&1 || useradd -m -s /bin/bash tezos
 
 # Create required directories
 RUN mkdir -p /var/lib/octez /etc/octez /var/log/octez \
     && chown -R tezos:tezos /var/lib/octez /etc/octez /var/log/octez
 
-# Install mock systemctl for testing (since systemd isn't running as PID 1)
-COPY cli-tester/mock-systemctl.sh /usr/local/bin/systemctl
-RUN chmod +x /usr/local/bin/systemctl
+# Systemd needs these
+VOLUME ["/sys/fs/cgroup", "/run", "/run/lock"]
+STOPSIGNAL SIGRTMIN+3
 
-VOLUME ["/sys/fs/cgroup"]
-
-# Default: keep container running for test execution
-CMD ["sleep", "infinity"]
+# Run systemd as PID 1
+CMD ["/lib/systemd/systemd"]

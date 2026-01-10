@@ -104,8 +104,20 @@ jobs:
         working-directory: test/integration
         run: |
           docker compose up -d cli-tester
-          # Wait for systemd to be ready
-          sleep 10
+          # Wait for systemd to be ready and debug if failing
+          echo "Waiting for systemd..."
+          for i in {1..30}; do
+            if docker compose exec -T cli-tester systemctl is-system-running 2>/dev/null; then
+              echo "Systemd is ready"
+              break
+            fi
+            echo "Attempt $i: systemd not ready yet..."
+            docker compose ps || true
+            sleep 2
+          done
+          # Show status regardless
+          docker compose ps
+          docker compose logs cli-tester || true
 
       - name: Run integration tests
         working-directory: test/integration

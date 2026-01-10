@@ -48,39 +48,68 @@ assert_dir_exists() {
     fi
 }
 
-# Instance helpers (use octez-manager registry instead of systemctl)
+# Instance helpers
 instance_exists() {
     local instance="$1"
     om list 2>/dev/null | grep -q "$instance"
 }
 
-# Legacy service helpers (mock - always succeed in test mode)
+# Service helpers (real systemd)
 service_exists() {
     local role="$1"
     local instance="$2"
-    instance_exists "$instance"
+    systemctl list-unit-files "octez-${role}@${instance}.service" 2>/dev/null | grep -q "octez-${role}@"
 }
 
 service_is_active() {
-    # In test mode with mock systemctl, services aren't actually running
-    # Return false so tests don't expect running services
-    return 1
+    local role="$1"
+    local instance="$2"
+    systemctl is-active "octez-${role}@${instance}.service" >/dev/null 2>&1
 }
 
 service_is_enabled() {
-    # In test mode, return false
-    return 1
+    local role="$1"
+    local instance="$2"
+    systemctl is-enabled "octez-${role}@${instance}.service" >/dev/null 2>&1
 }
 
 wait_for_service_active() {
-    # Skip waiting in test mode
-    echo "Note: Skipping service wait in test mode (mock systemctl)"
-    return 0
+    local role="$1"
+    local instance="$2"
+    local max_wait="${3:-30}"
+    local count=0
+
+    echo "Waiting for octez-${role}@${instance} to be active..."
+    while [ $count -lt $max_wait ]; do
+        if service_is_active "$role" "$instance"; then
+            echo "Service is active"
+            return 0
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+
+    echo "Service octez-${role}@${instance} did not become active after ${max_wait}s"
+    show_service_status "$role" "$instance"
+    return 1
 }
 
 wait_for_service_stopped() {
-    # Skip waiting in test mode
-    return 0
+    local role="$1"
+    local instance="$2"
+    local max_wait="${3:-30}"
+    local count=0
+
+    while [ $count -lt $max_wait ]; do
+        if ! service_is_active "$role" "$instance"; then
+            return 0
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+
+    echo "Service octez-${role}@${instance} did not stop"
+    return 1
 }
 
 # octez-manager helpers
@@ -115,7 +144,9 @@ om_instance() {
 cleanup_instance() {
     local instance="${1:-$TEST_INSTANCE}"
 
-    # Try to remove, ignore errors
+    # Stop service if running, ignore errors
+    om instance "$instance" stop 2>/dev/null || true
+    # Remove and purge
     om instance "$instance" remove 2>/dev/null || true
     om instance "$instance" purge 2>/dev/null || true
 }
@@ -125,7 +156,7 @@ show_service_status() {
     local role="$1"
     local instance="$2"
     echo "=== Service status: octez-${role}@${instance} ==="
-    systemctl status "octez-${role}@${instance}.service" 2>&1 || true
+    systemctl status "octez-${role}@${instance}.service" --no-pager 2>&1 || true
     echo "==="
 }
 
