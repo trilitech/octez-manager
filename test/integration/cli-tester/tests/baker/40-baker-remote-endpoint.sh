@@ -43,11 +43,11 @@ if ! wait_for_node_ready "$NODE_RPC" 180; then
 fi
 echo "Node is ready"
 
-# Install baker with --node-endpoint instead of --node-instance
+# Install baker with endpoint URL via --node-instance (not an instance name)
 echo "Installing baker with remote endpoint..."
 om install-baker \
     --instance "$BAKER_INSTANCE" \
-    --node-endpoint "http://$NODE_RPC" \
+    --node-instance "http://$NODE_RPC" \
     --liquidity-baking-vote pass \
     --dal-endpoint none \
     --service-user tezos \
