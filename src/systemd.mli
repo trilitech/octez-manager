@@ -78,4 +78,7 @@ module For_tests : sig
   val render_logging_lines : Logging_mode.t -> string list
 
   val exec_line : string -> string
+
+  (** Parse systemd show output string into unit_state (for testing) *)
+  val parse_unit_state_output : string -> unit_state
 end
