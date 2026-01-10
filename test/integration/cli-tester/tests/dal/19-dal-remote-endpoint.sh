@@ -1,21 +1,22 @@
 #!/bin/bash
-# Test: DAL node installation with RPC endpoint (not local instance reference)
+# Test: DAL node installation verifies systemd dependency is created
+# When using a local node instance, DAL should have BindsTo dependency
 set -euo pipefail
 source /tests/lib.sh
 
-NODE_INSTANCE="test-dal-remote-node"
-DAL_INSTANCE="test-dal-remote"
+NODE_INSTANCE="test-dal-dep-check-node"
+DAL_INSTANCE="test-dal-dep-check"
 NODE_RPC="127.0.0.1:18741"
 NODE_NET="0.0.0.0:19761"
 DAL_RPC="127.0.0.1:10741"
 DAL_NET="0.0.0.0:11741"
 
-echo "Test: DAL node installation with RPC endpoint"
+echo "Test: DAL node systemd dependency verification"
 
 cleanup_instance "$DAL_INSTANCE" || true
 cleanup_instance "$NODE_INSTANCE" || true
 
-# Install a node first (needed to have a valid RPC endpoint)
+# Install a node first
 echo "Installing node..."
 om install-node \
     --instance "$NODE_INSTANCE" \
@@ -25,12 +26,11 @@ om install-node \
     --service-user tezos \
     --no-enable 2>&1
 
-# Install DAL node using RPC endpoint instead of instance reference
-# This tests the "remote endpoint" code path
-echo "Installing DAL node with RPC endpoint..."
+# Install DAL node using local instance reference
+echo "Installing DAL node with local instance reference..."
 om install-dal-node \
     --instance "$DAL_INSTANCE" \
-    --node-instance "http://$NODE_RPC" \
+    --node-instance "$NODE_INSTANCE" \
     --rpc-addr "$DAL_RPC" \
     --net-addr "$DAL_NET" \
     --service-user tezos \
@@ -43,14 +43,35 @@ if ! instance_exists "$DAL_INSTANCE"; then
 fi
 echo "DAL instance registered"
 
-# Verify env file contains the RPC endpoint (not instance reference)
+# Verify env file contains the node endpoint
 ENV_FILE="/etc/octez/instances/$DAL_INSTANCE/node.env"
 if ! grep -q "OCTEZ_NODE_ENDPOINT=http://$NODE_RPC" "$ENV_FILE"; then
-    echo "ERROR: RPC endpoint not in env file"
+    echo "ERROR: Node endpoint not in env file"
     cat "$ENV_FILE"
     exit 1
 fi
-echo "RPC endpoint configured correctly"
+echo "Node endpoint configured correctly"
+
+# Verify systemd dependency IS configured (local instance should have BindsTo)
+DROPIN_DIR="/etc/systemd/system/octez-dal-node@${DAL_INSTANCE}.service.d"
+if [ ! -f "$DROPIN_DIR/override.conf" ]; then
+    echo "ERROR: Drop-in override not found"
+    exit 1
+fi
+
+if ! grep -q "BindsTo=octez-node@${NODE_INSTANCE}.service" "$DROPIN_DIR/override.conf"; then
+    echo "ERROR: BindsTo dependency not configured for local instance"
+    cat "$DROPIN_DIR/override.conf"
+    exit 1
+fi
+echo "BindsTo dependency configured correctly"
+
+if ! grep -q "After=octez-node@${NODE_INSTANCE}.service" "$DROPIN_DIR/override.conf"; then
+    echo "ERROR: After dependency not configured"
+    cat "$DROPIN_DIR/override.conf"
+    exit 1
+fi
+echo "After dependency configured correctly"
 
 # Verify systemd service exists
 if ! service_exists "dal-node" "$DAL_INSTANCE"; then
@@ -59,20 +80,8 @@ if ! service_exists "dal-node" "$DAL_INSTANCE"; then
 fi
 echo "Systemd service exists"
 
-# Verify no systemd dependency on local node (using RPC endpoint, not instance)
-# Note: When using an RPC endpoint directly, there should be no BindsTo dependency
-DROPIN_DIR="/etc/systemd/system/octez-dal-node@${DAL_INSTANCE}.service.d"
-if [ -f "$DROPIN_DIR/override.conf" ]; then
-    if grep -q "BindsTo=octez-node@" "$DROPIN_DIR/override.conf"; then
-        echo "ERROR: Should not have BindsTo dependency for RPC endpoint"
-        cat "$DROPIN_DIR/override.conf"
-        exit 1
-    fi
-fi
-echo "No local node dependency (correct for RPC endpoint)"
-
 # Cleanup
 cleanup_instance "$DAL_INSTANCE"
 cleanup_instance "$NODE_INSTANCE"
 
-echo "DAL RPC endpoint test passed"
+echo "DAL systemd dependency test passed"

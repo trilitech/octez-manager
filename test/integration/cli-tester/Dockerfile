@@ -29,7 +29,7 @@ RUN rm -rf /lib/systemd/system/multi-user.target.wants/* \
 # Download Octez binaries directly (more reliable than packages)
 ARG OCTEZ_VERSION=v24.0
 ARG OCTEZ_BASE_URL=https://octez.tezos.com/releases/octez-v24.0/binaries/x86_64
-RUN for binary in octez-node octez-client octez-baker; do \
+RUN for binary in octez-node octez-client octez-baker octez-dal-node; do \
         echo "Downloading $binary..." && \
         curl -sfL "${OCTEZ_BASE_URL}/${binary}" -o /usr/local/bin/${binary} && \
         chmod +x /usr/local/bin/${binary}; \
