@@ -1,0 +1,14 @@
+{
+  "tallinnnet": {
+    "chain_name": "TEZOS_TALLINNNET_2025-11-18T21:00:00Z",
+    "default_bootstrap_peers": [
+      "tallinnnet.teztnets.com",
+      "tallinnnet.tzinit.org"
+    ],
+    "genesis": {
+      "timestamp": "2025-11-18T21:00:00Z",
+      "block": "BMQuJ7YgLaLUiyiSWmGma5LwkEFBAmksDFmocyEUe59yVav7wfC",
+      "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+    }
+  }
+}

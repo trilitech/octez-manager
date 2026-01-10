@@ -1,0 +1,44 @@
+services:
+  sandbox:
+    build:
+      context: .
+      dockerfile: sandbox/Dockerfile
+    container_name: octez-sandbox
+    ports:
+      - "8732:8732"   # Node RPC
+      - "8080:8080"   # Snapshot server
+    volumes:
+      - sandbox-data:/data
+      - snapshot-cache:/snapshots
+    environment:
+      - NUM_BLOCKS=10
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 120s
+      retries: 30
+
+  cli-tester:
+    build:
+      context: .
+      dockerfile: cli-tester/Dockerfile
+      args:
+        - OCTEZ_MANAGER_BIN=${OCTEZ_MANAGER_BIN:-../../_build/default/src/main.exe}
+    container_name: octez-cli-tester
+    depends_on:
+      sandbox:
+        condition: service_healthy
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    environment:
+      - SANDBOX_URL=http://sandbox:8080
+      - NODE_RPC=http://sandbox:8732
+      - TEST_INSTANCE=test-node
+    # Keep container running for test execution
+    command: ["sleep", "infinity"]
+
+volumes:
+  sandbox-data:
+  snapshot-cache:
