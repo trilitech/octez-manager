@@ -3,20 +3,33 @@
 set -euo pipefail
 source /tests/lib.sh
 
+NODE_INSTANCE="test-dal-extra-node"
 DAL_INSTANCE="test-dal-extra"
-REMOTE_ENDPOINT="http://remote-node.example.com:8732"
+NODE_RPC="127.0.0.1:18743"
+NODE_NET="0.0.0.0:19763"
 DAL_RPC="127.0.0.1:10742"
 DAL_NET="0.0.0.0:11742"
 
 echo "Test: DAL node installation with extra arguments"
 
 cleanup_instance "$DAL_INSTANCE" || true
+cleanup_instance "$NODE_INSTANCE" || true
+
+# Install a node first
+echo "Installing node..."
+om install-node \
+    --instance "$NODE_INSTANCE" \
+    --network tallinnnet \
+    --rpc-addr "$NODE_RPC" \
+    --net-addr "$NODE_NET" \
+    --service-user tezos \
+    --no-enable 2>&1
 
 # Install DAL node with extra args
 echo "Installing DAL node with extra args..."
 om install-dal-node \
     --instance "$DAL_INSTANCE" \
-    --node-instance "$REMOTE_ENDPOINT" \
+    --node-instance "$NODE_INSTANCE" \
     --rpc-addr "$DAL_RPC" \
     --net-addr "$DAL_NET" \
     --service-user tezos \
@@ -33,13 +46,13 @@ if ! grep -q "OCTEZ_SERVICE_ARGS=.*--metrics-addr=0.0.0.0:9933" "$ENV_FILE"; the
 fi
 echo "Extra args configured correctly"
 
-# Test with multiple extra args
+# Cleanup and test with multiple extra args
 cleanup_instance "$DAL_INSTANCE"
 
 echo "Installing DAL node with multiple extra args..."
 om install-dal-node \
     --instance "$DAL_INSTANCE" \
-    --node-instance "$REMOTE_ENDPOINT" \
+    --node-instance "$NODE_INSTANCE" \
     --rpc-addr "$DAL_RPC" \
     --net-addr "$DAL_NET" \
     --service-user tezos \
@@ -63,5 +76,6 @@ echo "Multiple extra args configured correctly"
 
 # Cleanup
 cleanup_instance "$DAL_INSTANCE"
+cleanup_instance "$NODE_INSTANCE"
 
 echo "DAL extra args test passed"

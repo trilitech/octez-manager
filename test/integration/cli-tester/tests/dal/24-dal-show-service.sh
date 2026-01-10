@@ -3,20 +3,33 @@
 set -euo pipefail
 source /tests/lib.sh
 
+NODE_INSTANCE="test-dal-show-node"
 DAL_INSTANCE="test-dal-show"
-REMOTE_ENDPOINT="http://remote-node.example.com:8732"
+NODE_RPC="127.0.0.1:18752"
+NODE_NET="0.0.0.0:19772"
 DAL_RPC="127.0.0.1:10752"
 DAL_NET="0.0.0.0:11752"
 
 echo "Test: DAL node show-service command"
 
 cleanup_instance "$DAL_INSTANCE" || true
+cleanup_instance "$NODE_INSTANCE" || true
+
+# Install a node first
+echo "Installing node..."
+om install-node \
+    --instance "$NODE_INSTANCE" \
+    --network tallinnnet \
+    --rpc-addr "$NODE_RPC" \
+    --net-addr "$NODE_NET" \
+    --service-user tezos \
+    --no-enable 2>&1
 
 # Install DAL node
 echo "Installing DAL node..."
 om install-dal-node \
     --instance "$DAL_INSTANCE" \
-    --node-instance "$REMOTE_ENDPOINT" \
+    --node-instance "$NODE_INSTANCE" \
     --rpc-addr "$DAL_RPC" \
     --net-addr "$DAL_NET" \
     --service-user tezos \
@@ -64,5 +77,6 @@ echo "Role in show output"
 
 # Cleanup
 cleanup_instance "$DAL_INSTANCE"
+cleanup_instance "$NODE_INSTANCE"
 
 echo "DAL show-service test passed"

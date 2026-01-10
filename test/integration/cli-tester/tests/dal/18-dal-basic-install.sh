@@ -23,7 +23,6 @@ om install-node \
     --rpc-addr "$NODE_RPC" \
     --net-addr "$NODE_NET" \
     --service-user tezos \
-    --no-snapshot \
     --no-enable 2>&1
 
 # Install DAL node pointing to the local node

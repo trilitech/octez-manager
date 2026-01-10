@@ -3,9 +3,11 @@
 set -euo pipefail
 source /tests/lib.sh
 
+NODE_INSTANCE="test-dal-multi-node"
 DAL_INSTANCE_1="test-dal-multi-1"
 DAL_INSTANCE_2="test-dal-multi-2"
-REMOTE_ENDPOINT="http://remote-node.example.com:8732"
+NODE_RPC="127.0.0.1:18753"
+NODE_NET="0.0.0.0:19773"
 DAL_RPC_1="127.0.0.1:10760"
 DAL_NET_1="0.0.0.0:11760"
 DAL_RPC_2="127.0.0.1:10761"
@@ -15,12 +17,23 @@ echo "Test: Multiple DAL node instances"
 
 cleanup_instance "$DAL_INSTANCE_1" || true
 cleanup_instance "$DAL_INSTANCE_2" || true
+cleanup_instance "$NODE_INSTANCE" || true
+
+# Install a node first
+echo "Installing node..."
+om install-node \
+    --instance "$NODE_INSTANCE" \
+    --network tallinnnet \
+    --rpc-addr "$NODE_RPC" \
+    --net-addr "$NODE_NET" \
+    --service-user tezos \
+    --no-enable 2>&1
 
 # Install first DAL node
 echo "Installing first DAL node..."
 om install-dal-node \
     --instance "$DAL_INSTANCE_1" \
-    --node-instance "$REMOTE_ENDPOINT" \
+    --node-instance "$NODE_INSTANCE" \
     --rpc-addr "$DAL_RPC_1" \
     --net-addr "$DAL_NET_1" \
     --service-user tezos \
@@ -30,7 +43,7 @@ om install-dal-node \
 echo "Installing second DAL node..."
 om install-dal-node \
     --instance "$DAL_INSTANCE_2" \
-    --node-instance "$REMOTE_ENDPOINT" \
+    --node-instance "$NODE_INSTANCE" \
     --rpc-addr "$DAL_RPC_2" \
     --net-addr "$DAL_NET_2" \
     --service-user tezos \
@@ -106,5 +119,6 @@ echo "Both systemd services exist"
 # Cleanup
 cleanup_instance "$DAL_INSTANCE_1"
 cleanup_instance "$DAL_INSTANCE_2"
+cleanup_instance "$NODE_INSTANCE"
 
 echo "DAL multiple instances test passed"
