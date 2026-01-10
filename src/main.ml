@@ -1420,7 +1420,9 @@ let install_dal_node_cmd =
        $ logging_mode_term))
   in
   let info =
-    Cmd.info "install-dal-node" ~doc:"Install an octez-dal-node service"
+    Cmd.info
+      "install-dal-node"
+      ~doc:"Install a DAL node service (octez-baker run dal)"
   in
   Cmd.v info term
 

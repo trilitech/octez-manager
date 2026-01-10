@@ -2223,7 +2223,7 @@ let systemd_helper_paths () =
         "unit name"
         "octez-node@alpha"
         (Systemd.unit_name "node" "alpha") ;
-      Alcotest.(check string) "role binary" "octez-dal-node" (role_binary "dal") ;
+      Alcotest.(check string) "role binary" "octez-baker" (role_binary "dal") ;
       let unit_path_expected =
         Filename.concat env.config "systemd/user/octez-node@.service"
       in
