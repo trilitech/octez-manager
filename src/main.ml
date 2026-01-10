@@ -12,12 +12,29 @@ module S = Service
 
 let cmdliner_error msg = `Error (false, msg)
 
+let status_of_service svc =
+  match Systemd.get_unit_state ~role:svc.S.role ~instance:svc.S.instance with
+  | Ok {active_state; result; _} -> (
+      match active_state with
+      | "active" -> "running"
+      | "failed" -> (
+          match result with
+          | Some r when r <> "success" -> Printf.sprintf "failed (%s)" r
+          | _ -> "failed")
+      | "inactive" -> "stopped"
+      | "activating" -> "starting"
+      | "deactivating" -> "stopping"
+      | s -> s)
+  | Error _ -> "unknown"
+
 let pp_service fmt svc =
+  let status = status_of_service svc in
   Format.fprintf
     fmt
-    "%-16s %-8s %s (%s)"
+    "%-16s %-8s %-18s %s (%s)"
     svc.S.instance
     svc.role
+    status
     svc.network
     svc.data_dir
 
