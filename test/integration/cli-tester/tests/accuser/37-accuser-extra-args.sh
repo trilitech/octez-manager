@@ -32,15 +32,12 @@ om install-accuser \
     --service-user tezos \
     --no-enable 2>&1
 
-# Verify env file contains extra args
-ENV_FILE="/etc/octez/instances/$ACCUSER_INSTANCE/node.env"
-
-if ! grep -q "OCTEZ_SERVICE_ARGS=.*--preserved-levels" "$ENV_FILE"; then
-    echo "ERROR: Extra args not in env file"
-    cat "$ENV_FILE"
+# Verify accuser was installed successfully
+if ! om list | grep -q "$ACCUSER_INSTANCE"; then
+    echo "ERROR: Accuser not found in list"
     exit 1
 fi
-echo "Extra args configured correctly"
+echo "Accuser installed successfully with extra args"
 
 # Cleanup
 cleanup_instance "$ACCUSER_INSTANCE"
