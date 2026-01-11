@@ -40,7 +40,9 @@ let pp_service fmt svc =
 
 let print_services services =
   if services = [] then print_endline "No services registered."
-  else List.iter (fun svc -> Format.printf "%a@." pp_service svc) services
+  else (
+    List.iter (fun svc -> Format.printf "%a@." pp_service svc) services ;
+    Format.print_flush ())
 
 let pp_logging fmt = function
   | Logging_mode.Journald -> Format.fprintf fmt "journald"
