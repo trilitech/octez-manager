@@ -12,21 +12,14 @@ module S = Service
 
 let cmdliner_error msg = `Error (false, msg)
 
-let status_of_service svc =
-  (* Use simpler is_active check to avoid timeout issues with multiple services *)
-  match Systemd.is_active ~role:svc.S.role ~instance:svc.S.instance with
-  | Ok true -> "running"
-  | Ok false -> "stopped"
-  | Error _ -> "-"
-
 let pp_service fmt svc =
-  let status = status_of_service svc in
+  (* Don't query systemd during list - causes issues with multiple services *)
+  (* Status is shown in the UI instead *)
   Format.fprintf
     fmt
-    "%-16s %-8s %-18s %s (%s)"
+    "%-16s %-8s %s (%s)"
     svc.S.instance
     svc.role
-    status
     svc.network
     svc.data_dir
 
