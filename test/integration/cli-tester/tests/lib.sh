@@ -51,7 +51,8 @@ assert_dir_exists() {
 # Instance helpers
 instance_exists() {
     local instance="$1"
-    om list 2>/dev/null | grep -q "$instance"
+    # Capture both stdout and stderr to ensure we see all output
+    om list 2>&1 | grep -q "$instance"
 }
 
 # Inject pre-generated identity to skip PoW during node start
