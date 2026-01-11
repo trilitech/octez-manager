@@ -21,6 +21,9 @@ om install-node \
     --service-user tezos \
     --no-enable 2>&1
 
+# Inject pre-generated identity for faster start
+inject_identity "$NODE_INSTANCE"
+
 # Initially should be stopped
 LIST_OUTPUT=$(om list)
 echo "Initial om list output:"

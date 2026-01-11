@@ -12,9 +12,12 @@ module S = Service
 
 let cmdliner_error msg = `Error (false, msg)
 
-let status_of_service _svc =
-  (* Temporarily disabled to debug test failures *)
-  "-"
+let status_of_service svc =
+  (* Use simpler is_active check to avoid timeout issues with multiple services *)
+  match Systemd.is_active ~role:svc.S.role ~instance:svc.S.instance with
+  | Ok true -> "running"
+  | Ok false -> "stopped"
+  | Error _ -> "-"
 
 let pp_service fmt svc =
   let status = status_of_service svc in
