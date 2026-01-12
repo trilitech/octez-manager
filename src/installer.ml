@@ -670,7 +670,14 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       log "Skipping bootstrap (preserve_data=true)\n" ;
       Ok ())
     else
-      perform_bootstrap ~quiet ?on_log ~plan:snapshot_plan ~request ~data_dir ()
+      perform_bootstrap
+        ~quiet
+        ?on_log
+        ?tmp_dir:request.tmp_dir
+        ~plan:snapshot_plan
+        ~request
+        ~data_dir
+        ()
   in
   log "Reowning runtime paths...\n" ;
   let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
