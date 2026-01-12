@@ -501,11 +501,11 @@ let tmp_dir_field =
     ~get:(fun m ->
       match m.tmp_dir with None -> "/tmp (default)" | Some dir -> dir)
     ~edit:(fun model_ref ->
-      Modal_helpers.prompt_text_modal
-        ~title:"Snapshot Download Directory"
-        ~placeholder:(Some "/var/tmp")
-        ~initial:(Option.value ~default:"" !model_ref.tmp_dir)
-        ~on_submit:(fun dir ->
+      Modal_helpers.open_file_browser_modal
+        ?initial_path:!model_ref.tmp_dir
+        ~dirs_only:true
+        ~require_writable:true
+        ~on_select:(fun dir ->
           let dir = String.trim dir in
           model_ref :=
             {!model_ref with tmp_dir = (if dir = "" then None else Some dir)})
