@@ -161,16 +161,26 @@ let handled_keys () =
     ]
 
 let keymap _ =
+  let noop ps = ps in
+  let kb key action help =
+    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  in
   [
-    ("Esc", back, "Back");
-    ("r", refresh, "Refresh");
-    ("m", (fun ps -> Navigation.update toggle_metrics ps), "Toggle metrics");
-    ("a", (fun ps -> Navigation.update edit_metrics_addr ps), "Edit address");
-    ("R", (fun ps -> Navigation.update toggle_recorder ps), "Toggle recorder");
-    ("d", (fun ps -> Navigation.update change_duration ps), "Change duration");
-    ("c", (fun ps -> Navigation.update clear_caches ps), "Clear caches");
-    ("Up", (fun ps -> Navigation.update scroll_up ps), "Scroll up");
-    ("Down", (fun ps -> Navigation.update scroll_down ps), "Scroll down");
+    kb "Esc" back "Back";
+    kb "r" refresh "Refresh";
+    kb "m" (fun ps -> Navigation.update toggle_metrics ps) "Toggle metrics";
+    kb "a" (fun ps -> Navigation.update edit_metrics_addr ps) "Edit address";
+    kb "R" (fun ps -> Navigation.update toggle_recorder ps) "Toggle recorder";
+    kb "d" (fun ps -> Navigation.update change_duration ps) "Change duration";
+    kb "c" (fun ps -> Navigation.update clear_caches ps) "Clear caches";
+    kb "Up" (fun ps -> Navigation.update scroll_up ps) "Scroll up";
+    kb "Down" (fun ps -> Navigation.update scroll_down ps) "Scroll down";
+    {
+      Miaou.Core.Tui_page.key = "?";
+      action = noop;
+      help = "Help";
+      display_only = true;
+    };
   ]
 
 let header =
@@ -179,12 +189,7 @@ let header =
     Widgets.dim "Live system metrics and service status";
   ]
 
-let footer =
-  [
-    Widgets.dim
-      "↑/↓: scroll  r: refresh  c: clear caches  m: metrics  R: recorder  Esc: \
-       back";
-  ]
+let footer = []
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
@@ -545,7 +550,7 @@ let view ps ~focus:_ ~size =
       Miaou_widgets_layout.Vsection.render
         ~size
         ~header:header_with_scroll
-        ~footer
+        ~content_footer:[]
         ~child:(fun _ -> body))
 
 let handle_modal_key ps key ~size:_ =
@@ -583,6 +588,8 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state
 
   type nonrec msg = msg
+
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
 
   type nonrec pstate = pstate
 

@@ -18,6 +18,8 @@ struct
 
   type msg = P.msg
 
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
   type pstate = P.pstate
 
   let init = P.init

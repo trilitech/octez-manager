@@ -72,9 +72,19 @@ let handled_keys () = Miaou.Core.Keys.[Escape; Enter]
 let open_actions_modal_ref : (pstate -> pstate) ref = ref (fun ps -> ps)
 
 let keymap _ =
+  let noop ps = ps in
+  let kb key action help =
+    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  in
   [
-    ("Enter", (fun ps -> !open_actions_modal_ref ps), "Actions");
-    ("Esc", back, "Back");
+    kb "Enter" (fun ps -> !open_actions_modal_ref ps) "Actions";
+    kb "Esc" back "Back";
+    {
+      Miaou.Core.Tui_page.key = "?";
+      action = noop;
+      help = "Help";
+      display_only = true;
+    };
   ]
 
 let header s =
@@ -85,7 +95,7 @@ let header s =
     | None -> "");
   ]
 
-let footer = [Widgets.dim "Enter: actions  ?: help  Esc: back"]
+let footer = []
 
 let view_details svc =
   let render_fields fields =
@@ -302,7 +312,7 @@ let view ps ~focus:_ ~size =
     | None, Some svc -> view_details svc
     | None, None -> ["Loading..."]
   in
-  Vsection.render ~size ~header:(header s) ~footer ~child:(fun _ ->
+  Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
       String.concat "\n" body)
 
 let handle_modal_key ps key ~size:_ =
@@ -372,6 +382,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state
 
   type nonrec msg = msg
+
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
 
   type nonrec pstate = pstate
 

@@ -26,6 +26,8 @@ let open_text_modal ~title ~lines =
 
     type msg = unit
 
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
     type pstate = state Navigation.t
 
     let init () = Navigation.make (Pager.open_lines ~title:"" lines)
@@ -110,6 +112,8 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
     type state = choice Select_widget.t
 
     type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
 
     type pstate = state Navigation.t
 
@@ -206,6 +210,8 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
 
     type msg = unit
 
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
     type pstate = state Navigation.t
 
     let init () = failwith "choice modal init provided by caller"
@@ -229,6 +235,10 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
     let back ps = ps
 
     let keymap ps =
+      let noop ps = ps in
+      let kb key help =
+        {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
+      in
       let s = ps.Navigation.s in
       let doc_lines =
         match Select_widget.get_selection s with
@@ -239,19 +249,19 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
         doc_lines
         |> List.filter (fun l -> String.trim l <> "")
         |> List.mapi (fun idx line ->
-            (Printf.sprintf "doc%d" (idx + 1), (fun ps -> ps), line))
+            kb (Printf.sprintf "doc%d" (idx + 1)) line)
       in
       (* Keep keymap mostly for displaying help; handlers are no-op to avoid
          interfering with handle_modal_key. *)
       [
-        ("Enter", (fun ps -> ps), "Select");
-        ("Up", (fun ps -> ps), "Up");
-        ("Down", (fun ps -> ps), "Down");
-        ("PageUp", (fun ps -> ps), "Page up");
-        ("PageDown", (fun ps -> ps), "Page down");
-        ("Home", (fun ps -> ps), "Top");
-        ("End", (fun ps -> ps), "Bottom");
-        ("?", (fun ps -> ps), "Show description");
+        kb "Enter" "Select";
+        kb "Up" "Up";
+        kb "Down" "Down";
+        kb "PageUp" "Page up";
+        kb "PageDown" "Page down";
+        kb "Home" "Top";
+        kb "End" "Bottom";
+        kb "?" "Show description";
       ]
       @ doc_entries
 
@@ -325,6 +335,8 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
 
     type msg = unit
 
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
     type pstate = state Navigation.t
 
     let init () = failwith "textbox modal init provided by caller"
@@ -379,6 +391,8 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
     type state = choice Select_widget.t
 
     type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
 
     type pstate = state Navigation.t
 
@@ -485,6 +499,8 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
     type state = unit Miaou_widgets_input.Validated_textbox_widget.t
 
     type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
 
     type pstate = state Navigation.t
 
@@ -606,6 +622,8 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
 
     type msg = unit
 
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
     type pstate = state Navigation.t
 
     let init () =
@@ -631,46 +649,51 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
 
     let back ps = ps
 
-    let keymap _ = []
+    let keymap ps =
+      let noop ps = ps in
+      let hints = File_browser.key_hints ps.Navigation.s in
+      let kb key help =
+        {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
+      in
+      List.map (fun (key, help) -> kb key help) hints @ [kb "?" "Help"]
 
-    let handled_keys () = []
+    let handled_keys () =
+      Miaou.Core.Keys.
+        [
+          Up;
+          Down;
+          PageUp;
+          PageDown;
+          Char " ";
+          Enter;
+          Escape;
+          Backspace;
+          Tab;
+          Char "h";
+          Char "n";
+          Char "s";
+        ]
 
     let handle_modal_key ps key ~size:_ =
-      let s = ps.Navigation.s in
-      (* Let browser handle the key first and get updated state *)
-      let browser' = File_browser.handle_key s ~key in
-      (* Apply any pending updates from modal callbacks *)
-      let browser'' = File_browser.apply_pending_updates browser' in
-
-      (* Check for cancellation after browser processes key *)
-      if File_browser.is_cancelled browser'' then (
-        Miaou.Core.Modal_manager.close_top `Cancel ;
-        Navigation.update (fun _ -> browser'') ps
-        (* Check for commit with 's' key (Enter is used for navigation) *))
-      else
-        let selected = File_browser.get_selected_entry browser'' in
-        let is_dot =
-          match selected with Some {name = "."; _} -> true | _ -> false
-        in
-        let is_dir =
-          match selected with Some {is_dir; _} -> is_dir | None -> false
-        in
-        let has_selection =
-          match File_browser.get_selection browser'' with
-          | Some _ -> true
-          | None -> false
-        in
-        let should_commit =
-          File_browser.can_commit browser''
-          && (((key = "Space" || key = " ") && has_selection)
-             || key = "s"
-             || (key = "Enter" && (is_dot || not is_dir)))
-        in
-        if should_commit then (
-          Miaou.Core.Modal_manager.close_top `Commit ;
-          Navigation.update (fun _ -> browser'') ps)
-        (* Return the updated browser state *)
-          else Navigation.update (fun _ -> browser'') ps
+      Navigation.update
+        (fun s ->
+          let s' = File_browser.handle_key s ~key in
+          let s'' = File_browser.apply_pending_updates s' in
+          (* Check for cancel *)
+          if File_browser.is_cancelled s'' then (
+            Miaou.Core.Modal_manager.close_top `Cancel ;
+            s'' (* Commit on Enter for files or "." directory *))
+          else if key = "Enter" then
+            match File_browser.get_selected_entry s'' with
+            | Some e when (not e.is_dir) || e.name = "." ->
+                Miaou.Core.Modal_manager.close_top `Commit ;
+                s''
+            | _ -> s'' (* Commit on 's' key *)
+          else if key = "s" && File_browser.can_commit s'' then (
+            Miaou.Core.Modal_manager.close_top `Commit ;
+            s'')
+          else s'')
+        ps
 
     let handle_key = handle_modal_key
 
@@ -686,13 +709,13 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
       dim_background = true;
     }
   in
-  (* Use push with empty commit_on/cancel_on since we handle keys manually *)
+  (* Space commits via Miaou's commit_on, Enter/s handled manually in handle_key *)
   Miaou.Core.Modal_manager.push
     (module Modal)
     ~init:(Modal.init ())
     ~ui
-    ~commit_on:[]
-    ~cancel_on:[]
+    ~commit_on:["Space"; " "]
+    ~cancel_on:["Esc"; "Escape"]
     ~on_close:(fun pstate -> function
       | `Commit -> (
           match
