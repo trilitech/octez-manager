@@ -48,11 +48,33 @@ type model = {
   stopped_dependents : string list;
 }
 
+(** Generate instance name from network and history mode.
+    Format: node-{network} for rolling, node-{network}-{history_mode} for full/archive *)
+let generate_instance_name ~network ~history_mode =
+  (* Extract short network name (e.g., "mainnet" from URL or slug) *)
+  let network_short =
+    let n = String.lowercase_ascii (String.trim network) in
+    (* Handle URL format like https://teztnets.com/mainnet *)
+    let base =
+      match String.rindex_opt n '/' with
+      | Some i -> String.sub n (i + 1) (String.length n - i - 1)
+      | None -> n
+    in
+    (* Truncate long names *)
+    if String.length base > 15 then String.sub base 0 15 else base
+  in
+  match String.lowercase_ascii history_mode with
+  | "rolling" -> Printf.sprintf "node-%s" network_short
+  | mode -> Printf.sprintf "node-%s-%s" network_short mode
+
 let base_initial_model () =
+  let network = "mainnet" in
+  let history_mode = "rolling" in
+  let instance_name = generate_instance_name ~network ~history_mode in
   {
     core =
       {
-        instance_name = "node";
+        instance_name;
         service_user = Form_builder_common.default_service_user ();
         app_bin_dir =
           Form_builder_common.default_app_bin_dir ~binary_name:"octez-node";
@@ -62,9 +84,9 @@ let base_initial_model () =
       };
     node =
       {
-        network = "mainnet";
-        history_mode = "rolling";
-        data_dir = Common.default_role_dir "node" "node";
+        network;
+        history_mode;
+        data_dir = Common.default_role_dir "node" instance_name;
         rpc_addr = "127.0.0.1:8732";
         p2p_addr = "0.0.0.0:9732";
         (* All interfaces for peer reachability *)
@@ -556,6 +578,40 @@ let keep_snapshot_field =
 
 (** {1 Form Specification} *)
 
+(** Auto-update instance name and data_dir when network/history_mode changes *)
+let set_node_with_autoname node m =
+  if m.edit_mode then {m with node}
+  else
+    (* Check if network or history_mode changed *)
+    let old_name =
+      generate_instance_name
+        ~network:m.node.network
+        ~history_mode:m.node.history_mode
+    in
+    let new_name =
+      generate_instance_name
+        ~network:node.network
+        ~history_mode:node.history_mode
+    in
+    (* Only auto-update if instance name matches the old generated name *)
+    if String.equal m.core.instance_name old_name then
+      let new_data_dir = Common.default_role_dir "node" new_name in
+      let old_default_dir = Common.default_role_dir "node" old_name in
+      let should_update_data_dir =
+        String.equal (String.trim m.node.data_dir) old_default_dir
+      in
+      {
+        m with
+        node =
+          {
+            node with
+            data_dir =
+              (if should_update_data_dir then new_data_dir else node.data_dir);
+          };
+        core = {m.core with instance_name = new_name};
+      }
+    else {m with node}
+
 let spec =
   let open Form_builder in
   let open Form_builder_bundles in
@@ -568,7 +624,7 @@ let spec =
         (* 2. Network params: network, history mode, snapshot, tmp_dir, keep_snapshot *)
         node_fields
           ~get_node:(fun m -> m.node)
-          ~set_node:(fun node m -> {m with node})
+          ~set_node:set_node_with_autoname
           ~on_network_selected:prefetch_snapshot_list
           ~edit_mode:model.edit_mode
           ?editing_instance:model.original_instance

@@ -351,8 +351,9 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
 (** {1 Node-specific Bundle} *)
 
 let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
-    ?(edit_mode = false) ?editing_instance ?(skip_network = false)
-    ?(skip_data_dir = false) ?(skip_addresses = false) () =
+    ?(on_history_mode_changed = fun _ -> ()) ?(edit_mode = false)
+    ?editing_instance ?(skip_network = false) ?(skip_data_dir = false)
+    ?(skip_addresses = false) () =
   let open Form_builder in
   (* Helper for network field - needs special handling for dynamic fetch *)
   let network_field =
@@ -445,7 +446,9 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
         ~get:(fun m -> (get_node m).history_mode)
         ~set:(fun history_mode m ->
           let node = get_node m in
-          set_node {node with history_mode} m)
+          let m' = set_node {node with history_mode} m in
+          on_history_mode_changed history_mode ;
+          m')
         ~items:["rolling"; "full"; "archive"]
         ~to_string:(fun x -> x)
   in
