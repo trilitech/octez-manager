@@ -576,10 +576,16 @@ struct
       else Widgets.bg 160 (Widgets.fg 15 (Widgets.bold " ⚠ Form incomplete "))
     in
     (* Get hint for current field and set it for Help_hint modal *)
+    (* If field is invalid, show validation error instead of hint *)
     let current_hint =
       if s.cursor < List.length fields then
         let (Field f) = List.nth fields s.cursor in
-        f.hint
+        if f.validate model then f.hint
+        else
+          (* Show validation error message *)
+          match f.validate_msg model with
+          | Some msg -> Some ("⚠ " ^ msg)
+          | None -> Some "⚠ This field is invalid"
       else Some "Press Enter to install the service"
     in
     Miaou.Core.Help_hint.set current_hint ;
