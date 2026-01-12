@@ -604,3 +604,17 @@ let get_available_space dir =
       match lines with
       | _ :: value_line :: _ -> Int64.of_string_opt (String.trim value_line)
       | _ -> None)
+
+(** Map Octez exit codes to human-readable descriptions.
+    See https://octez.tezos.com/docs/user/exits.html *)
+let octez_exit_code_description code =
+  match code with
+  | 0 -> "success"
+  | 126 -> "unhandled exception (bug)"
+  | 127 -> "terminated by signal"
+  | 128 -> "error during shutdown"
+  | 254 -> "unhandled exception with shutdown error"
+  | 255 -> "forcefully terminated"
+  | n when n >= 1 && n <= 125 -> "configuration or startup error"
+  | n when n >= 129 && n <= 253 -> "error with shutdown failure"
+  | _ -> Printf.sprintf "exit code %d" code

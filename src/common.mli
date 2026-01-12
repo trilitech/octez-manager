@@ -107,3 +107,6 @@ val is_port_in_use : int -> bool
 val get_remote_file_size : string -> int64 option
 
 val get_available_space : string -> int64 option
+
+(** Map Octez exit codes to human-readable descriptions. *)
+val octez_exit_code_description : int -> string

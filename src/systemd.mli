@@ -14,6 +14,7 @@ type unit_state = {
   active_state : string;  (** active, inactive, failed, etc. *)
   sub_state : string;  (** running, dead, failed, etc. *)
   result : string option;  (** exit-code, signal, timeout, etc. when failed *)
+  exit_status : int option;  (** actual exit code if available *)
 }
 
 (** Get detailed unit state including failure information *)
