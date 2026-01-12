@@ -241,7 +241,8 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir =
               else
                 Error
                   (Printf.sprintf
-                     "Snapshot size is %s but %s only has %s available"
+                     "Need %s (snapshot %s + 10%% buffer) but %s only has %s"
+                     (format_bytes required)
                      (format_bytes size)
                      dir
                      (format_bytes available))))
