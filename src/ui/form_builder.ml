@@ -528,6 +528,11 @@ struct
     let s = ps.Navigation.s in
     let model = !(s.model_ref) in
     let fields = S.spec.fields model in
+    (* Truncate string to max length with ellipsis *)
+    let truncate max_len s =
+      if String.length s <= max_len then s
+      else String.sub s 0 (max_len - 1) ^ "…"
+    in
     (* Validate each field once and collect results *)
     let field_results =
       fields
@@ -538,13 +543,13 @@ struct
           let formatted_value =
             if ok then value_str
             else
-              (* Show value and error message *)
+              (* Show value and short error message *)
               let err_msg =
                 match f.validate_msg model with
-                | Some msg -> " ⚠ " ^ msg
-                | None -> ""
+                | Some msg -> " ⚠ " ^ truncate 40 msg
+                | None -> " ⚠ invalid"
               in
-              Widgets.fg 214 (Widgets.bold (value_str ^ err_msg))
+              Widgets.fg 214 (Widgets.bold (truncate 20 value_str ^ err_msg))
           in
           (f.label, formatted_value, ok))
     in
