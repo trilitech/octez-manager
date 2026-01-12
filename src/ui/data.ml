@@ -57,16 +57,22 @@ let classify_unit_state result =
   | Ok Systemd.{active_state; result = failure_reason; exit_status; _} -> (
       match active_state with
       | "active" -> (Some true, Service_state.Running)
-      | "failed" ->
-          let msg =
-            match (exit_status, failure_reason) with
-            | Some code, _ when code <> 0 ->
-                (* Use Octez-specific exit code descriptions *)
-                Common.octez_exit_code_description code
-            | _, Some reason -> reason
-            | _, None -> "service failed"
-          in
-          (Some false, Service_state.Unknown msg)
+      | "failed" -> (
+          (* Check if this is a normal stop (signal termination) vs actual failure *)
+          match exit_status with
+          | Some 127 | Some 255 ->
+              (* 127 = terminated by signal (normal stop)
+                 255 = forcefully terminated (SIGKILL)
+                 These are normal stops, not failures *)
+              (Some false, Service_state.Stopped)
+          | Some code when code <> 0 ->
+              (* Actual failure - use Octez-specific exit code descriptions *)
+              let msg = Common.octez_exit_code_description code in
+              (Some false, Service_state.Unknown msg)
+          | _ -> (
+              match failure_reason with
+              | Some reason -> (Some false, Service_state.Unknown reason)
+              | None -> (Some false, Service_state.Stopped)))
       | "inactive" | "deactivating" -> (Some false, Service_state.Stopped)
       | _ -> (None, Service_state.Stopped))
   | Error (`Msg msg) -> (None, Service_state.Unknown msg)
