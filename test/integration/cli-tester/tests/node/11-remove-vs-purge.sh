@@ -14,7 +14,7 @@ rm -rf "$DATA_DIR"
 # Install node
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "127.0.0.1:8740" --net-addr "0.0.0.0:9740" \
     --service-user tezos \
     --no-enable 2>&1

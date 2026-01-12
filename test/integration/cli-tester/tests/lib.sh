@@ -124,7 +124,7 @@ om_install_node() {
 
     om install-node \
         --instance "$instance" \
-        --network tallinnnet \
+        --network shadownet \
         --snapshot \
         --snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
         --rpc-addr "127.0.0.1:8732" \

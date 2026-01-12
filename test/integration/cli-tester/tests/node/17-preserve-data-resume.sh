@@ -17,7 +17,7 @@ rm -rf "$DATA_DIR"
 echo "Installing node with snapshot..."
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --snapshot \
     --snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
     --rpc-addr "$RPC_ADDR" \

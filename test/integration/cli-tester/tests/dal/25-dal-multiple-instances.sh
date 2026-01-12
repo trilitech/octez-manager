@@ -23,7 +23,7 @@ cleanup_instance "$NODE_INSTANCE" || true
 echo "Installing node..."
 om install-node \
     --instance "$NODE_INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "$NODE_RPC" \
     --net-addr "$NODE_NET" \
     --service-user tezos \

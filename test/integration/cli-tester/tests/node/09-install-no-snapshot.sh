@@ -13,7 +13,7 @@ cleanup_instance "$INSTANCE" || true
 # Install without --snapshot flag
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "127.0.0.1:8738" --net-addr "0.0.0.0:9738" \
     --service-user tezos \
     --no-enable 2>&1

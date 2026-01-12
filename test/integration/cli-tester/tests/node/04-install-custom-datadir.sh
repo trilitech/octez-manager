@@ -14,7 +14,7 @@ rm -rf "$CUSTOM_DATA_DIR"
 # Install with custom data-dir
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --data-dir "$CUSTOM_DATA_DIR" \
     --rpc-addr "127.0.0.1:8733" --net-addr "0.0.0.0:9733" \
     --service-user tezos \

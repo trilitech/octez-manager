@@ -18,6 +18,6 @@ SHOW_OUTPUT=$(om_instance "$TEST_INSTANCE" show 2>&1)
 # Verify key fields are present
 assert_contains "$SHOW_OUTPUT" "$TEST_INSTANCE" "Should show instance name"
 assert_contains "$SHOW_OUTPUT" "node" "Should show role"
-assert_contains "$SHOW_OUTPUT" "tallinnnet" "Should show network"
+assert_contains "$SHOW_OUTPUT" "shadownet" "Should show network"
 
 echo "Show instance test passed"

@@ -12,7 +12,7 @@ cleanup_instance "$INSTANCE_ROLLING" || true
 echo "Installing node with rolling history mode..."
 om install-node \
     --instance "$INSTANCE_ROLLING" \
-    --network tallinnnet \
+    --network shadownet \
     --history-mode rolling \
     --rpc-addr "127.0.0.1:8734" \
     --net-addr "0.0.0.0:9734" \
@@ -35,7 +35,7 @@ cleanup_instance "$INSTANCE_FULL" || true
 echo "Installing node with full history mode..."
 om install-node \
     --instance "$INSTANCE_FULL" \
-    --network tallinnnet \
+    --network shadownet \
     --history-mode full \
     --rpc-addr "127.0.0.1:8735" \
     --net-addr "0.0.0.0:9735" \
