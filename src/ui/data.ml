@@ -54,14 +54,17 @@ let parse_enabled_response resp =
 (** Classify using detailed systemd state, detecting failed services *)
 let classify_unit_state result =
   match result with
-  | Ok Systemd.{active_state; result = failure_reason; _} -> (
+  | Ok Systemd.{active_state; result = failure_reason; exit_status; _} -> (
       match active_state with
       | "active" -> (Some true, Service_state.Running)
       | "failed" ->
           let msg =
-            match failure_reason with
-            | Some reason -> reason
-            | None -> "service failed"
+            match (exit_status, failure_reason) with
+            | Some code, _ when code <> 0 ->
+                (* Use Octez-specific exit code descriptions *)
+                Common.octez_exit_code_description code
+            | _, Some reason -> reason
+            | _, None -> "service failed"
           in
           (Some false, Service_state.Unknown msg)
       | "inactive" | "deactivating" -> (Some false, Service_state.Stopped)

@@ -399,11 +399,16 @@ let with_service state handler =
   | Some svc -> handler svc
 
 let status_icon (st : Service_state.t) =
+  let instance = st.Service_state.service.Service.instance in
   match st.Service_state.status with
   | Service_state.Running -> Widgets.green "●"
   | Service_state.Stopped -> Widgets.yellow "○"
-  | Service_state.Unknown msg ->
-      Widgets.red ("?" ^ if msg = "" then "" else " " ^ msg)
+  | Service_state.Unknown _ ->
+      (* Only show red if there's a recent start/restart failure.
+         This distinguishes actual failures from normal stops that resulted
+         in systemd "failed" state (e.g., killed by signal). *)
+      if Option.is_some (get_recent_failure ~instance) then Widgets.red "●"
+      else Widgets.yellow "○"
 
 let enabled_badge (st : Service_state.t) =
   match st.Service_state.enabled with
@@ -501,18 +506,26 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let marker = if idx + 3 = selected then Widgets.bold "➤" else " " in
   let status = status_icon st in
   let enabled = enabled_badge st in
-  (* Add failure badge if service has failed *)
+  (* Add failure badge if service has a recent start/restart failure *)
   let has_failure =
     match st.Service_state.status with
-    | Service_state.Unknown _ -> true
-    | Service_state.Stopped ->
-        Option.is_some (get_recent_failure ~instance:svc.Service.instance)
     | Service_state.Running -> false
+    | Service_state.Stopped | Service_state.Unknown _ ->
+        (* Only show failure badge if there's a recent start/restart failure.
+           This avoids showing failure for normal stops. *)
+        Option.is_some (get_recent_failure ~instance:svc.Service.instance)
   in
   let failure_badge = if has_failure then Widgets.red " [!]" else "" in
   let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
-  let history =
-    Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
+  (* For nodes: show history mode. For others: show dependency *)
+  let role_info =
+    match svc.Service.role with
+    | "node" ->
+        Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
+    | _ -> (
+        match svc.Service.depends_on with
+        | Some dep -> Printf.sprintf "%-10s" ("→" ^ dep)
+        | None -> Printf.sprintf "%-10s" "")
   in
   let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
   let fold_indicator = if folded then "▸" else "▾" in
@@ -524,7 +537,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
       status
       instance_str
       failure_badge
-      history
+      role_info
       network
       enabled
   in
@@ -648,23 +661,35 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
         in
         Printf.sprintf "health: %s%s" status_str checks_str
   in
+  (* Line 2 only shows meaningful content when service is running *)
+  let is_running = st.Service_state.status = Service_state.Running in
   let second_line =
-    match svc.Service.role with
-    | "baker" ->
-        (* Line 2 for bakers: highwatermarks (last signed levels) *)
-        let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
-        Printf.sprintf "%s%s" (String.make indent_start ' ') hwm
-    | "dal-node" ->
-        (* Line 2 for DAL nodes: health status *)
-        Printf.sprintf
-          "%s%s"
-          (String.make indent_start ' ')
-          (dal_health_line ~instance:svc.Service.instance)
-    | _ ->
-        Printf.sprintf
-          "%s%s"
-          (String.make indent_start ' ')
-          (rpc_status_line ~service_status:st.Service_state.status svc)
+    let indent = String.make indent_start ' ' in
+    if not is_running then
+      (* When stopped/failed, show minimal status *)
+      match st.Service_state.status with
+      | Service_state.Stopped -> indent ^ Widgets.yellow "stopped"
+      | Service_state.Unknown msg when has_failure ->
+          indent ^ Widgets.red ("failed: " ^ msg)
+      | Service_state.Unknown _ -> indent ^ Widgets.yellow "stopped"
+      | Service_state.Running -> indent (* shouldn't happen *)
+    else
+      match svc.Service.role with
+      | "baker" ->
+          (* Line 2 for bakers: highwatermarks (last signed levels) *)
+          let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
+          Printf.sprintf "%s%s" indent hwm
+      | "dal-node" ->
+          (* Line 2 for DAL nodes: health status *)
+          Printf.sprintf
+            "%s%s"
+            indent
+            (dal_health_line ~instance:svc.Service.instance)
+      | _ ->
+          Printf.sprintf
+            "%s%s"
+            indent
+            (rpc_status_line ~service_status:st.Service_state.status svc)
   in
   (* If folded, return first two lines (header + RPC/health status) *)
   if folded then String.concat "\n" [first_line; second_line]
@@ -1483,6 +1508,8 @@ let instance_actions_modal state =
               Context.navigate Instance_details.name
           | `Start -> start_with_cascade ~instance ~role
           | `Stop ->
+              (* Clear any previous failure when user intentionally stops *)
+              clear_failure ~instance ;
               run_unit_action ~verb:"stop" ~instance (fun () ->
                   let cap = Miaou_interfaces.Service_lifecycle.require () in
                   Miaou_interfaces.Service_lifecycle.stop
