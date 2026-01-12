@@ -402,13 +402,14 @@ let status_icon (st : Service_state.t) =
   let instance = st.Service_state.service.Service.instance in
   match st.Service_state.status with
   | Service_state.Running -> Widgets.green "●"
-  | Service_state.Stopped -> Widgets.yellow "○"
-  | Service_state.Unknown _ ->
-      (* Only show red if there's a recent start/restart failure.
-         This distinguishes actual failures from normal stops that resulted
-         in systemd "failed" state (e.g., killed by signal). *)
+  | Service_state.Stopped ->
+      (* Stopped but check for recent failure from UI-initiated start *)
       if Option.is_some (get_recent_failure ~instance) then Widgets.red "●"
       else Widgets.yellow "○"
+  | Service_state.Unknown _ ->
+      (* Unknown status from systemd means the service failed.
+         This catches crashes at startup even when not started via UI. *)
+      Widgets.red "●"
 
 let enabled_badge (st : Service_state.t) =
   match st.Service_state.enabled with
@@ -517,15 +518,12 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   in
   let failure_badge = if has_failure then Widgets.red " [!]" else "" in
   let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
-  (* For nodes: show history mode. For others: show dependency *)
+  (* For nodes: show history mode. For others: no extra info on first line *)
   let role_info =
     match svc.Service.role with
     | "node" ->
         Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
-    | _ -> (
-        match svc.Service.depends_on with
-        | Some dep -> Printf.sprintf "%-10s" ("→" ^ dep)
-        | None -> Printf.sprintf "%-10s" "")
+    | _ -> Printf.sprintf "%-10s" ""
   in
   let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
   let fold_indicator = if folded then "▸" else "▾" in
@@ -668,10 +666,16 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     if not is_running then
       (* When stopped/failed, show minimal status *)
       match st.Service_state.status with
-      | Service_state.Stopped -> indent ^ Widgets.yellow "stopped"
-      | Service_state.Unknown msg when has_failure ->
+      | Service_state.Stopped ->
+          (* Stopped but check for recent failure from UI-initiated start *)
+          if has_failure then
+            match get_recent_failure ~instance:svc.Service.instance with
+            | Some error -> indent ^ Widgets.red ("failed: " ^ error)
+            | None -> indent ^ Widgets.yellow "stopped"
+          else indent ^ Widgets.yellow "stopped"
+      | Service_state.Unknown msg ->
+          (* Unknown status from systemd means the service failed *)
           indent ^ Widgets.red ("failed: " ^ msg)
-      | Service_state.Unknown _ -> indent ^ Widgets.yellow "stopped"
       | Service_state.Running -> indent (* shouldn't happen *)
     else
       match svc.Service.role with
@@ -685,6 +689,9 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
             "%s%s"
             indent
             (dal_health_line ~instance:svc.Service.instance)
+      | "accuser" ->
+          (* Line 2 for accusers: simple monitoring status *)
+          Printf.sprintf "%s%s" indent (Widgets.green "monitoring")
       | _ ->
           Printf.sprintf
             "%s%s"
@@ -1718,6 +1725,21 @@ Press **Enter** to open instance menu.|}
 
 Press **Enter** to open instance menu.|}
 
+  let accuser_help_hint =
+    {|## Accuser Instance
+
+**Line 1:** Instance status
+- `●` running (green), `○` stopped (yellow), `●` failed (red)
+- `[enabled]` starts on boot
+
+**Line 2:** Activity status
+- `monitoring` (green) = accuser is watching for double-baking/endorsing
+
+The accuser monitors the chain for misbehavior and
+automatically submits denunciation operations when detected.
+
+Press **Enter** to open instance menu.|}
+
   (* Mutable scroll offset - updated during view to keep selection visible *)
   let scroll_offset_ref = ref 0
 
@@ -1739,6 +1761,8 @@ Press **Enter** to open instance menu.|}
         Miaou.Core.Help_hint.set (Some baker_help_hint)
     | Some st when st.service.Service.role = "dal-node" ->
         Miaou.Core.Help_hint.set (Some dal_help_hint)
+    | Some st when st.service.Service.role = "accuser" ->
+        Miaou.Core.Help_hint.set (Some accuser_help_hint)
     | _ -> Miaou.Core.Help_hint.set (Some "Press Enter to select, ? for help")) ;
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
