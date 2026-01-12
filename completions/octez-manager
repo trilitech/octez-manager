@@ -67,6 +67,10 @@ _octez_manager() {
       COMPREPLY=( $(compgen -f -- "$cur") )
       return 0
       ;;
+    --tmp-dir)
+      COMPREPLY=( $(compgen -d -- "$cur") )
+      return 0
+      ;;
   esac
 
   if [[ $COMP_CWORD -eq 1 ]]; then
@@ -145,7 +149,7 @@ _octez_manager() {
       ;;
     install-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --net-addr --network --no-enable --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --help"
+        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --keep-snapshot --net-addr --network --no-enable --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --tmp-dir --help"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0

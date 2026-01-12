@@ -40,6 +40,8 @@ type model = {
   (* Node-specific fields *)
   snapshot : snapshot_selection;
   preserve_data : preserve_data;
+  tmp_dir : string option; (* Custom directory for snapshot download *)
+  keep_snapshot : bool; (* Keep snapshot file after import *)
   (* Edit mode *)
   edit_mode : bool;
   original_instance : string option;
@@ -69,6 +71,8 @@ let base_initial_model () =
       };
     snapshot = `None;
     preserve_data = `Auto;
+    tmp_dir = None;
+    keep_snapshot = false;
     edit_mode = false;
     original_instance = None;
     stopped_dependents = [];
@@ -176,6 +180,71 @@ let prefetch_snapshot_list network =
       | Some _ -> ()
       | None -> schedule_snapshot_fetch slug)
   | None -> ()
+
+(** {1 Snapshot Space Check} *)
+
+let format_bytes bytes =
+  let kb = 1024L in
+  let mb = Int64.mul kb 1024L in
+  let gb = Int64.mul mb 1024L in
+  if bytes >= gb then
+    Printf.sprintf "%.1f GB" (Int64.to_float bytes /. Int64.to_float gb)
+  else if bytes >= mb then
+    Printf.sprintf "%.0f MB" (Int64.to_float bytes /. Int64.to_float mb)
+  else Printf.sprintf "%Ld bytes" bytes
+
+(** Get the download URL for a snapshot selection *)
+let get_snapshot_url ~network snapshot =
+  match snapshot with
+  | `None -> None
+  | `Url url ->
+      if
+        String.length url > 4
+        && String.sub (String.lowercase_ascii url) 0 4 = "http"
+      then Some url
+      else None (* Local file, no space check needed *)
+  | `Tzinit snap -> (
+      match slug_of_network network with
+      | None -> None
+      | Some network_slug -> (
+          match snapshot_entries_from_cache network_slug with
+          | None -> None
+          | Some entries -> (
+              match
+                List.find_opt
+                  (fun (e : Snapshots.entry) ->
+                    e.network = snap.network_slug && e.slug = snap.kind_slug)
+                  entries
+              with
+              | None -> None
+              | Some entry -> entry.download_url)))
+
+(** Check if there's enough space for the snapshot download.
+    Returns [Ok ()] if space is sufficient or can't be determined.
+    Returns [Error msg] if space is definitely insufficient. *)
+let check_snapshot_space ~network ~snapshot ~tmp_dir =
+  match get_snapshot_url ~network snapshot with
+  | None -> Ok () (* No URL to check, or local file *)
+  | Some url -> (
+      match Common.get_remote_file_size url with
+      | None -> Ok () (* Can't determine size, proceed *)
+      | Some size -> (
+          let dir =
+            Option.value ~default:(Filename.get_temp_dir_name ()) tmp_dir
+          in
+          match Common.get_available_space dir with
+          | None -> Ok () (* Can't determine space, proceed *)
+          | Some available ->
+              (* Add 10% buffer for safety *)
+              let required = Int64.add size (Int64.div size 10L) in
+              if available >= required then Ok ()
+              else
+                Error
+                  (Printf.sprintf
+                     "Snapshot size is %s but %s only has %s available"
+                     (format_bytes size)
+                     dir
+                     (format_bytes available))))
 
 let parse_port addr =
   match String.split_on_char ':' addr with
@@ -293,6 +362,8 @@ let make_initial_model () =
         snapshot = `None;
         preserve_data = `Keep;
         (* Always preserve data in edit mode *)
+        tmp_dir = None;
+        keep_snapshot = false;
         edit_mode = true;
         original_instance = Some svc.Service.instance;
         stopped_dependents = edit_ctx.stopped_dependents;
@@ -423,6 +494,65 @@ let snapshot_field =
         | _ -> None)
     ()
 
+let tmp_dir_field =
+  Form_builder.custom
+    ~label:"Download Directory"
+    ~get:(fun m ->
+      match m.tmp_dir with None -> "/tmp (default)" | Some dir -> dir)
+    ~edit:(fun model_ref ->
+      Modal_helpers.prompt_text_modal
+        ~title:"Snapshot Download Directory"
+        ~placeholder:(Some "/var/tmp")
+        ~initial:(Option.value ~default:"" !model_ref.tmp_dir)
+        ~on_submit:(fun dir ->
+          let dir = String.trim dir in
+          model_ref :=
+            {!model_ref with tmp_dir = (if dir = "" then None else Some dir)})
+        ())
+    ~validate:(fun m ->
+      (* First check directory validity *)
+      let dir_valid =
+        match m.tmp_dir with
+        | None -> true
+        | Some dir ->
+            String.trim dir <> ""
+            && ((not (Sys.file_exists dir)) || Sys.is_directory dir)
+      in
+      if not dir_valid then false
+      else
+        (* Then check available space *)
+        match
+          check_snapshot_space
+            ~network:m.node.network
+            ~snapshot:m.snapshot
+            ~tmp_dir:m.tmp_dir
+        with
+        | Ok () -> true
+        | Error _ -> false)
+    ~validate_msg:(fun m ->
+      match m.tmp_dir with
+      | Some dir when String.trim dir = "" ->
+          Some "Directory path cannot be empty"
+      | Some dir when Sys.file_exists dir && not (Sys.is_directory dir) ->
+          Some "Path exists but is not a directory"
+      | _ -> (
+          (* Check available space *)
+          match
+            check_snapshot_space
+              ~network:m.node.network
+              ~snapshot:m.snapshot
+              ~tmp_dir:m.tmp_dir
+          with
+          | Ok () -> None
+          | Error msg -> Some msg))
+    ()
+
+let keep_snapshot_field =
+  Form_builder.toggle
+    ~label:"Keep Snapshot"
+    ~get:(fun m -> m.keep_snapshot)
+    ~set:(fun keep_snapshot m -> {m with keep_snapshot})
+
 (** {1 Form Specification} *)
 
 let spec =
@@ -490,6 +620,24 @@ let spec =
                |> with_hint
                     "Import a snapshot for faster sync. None = sync from \
                      genesis (slow).";
+             ])
+        (* Download directory field, only shown when snapshot is selected *)
+        @ (if model.edit_mode || model.snapshot = `None then []
+           else
+             [
+               tmp_dir_field
+               |> with_hint
+                    "Custom directory for large snapshot downloads. Use if \
+                     /tmp has insufficient space.";
+             ])
+        (* Keep snapshot field, only shown when snapshot is selected *)
+        @ (if model.edit_mode || model.snapshot = `None then []
+           else
+             [
+               keep_snapshot_field
+               |> with_hint
+                    "Keep the downloaded snapshot file after import instead of \
+                     deleting it.";
              ])
         @ core_service_fields
             ~get_core:(fun m -> m.core)
@@ -595,6 +743,8 @@ let spec =
             bootstrap;
             preserve_data = model.preserve_data = `Keep;
             snapshot_no_check = false;
+            tmp_dir = model.tmp_dir;
+            keep_snapshot = model.keep_snapshot;
           }
         in
 

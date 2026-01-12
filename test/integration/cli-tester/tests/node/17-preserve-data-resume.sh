@@ -37,7 +37,7 @@ if ! wait_for_service_active "node" "$INSTANCE" 30; then
 fi
 
 # Identity generation (PoW) can take 60-120s on CI runners
-if ! wait_for_node_ready "$RPC_ADDR" 240; then
+if ! wait_for_node_ready "$RPC_ADDR" 180; then
     echo "ERROR: Node RPC not ready"
     show_service_logs "node" "$INSTANCE" 50
     exit 1

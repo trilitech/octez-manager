@@ -569,3 +569,38 @@ let is_port_in_use (port : int) : bool =
     with
     | Ok out -> String.trim out <> ""
     | Error _ -> false
+
+let get_remote_file_size url =
+  (* Use curl -I (HEAD request) to get Content-Length *)
+  match run_out ["curl"; "-sfI"; "--connect-timeout"; "10"; url] with
+  | Error _ -> None
+  | Ok output ->
+      let lines = String.split_on_char '\n' output in
+      let rec find_content_length = function
+        | [] -> None
+        | line :: rest ->
+            let lower = String.lowercase_ascii line in
+            if
+              String.length lower > 16
+              && String.sub lower 0 16 = "content-length: "
+            then
+              let value =
+                String.trim (String.sub line 16 (String.length line - 16))
+              in
+              match Int64.of_string_opt value with
+              | Some size -> Some size
+              | None -> find_content_length rest
+            else find_content_length rest
+      in
+      find_content_length lines
+
+let get_available_space dir =
+  (* Use df to get available space in bytes *)
+  match run_out ["df"; "-B1"; "--output=avail"; dir] with
+  | Error _ -> None
+  | Ok output -> (
+      let lines = String.split_on_char '\n' output in
+      (* Skip header line, get second line *)
+      match lines with
+      | _ :: value_line :: _ -> Int64.of_string_opt (String.trim value_line)
+      | _ -> None)

@@ -103,3 +103,7 @@ val remove_tree : string -> (unit, [> `Msg of string]) result
 val copy_file : string -> string -> (unit, [> `Msg of string]) result
 
 val is_port_in_use : int -> bool
+
+val get_remote_file_size : string -> int64 option
+
+val get_available_space : string -> int64 option
