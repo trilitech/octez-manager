@@ -390,6 +390,72 @@ let prompt_yes_no question ~default =
     in
     loop ()
 
+let format_bytes bytes =
+  let gb = Int64.to_float bytes /. (1024. *. 1024. *. 1024.) in
+  if gb >= 1.0 then Printf.sprintf "%.1f GB" gb
+  else
+    let mb = Int64.to_float bytes /. (1024. *. 1024.) in
+    Printf.sprintf "%.0f MB" mb
+
+let resolve_tmp_dir_for_snapshot ~snapshot_url ~tmp_dir =
+  (* If tmp_dir is already specified, use it *)
+  match tmp_dir with
+  | Some dir -> Ok (Some dir)
+  | None -> (
+      (* Check snapshot size vs /tmp space *)
+      match Common.get_remote_file_size snapshot_url with
+      | None ->
+          (* Can't determine size, proceed with default /tmp *)
+          Ok None
+      | Some size -> (
+          let tmp_path = Filename.get_temp_dir_name () in
+          match Common.get_available_space tmp_path with
+          | None ->
+              (* Can't determine space, proceed with default *)
+              Ok None
+          | Some available ->
+              (* Add 10% buffer for safety *)
+              let required = Int64.add size (Int64.div size 10L) in
+              if available >= required then Ok None
+              else if is_interactive () then (
+                Printf.printf
+                  "Snapshot size is %s but %s only has %s available.\n"
+                  (format_bytes size)
+                  tmp_path
+                  (format_bytes available) ;
+                let rec prompt_dir () =
+                  match
+                    prompt_required_string
+                      "Enter a directory with enough space for the download"
+                  with
+                  | dir ->
+                      if Sys.file_exists dir && Sys.is_directory dir then (
+                        match Common.get_available_space dir with
+                        | Some space when space >= required -> Some dir
+                        | Some space ->
+                            Printf.printf
+                              "%s only has %s available, need %s.\n"
+                              dir
+                              (format_bytes space)
+                              (format_bytes required) ;
+                            prompt_dir ()
+                        | None ->
+                            Printf.printf "Cannot determine space in %s.\n" dir ;
+                            prompt_dir ())
+                      else (
+                        Printf.printf "%s is not a valid directory.\n" dir ;
+                        prompt_dir ())
+                in
+                Ok (prompt_dir ()))
+              else
+                Error
+                  (Printf.sprintf
+                     "Snapshot size is %s but %s only has %s available. Use \
+                      --tmp-dir to specify an alternative download location."
+                     (format_bytes size)
+                     tmp_path
+                     (format_bytes available))))
+
 (* Prompt with linenoise for autocompletion support *)
 let prompt_with_completion question completions =
   if not (is_interactive ()) then None
@@ -685,9 +751,23 @@ let install_node_cmd =
     in
     Arg.(value & flag & info ["preserve-data"] ~doc)
   in
+  let tmp_dir =
+    let doc =
+      "Directory for temporary snapshot download. Use when /tmp has \
+       insufficient space for large snapshots (e.g., mainnet full)."
+    in
+    Arg.(value & opt (some string) None & info ["tmp-dir"] ~doc ~docv:"DIR")
+  in
+  let keep_snapshot =
+    let doc =
+      "Keep the downloaded snapshot file after import instead of deleting it."
+    in
+    Arg.(value & flag & info ["keep-snapshot"] ~doc)
+  in
   let make instance_opt network_opt history_mode_opt data_dir rpc_addr net_addr
       service_user app_bin_dir extra_args snapshot_flag snapshot_uri
-      snapshot_no_check no_enable preserve_data logging_mode =
+      snapshot_no_check no_enable preserve_data tmp_dir keep_snapshot
+      logging_mode =
     let res =
       let ( let* ) = Result.bind in
       let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
@@ -807,6 +887,8 @@ let install_node_cmd =
               bootstrap = Genesis;
               preserve_data;
               snapshot_no_check;
+              tmp_dir;
+              keep_snapshot;
             }
           in
           Result.map_error (fun (`Msg s) -> s) @@ Installer.install_node req
@@ -858,6 +940,35 @@ let install_node_cmd =
             else if snapshot_requested then Snapshot {src = snapshot_uri}
             else Genesis
           in
+          (* Check snapshot size vs tmp space *)
+          let* tmp_dir =
+            match bootstrap with
+            | Snapshot _ -> (
+                (* Get the snapshot URL - either direct or resolved from tzinit *)
+                let snapshot_url =
+                  match snapshot_uri with
+                  | Some uri
+                    when String.length uri > 4
+                         && String.sub (String.lowercase_ascii uri) 0 4 = "http"
+                    ->
+                      Some uri
+                  | Some _ -> None (* Local file, no space check needed *)
+                  | None -> (
+                      (* Auto-select: resolve from tzinit to get URL *)
+                      match
+                        Installer.resolve_snapshot_download
+                          ~network
+                          ~history_mode
+                      with
+                      | Ok res -> Some res.download_url
+                      | Error _ -> None)
+                in
+                match snapshot_url with
+                | Some url ->
+                    resolve_tmp_dir_for_snapshot ~snapshot_url:url ~tmp_dir
+                | None -> Ok tmp_dir)
+            | Genesis -> Ok tmp_dir
+          in
           (* Validate ports for new install *)
           let* rpc_addr =
             validate_port_addr
@@ -889,6 +1000,8 @@ let install_node_cmd =
               bootstrap;
               preserve_data;
               snapshot_no_check;
+              tmp_dir;
+              keep_snapshot;
             }
           in
           Result.map_error (fun (`Msg s) -> s) @@ Installer.install_node req
@@ -905,7 +1018,7 @@ let install_node_cmd =
         (const make $ instance $ network $ history_mode_opt_term $ data_dir
        $ rpc_addr $ net_addr $ service_user $ app_bin_dir $ extra_args
        $ snapshot_flag $ snapshot_uri $ snapshot_no_check $ auto_enable
-       $ preserve_data $ logging_mode_term))
+       $ preserve_data $ tmp_dir $ keep_snapshot $ logging_mode_term))
   in
   let info =
     Cmd.info "install-node" ~doc:"Install an octez-node systemd instance"
@@ -2078,6 +2191,8 @@ let instance_term =
                             bootstrap = Installer_types.Genesis;
                             preserve_data = true;
                             snapshot_no_check = false;
+                            tmp_dir = None;
+                            keep_snapshot = false;
                           }
                         in
                         Result.map_error

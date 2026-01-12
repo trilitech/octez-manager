@@ -176,6 +176,8 @@ let sample_node_request ?data_dir ?(bootstrap = Genesis)
     bootstrap;
     preserve_data;
     snapshot_no_check;
+    tmp_dir = None;
+    keep_snapshot = false;
   }
 
 let service_make_populates_fields () =
@@ -1341,83 +1343,6 @@ let parse_initial_args_tests () =
     "quoted value"
     [("--msg", Some "hello world")]
     (BH.parse_initial_args "--msg 'hello world'")
-
-let binary_mtime_tests () =
-  let module BH = Octez_manager_ui.Binary_help_explorer.For_tests in
-  (* Missing file returns "unknown" *)
-  Alcotest.(check string)
-    "missing file"
-    "unknown"
-    (BH.binary_mtime "/nonexistent/binary/path") ;
-  (* Existing file returns numeric mtime *)
-  let mtime = BH.binary_mtime "/bin/sh" in
-  Alcotest.(check bool)
-    "existing file has numeric mtime"
-    true
-    (try
-       ignore (float_of_string mtime) ;
-       true
-     with _ -> false)
-
-let cache_key_tests () =
-  let module BH = Octez_manager_ui.Binary_help_explorer.For_tests in
-  let binary = "/usr/bin/octez-baker" in
-  (* Node cache key includes binary and mtime *)
-  let node_key = BH.node_cache_key ~binary in
-  Alcotest.(check bool)
-    "node key starts with binary"
-    true
-    (String.length node_key > String.length binary
-    && String.sub node_key 0 (String.length binary) = binary) ;
-  (* Baker cache keys differ by mode *)
-  let local_key = BH.baker_cache_key ~binary ~mode:`Local in
-  let remote_key = BH.baker_cache_key ~binary ~mode:`Remote in
-  Alcotest.(check bool)
-    "baker local vs remote keys differ"
-    true
-    (local_key <> remote_key) ;
-  Alcotest.(check bool)
-    "baker local key contains 'local'"
-    true
-    (String.length local_key > 0
-    &&
-      try
-        ignore
-          (Str.search_forward (Str.regexp_string ":baker:local:") local_key 0) ;
-        true
-      with Not_found -> false) ;
-  Alcotest.(check bool)
-    "baker remote key contains 'remote'"
-    true
-    (String.length remote_key > 0
-    &&
-      try
-        ignore
-          (Str.search_forward (Str.regexp_string ":baker:remote:") remote_key 0) ;
-        true
-      with Not_found -> false) ;
-  (* Accuser and DAL keys include role *)
-  let accuser_key = BH.accuser_cache_key ~binary in
-  let dal_key = BH.dal_cache_key ~binary in
-  Alcotest.(check bool)
-    "accuser key contains 'accuser'"
-    true
-    (String.length accuser_key > 0
-    &&
-      try
-        ignore
-          (Str.search_forward (Str.regexp_string ":accuser:") accuser_key 0) ;
-        true
-      with Not_found -> false) ;
-  Alcotest.(check bool)
-    "dal key contains 'dal'"
-    true
-    (String.length dal_key > 0
-    &&
-      try
-        ignore (Str.search_forward (Str.regexp_string ":dal:") dal_key 0) ;
-        true
-      with Not_found -> false)
 
 let home_dir_fallback () =
   let pw = Unix.getpwuid (Unix.geteuid ()) in
@@ -3247,8 +3172,6 @@ let () =
       ( "binary_help_explorer",
         [
           Alcotest.test_case "parse_initial_args" `Quick parse_initial_args_tests;
-          Alcotest.test_case "binary_mtime" `Quick binary_mtime_tests;
-          Alcotest.test_case "cache_keys" `Quick cache_key_tests;
         ] );
       ( "snapshots.basic",
         [

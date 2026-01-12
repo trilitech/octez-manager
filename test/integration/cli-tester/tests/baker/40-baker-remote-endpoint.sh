@@ -36,7 +36,7 @@ if ! wait_for_service_active "node" "$NODE_INSTANCE" 30; then
     exit 1
 fi
 
-if ! wait_for_node_ready "$NODE_RPC" 240; then
+if ! wait_for_node_ready "$NODE_RPC" 180; then
     echo "ERROR: Node RPC not ready"
     show_service_logs "node" "$NODE_INSTANCE" 50
     exit 1

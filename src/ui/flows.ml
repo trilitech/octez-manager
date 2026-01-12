@@ -85,6 +85,8 @@ let create_node_flow ~on_success =
                         preserve_data = false;
                         bootstrap;
                         snapshot_no_check = false;
+                        tmp_dir = None;
+                        keep_snapshot = false;
                       }
                     in
                     let res =
