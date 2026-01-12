@@ -51,21 +51,6 @@ octez-manager --version
 octez-manager --help
 ```
 
-## Shell Completions
-
-Octez Manager supports shell completions for bash, zsh, and fish:
-
-```bash
-# Bash
-octez-manager completions bash > ~/.local/share/bash-completion/completions/octez-manager
-
-# Zsh
-octez-manager completions zsh > ~/.zfunc/_octez-manager
-
-# Fish
-octez-manager completions fish > ~/.config/fish/completions/octez-manager.fish
-```
-
 ## Running Modes
 
 Octez Manager can run in two modes:

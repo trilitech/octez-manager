@@ -126,16 +126,6 @@ octez-manager list [OPTIONS]
 |--------|-------------|
 | `--json` | Output as JSON |
 
-### `completions`
-
-Generate shell completions.
-
-```bash
-octez-manager completions <SHELL>
-```
-
-Supported shells: `bash`, `zsh`, `fish`
-
 ## Examples
 
 ```bash
