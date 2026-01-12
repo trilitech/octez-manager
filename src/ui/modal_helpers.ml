@@ -631,15 +631,11 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
 
     let back ps = ps
 
-    let keymap _ =
+    let keymap ps =
       let noop ps = ps in
-      [
-        ("Enter", noop, "Open/Select");
-        ("Space", noop, "Toggle");
-        ("s", noop, "Confirm");
-        ("Esc", noop, "Cancel");
-        ("?", noop, "Help");
-      ]
+      let hints = File_browser.key_hints ps.Navigation.s in
+      List.map (fun (key, desc) -> (key, noop, desc)) hints
+      @ [("?", noop, "Help")]
 
     let handled_keys () = []
 

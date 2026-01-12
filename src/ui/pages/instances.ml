@@ -1807,7 +1807,7 @@ Press **Enter** to open instance menu.|}
     Vsection.render
       ~size
       ~header:(header s)
-      ~footer:[]
+      ~content_footer:[]
       ~child:(fun inner_size ->
         (* Available rows for content (reserve space for progress/toasts/logs) *)
         let progress_lines =

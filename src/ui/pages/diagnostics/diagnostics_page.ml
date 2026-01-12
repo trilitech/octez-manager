@@ -542,7 +542,7 @@ let view ps ~focus:_ ~size =
       Miaou_widgets_layout.Vsection.render
         ~size
         ~header:header_with_scroll
-        ~footer
+        ~content_footer:[]
         ~child:(fun _ -> body))
 
 let handle_modal_key ps key ~size:_ =

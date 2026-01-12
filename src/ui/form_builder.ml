@@ -622,11 +622,11 @@ struct
     Miaou.Core.Help_hint.set current_hint ;
     let title_line = Widgets.title_highlight S.spec.title in
     let header = [title_line; status_banner] in
-    let footer =
-      [Widgets.dim "↑/↓ navigate, Enter to edit, ? for help, Esc back"]
-    in
-    Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
-        Table_widget.Table.render table)
+    Miaou_widgets_layout.Vsection.render
+      ~size
+      ~header
+      ~content_footer:[]
+      ~child:(fun _ -> Table_widget.Table.render table)
 
   let handle_modal_key ps key ~size:_ =
     Miaou.Core.Modal_manager.handle_key key ;

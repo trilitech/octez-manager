@@ -72,7 +72,7 @@ let view ps ~focus:_ ~size =
             (Widgets.bold entry.label)
             (Widgets.dim (Option.value ~default:"" entry.download_url)))
   in
-  Vsection.render ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
+  Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
       String.concat "\n" body)
 
 let handle_modal_key ps key ~size:_ =

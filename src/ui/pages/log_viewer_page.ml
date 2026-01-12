@@ -251,7 +251,7 @@ let view ps ~focus ~size =
          source_str)
   in
   let header = [title; help] in
-  Vsection.render ~size ~header ~footer:[] ~child:(fun inner_size ->
+  Vsection.render ~size ~header ~content_footer:[] ~child:(fun inner_size ->
       Pager.render
         ~cols:inner_size.LTerm_geom.cols
         ~win:inner_size.LTerm_geom.rows
