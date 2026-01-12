@@ -219,6 +219,8 @@ let open_modal ~title ~options ~initial_args ~on_apply =
 
     type msg = unit
 
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
     type pstate = state Navigation.t
 
     let update_help_hint s =
@@ -275,6 +277,8 @@ let open_modal ~title ~options ~initial_args ~on_apply =
         type state = {textbox : Textbox_widget.t; doc_lines : string list}
 
         type msg = unit
+
+        type key_binding = state Miaou.Core.Tui_page.key_binding_desc
 
         type pstate = state Navigation.t
 
@@ -453,19 +457,6 @@ let open_modal ~title ~options ~initial_args ~on_apply =
         else ""
       in
       let body = String.concat "\n" visible in
-      let hint_line =
-        match current_row s with
-        | None -> Widgets.dim "Select an option to view details"
-        | Some row -> truncate ~max_len:(max 20 (width - 10)) row.opt.doc
-      in
-      let footer =
-        [
-          Widgets.dim
-            "↑/↓ move  Enter edit/toggle  Space toggle  s apply  ? hint  Esc \
-             close";
-          Widgets.dim (Printf.sprintf "Last key: %S | %s" s.last_key hint_line);
-        ]
-      in
       Miaou_widgets_layout.Vsection.render
         ~size
         ~header:
@@ -480,7 +471,7 @@ let open_modal ~title ~options ~initial_args ~on_apply =
             summary_line;
             "";
           ]
-        ~footer
+        ~content_footer:[]
         ~child:(fun _ -> body)
 
     let handle_modal_key ps key ~size:_ =
@@ -555,30 +546,38 @@ let open_modal ~title ~options ~initial_args ~on_apply =
 
     let keymap ps =
       let s = ps.Navigation.s in
+      let kb key action help =
+        {Miaou.Core.Tui_page.key; action; help; display_only = false}
+      in
       [
-        ( "Up",
+        kb
+          "Up"
           (fun ps ->
             s.last_key <- "Up(keymap)" ;
-            move ps (-1)),
-          "Up" );
-        ( "Down",
+            move ps (-1))
+          "Up";
+        kb
+          "Down"
           (fun ps ->
             s.last_key <- "Down(keymap)" ;
-            move ps 1),
-          "Down" );
-        ( "Enter",
+            move ps 1)
+          "Down";
+        kb
+          "Enter"
           (fun ps ->
             s.last_key <- "Enter(keymap)" ;
             edit_value s ;
-            ps),
-          "Edit/Select" );
-        ( "Return",
+            ps)
+          "Edit/Select";
+        kb
+          "Return"
           (fun ps ->
             s.last_key <- "Return(keymap)" ;
             edit_value s ;
-            ps),
-          "Edit/Select" );
-        ( "Space",
+            ps)
+          "Edit/Select";
+        kb
+          "Space"
           (fun ps ->
             s.last_key <- "Space(keymap)" ;
             (match current_row s with
@@ -591,9 +590,10 @@ let open_modal ~title ~options ~initial_args ~on_apply =
                       row.selected <- false ;
                       row.value <- None)
                     else edit_value s)) ;
-            ps),
-          "Toggle/Edit" );
-        ( "Backspace",
+            ps)
+          "Toggle/Edit";
+        kb
+          "Backspace"
           (fun ps ->
             s.last_key <- "Backspace(keymap)" ;
             (match current_row s with
@@ -601,20 +601,25 @@ let open_modal ~title ~options ~initial_args ~on_apply =
             | Some row ->
                 row.selected <- false ;
                 row.value <- None) ;
-            ps),
-          "Clear" );
-        ( "s",
+            ps)
+          "Clear";
+        kb
+          "s"
           (fun ps ->
             s.last_key <- "s(keymap)" ;
             apply_and_close s ;
-            ps),
-          "Apply" );
-        ( "?",
-          (fun ps ->
-            s.last_key <- "?(keymap)" ;
-            show_hint s ;
-            ps),
-          "Help" );
+            ps)
+          "Apply";
+        {
+          Miaou.Core.Tui_page.key = "?";
+          action =
+            (fun ps ->
+              s.last_key <- "?(keymap)" ;
+              show_hint s ;
+              ps);
+          help = "Help";
+          display_only = true;
+        };
       ]
 
     let has_modal _ = true

@@ -1597,6 +1597,8 @@ struct
 
   type nonrec msg = msg
 
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
   type nonrec pstate = pstate
 
   let init () = init_state ()
@@ -1618,19 +1620,28 @@ struct
     ps
 
   let handled_keys () =
-    Miaou.Core.Keys.
-      [Enter; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"; Char "?"]
+    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
 
   let keymap _ps =
     let activate ps = Navigation.update activate_selection ps in
     let create ps = Navigation.update create_menu_modal ps in
     let diag ps = Navigation.update go_to_diagnostics ps in
     let dismiss ps = Navigation.update dismiss_failure ps in
+    let noop ps = ps in
+    let kb key action help =
+      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    in
     [
-      ("Enter", activate, "Open");
-      ("c", create, "Create service");
-      ("d", diag, "Diagnostics");
-      ("x", dismiss, "Clear failure");
+      kb "Enter" activate "Open";
+      kb "c" create "Create";
+      kb "d" diag "Diagnostics";
+      kb "x" dismiss "Clear failure";
+      {
+        Miaou.Core.Tui_page.key = "?";
+        action = noop;
+        help = "Help";
+        display_only = true;
+      };
     ]
 
   let header s =
@@ -1647,9 +1658,6 @@ struct
         (Widgets.dim hint);
       Widgets.dim (summary_line s);
     ]
-
-  let footer ~cols:_ =
-    [Widgets.dim "Tab: fold  d: diagnostics  Enter: actions  ?: help  q: quit"]
 
   let node_help_hint =
     {|## Node Instance
@@ -1806,11 +1814,10 @@ Press **Enter** to open instance menu.|}
       | None -> ""
     in
     let toast_lines_str = Context.render_toasts ~cols in
-    let footer_lines = footer ~cols in
     Vsection.render
       ~size
       ~header:(header s)
-      ~footer:footer_lines
+      ~content_footer:[]
       ~child:(fun inner_size ->
         (* Available rows for content (reserve space for progress/toasts/logs) *)
         let progress_lines =

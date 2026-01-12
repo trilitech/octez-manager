@@ -405,6 +405,8 @@ struct
 
   type msg = unit
 
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
   type pstate = state Navigation.t
 
   let init () =
@@ -622,11 +624,11 @@ struct
     Miaou.Core.Help_hint.set current_hint ;
     let title_line = Widgets.title_highlight S.spec.title in
     let header = [title_line; status_banner] in
-    let footer =
-      [Widgets.dim "↑/↓ navigate, Enter to edit, ? for help, Esc back"]
-    in
-    Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
-        Table_widget.Table.render table)
+    Miaou_widgets_layout.Vsection.render
+      ~size
+      ~header
+      ~content_footer:[]
+      ~child:(fun _ -> Table_widget.Table.render table)
 
   let handle_modal_key ps key ~size:_ =
     Miaou.Core.Modal_manager.handle_key key ;
@@ -667,11 +669,21 @@ struct
   let move ps delta = Navigation.update (fun s -> move_state s delta) ps
 
   let keymap _ps =
+    let noop ps = ps in
+    let kb key action help =
+      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    in
     [
-      ("Up", (fun ps -> move ps (-1)), "Move up");
-      ("Down", (fun ps -> move ps 1), "Move down");
-      ("Enter", (fun ps -> Navigation.update enter ps), "Edit field / Submit");
-      ("Esc", back, "Back to instances");
+      kb "Up" (fun ps -> move ps (-1)) "Move up";
+      kb "Down" (fun ps -> move ps 1) "Move down";
+      kb "Enter" (fun ps -> Navigation.update enter ps) "Edit / Submit";
+      kb "Esc" back "Back";
+      {
+        Miaou.Core.Tui_page.key = "?";
+        action = noop;
+        help = "Help";
+        display_only = true;
+      };
     ]
 
   let handled_keys () =
