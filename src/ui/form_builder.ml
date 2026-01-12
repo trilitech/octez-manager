@@ -536,7 +536,15 @@ struct
           let ok = f.validate model in
           let value_str = f.to_string value in
           let formatted_value =
-            if ok then value_str else Widgets.fg 214 (Widgets.bold value_str)
+            if ok then value_str
+            else
+              (* Show value and error message *)
+              let err_msg =
+                match f.validate_msg model with
+                | Some msg -> " ⚠ " ^ msg
+                | None -> ""
+              in
+              Widgets.fg 214 (Widgets.bold (value_str ^ err_msg))
           in
           (f.label, formatted_value, ok))
     in
