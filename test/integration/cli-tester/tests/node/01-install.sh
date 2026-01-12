@@ -12,7 +12,7 @@ cleanup_instance "$TEST_INSTANCE" || true
 echo "Installing node '$TEST_INSTANCE'..."
 om install-node \
     --instance "$TEST_INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --snapshot \
     --snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
     --rpc-addr "127.0.0.1:8732" \

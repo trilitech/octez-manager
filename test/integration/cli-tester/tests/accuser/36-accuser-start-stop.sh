@@ -18,7 +18,7 @@ cleanup_instance "$NODE_INSTANCE" || true
 echo "Installing node with snapshot..."
 om install-node \
     --instance "$NODE_INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --snapshot \
     --snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
     --rpc-addr "$NODE_RPC" \

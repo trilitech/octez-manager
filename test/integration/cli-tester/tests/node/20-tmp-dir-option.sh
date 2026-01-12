@@ -21,7 +21,7 @@ chown tezos:tezos "$TMP_DIR"
 echo "Installing node with --tmp-dir..."
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --snapshot \
     --snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
     --tmp-dir "$TMP_DIR" \

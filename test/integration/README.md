@@ -93,7 +93,7 @@ cleanup_instance "$INSTANCE" || true
 # Test logic here
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --service-user tezos \
     --no-enable 2>&1
 
