@@ -52,8 +52,7 @@ octez-manager install-node \
   --instance mainnet \
   --network mainnet \
   --history-mode rolling \
-  --bootstrap snapshot \
-  --yes
+  --snapshot
 ```
 
 Check status:
