@@ -285,9 +285,14 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
                   }
                   !model_ref ;
               if should_autoname then (
-                let new_name =
-                  Printf.sprintf "%s-%s" role svc.Service.instance
+                (* Strip "node-" prefix from dependency name to avoid "baker-node-mainnet" *)
+                let dep_suffix =
+                  let inst = svc.Service.instance in
+                  if String.starts_with ~prefix:"node-" inst then
+                    String.sub inst 5 (String.length inst - 5)
+                  else inst
                 in
+                let new_name = Printf.sprintf "%s-%s" role dep_suffix in
                 let default_dir = Common.default_role_dir role new_name in
                 let core = get_core !model_ref in
                 let client = get_client !model_ref in
