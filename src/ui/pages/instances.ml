@@ -405,7 +405,7 @@ let status_icon (st : Service_state.t) =
   | Service_state.Stopped ->
       (* Stopped but check for recent failure from UI-initiated start *)
       if Option.is_some (get_recent_failure ~instance) then Widgets.red "●"
-      else Widgets.yellow "○"
+      else Widgets.yellow "●"
   | Service_state.Unknown _ ->
       (* Unknown status from systemd means the service failed.
          This catches crashes at startup even when not started via UI. *)
