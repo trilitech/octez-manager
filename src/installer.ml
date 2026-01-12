@@ -281,6 +281,7 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
       log "\n=== Downloading snapshot ===\n" ;
       log (Printf.sprintf "From: %s\n" uri) ;
       let* snapshot_file = prepare_snapshot_source ~quiet ?on_log uri in
+      log "\n=== Importing snapshot ===\n" ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
@@ -299,6 +300,7 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
       let* snapshot_file =
         download_snapshot_to_tmp ~quiet ?on_log res.download_url
       in
+      log "\n=== Importing snapshot ===\n" ;
       Fun.protect
         ~finally:(fun () ->
           if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
