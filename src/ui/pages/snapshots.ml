@@ -56,7 +56,7 @@ let header s =
     Widgets.dim "n: select network";
   ]
 
-let footer = [Widgets.dim "Enter: import  n: network  Esc: back"]
+let footer = [Widgets.dim "Enter: import  n: network  ?: help  Esc: back"]
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in

@@ -85,7 +85,7 @@ let header s =
     | None -> "");
   ]
 
-let footer = [Widgets.dim "Enter: actions  Esc: back"]
+let footer = [Widgets.dim "Enter: actions  ?: help  Esc: back"]
 
 let view_details svc =
   let render_fields fields =

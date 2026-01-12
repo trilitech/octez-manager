@@ -1535,12 +1535,12 @@ let create_menu_modal state =
   let open Modal_helpers in
   open_choice_modal
     ~title:"Create Service"
-    ~items:[`Node; `Baker; `Accuser; `DalNode]
+    ~items:[`Node; `DalNode; `Baker; `Accuser]
     ~to_string:(function
       | `Node -> "Node"
+      | `DalNode -> "DAL Node"
       | `Baker -> "Baker"
-      | `Accuser -> "Accuser"
-      | `DalNode -> "DAL Node")
+      | `Accuser -> "Accuser")
     ~on_select:(function
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
@@ -1648,7 +1648,7 @@ struct
     ]
 
   let footer ~cols:_ =
-    [Widgets.dim "Tab: fold  d: diagnostics  Enter: actions  q: quit"]
+    [Widgets.dim "Tab: fold  d: diagnostics  Enter: actions  ?: help  q: quit"]
 
   let node_help_hint =
     {|## Node Instance
