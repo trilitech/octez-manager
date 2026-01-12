@@ -28,7 +28,7 @@ octez-client import secret key my-baker "ledger://..."
 
 ## Installation via TUI
 
-1. Launch `octez-manager`
+1. Launch `octez-manager ui`
 2. Press `i` → Select **Baker**
 3. Configure:
    - **Instance name**: `my-baker`
