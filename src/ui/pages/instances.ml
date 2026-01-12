@@ -1618,7 +1618,8 @@ struct
     ps
 
   let handled_keys () =
-    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
+    Miaou.Core.Keys.
+      [Enter; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"; Char "?"]
 
   let keymap _ps =
     let activate ps = Navigation.update activate_selection ps in
