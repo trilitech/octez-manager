@@ -9,7 +9,7 @@ _octez-manager() {
     'cleanup-orphans:Remove orphan data directories and log files not associated with any registered service. Use --dry-run to preview what would be removed.'
     'install-accuser:Install an octez-accuser service'
     'install-baker:Install an octez-baker service'
-    'install-dal-node:Install an octez-dal-node service'
+    'install-dal-node:Install a DAL node service (octez-baker run dal)'
     'install-node:Install an octez-node systemd instance'
     'instance:Manage existing Octez services.'
     'list:Show registered services'
@@ -114,6 +114,7 @@ _octez-manager() {
     '--extra-arg[Additional arguments appended to the node command.]:ARG:'
     '--history-mode[History mode to configure on octez-node (rolling|full|archive).]:MODE:->history-modes'
     '--instance[Instance name used for node.env and systemd units.]:NAME:'
+    '--keep-snapshot[Keep the downloaded snapshot file after import instead of deleting it.]'
     '--net-addr[P2P address]:ADDR:'
     '--network[Chain network (default: mainnet).]:NET:'
     '--no-enable[Disable automatic systemctl enable --now.]'
@@ -123,6 +124,7 @@ _octez-manager() {
     '--snapshot[Bootstrap by importing a snapshot before enabling the node service.]'
     '--snapshot-no-check[Pass --no-check to octez-node snapshot import during bootstrap.]'
     '--snapshot-uri[Snapshot URI (path, file://, or http(s)) to import when --snapshot is set.]:URI:'
+    '--tmp-dir[Directory for temporary snapshot download. Use when /tmp has insufficient space for large snapshots (e.g., mainnet full).]:DIR:_directories'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
   )
 

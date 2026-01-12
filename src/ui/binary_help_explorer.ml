@@ -54,16 +54,8 @@ let run_help_cmd binary cmd =
     Common.run_out
       (["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ cmd)
 
-(* Get binary mtime for cache invalidation on binary updates *)
-let binary_mtime binary =
-  try
-    let st = Unix.stat binary in
-    Printf.sprintf "%.0f" st.Unix.st_mtime
-  with _ -> "unknown"
-
 let load_options ~binary =
-  let cache_key = Printf.sprintf "%s:%s" binary (binary_mtime binary) in
-  match Cache.get_safe_keyed_cached cache cache_key with
+  match Cache.get_safe_keyed_cached cache binary with
   | Some opts -> Ok opts
   | None ->
       let* output = run_help binary in
@@ -71,7 +63,7 @@ let load_options ~binary =
       let opts = parse_help_node output in
       if opts = [] then Error (`Msg "No options parsed from help output")
       else (
-        Cache.set_safe_keyed cache cache_key opts ;
+        Cache.set_safe_keyed cache binary opts ;
         Ok opts)
 
 let render_value = function None -> "" | Some v -> v
@@ -715,10 +707,9 @@ type baker_mode = [`Local | `Remote]
 let load_baker_options ~binary ~mode =
   let cache_key =
     Printf.sprintf
-      "%s:baker:%s:%s"
+      "%s:baker:%s"
       binary
       (match mode with `Local -> "local" | `Remote -> "remote")
-      (binary_mtime binary)
   in
   match Cache.get_safe_keyed_cached cache cache_key with
   | Some opts -> Ok opts
@@ -740,16 +731,34 @@ let load_baker_options ~binary ~mode =
         match mode with
         | `Local ->
             [
-              ("local", ["run"; "with"; "local"; "node"; "/tmp"; "--help"]);
-              ("remote-fallback", ["run"; "remotely"; "--help"]);
+              ("local", ["run"; "with"; "local"; "node"; "/dev/null"; "--help"]);
+              ( "remote-fallback",
+                [
+                  "run";
+                  "with";
+                  "remote";
+                  "node";
+                  "http://127.0.0.1:8732";
+                  "--help";
+                ] );
               ("help", ["--help"]);
+              ("run-help", ["run"; "--help"]);
             ]
         | `Remote ->
             [
-              ("remote", ["run"; "remotely"; "--help"]);
-              ( "local-fallback",
-                ["run"; "with"; "local"; "node"; "/tmp"; "--help"] );
+              ( "remote",
+                [
+                  "run";
+                  "with";
+                  "remote";
+                  "node";
+                  "http://127.0.0.1:8732";
+                  "--help";
+                ] );
               ("help", ["--help"]);
+              ("run-help", ["run"; "--help"]);
+              ( "local-fallback",
+                ["run"; "with"; "local"; "node"; "/dev/null"; "--help"] );
             ]
       in
       let rec loop errs = function
@@ -785,73 +794,6 @@ let open_baker_run_help ~app_bin_dir ~mode ~initial_args ~on_apply =
         open_modal ~title ~options:filtered ~initial_args ~on_apply
     | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
 
-let excluded_accuser_options =
-  ["--help"; "-help"; "--version"; "--base-dir"; "--endpoint"]
-
-let load_accuser_options ~binary =
-  let cache_key = Printf.sprintf "%s:accuser:%s" binary (binary_mtime binary) in
-  match Cache.get_safe_keyed_cached cache cache_key with
-  | Some opts -> Ok opts
-  | None ->
-      let* output = run_help_cmd binary ["run"; "accuser"; "--help"] in
-      let opts = parse_help_baker (strip_ansi output) in
-      if opts = [] then
-        Error (`Msg "No options parsed from accuser help output")
-      else (
-        Cache.set_safe_keyed cache cache_key opts ;
-        Ok opts)
-
-let open_accuser_run_help ~app_bin_dir ~initial_args ~on_apply =
-  let app_bin_dir = String.trim app_bin_dir in
-  let title = "Accuser Flags" in
-  if app_bin_dir = "" then
-    Modal_helpers.show_error ~title "Octez bin directory is empty"
-  else
-    let binary = Filename.concat app_bin_dir "octez-baker" in
-    match load_accuser_options ~binary with
-    | Ok options ->
-        let filtered =
-          List.filter
-            (fun opt ->
-              not (is_excluded_option opt ~excluded:excluded_accuser_options))
-            options
-        in
-        open_modal ~title ~options:filtered ~initial_args ~on_apply
-    | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
-
-let excluded_dal_options =
-  ["--help"; "-help"; "--version"; "--base-dir"; "--endpoint"; "--dal-node"]
-
-let load_dal_options ~binary =
-  let cache_key = Printf.sprintf "%s:dal:%s" binary (binary_mtime binary) in
-  match Cache.get_safe_keyed_cached cache cache_key with
-  | Some opts -> Ok opts
-  | None ->
-      let* output = run_help_cmd binary ["run"; "dal"; "--help"] in
-      let opts = parse_help_baker (strip_ansi output) in
-      if opts = [] then Error (`Msg "No options parsed from DAL help output")
-      else (
-        Cache.set_safe_keyed cache cache_key opts ;
-        Ok opts)
-
-let open_dal_run_help ~app_bin_dir ~initial_args ~on_apply =
-  let app_bin_dir = String.trim app_bin_dir in
-  let title = "DAL Flags" in
-  if app_bin_dir = "" then
-    Modal_helpers.show_error ~title "Octez bin directory is empty"
-  else
-    let binary = Filename.concat app_bin_dir "octez-baker" in
-    match load_dal_options ~binary with
-    | Ok options ->
-        let filtered =
-          List.filter
-            (fun opt ->
-              not (is_excluded_option opt ~excluded:excluded_dal_options))
-            options
-        in
-        open_modal ~title ~options:filtered ~initial_args ~on_apply
-    | Error (`Msg msg) -> Modal_helpers.show_error ~title msg
-
 module For_tests = struct
   let parse_help = parse_help_node
 
@@ -870,26 +812,4 @@ module For_tests = struct
     | Value Text -> "text"
 
   let parse_initial_args = parse_initial_args
-
-  let binary_mtime = binary_mtime
-
-  (** Generate cache key for node help *)
-  let node_cache_key ~binary =
-    Printf.sprintf "%s:%s" binary (binary_mtime binary)
-
-  (** Generate cache key for baker help *)
-  let baker_cache_key ~binary ~mode =
-    Printf.sprintf
-      "%s:baker:%s:%s"
-      binary
-      (match mode with `Local -> "local" | `Remote -> "remote")
-      (binary_mtime binary)
-
-  (** Generate cache key for accuser help *)
-  let accuser_cache_key ~binary =
-    Printf.sprintf "%s:accuser:%s" binary (binary_mtime binary)
-
-  (** Generate cache key for dal help *)
-  let dal_cache_key ~binary =
-    Printf.sprintf "%s:dal:%s" binary (binary_mtime binary)
 end

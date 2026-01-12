@@ -143,8 +143,16 @@ type snapshot_progress = {
   on_download_progress : (int -> int option -> unit) option;
 }
 
-let download_snapshot_to_tmp ?(quiet = false) ?on_log ?progress src =
-  let tmp = Filename.temp_file "octez-manager.snapshot" ".snap" in
+let download_snapshot ?(quiet = false) ?on_log ?progress ?tmp_dir src =
+  let tmp =
+    match tmp_dir with
+    | Some dir ->
+        let name =
+          Printf.sprintf "octez-manager.snapshot.%d.snap" (Unix.getpid ())
+        in
+        Filename.concat dir name
+    | None -> Filename.temp_file "octez-manager.snapshot" ".snap"
+  in
   let last_log_time = ref 0. in
   let res =
     match (progress, on_log) with
@@ -175,7 +183,7 @@ let download_snapshot_to_tmp ?(quiet = false) ?on_log ?progress src =
       Common.remove_path tmp ;
       e
 
-let prepare_snapshot_source ?(quiet = false) ?on_log ?progress src =
+let prepare_snapshot_source ?(quiet = false) ?on_log ?progress ?tmp_dir src =
   let trimmed = String.trim src in
   if trimmed = "" then R.error_msg "Snapshot URI is empty"
   else
@@ -184,7 +192,7 @@ let prepare_snapshot_source ?(quiet = false) ?on_log ?progress src =
     | None when not (is_http_url trimmed) ->
         if Sys.file_exists trimmed then Ok {path = trimmed; cleanup = false}
         else R.error_msgf "Snapshot file %s does not exist" trimmed
-    | _ -> download_snapshot_to_tmp ~quiet ?on_log ?progress trimmed
+    | _ -> download_snapshot ~quiet ?on_log ?progress ?tmp_dir trimmed
 
 let snapshot_plan_of_request request =
   match request.bootstrap with
@@ -272,19 +280,25 @@ let import_snapshot_file ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
     ~no_check
     ()
 
-let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
-    ~no_check () =
+let perform_snapshot_plan ?(quiet = false) ?on_log ?tmp_dir
+    ?(keep_snapshot = false) ~plan ~app_bin_dir ~data_dir ~no_check () =
   let log msg = match on_log with Some f -> f msg | None -> () in
+  let should_cleanup snapshot_file =
+    snapshot_file.cleanup && not keep_snapshot
+  in
   match plan with
   | No_snapshot -> Ok ()
   | Direct_snapshot {uri} ->
       log "\n=== Downloading snapshot ===\n" ;
       log (Printf.sprintf "From: %s\n" uri) ;
-      let* snapshot_file = prepare_snapshot_source ~quiet ?on_log uri in
+      let* snapshot_file =
+        prepare_snapshot_source ~quiet ?on_log ?tmp_dir uri
+      in
       log "\n=== Importing snapshot ===\n" ;
       Fun.protect
         ~finally:(fun () ->
-          if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
+          if should_cleanup snapshot_file then
+            Common.remove_path snapshot_file.path)
         (fun () ->
           import_snapshot_file
             ~quiet
@@ -298,12 +312,13 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
       log "\n=== Downloading snapshot ===\n" ;
       log (Printf.sprintf "From: %s\n" res.download_url) ;
       let* snapshot_file =
-        download_snapshot_to_tmp ~quiet ?on_log res.download_url
+        download_snapshot ~quiet ?on_log ?tmp_dir res.download_url
       in
       log "\n=== Importing snapshot ===\n" ;
       Fun.protect
         ~finally:(fun () ->
-          if snapshot_file.cleanup then Common.remove_path snapshot_file.path)
+          if should_cleanup snapshot_file then
+            Common.remove_path snapshot_file.path)
         (fun () ->
           import_snapshot_file
             ~quiet
@@ -314,11 +329,13 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ~plan ~app_bin_dir ~data_dir
             ~no_check
             ())
 
-let perform_bootstrap ?(quiet = false) ?on_log ~plan ~(request : node_request)
-    ~data_dir () =
+let perform_bootstrap ?(quiet = false) ?on_log ?tmp_dir ~plan
+    ~(request : node_request) ~data_dir () =
   perform_snapshot_plan
     ~quiet
     ?on_log
+    ?tmp_dir
+    ~keep_snapshot:request.keep_snapshot
     ~plan
     ~app_bin_dir:request.app_bin_dir
     ~data_dir

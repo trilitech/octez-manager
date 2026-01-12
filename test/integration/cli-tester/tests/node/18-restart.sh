@@ -35,7 +35,7 @@ if ! wait_for_service_active "node" "$INSTANCE" 30; then
 fi
 
 # Wait for node RPC to be ready
-if ! wait_for_node_ready "$RPC_ADDR" 240; then
+if ! wait_for_node_ready "$RPC_ADDR" 180; then
     echo "ERROR: Node RPC not ready"
     show_service_logs "node" "$INSTANCE" 50
     exit 1
@@ -58,7 +58,7 @@ if ! wait_for_service_active "node" "$INSTANCE" 30; then
 fi
 
 # Wait for node RPC to be ready again
-if ! wait_for_node_ready "$RPC_ADDR" 240; then
+if ! wait_for_node_ready "$RPC_ADDR" 180; then
     echo "ERROR: Node RPC not ready after restart"
     show_service_logs "node" "$INSTANCE" 50
     exit 1
