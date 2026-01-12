@@ -33,7 +33,7 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 
 ## Installation via TUI
 
-1. Launch `octez-manager`
+1. Launch `octez-manager ui`
 2. Press `i` → Select **Node**
 3. Configure:
    - **Instance name**: Unique identifier (e.g., `mainnet-node`)
@@ -52,7 +52,7 @@ octez-manager install-node \
   --history-mode rolling \
   --rpc-addr 127.0.0.1:8732 \
   --net-addr "[::]:9732" \
-  --bootstrap snapshot
+  --snapshot
 ```
 
 ### Custom Snapshot URL
@@ -61,8 +61,8 @@ octez-manager install-node \
 octez-manager install-node \
   --instance my-node \
   --network mainnet \
-  --bootstrap snapshot \
-  --snapshot-url https://example.com/snapshot.rolling
+  --snapshot \
+  --snapshot-uri https://example.com/snapshot.rolling
 ```
 
 ### Custom Data Directory
@@ -106,12 +106,21 @@ curl -s http://127.0.0.1:8732/chains/main/blocks/head/header | jq .level
 
 ## Configuration Files
 
-Octez Manager creates:
+Octez Manager creates (in user mode):
 
 | Path | Description |
 |------|-------------|
-| `~/.local/share/octez-manager/instances/<name>/` | Instance data |
+| `~/.config/octez/instances/<name>/` | Instance configuration (node.env) |
+| `~/.local/share/octez/<name>/` | Node data directory |
 | `~/.config/systemd/user/octez-node@<name>.service.d/` | Systemd overrides |
+
+In system mode (run as root):
+
+| Path | Description |
+|------|-------------|
+| `/etc/octez/instances/<name>/` | Instance configuration (node.env) |
+| `/var/lib/octez/<name>/` | Node data directory |
+| `/etc/systemd/system/octez-node@<name>.service.d/` | Systemd overrides |
 
 ## Troubleshooting
 

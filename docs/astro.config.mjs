@@ -10,8 +10,9 @@ export default defineConfig({
 		starlight({
 			title: 'Octez Manager',
 			logo: {
-				src: './public/logo.svg',
+				src: './public/favicon.png',
 			},
+			favicon: '/favicon.png',
 			description: 'CLI and TUI for managing Tezos nodes, bakers, and DAL infrastructure',
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/mathiasbourgoin/octez-manager' },

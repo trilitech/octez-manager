@@ -12,7 +12,7 @@ Get a Tezos node running in 5 minutes.
 Launch the TUI:
 
 ```bash
-octez-manager
+octez-manager ui
 ```
 
 You'll see the main dashboard:
@@ -52,8 +52,7 @@ octez-manager install-node \
   --instance mainnet \
   --network mainnet \
   --history-mode rolling \
-  --bootstrap snapshot \
-  --yes
+  --snapshot
 ```
 
 Check status:

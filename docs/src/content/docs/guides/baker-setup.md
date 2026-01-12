@@ -28,7 +28,7 @@ octez-client import secret key my-baker "ledger://..."
 
 ## Installation via TUI
 
-1. Launch `octez-manager`
+1. Launch `octez-manager ui`
 2. Press `i` → Select **Baker**
 3. Configure:
    - **Instance name**: `my-baker`
@@ -40,18 +40,18 @@ octez-client import secret key my-baker "ledger://..."
 ## Installation via CLI
 
 ```bash
-# Using local node
+# Using local node instance
 octez-manager install-baker \
   --instance my-baker \
   --node-instance my-node \
-  --delegates tz1... \
+  --delegate tz1... \
   --liquidity-baking-vote pass
 
 # Using remote endpoint
 octez-manager install-baker \
   --instance my-baker \
-  --node-endpoint http://localhost:8732 \
-  --delegates tz1... \
+  --node-instance http://localhost:8732 \
+  --delegate tz1... \
   --liquidity-baking-vote pass
 ```
 
@@ -61,7 +61,9 @@ octez-manager install-baker \
 octez-manager install-baker \
   --instance multi-baker \
   --node-instance my-node \
-  --delegates tz1abc...,tz1def...,tz1ghi...
+  --delegate tz1abc... \
+  --delegate tz1def... \
+  --delegate tz1ghi...
 ```
 
 ### With DAL Attestations
@@ -70,8 +72,8 @@ octez-manager install-baker \
 octez-manager install-baker \
   --instance my-baker \
   --node-instance my-node \
-  --delegates tz1... \
-  --dal-node my-dal-node
+  --delegate tz1... \
+  --dal-endpoint my-dal-node
 ```
 
 ## Liquidity Baking Vote
