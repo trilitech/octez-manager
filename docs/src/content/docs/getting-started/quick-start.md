@@ -12,7 +12,7 @@ Get a Tezos node running in 5 minutes.
 Launch the TUI:
 
 ```bash
-octez-manager
+octez-manager ui
 ```
 
 You'll see the main dashboard:

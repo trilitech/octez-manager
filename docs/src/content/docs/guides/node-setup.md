@@ -33,7 +33,7 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 
 ## Installation via TUI
 
-1. Launch `octez-manager`
+1. Launch `octez-manager ui`
 2. Press `i` → Select **Node**
 3. Configure:
    - **Instance name**: Unique identifier (e.g., `mainnet-node`)

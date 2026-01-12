@@ -11,10 +11,10 @@ Octez Manager provides a full-featured Terminal User Interface (TUI) for managin
 
 ```bash
 # User mode
-octez-manager
+octez-manager ui
 
 # System mode (as root)
-sudo octez-manager
+sudo octez-manager ui
 ```
 
 ## Main Dashboard
@@ -63,10 +63,9 @@ Press `i` to open the install menu:
 ```
 ┌─ Install ───────────┐
 │  Node              │
+│  DAL Node          │
 │  Baker             │
 │  Accuser           │
-│  DAL Node          │
-│  Signer            │
 └────────────────────┘
 ```
 

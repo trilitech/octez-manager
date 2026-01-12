@@ -60,7 +60,7 @@ Octez Manager can run in two modes:
 Run without root privileges. Services run as your user.
 
 ```bash
-octez-manager
+octez-manager ui
 ```
 
 ### System Mode (Recommended for production)
@@ -68,7 +68,7 @@ octez-manager
 Run with root privileges. Creates dedicated service users and proper system directories.
 
 ```bash
-sudo octez-manager
+sudo octez-manager ui
 ```
 
 ## Next Steps
