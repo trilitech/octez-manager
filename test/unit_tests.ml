@@ -3080,6 +3080,40 @@ let log_viewer_journalctl_baker_unit_name () =
   | Ok cmd -> assert_contains ~msg:"baker unit name" cmd "octez-baker@my-baker"
   | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
 
+(* Unit state parsing tests *)
+let systemd_unit_state_active () =
+  let output = "ActiveState=active\nSubState=running\nResult=success\n" in
+  let state = Systemd.For_tests.parse_unit_state_output output in
+  Alcotest.(check string) "active_state" "active" state.active_state ;
+  Alcotest.(check string) "sub_state" "running" state.sub_state ;
+  Alcotest.(check (option string)) "result" None state.result
+
+let systemd_unit_state_inactive () =
+  let output = "ActiveState=inactive\nSubState=dead\nResult=success\n" in
+  let state = Systemd.For_tests.parse_unit_state_output output in
+  Alcotest.(check string) "active_state" "inactive" state.active_state ;
+  Alcotest.(check string) "sub_state" "dead" state.sub_state ;
+  Alcotest.(check (option string)) "result" None state.result
+
+let systemd_unit_state_failed_exit_code () =
+  let output = "ActiveState=failed\nSubState=failed\nResult=exit-code\n" in
+  let state = Systemd.For_tests.parse_unit_state_output output in
+  Alcotest.(check string) "active_state" "failed" state.active_state ;
+  Alcotest.(check string) "sub_state" "failed" state.sub_state ;
+  Alcotest.(check (option string)) "result" (Some "exit-code") state.result
+
+let systemd_unit_state_failed_signal () =
+  let output = "ActiveState=failed\nSubState=failed\nResult=signal\n" in
+  let state = Systemd.For_tests.parse_unit_state_output output in
+  Alcotest.(check string) "active_state" "failed" state.active_state ;
+  Alcotest.(check (option string)) "result" (Some "signal") state.result
+
+let systemd_unit_state_success_result () =
+  (* Result=success should be treated as no failure *)
+  let output = "ActiveState=inactive\nSubState=dead\nResult=success\n" in
+  let state = Systemd.For_tests.parse_unit_state_output output in
+  Alcotest.(check (option string)) "result" None state.result
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -3577,5 +3611,22 @@ let () =
             "baker unit name"
             `Quick
             log_viewer_journalctl_baker_unit_name;
+        ] );
+      ( "systemd.unit_state",
+        [
+          Alcotest.test_case "parse active" `Quick systemd_unit_state_active;
+          Alcotest.test_case "parse inactive" `Quick systemd_unit_state_inactive;
+          Alcotest.test_case
+            "parse failed exit-code"
+            `Quick
+            systemd_unit_state_failed_exit_code;
+          Alcotest.test_case
+            "parse failed signal"
+            `Quick
+            systemd_unit_state_failed_signal;
+          Alcotest.test_case
+            "parse success result"
+            `Quick
+            systemd_unit_state_success_result;
         ] );
     ]

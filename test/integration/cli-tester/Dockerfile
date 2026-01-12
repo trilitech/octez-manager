@@ -59,6 +59,14 @@ RUN id tezos >/dev/null 2>&1 || useradd -m -s /bin/bash tezos
 RUN mkdir -p /var/lib/octez /etc/octez /var/log/octez \
     && chown -R tezos:tezos /var/lib/octez /etc/octez /var/log/octez
 
+# Pre-generate identity file to avoid PoW during tests (saves ~2-3 min per node start)
+# Generate with minimum difficulty for speed
+RUN mkdir -p /etc/octez/pregenerated && \
+    octez-node identity generate 0 --data-dir /tmp/identity-gen && \
+    cp /tmp/identity-gen/identity.json /etc/octez/pregenerated/identity.json && \
+    rm -rf /tmp/identity-gen && \
+    chmod 644 /etc/octez/pregenerated/identity.json
+
 # Systemd needs these
 VOLUME ["/sys/fs/cgroup", "/run", "/run/lock"]
 STOPSIGNAL SIGRTMIN+3
