@@ -292,6 +292,45 @@ let rec prompt_required_string question =
       prerr_endline "A value is required." ;
       prompt_required_string question
 
+(** Prompt with filesystem directory completion *)
+let prompt_directory question =
+  if not (is_interactive ()) then None
+  else (
+    (* Set up directory completion *)
+    LNoise.set_completion_callback (fun line_so_far ln_completions ->
+        let dir, prefix =
+          if String.ends_with ~suffix:"/" line_so_far then (line_so_far, "")
+          else (Filename.dirname line_so_far, Filename.basename line_so_far)
+        in
+        let dir = if dir = "" then "." else dir in
+        try
+          let entries = Sys.readdir dir in
+          Array.iter
+            (fun entry ->
+              if
+                String.starts_with
+                  ~prefix:(String.lowercase_ascii prefix)
+                  (String.lowercase_ascii entry)
+              then
+                let full_path = Filename.concat dir entry in
+                if Sys.is_directory full_path then
+                  LNoise.add_completion ln_completions (full_path ^ "/"))
+            entries
+        with _ -> ()) ;
+    LNoise.set_hints_callback (fun _ -> None) ;
+    match LNoise.linenoise (question ^ ": ") with
+    | None -> None
+    | Some line ->
+        let trimmed = String.trim line in
+        if trimmed = "" then None else Some trimmed)
+
+let rec prompt_required_directory question =
+  match prompt_directory question with
+  | Some value -> value
+  | None ->
+      prerr_endline "A directory path is required." ;
+      prompt_required_directory question
+
 (* Inline copy of prompt_with_completion placed before prompt_history_mode so it
    can be referenced. This mirrors the main prompt_with_completion later in the
    file. *)
@@ -424,27 +463,26 @@ let resolve_tmp_dir_for_snapshot ~snapshot_url ~tmp_dir =
                   tmp_path
                   (format_bytes available) ;
                 let rec prompt_dir () =
-                  match
-                    prompt_required_string
+                  let dir =
+                    prompt_required_directory
                       "Enter a directory with enough space for the download"
-                  with
-                  | dir ->
-                      if Sys.file_exists dir && Sys.is_directory dir then (
-                        match Common.get_available_space dir with
-                        | Some space when space >= required -> Some dir
-                        | Some space ->
-                            Printf.printf
-                              "%s only has %s available, need %s.\n"
-                              dir
-                              (format_bytes space)
-                              (format_bytes required) ;
-                            prompt_dir ()
-                        | None ->
-                            Printf.printf "Cannot determine space in %s.\n" dir ;
-                            prompt_dir ())
-                      else (
-                        Printf.printf "%s is not a valid directory.\n" dir ;
+                  in
+                  if Sys.file_exists dir && Sys.is_directory dir then (
+                    match Common.get_available_space dir with
+                    | Some space when space >= required -> Some dir
+                    | Some space ->
+                        Printf.printf
+                          "%s only has %s available, need %s.\n"
+                          dir
+                          (format_bytes space)
+                          (format_bytes required) ;
+                        prompt_dir ()
+                    | None ->
+                        Printf.printf "Cannot determine space in %s.\n" dir ;
                         prompt_dir ())
+                  else (
+                    Printf.printf "%s is not a valid directory.\n" dir ;
+                    prompt_dir ())
                 in
                 Ok (prompt_dir ()))
               else
