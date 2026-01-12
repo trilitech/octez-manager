@@ -13,6 +13,8 @@ module S = Service
 let cmdliner_error msg = `Error (false, msg)
 
 let pp_service fmt svc =
+  (* Don't query systemd during list - causes issues with multiple services *)
+  (* Status is shown in the UI instead *)
   Format.fprintf
     fmt
     "%-16s %-8s %s (%s)"
@@ -23,7 +25,9 @@ let pp_service fmt svc =
 
 let print_services services =
   if services = [] then print_endline "No services registered."
-  else List.iter (fun svc -> Format.printf "%a@." pp_service svc) services
+  else (
+    List.iter (fun svc -> Format.printf "%a@." pp_service svc) services ;
+    Format.print_flush ())
 
 let pp_logging fmt = function
   | Logging_mode.Journald -> Format.fprintf fmt "journald"

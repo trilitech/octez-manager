@@ -51,7 +51,22 @@ assert_dir_exists() {
 # Instance helpers
 instance_exists() {
     local instance="$1"
-    om list 2>/dev/null | grep -q "$instance"
+    # Capture both stdout and stderr to ensure we see all output
+    om list 2>&1 | grep -q "$instance"
+}
+
+# Inject pre-generated identity to skip PoW during node start
+# Call this after install-node but before starting the node
+inject_identity() {
+    local instance="$1"
+    local data_dir="${2:-/var/lib/octez/$instance}"
+    local pregenerated="/etc/octez/pregenerated/identity.json"
+
+    if [ -f "$pregenerated" ]; then
+        cp "$pregenerated" "$data_dir/identity.json"
+        chown tezos:tezos "$data_dir/identity.json"
+        chmod 600 "$data_dir/identity.json"
+    fi
 }
 
 # Service helpers (real systemd)

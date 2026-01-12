@@ -78,6 +78,63 @@ let is_active ~role ~instance =
       Ok (String.equal state "active")
   | Error _ as e -> e
 
+type unit_state = {
+  active_state : string; (* active, inactive, failed, etc. *)
+  sub_state : string; (* running, dead, failed, etc. *)
+  result : string option; (* exit-code, signal, timeout, etc. *)
+  exit_status : int option; (* actual exit code if available *)
+}
+
+let get_unit_state ~role ~instance =
+  let unit = unit_name role instance in
+  (* Get ActiveState, SubState, Result, and ExecMainStatus properties *)
+  match
+    run_systemctl_out_timeout
+      ["show"; "--property=ActiveState,SubState,Result,ExecMainStatus"; unit]
+  with
+  | Ok output ->
+      let lines = String.split_on_char '\n' output in
+      let parse_prop prefix line =
+        if
+          String.length line > String.length prefix
+          && String.sub line 0 (String.length prefix) = prefix
+        then
+          Some
+            (String.sub
+               line
+               (String.length prefix)
+               (String.length line - String.length prefix)
+            |> String.trim)
+        else None
+      in
+      let active_state = ref "unknown" in
+      let sub_state = ref "unknown" in
+      let result = ref None in
+      let exit_status = ref None in
+      List.iter
+        (fun line ->
+          (match parse_prop "ActiveState=" line with
+          | Some v -> active_state := v
+          | None -> ()) ;
+          (match parse_prop "SubState=" line with
+          | Some v -> sub_state := v
+          | None -> ()) ;
+          (match parse_prop "Result=" line with
+          | Some v when v <> "" && v <> "success" -> result := Some v
+          | _ -> ()) ;
+          match parse_prop "ExecMainStatus=" line with
+          | Some v -> exit_status := int_of_string_opt v
+          | None -> ())
+        lines ;
+      Ok
+        {
+          active_state = !active_state;
+          sub_state = !sub_state;
+          result = !result;
+          exit_status = !exit_status;
+        }
+  | Error _ as e -> e
+
 let env_file_template user_mode =
   let base =
     if user_mode then Common.env_instances_base_dir ()
@@ -717,6 +774,48 @@ module For_tests = struct
   let render_logging_lines = render_logging_lines
 
   let exec_line = exec_line
+
+  (** Parse systemd show output for unit state (for testing) *)
+  let parse_unit_state_output output =
+    let lines = String.split_on_char '\n' output in
+    let parse_prop prefix line =
+      if
+        String.length line > String.length prefix
+        && String.sub line 0 (String.length prefix) = prefix
+      then
+        Some
+          (String.sub
+             line
+             (String.length prefix)
+             (String.length line - String.length prefix)
+          |> String.trim)
+      else None
+    in
+    let active_state = ref "unknown" in
+    let sub_state = ref "unknown" in
+    let result = ref None in
+    let exit_status = ref None in
+    List.iter
+      (fun line ->
+        (match parse_prop "ActiveState=" line with
+        | Some v -> active_state := v
+        | None -> ()) ;
+        (match parse_prop "SubState=" line with
+        | Some v -> sub_state := v
+        | None -> ()) ;
+        (match parse_prop "Result=" line with
+        | Some v when v <> "" && v <> "success" -> result := Some v
+        | _ -> ()) ;
+        match parse_prop "ExecMainStatus=" line with
+        | Some v -> exit_status := int_of_string_opt v
+        | None -> ())
+      lines ;
+    {
+      active_state = !active_state;
+      sub_state = !sub_state;
+      result = !result;
+      exit_status = !exit_status;
+    }
 end
 
 let get_service_paths ~role ~instance =

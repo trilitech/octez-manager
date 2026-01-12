@@ -25,6 +25,9 @@ om install-node \
     --service-user tezos \
     --no-enable 2>&1
 
+# Inject pre-generated identity to skip PoW
+inject_identity "$INSTANCE"
+
 # Start the node
 echo "Starting node (first time)..."
 om instance "$INSTANCE" start
@@ -36,8 +39,7 @@ if ! wait_for_service_active "node" "$INSTANCE" 30; then
     exit 1
 fi
 
-# Identity generation (PoW) can take 60-120s on CI runners
-if ! wait_for_node_ready "$RPC_ADDR" 180; then
+if ! wait_for_node_ready "$RPC_ADDR" 60; then
     echo "ERROR: Node RPC not ready"
     show_service_logs "node" "$INSTANCE" 50
     exit 1
@@ -96,8 +98,8 @@ if ! wait_for_service_active "node" "$INSTANCE" 30; then
     exit 1
 fi
 
-# Second run should be faster since identity exists, but still give it time
-if ! wait_for_node_ready "$RPC_ADDR" 120; then
+# Second run should be fast since identity was preserved
+if ! wait_for_node_ready "$RPC_ADDR" 60; then
     echo "ERROR: Node RPC not ready on second run"
     show_service_logs "node" "$INSTANCE" 50
     exit 1

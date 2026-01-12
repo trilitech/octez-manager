@@ -20,6 +20,27 @@ let name = "instances"
 
 module StringSet = Set.Make (String)
 
+(** Track recent start/restart failures for display.
+    Maps instance name to (error_message, timestamp) *)
+let recent_failures : (string, string * float) Hashtbl.t = Hashtbl.create 16
+
+let recent_failure_ttl = 30.0 (* seconds to keep showing failure *)
+
+let record_failure ~instance ~error =
+  Hashtbl.replace recent_failures instance (error, Unix.gettimeofday ())
+
+let clear_failure ~instance = Hashtbl.remove recent_failures instance
+
+let get_recent_failure ~instance =
+  match Hashtbl.find_opt recent_failures instance with
+  | Some (error, ts) when Unix.gettimeofday () -. ts < recent_failure_ttl ->
+      Some error
+  | Some _ ->
+      (* Expired, clean up *)
+      Hashtbl.remove recent_failures instance ;
+      None
+  | None -> None
+
 (** Matrix layout configuration *)
 let min_column_width = 50
 
@@ -378,11 +399,17 @@ let with_service state handler =
   | Some svc -> handler svc
 
 let status_icon (st : Service_state.t) =
+  let instance = st.Service_state.service.Service.instance in
   match st.Service_state.status with
   | Service_state.Running -> Widgets.green "●"
-  | Service_state.Stopped -> Widgets.yellow "○"
-  | Service_state.Unknown msg ->
-      Widgets.red ("?" ^ if msg = "" then "" else " " ^ msg)
+  | Service_state.Stopped ->
+      (* Stopped but check for recent failure from UI-initiated start *)
+      if Option.is_some (get_recent_failure ~instance) then Widgets.red "●"
+      else Widgets.yellow "●"
+  | Service_state.Unknown _ ->
+      (* Unknown status from systemd means the service failed.
+         This catches crashes at startup even when not started via UI. *)
+      Widgets.red "●"
 
 let enabled_badge (st : Service_state.t) =
   match st.Service_state.enabled with
@@ -394,11 +421,18 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
   let stopped =
     match service_status with Service_state.Running -> false | _ -> true
   in
-  (* Show service status when not running *)
+  (* Show service status when not running, prioritizing recent failures *)
   let service_prefix =
     match service_status with
-    | Service_state.Running -> None
-    | Service_state.Stopped -> Some (Widgets.yellow "stopped")
+    | Service_state.Running ->
+        (* Clear any stale failure on successful run *)
+        clear_failure ~instance:svc.Service.instance ;
+        None
+    | Service_state.Stopped -> (
+        (* Check for recent start failure first *)
+        match get_recent_failure ~instance:svc.Service.instance with
+        | Some error -> Some (Widgets.red ("failed: " ^ error))
+        | None -> Some (Widgets.yellow "stopped"))
     | Service_state.Unknown msg ->
         Some (Widgets.red ("failed" ^ if msg = "" then "" else ": " ^ msg))
   in
@@ -473,20 +507,35 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let marker = if idx + 3 = selected then Widgets.bold "➤" else " " in
   let status = status_icon st in
   let enabled = enabled_badge st in
+  (* Add failure badge if service has a recent start/restart failure *)
+  let has_failure =
+    match st.Service_state.status with
+    | Service_state.Running -> false
+    | Service_state.Stopped | Service_state.Unknown _ ->
+        (* Only show failure badge if there's a recent start/restart failure.
+           This avoids showing failure for normal stops. *)
+        Option.is_some (get_recent_failure ~instance:svc.Service.instance)
+  in
+  let failure_badge = if has_failure then Widgets.red " [!]" else "" in
   let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
-  let history =
-    Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
+  (* For nodes: show history mode. For others: no extra info on first line *)
+  let role_info =
+    match svc.Service.role with
+    | "node" ->
+        Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
+    | _ -> Printf.sprintf "%-10s" ""
   in
   let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
   let fold_indicator = if folded then "▸" else "▾" in
   let first_line =
     Printf.sprintf
-      "%s %s %s %s %s %s %s"
+      "%s %s %s %s%s %s %s %s"
       marker
       fold_indicator
       status
       instance_str
-      history
+      failure_badge
+      role_info
       network
       enabled
   in
@@ -610,23 +659,44 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
         in
         Printf.sprintf "health: %s%s" status_str checks_str
   in
+  (* Line 2 only shows meaningful content when service is running *)
+  let is_running = st.Service_state.status = Service_state.Running in
   let second_line =
-    match svc.Service.role with
-    | "baker" ->
-        (* Line 2 for bakers: highwatermarks (last signed levels) *)
-        let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
-        Printf.sprintf "%s%s" (String.make indent_start ' ') hwm
-    | "dal-node" ->
-        (* Line 2 for DAL nodes: health status *)
-        Printf.sprintf
-          "%s%s"
-          (String.make indent_start ' ')
-          (dal_health_line ~instance:svc.Service.instance)
-    | _ ->
-        Printf.sprintf
-          "%s%s"
-          (String.make indent_start ' ')
-          (rpc_status_line ~service_status:st.Service_state.status svc)
+    let indent = String.make indent_start ' ' in
+    if not is_running then
+      (* When stopped/failed, show minimal status *)
+      match st.Service_state.status with
+      | Service_state.Stopped ->
+          (* Stopped but check for recent failure from UI-initiated start *)
+          if has_failure then
+            match get_recent_failure ~instance:svc.Service.instance with
+            | Some error -> indent ^ Widgets.red ("failed: " ^ error)
+            | None -> indent ^ Widgets.yellow "stopped"
+          else indent ^ Widgets.yellow "stopped"
+      | Service_state.Unknown msg ->
+          (* Unknown status from systemd means the service failed *)
+          indent ^ Widgets.red ("failed: " ^ msg)
+      | Service_state.Running -> indent (* shouldn't happen *)
+    else
+      match svc.Service.role with
+      | "baker" ->
+          (* Line 2 for bakers: highwatermarks (last signed levels) *)
+          let hwm = baker_highwatermarks_line ~instance:svc.Service.instance in
+          Printf.sprintf "%s%s" indent hwm
+      | "dal-node" ->
+          (* Line 2 for DAL nodes: health status *)
+          Printf.sprintf
+            "%s%s"
+            indent
+            (dal_health_line ~instance:svc.Service.instance)
+      | "accuser" ->
+          (* Line 2 for accusers: simple monitoring status *)
+          Printf.sprintf "%s%s" indent (Widgets.green "monitoring")
+      | _ ->
+          Printf.sprintf
+            "%s%s"
+            indent
+            (rpc_status_line ~service_status:st.Service_state.status svc)
   in
   (* If folded, return first two lines (header + RPC/health status) *)
   if folded then String.concat "\n" [first_line; second_line]
@@ -951,8 +1021,11 @@ let run_unit_action ~verb ~instance action =
           Context.toast_success (Printf.sprintf "%s: %s finished" instance verb) ;
           Context.mark_instances_dirty ()
       | Job_manager.Failed msg ->
+          (* Record failure for display in status line *)
+          record_failure ~instance ~error:msg ;
           Context.toast_error
-            (Printf.sprintf "%s: %s failed: %s" instance verb msg)
+            (Printf.sprintf "%s: %s failed: %s" instance verb msg) ;
+          Context.mark_instances_dirty ()
       | _ -> ())
 
 let require_installer () =
@@ -1199,6 +1272,7 @@ let offer_start_dependents ~instance =
                       Context.toast_success
                         (Printf.sprintf "%s started" dep.Service.instance)
                   | Error (`Msg e) ->
+                      record_failure ~instance:dep.Service.instance ~error:e ;
                       Context.toast_error
                         (Printf.sprintf "%s: %s" dep.Service.instance e)) ;
               Context.mark_instances_dirty ()
@@ -1254,6 +1328,7 @@ let start_with_cascade ~instance ~role =
                             (Printf.sprintf "%s started" dep.Service.instance) ;
                           true
                       | Error (`Msg e) ->
+                          record_failure ~instance:dep.Service.instance ~error:e ;
                           Context.toast_error
                             (Printf.sprintf "%s: %s" dep.Service.instance e) ;
                           false)
@@ -1271,7 +1346,9 @@ let start_with_cascade ~instance ~role =
                     (* Offer to start dependents *)
                     offer_start_dependents ~instance
                 | Error (`Msg e) ->
-                    Context.toast_error (Printf.sprintf "%s: %s" instance e))
+                    record_failure ~instance ~error:e ;
+                    Context.toast_error (Printf.sprintf "%s: %s" instance e) ;
+                    Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
 
 (* Restart a single service (internal helper) *)
@@ -1325,12 +1402,15 @@ let offer_restart_dependents ~instance =
                                 if retries > 0 then (
                                   Unix.sleepf 2.0 ;
                                   try_restart (retries - 1))
-                                else
+                                else (
+                                  record_failure
+                                    ~instance:dep.Service.instance
+                                    ~error:e ;
                                   append_log
                                     (Printf.sprintf
                                        "Failed: %s: %s"
                                        dep.Service.instance
-                                       e)
+                                       e))
                           in
                           try_restart 2
                       | _ ->
@@ -1389,6 +1469,7 @@ let restart_with_cascade ~instance ~role =
                             (Printf.sprintf "%s started" dep.Service.instance) ;
                           true
                       | Error (`Msg e) ->
+                          record_failure ~instance:dep.Service.instance ~error:e ;
                           Context.toast_error
                             (Printf.sprintf "%s: %s" dep.Service.instance e) ;
                           false)
@@ -1407,7 +1488,9 @@ let restart_with_cascade ~instance ~role =
                     (* Offer to restart dependents *)
                     offer_restart_dependents ~instance
                 | Error (`Msg e) ->
-                    Context.toast_error (Printf.sprintf "%s: %s" instance e))
+                    record_failure ~instance ~error:e ;
+                    Context.toast_error (Printf.sprintf "%s: %s" instance e) ;
+                    Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
 
 let instance_actions_modal state =
@@ -1432,6 +1515,8 @@ let instance_actions_modal state =
               Context.navigate Instance_details.name
           | `Start -> start_with_cascade ~instance ~role
           | `Stop ->
+              (* Clear any previous failure when user intentionally stops *)
+              clear_failure ~instance ;
               run_unit_action ~verb:"stop" ~instance (fun () ->
                   let cap = Miaou_interfaces.Service_lifecycle.require () in
                   Miaou_interfaces.Service_lifecycle.stop
@@ -1495,6 +1580,16 @@ let activate_selection s =
     | Some _ -> instance_actions_modal s
     | None -> s
 
+let dismiss_failure s =
+  match current_service s with
+  | Some st ->
+      let instance = st.Service_state.service.Service.instance in
+      clear_failure ~instance ;
+      Context.toast_info (Printf.sprintf "Cleared failure for %s" instance) ;
+      Context.mark_instances_dirty () ;
+      s
+  | None -> s
+
 module Page_Impl :
   Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg =
 struct
@@ -1523,16 +1618,18 @@ struct
     ps
 
   let handled_keys () =
-    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"]
+    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
 
   let keymap _ps =
     let activate ps = Navigation.update activate_selection ps in
     let create ps = Navigation.update create_menu_modal ps in
     let diag ps = Navigation.update go_to_diagnostics ps in
+    let dismiss ps = Navigation.update dismiss_failure ps in
     [
       ("Enter", activate, "Open");
       ("c", create, "Create service");
       ("d", diag, "Diagnostics");
+      ("x", dismiss, "Clear failure");
     ]
 
   let header s =
@@ -1628,6 +1725,21 @@ Press **Enter** to open instance menu.|}
 
 Press **Enter** to open instance menu.|}
 
+  let accuser_help_hint =
+    {|## Accuser Instance
+
+**Line 1:** Instance status
+- `●` running (green), `○` stopped (yellow), `●` failed (red)
+- `[enabled]` starts on boot
+
+**Line 2:** Activity status
+- `monitoring` (green) = accuser is watching for double-baking/endorsing
+
+The accuser monitors the chain for misbehavior and
+automatically submits denunciation operations when detected.
+
+Press **Enter** to open instance menu.|}
+
   (* Mutable scroll offset - updated during view to keep selection visible *)
   let scroll_offset_ref = ref 0
 
@@ -1649,6 +1761,8 @@ Press **Enter** to open instance menu.|}
         Miaou.Core.Help_hint.set (Some baker_help_hint)
     | Some st when st.service.Service.role = "dal-node" ->
         Miaou.Core.Help_hint.set (Some dal_help_hint)
+    | Some st when st.service.Service.role = "accuser" ->
+        Miaou.Core.Help_hint.set (Some accuser_help_hint)
     | _ -> Miaou.Core.Help_hint.set (Some "Press Enter to select, ? for help")) ;
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
@@ -2027,6 +2141,7 @@ Press **Enter** to open instance menu.|}
         | Some Keys.Tab -> Navigation.update toggle_fold ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
+        | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
         | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
         | Some (Keys.Char "Esc")
         | Some (Keys.Char "Escape")

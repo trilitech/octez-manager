@@ -27,6 +27,9 @@ om install-node \
     --service-user tezos \
     --no-enable 2>&1
 
+# Inject pre-generated identity to skip PoW
+inject_identity "$NODE_INSTANCE"
+
 # Start the node
 echo "Starting node..."
 om instance "$NODE_INSTANCE" start
@@ -39,7 +42,7 @@ if ! wait_for_service_active "node" "$NODE_INSTANCE" 30; then
 fi
 
 # Identity generation can take time - wait for RPC
-if ! wait_for_node_ready "$NODE_RPC" 180; then
+if ! wait_for_node_ready "$NODE_RPC" 60; then
     echo "ERROR: Node RPC not ready"
     show_service_logs "node" "$NODE_INSTANCE" 50
     exit 1
