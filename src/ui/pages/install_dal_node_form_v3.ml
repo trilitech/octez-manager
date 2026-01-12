@@ -128,28 +128,37 @@ let spec =
   {
     title = " Install DAL Node ";
     initial_model = make_initial_model;
-    (* Compose fields from bundles with auto-naming support *)
+    (* Compose fields from bundles following standard ordering *)
     fields =
       (fun model ->
-        core_service_fields
+        (* 1. Dependencies: node (via client_fields_with_autoname) *)
+        client_fields_with_autoname
+          ~role:"dal"
+          ~binary:"octez-baker"
+          ~binary_validator:Form_builder_common.has_octez_baker_binary
           ~get_core:(fun m -> m.core)
           ~set_core:(fun core m -> {m with core})
-          ~binary:"octez-baker"
-          ~subcommand:["run"; "dal"]
-          ~binary_validator:Form_builder_common.has_octez_baker_binary
+          ~get_client:(fun m -> m.client)
+          ~set_client:(fun client m -> {m with client})
           ~edit_mode:model.edit_mode
-          ~original_instance:model.original_instance
           ()
-        @ client_fields_with_autoname
-            ~role:"dal"
-            ~binary:"octez-baker"
-            ~binary_validator:Form_builder_common.has_octez_baker_binary
+        (* 2. Network params - N/A *)
+        (* 3. App bin dir *)
+        @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
-            ~get_client:(fun m -> m.client)
-            ~set_client:(fun client m -> {m with client})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "dal"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_extra_args:true
+            ~skip_service_fields:true
             ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
             ()
+        (* 4. Base dir - already included in client_fields_with_autoname *)
+        (* 5. Role-specific - N/A *)
+        (* 6. Addresses and ports *)
         @ [
             (* DAL node's own RPC address - with port validation *)
             Form_builder.validated_text
@@ -197,7 +206,46 @@ let spec =
                       (Printf.sprintf
                          "DAL P2P Addr: %s"
                          (Port_validation.pp_error err)));
-          ]);
+          ]
+        (* 7. Extra args *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "dal"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_service_fields:true
+            ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
+            ()
+        (* 8. Service fields *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "dal"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_extra_args:true
+            ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
+            ()
+        (* 9. Instance name *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "dal"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_app_bin_dir:true
+            ~skip_extra_args:true
+            ~skip_service_fields:true
+            ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
+            ());
     pre_submit =
       Some
         (fun model ->

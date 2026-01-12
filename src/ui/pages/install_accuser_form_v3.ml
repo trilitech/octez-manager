@@ -253,17 +253,24 @@ let spec =
     initial_model = make_initial_model;
     fields =
       (fun model ->
-        core_service_fields
-          ~get_core:(fun m -> m.core)
-          ~set_core:(fun core m -> {m with core})
-          ~binary:"octez-baker"
-          ~subcommand:["run"; "accuser"]
-          ~binary_validator:Form_builder_common.has_octez_baker_binary
-          ~edit_mode:model.edit_mode
-          ~original_instance:model.original_instance
-          ()
+        (* 1. Dependencies: node *)
+        [node_selection_field]
+        (* 2. Network params - N/A *)
+        (* 3. App bin dir *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "accuser"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_extra_args:true
+            ~skip_service_fields:true
+            ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
+            ()
+        (* 4. Base dir *)
         @ [
-            node_selection_field;
             client_base_dir
               ~label:"Base Dir"
               ~get:(fun m -> m.client.base_dir)
@@ -272,7 +279,47 @@ let spec =
               ~validate:(fun m ->
                 Form_builder_common.is_nonempty m.client.base_dir)
               ();
-          ]);
+          ]
+        (* 5-6. Role-specific and addresses - N/A *)
+        (* 7. Extra args *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "accuser"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_service_fields:true
+            ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
+            ()
+        (* 8. Service fields *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "accuser"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_extra_args:true
+            ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
+            ()
+        (* 9. Instance name *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"; "accuser"]
+            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~skip_app_bin_dir:true
+            ~skip_extra_args:true
+            ~skip_service_fields:true
+            ~edit_mode:model.edit_mode
+            ~original_instance:model.original_instance
+            ());
     pre_submit =
       Some
         (fun model ->

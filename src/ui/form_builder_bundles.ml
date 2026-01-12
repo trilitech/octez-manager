@@ -70,7 +70,9 @@ let format_network_choice (info : Teztnets.network_info) =
 
 let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
     ?(binary_validator = fun _ -> true) ?(skip_instance_name = false)
-    ?(edit_mode = false) ?(original_instance : string option = None) () =
+    ?(skip_app_bin_dir = false) ?(skip_extra_args = false)
+    ?(skip_service_fields = false) ?(edit_mode = false)
+    ?(original_instance : string option = None) () =
   let open Form_builder in
   let instance_name_field =
     if skip_instance_name then []
@@ -119,55 +121,68 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
            "Unix user that runs the service. Created automatically if running \
             as root."
   in
-  instance_name_field
-  @ [
-      service_user_field;
-      (* App Bin Dir *)
-      app_bin_dir
-        ~label:"App Bin Dir"
-        ~get:(fun m -> (get_core m).app_bin_dir)
-        ~set:(fun app_bin_dir m ->
-          let core = get_core m in
-          set_core {core with app_bin_dir} m)
-        ~validate:(fun m -> binary_validator (get_core m).app_bin_dir)
-        ()
-      |> with_hint
-           "Directory containing octez binaries. Must include the required \
-            executable.";
-      (* Logging is always journald - octez binaries handle their own file logging *)
-      (* Enable on Boot *)
-      toggle
-        ~label:"Enable on Boot"
-        ~get:(fun m -> (get_core m).enable_on_boot)
-        ~set:(fun enable_on_boot m ->
-          let core = get_core m in
-          set_core {core with enable_on_boot} m)
-      |> with_hint
-           "Auto-start service when system boots. Recommended for production.";
-      (* Start Now *)
-      toggle
-        ~label:"Start Now"
-        ~get:(fun m -> (get_core m).start_now)
-        ~set:(fun start_now m ->
-          let core = get_core m in
-          set_core {core with start_now} m)
-      |> with_hint "Start service immediately after installation.";
-      (* Extra Args *)
-      extra_args
-        ~label:"Extra Args"
-        ~get_args:(fun m -> (get_core m).extra_args)
-        ~set_args:(fun extra_args m ->
-          let core = get_core m in
-          set_core {core with extra_args} m)
-        ~get_bin_dir:(fun m -> (get_core m).app_bin_dir)
-        ~binary
-        ?baker_mode
-        ~subcommand
-        ()
-      |> with_hint
-           "Additional command-line arguments passed to the binary. Press \
-            Enter to browse options.";
-    ]
+  let app_bin_dir_field =
+    if skip_app_bin_dir then []
+    else
+      [
+        app_bin_dir
+          ~label:"App Bin Dir"
+          ~get:(fun m -> (get_core m).app_bin_dir)
+          ~set:(fun app_bin_dir m ->
+            let core = get_core m in
+            set_core {core with app_bin_dir} m)
+          ~validate:(fun m -> binary_validator (get_core m).app_bin_dir)
+          ()
+        |> with_hint
+             "Directory containing octez binaries. Must include the required \
+              executable.";
+      ]
+  in
+  let extra_args_field =
+    if skip_extra_args then []
+    else
+      [
+        extra_args
+          ~label:"Extra Args"
+          ~get_args:(fun m -> (get_core m).extra_args)
+          ~set_args:(fun extra_args m ->
+            let core = get_core m in
+            set_core {core with extra_args} m)
+          ~get_bin_dir:(fun m -> (get_core m).app_bin_dir)
+          ~binary
+          ?baker_mode
+          ~subcommand
+          ()
+        |> with_hint
+             "Additional command-line arguments passed to the binary. Press \
+              Enter to browse options.";
+      ]
+  in
+  let service_fields =
+    if skip_service_fields then []
+    else
+      [
+        service_user_field;
+        (* Enable on Boot *)
+        toggle
+          ~label:"Enable on Boot"
+          ~get:(fun m -> (get_core m).enable_on_boot)
+          ~set:(fun enable_on_boot m ->
+            let core = get_core m in
+            set_core {core with enable_on_boot} m)
+        |> with_hint
+             "Auto-start service when system boots. Recommended for production.";
+        (* Start Now *)
+        toggle
+          ~label:"Start Now"
+          ~get:(fun m -> (get_core m).start_now)
+          ~set:(fun start_now m ->
+            let core = get_core m in
+            set_core {core with start_now} m)
+        |> with_hint "Start service immediately after installation.";
+      ]
+  in
+  app_bin_dir_field @ extra_args_field @ service_fields @ instance_name_field
 
 (** {1 Client-based Tool Bundle with Auto-naming} *)
 
@@ -336,7 +351,8 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
 (** {1 Node-specific Bundle} *)
 
 let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
-    ?(edit_mode = false) ?editing_instance () =
+    ?(edit_mode = false) ?editing_instance ?(skip_network = false)
+    ?(skip_data_dir = false) ?(skip_addresses = false) () =
   let open Form_builder in
   (* Helper for network field - needs special handling for dynamic fetch *)
   let network_field =
@@ -460,47 +476,76 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
                   states))
         ()
   in
-  [
-    network_field
-    |> with_hint
-         "Tezos network to connect to. Mainnet for production, testnets for \
-          development.";
-    history_mode_field
-    |> with_hint
-         "Rolling: minimal disk (~50GB). Full: all blocks. Archive: all states \
-          (1TB+).";
-    data_dir_field
-    |> with_hint
-         "Directory where blockchain data is stored. Must be writable by \
-          service user.";
-    (* RPC Address *)
-    validated_text
-      ~label:"RPC Address"
-      ~get:(fun m -> (get_node m).rpc_addr)
-      ~set:(fun rpc_addr m ->
-        let node = get_node m in
-        set_node {node with rpc_addr} m)
-      ~validate:(fun m ->
-        let addr = (get_node m).rpc_addr in
-        (* Use non-blocking cache to avoid syscalls during typing *)
-        let states = Form_builder_common.cached_service_states_nonblocking () in
-        validate_port addr states ~label:"RPC Address" ~example:"127.0.0.1:8732")
-    |> with_hint
-         "RPC endpoint for clients (bakers, wallets). Use 127.0.0.1 for local \
-          only.";
-    (* P2P Address *)
-    validated_text
-      ~label:"P2P Address"
-      ~get:(fun m -> (get_node m).p2p_addr)
-      ~set:(fun p2p_addr m ->
-        let node = get_node m in
-        set_node {node with p2p_addr} m)
-      ~validate:(fun m ->
-        let addr = (get_node m).p2p_addr in
-        (* Use non-blocking cache to avoid syscalls during typing *)
-        let states = Form_builder_common.cached_service_states_nonblocking () in
-        validate_port addr states ~label:"P2P Address" ~example:"0.0.0.0:9732")
-    |> with_hint
-         "P2P port for peer discovery. Use 0.0.0.0 to accept connections from \
-          all interfaces.";
-  ]
+  let network_fields =
+    if skip_network then []
+    else
+      [
+        network_field
+        |> with_hint
+             "Tezos network to connect to. Mainnet for production, testnets \
+              for development.";
+        history_mode_field
+        |> with_hint
+             "Rolling: minimal disk (~50GB). Full: all blocks. Archive: all \
+              states (1TB+).";
+      ]
+  in
+  let data_dir_fields =
+    if skip_data_dir then []
+    else
+      [
+        data_dir_field
+        |> with_hint
+             "Directory where blockchain data is stored. Must be writable by \
+              service user.";
+      ]
+  in
+  let address_fields =
+    if skip_addresses then []
+    else
+      [
+        (* RPC Address *)
+        validated_text
+          ~label:"RPC Address"
+          ~get:(fun m -> (get_node m).rpc_addr)
+          ~set:(fun rpc_addr m ->
+            let node = get_node m in
+            set_node {node with rpc_addr} m)
+          ~validate:(fun m ->
+            let addr = (get_node m).rpc_addr in
+            (* Use non-blocking cache to avoid syscalls during typing *)
+            let states =
+              Form_builder_common.cached_service_states_nonblocking ()
+            in
+            validate_port
+              addr
+              states
+              ~label:"RPC Address"
+              ~example:"127.0.0.1:8732")
+        |> with_hint
+             "RPC endpoint for clients (bakers, wallets). Use 127.0.0.1 for \
+              local only.";
+        (* P2P Address *)
+        validated_text
+          ~label:"P2P Address"
+          ~get:(fun m -> (get_node m).p2p_addr)
+          ~set:(fun p2p_addr m ->
+            let node = get_node m in
+            set_node {node with p2p_addr} m)
+          ~validate:(fun m ->
+            let addr = (get_node m).p2p_addr in
+            (* Use non-blocking cache to avoid syscalls during typing *)
+            let states =
+              Form_builder_common.cached_service_states_nonblocking ()
+            in
+            validate_port
+              addr
+              states
+              ~label:"P2P Address"
+              ~example:"0.0.0.0:9732")
+        |> with_hint
+             "P2P port for peer discovery. Use 0.0.0.0 to accept connections \
+              from all interfaces.";
+      ]
+  in
+  network_fields @ data_dir_fields @ address_fields
