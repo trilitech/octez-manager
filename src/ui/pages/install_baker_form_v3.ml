@@ -483,77 +483,10 @@ let spec =
                 Form_builder_common.is_nonempty m.client.base_dir)
               ()
         in
-        [
-          (* Instance name with auto-update of base_dir (only in create mode) *)
-          validated_text
-            ~label:"Instance Name"
-            ~get:(fun m -> m.core.instance_name)
-            ~set:(fun instance_name m ->
-              let old = m.core.instance_name in
-              let default_dir = Common.default_role_dir "baker" instance_name in
-              (* In edit mode, never auto-change base_dir - data is already there *)
-              let keep_base_dir =
-                m.edit_mode
-                || String.trim m.client.base_dir <> ""
-                   && not
-                        (String.equal
-                           m.client.base_dir
-                           (Common.default_role_dir "baker" old))
-              in
-              let new_core = {m.core with instance_name} in
-              let new_client =
-                {
-                  m.client with
-                  base_dir =
-                    (if keep_base_dir then m.client.base_dir else default_dir);
-                }
-              in
-              {m with core = new_core; client = new_client})
-            ~validate:(fun m ->
-              let states = Form_builder_common.cached_service_states () in
-              if not (Form_builder_common.is_nonempty m.core.instance_name) then
-                Error "Instance name is required"
-              else if
-                Form_builder_common.instance_in_use ~states m.core.instance_name
-                && not
-                     (m.edit_mode
-                     && m.original_instance = Some m.core.instance_name)
-              then Error "Instance name already exists"
-              else Ok ());
-          parent_node_field;
-          dal_node_field;
-          node_endpoint_field;
-          (* Node data dir - readonly in edit mode, interactive in create mode *)
-          (if model.edit_mode then
-             readonly ~label:"Node Data Dir" ~get:(fun m ->
-                 let states =
-                   Form_builder_common.cached_service_states_nonblocking ()
-                 in
-                 resolve_node_data_dir m states)
-             |> with_hint
-                  "Node data directory cannot be changed after creation."
-           else node_data_dir_field);
-          base_dir_field;
-          string_list
-            ~label:"Delegates"
-            ~get:(fun m -> m.delegates)
-            ~set:(fun delegates m -> {m with delegates})
-            ~get_suggestions:(fun m ->
-              if String.trim m.client.base_dir = "" then []
-              else
-                match
-                  Keys_reader.read_public_key_hashes ~base_dir:m.client.base_dir
-                with
-                | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
-                | Error _ -> [])
-            ();
-          choice
-            ~label:"Liquidity Baking Vote"
-            ~get:(fun m -> m.liquidity_baking_vote)
-            ~set:(fun liquidity_baking_vote m -> {m with liquidity_baking_vote})
-            ~items:["pass"; "on"; "off"]
-            ~to_string:(fun x -> x);
-        ]
+        (* 1. Dependencies: node and dal node *)
+        [parent_node_field; dal_node_field]
+        (* 2. Network params - N/A for baker, inherited from node *)
+        (* 3. App bin dir *)
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
@@ -562,8 +495,116 @@ let spec =
             ~baker_mode:baker_mode_for_help
             ~binary_validator:has_octez_baker_binary
             ~skip_instance_name:true
+            ~skip_extra_args:true
+            ~skip_service_fields:true
             ~edit_mode:model.edit_mode
-            ());
+            ()
+        (* 4. Base dir *)
+        @ [base_dir_field]
+        (* 5. Baker params: delegates, liquidity baking *)
+        @ [
+            string_list
+              ~label:"Delegates"
+              ~get:(fun m -> m.delegates)
+              ~set:(fun delegates m -> {m with delegates})
+              ~get_suggestions:(fun m ->
+                if String.trim m.client.base_dir = "" then []
+                else
+                  match
+                    Keys_reader.read_public_key_hashes
+                      ~base_dir:m.client.base_dir
+                  with
+                  | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
+                  | Error _ -> [])
+              ();
+            choice
+              ~label:"Liquidity Baking Vote"
+              ~get:(fun m -> m.liquidity_baking_vote)
+              ~set:(fun liquidity_baking_vote m ->
+                {m with liquidity_baking_vote})
+              ~items:["pass"; "on"; "off"]
+              ~to_string:(fun x -> x);
+          ]
+        (* 6. Addresses and ports: node endpoint, node data dir *)
+        @ [
+            node_endpoint_field;
+            (if model.edit_mode then
+               readonly ~label:"Node Data Dir" ~get:(fun m ->
+                   let states =
+                     Form_builder_common.cached_service_states_nonblocking ()
+                   in
+                   resolve_node_data_dir m states)
+               |> with_hint
+                    "Node data directory cannot be changed after creation."
+             else node_data_dir_field);
+          ]
+        (* 7. Extra args *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"]
+            ~baker_mode:baker_mode_for_help
+            ~binary_validator:has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_service_fields:true
+            ~edit_mode:model.edit_mode
+            ()
+        (* 8. Service fields: service user, enable, start *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-baker"
+            ~subcommand:["run"]
+            ~baker_mode:baker_mode_for_help
+            ~binary_validator:has_octez_baker_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_extra_args:true
+            ~edit_mode:model.edit_mode
+            ()
+        (* 9. Instance name *)
+        @ [
+            validated_text
+              ~label:"Instance Name"
+              ~get:(fun m -> m.core.instance_name)
+              ~set:(fun instance_name m ->
+                let old = m.core.instance_name in
+                let default_dir =
+                  Common.default_role_dir "baker" instance_name
+                in
+                let keep_base_dir =
+                  m.edit_mode
+                  || String.trim m.client.base_dir <> ""
+                     && not
+                          (String.equal
+                             m.client.base_dir
+                             (Common.default_role_dir "baker" old))
+                in
+                let new_core = {m.core with instance_name} in
+                let new_client =
+                  {
+                    m.client with
+                    base_dir =
+                      (if keep_base_dir then m.client.base_dir else default_dir);
+                  }
+                in
+                {m with core = new_core; client = new_client})
+              ~validate:(fun m ->
+                let states = Form_builder_common.cached_service_states () in
+                if not (Form_builder_common.is_nonempty m.core.instance_name)
+                then Error "Instance name is required"
+                else if
+                  Form_builder_common.instance_in_use
+                    ~states
+                    m.core.instance_name
+                  && not
+                       (m.edit_mode
+                       && m.original_instance = Some m.core.instance_name)
+                then Error "Instance name already exists"
+                else Ok ());
+          ]);
     pre_submit = None;
     on_init = None;
     on_refresh = None;

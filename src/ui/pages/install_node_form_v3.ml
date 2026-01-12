@@ -564,55 +564,17 @@ let spec =
     initial_model = make_initial_model;
     fields =
       (fun model ->
-        [
-          (* Instance name with auto-update of data_dir *)
-          validated_text
-            ~label:"Instance Name"
-            ~get:(fun m -> m.core.instance_name)
-            ~set:(fun instance_name m ->
-              let old = m.core.instance_name in
-              let default_dir = Common.default_role_dir "node" instance_name in
-              let keep_data_dir =
-                String.trim m.node.data_dir <> ""
-                && not
-                     (String.equal
-                        m.node.data_dir
-                        (Common.default_role_dir "node" old))
-              in
-              let new_core = {m.core with instance_name} in
-              let new_node =
-                {
-                  m.node with
-                  data_dir =
-                    (if keep_data_dir then m.node.data_dir else default_dir);
-                }
-              in
-              {m with core = new_core; node = new_node})
-            ~validate:(fun m ->
-              (* Use non-blocking cache to avoid syscalls during typing *)
-              let states =
-                Form_builder_common.cached_service_states_nonblocking ()
-              in
-              if not (Form_builder_common.is_nonempty m.core.instance_name) then
-                Error "Instance name is required"
-              else if
-                Form_builder_common.instance_in_use ~states m.core.instance_name
-                && not
-                     (m.edit_mode
-                     && m.original_instance = Some m.core.instance_name)
-              then Error "Instance name already exists"
-              else Ok ())
-          |> with_hint
-               "Unique identifier for this node. Used in systemd unit and \
-                default paths.";
-        ]
-        @ node_fields
-            ~get_node:(fun m -> m.node)
-            ~set_node:(fun node m -> {m with node})
-            ~on_network_selected:prefetch_snapshot_list
-            ~edit_mode:model.edit_mode
-            ?editing_instance:model.original_instance
-            ()
+        (* 1. Dependencies - none for node *)
+        (* 2. Network params: network, history mode, snapshot, tmp_dir, keep_snapshot *)
+        node_fields
+          ~get_node:(fun m -> m.node)
+          ~set_node:(fun node m -> {m with node})
+          ~on_network_selected:prefetch_snapshot_list
+          ~edit_mode:model.edit_mode
+          ?editing_instance:model.original_instance
+          ~skip_data_dir:true
+          ~skip_addresses:true
+          ()
         (* Snapshot field only shown for new installs, not edit mode *)
         @ (if model.edit_mode then []
            else
@@ -640,6 +602,7 @@ let spec =
                     "Keep the downloaded snapshot file after import instead of \
                      deleting it.";
              ])
+        (* 3. App bin dir *)
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
@@ -647,8 +610,99 @@ let spec =
             ~subcommand:["run"]
             ~binary_validator:has_octez_node_binary
             ~skip_instance_name:true
+            ~skip_extra_args:true
+            ~skip_service_fields:true
             ~edit_mode:model.edit_mode
-            ());
+            ()
+        (* 4. Data dir *)
+        @ node_fields
+            ~get_node:(fun m -> m.node)
+            ~set_node:(fun node m -> {m with node})
+            ~edit_mode:model.edit_mode
+            ?editing_instance:model.original_instance
+            ~skip_network:true
+            ~skip_addresses:true
+            ()
+        (* 5. Role-specific - none for node *)
+        (* 6. Addresses and ports *)
+        @ node_fields
+            ~get_node:(fun m -> m.node)
+            ~set_node:(fun node m -> {m with node})
+            ~edit_mode:model.edit_mode
+            ?editing_instance:model.original_instance
+            ~skip_network:true
+            ~skip_data_dir:true
+            ()
+        (* 7. Extra args *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-node"
+            ~subcommand:["run"]
+            ~binary_validator:has_octez_node_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_service_fields:true
+            ~edit_mode:model.edit_mode
+            ()
+        (* 8. Service fields: service user, enable on boot, start now *)
+        @ core_service_fields
+            ~get_core:(fun m -> m.core)
+            ~set_core:(fun core m -> {m with core})
+            ~binary:"octez-node"
+            ~subcommand:["run"]
+            ~binary_validator:has_octez_node_binary
+            ~skip_instance_name:true
+            ~skip_app_bin_dir:true
+            ~skip_extra_args:true
+            ~edit_mode:model.edit_mode
+            ()
+        (* 9. Instance name *)
+        @ [
+            validated_text
+              ~label:"Instance Name"
+              ~get:(fun m -> m.core.instance_name)
+              ~set:(fun instance_name m ->
+                let old = m.core.instance_name in
+                let default_dir =
+                  Common.default_role_dir "node" instance_name
+                in
+                let keep_data_dir =
+                  String.trim m.node.data_dir <> ""
+                  && not
+                       (String.equal
+                          m.node.data_dir
+                          (Common.default_role_dir "node" old))
+                in
+                let new_core = {m.core with instance_name} in
+                let new_node =
+                  {
+                    m.node with
+                    data_dir =
+                      (if keep_data_dir then m.node.data_dir else default_dir);
+                  }
+                in
+                {m with core = new_core; node = new_node})
+              ~validate:(fun m ->
+                (* Use non-blocking cache to avoid syscalls during typing *)
+                let states =
+                  Form_builder_common.cached_service_states_nonblocking ()
+                in
+                if not (Form_builder_common.is_nonempty m.core.instance_name)
+                then Error "Instance name is required"
+                else if
+                  Form_builder_common.instance_in_use
+                    ~states
+                    m.core.instance_name
+                  && not
+                       (m.edit_mode
+                       && m.original_instance = Some m.core.instance_name)
+                then Error "Instance name already exists"
+                else Ok ())
+            |> with_hint
+                 "Unique identifier for this node. Used in systemd unit and \
+                  default paths.";
+          ]);
     pre_submit = None;
     on_init = Some (fun model -> prefetch_snapshot_list model.node.network);
     on_refresh = None;
