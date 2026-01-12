@@ -52,7 +52,7 @@ octez-manager install-node \
   --history-mode rolling \
   --rpc-addr 127.0.0.1:8732 \
   --net-addr "[::]:9732" \
-  --bootstrap snapshot
+  --snapshot
 ```
 
 ### Custom Snapshot URL
@@ -61,8 +61,8 @@ octez-manager install-node \
 octez-manager install-node \
   --instance my-node \
   --network mainnet \
-  --bootstrap snapshot \
-  --snapshot-url https://example.com/snapshot.rolling
+  --snapshot \
+  --snapshot-uri https://example.com/snapshot.rolling
 ```
 
 ### Custom Data Directory
