@@ -106,12 +106,21 @@ curl -s http://127.0.0.1:8732/chains/main/blocks/head/header | jq .level
 
 ## Configuration Files
 
-Octez Manager creates:
+Octez Manager creates (in user mode):
 
 | Path | Description |
 |------|-------------|
-| `~/.local/share/octez-manager/instances/<name>/` | Instance data |
+| `~/.config/octez/instances/<name>/` | Instance configuration (node.env) |
+| `~/.local/share/octez/<name>/` | Node data directory |
 | `~/.config/systemd/user/octez-node@<name>.service.d/` | Systemd overrides |
+
+In system mode (run as root):
+
+| Path | Description |
+|------|-------------|
+| `/etc/octez/instances/<name>/` | Instance configuration (node.env) |
+| `/var/lib/octez/<name>/` | Node data directory |
+| `/etc/systemd/system/octez-node@<name>.service.d/` | Systemd overrides |
 
 ## Troubleshooting
 
