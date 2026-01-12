@@ -48,15 +48,15 @@ let back ps = Navigation.back ps
 
 let handled_keys () = Miaou.Core.Keys.[Escape]
 
-let keymap _ = [("Esc", back, "Back")]
+let keymap _ =
+  let noop ps = ps in
+  [("Esc", back, "Back"); ("?", noop, "Help")]
 
 let header s =
   [
     Widgets.title_highlight (" Snapshots · " ^ s.network);
     Widgets.dim "n: select network";
   ]
-
-let footer = [Widgets.dim "Enter: import  n: network  ?: help  Esc: back"]
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
@@ -72,7 +72,7 @@ let view ps ~focus:_ ~size =
             (Widgets.bold entry.label)
             (Widgets.dim (Option.value ~default:"" entry.download_url)))
   in
-  Vsection.render ~size ~header:(header s) ~footer ~child:(fun _ ->
+  Vsection.render ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
       String.concat "\n" body)
 
 let handle_modal_key ps key ~size:_ =

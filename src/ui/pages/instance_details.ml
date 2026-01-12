@@ -72,9 +72,11 @@ let handled_keys () = Miaou.Core.Keys.[Escape; Enter]
 let open_actions_modal_ref : (pstate -> pstate) ref = ref (fun ps -> ps)
 
 let keymap _ =
+  let noop ps = ps in
   [
     ("Enter", (fun ps -> !open_actions_modal_ref ps), "Actions");
     ("Esc", back, "Back");
+    ("?", noop, "Help");
   ]
 
 let header s =
@@ -85,7 +87,7 @@ let header s =
     | None -> "");
   ]
 
-let footer = [Widgets.dim "Enter: actions  ?: help  Esc: back"]
+let footer = []
 
 let view_details svc =
   let render_fields fields =

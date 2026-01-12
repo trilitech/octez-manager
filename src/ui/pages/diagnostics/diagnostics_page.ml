@@ -161,6 +161,7 @@ let handled_keys () =
     ]
 
 let keymap _ =
+  let noop ps = ps in
   [
     ("Esc", back, "Back");
     ("r", refresh, "Refresh");
@@ -171,6 +172,7 @@ let keymap _ =
     ("c", (fun ps -> Navigation.update clear_caches ps), "Clear caches");
     ("Up", (fun ps -> Navigation.update scroll_up ps), "Scroll up");
     ("Down", (fun ps -> Navigation.update scroll_down ps), "Scroll down");
+    ("?", noop, "Help");
   ]
 
 let header =
@@ -179,12 +181,7 @@ let header =
     Widgets.dim "Live system metrics and service status";
   ]
 
-let footer =
-  [
-    Widgets.dim
-      "↑/↓: scroll  r: refresh  c: clear caches  m: metrics  R: recorder  Esc: \
-       back";
-  ]
+let footer = []
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in

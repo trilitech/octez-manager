@@ -667,11 +667,13 @@ struct
   let move ps delta = Navigation.update (fun s -> move_state s delta) ps
 
   let keymap _ps =
+    let noop ps = ps in
     [
       ("Up", (fun ps -> move ps (-1)), "Move up");
       ("Down", (fun ps -> move ps 1), "Move down");
-      ("Enter", (fun ps -> Navigation.update enter ps), "Edit field / Submit");
-      ("Esc", back, "Back to instances");
+      ("Enter", (fun ps -> Navigation.update enter ps), "Edit / Submit");
+      ("Esc", back, "Back");
+      ("?", noop, "Help");
     ]
 
   let handled_keys () =

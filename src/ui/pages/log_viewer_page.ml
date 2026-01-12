@@ -222,7 +222,9 @@ let toggle_source ps =
 
 let handled_keys () = []
 
-let keymap _ps = []
+let keymap _ps =
+  let noop ps = ps in
+  [("?", noop, "Help")]
 
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
