@@ -12,7 +12,7 @@ cleanup_instance "$INSTANCE" || true
 # Install a node
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "127.0.0.1:8746" --net-addr "0.0.0.0:9746" \
     --service-user tezos \
     --no-enable 2>&1
@@ -37,7 +37,7 @@ fi
 echo "Role appears in list"
 
 # Verify network appears
-if ! echo "$LIST_OUTPUT" | grep -q "tallinnnet"; then
+if ! echo "$LIST_OUTPUT" | grep -q "shadownet"; then
     echo "ERROR: Network not in list output"
     echo "Output: $LIST_OUTPUT"
     exit 1

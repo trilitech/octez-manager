@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Download tallinnnet rolling snapshot (~42MB)
+# Download shadownet rolling snapshot (~32MB)
 RUN mkdir -p /srv/http \
-    && curl -sfL https://snapshots.eu.tzinit.org/tallinnnet/rolling \
+    && curl -sfL https://snapshots.eu.tzinit.org/shadownet/rolling \
        -o /srv/http/snapshot.rolling
 
 # Copy HTTP server

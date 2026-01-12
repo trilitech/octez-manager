@@ -12,7 +12,7 @@ cleanup_instance "$INSTANCE" || true
 # Install node
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "127.0.0.1:8741" --net-addr "0.0.0.0:9741" \
     --service-user tezos \
     --no-enable 2>&1

@@ -15,7 +15,7 @@ cleanup_instance "$INSTANCE2" || true
 echo "Installing first instance..."
 om install-node \
     --instance "$INSTANCE1" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "127.0.0.1:8744" --net-addr "0.0.0.0:9744" \
     --service-user tezos \
     --no-enable 2>&1
@@ -24,7 +24,7 @@ om install-node \
 echo "Installing second instance..."
 om install-node \
     --instance "$INSTANCE2" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "127.0.0.1:8745" --net-addr "0.0.0.0:9745" \
     --service-user tezos \
     --no-enable 2>&1

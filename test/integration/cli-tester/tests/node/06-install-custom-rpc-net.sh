@@ -13,7 +13,7 @@ cleanup_instance "$INSTANCE" || true
 
 om install-node \
     --instance "$INSTANCE" \
-    --network tallinnnet \
+    --network shadownet \
     --rpc-addr "$CUSTOM_RPC" \
     --net-addr "$CUSTOM_NET" \
     --service-user tezos \
