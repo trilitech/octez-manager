@@ -5,7 +5,7 @@ template: splash
 hero:
   tagline: Deploy and manage Tezos nodes, bakers, and DAL infrastructure from your terminal.
   image:
-    file: ../../assets/logo.svg
+    file: ../../assets/logo.png
   actions:
     - text: Get Started
       link: /octez-manager/getting-started/introduction/
@@ -16,7 +16,11 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid, Code, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Card, CardGrid, Code, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Experimental">
+Octez Manager is in early development. Recommended for **testnet use only**.
+</Aside>
 
 ## Install in seconds
 
@@ -38,13 +42,13 @@ octez-manager install-node \
   --instance mainnet \
   --network mainnet \
   --history-mode rolling \
-  --bootstrap snapshot
+  --snapshot
 ```
 
 Or use the interactive TUI:
 
 ```bash
-octez-manager
+octez-manager ui
 ```
 
 ---
@@ -53,7 +57,7 @@ octez-manager
 
 <CardGrid>
 	<Card title="One tool, full stack" icon="rocket">
-		Node, baker, accuser, DAL node, signer — all managed from a single interface.
+		Node, baker, accuser, DAL node — all managed from a single interface.
 	</Card>
 	<Card title="Production ready" icon="setting">
 		Systemd integration, proper user isolation, automatic snapshots.
@@ -73,10 +77,9 @@ octez-manager
 | Service | Command | Description |
 |---------|---------|-------------|
 | **Node** | `install-node` | Tezos L1 node with snapshot bootstrap |
+| **DAL Node** | `install-dal-node` | Data Availability Layer |
 | **Baker** | `install-baker` | Block production and attestations |
 | **Accuser** | `install-accuser` | Double-baking detection |
-| **DAL Node** | `install-dal-node` | Data Availability Layer |
-| **Signer** | `install-signer` | Remote signing service |
 
 ---
 

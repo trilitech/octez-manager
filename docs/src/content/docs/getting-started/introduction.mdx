@@ -3,7 +3,13 @@ title: Introduction
 description: What is Octez Manager
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
 # What is Octez Manager?
+
+<Aside type="caution" title="Experimental Software">
+Octez Manager is currently in early development (v0.0.2). It is recommended for **testnet use only**. Use at your own risk on mainnet. Always maintain backups of your keys and data.
+</Aside>
 
 Octez Manager is a CLI and TUI tool for deploying and managing Tezos infrastructure.
 
@@ -44,23 +50,22 @@ Or an interactive TUI:
 | Service | Description |
 |---------|-------------|
 | **Node** | L1 node with automatic snapshot bootstrap |
+| **DAL Node** | Data Availability Layer |
 | **Baker** | Block production and attestations |
 | **Accuser** | Double-baking/endorsing detection |
-| **DAL Node** | Data Availability Layer |
-| **Signer** | Remote signing service |
 
 ## Modes
 
 **User mode** — Services run as your user. Good for testing.
 
 ```bash
-octez-manager
+octez-manager ui
 ```
 
 **System mode** — Dedicated service users, proper isolation. For production.
 
 ```bash
-sudo octez-manager
+sudo octez-manager ui
 ```
 
 ## Next
