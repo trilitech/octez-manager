@@ -466,6 +466,8 @@ let snapshot_field =
         | None -> []
       in
 
+      (* When no snapshots match, only None and Custom are offered.
+         This allows users to either sync from genesis or provide a custom URL. *)
       let items =
         match filtered_snapshots with
         | [] -> [`None; `Custom]

@@ -651,7 +651,16 @@ let install_node_form_v3_snapshot_filtering () =
        rolling_entry
        ~history_mode:"archive") ;
   (* Test entry with no history mode matches all *)
-  let no_mode_entry = {rolling_entry with Snapshots.history_mode = None} in
+  let no_mode_entry =
+    {
+      Snapshots.network = "mainnet";
+      slug = "legacy";
+      label = "legacy";
+      download_url = None;
+      history_mode = None;
+      metadata = [];
+    }
+  in
   Alcotest.(check bool)
     "entry with no mode matches rolling"
     true
