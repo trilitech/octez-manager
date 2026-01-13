@@ -658,6 +658,146 @@ let test_dal_form_navigation_bounds () =
       check bool "Down at end" true (result = `Continue))
 
 (* ============================================================ *)
+(* Wizard-Style Integration Tests (using test helpers) *)
+(* ============================================================ *)
+
+module TH = Tui_test_helpers
+
+(** Test: Drive through create menu and select Node *)
+let test_instances_create_node_flow () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Instances.Page) ;
+
+      (* Open create menu with 'c' *)
+      ignore (TH.send_key_and_wait "c") ;
+      check bool "create menu opened" true (Modal_manager.has_active ()) ;
+
+      (* Verify Node option is visible *)
+      TH.assert_screen_contains "Node" ;
+
+      (* Select first item (Node) *)
+      let result = TH.send_key_and_wait "Enter" in
+
+      (* Should navigate to node form or open another modal *)
+      check
+        bool
+        "selection handled"
+        true
+        (result = `Continue || result = `SwitchTo "install_node_form_v3"))
+
+(** Test: Drive through create menu and select Baker *)
+let test_instances_create_baker_flow () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Instances.Page) ;
+
+      (* Open create menu *)
+      ignore (TH.send_key_and_wait "c") ;
+      check bool "create menu opened" true (Modal_manager.has_active ()) ;
+
+      (* Navigate to Baker (second item) *)
+      TH.navigate_down 1 ;
+
+      (* Select Baker *)
+      let result = TH.send_key_and_wait "Enter" in
+      check
+        bool
+        "baker selection handled"
+        true
+        (result = `Continue || result = `SwitchTo "install_baker_form_v3"))
+
+(** Test: Create menu shows all service types *)
+let test_instances_create_menu_shows_all_types () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Instances.Page) ;
+
+      (* Open create menu *)
+      ignore (TH.send_key_and_wait "c") ;
+      check bool "create menu opened" true (Modal_manager.has_active ()) ;
+
+      (* Verify all service types are shown *)
+      TH.assert_screen_contains "Node" ;
+      TH.assert_screen_contains "Baker" ;
+      TH.assert_screen_contains "Accuser" ;
+      TH.assert_screen_contains "DAL")
+
+(** Test: Escape from create menu returns to instances *)
+let test_instances_create_menu_escape () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Instances.Page) ;
+
+      (* Open create menu *)
+      ignore (TH.send_key_and_wait "c") ;
+      check bool "menu opened" true (Modal_manager.has_active ()) ;
+
+      (* Press Esc to close *)
+      ignore (TH.send_key_and_wait "Esc") ;
+
+      (* Modal should be closed *)
+      check bool "menu closed" false (Modal_manager.has_active ()) ;
+
+      (* Page should still be instances *)
+      TH.assert_screen_contains "octez-manager")
+
+(** Test: Navigate through create menu with j/k *)
+let test_instances_create_menu_vim_nav () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Instances.Page) ;
+
+      (* Open create menu *)
+      ignore (TH.send_key_and_wait "c") ;
+      check bool "menu opened" true (Modal_manager.has_active ()) ;
+
+      (* Navigate with j (down) *)
+      ignore (TH.send_key_and_wait "j") ;
+      check bool "j handled" true (Modal_manager.has_active ()) ;
+
+      (* Navigate with k (up) *)
+      ignore (TH.send_key_and_wait "k") ;
+      check bool "k handled" true (Modal_manager.has_active ()))
+
+(** Test: Multiple create menu open/close cycles *)
+let test_instances_create_menu_cycle () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Instances.Page) ;
+
+      for _ = 1 to 3 do
+        (* Open *)
+        ignore (TH.send_key_and_wait "c") ;
+        check bool "opened" true (Modal_manager.has_active ()) ;
+
+        (* Close *)
+        ignore (TH.send_key_and_wait "Esc") ;
+        check bool "closed" false (Modal_manager.has_active ())
+      done)
+
+(** Test: Screen content changes after navigation *)
+let test_instances_screen_updates_on_nav () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Instances.Page) ;
+
+      let screen1 = TH.get_screen_text () in
+
+      (* Open and close create menu *)
+      ignore (TH.send_key_and_wait "c") ;
+      let screen2 = TH.get_screen_text () in
+      ignore (TH.send_key_and_wait "Esc") ;
+      let screen3 = TH.get_screen_text () in
+
+      (* Screen should have changed when modal opened *)
+      check
+        bool
+        "screen changed with modal"
+        true
+        (not (String.equal screen1 screen2)) ;
+
+      (* Screen should be similar after modal closed *)
+      check
+        bool
+        "header present after close"
+        true
+        (TH.contains_substring screen3 "octez-manager"))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -759,5 +899,28 @@ let () =
         [
           test_case "Enter opens modal" `Quick test_dal_form_enter_opens_modal;
           test_case "Esc closes modal" `Quick test_dal_form_modal_esc;
+        ] );
+      (* Wizard-style integration tests *)
+      ( "Instances.wizard",
+        [
+          test_case "create node flow" `Quick test_instances_create_node_flow;
+          test_case "create baker flow" `Quick test_instances_create_baker_flow;
+          test_case
+            "create menu shows all"
+            `Quick
+            test_instances_create_menu_shows_all_types;
+          test_case
+            "create menu escape"
+            `Quick
+            test_instances_create_menu_escape;
+          test_case
+            "create menu vim nav"
+            `Quick
+            test_instances_create_menu_vim_nav;
+          test_case "create menu cycle" `Quick test_instances_create_menu_cycle;
+          test_case
+            "screen updates on nav"
+            `Quick
+            test_instances_screen_updates_on_nav;
         ] );
     ]

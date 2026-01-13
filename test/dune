@@ -14,6 +14,6 @@
   miaou-core.lib
   miaou-core.lib_miaou_internal
   lambda-term)
- (modules tui_flow_tests)
+ (modules tui_flow_tests tui_test_helpers)
  (instrumentation
   (backend bisect_ppx)))
