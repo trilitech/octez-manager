@@ -490,12 +490,14 @@ let snapshot_field =
         | None -> None
       in
 
-      (* Filter snapshots to only show those matching the selected history mode *)
+      (* Filter snapshots to only show those matching the selected history mode
+         and exclude full50 snapshots *)
       let filtered_snapshots =
         match snapshots_opt with
         | Some entries ->
             entries
             |> List.filter (fun e ->
+                e.Snapshots.slug <> "full50" &&
                 snapshot_entry_matches_history_mode
                   e
                   ~history_mode:!model_ref.node.history_mode)
