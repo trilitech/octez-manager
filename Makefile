@@ -38,7 +38,10 @@ completions:
 completions-check: completions
 	@git --no-pager diff --exit-code completions/ || (echo "Completions are out of date. Run 'make completions' and commit." && false)
 
-test: fmt-check completions-check
+lint-sync-io:
+	@./scripts/check-sync-io.sh
+
+test: fmt-check completions-check lint-sync-io
 	$(DUNE) runtest
 
 clean:
