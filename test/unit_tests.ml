@@ -1421,14 +1421,12 @@ let default_role_dir_no_duplicate_prefix () =
             "accuser with existing prefix"
             expected_accuser
             (Common.default_role_dir "accuser" "accuser-node-mainnet") ;
-          (* Test dal-node instance that already has "dal-node-" prefix *)
-          let expected_dal =
-            Filename.concat data "octez/dal-node-node-shadownet"
-          in
+          (* Test dal-node with default name (no prefix duplication expected) *)
+          let expected_dal = Filename.concat data "octez/dal-node-dal" in
           Alcotest.(check string)
-            "dal-node with existing prefix"
+            "dal-node with default name"
             expected_dal
-            (Common.default_role_dir "dal-node" "dal-node-node-shadownet")))
+            (Common.default_role_dir "dal-node" "dal")))
 
 let ensure_dir_path_creates () =
   let owner, group = current_user_group () in
