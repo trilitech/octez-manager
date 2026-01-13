@@ -1502,10 +1502,10 @@ let do_edit_instance svc =
   (* Navigate to the appropriate install form based on role *)
   let form_page =
     match svc.Service.role with
-    | "node" -> Install_node_form_v3.name
-    | "baker" -> Install_baker_form_v3.name
-    | "accuser" -> Install_accuser_form_v3.name
-    | "dal-node" | "dal" -> Install_dal_node_form_v3.name
+    | "node" -> "install_node_form_v3"
+    | "baker" -> "install_baker_form_v3"
+    | "accuser" -> "install_accuser_form_v3"
+    | "dal-node" | "dal" -> "install_dal_node_form_v3"
     | _ -> "instances"
   in
   Context.navigate form_page
