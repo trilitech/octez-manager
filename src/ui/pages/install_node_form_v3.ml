@@ -400,13 +400,24 @@ let make_initial_model () =
 let snapshot_entry_matches_history_mode entry ~history_mode =
   match entry.Snapshots.history_mode with
   | Some snap_mode when String.trim snap_mode <> "" -> (
+      (* Use explicit history mode from metadata *)
       match History_mode.of_string history_mode with
       | Ok requested ->
           Installer.For_tests.history_mode_matches
             ~requested
             ~snapshot_mode:snap_mode
       | Error _ -> false)
-  | _ -> true (* No history mode specified in snapshot = compatible with all *)
+  | _ ->
+      (* No explicit history mode in metadata - try to infer from slug *)
+      let slug_lower = String.lowercase_ascii entry.Snapshots.slug in
+      let mode_lower = String.lowercase_ascii (String.trim history_mode) in
+      (* Check if slug starts with or contains the history mode *)
+      String.starts_with ~prefix:mode_lower slug_lower
+      || (match mode_lower with
+          | "full" ->
+              (* "full" matches "full", "full50", etc. *)
+              String.starts_with ~prefix:"full" slug_lower
+          | _ -> false)
 
 let history_snapshot_conflict ~history_mode ~snapshot ~network =
   match snapshot with
