@@ -32,7 +32,7 @@ let config_lock = Mutex.create ()
 
 (** Read baker config from disk (internal, does file I/O) *)
 let read_baker_config_from_disk ~instance =
-  match Node_env.read ~inst:instance with
+  match Node_env.read_from_disk ~inst:instance with
   | Error _ -> {delegates = []; node_endpoint = None; has_dal = false}
   | Ok pairs ->
       let delegates =

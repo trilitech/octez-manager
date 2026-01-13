@@ -12,7 +12,9 @@ let unit_name ~role ~instance = Printf.sprintf "octez-%s@%s" role instance
 let get_daily_log_file ~role ~instance =
   (* Read the instance's env file to find the correct base directory *)
   let env =
-    match Node_env.read ~inst:instance with Ok pairs -> pairs | Error _ -> []
+    match Node_env.read_from_disk ~inst:instance with
+    | Ok pairs -> pairs
+    | Error _ -> []
   in
   let lookup key =
     match List.assoc_opt key env with

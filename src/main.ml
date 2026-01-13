@@ -35,7 +35,7 @@ let pp_logging fmt = function
 let print_service_details svc =
   (* Read env file for this instance *)
   let env =
-    match Node_env.read ~inst:svc.S.instance with
+    match Node_env.read_from_disk ~inst:svc.S.instance with
     | Ok pairs -> pairs
     | Error _ -> []
   in
@@ -2086,7 +2086,7 @@ let instance_term =
                   Format.printf "@.Current configuration:@." ;
                   (* Read env file for role-specific values *)
                   let env =
-                    match Node_env.read ~inst with
+                    match Node_env.read_from_disk ~inst with
                     | Ok pairs -> pairs
                     | Error _ -> []
                   in
