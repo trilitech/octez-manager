@@ -235,6 +235,13 @@ let prefetch_snapshot_list network =
 
 (** {1 Snapshot Space Check} *)
 
+let snapshot_size_cache =
+  Cache.create_safe_keyed ~name:"snapshot_sizes" ~ttl:300.0 ()
+
+let snapshot_size_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
+
+let snapshot_size_inflight_lock = Mutex.create ()
+
 let format_bytes bytes =
   let kb = 1024L in
   let mb = Int64.mul kb 1024L in
@@ -278,26 +285,48 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir =
   match get_snapshot_url ~network snapshot with
   | None -> Ok () (* No URL to check, or local file *)
   | Some url -> (
-      match Common.get_remote_file_size url with
-      | None -> Ok () (* Can't determine size, proceed *)
-      | Some size -> (
-          let dir =
-            Option.value ~default:(Filename.get_temp_dir_name ()) tmp_dir
+      match Cache.get_safe_keyed_cached snapshot_size_cache url with
+      | Some size_opt -> (
+          match size_opt with
+          | None -> Ok () (* Size unknown, proceed *)
+          | Some size -> (
+              let dir =
+                Option.value ~default:(Filename.get_temp_dir_name ()) tmp_dir
+              in
+              match Common.get_available_space dir with
+              | None -> Ok () (* Can't determine space, proceed *)
+              | Some available ->
+                  (* Add 10% buffer for safety *)
+                  let required = Int64.add size (Int64.div size 10L) in
+                  if available >= required then Ok ()
+                  else
+                    Error
+                      (Printf.sprintf
+                         "Need %s (snapshot %s + 10%% buffer) but %s only has \
+                          %s"
+                         (format_bytes required)
+                         (format_bytes size)
+                         dir
+                         (format_bytes available))))
+      | None ->
+          (* Trigger background fetch *)
+          let should_fetch =
+            Mutex.protect snapshot_size_inflight_lock (fun () ->
+                if not (Hashtbl.mem snapshot_size_inflight url) then (
+                  Hashtbl.add snapshot_size_inflight url () ;
+                  true)
+                else false)
           in
-          match Common.get_available_space dir with
-          | None -> Ok () (* Can't determine space, proceed *)
-          | Some available ->
-              (* Add 10% buffer for safety *)
-              let required = Int64.add size (Int64.div size 10L) in
-              if available >= required then Ok ()
-              else
-                Error
-                  (Printf.sprintf
-                     "Need %s (snapshot %s + 10%% buffer) but %s only has %s"
-                     (format_bytes required)
-                     (format_bytes size)
-                     dir
-                     (format_bytes available))))
+          if should_fetch then
+            Background_runner.submit_blocking (fun () ->
+                Fun.protect
+                  ~finally:(fun () ->
+                    Mutex.protect snapshot_size_inflight_lock (fun () ->
+                        Hashtbl.remove snapshot_size_inflight url))
+                  (fun () ->
+                    let size = Common.get_remote_file_size url in
+                    Cache.set_safe_keyed snapshot_size_cache url size)) ;
+          Ok ())
 
 let parse_port addr =
   match String.split_on_char ':' addr with
