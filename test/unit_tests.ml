@@ -617,7 +617,9 @@ let install_node_form_v3_snapshot_filtering () =
   Alcotest.(check bool)
     "rolling entry matches rolling mode"
     true
-    (F.snapshot_entry_matches_history_mode rolling_entry ~history_mode:"rolling") ;
+    (F.snapshot_entry_matches_history_mode
+       rolling_entry
+       ~history_mode:"rolling") ;
   Alcotest.(check bool)
     "full entry does not match rolling mode"
     false
@@ -670,7 +672,9 @@ let install_node_form_v3_snapshot_filtering () =
   Alcotest.(check bool)
     "entry with rolling slug does not match full mode"
     false
-    (F.snapshot_entry_matches_history_mode rolling_slug_entry ~history_mode:"full") ;
+    (F.snapshot_entry_matches_history_mode
+       rolling_slug_entry
+       ~history_mode:"full") ;
   (* Test full variants *)
   let full50_slug_entry =
     {
@@ -685,7 +689,9 @@ let install_node_form_v3_snapshot_filtering () =
   Alcotest.(check bool)
     "entry with full50 slug matches full mode"
     true
-    (F.snapshot_entry_matches_history_mode full50_slug_entry ~history_mode:"full") ;
+    (F.snapshot_entry_matches_history_mode
+       full50_slug_entry
+       ~history_mode:"full") ;
   Alcotest.(check bool)
     "entry with full50 slug does not match rolling mode"
     false
