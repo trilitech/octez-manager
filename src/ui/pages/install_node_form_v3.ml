@@ -515,10 +515,17 @@ let snapshot_field =
     ~edit:(fun model_ref ->
       let snapshots_opt =
         match slug_of_network !model_ref.node.network with
-        | Some slug ->
-            (* Only read from cache - no synchronous I/O in render loop!
-               Prefetching via on_init and on_network_selected handles cache population. *)
-            snapshot_entries_from_cache slug
+        | Some slug -> (
+            (* Check cache *)
+            match snapshot_entries_from_cache slug with
+            | Some entries -> Some entries
+            | None ->
+                (* Cache miss or expired:
+                   1. Trigger a background fetch if not already in flight
+                   2. Return None for now (will re-render when fetch completes,
+                      assuming UI handles async updates, or on next interaction) *)
+                schedule_snapshot_fetch slug ;
+                None)
         | None -> None
       in
 
