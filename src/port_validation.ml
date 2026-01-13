@@ -23,10 +23,17 @@ let parse_port addr =
       try Some (int_of_string (String.trim port_str)) with _ -> None)
   | _ -> None
 
-(** Collect RPC and P2P ports from registered services (nodes and DAL nodes),
-    optionally excluding a specific instance.
-    Returns (port, instance_name) pairs. *)
-let ports_from_services ?(exclude_instance : string option) () =
+(** Cache for service ports to avoid repeated I/O during form validation.
+    Short TTL since services can be added/removed. *)
+let service_ports_cache : ((int * string) list * (int * string) list) option ref
+    =
+  ref None
+
+let service_ports_cache_time = ref 0.0
+
+let service_ports_cache_ttl = 2.0 (* seconds *)
+
+let fetch_service_ports () =
   match Service_registry.list () with
   | Error _ -> ([], [])
   | Ok services ->
@@ -34,8 +41,7 @@ let ports_from_services ?(exclude_instance : string option) () =
       let with_ports =
         services
         |> List.filter (fun (s : Service.t) ->
-            (s.role = "node" || s.role = "dal-node" || s.role = "dal")
-            && Some s.instance <> exclude_instance)
+            s.role = "node" || s.role = "dal-node" || s.role = "dal")
       in
       let rpc_ports =
         with_ports
@@ -50,6 +56,29 @@ let ports_from_services ?(exclude_instance : string option) () =
             |> Option.map (fun p -> (p, s.Service.instance)))
       in
       (rpc_ports, p2p_ports)
+
+(** Collect RPC and P2P ports from registered services (nodes and DAL nodes),
+    optionally excluding a specific instance.
+    Returns (port, instance_name) pairs. Uses cache to avoid I/O during typing. *)
+let ports_from_services ?(exclude_instance : string option) () =
+  let now = Unix.gettimeofday () in
+  let rpc_ports, p2p_ports =
+    match !service_ports_cache with
+    | Some cached
+      when now -. !service_ports_cache_time < service_ports_cache_ttl ->
+        cached
+    | _ ->
+        let result = fetch_service_ports () in
+        service_ports_cache := Some result ;
+        service_ports_cache_time := now ;
+        result
+  in
+  (* Filter out excluded instance *)
+  match exclude_instance with
+  | None -> (rpc_ports, p2p_ports)
+  | Some inst ->
+      let filter_inst = List.filter (fun (_, i) -> i <> inst) in
+      (filter_inst rpc_ports, filter_inst p2p_ports)
 
 (** Check if a port is owned by a specific instance (used for edit mode). *)
 let port_owned_by_instance ~instance port =
@@ -72,40 +101,63 @@ let extract_process_name line =
     else None
   with Not_found -> None
 
+(** Cache for port process checks, keyed by port number.
+    Re-check every 1 second while port is being edited. *)
+let port_process_cache : (int, string option option * float) Hashtbl.t =
+  Hashtbl.create 16
+
+let port_process_cache_ttl = 1.0 (* seconds *)
+
+(** Clear the port process cache. Call when form opens to get fresh data. *)
+let clear_port_process_cache () = Hashtbl.clear port_process_cache
+
 (** Check if a port is in use by any running process.
     Returns Some process_name if in use, None otherwise.
-    Uses ss (with -p for process info) or falls back to netstat. *)
+    Uses ss (with -p for process info) or falls back to netstat.
+    Results are cached per port with 1s TTL. *)
 let get_port_process port =
-  let port_str = string_of_int port in
-  (* Try ss with process info first (-p requires root or same user) *)
-  let ss_cmd =
-    Printf.sprintf "ss -tulnp 2>/dev/null | grep -w ':%s'" port_str
-  in
-  let try_cmd cmd =
-    try
-      let ic = Unix.open_process_in cmd in
-      let output = In_channel.input_all ic in
-      let _ = Unix.close_process_in ic in
-      if String.trim output <> "" then Some output else None
-    with _ -> None
-  in
-  match try_cmd ss_cmd with
-  | Some output -> (
-      match extract_process_name output with
-      | Some proc -> Some (Some proc)
-      | None -> Some None (* Port in use but can't get process name *))
-  | None -> (
-      (* Fall back to basic ss/netstat without process info *)
-      let ss_basic =
-        Printf.sprintf "ss -tuln 2>/dev/null | grep -w ':%s'" port_str
+  let now = Unix.gettimeofday () in
+  match Hashtbl.find_opt port_process_cache port with
+  | Some (cached, time) when now -. time < port_process_cache_ttl -> cached
+  | _ ->
+      let port_str = string_of_int port in
+      (* Try ss with process info first (-p requires root or same user) *)
+      let ss_cmd =
+        Printf.sprintf "ss -tulnp 2>/dev/null | grep -w ':%s'" port_str
       in
-      let netstat_cmd =
-        Printf.sprintf "netstat -tuln 2>/dev/null | grep -w ':%s'" port_str
+      let try_cmd cmd =
+        try
+          let ic = Unix.open_process_in cmd in
+          let output = In_channel.input_all ic in
+          let _ = Unix.close_process_in ic in
+          if String.trim output <> "" then Some output else None
+        with _ -> None
       in
-      match try_cmd ss_basic with
-      | Some _ -> Some None
-      | None -> (
-          match try_cmd netstat_cmd with Some _ -> Some None | None -> None))
+      let result =
+        match try_cmd ss_cmd with
+        | Some output -> (
+            match extract_process_name output with
+            | Some proc -> Some (Some proc)
+            | None -> Some None (* Port in use but can't get process name *))
+        | None -> (
+            (* Fall back to basic ss/netstat without process info *)
+            let ss_basic =
+              Printf.sprintf "ss -tuln 2>/dev/null | grep -w ':%s'" port_str
+            in
+            let netstat_cmd =
+              Printf.sprintf
+                "netstat -tuln 2>/dev/null | grep -w ':%s'"
+                port_str
+            in
+            match try_cmd ss_basic with
+            | Some _ -> Some None
+            | None -> (
+                match try_cmd netstat_cmd with
+                | Some _ -> Some None
+                | None -> None))
+      in
+      Hashtbl.replace port_process_cache port (result, now) ;
+      result
 
 (** Check if a port is in use by any running process. *)
 let is_port_in_use port = Option.is_some (get_port_process port)

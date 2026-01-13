@@ -544,10 +544,14 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
         Miaou.Core.Modal_manager.close_top `Cancel ;
         ps)
       else
-        Navigation.update
-          (fun _ ->
-            Miaou_widgets_input.Validated_textbox_widget.handle_key s ~key)
-          ps
+        (* Process key and flush validation to avoid stale error messages *)
+        let s =
+          Miaou_widgets_input.Validated_textbox_widget.handle_key s ~key
+        in
+        let s =
+          Miaou_widgets_input.Validated_textbox_widget.flush_validation s
+        in
+        Navigation.update (fun _ -> s) ps
 
     let handle_key = handle_modal_key
 

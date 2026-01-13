@@ -46,6 +46,9 @@ val validate_addr :
   unit ->
   (unit, validation_error) result
 
+(** Clear the port process cache. Call when form opens to get fresh data. *)
+val clear_port_process_cache : unit -> unit
+
 (** Validate an RPC address (example: 127.0.0.1:8732). *)
 val validate_rpc_addr :
   ?exclude_instance:string -> string -> (unit, validation_error) result
