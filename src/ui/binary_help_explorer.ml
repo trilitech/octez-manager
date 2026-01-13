@@ -268,6 +268,7 @@ let open_modal ~title ~options ~initial_args ~on_apply =
         ~on_select:(fun v ->
           row.selected <- v ;
           if not v then row.value <- None)
+        ()
 
     let open_value_modal row placeholder =
       let doc_lines = wrap_text ~width:68 row.opt.doc in

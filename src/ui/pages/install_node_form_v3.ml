@@ -559,7 +559,7 @@ let snapshot_field =
       in
 
       let to_string = function
-        | `Loading -> "Loading snapshots..."
+        | `Loading -> Context.render_spinner "Loading snapshots..."
         | `None -> "None (manual sync)"
         | `Custom -> "Custom URL..."
         | `Tzinit e ->
@@ -592,7 +592,9 @@ let snapshot_field =
         ~title:"Import Snapshot"
         ~items
         ~to_string
-        ~on_select)
+        ~on_tick:Context.tick_spinner
+        ~on_select
+        ())
     ~validate:(fun m ->
       let history_conflict =
         history_snapshot_conflict

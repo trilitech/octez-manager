@@ -107,7 +107,8 @@ let select_network ps =
     ~to_string:(fun x -> x)
     ~on_select:(fun _network ->
       (* TODO: Implement network selection properly *)
-      ()) ;
+      ())
+    () ;
   ps
 
 let import_snapshot ps =

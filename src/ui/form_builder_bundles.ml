@@ -330,7 +330,8 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
           ~title:"Select Node"
           ~items
           ~to_string
-          ~on_select)
+          ~on_select
+          ())
       ()
     |> with_hint
          "Node providing RPC. Select a managed instance or enter external \
@@ -424,7 +425,8 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
                 ~title:"Network"
                 ~items
                 ~to_string
-                ~on_select)
+                ~on_select
+                ())
         ()
   in
   (* Use shared port validation from lib *)
