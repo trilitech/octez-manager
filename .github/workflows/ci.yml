@@ -63,8 +63,6 @@ jobs:
         with:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
-          restore-keys: |
-            opam-miaou-
 
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
@@ -211,8 +209,6 @@ jobs:
         with:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
-          restore-keys: |
-            opam-miaou-
 
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
