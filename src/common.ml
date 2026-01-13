@@ -65,7 +65,10 @@ let default_role_dir role inst =
   (* Check if instance name already starts with the role prefix *)
   let prefix = role_part ^ "-" in
   let suffix =
-    if String.starts_with ~prefix inst_lower then inst_trimmed
+    (* Use lowercase for comparison, but preserve original case in the result.
+       When the prefix is detected, we lowercase the entire name for consistency
+       since the role_part is always lowercase. *)
+    if String.starts_with ~prefix inst_lower then inst_lower
     else Printf.sprintf "%s-%s" role_part inst_trimmed
   in
   default_data_dir suffix
