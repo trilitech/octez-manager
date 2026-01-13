@@ -549,17 +549,8 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     | None -> Widgets.yellow "no signing activity"
     | Some summary -> summary
   in
-  (* Check if baker has DAL enabled *)
-  let baker_has_dal ~instance =
-    match Node_env.read_from_disk ~inst:instance with
-    | Error _ -> false
-    | Ok pairs -> (
-        match List.assoc_opt "OCTEZ_DAL_CONFIG" pairs with
-        | None -> false
-        | Some cfg ->
-            let cfg = String.trim (String.lowercase_ascii cfg) in
-            cfg <> "" && cfg <> "disabled")
-  in
+  (* Check if baker has DAL enabled - use cached value to avoid I/O during render *)
+  let baker_has_dal = Render_data.baker_has_dal in
   (* Render delegate status for bakers (from RPC) *)
   let delegate_status_line ~instance =
     let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
