@@ -222,7 +222,16 @@ let toggle_source ps =
 
 let handled_keys () = []
 
-let keymap _ps = []
+let keymap _ps =
+  let noop ps = ps in
+  [
+    {
+      Miaou.Core.Tui_page.key = "?";
+      action = noop;
+      help = "Help";
+      display_only = true;
+    };
+  ]
 
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
@@ -249,7 +258,7 @@ let view ps ~focus ~size =
          source_str)
   in
   let header = [title; help] in
-  Vsection.render ~size ~header ~footer:[] ~child:(fun inner_size ->
+  Vsection.render ~size ~header ~content_footer:[] ~child:(fun inner_size ->
       Pager.render
         ~cols:inner_size.LTerm_geom.cols
         ~win:inner_size.LTerm_geom.rows
@@ -338,6 +347,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state
 
   type nonrec msg = msg
+
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
 
   type nonrec pstate = pstate
 

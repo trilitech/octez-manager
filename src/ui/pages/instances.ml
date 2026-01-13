@@ -705,10 +705,10 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     System_metrics_scheduler.mark_visible
       ~role:svc.Service.role
       ~instance:svc.Service.instance ;
-    (* Additional lines for nodes, bakers, and dal-nodes: metrics + CPU chart *)
+    (* Additional lines for nodes, bakers, accusers, and dal-nodes: metrics + CPU chart *)
     let extra_lines =
       match svc.Service.role with
-      | "node" | "baker" | "dal-node" ->
+      | "node" | "baker" | "accuser" | "dal-node" ->
           let focus = idx + 3 = selected in
           let indent = String.make indent_start ' ' in
           (* For bakers: add delegate status line (line 3) *)
@@ -1535,12 +1535,12 @@ let create_menu_modal state =
   let open Modal_helpers in
   open_choice_modal
     ~title:"Create Service"
-    ~items:[`Node; `Baker; `Accuser; `DalNode]
+    ~items:[`Node; `DalNode; `Baker; `Accuser]
     ~to_string:(function
       | `Node -> "Node"
+      | `DalNode -> "DAL Node"
       | `Baker -> "Baker"
-      | `Accuser -> "Accuser"
-      | `DalNode -> "DAL Node")
+      | `Accuser -> "Accuser")
     ~on_select:(function
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
@@ -1597,6 +1597,8 @@ struct
 
   type nonrec msg = msg
 
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
   type nonrec pstate = pstate
 
   let init () = init_state ()
@@ -1625,11 +1627,21 @@ struct
     let create ps = Navigation.update create_menu_modal ps in
     let diag ps = Navigation.update go_to_diagnostics ps in
     let dismiss ps = Navigation.update dismiss_failure ps in
+    let noop ps = ps in
+    let kb key action help =
+      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    in
     [
-      ("Enter", activate, "Open");
-      ("c", create, "Create service");
-      ("d", diag, "Diagnostics");
-      ("x", dismiss, "Clear failure");
+      kb "Enter" activate "Open";
+      kb "c" create "Create";
+      kb "d" diag "Diagnostics";
+      kb "x" dismiss "Clear failure";
+      {
+        Miaou.Core.Tui_page.key = "?";
+        action = noop;
+        help = "Help";
+        display_only = true;
+      };
     ]
 
   let header s =
@@ -1646,9 +1658,6 @@ struct
         (Widgets.dim hint);
       Widgets.dim (summary_line s);
     ]
-
-  let footer ~cols:_ =
-    [Widgets.dim "Tab: fold  d: diagnostics  Enter: actions  q: quit"]
 
   let node_help_hint =
     {|## Node Instance
@@ -1805,11 +1814,10 @@ Press **Enter** to open instance menu.|}
       | None -> ""
     in
     let toast_lines_str = Context.render_toasts ~cols in
-    let footer_lines = footer ~cols in
     Vsection.render
       ~size
       ~header:(header s)
-      ~footer:footer_lines
+      ~content_footer:[]
       ~child:(fun inner_size ->
         (* Available rows for content (reserve space for progress/toasts/logs) *)
         let progress_lines =

@@ -405,6 +405,8 @@ struct
 
   type msg = unit
 
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
   type pstate = state Navigation.t
 
   let init () =
@@ -538,11 +540,17 @@ struct
     let s = ps.Navigation.s in
     let model = !(s.model_ref) in
     let fields = S.spec.fields model in
+    let cols = size.LTerm_geom.cols in
     (* Truncate string to max length with ellipsis *)
     let truncate max_len s =
       if String.length s <= max_len then s
       else String.sub s 0 (max_len - 1) ^ "…"
     in
+    (* Calculate available space for value + error message based on terminal width *)
+    (* Layout: label (~20 chars) + " │ " (3) + value + error + " │ " (3) + status (1) *)
+    let value_space = max 20 (cols - 30) in
+    let err_msg_space = max 15 (value_space * 2 / 3) in
+    let value_truncate = max 10 (value_space / 3) in
     (* Validate each field once and collect results *)
     let field_results =
       fields
@@ -556,10 +564,12 @@ struct
               (* Show value and short error message *)
               let err_msg =
                 match f.validate_msg model with
-                | Some msg -> " ⚠ " ^ truncate 40 msg
+                | Some msg -> " ⚠ " ^ truncate err_msg_space msg
                 | None -> " ⚠ invalid"
               in
-              Widgets.fg 214 (Widgets.bold (truncate 20 value_str ^ err_msg))
+              Widgets.fg
+                214
+                (Widgets.bold (truncate value_truncate value_str ^ err_msg))
           in
           (f.label, formatted_value, ok))
     in
@@ -614,11 +624,11 @@ struct
     Miaou.Core.Help_hint.set current_hint ;
     let title_line = Widgets.title_highlight S.spec.title in
     let header = [title_line; status_banner] in
-    let footer =
-      [Widgets.dim "↑/↓ navigate, Enter to edit, ? for help, Esc back"]
-    in
-    Miaou_widgets_layout.Vsection.render ~size ~header ~footer ~child:(fun _ ->
-        Table_widget.Table.render table)
+    Miaou_widgets_layout.Vsection.render
+      ~size
+      ~header
+      ~content_footer:[]
+      ~child:(fun _ -> Table_widget.Table.render table)
 
   let handle_modal_key ps key ~size:_ =
     Miaou.Core.Modal_manager.handle_key key ;
@@ -659,11 +669,21 @@ struct
   let move ps delta = Navigation.update (fun s -> move_state s delta) ps
 
   let keymap _ps =
+    let noop ps = ps in
+    let kb key action help =
+      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    in
     [
-      ("Up", (fun ps -> move ps (-1)), "Move up");
-      ("Down", (fun ps -> move ps 1), "Move down");
-      ("Enter", (fun ps -> Navigation.update enter ps), "Edit field / Submit");
-      ("Esc", back, "Back to instances");
+      kb "Up" (fun ps -> move ps (-1)) "Move up";
+      kb "Down" (fun ps -> move ps 1) "Move down";
+      kb "Enter" (fun ps -> Navigation.update enter ps) "Edit / Submit";
+      kb "Esc" back "Back";
+      {
+        Miaou.Core.Tui_page.key = "?";
+        action = noop;
+        help = "Help";
+        display_only = true;
+      };
     ]
 
   let handled_keys () =

@@ -362,6 +362,14 @@ let tick () =
             else "http://" ^ svc.Service.rpc_addr
           in
           submit_dal_health ~instance:svc.Service.instance ~rpc_endpoint
+      | "accuser" ->
+          (* Accuser runs via octez-baker run accuser *)
+          let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
+          submit_poll
+            ~role:svc.Service.role
+            ~instance:svc.Service.instance
+            ~binary
+            ~data_dir:""
       | _ -> ())
 
 let started = ref false
