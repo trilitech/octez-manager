@@ -172,7 +172,7 @@ let has_octez_node_binary dir =
 
 (** {1 Snapshot Cache} *)
 
-let snapshot_cache = Cache.create_safe_keyed ~name:"snapshots" ~ttl:300.0 ()
+let snapshot_cache = Cache.create_safe_keyed ~name:"snapshots" ~ttl:60.0 ()
 
 let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
@@ -236,7 +236,7 @@ let prefetch_snapshot_list network =
 (** {1 Snapshot Space Check} *)
 
 let snapshot_size_cache =
-  Cache.create_safe_keyed ~name:"snapshot_sizes" ~ttl:300.0 ()
+  Cache.create_safe_keyed ~name:"snapshot_sizes" ~ttl:60.0 ()
 
 let snapshot_size_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
