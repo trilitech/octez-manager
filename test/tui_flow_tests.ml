@@ -282,6 +282,135 @@ let test_instances_key_sequence () =
       check bool "renders after sequence" true (String.length screen > 0))
 
 (* ============================================================ *)
+(* Install Node Form Tests *)
+(* ============================================================ *)
+
+module Install_node_form = Octez_manager_ui.Install_node_form_v3
+
+(** Test: Node form initializes and renders *)
+let test_node_form_init () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      (* Should show form title *)
+      check bool "contains Install" true (contains_substring text "Install") ;
+      check bool "contains Node" true (contains_substring text "Node"))
+
+(** Test: Node form shows required fields *)
+let test_node_form_shows_fields () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      (* Should show key fields *)
+      check bool "shows Instance" true (contains_substring text "Instance") ;
+      check bool "shows Network" true (contains_substring text "Network") ;
+      check
+        bool
+        "shows History"
+        true
+        (contains_substring text "History" || contains_substring text "history"))
+
+(** Test: Up/Down navigates between fields *)
+let test_node_form_field_navigation () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Down moves to next field *)
+      let result = Headless.Stateful.send_key "Down" in
+      check bool "Down handled" true (result = `Continue) ;
+
+      let result = Headless.Stateful.send_key "Down" in
+      check bool "Down again" true (result = `Continue) ;
+
+      (* Up moves back *)
+      let result = Headless.Stateful.send_key "Up" in
+      check bool "Up handled" true (result = `Continue))
+
+(** Test: Enter on field opens edit modal *)
+let test_node_form_enter_opens_modal () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Should not have modal initially *)
+      check bool "no modal initially" false (Modal_manager.has_active ()) ;
+
+      (* Enter should open field editor *)
+      let _ = Headless.Stateful.send_key "Enter" in
+      check bool "modal opened" true (Modal_manager.has_active ()))
+
+(** Test: Esc in modal closes it *)
+let test_node_form_modal_esc () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Open modal *)
+      let _ = Headless.Stateful.send_key "Enter" in
+      check bool "modal opened" true (Modal_manager.has_active ()) ;
+
+      (* Esc closes modal *)
+      let _ = Headless.Stateful.send_key "Esc" in
+      check bool "modal closed" false (Modal_manager.has_active ()))
+
+(** Test: Navigate to Submit and check it's visible *)
+let test_node_form_submit_visible () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Navigate down through all fields to reach Submit *)
+      for _ = 1 to 15 do
+        ignore (Headless.Stateful.send_key "Down")
+      done ;
+
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      (* Submit should be visible somewhere *)
+      check
+        bool
+        "shows Submit"
+        true
+        (contains_substring text "Submit" || contains_substring text "Install"))
+
+(** Test: Form navigation wraps or clamps properly *)
+let test_node_form_navigation_bounds () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Go up from first field - should not crash *)
+      let result = Headless.Stateful.send_key "Up" in
+      check bool "Up at start" true (result = `Continue) ;
+
+      (* Go down many times - should not crash *)
+      for _ = 1 to 30 do
+        ignore (Headless.Stateful.send_key "Down")
+      done ;
+
+      let result = Headless.Stateful.send_key "Down" in
+      check bool "Down at end" true (result = `Continue))
+
+(** Test: Network field shows network options *)
+let test_node_form_network_field () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Navigate to network field (usually second) *)
+      let _ = Headless.Stateful.send_key "Down" in
+
+      (* Enter to edit *)
+      let _ = Headless.Stateful.send_key "Enter" in
+      check bool "modal opened" true (Modal_manager.has_active ()) ;
+
+      (* Should show network options *)
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      check
+        bool
+        "shows mainnet"
+        true
+        (contains_substring text "mainnet" || contains_substring text "Mainnet"))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -315,4 +444,21 @@ let () =
         ] );
       ( "Instances.quit",
         [test_case "q triggers quit" `Quick test_instances_quit] );
+      ( "NodeForm.init",
+        [
+          test_case "renders form" `Quick test_node_form_init;
+          test_case "shows fields" `Quick test_node_form_shows_fields;
+        ] );
+      ( "NodeForm.navigation",
+        [
+          test_case "field navigation" `Quick test_node_form_field_navigation;
+          test_case "navigation bounds" `Quick test_node_form_navigation_bounds;
+          test_case "submit visible" `Quick test_node_form_submit_visible;
+        ] );
+      ( "NodeForm.modal",
+        [
+          test_case "Enter opens modal" `Quick test_node_form_enter_opens_modal;
+          test_case "Esc closes modal" `Quick test_node_form_modal_esc;
+          test_case "network field" `Quick test_node_form_network_field;
+        ] );
     ]
