@@ -411,6 +411,106 @@ let test_node_form_network_field () =
         (contains_substring text "mainnet" || contains_substring text "Mainnet"))
 
 (* ============================================================ *)
+(* Install Baker Form Tests *)
+(* ============================================================ *)
+
+module Install_baker_form = Octez_manager_ui.Install_baker_form_v3
+
+(** Test: Baker form initializes and renders *)
+let test_baker_form_init () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_baker_form.Page) ;
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      check bool "contains Install" true (contains_substring text "Install") ;
+      check bool "contains Baker" true (contains_substring text "Baker"))
+
+(** Test: Baker form shows specific fields *)
+let test_baker_form_shows_fields () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_baker_form.Page) ;
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      check bool "shows Instance" true (contains_substring text "Instance") ;
+      (* Baker-specific: delegates, liquidity baking *)
+      check
+        bool
+        "shows Delegates or delegates"
+        true
+        (contains_substring text "Delegate"
+        || contains_substring text "delegate"))
+
+(** Test: Up/Down navigates between fields *)
+let test_baker_form_field_navigation () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_baker_form.Page) ;
+
+      let result = Headless.Stateful.send_key "Down" in
+      check bool "Down handled" true (result = `Continue) ;
+
+      let result = Headless.Stateful.send_key "Up" in
+      check bool "Up handled" true (result = `Continue))
+
+(** Test: Enter on field opens edit modal *)
+let test_baker_form_enter_opens_modal () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_baker_form.Page) ;
+
+      check bool "no modal initially" false (Modal_manager.has_active ()) ;
+
+      let _ = Headless.Stateful.send_key "Enter" in
+      check bool "modal opened" true (Modal_manager.has_active ()))
+
+(** Test: Esc in modal closes it *)
+let test_baker_form_modal_esc () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_baker_form.Page) ;
+
+      let _ = Headless.Stateful.send_key "Enter" in
+      check bool "modal opened" true (Modal_manager.has_active ()) ;
+
+      let _ = Headless.Stateful.send_key "Esc" in
+      check bool "modal closed" false (Modal_manager.has_active ()))
+
+(** Test: Form handles liquidity baking vote field *)
+let test_baker_form_liquidity_vote () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_baker_form.Page) ;
+
+      (* Navigate through form to find liquidity baking vote *)
+      for _ = 1 to 10 do
+        ignore (Headless.Stateful.send_key "Down")
+      done ;
+
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      (* Should show liquidity or vote somewhere *)
+      check
+        bool
+        "shows vote option"
+        true
+        (contains_substring text "pass"
+        || contains_substring text "liquidity"
+        || contains_substring text "Vote"))
+
+(** Test: Navigation bounds work correctly *)
+let test_baker_form_navigation_bounds () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Install_baker_form.Page) ;
+
+      (* Go up from first field *)
+      let result = Headless.Stateful.send_key "Up" in
+      check bool "Up at start" true (result = `Continue) ;
+
+      (* Go down many times *)
+      for _ = 1 to 25 do
+        ignore (Headless.Stateful.send_key "Down")
+      done ;
+
+      let result = Headless.Stateful.send_key "Down" in
+      check bool "Down at end" true (result = `Continue))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -460,5 +560,21 @@ let () =
           test_case "Enter opens modal" `Quick test_node_form_enter_opens_modal;
           test_case "Esc closes modal" `Quick test_node_form_modal_esc;
           test_case "network field" `Quick test_node_form_network_field;
+        ] );
+      ( "BakerForm.init",
+        [
+          test_case "renders form" `Quick test_baker_form_init;
+          test_case "shows fields" `Quick test_baker_form_shows_fields;
+        ] );
+      ( "BakerForm.navigation",
+        [
+          test_case "field navigation" `Quick test_baker_form_field_navigation;
+          test_case "navigation bounds" `Quick test_baker_form_navigation_bounds;
+          test_case "liquidity vote" `Quick test_baker_form_liquidity_vote;
+        ] );
+      ( "BakerForm.modal",
+        [
+          test_case "Enter opens modal" `Quick test_baker_form_enter_opens_modal;
+          test_case "Esc closes modal" `Quick test_baker_form_modal_esc;
         ] );
     ]
