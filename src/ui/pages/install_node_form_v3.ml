@@ -670,12 +670,18 @@ let set_node_with_autoname node m =
       (* Auto-update snapshot if:
          1. Current snapshot is an auto snapshot and network or history_mode changed, OR
          2. Current snapshot is None and we're moving FROM archive mode to non-archive mode *)
-      let old_is_archive = String.(lowercase_ascii (trim m.node.history_mode)) = "archive" in
-      let new_is_archive = String.(lowercase_ascii (trim node.history_mode)) = "archive" in
+      let old_is_archive =
+        String.(lowercase_ascii (trim m.node.history_mode)) = "archive"
+      in
+      let new_is_archive =
+        String.(lowercase_ascii (trim node.history_mode)) = "archive"
+      in
       let new_snapshot =
-        if (is_auto_snapshot m.snapshot || (m.snapshot = `None && old_is_archive && not new_is_archive)) &&
-           (not (String.equal m.node.network node.network) ||
-            not (String.equal m.node.history_mode node.history_mode))
+        if
+          (is_auto_snapshot m.snapshot
+          || (m.snapshot = `None && old_is_archive && not new_is_archive))
+          && (not (String.equal m.node.network node.network)
+             || not (String.equal m.node.history_mode node.history_mode))
         then create_default_snapshot ~network:node.network ~history_mode:node.history_mode
         else m.snapshot
       in
@@ -712,7 +718,11 @@ let spec =
           ~skip_addresses:true
           ()
         (* Snapshot field only shown for new installs, not edit mode, and not for archive mode *)
-        @ (if model.edit_mode || String.(lowercase_ascii (trim model.node.history_mode)) = "archive" then []
+        @ (if
+             model.edit_mode
+             || String.(lowercase_ascii (trim model.node.history_mode))
+                = "archive"
+           then []
            else
              [
                snapshot_field
