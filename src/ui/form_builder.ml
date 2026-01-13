@@ -201,7 +201,7 @@ let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
           ~app_bin_dir
           ~initial_args
           ~on_apply
-    | "octez-baker", Some ["run"; "dal"] ->
+    | "octez-dal-node", Some ["run"] ->
         Binary_help_explorer.open_dal_run_help
           ~app_bin_dir
           ~initial_args

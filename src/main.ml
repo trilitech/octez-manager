@@ -1581,7 +1581,7 @@ let install_dal_node_cmd =
   let info =
     Cmd.info
       "install-dal-node"
-      ~doc:"Install a DAL node service (octez-baker run dal)"
+      ~doc:"Install a DAL node service (octez-dal-node)"
   in
   Cmd.v info term
 
