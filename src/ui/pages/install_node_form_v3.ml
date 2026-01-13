@@ -209,7 +209,7 @@ let schedule_snapshot_fetch slug =
             match fetch_snapshot_list slug with
             | Ok entries -> cache_snapshot slug entries
             | Error msg ->
-                prerr_endline
+                Common.append_debug_log
                   (Printf.sprintf "Background snapshot fetch failed: %s" msg)))
 
 let snapshot_entries_from_cache slug =

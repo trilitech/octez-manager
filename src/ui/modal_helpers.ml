@@ -822,7 +822,8 @@ let select_directory_modal ~title ~dir_type ~on_select () =
                  with
                 | Ok () -> ()
                 | Error (`Msg msg) ->
-                    prerr_endline ("Registry add failed: " ^ msg)) ;
+                    Octez_manager_lib.Common.append_debug_log
+                      ("Registry add failed: " ^ msg)) ;
                 on_select trimmed
               in
               if Sys.file_exists trimmed then
