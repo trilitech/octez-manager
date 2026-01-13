@@ -1493,18 +1493,51 @@ let restart_with_cascade ~instance ~role =
                     Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
 
+(** Helper for editing a service - navigates to appropriate form *)
+let do_edit_instance svc =
+  (* Set the edit context (service will be stopped when form is submitted) *)
+  Context.set_pending_edit_service
+    ~service:svc
+    ~stopped_dependents:svc.Service.dependents ;
+  (* Navigate to the appropriate install form based on role *)
+  let form_page =
+    match svc.Service.role with
+    | "node" -> Install_node_form_v3.name
+    | "baker" -> Install_baker_form_v3.name
+    | "accuser" -> Install_accuser_form_v3.name
+    | "dal-node" | "dal" -> Install_dal_node_form_v3.name
+    | _ -> "instances"
+  in
+  Context.navigate form_page
+
+let confirm_edit_modal svc =
+  if svc.Service.dependents = [] then do_edit_instance svc
+  else
+    Modal_helpers.open_choice_modal
+      ~title:"Confirm Edit"
+      ~items:[`Confirm; `Cancel]
+      ~to_string:(function
+        | `Confirm ->
+            Printf.sprintf
+              "Proceed (will stop: %s)"
+              (String.concat ", " svc.Service.dependents)
+        | `Cancel -> "Cancel")
+      ~on_select:(fun choice ->
+        match choice with `Confirm -> do_edit_instance svc | `Cancel -> ())
+
 let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
       Modal_helpers.open_choice_modal
         ~title:("Actions · " ^ svc.Service.instance)
-        ~items:[`Details; `Start; `Stop; `Restart; `Logs; `Remove]
+        ~items:[`Details; `Start; `Stop; `Restart; `Logs; `Edit; `Remove]
         ~to_string:(function
           | `Details -> "Details"
           | `Start -> "Start"
           | `Stop -> "Stop"
           | `Restart -> "Restart"
           | `Logs -> "View Logs"
+          | `Edit -> "Edit"
           | `Remove -> "Remove")
         ~on_select:(fun choice ->
           let instance = svc.Service.instance in
@@ -1528,6 +1561,7 @@ let instance_actions_modal state =
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
+          | `Edit -> confirm_edit_modal svc
           | `Remove -> remove_modal state |> ignore) ;
       state)
 
