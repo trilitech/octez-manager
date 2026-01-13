@@ -598,6 +598,69 @@ let install_node_form_v3_history_conflict () =
        ~snapshot:snap_roll
        ~network:"mainnet")
 
+let install_node_form_v3_snapshot_filtering () =
+  let module F = Octez_manager_ui.Install_node_form_v3.For_tests in
+  let mk_entry ~slug ~history_mode =
+    {
+      Snapshots.network = "mainnet";
+      slug;
+      label = slug;
+      download_url = None;
+      history_mode = Some history_mode;
+      metadata = [];
+    }
+  in
+  let rolling_entry = mk_entry ~slug:"rolling" ~history_mode:"rolling" in
+  let full_entry = mk_entry ~slug:"full" ~history_mode:"full" in
+  let archive_entry = mk_entry ~slug:"archive" ~history_mode:"archive" in
+  (* Test rolling mode filters correctly *)
+  Alcotest.(check bool)
+    "rolling entry matches rolling mode"
+    true
+    (F.snapshot_entry_matches_history_mode rolling_entry ~history_mode:"rolling") ;
+  Alcotest.(check bool)
+    "full entry does not match rolling mode"
+    false
+    (F.snapshot_entry_matches_history_mode full_entry ~history_mode:"rolling") ;
+  Alcotest.(check bool)
+    "archive entry does not match rolling mode"
+    false
+    (F.snapshot_entry_matches_history_mode
+       archive_entry
+       ~history_mode:"rolling") ;
+  (* Test full mode filters correctly *)
+  Alcotest.(check bool)
+    "full entry matches full mode"
+    true
+    (F.snapshot_entry_matches_history_mode full_entry ~history_mode:"full") ;
+  Alcotest.(check bool)
+    "rolling entry does not match full mode"
+    false
+    (F.snapshot_entry_matches_history_mode rolling_entry ~history_mode:"full") ;
+  (* Test archive mode filters correctly *)
+  Alcotest.(check bool)
+    "archive entry matches archive mode"
+    true
+    (F.snapshot_entry_matches_history_mode
+       archive_entry
+       ~history_mode:"archive") ;
+  Alcotest.(check bool)
+    "rolling entry does not match archive mode"
+    false
+    (F.snapshot_entry_matches_history_mode
+       rolling_entry
+       ~history_mode:"archive") ;
+  (* Test entry with no history mode matches all *)
+  let no_mode_entry = {rolling_entry with Snapshots.history_mode = None} in
+  Alcotest.(check bool)
+    "entry with no mode matches rolling"
+    true
+    (F.snapshot_entry_matches_history_mode no_mode_entry ~history_mode:"rolling") ;
+  Alcotest.(check bool)
+    "entry with no mode matches full"
+    true
+    (F.snapshot_entry_matches_history_mode no_mode_entry ~history_mode:"full")
+
 let runtime_probe_writable_directory () =
   let dir = Filename.temp_file "octez_manager_probe" "" in
   Sys.remove dir ;
@@ -3431,6 +3494,10 @@ let () =
             "node form snapshot conflict validation"
             `Quick
             install_node_form_v3_history_conflict;
+          Alcotest.test_case
+            "node form snapshot filtering by history mode"
+            `Quick
+            install_node_form_v3_snapshot_filtering;
           Alcotest.test_case
             "runtime probe writable directory"
             `Quick
