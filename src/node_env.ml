@@ -26,7 +26,7 @@ let write_pairs ~inst pairs =
   in
   Common.write_file ~mode:0o644 ~owner ~group path body
 
-let read ~inst =
+let read_from_disk ~inst =
   let base = Common.env_instances_base_dir () in
   let path = Filename.concat (Filename.concat base inst) "node.env" in
   if not (Sys.file_exists path) then Ok []

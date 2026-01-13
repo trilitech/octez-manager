@@ -123,7 +123,7 @@ let find_highwatermarks_file base_dir =
 
 (** Get baker's base directory from env file *)
 let get_baker_base_dir ~instance =
-  match Node_env.read ~inst:instance with
+  match Node_env.read_from_disk ~inst:instance with
   | Error _ -> None
   | Ok pairs -> (
       match List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs with

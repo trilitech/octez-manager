@@ -8,7 +8,10 @@
 val write_pairs :
   inst:string -> (string * string) list -> (unit, Rresult.R.msg) result
 
-val read : inst:string -> ((string * string) list, Rresult.R.msg) result
+(** [read_from_disk ~inst] reads the environment file for an instance.
+    WARNING: Performs file I/O. For render-safe access, use {!Render_data}. *)
+val read_from_disk :
+  inst:string -> ((string * string) list, Rresult.R.msg) result
 
 val write :
   inst:string ->

@@ -60,7 +60,7 @@ let make_initial_model () =
       let svc = edit_ctx.service in
       (* Read accuser env to get config *)
       let env =
-        match Node_env.read ~inst:svc.Service.instance with
+        match Node_env.read_from_disk ~inst:svc.Service.instance with
         | Ok pairs -> pairs
         | Error _ -> []
       in
