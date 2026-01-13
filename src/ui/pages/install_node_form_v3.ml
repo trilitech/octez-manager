@@ -83,7 +83,12 @@ let base_initial_model () =
         in
         (* Create a placeholder Tzinit snapshot that will be auto-resolved by installer.
            This avoids synchronous I/O while still defaulting to snapshot download. *)
-        `Tzinit {network_slug; kind_slug; label = kind_slug}
+        `Tzinit
+          {
+            network_slug;
+            kind_slug;
+            label = Printf.sprintf "Auto (%s)" kind_slug;
+          }
     | None -> `None
   in
   {
