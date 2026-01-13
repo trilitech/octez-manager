@@ -456,12 +456,10 @@ let snapshot_field =
     ~edit:(fun model_ref ->
       let snapshots_opt =
         match slug_of_network !model_ref.node.network with
-        | Some slug -> (
-            match ensure_snapshot_entries slug with
-            | Ok entries -> Some entries
-            | Error msg ->
-                Context.toast_info msg ;
-                snapshot_entries_from_cache slug)
+        | Some slug ->
+            (* Only read from cache - no synchronous I/O in render loop!
+               Prefetching via on_init and on_network_selected handles cache population. *)
+            snapshot_entries_from_cache slug
         | None -> None
       in
 
