@@ -687,16 +687,16 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
           if File_browser.is_cancelled s'' then (
             Miaou.Core.Modal_manager.close_top `Cancel ;
             s'' (* Commit on Enter for files or "." directory *))
-          else if key = "Enter" then
-            match File_browser.get_selected_entry s'' with
-            | Some e when (not e.is_dir) || e.name = "." ->
+          else
+            match File_browser.get_pending_selection s'' with
+            | Some _ ->
                 Miaou.Core.Modal_manager.close_top `Commit ;
                 s''
-            | _ -> s'' (* Commit on 's' key *)
-          else if key = "s" && File_browser.can_commit s'' then (
-            Miaou.Core.Modal_manager.close_top `Commit ;
-            s'')
-          else s'')
+            | None ->
+                if key = "s" && File_browser.can_commit s'' then (
+                  Miaou.Core.Modal_manager.close_top `Commit ;
+                  s'')
+                else s'')
         ps
 
     let handle_key = handle_modal_key
