@@ -46,6 +46,12 @@ let min_column_width = 50
 
 let column_separator = "   "
 
+(** Number of menu items before services (just Install button) *)
+let menu_item_count = 1
+
+(** Index where services start (after menu items + separator line) *)
+let services_start_idx = menu_item_count + 1
+
 type state = {
   services : Service_state.t list;
   selected : int;
@@ -62,7 +68,7 @@ type msg = unit
 type pstate = state Navigation.t
 
 let clamp_selection services idx =
-  let len = List.length services + 3 in
+  let len = List.length services + services_start_idx in
   max 0 (min idx (len - 1))
 
 (** Role ordering for display grouping *)
@@ -307,7 +313,11 @@ let ensure_valid_column state =
               ~services:state.services
               new_col
           in
-          {state with active_column = new_col; selected = first_svc + 3}
+          {
+            state with
+            active_column = new_col;
+            selected = first_svc + services_start_idx;
+          }
 
 let init_state () =
   let services = load_services () in
@@ -388,8 +398,8 @@ let maybe_refresh ps =
   else Navigation.update ensure_valid_column ps
 
 let current_service state =
-  if state.selected < 3 then None
-  else List.nth_opt state.services (state.selected - 3)
+  if state.selected < services_start_idx then None
+  else List.nth_opt state.services (state.selected - services_start_idx)
 
 let with_service state handler =
   match current_service state with
@@ -504,7 +514,9 @@ let network_short (n : string) =
 
 let line_for_service idx selected ~folded (st : Service_state.t) =
   let svc = st.Service_state.service in
-  let marker = if idx + 3 = selected then Widgets.bold "➤" else " " in
+  let marker =
+    if idx + services_start_idx = selected then Widgets.bold "➤" else " "
+  in
   let status = status_icon st in
   let enabled = enabled_badge st in
   (* Add failure badge if service has a recent start/restart failure *)
@@ -709,7 +721,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     let extra_lines =
       match svc.Service.role with
       | "node" | "baker" | "accuser" | "dal-node" ->
-          let focus = idx + 3 = selected in
+          let focus = idx + services_start_idx = selected in
           let indent = String.make indent_start ' ' in
           (* For bakers: add delegate status line (line 3) *)
           let baker_delegate_line =
@@ -914,10 +926,6 @@ let table_lines_single state =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
   in
-  let manage_wallet_row =
-    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
-  in
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
     else
@@ -942,7 +950,7 @@ let table_lines_single state =
       in
       build_rows 0 None [] state.services
   in
-  install_row :: manage_wallet_row :: "" :: instance_rows
+  install_row :: "" :: instance_rows
 
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
@@ -958,14 +966,10 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
       (fun column_groups -> render_column ~col_width ~state ~column_groups)
       columns
   in
-  (* Header rows (install/wallet) span full width in single line *)
+  (* Header row (install) spans full width in single line *)
   let install_row =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
-  in
-  let manage_wallet_row =
-    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
   in
   let instance_rows =
     merge_columns
@@ -975,7 +979,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
       ~active_column:state.active_column
       ~columns_content
   in
-  install_row :: manage_wallet_row :: "" :: instance_rows
+  install_row :: "" :: instance_rows
 
 let table_lines ?(cols = 80) ?(visible_height = 20) state =
   (* Clear visibility markers at start of render pass *)
@@ -986,15 +990,11 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
       let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
       Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
     in
-    let manage_wallet_row =
-      let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
-      Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage wallet ]")
-    in
-    [install_row; manage_wallet_row; ""; "  No managed instances."]
+    [install_row; ""; "  No managed instances."]
   else if num_columns <= 1 then table_lines_single state
   else
-    (* For matrix layout, subtract 3 for menu rows (install, wallet, separator) *)
-    let matrix_height = max 5 (visible_height - 3) in
+    (* For matrix layout, subtract for menu rows (install + separator) *)
+    let matrix_height = max 5 (visible_height - services_start_idx) in
     table_lines_matrix
       ~cols
       ~visible_height:matrix_height
@@ -1552,29 +1552,8 @@ let go_to_diagnostics state =
   Context.navigate Diagnostics.name ;
   state
 
-let manage_wallet_modal state =
-  Modal_helpers.select_client_base_dir_modal
-    ~on_select:(fun path ->
-      let content =
-        Printf.sprintf
-          "# Wallet Management\n\n\
-           Using wallet directory: `%s`\n\n\
-           ## No Wallet UI Yet\n\n\
-           Octez Manager does not provide a wallet interface yet.\n\
-           Please use `octez-client` to manage keys and addresses.\n\n\
-           For documentation, see: https://octez.tezos.com"
-          path
-      in
-      let rendered = Miaou.Internal.Modal_utils.markdown_to_ansi content in
-      Modal_helpers.open_text_modal
-        ~title:"Wallet Management"
-        ~lines:(String.split_on_char '\n' rendered))
-    () ;
-  state
-
 let activate_selection s =
   if s.selected = 0 then create_menu_modal s
-  else if s.selected = 1 then manage_wallet_modal s
   else
     match current_service s with
     | Some _ -> instance_actions_modal s
@@ -1842,9 +1821,8 @@ Press **Enter** to open instance menu.|}
           - toast_lines - 1
         in
         let avail_rows = max 5 avail_rows in
-        (* Update visible height for scroll calculations *)
-        last_visible_height_ref := avail_rows - 3 ;
-        (* subtract menu rows *)
+        (* Update visible height for scroll calculations - subtract menu rows *)
+        last_visible_height_ref := avail_rows - services_start_idx ;
         let num_columns = calc_num_columns ~cols in
         (* Matrix layout handles its own scrolling per-column *)
         if num_columns > 1 then
@@ -1867,18 +1845,17 @@ Press **Enter** to open instance menu.|}
           (* Calculate line index where current selection starts.
              s.selected meanings:
                0 -> install menu
-               1 -> wallet menu
-               2 -> separator (skipped in navigation)
-               3+ -> service at index (s.selected - 3)
+               1 -> separator (skipped in navigation)
+               2+ -> service at index (s.selected - services_start_idx)
 
              Table structure from table_lines_single:
-               [install; wallet; ""; ...instance_rows...]
+               [install; ""; ...instance_rows...]
              where instance_rows = headers interleaved with services.
 
              We need to find where the selected item starts in all_lines.
           *)
           let selection_line_start, selection_line_count =
-            if s.selected < 3 then
+            if s.selected < services_start_idx then
               (* Menu items: count lines for entries 0..s.selected-1 *)
               let line_start =
                 let rec count idx acc =
@@ -1899,14 +1876,14 @@ Press **Enter** to open instance menu.|}
               in
               (line_start, line_count)
             else
-              (* Service selection: s.selected = 3 + service_index.
-                 Count menu lines (3 entries), then iterate through services
+              (* Service selection: s.selected = services_start_idx + service_index.
+                 Count menu lines, then iterate through services
                  adding header lines when role changes. *)
-              let target_svc_idx = s.selected - 3 in
-              (* Menu lines: install + wallet + "" *)
+              let target_svc_idx = s.selected - services_start_idx in
+              (* Menu lines: install + "" *)
               let menu_lines =
                 let rec count idx acc =
-                  if idx >= 3 then acc
+                  if idx >= services_start_idx then acc
                   else if idx >= List.length table then acc
                   else
                     let entry = List.nth table idx in
@@ -2006,36 +1983,37 @@ Press **Enter** to open instance menu.|}
 
   let move_selection s delta =
     if s.services = [] then
-      (* Only menu items (0 and 1) when no services *)
-      let selected = max 0 (min 1 (s.selected + delta)) in
-      {s with selected}
+      (* Only Install button (0) when no services - ignore navigation *)
+      {s with selected = 0}
     else if s.num_columns <= 1 then
       (* Single column mode: simple linear navigation *)
       let raw = s.selected + delta in
       let selected = clamp_selection s.services raw in
-      (* Skip position 2 (separator between menu and services) *)
-      let selected = if selected = 2 then selected + delta else selected in
+      (* Skip separator during navigation *)
+      let selected =
+        if selected = menu_item_count then selected + delta else selected
+      in
       let selected = clamp_selection s.services selected in
       {s with selected}
     else if
       (* Multi-column mode: navigate within current column *)
-      s.selected < 3
+      s.selected < services_start_idx
     then
       (* In menu area, simple navigation *)
-      let selected = max 0 (min 2 (s.selected + delta)) in
+      let selected = max 0 (min menu_item_count (s.selected + delta)) in
       (* Jump from menu to first service in active column *)
-      if selected >= 2 && delta > 0 then
+      if selected >= menu_item_count && delta > 0 then
         let first_svc =
           first_service_in_column
             ~num_columns:s.num_columns
             ~services:s.services
             s.active_column
         in
-        {s with selected = first_svc + 3}
+        {s with selected = first_svc + services_start_idx}
       else {s with selected}
     else
       (* In services area: stay within column *)
-      let current_idx = s.selected - 3 in
+      let current_idx = s.selected - services_start_idx in
       let col_indices =
         services_in_column
           ~num_columns:s.num_columns
@@ -2050,10 +2028,10 @@ Press **Enter** to open instance menu.|}
       in
       let new_pos = current_pos + delta in
       if new_pos < 0 then (
-        (* Moving up from first service goes to menu *)
+        (* Moving up from first service goes to Install button *)
         (* Scroll to top of column *)
         s.column_scroll.(s.active_column) <- 0 ;
-        {s with selected = 1})
+        {s with selected = 0})
       else if new_pos >= List.length col_indices then
         (* At bottom of column, stay put *)
         s
@@ -2074,7 +2052,7 @@ Press **Enter** to open instance menu.|}
           ~line_start
           ~line_count
           ~visible_height:!last_visible_height_ref ;
-        {s with selected = new_idx + 3}
+        {s with selected = new_idx + services_start_idx}
 
   let force_refresh_cmd s = force_refresh s
 
@@ -2093,13 +2071,13 @@ Press **Enter** to open instance menu.|}
   let move_column s delta =
     let num_cols = s.num_columns in
     if num_cols <= 1 then s
-    else if s.selected < 3 then
+    else if s.selected < services_start_idx then
       (* In menu area, just change column *)
       let new_col = (s.active_column + delta + num_cols) mod num_cols in
       {s with active_column = new_col}
     else
       (* In services area: move to same position in target column *)
-      let current_idx = s.selected - 3 in
+      let current_idx = s.selected - services_start_idx in
       let current_col_indices =
         services_in_column
           ~num_columns:num_cols
@@ -2123,7 +2101,11 @@ Press **Enter** to open instance menu.|}
         (* Move to same position (clamped) in target column *)
         let target_pos = min current_pos (List.length target_col_indices - 1) in
         let target_idx = List.nth target_col_indices target_pos in
-        {s with active_column = new_col; selected = target_idx + 3}
+        {
+          s with
+          active_column = new_col;
+          selected = target_idx + services_start_idx;
+        }
 
   let handle_key ps key ~size =
     let s = ps.Navigation.s in
@@ -2166,8 +2148,8 @@ Press **Enter** to open instance menu.|}
       (* Keep active_column in sync with selection *)
       let ps =
         let s = ps.Navigation.s in
-        if s.selected >= 3 && s.num_columns > 1 then
-          let svc_idx = s.selected - 3 in
+        if s.selected >= services_start_idx && s.num_columns > 1 then
+          let svc_idx = s.selected - services_start_idx in
           let col =
             column_for_service
               ~num_columns:s.num_columns
