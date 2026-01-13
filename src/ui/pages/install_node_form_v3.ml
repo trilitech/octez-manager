@@ -396,6 +396,18 @@ let make_initial_model () =
       ensure_ports_initialized model_ref ;
       !model_ref
 
+(** Check if a snapshot entry matches the requested history mode *)
+let snapshot_entry_matches_history_mode entry ~history_mode =
+  match entry.Snapshots.history_mode with
+  | Some snap_mode when String.trim snap_mode <> "" -> (
+      match History_mode.of_string history_mode with
+      | Ok requested ->
+          Installer.For_tests.history_mode_matches
+            ~requested
+            ~snapshot_mode:snap_mode
+      | Error _ -> false)
+  | _ -> true (* No history mode specified in snapshot = compatible with all *)
+
 let history_snapshot_conflict ~history_mode ~snapshot ~network =
   match snapshot with
   | `None | `Url _ -> false
@@ -413,17 +425,11 @@ let history_snapshot_conflict ~history_mode ~snapshot ~network =
                   entries
               with
               | None -> false
-              | Some entry -> (
-                  match entry.history_mode with
-                  | Some snap_mode when String.trim snap_mode <> "" -> (
-                      match History_mode.of_string history_mode with
-                      | Ok requested ->
-                          not
-                            (Installer.For_tests.history_mode_matches
-                               ~requested
-                               ~snapshot_mode:snap_mode)
-                      | Error _ -> true)
-                  | _ -> false))))
+              | Some entry ->
+                  not
+                    (snapshot_entry_matches_history_mode
+                       entry
+                       ~history_mode))))
 
 (** {1 Custom Fields} *)
 
@@ -448,11 +454,23 @@ let snapshot_field =
         | None -> None
       in
 
-      let items =
+      (* Filter snapshots to only show those matching the selected history mode *)
+      let filtered_snapshots =
         match snapshots_opt with
         | Some entries ->
+            entries
+            |> List.filter (fun e ->
+                   snapshot_entry_matches_history_mode
+                     e
+                     ~history_mode:!model_ref.node.history_mode)
+        | None -> []
+      in
+
+      let items =
+        match filtered_snapshots with
+        | [] -> [`None; `Custom]
+        | entries ->
             (`None :: (entries |> List.map (fun e -> `Tzinit e))) @ [`Custom]
-        | None -> [`None; `Custom]
       in
 
       let to_string = function
@@ -997,6 +1015,8 @@ module For_tests = struct
     match slug_of_network network with
     | None -> ()
     | Some slug -> cache_snapshot slug entries
+
+  let snapshot_entry_matches_history_mode = snapshot_entry_matches_history_mode
 
   let history_snapshot_conflict = history_snapshot_conflict
 end
