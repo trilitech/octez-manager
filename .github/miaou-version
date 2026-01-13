@@ -1,0 +1,3 @@
+# Bump this version to invalidate the miaou cache in CI
+# Format: YYYY-MM-DD or any string that changes when miaou needs updating
+1

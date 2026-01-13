@@ -38,7 +38,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache opam packages
+        id: cache-opam
+        uses: actions/cache@v4
+        with:
+          path: /home/opam/.opam
+          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          restore-keys: |
+            opam-miaou-
+
       - name: Pin miaou packages
+        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           if [ -z "$MIAOU_GIT_URL" ]; then
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
@@ -97,7 +107,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache opam packages
+        id: cache-opam
+        uses: actions/cache@v4
+        with:
+          path: /home/opam/.opam
+          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          restore-keys: |
+            opam-miaou-
+
       - name: Pin miaou packages
+        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
