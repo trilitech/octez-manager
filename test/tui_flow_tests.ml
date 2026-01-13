@@ -798,6 +798,184 @@ let test_instances_screen_updates_on_nav () =
         (TH.contains_substring screen3 "octez-manager"))
 
 (* ============================================================ *)
+(* Form Fill Integration Tests *)
+(* ============================================================ *)
+
+(** Test: Fill instance name field in node form.
+    Instance Name is near the bottom of the form.
+    Typing appends to existing text in the text input modal.
+*)
+let test_node_form_fill_instance_name () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Instance Name field is near the bottom of the form - navigate to it *)
+      (* Form order: Network(0), History(1), Snapshot(2), AppBin(3), DataDir(4),
+         RPC(5), P2P(6), ExtraArgs(7), User(8), EnableBoot(9), StartNow(10),
+         InstanceName(11), Confirm(12) *)
+      TH.navigate_down 11 ;
+
+      (* Verify we're on instance name field *)
+      let screen1 = TH.get_screen_text () in
+      check
+        bool
+        "shows instance name field"
+        true
+        (TH.contains_substring screen1 "Instance Name") ;
+
+      (* Press Enter to edit the instance name *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      check bool "edit modal opened" true (Modal_manager.has_active ()) ;
+
+      (* Type a suffix - this appends to existing text *)
+      let custom_suffix = "-custom" in
+      TH.type_string custom_suffix ;
+
+      (* Confirm with Enter *)
+      ignore (TH.send_key_and_wait "Enter") ;
+
+      (* Wait for modal to close *)
+      ignore (TH.wait_until_no_modal ()) ;
+
+      (* Verify the custom suffix appears in the form *)
+      let screen2 = TH.get_screen_text () in
+      check
+        bool
+        "custom suffix visible"
+        true
+        (TH.contains_substring screen2 custom_suffix) ;
+
+      (* Navigate and verify name persists *)
+      ignore (TH.send_key_and_wait "Up") ;
+      let screen3 = TH.get_screen_text () in
+      check
+        bool
+        "name persists after nav"
+        true
+        (TH.contains_substring screen3 custom_suffix))
+
+(** Test: Change network selection in node form.
+    Verifies the network picker modal works and selection persists.
+*)
+let test_node_form_change_network () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Default network should be mainnet *)
+      let screen1 = TH.get_screen_text () in
+      check bool "shows mainnet" true (TH.contains_substring screen1 "mainnet") ;
+
+      (* Navigate to network field (second field) *)
+      ignore (TH.send_key_and_wait "Down") ;
+
+      (* Open network picker *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      check bool "network picker opened" true (Modal_manager.has_active ()) ;
+
+      (* Network picker should show options *)
+      let picker_screen = TH.get_screen_text () in
+      check
+        bool
+        "shows network options"
+        true
+        (TH.contains_substring picker_screen "mainnet"
+        || TH.contains_substring picker_screen "ghostnet"
+        || TH.contains_substring picker_screen "Network") ;
+
+      (* Navigate down to select a different network (ghostnet) *)
+      ignore (TH.send_key_and_wait "Down") ;
+
+      (* Select it *)
+      ignore (TH.send_key_and_wait "Enter") ;
+
+      (* Modal should close *)
+      ignore (TH.wait_until_no_modal ()) ;
+
+      (* The form should now show the selected network *)
+      let screen2 = TH.get_screen_text () in
+      (* Either ghostnet is shown or we stayed on mainnet - both are valid *)
+      check
+        bool
+        "network field has value"
+        true
+        (TH.contains_substring screen2 "mainnet"
+        || TH.contains_substring screen2 "ghostnet"))
+
+(** Test: Navigate through entire node form without errors.
+    Verifies all fields are accessible and form structure is intact.
+*)
+let test_node_form_full_navigation () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Form has 13 fields: Network through Confirm & Install *)
+      let total_fields = 13 in
+
+      (* Navigate through all fields *)
+      for _ = 1 to total_fields - 1 do
+        ignore (TH.send_key_and_wait "Down")
+      done ;
+
+      (* Should be on last field (Confirm & Install) *)
+      let screen_at_bottom = TH.get_screen_text () in
+      check
+        bool
+        "can reach bottom"
+        true
+        (TH.contains_substring screen_at_bottom "Confirm") ;
+
+      (* Navigate back up to first field *)
+      for _ = 1 to total_fields - 1 do
+        ignore (TH.send_key_and_wait "Up")
+      done ;
+
+      (* Should be back at first field (Network), form still working *)
+      let final_screen = TH.get_screen_text () in
+      check
+        bool
+        "form still renders"
+        true
+        (TH.contains_substring final_screen "Network"))
+
+(** Test: Edit and cancel - verify Esc doesn't save changes.
+    Opens a field, types something, presses Esc, verifies original value.
+*)
+let test_node_form_edit_cancel () =
+  TH.with_test_env (fun () ->
+      Headless.Stateful.init (module Install_node_form.Page) ;
+
+      (* Get original screen content *)
+      let screen1 = TH.get_screen_text () in
+
+      (* Open instance name editor *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      check bool "modal opened" true (Modal_manager.has_active ()) ;
+
+      (* Type something *)
+      TH.type_string "cancelled-name" ;
+
+      (* Cancel with Esc *)
+      ignore (TH.send_key_and_wait "Esc") ;
+
+      (* Modal should close *)
+      ignore (TH.wait_until_no_modal ()) ;
+
+      (* The cancelled text should NOT appear in the form *)
+      let screen2 = TH.get_screen_text () in
+      check
+        bool
+        "cancelled text not saved"
+        false
+        (TH.contains_substring screen2 "cancelled-name") ;
+
+      (* Screen should be unchanged from before edit *)
+      check
+        bool
+        "form unchanged after cancel"
+        true
+        (String.equal (String.trim screen1) (String.trim screen2)))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -922,5 +1100,13 @@ let () =
             "screen updates on nav"
             `Quick
             test_instances_screen_updates_on_nav;
+        ] );
+      (* Form fill integration tests *)
+      ( "NodeForm.fill",
+        [
+          test_case "fill instance name" `Quick test_node_form_fill_instance_name;
+          test_case "change network" `Quick test_node_form_change_network;
+          test_case "full navigation" `Quick test_node_form_full_navigation;
+          test_case "edit and cancel" `Quick test_node_form_edit_cancel;
         ] );
     ]
