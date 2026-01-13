@@ -60,7 +60,14 @@ let default_role_dir role inst =
     Bytes.to_string buf
   in
   let role_part = match sanitize role with "" -> "service" | clean -> clean in
-  let suffix = Printf.sprintf "%s-%s" role_part inst in
+  let inst_trimmed = String.trim inst in
+  let inst_lower = String.lowercase_ascii inst_trimmed in
+  (* Check if instance name already starts with the role prefix *)
+  let prefix = role_part ^ "-" in
+  let suffix =
+    if String.starts_with ~prefix inst_lower then inst_trimmed
+    else Printf.sprintf "%s-%s" role_part inst_trimmed
+  in
   default_data_dir suffix
 
 let default_log_dir ~role:_ ~instance:_ =
