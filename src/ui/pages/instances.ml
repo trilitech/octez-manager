@@ -705,10 +705,10 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     System_metrics_scheduler.mark_visible
       ~role:svc.Service.role
       ~instance:svc.Service.instance ;
-    (* Additional lines for nodes, bakers, and dal-nodes: metrics + CPU chart *)
+    (* Additional lines for nodes, bakers, accusers, and dal-nodes: metrics + CPU chart *)
     let extra_lines =
       match svc.Service.role with
-      | "node" | "baker" | "dal-node" ->
+      | "node" | "baker" | "accuser" | "dal-node" ->
           let focus = idx + 3 = selected in
           let indent = String.make indent_start ' ' in
           (* For bakers: add delegate status line (line 3) *)
