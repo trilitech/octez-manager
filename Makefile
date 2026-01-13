@@ -1,8 +1,13 @@
-.PHONY: deps deps-ci build test clean coverage
+.PHONY: all deps deps-ci build test clean coverage update-miaou
 
 OPAM_EXEC ?= opam exec --
 DUNE = $(OPAM_EXEC) dune
 BISECT = $(OPAM_EXEC) bisect-ppx-report
+
+all: build
+
+update-miaou:
+	opam reinstall miaou-core miaou-driver-term miaou-runner miaou-tui miaou-driver-matrix
 
 deps:
 	opam update -y
