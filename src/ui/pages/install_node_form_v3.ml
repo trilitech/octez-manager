@@ -42,6 +42,7 @@ type model = {
   preserve_data : preserve_data;
   tmp_dir : string option; (* Custom directory for snapshot download *)
   keep_snapshot : bool; (* Keep snapshot file after import *)
+  check_snapshot : bool; (* Verify snapshot integrity during import *)
   (* Edit mode *)
   edit_mode : bool;
   original_instance : string option;
@@ -137,6 +138,7 @@ let base_initial_model () =
     preserve_data = `Auto;
     tmp_dir = None;
     keep_snapshot = false;
+    check_snapshot = true;
     edit_mode = false;
     original_instance = None;
     stopped_dependents = [];
@@ -415,6 +417,7 @@ let make_initial_model () =
         (* Always preserve data in edit mode *)
         tmp_dir = None;
         keep_snapshot = false;
+        check_snapshot = true;
         edit_mode = true;
         original_instance = Some svc.Service.instance;
         stopped_dependents = edit_ctx.stopped_dependents;
@@ -634,6 +637,12 @@ let keep_snapshot_field =
     ~get:(fun m -> m.keep_snapshot)
     ~set:(fun keep_snapshot m -> {m with keep_snapshot})
 
+let check_snapshot_field =
+  Form_builder.toggle
+    ~label:"Check Snapshot"
+    ~get:(fun m -> m.check_snapshot)
+    ~set:(fun check_snapshot m -> {m with check_snapshot})
+
 (** {1 Form Specification} *)
 
 (** Auto-update instance name, data_dir, and snapshot when network/history_mode changes *)
@@ -728,6 +737,15 @@ let spec =
                |> with_hint
                     "Keep the downloaded snapshot file after import instead of \
                      deleting it.";
+             ])
+        (* Check snapshot field, only shown when snapshot is selected *)
+        @ (if model.edit_mode || model.snapshot = `None then []
+           else
+             [
+               check_snapshot_field
+               |> with_hint
+                    "Verify snapshot integrity during import. Disable with \
+                     --no-check for faster import (not recommended).";
              ])
         (* 3. App bin dir *)
         @ core_service_fields
@@ -924,7 +942,7 @@ let spec =
             auto_enable = model.core.enable_on_boot;
             bootstrap;
             preserve_data = model.preserve_data = `Keep;
-            snapshot_no_check = false;
+            snapshot_no_check = not model.check_snapshot;
             tmp_dir = model.tmp_dir;
             keep_snapshot = model.keep_snapshot;
           }
