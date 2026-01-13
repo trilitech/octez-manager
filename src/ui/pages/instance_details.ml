@@ -66,10 +66,7 @@ let service_cycle ps _ = refresh ps
 
 let back ps = Navigation.back ps
 
-let handled_keys () = Miaou.Core.Keys.[Escape; Enter]
-
-(* Forward reference for keymap - set after open_actions_modal is defined *)
-let open_actions_modal_ref : (pstate -> pstate) ref = ref (fun ps -> ps)
+let handled_keys () = Miaou.Core.Keys.[Escape]
 
 let keymap _ =
   let noop ps = ps in
@@ -77,7 +74,6 @@ let keymap _ =
     {Miaou.Core.Tui_page.key; action; help; display_only = false}
   in
   [
-    kb "Enter" (fun ps -> !open_actions_modal_ref ps) "Actions";
     kb "Esc" back "Back";
     {
       Miaou.Core.Tui_page.key = "?";
@@ -319,53 +315,6 @@ let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
   ps
 
-(* Set edit context and navigate to form - service is stopped on submit *)
-let do_edit_instance svc =
-  (* Set the edit context (service will be stopped when form is submitted) *)
-  Context.set_pending_edit_service
-    ~service:svc
-    ~stopped_dependents:svc.Service.dependents ;
-  (* Navigate to the appropriate install form based on role *)
-  let form_page =
-    match svc.Service.role with
-    | "node" -> "install_node_form_v3"
-    | "baker" -> "install_baker_form_v3"
-    | "accuser" -> "install_accuser_form_v3"
-    | "dal-node" | "dal" -> "install_dal_node_form_v3"
-    | _ -> "instances"
-  in
-  Context.navigate form_page
-
-let confirm_edit_modal ps svc =
-  if svc.Service.dependents = [] then (
-    do_edit_instance svc ;
-    ps)
-  else (
-    Modal_helpers.open_choice_modal
-      ~title:"Confirm Edit"
-      ~items:[`Confirm; `Cancel]
-      ~to_string:(function
-        | `Confirm ->
-            Printf.sprintf
-              "Proceed (will stop: %s)"
-              (String.concat ", " svc.Service.dependents)
-        | `Cancel -> "Cancel")
-      ~on_select:(fun choice ->
-        match choice with `Confirm -> do_edit_instance svc | `Cancel -> ()) ;
-    ps)
-
-let open_actions_modal ps =
-  let s = ps.Navigation.s in
-  match s.service with
-  | None -> ps
-  | Some svc ->
-      (* Directly open the edit confirmation modal - no need for action menu *)
-      ignore (confirm_edit_modal ps svc) ;
-      ps
-
-(* Set the forward reference now that open_actions_modal is defined *)
-let () = open_actions_modal_ref := open_actions_modal
-
 let handle_key ps key ~size:_ =
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
@@ -373,7 +322,6 @@ let handle_key ps key ~size:_ =
   else
     match Keys.of_string key with
     | Some (Keys.Char "Esc") | Some (Keys.Char "q") -> Navigation.back ps
-    | Some Keys.Enter -> open_actions_modal ps
     | _ -> ps
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
