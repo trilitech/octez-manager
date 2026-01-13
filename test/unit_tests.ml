@@ -1392,6 +1392,44 @@ let default_role_dir_custom () =
             expected
             (Common.default_role_dir "Baker" "alpha")))
 
+let default_role_dir_no_duplicate_prefix () =
+  with_temp_dir (fun base ->
+      let data = Filename.concat base "data" in
+      Unix.mkdir data 0o755 ;
+      with_env
+        [("XDG_DATA_HOME", Some data)]
+        (fun () ->
+          (* Test node instance that already has "node-" prefix *)
+          let expected_node = Filename.concat data "octez/node-shadownet" in
+          Alcotest.(check string)
+            "node with existing prefix"
+            expected_node
+            (Common.default_role_dir "node" "node-shadownet") ;
+          (* Test baker instance that already has "baker-" prefix *)
+          let expected_baker =
+            Filename.concat data "octez/baker-node-shadownet"
+          in
+          Alcotest.(check string)
+            "baker with existing prefix"
+            expected_baker
+            (Common.default_role_dir "baker" "baker-node-shadownet") ;
+          (* Test accuser instance that already has "accuser-" prefix *)
+          let expected_accuser =
+            Filename.concat data "octez/accuser-node-mainnet"
+          in
+          Alcotest.(check string)
+            "accuser with existing prefix"
+            expected_accuser
+            (Common.default_role_dir "accuser" "accuser-node-mainnet") ;
+          (* Test dal-node instance that already has "dal-node-" prefix *)
+          let expected_dal =
+            Filename.concat data "octez/dal-node-node-shadownet"
+          in
+          Alcotest.(check string)
+            "dal-node with existing prefix"
+            expected_dal
+            (Common.default_role_dir "dal-node" "dal-node-node-shadownet")))
+
 let ensure_dir_path_creates () =
   let owner, group = current_user_group () in
   with_temp_dir (fun base ->
@@ -3142,6 +3180,10 @@ let () =
           Alcotest.test_case "xdg config" `Quick xdg_config_custom;
           Alcotest.test_case "data dir" `Quick default_data_dir_custom;
           Alcotest.test_case "role dir" `Quick default_role_dir_custom;
+          Alcotest.test_case
+            "role dir no duplicate prefix"
+            `Quick
+            default_role_dir_no_duplicate_prefix;
         ] );
       ( "common.path",
         [
