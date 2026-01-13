@@ -407,17 +407,18 @@ let snapshot_entry_matches_history_mode entry ~history_mode =
             ~requested
             ~snapshot_mode:snap_mode
       | Error _ -> false)
-  | _ ->
+  | _ -> (
       (* No explicit history mode in metadata - try to infer from slug *)
       let slug_lower = String.lowercase_ascii entry.Snapshots.slug in
       let mode_lower = String.lowercase_ascii (String.trim history_mode) in
       (* Check if slug starts with or contains the history mode *)
       String.starts_with ~prefix:mode_lower slug_lower
-      || (match mode_lower with
-          | "full" ->
-              (* "full" matches "full", "full50", etc. *)
-              String.starts_with ~prefix:"full" slug_lower
-          | _ -> false)
+      ||
+      match mode_lower with
+      | "full" ->
+          (* "full" matches "full", "full50", etc. *)
+          String.starts_with ~prefix:"full" slug_lower
+      | _ -> false)
 
 let history_snapshot_conflict ~history_mode ~snapshot ~network =
   match snapshot with
@@ -437,10 +438,8 @@ let history_snapshot_conflict ~history_mode ~snapshot ~network =
               with
               | None -> false
               | Some entry ->
-                  not
-                    (snapshot_entry_matches_history_mode
-                       entry
-                       ~history_mode))))
+                  not (snapshot_entry_matches_history_mode entry ~history_mode))
+          ))
 
 (** {1 Custom Fields} *)
 
@@ -469,9 +468,9 @@ let snapshot_field =
         | Some entries ->
             entries
             |> List.filter (fun e ->
-                   snapshot_entry_matches_history_mode
-                     e
-                     ~history_mode:!model_ref.node.history_mode)
+                snapshot_entry_matches_history_mode
+                  e
+                  ~history_mode:!model_ref.node.history_mode)
         | None -> []
       in
 
