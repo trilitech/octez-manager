@@ -1792,6 +1792,8 @@ let snapshots_list_missing_entries_error () =
       | Error _ -> ()
       | Ok _ -> Alcotest.fail "expected missing entry error")
 
+(* Test that disappeared entries are silently skipped (robust error handling).
+   When all candidates return 404, we get "No snapshots advertised" error. *)
 let snapshots_list_disappeared_entry_error () =
   let root_html = "<a href=\"/seoulnet/rolling.html\">Rolling</a>" in
   let fetch url =
@@ -1801,10 +1803,15 @@ let snapshots_list_disappeared_entry_error () =
   Snapshots.For_tests.with_fetch fetch (fun () ->
       match Snapshots.list ~network_slug:"seoulnet" with
       | Error (`Msg msg) ->
-          if String.starts_with ~prefix:"Snapshot 'rolling' disappeared" msg
+          (* After robust error handling, missing entries are skipped.
+             When all entries fail, we get "No snapshots advertised". *)
+          if
+            String.starts_with
+              ~prefix:"No snapshots advertised for network 'seoulnet'"
+              msg
           then ()
           else Alcotest.failf "unexpected message: %s" msg
-      | Ok _ -> Alcotest.fail "expected disappeared entry error")
+      | Ok _ -> Alcotest.fail "expected no snapshots error")
 
 let snapshots_list_no_advertised () =
   let fetch url =
