@@ -83,7 +83,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _build
-          key: dune-${{ runner.os }}-${{ hashFiles('**/*.ml', '**/*.mli', '**/dune', '**/dune-project') }}
+          key: dune-${{ runner.os }}-${{ hashFiles('src/**', 'dune-project') }}
           restore-keys: |
             dune-${{ runner.os }}-
 
