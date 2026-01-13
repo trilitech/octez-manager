@@ -1,25 +1,16 @@
-name: Integration Tests
+name: Integration Tests (Scheduled)
+
+# This workflow runs integration tests on a schedule and manual trigger.
+# For PR/push integration tests, see ci.yml which runs them as a dependent job.
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '**/*.md'
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '**/*.md'
   workflow_dispatch:
   schedule:
     # Run weekly to catch octez version incompatibilities
     - cron: '0 6 * * 0'
 
 concurrency:
-  group: integration-${{ github.ref }}
+  group: integration-scheduled-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
