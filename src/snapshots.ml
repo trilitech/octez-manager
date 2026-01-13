@@ -65,7 +65,8 @@ let sanitize_kind_input k =
 let fetch_html_curl url =
   let cmd =
     Printf.sprintf
-      "curl -fsL --max-time 8 --connect-timeout 2 -w '\n%%{http_code}' %s"
+      "curl -fsL --max-time 10 --connect-timeout 5 -w '\n\
+       %%{http_code}' %s 2>/dev/null"
       (Common.sh_quote url)
   in
   match Common.run_out ["/bin/sh"; "-c"; cmd] with
