@@ -5,6 +5,7 @@
 (*                                                                            *)
 (******************************************************************************)
 
+open Octez_manager_lib
 module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
@@ -621,6 +622,8 @@ let show_error ~title message =
 let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     ~on_select () =
   let module File_browser = Miaou_widgets_layout.File_browser_widget in
+  let default_path = if Common.is_root () then "/" else Common.home_dir () in
+  let start_path = Option.value initial_path ~default:default_path in
   let module Modal = struct
     type state = File_browser.t
 
@@ -633,7 +636,7 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     let init () =
       Navigation.make
         (File_browser.open_centered
-           ?path:initial_path
+           ~path:start_path
            ~dirs_only
            ~require_writable
            ())
@@ -691,21 +694,11 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
             match Miaou.Core.Keys.of_string key with
             | Some Miaou.Core.Keys.Right -> "Right"
             | Some Miaou.Core.Keys.Left -> "Left"
-            | Some (Miaou.Core.Keys.Char "l") -> "Right"
             | Some (Miaou.Core.Keys.Char "h") -> "Left"
             | _ -> key
           in
 
-          (* Intelligent Enter handling: Navigate if directory, Select if file/dot *)
-          let key_to_use =
-            if key = "Enter" then
-              match File_browser.get_selected_entry s with
-              | Some e when e.is_dir && e.name <> "." -> "Right"
-              | _ -> key
-            else key
-          in
-
-          let s' = File_browser.handle_key s ~key:key_to_use in
+          let s' = File_browser.handle_key s ~key in
           let s'' = File_browser.apply_pending_updates s' in
           (* Check for cancel *)
           if File_browser.is_cancelled s'' then (
