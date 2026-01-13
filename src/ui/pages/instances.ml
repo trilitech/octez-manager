@@ -1493,14 +1493,47 @@ let restart_with_cascade ~instance ~role =
                     Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
 
+(* Edit instance - navigate to appropriate form *)
+let do_edit_instance svc =
+  (* Set the edit context (service will be stopped when form is submitted) *)
+  Context.set_pending_edit_service
+    ~service:svc
+    ~stopped_dependents:svc.Service.dependents ;
+  (* Navigate to the appropriate install form based on role *)
+  let form_page =
+    match svc.Service.role with
+    | "node" -> "install_node_form_v3"
+    | "baker" -> "install_baker_form_v3"
+    | "accuser" -> "install_accuser_form_v3"
+    | "dal-node" | "dal" -> "install_dal_node_form_v3"
+    | _ -> "instances"
+  in
+  Context.navigate form_page
+
+let confirm_edit_modal svc =
+  if svc.Service.dependents = [] then do_edit_instance svc
+  else
+    Modal_helpers.open_choice_modal
+      ~title:"Confirm Edit"
+      ~items:[`Confirm; `Cancel]
+      ~to_string:(function
+        | `Confirm ->
+            Printf.sprintf
+              "Proceed (will stop: %s)"
+              (String.concat ", " svc.Service.dependents)
+        | `Cancel -> "Cancel")
+      ~on_select:(fun choice ->
+        match choice with `Confirm -> do_edit_instance svc | `Cancel -> ())
+
 let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
       Modal_helpers.open_choice_modal
         ~title:("Actions · " ^ svc.Service.instance)
-        ~items:[`Details; `Start; `Stop; `Restart; `Logs; `Remove]
+        ~items:[`Details; `Edit; `Start; `Stop; `Restart; `Logs; `Remove]
         ~to_string:(function
           | `Details -> "Details"
+          | `Edit -> "Edit"
           | `Start -> "Start"
           | `Stop -> "Stop"
           | `Restart -> "Restart"
@@ -1513,6 +1546,7 @@ let instance_actions_modal state =
           | `Details ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Instance_details.name
+          | `Edit -> confirm_edit_modal svc
           | `Start -> start_with_cascade ~instance ~role
           | `Stop ->
               (* Clear any previous failure when user intentionally stops *)
