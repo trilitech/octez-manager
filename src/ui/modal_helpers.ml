@@ -666,6 +666,8 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
         [
           Up;
           Down;
+          Left;
+          Right;
           PageUp;
           PageDown;
           Char " ";
@@ -674,6 +676,9 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
           Backspace;
           Tab;
           Char "h";
+          Char "j";
+          Char "k";
+          Char "l";
           Char "n";
           Char "s";
         ]
@@ -681,7 +686,26 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     let handle_modal_key ps key ~size:_ =
       Navigation.update
         (fun s ->
-          let s' = File_browser.handle_key s ~key in
+          (* Remap keys for navigation *)
+          let key =
+            match Miaou.Core.Keys.of_string key with
+            | Some Miaou.Core.Keys.Right -> "Right"
+            | Some Miaou.Core.Keys.Left -> "Left"
+            | Some (Miaou.Core.Keys.Char "l") -> "Right"
+            | Some (Miaou.Core.Keys.Char "h") -> "Left"
+            | _ -> key
+          in
+
+          (* Intelligent Enter handling: Navigate if directory, Select if file/dot *)
+          let key_to_use =
+            if key = "Enter" then
+              match File_browser.get_selected_entry s with
+              | Some e when e.is_dir && e.name <> "." -> "Right"
+              | _ -> key
+            else key
+          in
+
+          let s' = File_browser.handle_key s ~key:key_to_use in
           let s'' = File_browser.apply_pending_updates s' in
           (* Check for cancel *)
           if File_browser.is_cancelled s'' then (
