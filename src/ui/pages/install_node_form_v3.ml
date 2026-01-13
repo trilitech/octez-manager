@@ -67,25 +67,47 @@ let generate_instance_name ~network ~history_mode =
   | "rolling" -> Printf.sprintf "node-%s" network_short
   | mode -> Printf.sprintf "node-%s-%s" network_short mode
 
+let snapshot_provider () =
+  Miaou_interfaces.Capability.get
+    Manager_interfaces.Snapshot_provider_capability.key
+
+let slug_of_network network =
+  let fallback () = Snapshots.slug_of_network network in
+  match snapshot_provider () with
+  | Some cap -> (
+      let module P = (val cap : Manager_interfaces.Snapshot_provider) in
+      match P.slug_of_network network with
+      | Some slug -> Some slug
+      | None -> fallback ())
+  | None -> fallback ()
+
+(** Check if a snapshot is an auto-generated snapshot by looking at its label *)
+let is_auto_snapshot = function
+  | `Tzinit {label; _} -> String.starts_with ~prefix:"Auto (" label
+  | _ -> false
+
 (** Create a default snapshot placeholder for auto-resolution by the installer.
-    This avoids synchronous I/O while still defaulting to snapshot download. *)
+    This avoids synchronous I/O while still defaulting to snapshot download.
+    Archive mode returns `None since snapshots cannot be imported for archive nodes. *)
 let create_default_snapshot ~network ~history_mode =
-  match slug_of_network network with
-  | Some network_slug ->
-      let kind_slug =
-        match String.lowercase_ascii (String.trim history_mode) with
-        | "rolling" -> "rolling"
-        | "full" -> "full"
-        | "archive" -> "rolling" (* Archive snapshots not provided, fallback to rolling *)
-        | _ -> "rolling" (* Unknown history mode, fallback to rolling *)
-      in
-      `Tzinit
-        {
-          network_slug;
-          kind_slug;
-          label = Printf.sprintf "Auto (%s)" kind_slug;
-        }
-  | None -> `None
+  match String.lowercase_ascii (String.trim history_mode) with
+  | "archive" -> `None (* Archive nodes cannot import snapshots *)
+  | _ ->
+      match slug_of_network network with
+      | Some network_slug ->
+          let kind_slug =
+            match String.lowercase_ascii (String.trim history_mode) with
+            | "rolling" -> "rolling"
+            | "full" -> "full"
+            | _ -> "rolling"
+          in
+          `Tzinit
+            {
+              network_slug;
+              kind_slug;
+              label = Printf.sprintf "Auto (%s)" kind_slug;
+            }
+      | None -> `None
 
 let base_initial_model () =
   let network = "mainnet" in
@@ -153,20 +175,6 @@ let snapshot_cache = Cache.create_safe_keyed ~name:"snapshots" ~ttl:300.0 ()
 let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
 let snapshot_inflight_lock = Mutex.create ()
-
-let snapshot_provider () =
-  Miaou_interfaces.Capability.get
-    Manager_interfaces.Snapshot_provider_capability.key
-
-let slug_of_network network =
-  let fallback () = Snapshots.slug_of_network network in
-  match snapshot_provider () with
-  | Some cap -> (
-      let module P = (val cap : Manager_interfaces.Snapshot_provider) in
-      match P.slug_of_network network with
-      | Some slug -> Some slug
-      | None -> fallback ())
-  | None -> fallback ()
 
 let fetch_snapshot_list slug =
   let fallback () = of_rresult (Snapshots.list ~network_slug:slug) in
@@ -626,7 +634,7 @@ let keep_snapshot_field =
 
 (** {1 Form Specification} *)
 
-(** Auto-update instance name and data_dir when network/history_mode changes *)
+(** Auto-update instance name, data_dir, and snapshot when network/history_mode changes *)
 let set_node_with_autoname node m =
   if m.edit_mode then {m with node}
   else
@@ -648,6 +656,18 @@ let set_node_with_autoname node m =
       let should_update_data_dir =
         String.equal (String.trim m.node.data_dir) old_default_dir
       in
+      (* Auto-update snapshot if:
+         1. Current snapshot is an auto snapshot and network or history_mode changed, OR
+         2. Current snapshot is None and we're moving FROM archive mode to non-archive mode *)
+      let old_is_archive = String.(lowercase_ascii (trim m.node.history_mode)) = "archive" in
+      let new_is_archive = String.(lowercase_ascii (trim node.history_mode)) = "archive" in
+      let new_snapshot =
+        if (is_auto_snapshot m.snapshot || (m.snapshot = `None && old_is_archive && not new_is_archive)) &&
+           (not (String.equal m.node.network node.network) ||
+            not (String.equal m.node.history_mode node.history_mode))
+        then create_default_snapshot ~network:node.network ~history_mode:node.history_mode
+        else m.snapshot
+      in
       {
         m with
         node =
@@ -657,6 +677,7 @@ let set_node_with_autoname node m =
               (if should_update_data_dir then new_data_dir else node.data_dir);
           };
         core = {m.core with instance_name = new_name};
+        snapshot = new_snapshot;
       }
     else {m with node}
 
@@ -679,8 +700,8 @@ let spec =
           ~skip_data_dir:true
           ~skip_addresses:true
           ()
-        (* Snapshot field only shown for new installs, not edit mode *)
-        @ (if model.edit_mode then []
+        (* Snapshot field only shown for new installs, not edit mode, and not for archive mode *)
+        @ (if model.edit_mode || String.(lowercase_ascii (trim model.node.history_mode)) = "archive" then []
            else
              [
                snapshot_field
