@@ -12,6 +12,7 @@
   octez_manager_lib
   octez-manager.ui
   miaou-core.lib
+  miaou-core.lib_miaou_internal
   lambda-term)
  (modules tui_flow_tests)
  (instrumentation
