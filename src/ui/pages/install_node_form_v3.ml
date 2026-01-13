@@ -71,6 +71,19 @@ let base_initial_model () =
   let network = "mainnet" in
   let history_mode = "rolling" in
   let instance_name = generate_instance_name ~network ~history_mode in
+  (* Try to populate cache synchronously for default network before creating model *)
+  let () =
+    match slug_of_network network with
+    | Some slug -> (
+        match snapshot_entries_from_cache slug with
+        | Some _ -> () (* Already cached *)
+        | None -> (
+            (* Fetch synchronously to populate cache for initial default *)
+            match fetch_snapshot_list slug with
+            | Ok entries -> cache_snapshot slug entries
+            | Error _ -> () (* Silently fail - user can still select manually *)))
+    | None -> ()
+  in
   {
     core =
       {
@@ -91,7 +104,7 @@ let base_initial_model () =
         p2p_addr = "0.0.0.0:9732";
         (* All interfaces for peer reachability *)
       };
-    snapshot = `None;
+    snapshot = get_default_snapshot ~network ~history_mode;
     preserve_data = `Auto;
     tmp_dir = None;
     keep_snapshot = false;
@@ -440,6 +453,30 @@ let history_snapshot_conflict ~history_mode ~snapshot ~network =
               | Some entry ->
                   not (snapshot_entry_matches_history_mode entry ~history_mode))
           ))
+
+(** Get the default snapshot for a given network and history mode.
+    Returns [`Tzinit snap] if a matching snapshot is found in cache, [`None] otherwise. *)
+let get_default_snapshot ~network ~history_mode =
+  match slug_of_network network with
+  | None -> `None
+  | Some slug -> (
+      match snapshot_entries_from_cache slug with
+      | None -> `None
+      | Some entries -> (
+          (* Find the first snapshot that matches the history mode *)
+          match
+            List.find_opt
+              (fun e -> snapshot_entry_matches_history_mode e ~history_mode)
+              entries
+          with
+          | Some entry ->
+              `Tzinit
+                {
+                  network_slug = entry.Snapshots.network;
+                  kind_slug = entry.Snapshots.slug;
+                  label = entry.Snapshots.label;
+                }
+          | None -> `None))
 
 (** {1 Custom Fields} *)
 
