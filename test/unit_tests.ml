@@ -650,25 +650,71 @@ let install_node_form_v3_snapshot_filtering () =
     (F.snapshot_entry_matches_history_mode
        rolling_entry
        ~history_mode:"archive") ;
-  (* Test entry with no history mode matches all *)
-  let no_mode_entry =
+  (* Test entry with no history mode - infer from slug *)
+  let rolling_slug_entry =
     {
       Snapshots.network = "mainnet";
-      slug = "legacy";
-      label = "legacy";
+      slug = "rolling";
+      label = "rolling";
       download_url = None;
       history_mode = None;
       metadata = [];
     }
   in
   Alcotest.(check bool)
-    "entry with no mode matches rolling"
+    "entry with rolling slug matches rolling mode"
     true
-    (F.snapshot_entry_matches_history_mode no_mode_entry ~history_mode:"rolling") ;
+    (F.snapshot_entry_matches_history_mode
+       rolling_slug_entry
+       ~history_mode:"rolling") ;
   Alcotest.(check bool)
-    "entry with no mode matches full"
+    "entry with rolling slug does not match full mode"
+    false
+    (F.snapshot_entry_matches_history_mode rolling_slug_entry ~history_mode:"full") ;
+  (* Test full variants *)
+  let full50_slug_entry =
+    {
+      Snapshots.network = "mainnet";
+      slug = "full50";
+      label = "full:50";
+      download_url = None;
+      history_mode = None;
+      metadata = [];
+    }
+  in
+  Alcotest.(check bool)
+    "entry with full50 slug matches full mode"
     true
-    (F.snapshot_entry_matches_history_mode no_mode_entry ~history_mode:"full")
+    (F.snapshot_entry_matches_history_mode full50_slug_entry ~history_mode:"full") ;
+  Alcotest.(check bool)
+    "entry with full50 slug does not match rolling mode"
+    false
+    (F.snapshot_entry_matches_history_mode
+       full50_slug_entry
+       ~history_mode:"rolling") ;
+  (* Test archive *)
+  let archive_slug_entry =
+    {
+      Snapshots.network = "mainnet";
+      slug = "archive";
+      label = "archive";
+      download_url = None;
+      history_mode = None;
+      metadata = [];
+    }
+  in
+  Alcotest.(check bool)
+    "entry with archive slug matches archive mode"
+    true
+    (F.snapshot_entry_matches_history_mode
+       archive_slug_entry
+       ~history_mode:"archive") ;
+  Alcotest.(check bool)
+    "entry with archive slug does not match rolling mode"
+    false
+    (F.snapshot_entry_matches_history_mode
+       archive_slug_entry
+       ~history_mode:"rolling")
 
 let runtime_probe_writable_directory () =
   let dir = Filename.temp_file "octez_manager_probe" "" in
