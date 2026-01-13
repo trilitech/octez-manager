@@ -25,7 +25,7 @@ opam pin add miaou https://github.com/trilitech/miaou.git
 
 # Install dependencies and build
 opam install . --deps-only --with-test
-dune build
+make build
 ```
 
 ### Install a Node
