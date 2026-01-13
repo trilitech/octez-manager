@@ -200,7 +200,9 @@ let schedule_snapshot_fetch slug =
         else false)
   in
   if should_fetch then
-    Background_runner.submit_blocking (fun () ->
+    Background_runner.submit_blocking
+      (* ~on_complete:(fun () -> Context.invalidate_cache ()) *)
+      (fun () ->
         Fun.protect
           ~finally:(fun () ->
             Mutex.protect snapshot_inflight_lock (fun () ->
