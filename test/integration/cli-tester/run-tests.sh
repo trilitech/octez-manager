@@ -54,14 +54,25 @@ run_test() {
     fi
 }
 
-# Run all tests in order
-run_all_tests() {
+# Run tests, optionally filtered by category
+run_tests() {
+    local category_filter="${1:-}"
     local failed=0
     local passed=0
     local tests=()
+    local categories
+
+    # Determine which categories to run
+    if [ -n "$category_filter" ]; then
+        categories=("$category_filter")
+        log "Running tests for category: $category_filter"
+    else
+        categories=(node dal baker accuser)
+        log "Running all test categories"
+    fi
 
     # Collect tests in order
-    for category in node dal baker accuser; do
+    for category in "${categories[@]}"; do
         if [ -d "$TESTS_DIR/$category" ]; then
             for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
                 tests+=("$test")
@@ -90,9 +101,14 @@ run_all_tests() {
 
 # Main
 main() {
+    local category="${1:-}"
+
     log "Starting integration tests..."
     log "SANDBOX_URL=$SANDBOX_URL"
     log "NODE_RPC=$NODE_RPC"
+    if [ -n "$category" ]; then
+        log "Category filter: $category"
+    fi
 
     # Export for tests
     export SANDBOX_URL NODE_RPC
@@ -101,7 +117,7 @@ main() {
 
     wait_for_sandbox
 
-    run_all_tests
+    run_tests "$category"
 }
 
 main "$@"

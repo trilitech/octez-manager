@@ -85,10 +85,14 @@ jobs:
           retention-days: 1
 
   integration-tests:
-    name: Integration Tests
+    name: Integration Tests (${{ matrix.category }})
     runs-on: ubuntu-latest
     needs: build-and-test
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        category: [node, dal, baker, accuser]
 
     steps:
       - name: Checkout
@@ -135,10 +139,10 @@ jobs:
           done
           docker compose ps
 
-      - name: Run integration tests
+      - name: Run integration tests (${{ matrix.category }})
         working-directory: test/integration
         run: |
-          docker compose exec -T cli-tester /run-tests.sh
+          docker compose exec -T cli-tester /run-tests.sh ${{ matrix.category }}
 
       - name: Collect logs on failure
         if: failure()
