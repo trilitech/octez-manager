@@ -5,14 +5,18 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(test
+; TUI tests are skipped in CI (headless driver hangs in container)
+; Run locally with: dune exec test/tui_flow_tests.exe
+
+(executable
  (name tui_flow_tests)
  (libraries
   alcotest
   octez_manager_lib
   octez-manager.ui
   miaou-core.lib
+  miaou-core.lib_miaou_internal
   lambda-term)
- (modules tui_flow_tests)
+ (modules tui_flow_tests tui_test_helpers)
  (instrumentation
   (backend bisect_ppx)))
