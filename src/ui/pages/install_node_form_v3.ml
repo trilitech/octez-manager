@@ -67,30 +67,30 @@ let generate_instance_name ~network ~history_mode =
   | "rolling" -> Printf.sprintf "node-%s" network_short
   | mode -> Printf.sprintf "node-%s-%s" network_short mode
 
+(** Create a default snapshot placeholder for auto-resolution by the installer.
+    This avoids synchronous I/O while still defaulting to snapshot download. *)
+let create_default_snapshot ~network ~history_mode =
+  match slug_of_network network with
+  | Some network_slug ->
+      let kind_slug =
+        match String.lowercase_ascii (String.trim history_mode) with
+        | "rolling" -> "rolling"
+        | "full" -> "full"
+        | "archive" -> "rolling" (* Archive snapshots not provided, fallback to rolling *)
+        | _ -> "rolling" (* Unknown history mode, fallback to rolling *)
+      in
+      `Tzinit
+        {
+          network_slug;
+          kind_slug;
+          label = Printf.sprintf "Auto (%s)" kind_slug;
+        }
+  | None -> `None
+
 let base_initial_model () =
   let network = "mainnet" in
   let history_mode = "rolling" in
   let instance_name = generate_instance_name ~network ~history_mode in
-  (* Default to auto-selected snapshot matching the CLI interactive default *)
-  let default_snapshot =
-    match slug_of_network network with
-    | Some network_slug ->
-        let kind_slug =
-          match String.lowercase_ascii (String.trim history_mode) with
-          | "rolling" -> "rolling"
-          | "full" -> "full"
-          | _ -> "rolling" (* fallback *)
-        in
-        (* Create a placeholder Tzinit snapshot that will be auto-resolved by installer.
-           This avoids synchronous I/O while still defaulting to snapshot download. *)
-        `Tzinit
-          {
-            network_slug;
-            kind_slug;
-            label = Printf.sprintf "Auto (%s)" kind_slug;
-          }
-    | None -> `None
-  in
   {
     core =
       {
@@ -111,7 +111,7 @@ let base_initial_model () =
         p2p_addr = "0.0.0.0:9732";
         (* All interfaces for peer reachability *)
       };
-    snapshot = default_snapshot;
+    snapshot = create_default_snapshot ~network ~history_mode;
     preserve_data = `Auto;
     tmp_dir = None;
     keep_snapshot = false;
