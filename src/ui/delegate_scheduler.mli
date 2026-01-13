@@ -23,6 +23,9 @@ val get_baker_delegate_data : instance:string -> Delegate_data.t list
 (** Get delegates configured for a baker instance (from cache, never blocks). *)
 val get_baker_delegates : instance:string -> string list
 
+(** Get node endpoint configured for a baker instance (from cache, never blocks). *)
+val get_baker_node_endpoint : instance:string -> string option
+
 (** Check if baker has DAL enabled (from cache, never blocks). *)
 val baker_has_dal : instance:string -> bool
 

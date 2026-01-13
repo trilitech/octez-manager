@@ -551,7 +551,7 @@ let update_dependent_endpoints ~instance ~role ~new_rpc_addr () =
       List.fold_left
         (fun acc dep_inst ->
           let* () = acc in
-          match Node_env.read ~inst:dep_inst with
+          match Node_env.read_from_disk ~inst:dep_inst with
           | Ok pairs ->
               let updated_pairs =
                 List.map
@@ -1331,7 +1331,7 @@ let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
         let is_accuser = svc.role = "accuser" in
         if is_baker || is_accuser then
           let env =
-            match Node_env.read ~inst:svc.instance with
+            match Node_env.read_from_disk ~inst:svc.instance with
             | Ok pairs -> pairs
             | Error _ -> []
           in
@@ -1396,7 +1396,7 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
           (fun acc dep_inst ->
             let* () = acc in
             (* Update OCTEZ_NODE_INSTANCE and OCTEZ_DAL_INSTANCE in dependent's env file *)
-            match Node_env.read ~inst:dep_inst with
+            match Node_env.read_from_disk ~inst:dep_inst with
             | Ok pairs ->
                 let updated_pairs =
                   List.map
@@ -1429,7 +1429,7 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
       in
       (* Also check if old instance was in DAL node's dependents via env file *)
       let* () =
-        match Node_env.read ~inst:old_instance with
+        match Node_env.read_from_disk ~inst:old_instance with
         | Ok pairs -> (
             let dal_inst =
               List.assoc_opt "OCTEZ_DAL_INSTANCE" pairs

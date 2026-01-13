@@ -544,22 +544,13 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let indent_start = 6 in
   (* Render highwatermarks line for bakers (last signed levels) *)
   let baker_highwatermarks_line ~instance =
-    let activities = Baker_highwatermarks.read ~instance in
+    let activities = Render_data.baker_highwatermarks ~instance in
     match Baker_highwatermarks.format_summary activities with
     | None -> Widgets.yellow "no signing activity"
     | Some summary -> summary
   in
-  (* Check if baker has DAL enabled *)
-  let baker_has_dal ~instance =
-    match Node_env.read ~inst:instance with
-    | Error _ -> false
-    | Ok pairs -> (
-        match List.assoc_opt "OCTEZ_DAL_CONFIG" pairs with
-        | None -> false
-        | Some cfg ->
-            let cfg = String.trim (String.lowercase_ascii cfg) in
-            cfg <> "" && cfg <> "disabled")
-  in
+  (* Check if baker has DAL enabled - use cached value to avoid I/O during render *)
+  let baker_has_dal = Render_data.baker_has_dal in
   (* Render delegate status for bakers (from RPC) *)
   let delegate_status_line ~instance =
     let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
@@ -1133,7 +1124,7 @@ let _view_logs_old state =
       let svc = svc_state.Service_state.service in
       let title = Printf.sprintf "Logs · %s" svc.Service.instance in
       let env =
-        match Node_env.read ~inst:svc.Service.instance with
+        match Node_env.read_from_disk ~inst:svc.Service.instance with
         | Ok pairs -> pairs
         | Error _ -> []
       in
