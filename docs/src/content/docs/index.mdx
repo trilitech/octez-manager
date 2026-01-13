@@ -39,8 +39,8 @@ dune build && dune install
 
 ```bash
 octez-manager install-node \
-  --instance mainnet \
-  --network mainnet \
+  --instance shadownet \
+  --network shadownet \
   --history-mode rolling \
   --snapshot
 ```
@@ -90,13 +90,13 @@ octez-manager ui
 octez-manager list
 
 # Control services
-octez-manager instance mainnet start
-octez-manager instance mainnet stop
-octez-manager instance mainnet restart
+octez-manager instance shadownet start
+octez-manager instance shadownet stop
+octez-manager instance shadownet restart
 
 # View logs
-octez-manager instance mainnet logs
+octez-manager instance shadownet logs
 
 # Show details
-octez-manager instance mainnet show
+octez-manager instance shadownet show
 ```
