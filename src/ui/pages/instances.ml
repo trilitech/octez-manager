@@ -1804,12 +1804,17 @@ Press **Enter** to open instance menu.|}
               | Job_manager.Succeeded -> Widgets.green "Done"
               | Job_manager.Failed _ -> Widgets.red "Failed"
             in
+            let phase_str =
+              if job.Job_manager.phase = "" then ""
+              else " " ^ Widgets.cyan ("[" ^ job.phase ^ "]")
+            in
             "\n"
             ^ Widgets.dim
                 (Printf.sprintf
-                   "--- Job: %s (%s) ---"
+                   "--- Job: %s (%s)%s ---"
                    job.description
-                   status_str)
+                   status_str
+                   phase_str)
             ^ "\n" ^ tail
       | None -> ""
     in

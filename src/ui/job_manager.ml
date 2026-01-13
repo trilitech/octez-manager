@@ -17,6 +17,7 @@ type job = {
   started_at : float;
   mutable finished_at : float option;
   mutable log : string list;
+  mutable phase : string;
 }
 
 let jobs : job list ref = ref []
@@ -34,11 +35,25 @@ let submit ?(on_complete = fun _ -> ()) ~description action =
       started_at = Unix.gettimeofday ();
       finished_at = None;
       log = [];
+      phase = "";
     }
   in
   jobs := job :: !jobs ;
   Bg.submit_blocking (fun () ->
-      let append_log line = job.log <- line :: job.log in
+      let append_log line =
+        job.log <- line :: job.log ;
+        (* Detect phase changes from === headers === *)
+        let trimmed = String.trim line in
+        if
+          String.length trimmed > 6
+          && String.sub trimmed 0 3 = "==="
+          && String.sub trimmed (String.length trimmed - 3) 3 = "==="
+        then
+          let inner =
+            String.sub trimmed 3 (String.length trimmed - 6) |> String.trim
+          in
+          if inner <> "" then job.phase <- inner
+      in
       let result =
         try action ~append_log ()
         with exn -> Error (`Msg (Printexc.to_string exn))
