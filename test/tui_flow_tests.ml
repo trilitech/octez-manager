@@ -511,6 +511,79 @@ let test_baker_form_navigation_bounds () =
       check bool "Down at end" true (result = `Continue))
 
 (* ============================================================ *)
+(* Install Accuser Form Tests *)
+(* ============================================================ *)
+
+module Install_accuser_form = Octez_manager_ui.Install_accuser_form_v3
+
+(* Get the page module from the first-class module value *)
+module Accuser_page = (val Install_accuser_form.page)
+
+(** Test: Accuser form initializes and renders *)
+let test_accuser_form_init () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Accuser_page) ;
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      check bool "contains Install" true (contains_substring text "Install") ;
+      check bool "contains Accuser" true (contains_substring text "Accuser"))
+
+(** Test: Accuser form shows specific fields *)
+let test_accuser_form_shows_fields () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Accuser_page) ;
+      let screen = Headless.get_screen_content () in
+      let text = strip_ansi screen in
+      check bool "shows Instance" true (contains_substring text "Instance"))
+
+(** Test: Up/Down navigates between fields *)
+let test_accuser_form_field_navigation () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Accuser_page) ;
+
+      let result = Headless.Stateful.send_key "Down" in
+      check bool "Down handled" true (result = `Continue) ;
+
+      let result = Headless.Stateful.send_key "Up" in
+      check bool "Up handled" true (result = `Continue))
+
+(** Test: Enter on field opens edit modal *)
+let test_accuser_form_enter_opens_modal () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Accuser_page) ;
+
+      check bool "no modal initially" false (Modal_manager.has_active ()) ;
+
+      let _ = Headless.Stateful.send_key "Enter" in
+      check bool "modal opened" true (Modal_manager.has_active ()))
+
+(** Test: Esc in modal closes it *)
+let test_accuser_form_modal_esc () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Accuser_page) ;
+
+      let _ = Headless.Stateful.send_key "Enter" in
+      check bool "modal opened" true (Modal_manager.has_active ()) ;
+
+      let _ = Headless.Stateful.send_key "Esc" in
+      check bool "modal closed" false (Modal_manager.has_active ()))
+
+(** Test: Navigation bounds work correctly *)
+let test_accuser_form_navigation_bounds () =
+  with_test_env (fun () ->
+      Headless.Stateful.init (module Accuser_page) ;
+
+      let result = Headless.Stateful.send_key "Up" in
+      check bool "Up at start" true (result = `Continue) ;
+
+      for _ = 1 to 20 do
+        ignore (Headless.Stateful.send_key "Down")
+      done ;
+
+      let result = Headless.Stateful.send_key "Down" in
+      check bool "Down at end" true (result = `Continue))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -576,5 +649,26 @@ let () =
         [
           test_case "Enter opens modal" `Quick test_baker_form_enter_opens_modal;
           test_case "Esc closes modal" `Quick test_baker_form_modal_esc;
+        ] );
+      ( "AccuserForm.init",
+        [
+          test_case "renders form" `Quick test_accuser_form_init;
+          test_case "shows fields" `Quick test_accuser_form_shows_fields;
+        ] );
+      ( "AccuserForm.navigation",
+        [
+          test_case "field navigation" `Quick test_accuser_form_field_navigation;
+          test_case
+            "navigation bounds"
+            `Quick
+            test_accuser_form_navigation_bounds;
+        ] );
+      ( "AccuserForm.modal",
+        [
+          test_case
+            "Enter opens modal"
+            `Quick
+            test_accuser_form_enter_opens_modal;
+          test_case "Esc closes modal" `Quick test_accuser_form_modal_esc;
         ] );
     ]
