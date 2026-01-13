@@ -534,25 +534,30 @@ let snapshot_field =
       let filtered_snapshots =
         match snapshots_opt with
         | Some entries ->
-            entries
-            |> List.filter (fun e ->
-                e.Snapshots.slug <> "full50"
-                && snapshot_entry_matches_history_mode
-                     e
-                     ~history_mode:!model_ref.node.history_mode)
-        | None -> []
+            let matches =
+              entries
+              |> List.filter (fun e ->
+                  e.Snapshots.slug <> "full50"
+                  && snapshot_entry_matches_history_mode
+                       e
+                       ~history_mode:!model_ref.node.history_mode)
+            in
+            if matches = [] then `NoMatches else `Entries matches
+        | None -> `Loading
       in
 
       (* When no snapshots match, only None and Custom are offered.
          This allows users to either sync from genesis or provide a custom URL. *)
       let items =
         match filtered_snapshots with
-        | [] -> [`None; `Custom]
-        | entries ->
+        | `Loading -> [`Loading]
+        | `NoMatches -> [`None; `Custom]
+        | `Entries entries ->
             (`None :: (entries |> List.map (fun e -> `Tzinit e))) @ [`Custom]
       in
 
       let to_string = function
+        | `Loading -> "Loading snapshots..."
         | `None -> "None (manual sync)"
         | `Custom -> "Custom URL..."
         | `Tzinit e ->
@@ -561,6 +566,7 @@ let snapshot_field =
 
       let on_select choice =
         match choice with
+        | `Loading -> () (* Do nothing on select if loading *)
         | `None -> model_ref := {!model_ref with snapshot = `None}
         | `Tzinit e ->
             let snap =
