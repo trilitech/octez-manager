@@ -5,11 +5,11 @@ description: Set up a Data Availability Layer node
 
 # DAL Node Setup
 
-The Data Availability Layer (DAL) is Tezos's scalability solution. Running a DAL node allows your baker to attest to DAL slots.
+The Data Availability Layer (DAL) is Tezos's scalability solution. Running a DAL node allows your baker to attest to DAL slots. This guide uses Shadownet as an example.
 
 ## Prerequisites
 
-1. **Running Node**: A synced Tezos node
+1. **Running Node**: A synced Tezos node (e.g., your Shadownet node)
 2. **Baker** (optional): To attest DAL slots, you need to be a baker
 
 ## Installation via TUI
@@ -17,46 +17,62 @@ The Data Availability Layer (DAL) is Tezos's scalability solution. Running a DAL
 ![Install DAL Node](/octez-manager/gifs/install_dal_node.gif)
 
 1. Launch `octez-manager`
-2. Press `i` → Select **DAL Node**
+2. Select **[ Install new instance ]** → **DAL Node**
 3. Configure:
-   - **Instance name**: `my-dal-node`
-   - **Node**: Select your local node or enter endpoint
+   - **Node**: Select your Shadownet node
+   - **Instance name**: Auto-suggested as `dal-shadownet`
    - **RPC address**: `127.0.0.1:10732` (default)
    - **Net address**: `0.0.0.0:11732` (default)
+
+> Press `?` at any time to see available actions.
 
 ## Installation via CLI
 
 ```bash
-# Using local node
 octez-manager install-dal-node \
-  --instance my-dal-node \
-  --node-instance my-node \
+  --instance dal-shadownet \
+  --node-instance shadownet
+```
+
+### Custom Configuration
+
+```bash
+octez-manager install-dal-node \
+  --instance dal-shadownet \
+  --node-instance shadownet \
   --rpc-addr 127.0.0.1:10732 \
   --net-addr 0.0.0.0:11732
+```
 
-# Using remote endpoint
+### Using Remote Node Endpoint
+
+```bash
 octez-manager install-dal-node \
-  --instance my-dal-node \
-  --node-instance http://localhost:8732 \
-  --rpc-addr 127.0.0.1:10732
+  --instance dal-shadownet \
+  --node-instance http://localhost:8732
 ```
 
 ## Connecting Baker to DAL Node
 
-After setting up your DAL node, connect your baker by editing its configuration:
+After setting up your DAL node, connect your baker to enable DAL attestations.
 
+### Edit Existing Baker
+
+In the TUI, select your baker and press `e` to edit, then select your DAL node.
+
+Via CLI:
 ```bash
-# Edit existing baker configuration
-octez-manager instance my-baker edit
+octez-manager instance baker-shadownet edit
 ```
 
-Or specify during baker installation:
+### During Baker Installation
+
 ```bash
 octez-manager install-baker \
-  --instance my-baker \
-  --node-instance my-node \
+  --instance baker-shadownet \
+  --node-instance shadownet \
   --delegate tz1... \
-  --dal-endpoint my-dal-node \
+  --dal-endpoint dal-shadownet \
   --liquidity-baking-vote pass
 ```
 
@@ -71,14 +87,23 @@ Ensure these ports are accessible for DAL network participation.
 
 ## Monitoring
 
+### Check Status
+
 ```bash
-# Check status
-octez-manager instance my-dal-node show
+octez-manager instance dal-shadownet show
+```
 
-# View logs
-octez-manager instance my-dal-node logs
+### View Logs
 
-# Check DAL node RPC
+```bash
+# TUI: select DAL node, press 'l'
+# CLI:
+octez-manager instance dal-shadownet logs
+```
+
+### Check DAL Node RPC
+
+```bash
 curl -s http://127.0.0.1:10732/health
 ```
 

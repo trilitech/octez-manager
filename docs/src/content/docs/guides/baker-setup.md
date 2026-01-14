@@ -5,12 +5,12 @@ description: Set up a Tezos baker with Octez Manager
 
 # Becoming a Baker
 
-This guide covers setting up a baker to participate in Tezos consensus.
+This guide covers setting up a baker to participate in Tezos consensus. We'll use Shadownet as an example.
 
 ## Prerequisites
 
-1. **Running Node**: You need a synced Tezos node
-2. **Staked Tez**: Minimum 6,000 tez staked to your baker address
+1. **Running Node**: A synced Tezos node (e.g., your Shadownet node)
+2. **Staked Tez**: Minimum 6,000 tez staked to your baker address (use the faucet on testnets)
 3. **Baker Key**: Your baker's secret key imported into the client
 
 ## Import Your Baker Key
@@ -31,28 +31,22 @@ octez-client import secret key my-baker "ledger://..."
 ![Install Baker](/octez-manager/gifs/install_baker.gif)
 
 1. Launch `octez-manager`
-2. Press `i` → Select **Baker**
+2. Select **[ Install new instance ]** → **Baker**
 3. Configure:
-   - **Instance name**: `my-baker`
-   - **Node**: Select your local node or enter remote endpoint
+   - **Node**: Select your Shadownet node
+   - **Instance name**: Auto-suggested as `baker-shadownet`
    - **Delegates**: Your baker address(es)
    - **Liquidity baking vote**: `on`, `off`, or `pass`
    - **DAL node**: Optional, for DAL attestations
 
+> Press `?` at any time to see available actions.
+
 ## Installation via CLI
 
 ```bash
-# Using local node instance
 octez-manager install-baker \
-  --instance my-baker \
-  --node-instance my-node \
-  --delegate tz1... \
-  --liquidity-baking-vote pass
-
-# Using remote endpoint
-octez-manager install-baker \
-  --instance my-baker \
-  --node-instance http://localhost:8732 \
+  --instance baker-shadownet \
+  --node-instance shadownet \
   --delegate tz1... \
   --liquidity-baking-vote pass
 ```

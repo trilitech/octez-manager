@@ -5,52 +5,38 @@ description: Get a Tezos node running in 5 minutes
 
 # Quick Start
 
-Get a Tezos node running in 5 minutes.
+Get a Shadownet node running in 5 minutes. Shadownet is ideal for testing — it resets periodically and has fast block times.
 
-## Option 1: Interactive TUI
+## Using the TUI (Recommended)
 
-Launch the TUI:
+Launch Octez Manager:
 
 ```bash
 octez-manager
 ```
 
-You'll see the main dashboard:
+Select **[ Install new instance ]** → **Node**, then:
 
-```
-┌─ Instances ──────────────────────────────────────────────────────────┐
-│                                                                      │
-│  No instances configured yet.                                        │
-│                                                                      │
-│  Press 'i' to install a new instance.                                │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
- i: install  q: quit  ?: help
-```
+1. Enter instance name: `shadownet`
+2. Select network: `shadownet`
+3. Choose history mode: `rolling`
+4. Keep default addresses
+5. Bootstrap method: `Snapshot`
 
-Press `i`, select **Node**, and follow the prompts.
+The node installs and begins syncing automatically.
 
-After installation, your dashboard shows:
-
-```
-┌─ Instances ──────────────────────────────────────────────────────────┐
-│                                                                      │
-│  ● mainnet          node     running     mainnet     rolling         │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
- i: install  s: start/stop  l: logs  Enter: details  q: quit
-```
+> **Tip:** Press `?` at any time to see available actions.
 
 ---
 
-## Option 2: CLI one-liner
+## Using the CLI
 
-Deploy a mainnet node with snapshot:
+Deploy a Shadownet node with one command:
 
 ```bash
 octez-manager install-node \
-  --instance mainnet \
-  --network mainnet \
+  --instance shadownet \
+  --network shadownet \
   --history-mode rolling \
   --snapshot
 ```
@@ -61,61 +47,48 @@ Check status:
 octez-manager list
 ```
 
-Output:
-
 ```
-INSTANCE    ROLE    STATUS     NETWORK    MODE
-mainnet     node    running    mainnet    rolling
+INSTANCE     ROLE    STATUS     NETWORK      MODE
+shadownet    node    running    shadownet    rolling
 ```
 
 ---
 
-## View logs
+## Monitor Your Node
 
-**TUI:** Select instance, press `l`
+**In the TUI:** Select your node to see sync progress, or press `l` for logs.
 
-```
-┌─ Logs: mainnet ─────────────────────────────────────────────────────┐
-│ Source: journald  r: refresh  t: toggle  /: search  Esc: back       │
-├─────────────────────────────────────────────────────────────────────┤
-│ Jan 09 12:00:01 validator: applied block BLbc4...                   │
-│ Jan 09 12:00:02 p2p: 48 active connections                          │
-│ Jan 09 12:00:03 chain: head is now at level 7234521                 │
-│ Jan 09 12:00:04 mempool: 15 pending operations                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**CLI:**
+**Via CLI:**
 
 ```bash
-octez-manager instance mainnet logs
+# View logs
+octez-manager instance shadownet logs
+
+# Check sync status
+curl -s http://127.0.0.1:8732/chains/main/blocks/head/header | jq .level
 ```
 
 ---
 
-## Service control
+## Control Services
 
 ```bash
 # Stop
-octez-manager instance mainnet stop
+octez-manager instance shadownet stop
 
 # Start
-octez-manager instance mainnet start
+octez-manager instance shadownet start
 
 # Restart
-octez-manager instance mainnet restart
-
-# Remove (keeps data)
-octez-manager instance mainnet remove
-
-# Purge (removes data)
-octez-manager instance mainnet purge
+octez-manager instance shadownet restart
 ```
 
 ---
 
-## Next steps
+## Next Steps
 
-- [Setting up a baker](/octez-manager/guides/baker-setup/)
-- [TUI keyboard shortcuts](/octez-manager/guides/tui-guide/)
-- [CLI reference](/octez-manager/reference/cli/)
+Once your node is synced:
+
+- [Set up a baker](/octez-manager/guides/baker-setup/) to participate in consensus
+- [Add a DAL node](/octez-manager/guides/dal-node-setup/) for data availability attestations
+- [Learn the TUI](/octez-manager/guides/tui-guide/) for full feature access
