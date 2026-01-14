@@ -60,7 +60,7 @@ Select an instance and use these keys:
 
 Press `e` on any instance to edit its configuration. Here's an example of editing a baker's delegates:
 
-![Edit Baker](../../../assets/gifs/edit_baker.gif)
+![Edit Baker](/octez-manager/gifs/edit_baker.gif)
 
 ## Installing Services
 
@@ -79,7 +79,7 @@ Navigate and press `Enter` to start the installation wizard.
 
 ### Installing an Accuser
 
-![Install Accuser](../../../assets/gifs/install_accuser.gif)
+![Install Accuser](/octez-manager/gifs/install_accuser.gif)
 
 ## Log Viewer
 

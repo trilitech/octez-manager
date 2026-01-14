@@ -28,7 +28,7 @@ octez-client import secret key my-baker "ledger://..."
 
 ## Installation via TUI
 
-![Install Baker](../../../assets/gifs/install_baker.gif)
+![Install Baker](/octez-manager/gifs/install_baker.gif)
 
 1. Launch `octez-manager`
 2. Press `i` → Select **Baker**
