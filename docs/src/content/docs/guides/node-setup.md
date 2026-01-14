@@ -11,11 +11,13 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 
 | Network | Purpose | Recommended For |
 |---------|---------|-----------------|
-| **Shadownet** | Fast testnet (resets periodically) | Testing, learning |
+| **Shadownet** | Testnet mirroring mainnet | Testing with mainnet-like conditions |
 | **Ghostnet** | Permanent testnet | Development, staging |
-| **Mainnet** | Production network | Bakers, production services |
+| **Mainnet** | Production network | Not recommended yet (see below) |
 
-> **Tip:** Start with Shadownet for testing. It has fast block times and resets periodically.
+> **Tip:** Start with Shadownet for testing — it mirrors mainnet conditions. For faster iteration, consider a protocolnet which has shorter block times.
+
+> **Warning:** Octez Manager is experimental software. We recommend using it only on testnets (Shadownet, Ghostnet) until it matures. Mainnet usage is at your own risk.
 
 ### History Mode
 
