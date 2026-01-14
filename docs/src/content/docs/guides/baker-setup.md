@@ -5,7 +5,9 @@ description: Set up a Tezos baker with Octez Manager
 
 # Becoming a Baker
 
-This guide covers setting up a baker to participate in Tezos consensus. We'll use Shadownet as an example.
+This guide covers setting up a baker with Octez Manager. We'll use Shadownet as an example.
+
+For detailed information about baking on Tezos, see the [Octez documentation on running a delegate](https://octez.tezos.com/docs/introduction/howtorun.html#running-a-delegate).
 
 ## Prerequisites
 
@@ -46,7 +48,7 @@ See the [Octez documentation](https://octez.tezos.com/docs/introduction/howtorun
    - **Instance name**: Auto-suggested as `baker-shadownet`
    - **Delegates**: Your baker address(es)
    - **Liquidity baking vote**: `on`, `off`, or `pass`
-   - **DAL node**: Optional, for DAL attestations
+   - **DAL node**: For DAL attestations
 
 > Press `?` at any time to see available actions.
 
@@ -116,7 +118,6 @@ octez-manager instance my-baker logs
 - **Key Management**: Consider using a [remote signer](https://octez.tezos.com/docs/user/key-management.html) or Ledger hardware wallet
 - **Firewall**: Only expose necessary ports
 - **Monitoring**: Set up alerts for missed blocks/attestations
-- **Redundancy**: Have a backup baker ready (but not running simultaneously)
 
 ## Troubleshooting
 
