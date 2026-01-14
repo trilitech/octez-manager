@@ -538,7 +538,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     | _ -> Printf.sprintf "%-10s" ""
   in
   let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
-  let fold_indicator = if folded then "▸" else "▾" in
+  let fold_indicator = if folded then "+" else "−" in
   let first_line =
     Printf.sprintf
       "%s %s %s %s%s %s %s %s"
