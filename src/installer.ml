@@ -1396,24 +1396,49 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
           (fun acc dep_inst ->
             let* () = acc in
             (* Update OCTEZ_NODE_INSTANCE and OCTEZ_DAL_INSTANCE in dependent's env file *)
-            match Node_env.read ~inst:dep_inst with
-            | Ok pairs ->
-                let updated_pairs =
-                  List.map
-                    (fun (k, v) ->
-                      if
-                        (k = "OCTEZ_NODE_INSTANCE" || k = "OCTEZ_DAL_INSTANCE")
-                        && String.trim v = old_instance
-                      then (k, new_instance)
-                      else (k, v))
-                    pairs
-                in
-                Node_env.write_pairs ~inst:dep_inst updated_pairs
-            | Error _ -> Ok () (* Skip if can't read env *))
+            let* () =
+              match Node_env.read ~inst:dep_inst with
+              | Ok pairs ->
+                  let updated_pairs =
+                    List.map
+                      (fun (k, v) ->
+                        if
+                          (k = "OCTEZ_NODE_INSTANCE" || k = "OCTEZ_DAL_INSTANCE")
+                          && String.trim v = old_instance
+                        then (k, new_instance)
+                        else (k, v))
+                      pairs
+                  in
+                  Node_env.write_pairs ~inst:dep_inst updated_pairs
+              | Error _ -> Ok () (* Skip if can't read env *)
+            in
+            (* Update depends_on in dependent's service registry entry *)
+            let* () =
+              match Service_registry.find ~instance:dep_inst with
+              | Ok (Some dep_svc)
+                when dep_svc.Service.depends_on = Some old_instance ->
+                  let updated_dep =
+                    {dep_svc with depends_on = Some new_instance}
+                  in
+                  Service_registry.write updated_dep
+              | _ -> Ok ()
+            in
+            (* Regenerate systemd dropin for dependent with new parent reference *)
+            match Service_registry.find ~instance:dep_inst with
+            | Ok (Some dep_svc) ->
+                Systemd.write_dropin
+                  ~role:dep_svc.Service.role
+                  ~inst:dep_inst
+                  ~data_dir:dep_svc.Service.data_dir
+                  ~logging_mode:dep_svc.Service.logging_mode
+                  ~extra_paths:[]
+                  ~depends_on:(old_svc.role, new_instance)
+                  ()
+            | _ -> Ok ())
           (Ok ())
           old_svc.dependents
       in
-      (* Remove old instance from parent's dependents list *)
+      (* Update parent's dependents list: replace old instance name with new *)
       let* () =
         match old_svc.depends_on with
         | None -> Ok ()
@@ -1421,13 +1446,16 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
             match Service_registry.find ~instance:parent_inst with
             | Ok (Some parent) ->
                 let updated_deps =
-                  List.filter (( <> ) old_instance) parent.dependents
+                  parent.dependents
+                  |> List.filter (( <> ) old_instance)
+                  |> List.cons new_instance
+                  |> List.sort_uniq String.compare
                 in
                 let updated_parent = {parent with dependents = updated_deps} in
                 Service_registry.write updated_parent
             | _ -> Ok ())
       in
-      (* Also check if old instance was in DAL node's dependents via env file *)
+      (* Also update DAL node's dependents list if service uses DAL *)
       let* () =
         match Node_env.read ~inst:old_instance with
         | Ok pairs -> (
@@ -1440,7 +1468,10 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
               match Service_registry.find ~instance:dal_inst with
               | Ok (Some dal_svc) ->
                   let updated_deps =
-                    List.filter (( <> ) old_instance) dal_svc.dependents
+                    dal_svc.dependents
+                    |> List.filter (( <> ) old_instance)
+                    |> List.cons new_instance
+                    |> List.sort_uniq String.compare
                   in
                   let updated_dal = {dal_svc with dependents = updated_deps} in
                   Service_registry.write updated_dal
