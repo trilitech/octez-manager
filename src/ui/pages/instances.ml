@@ -1387,8 +1387,8 @@ let offer_restart_dependents ~instance =
               Job_manager.submit
                 ~description:"Restarting dependents"
                 (fun ~append_log () ->
-                  (* Wait a bit for parent service to be fully ready *)
-                  Unix.sleepf 1.0 ;
+                  (* Small delay for UI responsiveness *)
+                  Unix.sleepf 0.2 ;
                   dep_names
                   |> List.iter (fun dep_inst ->
                       match Service_registry.find ~instance:dep_inst with
@@ -1433,22 +1433,61 @@ let offer_restart_dependents ~instance =
         ()
   | _ -> ()
 
+(* Wait for RPC to be ready after restarting a node/DAL service *)
+let wait_for_rpc_after_restart ~instance ~svc ~on_ready =
+  let role = svc.Service.role in
+  if role = "node" || role = "dal-node" || role = "dal" then
+    (* Wait for RPC to be ready before offering to restart dependents *)
+    Job_manager.submit
+      ~description:(Printf.sprintf "Waiting for %s RPC" instance)
+      (fun ~append_log () ->
+        append_log (Printf.sprintf "Waiting for %s RPC to be ready..." instance) ;
+        let result =
+          Health_check.wait_for_service
+            ~timeout:120.0
+            ~on_progress:(fun elapsed ->
+              append_log (Printf.sprintf "Waiting for RPC... (%.0fs)" elapsed))
+            svc
+        in
+        if result.Health_check.ready then (
+          append_log result.Health_check.message ;
+          Ok ())
+        else (
+          append_log
+            (Printf.sprintf "Warning: %s (continuing anyway)" result.message) ;
+          Ok ()))
+      ~on_complete:(fun _ -> on_ready ())
+  else
+    (* For non-RPC services, just a short delay *)
+    Job_manager.submit
+      ~description:(Printf.sprintf "Check dependents for %s" instance)
+      (fun ~append_log:_ () ->
+        Unix.sleepf 0.5 ;
+        Ok ())
+      ~on_complete:(fun _ -> on_ready ())
+
 (* Restart with cascade: check dependencies first, then offer to restart dependents *)
 let restart_with_cascade ~instance ~role =
   match Installer.get_stopped_dependencies ~instance () with
   | Error (`Msg e) ->
       Context.toast_error (Printf.sprintf "Error checking dependencies: %s" e)
-  | Ok [] ->
+  | Ok [] -> (
       (* No stopped dependencies, restart directly *)
       run_unit_action ~verb:"restart" ~instance (fun () ->
           do_restart_service ~instance ~role) ;
-      (* After a short delay, offer to restart dependents *)
-      Job_manager.submit
-        ~description:(Printf.sprintf "Check dependents for %s" instance)
-        (fun ~append_log:_ () ->
-          Unix.sleepf 0.5 ;
-          Ok ())
-        ~on_complete:(fun _ -> offer_restart_dependents ~instance)
+      (* Wait for RPC if applicable, then offer to restart dependents *)
+      match Service_registry.find ~instance with
+      | Ok (Some svc) ->
+          wait_for_rpc_after_restart ~instance ~svc ~on_ready:(fun () ->
+              offer_restart_dependents ~instance)
+      | _ ->
+          (* Fallback to short delay if service not found *)
+          Job_manager.submit
+            ~description:(Printf.sprintf "Check dependents for %s" instance)
+            (fun ~append_log:_ () ->
+              Unix.sleepf 0.5 ;
+              Ok ())
+            ~on_complete:(fun _ -> offer_restart_dependents ~instance))
   | Ok stopped_deps ->
       (* Dependencies are stopped, ask user to start them first *)
       let dep_names = List.map (fun s -> s.Service.instance) stopped_deps in
@@ -1493,12 +1532,19 @@ let restart_with_cascade ~instance ~role =
                 (* Now restart the actual service *)
                 Context.toast_info (Printf.sprintf "Restarting %s..." instance) ;
                 match do_restart_service ~instance ~role with
-                | Ok () ->
+                | Ok () -> (
                     Context.toast_success
                       (Printf.sprintf "%s restarted" instance) ;
                     Context.mark_instances_dirty () ;
-                    (* Offer to restart dependents *)
-                    offer_restart_dependents ~instance
+                    (* Wait for RPC if applicable, then offer to restart dependents *)
+                    match Service_registry.find ~instance with
+                    | Ok (Some svc) ->
+                        wait_for_rpc_after_restart
+                          ~instance
+                          ~svc
+                          ~on_ready:(fun () ->
+                            offer_restart_dependents ~instance)
+                    | _ -> offer_restart_dependents ~instance)
                 | Error (`Msg e) ->
                     record_failure ~instance ~error:e ;
                     Context.toast_error (Printf.sprintf "%s: %s" instance e) ;
