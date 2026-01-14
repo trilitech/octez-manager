@@ -972,12 +972,16 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
   in
+  (* When selection is in menu area, use -1 to dim all columns equally *)
+  let effective_active_column =
+    if state.selected < services_start_idx then -1 else state.active_column
+  in
   let instance_rows =
     merge_columns
       ~col_width
       ~visible_height
       ~column_scroll
-      ~active_column:state.active_column
+      ~active_column:effective_active_column
       ~columns_content
   in
   install_row :: "" :: instance_rows
