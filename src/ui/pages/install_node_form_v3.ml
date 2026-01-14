@@ -93,7 +93,7 @@ let is_auto_snapshot = function
 let create_default_snapshot ~network ~history_mode =
   match String.lowercase_ascii (String.trim history_mode) with
   | "archive" -> `None (* Archive nodes cannot import snapshots *)
-  | _ ->
+  | _ -> (
       match slug_of_network network with
       | Some network_slug ->
           let kind_slug =
@@ -108,7 +108,7 @@ let create_default_snapshot ~network ~history_mode =
               kind_slug;
               label = Printf.sprintf "Auto (%s)" kind_slug;
             }
-      | None -> `None
+      | None -> `None)
 
 let base_initial_model () =
   let network = "mainnet" in
@@ -500,10 +500,10 @@ let snapshot_field =
         | Some entries ->
             entries
             |> List.filter (fun e ->
-                e.Snapshots.slug <> "full50" &&
-                snapshot_entry_matches_history_mode
-                  e
-                  ~history_mode:!model_ref.node.history_mode)
+                e.Snapshots.slug <> "full50"
+                && snapshot_entry_matches_history_mode
+                     e
+                     ~history_mode:!model_ref.node.history_mode)
         | None -> []
       in
 
@@ -680,9 +680,12 @@ let set_node_with_autoname node m =
         if
           (is_auto_snapshot m.snapshot
           || (m.snapshot = `None && old_is_archive && not new_is_archive))
-          && (not (String.equal m.node.network node.network)
+          && ((not (String.equal m.node.network node.network))
              || not (String.equal m.node.history_mode node.history_mode))
-        then create_default_snapshot ~network:node.network ~history_mode:node.history_mode
+        then
+          create_default_snapshot
+            ~network:node.network
+            ~history_mode:node.history_mode
         else m.snapshot
       in
       {
