@@ -13,8 +13,11 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 
 | Network | Purpose | Recommended For |
 |---------|---------|-----------------|
+| **Shadownet** | Fast testnet (resets periodically) | Testing, learning |
+| **Ghostnet** | Permanent testnet | Development, staging |
 | **Mainnet** | Production network | Bakers, production services |
-| **Ghostnet** | Permanent testnet | Testing, development |
+
+> **Tip:** Start with Shadownet for testing. It has fast block times and resets periodically.
 
 ### History Mode
 
@@ -36,24 +39,24 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 ![Install Node](/octez-manager/gifs/install_node.gif)
 
 1. Launch `octez-manager`
-2. Press `i` → Select **Node**
+2. Select **[ Install new instance ]** → **Node**
 3. Configure:
-   - **Instance name**: Unique identifier (e.g., `mainnet-node`)
-   - **Network**: `mainnet` or `ghostnet`
+   - **Instance name**: Unique identifier (e.g., `shadownet`)
+   - **Network**: `shadownet` (or `mainnet`/`ghostnet`)
    - **History mode**: `rolling` (recommended)
    - **RPC address**: `127.0.0.1:8732` (default)
    - **Net address**: `0.0.0.0:9732` (default)
    - **Bootstrap**: `Snapshot` (recommended)
 
+> Press `?` at any time to see available actions.
+
 ## Installation via CLI
 
 ```bash
 octez-manager install-node \
-  --instance mainnet-node \
-  --network mainnet \
+  --instance shadownet \
+  --network shadownet \
   --history-mode rolling \
-  --rpc-addr 127.0.0.1:8732 \
-  --net-addr 0.0.0.0:9732 \
   --snapshot
 ```
 
