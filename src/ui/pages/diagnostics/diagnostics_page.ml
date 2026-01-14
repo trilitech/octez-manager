@@ -138,7 +138,8 @@ let change_duration s =
     ~to_string
     ~on_select:(fun (samples, label) ->
       Metrics.set_recording_duration samples ;
-      Context.toast_info (Printf.sprintf "Recording duration set to %s" label)) ;
+      Context.toast_info (Printf.sprintf "Recording duration set to %s" label))
+    () ;
   s
 
 let clear_caches s =

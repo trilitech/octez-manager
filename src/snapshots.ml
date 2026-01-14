@@ -65,7 +65,8 @@ let sanitize_kind_input k =
 let fetch_html_curl url =
   let cmd =
     Printf.sprintf
-      "curl -fsSL --max-time 8 --connect-timeout 2 -w '\n%%{http_code}' %s"
+      "curl -fsL --max-time 10 --connect-timeout 5 -w '\n\
+       %%{http_code}' %s 2>/dev/null"
       (Common.sh_quote url)
   in
   match Common.run_out ["/bin/sh"; "-c"; cmd] with
@@ -74,6 +75,8 @@ let fetch_html_curl url =
       match lines with
       | code_str :: rev_body -> (
           match int_of_string_opt (String.trim code_str) with
+          | Some 0 ->
+              Error (`Msg (Printf.sprintf "curl failed (HTTP 0) for %s" url))
           | Some code ->
               let body = String.concat "\n" (List.rev rev_body) in
               Ok (code, body)
@@ -252,12 +255,12 @@ let default_candidates =
 
 let list_with_impl ~fetch ~network_slug =
   let root = fetch (base_url ^ "/") in
-  let base_candidates, from_root =
+  let base_candidates =
     match root with
     | Ok (_, html) ->
         let entries = parse_anchors html ~network_slug in
-        if entries = [] then (default_candidates, false) else (entries, true)
-    | Error _ -> (default_candidates, false)
+        if entries = [] then default_candidates else entries
+    | Error _ -> default_candidates
   in
   let rec gather acc = function
     | [] -> Ok (List.rev acc)
@@ -265,15 +268,17 @@ let list_with_impl ~fetch ~network_slug =
         match fetch_entry_with_impl ~fetch ~network_slug ~slug ~label with
         | Ok (Some entry) -> gather (entry :: acc) rest
         | Ok None ->
-            if from_root then
-              Error
-                (`Msg
-                   (Printf.sprintf
-                      "Snapshot '%s' disappeared from tzinit listings for %s."
-                      slug
-                      network_slug))
-            else gather acc rest
-        | Error _ as e -> e)
+            (* Just skip missing entries instead of failing *)
+            gather acc rest
+        | Error (`Msg e) ->
+            (* Log error but continue with other candidates *)
+            Common.append_debug_log
+              (Printf.sprintf
+                 "Failed to fetch snapshot metadata for %s/%s: %s"
+                 network_slug
+                 slug
+                 e) ;
+            gather acc rest)
   in
   match gather [] base_candidates with
   | Ok [] ->

@@ -108,7 +108,7 @@ let open_text_modal ~title ~lines =
     ~on_close:(fun _ _ -> ())
 
 let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
-    ~on_select =
+    ?on_tick ~on_select () =
   let module Modal = struct
     type state = choice Select_widget.t
 
@@ -131,7 +131,13 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
 
     let service_select ps _ = ps
 
-    let service_cycle ps _ = ps
+    let service_cycle ps _ =
+      match on_tick with
+      | Some f ->
+          f () ;
+          (* Force redraw for animation *)
+          Navigation.update (fun s -> s) ps
+      | None -> ps
 
     let back ps = ps
 
@@ -184,7 +190,7 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
       | `Cancel -> ())
 
 let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
-    ~to_string ~hint ~describe ~on_select =
+    ~to_string ~hint ~describe ~on_select () =
   let describe_fn = describe in
   (* Helper to update the Miaou Help_hint based on selected item *)
   let update_help_hint s =
@@ -493,6 +499,7 @@ let confirm_modal ?title ~message ~on_result () =
     ~items:[true; false]
     ~to_string:(function true -> "Yes" | false -> "No")
     ~on_select:on_result
+    ()
 
 let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
     ~validator ~on_submit () =
@@ -822,7 +829,8 @@ let select_directory_modal ~title ~dir_type ~on_select () =
                  with
                 | Ok () -> ()
                 | Error (`Msg msg) ->
-                    prerr_endline ("Registry add failed: " ^ msg)) ;
+                    Octez_manager_lib.Common.append_debug_log
+                      ("Registry add failed: " ^ msg)) ;
                 on_select trimmed
               in
               if Sys.file_exists trimmed then
@@ -839,7 +847,7 @@ let select_directory_modal ~title ~dir_type ~on_select () =
           ()
   in
 
-  open_choice_modal ~title ~items ~to_string ~on_select:on_choice_select
+  open_choice_modal ~title ~items ~to_string ~on_select:on_choice_select ()
 
 let select_node_data_dir_modal ~on_select () =
   select_directory_modal
@@ -925,6 +933,7 @@ let select_app_bin_dir_modal ~on_select () =
     ~items
     ~to_string
     ~on_select:on_choice_select
+    ()
 
 let show_help_modal () =
   let lines =
@@ -955,3 +964,4 @@ let show_menu_modal () =
     ~items
     ~to_string:(fun (label, _) -> label)
     ~on_select:(fun (_, target) -> Context.navigate target)
+    ()

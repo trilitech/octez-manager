@@ -120,7 +120,7 @@ let choice ~label ~get ~set ~to_string ~items =
   let validate_msg _ = None in
   let edit model_ref =
     let on_select v = model_ref := set v !model_ref in
-    Modal_helpers.open_choice_modal ~title:label ~items ~to_string ~on_select
+    Modal_helpers.open_choice_modal ~title:label ~items ~to_string ~on_select ()
   in
   Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
@@ -130,7 +130,7 @@ let dynamic_choice ~label ~get ~set ~to_string ~get_items =
   let edit model_ref =
     let items = get_items !model_ref in
     let on_select v = model_ref := set v !model_ref in
-    Modal_helpers.open_choice_modal ~title:label ~items ~to_string ~on_select
+    Modal_helpers.open_choice_modal ~title:label ~items ~to_string ~on_select ()
   in
   Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
@@ -319,6 +319,7 @@ let service_or_endpoint ~label ~role ~get ~set
       ~items
       ~to_string:to_string_item
       ~on_select
+      ()
   in
   Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
@@ -476,7 +477,8 @@ struct
                   ~title:modal_config.title
                   ~items:modal_config.choices
                   ~to_string:modal_config.to_string
-                  ~on_select ;
+                  ~on_select
+                  () ;
                 s
             | None ->
                 (* No modal needed, proceed with normal submission *)

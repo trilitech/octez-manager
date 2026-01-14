@@ -99,7 +99,10 @@ let create_node_flow ~on_success =
                           ~title:"Success"
                           ("Node " ^ instance ^ " created.") ;
                         on_success ()
-                    | Error (`Msg e) -> show_error ~title:"Error" e))))
+                    | Error (`Msg e) -> show_error ~title:"Error" e)
+                  ())
+              ())
+          ())
     ()
 
 let create_baker_flow ~services ~on_success =
@@ -167,6 +170,7 @@ let create_baker_flow ~services ~on_success =
                   | Error (`Msg e) -> show_error ~title:"Error" e)
                 ())
           ())
+      ()
 
 let create_accuser_flow ~on_success =
   let open Modal_helpers in
@@ -222,7 +226,8 @@ let create_accuser_flow ~on_success =
                   ~title:"Success"
                   ("Accuser " ^ instance ^ " created.") ;
                 on_success ()
-            | Error (`Msg e) -> show_error ~title:"Error" e))
+            | Error (`Msg e) -> show_error ~title:"Error" e)
+          ())
     ()
 
 let create_dal_node_flow ~on_success =
@@ -287,5 +292,6 @@ let create_dal_node_flow ~on_success =
                   ~title:"Success"
                   ("DAL Node " ^ instance ^ " created.") ;
                 on_success ()
-            | Error (`Msg e) -> show_error ~title:"Error" e))
+            | Error (`Msg e) -> show_error ~title:"Error" e)
+          ())
     ()

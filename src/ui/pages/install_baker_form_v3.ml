@@ -310,7 +310,8 @@ let parent_node_field =
         ~title:"Parent Node"
         ~items
         ~to_string
-        ~on_select)
+        ~on_select
+        ())
     ()
 
 let dal_node_field =
@@ -378,7 +379,8 @@ let dal_node_field =
         ~title:"DAL Node"
         ~items
         ~to_string
-        ~on_select)
+        ~on_select
+        ())
     ()
 
 let node_data_dir_field =

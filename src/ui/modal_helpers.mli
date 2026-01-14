@@ -11,7 +11,9 @@ val open_choice_modal :
   title:string ->
   items:'a list ->
   to_string:('a -> string) ->
+  ?on_tick:(unit -> unit) ->
   on_select:('a -> unit) ->
+  unit ->
   unit
 
 val open_choice_modal_with_hint :
@@ -21,6 +23,7 @@ val open_choice_modal_with_hint :
   hint:('a -> unit) ->
   describe:('a -> string list) ->
   on_select:('a -> unit) ->
+  unit ->
   unit
 
 val open_multiselect_modal :

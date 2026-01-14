@@ -242,7 +242,8 @@ let node_selection_field =
         ~title:"Select Node"
         ~items
         ~to_string
-        ~on_select)
+        ~on_select
+        ())
     ()
 
 let spec =

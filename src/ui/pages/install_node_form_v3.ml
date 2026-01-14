@@ -172,7 +172,7 @@ let has_octez_node_binary dir =
 
 (** {1 Snapshot Cache} *)
 
-let snapshot_cache = Cache.create_safe_keyed ~name:"snapshots" ~ttl:300.0 ()
+let snapshot_cache = Cache.create_safe_keyed ~name:"snapshots" ~ttl:60.0 ()
 
 let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
@@ -200,7 +200,9 @@ let schedule_snapshot_fetch slug =
         else false)
   in
   if should_fetch then
-    Background_runner.submit_blocking (fun () ->
+    Background_runner.submit_blocking
+      (* ~on_complete:(fun () -> Context.invalidate_cache ()) *)
+      (fun () ->
         Fun.protect
           ~finally:(fun () ->
             Mutex.protect snapshot_inflight_lock (fun () ->
@@ -209,7 +211,7 @@ let schedule_snapshot_fetch slug =
             match fetch_snapshot_list slug with
             | Ok entries -> cache_snapshot slug entries
             | Error msg ->
-                prerr_endline
+                Common.append_debug_log
                   (Printf.sprintf "Background snapshot fetch failed: %s" msg)))
 
 let snapshot_entries_from_cache slug =
@@ -234,6 +236,13 @@ let prefetch_snapshot_list network =
   | None -> ()
 
 (** {1 Snapshot Space Check} *)
+
+let snapshot_size_cache =
+  Cache.create_safe_keyed ~name:"snapshot_sizes" ~ttl:60.0 ()
+
+let snapshot_size_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
+
+let snapshot_size_inflight_lock = Mutex.create ()
 
 let format_bytes bytes =
   let kb = 1024L in
@@ -278,26 +287,48 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir =
   match get_snapshot_url ~network snapshot with
   | None -> Ok () (* No URL to check, or local file *)
   | Some url -> (
-      match Common.get_remote_file_size url with
-      | None -> Ok () (* Can't determine size, proceed *)
-      | Some size -> (
-          let dir =
-            Option.value ~default:(Filename.get_temp_dir_name ()) tmp_dir
+      match Cache.get_safe_keyed_cached snapshot_size_cache url with
+      | Some size_opt -> (
+          match size_opt with
+          | None -> Ok () (* Size unknown, proceed *)
+          | Some size -> (
+              let dir =
+                Option.value ~default:(Filename.get_temp_dir_name ()) tmp_dir
+              in
+              match Common.get_available_space dir with
+              | None -> Ok () (* Can't determine space, proceed *)
+              | Some available ->
+                  (* Add 10% buffer for safety *)
+                  let required = Int64.add size (Int64.div size 10L) in
+                  if available >= required then Ok ()
+                  else
+                    Error
+                      (Printf.sprintf
+                         "Need %s (snapshot %s + 10%% buffer) but %s only has \
+                          %s"
+                         (format_bytes required)
+                         (format_bytes size)
+                         dir
+                         (format_bytes available))))
+      | None ->
+          (* Trigger background fetch *)
+          let should_fetch =
+            Mutex.protect snapshot_size_inflight_lock (fun () ->
+                if not (Hashtbl.mem snapshot_size_inflight url) then (
+                  Hashtbl.add snapshot_size_inflight url () ;
+                  true)
+                else false)
           in
-          match Common.get_available_space dir with
-          | None -> Ok () (* Can't determine space, proceed *)
-          | Some available ->
-              (* Add 10% buffer for safety *)
-              let required = Int64.add size (Int64.div size 10L) in
-              if available >= required then Ok ()
-              else
-                Error
-                  (Printf.sprintf
-                     "Need %s (snapshot %s + 10%% buffer) but %s only has %s"
-                     (format_bytes required)
-                     (format_bytes size)
-                     dir
-                     (format_bytes available))))
+          if should_fetch then
+            Background_runner.submit_blocking (fun () ->
+                Fun.protect
+                  ~finally:(fun () ->
+                    Mutex.protect snapshot_size_inflight_lock (fun () ->
+                        Hashtbl.remove snapshot_size_inflight url))
+                  (fun () ->
+                    let size = Common.get_remote_file_size url in
+                    Cache.set_safe_keyed snapshot_size_cache url size)) ;
+          Ok ())
 
 let parse_port addr =
   match String.split_on_char ':' addr with
@@ -486,10 +517,17 @@ let snapshot_field =
     ~edit:(fun model_ref ->
       let snapshots_opt =
         match slug_of_network !model_ref.node.network with
-        | Some slug ->
-            (* Only read from cache - no synchronous I/O in render loop!
-               Prefetching via on_init and on_network_selected handles cache population. *)
-            snapshot_entries_from_cache slug
+        | Some slug -> (
+            (* Check cache *)
+            match snapshot_entries_from_cache slug with
+            | Some entries -> Some entries
+            | None ->
+                (* Cache miss or expired:
+                   1. Trigger a background fetch if not already in flight
+                   2. Return None for now (will re-render when fetch completes,
+                      assuming UI handles async updates, or on next interaction) *)
+                schedule_snapshot_fetch slug ;
+                None)
         | None -> None
       in
 
@@ -498,25 +536,30 @@ let snapshot_field =
       let filtered_snapshots =
         match snapshots_opt with
         | Some entries ->
-            entries
-            |> List.filter (fun e ->
-                e.Snapshots.slug <> "full50"
-                && snapshot_entry_matches_history_mode
-                     e
-                     ~history_mode:!model_ref.node.history_mode)
-        | None -> []
+            let matches =
+              entries
+              |> List.filter (fun e ->
+                  e.Snapshots.slug <> "full50"
+                  && snapshot_entry_matches_history_mode
+                       e
+                       ~history_mode:!model_ref.node.history_mode)
+            in
+            if matches = [] then `NoMatches else `Entries matches
+        | None -> `Loading
       in
 
       (* When no snapshots match, only None and Custom are offered.
          This allows users to either sync from genesis or provide a custom URL. *)
       let items =
         match filtered_snapshots with
-        | [] -> [`None; `Custom]
-        | entries ->
+        | `Loading -> [`Loading]
+        | `NoMatches -> [`None; `Custom]
+        | `Entries entries ->
             (`None :: (entries |> List.map (fun e -> `Tzinit e))) @ [`Custom]
       in
 
       let to_string = function
+        | `Loading -> Context.render_spinner "Loading snapshots..."
         | `None -> "None (manual sync)"
         | `Custom -> "Custom URL..."
         | `Tzinit e ->
@@ -525,6 +568,7 @@ let snapshot_field =
 
       let on_select choice =
         match choice with
+        | `Loading -> () (* Do nothing on select if loading *)
         | `None -> model_ref := {!model_ref with snapshot = `None}
         | `Tzinit e ->
             let snap =
@@ -548,7 +592,9 @@ let snapshot_field =
         ~title:"Import Snapshot"
         ~items
         ~to_string
-        ~on_select)
+        ~on_tick:Context.tick_spinner
+        ~on_select
+        ())
     ~validate:(fun m ->
       let history_conflict =
         history_snapshot_conflict

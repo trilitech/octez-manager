@@ -382,6 +382,7 @@ let show_restart_dependents_modal dependents =
           Printf.sprintf "Restart all (%s)" (String.concat ", " dependents)
       | `Dismiss -> "Dismiss (restart later)")
     ~on_select:(function `RestartAll -> restart_all () | `Dismiss -> ())
+    ()
 
 let maybe_refresh ps =
   let state = ps.Navigation.s in
@@ -1066,6 +1067,7 @@ let remove_with_dependents_confirm ~instance ~dependents ~delete_data_dir =
           run_unit_action ~verb:"remove" ~instance (fun () ->
               do_remove ~instance ~delete_data_dir ())
       | `Cancel -> ())
+    ()
 
 let purge_with_dependents_confirm ~instance ~dependents =
   Modal_helpers.open_choice_modal
@@ -1082,6 +1084,7 @@ let purge_with_dependents_confirm ~instance ~dependents =
           run_unit_action ~verb:"purge" ~instance (fun () ->
               do_purge ~instance ())
       | `Cancel -> ())
+    ()
 
 let remove_modal state =
   with_service state (fun svc_state ->
@@ -1119,7 +1122,8 @@ let remove_modal state =
               if dependents = [] then
                 run_unit_action ~verb:"purge" ~instance (fun () ->
                     do_purge ~instance ())
-              else purge_with_dependents_confirm ~instance ~dependents) ;
+              else purge_with_dependents_confirm ~instance ~dependents)
+        () ;
       state)
 
 let journalctl_args unit_name =
@@ -1231,7 +1235,8 @@ let _view_logs_old state =
               | `DailyLogs -> "Daily Logs (octez)")
             ~on_select:(function
               | `Journald -> show_journald ()
-              | `DailyLogs -> ignore (tail_file path)) ;
+              | `DailyLogs -> ignore (tail_file path))
+            () ;
           state
       | None ->
           (* No daily logs found, just show journald *)
@@ -1277,6 +1282,7 @@ let offer_start_dependents ~instance =
                         (Printf.sprintf "%s: %s" dep.Service.instance e)) ;
               Context.mark_instances_dirty ()
           | `Dismiss -> ())
+        ()
   | Error _ -> ()
 
 (* Start with cascade: check dependencies first, then offer to start dependents *)
@@ -1350,6 +1356,7 @@ let start_with_cascade ~instance ~role =
                     Context.toast_error (Printf.sprintf "%s: %s" instance e) ;
                     Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
+        ()
 
 (* Restart a single service (internal helper) *)
 let do_restart_service ~instance ~role =
@@ -1419,6 +1426,7 @@ let offer_restart_dependents ~instance =
                   Ok ())
                 ~on_complete:(fun _ -> Context.mark_instances_dirty ())
           | `Dismiss -> ())
+        ()
   | _ -> ()
 
 (* Restart with cascade: check dependencies first, then offer to restart dependents *)
@@ -1492,6 +1500,7 @@ let restart_with_cascade ~instance ~role =
                     Context.toast_error (Printf.sprintf "%s: %s" instance e) ;
                     Context.mark_instances_dirty ())
               else Context.mark_instances_dirty ())
+        ()
 
 (* Edit instance - navigate to appropriate form *)
 let do_edit_instance svc =
@@ -1524,6 +1533,7 @@ let confirm_edit_modal svc =
         | `Cancel -> "Cancel")
       ~on_select:(fun choice ->
         match choice with `Confirm -> do_edit_instance svc | `Cancel -> ())
+      ()
 
 let instance_actions_modal state =
   with_service state (fun svc_state ->
@@ -1562,7 +1572,8 @@ let instance_actions_modal state =
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
-          | `Remove -> remove_modal state |> ignore) ;
+          | `Remove -> remove_modal state |> ignore)
+        () ;
       state)
 
 let create_menu_modal state =
@@ -1579,7 +1590,8 @@ let create_menu_modal state =
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
       | `Accuser -> Context.navigate Install_accuser_form_v3.name
-      | `DalNode -> Context.navigate Install_dal_node_form_v3.name) ;
+      | `DalNode -> Context.navigate Install_dal_node_form_v3.name)
+    () ;
   state
 
 let go_to_diagnostics state =
