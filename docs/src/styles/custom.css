@@ -1,23 +1,33 @@
 /* Octez Manager - Tezos-inspired theme */
 
 :root {
-  /* Tezos blue palette */
+  /* Tezos blue palette - works for both themes */
   --sl-color-accent-low: #0a2540;
   --sl-color-accent: #0D61FF;
   --sl-color-accent-high: #4d94ff;
+}
 
-  /* Clean backgrounds */
+/* Dark theme specific */
+:root[data-theme='dark'] {
   --sl-color-bg: #0f1419;
   --sl-color-bg-nav: #0a0f14;
   --sl-color-bg-sidebar: #0a0f14;
-
-  /* Text */
   --sl-color-white: #f0f6fc;
   --sl-color-gray-1: #c9d1d9;
   --sl-color-gray-2: #8b949e;
-
-  /* Code blocks */
   --sl-color-bg-inline-code: #161b22;
+}
+
+/* Light theme specific */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #e6f0ff;
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #f6f8fa;
+  --sl-color-bg-sidebar: #f6f8fa;
+  --sl-color-white: #1f2328;
+  --sl-color-gray-1: #424a53;
+  --sl-color-gray-2: #656d76;
+  --sl-color-bg-inline-code: #f0f3f6;
 }
 
 /* Hero section */
@@ -33,7 +43,7 @@
 /* Code blocks - terminal style */
 pre {
   border-radius: 8px;
-  border: 1px solid #30363d;
+  border: 1px solid var(--sl-color-gray-5);
 }
 
 pre code {
@@ -55,26 +65,25 @@ th {
 
 td {
   padding: 0.75rem;
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid var(--sl-color-gray-5);
 }
 
 /* Cards */
 .card {
-  border: 1px solid #30363d;
-  background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+  border: 1px solid var(--sl-color-gray-5);
 }
 
 /* Horizontal rules */
 hr {
   border: none;
-  border-top: 1px solid #30363d;
+  border-top: 1px solid var(--sl-color-gray-5);
   margin: 2.5rem 0;
 }
 
 /* Command styling */
 code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  background: #161b22;
+  background: var(--sl-color-bg-inline-code);
   padding: 0.2em 0.4em;
   border-radius: 4px;
 }
