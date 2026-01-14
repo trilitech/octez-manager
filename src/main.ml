@@ -2976,7 +2976,10 @@ let ui_term =
 let ui_cmd =
   let open Cmdliner in
   let info =
-    Cmd.info "ui" ~doc:"Launch the interactive terminal UI (same as running without arguments)"
+    Cmd.info
+      "ui"
+      ~doc:
+        "Launch the interactive terminal UI (same as running without arguments)"
   in
   Cmd.v info ui_term
 
