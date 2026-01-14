@@ -1,137 +1,136 @@
 ---
 title: Using the TUI
-description: Navigate and use the Octez Manager terminal interface
+description: Manage your Tezos infrastructure with the interactive terminal interface
 ---
 
 # Using the TUI
 
-Octez Manager provides a full-featured Terminal User Interface (TUI) for managing your Tezos infrastructure.
+Octez Manager provides an interactive Terminal User Interface (TUI) for managing your Tezos infrastructure. This guide walks through common workflows using Shadownet as an example.
 
-## Launching the TUI
+> **Tip:** Press `?` at any time to see available actions for the current screen.
+
+## Getting Started
+
+Launch the TUI:
 
 ```bash
-# User mode
+# User mode (services run as your user)
 octez-manager
 
-# System mode (as root)
+# System mode (dedicated service users, production)
 sudo octez-manager
 ```
 
-## Main Dashboard
+## What You Can Do
 
-The main screen shows all your instances with their status:
+The TUI provides access to all Octez Manager features:
 
-```
-┌─ Instances ─────────────────────────────────────────┐
-│  mainnet-node     node      ● running    mainnet   │
-│  my-baker         baker     ● running    mainnet   │
-│  ghostnet-node    node      ○ stopped    ghostnet  │
-└─────────────────────────────────────────────────────┘
-```
+| Feature | Description |
+|---------|-------------|
+| **Install services** | Deploy nodes, bakers, accusers, and DAL nodes |
+| **Monitor status** | Real-time service status, sync progress, delegate activity |
+| **View logs** | Live log streaming with search and filtering |
+| **Edit configuration** | Modify instance settings without redeploying |
+| **Control services** | Start, stop, restart, and remove instances |
 
-Status indicators:
-- `●` Green: Running
-- `○` Gray: Stopped
-- `!` Red: Error/Failed
+## Installing Your First Node
 
-## Navigation
+From the main screen, select **[ Install new instance ]** and choose **Node**.
 
-| Key | Action |
-|-----|--------|
-| `↑`/`↓` or `j`/`k` | Move selection |
-| `Enter` | View instance details |
-| `Tab` | Switch panels |
-| `q` | Quit / Go back |
-| `?` | Show help |
+![Install Node](/octez-manager/gifs/install_node.gif)
 
-## Instance Actions
+The installation wizard guides you through:
 
-Select an instance and use these keys:
+1. **Instance name** — A unique identifier (e.g., `shadownet`)
+2. **Network** — Select `shadownet` for testing
+3. **History mode** — `rolling` is recommended for most users
+4. **RPC/Net addresses** — Keep defaults unless you need specific ports
+5. **Bootstrap method** — `Snapshot` downloads pre-built state (faster)
 
-| Key | Action |
-|-----|--------|
-| `s` | Start/Stop service |
-| `r` | Restart service |
-| `l` | View logs |
-| `e` | Edit configuration |
-| `d` | Delete instance |
+Once installed, the node appears on your dashboard and begins syncing.
 
-### Editing an Instance
+## The Main Dashboard
 
-Press `e` on any instance to edit its configuration. Here's an example of editing a baker's delegates:
+The dashboard shows all your instances organized by type:
+
+- **Nodes** — L1 blockchain nodes
+- **Bakers** — Block producers and attesters
+- **Accusers** — Double-baking detectors
+- **DAL Nodes** — Data Availability Layer nodes
+
+Each instance displays:
+- Status indicator (`●` running, `○` stopped, `!` failed)
+- Instance name and network
+- Real-time metrics (sync status, memory, signing activity)
+
+Select any instance with arrow keys and press `Enter` to see details, or use the action keys shown at the bottom of the screen.
+
+## Adding a Baker
+
+After your node is synced, you can add a baker. Select **[ Install new instance ]** → **Baker**.
+
+![Install Baker](/octez-manager/gifs/install_baker.gif)
+
+The wizard will:
+1. Ask which node to connect to (select your Shadownet node)
+2. Auto-suggest a name like `baker-shadownet`
+3. Prompt for delegate addresses (your baker keys)
+4. Configure liquidity baking vote and DAL settings
+
+## Editing an Instance
+
+Need to change delegates or other settings? Select the instance and press `e` to edit.
 
 ![Edit Baker](/octez-manager/gifs/edit_baker.gif)
 
-## Installing Services
+Changes take effect after saving. The TUI will restart the service if needed.
 
-Press `i` to open the install menu:
+## Viewing Logs
 
-```
-┌─ Install ───────────┐
-│  Node              │
-│  DAL Node          │
-│  Baker             │
-│  Accuser           │
-└────────────────────┘
-```
+Select an instance and press `l` to open the log viewer:
 
-Navigate and press `Enter` to start the installation wizard.
+- Logs stream in real-time (follow mode)
+- Press `/` to search for specific text
+- Press `t` to switch between journald and daily log files
+- Press `w` to toggle line wrapping
 
-### Installing an Accuser
+## Service Control
+
+From the dashboard, you can control any service:
+
+- **Start/Stop** — Toggle the service state
+- **Restart** — Stop and start the service
+- **Remove** — Uninstall the service (keeps data by default)
+
+The TUI shows dependent services and handles them automatically. For example, stopping a node will prompt about dependent bakers.
+
+## Installing a Complete Shadownet Setup
+
+Here's a typical workflow for a complete Shadownet baking setup:
+
+1. **Install a node**
+   - Network: `shadownet`
+   - History mode: `rolling`
+   - Bootstrap: `Snapshot`
+
+2. **Wait for sync** — The dashboard shows sync progress
+
+3. **Install a DAL node** (optional, for DAL attestations)
+   - Connect to your Shadownet node
+
+4. **Install a baker**
+   - Connect to your Shadownet node
+   - Add your delegate address(es)
+   - Optionally connect to your DAL node
+
+5. **Install an accuser** (recommended)
+   - Monitors for double-baking
 
 ![Install Accuser](/octez-manager/gifs/install_accuser.gif)
 
-## Log Viewer
-
-The log viewer (`l`) shows real-time logs:
-
-```
-┌─ Logs: mainnet-node ─────────────────────────────────┐
-│ Source: journald . r: refresh . t: toggle . /: search│
-│                                                       │
-│ Jan 09 12:00:01 validator: block BLabc... validated  │
-│ Jan 09 12:00:02 p2p: 50 connections established      │
-│ Jan 09 12:00:03 mempool: 12 pending operations       │
-└───────────────────────────────────────────────────────┘
-```
-
-Log viewer keys:
-| Key | Action |
-|-----|--------|
-| `f` | Toggle follow mode |
-| `w` | Toggle line wrap |
-| `t` | Toggle source (journald/daily logs) |
-| `/` | Search |
-| `n`/`N` | Next/previous match |
-| `g`/`G` | Go to top/bottom |
-| `Esc` | Exit log viewer |
-
-## Form Navigation
-
-When filling out forms:
-
-| Key | Action |
-|-----|--------|
-| `Tab` / `↓` | Next field |
-| `Shift+Tab` / `↑` | Previous field |
-| `Enter` | Submit form / Select option |
-| `Space` | Toggle checkbox |
-| `Esc` | Cancel |
-
 ## Tips
 
-### Quick Actions
-
-- From the main screen, press the first letter of an action for quick access
-- Use `?` anywhere to see context-specific help
-
-### Multiple Instances
-
-- Use meaningful instance names (e.g., `mainnet-baker`, `ghostnet-node`)
-- The TUI shows all instances grouped by type
-
-### Monitoring
-
-- Keep the TUI open to monitor services
-- Logs auto-refresh when in follow mode
-- Instance status updates automatically
+- **Use `?` for help** — Every screen has context-specific help
+- **Watch the hints** — The bottom bar shows available actions
+- **Check metrics** — Expanded instances show CPU, memory, and sync status
+- **Monitor bakers** — Baker instances show recent signing activity and delegate balances

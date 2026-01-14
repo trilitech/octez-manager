@@ -5,54 +5,57 @@ description: Set up a Tezos baker with Octez Manager
 
 # Becoming a Baker
 
-This guide covers setting up a baker to participate in Tezos consensus.
+This guide covers setting up a baker to participate in Tezos consensus. We'll use Shadownet as an example.
 
 ## Prerequisites
 
-1. **Running Node**: You need a synced Tezos node
-2. **Staked Tez**: Minimum 6,000 tez staked to your baker address
-3. **Baker Key**: Your baker's secret key imported into the client
+1. **Octez Binaries**: Install the Octez suite (`octez-client`, `octez-baker`, etc.). See [How to get Octez](https://octez.tezos.com/docs/introduction/howtoget.html) for installation options.
+2. **Running Node**: A synced Tezos node (e.g., your Shadownet node)
+3. **Staked Tez**: Minimum 6,000 tez staked to your baker address (use the faucet on testnets)
+4. **Baker Key**: Your baker's secret key imported into the client
 
-## Import Your Baker Key
+## Set Up Baker Directory
 
-Before setting up the baker, import your key:
+Before installing the baker with Octez Manager, you need to create a base directory and import your baker key. This directory holds your baker's configuration and keys.
+
+> **Note:** Future versions of Octez Manager may automate this setup.
 
 ```bash
+# Create a base directory for your baker
+mkdir -p ~/.tezos-client
+
+# Import your key (see Octez docs for details)
 octez-client import secret key my-baker unencrypted:edsk...
 ```
 
-Or use a ledger:
+Or use a Ledger hardware wallet:
 ```bash
 octez-client import secret key my-baker "ledger://..."
 ```
+
+See the [Octez documentation](https://octez.tezos.com/docs/introduction/howtorun.html#running-a-delegate) for detailed instructions on key management and delegate setup.
 
 ## Installation via TUI
 
 ![Install Baker](/octez-manager/gifs/install_baker.gif)
 
 1. Launch `octez-manager`
-2. Press `i` → Select **Baker**
+2. Select **[ Install new instance ]** → **Baker**
 3. Configure:
-   - **Instance name**: `my-baker`
-   - **Node**: Select your local node or enter remote endpoint
+   - **Node**: Select your Shadownet node
+   - **Instance name**: Auto-suggested as `baker-shadownet`
    - **Delegates**: Your baker address(es)
    - **Liquidity baking vote**: `on`, `off`, or `pass`
    - **DAL node**: Optional, for DAL attestations
 
+> Press `?` at any time to see available actions.
+
 ## Installation via CLI
 
 ```bash
-# Using local node instance
 octez-manager install-baker \
-  --instance my-baker \
-  --node-instance my-node \
-  --delegate tz1... \
-  --liquidity-baking-vote pass
-
-# Using remote endpoint
-octez-manager install-baker \
-  --instance my-baker \
-  --node-instance http://localhost:8732 \
+  --instance baker-shadownet \
+  --node-instance shadownet \
   --delegate tz1... \
   --liquidity-baking-vote pass
 ```
@@ -110,7 +113,7 @@ octez-manager instance my-baker logs
 
 ## Security Considerations
 
-- **Key Management**: Consider using a remote signer or Ledger
+- **Key Management**: Consider using a [remote signer](https://octez.tezos.com/docs/user/key-management.html) or Ledger hardware wallet
 - **Firewall**: Only expose necessary ports
 - **Monitoring**: Set up alerts for missed blocks/attestations
 - **Redundancy**: Have a backup baker ready (but not running simultaneously)

@@ -208,40 +208,72 @@ octez-manager cleanup-dependencies
 
 ## Examples
 
+### Quick Start with Shadownet
+
 ```bash
-# Install mainnet node with snapshot
-octez-manager install-node --instance mainnet --network mainnet --snapshot
+# Install Shadownet node with snapshot (recommended for testing)
+octez-manager install-node \
+  --instance shadownet \
+  --network shadownet \
+  --history-mode rolling \
+  --snapshot
 
-# Install baker with multiple delegates
+# Install baker
 octez-manager install-baker \
-  --instance my-baker \
-  --node-instance mainnet \
-  --delegate tz1abc... \
-  --delegate tz1def... \
+  --instance baker-shadownet \
+  --node-instance shadownet \
+  --delegate tz1... \
   --liquidity-baking-vote pass
 
-# Install baker with remote node endpoint
-octez-manager install-baker \
-  --instance my-baker \
-  --node-instance http://localhost:8732 \
-  --delegate tz1abc... \
-  --liquidity-baking-vote pass
+# Install accuser
+octez-manager install-accuser \
+  --instance accuser-shadownet \
+  --node-instance shadownet
+```
 
-# Restart a service
-octez-manager instance mainnet restart
+### Service Management
 
-# View logs
-octez-manager instance mainnet logs
-
+```bash
 # List all instances
 octez-manager list
 
+# View logs
+octez-manager instance shadownet logs
+
+# Restart a service
+octez-manager instance shadownet restart
+
 # Launch the TUI
 octez-manager
+```
 
+### Multiple Delegates
+
+```bash
+octez-manager install-baker \
+  --instance baker-shadownet \
+  --node-instance shadownet \
+  --delegate tz1abc... \
+  --delegate tz1def... \
+  --liquidity-baking-vote pass
+```
+
+### Remote Node Endpoint
+
+```bash
+octez-manager install-baker \
+  --instance baker-shadownet \
+  --node-instance http://localhost:8732 \
+  --delegate tz1abc... \
+  --liquidity-baking-vote pass
+```
+
+### Network Discovery
+
+```bash
 # List available networks
 octez-manager list-available-networks
 
-# List snapshots for ghostnet
-octez-manager list-snapshots --network ghostnet
+# List snapshots for a network
+octez-manager list-snapshots --network shadownet
 ```
