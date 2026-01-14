@@ -304,6 +304,9 @@ let unit_template ~user_mode ~role ~app_bin_dir ~user ?prestart () =
   in
   let common_hardening =
     "Restart=on-failure\n\
+     RestartSec=5s\n\
+     StartLimitBurst=10\n\
+     StartLimitIntervalSec=300s\n\
      NoNewPrivileges=yes\n\
      PrivateTmp=yes\n\
      ProtectSystem=strict\n\
