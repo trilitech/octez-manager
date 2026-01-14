@@ -2600,7 +2600,6 @@ let instance_term =
                             ()
                         in
                         let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
-                        let client_base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
                         let req : Installer_types.daemon_request =
                           {
                             role = "dal-node";
@@ -2616,13 +2615,12 @@ let instance_term =
                             service_args = new_extra_args;
                             extra_env =
                               [
-                                ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
                                 ("OCTEZ_NODE_ENDPOINT", new_node_endpoint);
                                 ("OCTEZ_DAL_DATA_DIR", dal_data_dir);
                                 ("OCTEZ_DAL_RPC_ADDR", new_rpc);
                                 ("OCTEZ_DAL_NET_ADDR", new_net);
                               ];
-                            extra_paths = [client_base_dir; dal_data_dir];
+                            extra_paths = [dal_data_dir];
                             auto_enable = true;
                             depends_on = new_depends_on;
                             preserve_data = true;
