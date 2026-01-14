@@ -1,11 +1,9 @@
 ---
 title: CLI Reference
-description: Complete CLI command reference
+description: Command reference for scripting and automation
 ---
 
-# CLI Reference
-
-Complete reference for all Octez Manager CLI commands.
+The CLI is for advanced users who prefer command-line workflows or need to automate deployments with scripts. For interactive use, see [Using the TUI](/octez-manager/guides/tui-guide).
 
 ## Global Options
 

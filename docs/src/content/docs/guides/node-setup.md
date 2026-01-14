@@ -3,8 +3,6 @@ title: Setting Up a Node
 description: Complete guide to setting up a Tezos node
 ---
 
-# Setting Up a Node
-
 This guide walks you through setting up a Tezos node with Octez Manager.
 
 ## Planning Your Setup

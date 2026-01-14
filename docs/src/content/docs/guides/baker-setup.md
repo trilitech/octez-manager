@@ -3,8 +3,6 @@ title: Becoming a Baker
 description: Set up a Tezos baker with Octez Manager
 ---
 
-# Becoming a Baker
-
 This guide covers setting up a baker with Octez Manager. We'll use Shadownet as an example.
 
 For detailed information about baking on Tezos, see the [Octez documentation on running a delegate](https://octez.tezos.com/docs/introduction/howtorun.html#running-a-delegate).
