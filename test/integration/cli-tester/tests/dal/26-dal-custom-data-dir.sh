@@ -67,7 +67,7 @@ echo "Custom data directory configured correctly"
 # Start the node first (DAL node depends on it)
 echo "Starting node..."
 om instance "$NODE_INSTANCE" start 2>&1
-wait_for_service "octez-node@$NODE_INSTANCE"
+wait_for_service_active "octez-node@$NODE_INSTANCE"
 echo "Node started"
 
 # Start the DAL node
