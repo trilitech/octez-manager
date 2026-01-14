@@ -2973,6 +2973,13 @@ let ui_term =
            | Error (`Msg msg) -> cmdliner_error msg)
       $ page_arg $ log_flag $ logfile_arg))
 
+let ui_cmd =
+  let open Cmdliner in
+  let info =
+    Cmd.info "ui" ~doc:"Launch the interactive terminal UI (same as running without arguments)"
+  in
+  Cmd.v info ui_term
+
 let root_cmd =
   let doc = "Terminal UI for managing Octez services" in
   let info = Cmd.info "octez-manager" ~doc ~version:"0.0.2" in
@@ -2991,6 +2998,7 @@ let root_cmd =
       cleanup_dependencies_cmd;
       list_networks_cmd;
       list_snapshots_cmd;
+      ui_cmd;
     ]
 
 let () =
