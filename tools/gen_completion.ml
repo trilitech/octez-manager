@@ -236,21 +236,9 @@ let render_zsh ~commands ~instance_actions ~options_map =
     buf
     "            _describe -t actions 'instance actions' instance_actions\n" ;
   Buffer.add_string buf "          else\n" ;
-  Buffer.add_string buf "            case $words[3] in\n" ;
-  Buffer.add_string buf "              remove)\n" ;
-  Buffer.add_string buf "                _arguments \\\n" ;
-  Buffer.add_string buf "                  --help[Show help information] \\\n" ;
-  Buffer.add_string
-    buf
-    "                  --delete-data-dir[Delete data directory when removing] \\\n" ;
-  Buffer.add_string buf "                ;;\n" ;
-  Buffer.add_string
-    buf
-    "              start|stop|restart|purge|show|show-service)\n" ;
-  Buffer.add_string buf "                _arguments \\\n" ;
-  Buffer.add_string buf "                  --help[Show help information] \\\n" ;
-  Buffer.add_string buf "                ;;\n" ;
-  Buffer.add_string buf "            esac\n" ;
+  (* Use dynamically loaded instance options for all actions *)
+  Buffer.add_string buf "            _arguments \\\n" ;
+  Buffer.add_string buf "              $opts_instance\n" ;
   Buffer.add_string buf "          fi\n" ;
   Buffer.add_string buf "          ;;\n" ;
   String_map.iter
@@ -422,20 +410,14 @@ let render_bash ~commands ~instance_actions ~options_map ~kinds =
      \"$cur\") )\n\
     \        return 0\n\
     \      fi\n" ;
-  Buffer.add_string buf "      action=\"${COMP_WORDS[3]}\"\n" ;
+  (* Use dynamically loaded instance options for all actions *)
+  let instance_opts =
+    match String_map.find_opt "instance" options_map with
+    | Some opts -> String.concat " " opts
+    | None -> "--help"
+  in
   Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
-  Buffer.add_string buf "        case \"$action\" in\n" ;
-  Buffer.add_string
-    buf
-    "          remove)\n\
-    \            opts=\"--delete-data-dir --help\"\n\
-    \            ;;\n" ;
-  Buffer.add_string
-    buf
-    "          start|stop|restart|purge|show|show-service)\n\
-    \            opts=\"--help\"\n\
-    \            ;;\n" ;
-  Buffer.add_string buf "        esac\n" ;
+  Buffer.add_string buf (Printf.sprintf "        opts=\"%s\"\n" instance_opts) ;
   Buffer.add_string
     buf
     "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n\
@@ -531,8 +513,8 @@ let () =
         ~options_map:bash_options_map
         ~kinds
     in
-    let zsh_path = Filename.concat !out_dir "_octez-manager" in
-    let bash_path = Filename.concat !out_dir "octez-manager" in
+    let zsh_path = Filename.concat !out_dir "octez-manager.zsh" in
+    let bash_path = Filename.concat !out_dir "octez-manager.bash" in
     let* () = write_file zsh_path zsh in
     let* () = write_file bash_path bash in
     Ok ()
