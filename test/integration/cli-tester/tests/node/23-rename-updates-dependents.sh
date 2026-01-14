@@ -34,6 +34,7 @@ echo "Installing baker dependent on node..."
 om install-baker \
     --instance "$BAKER_INSTANCE" \
     --node-instance "$NODE_INSTANCE" \
+    --liquidity-baking-vote pass \
     --service-user tezos \
     --no-enable 2>&1
 
