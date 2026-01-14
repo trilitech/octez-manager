@@ -14,6 +14,8 @@ The Data Availability Layer (DAL) is Tezos's scalability solution. Running a DAL
 
 ## Installation via TUI
 
+![Install DAL Node](../../../assets/gifs/install_dal_node.gif)
+
 1. Launch `octez-manager`
 2. Press `i` → Select **DAL Node**
 3. Configure:
