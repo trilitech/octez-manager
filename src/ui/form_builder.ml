@@ -325,7 +325,13 @@ let service_or_endpoint ~label ~role ~get ~set
 
 let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
     ?(item_validator = fun _ -> Ok ()) () =
-  let to_string lst = if lst = [] then "(none)" else String.concat ", " lst in
+  let to_string lst =
+    match lst with
+    | [] -> "(none)"
+    | [a] -> a
+    | [a; b] -> a ^ ", " ^ b
+    | _ -> Printf.sprintf "%d selected" (List.length lst)
+  in
   let validate _ = true in
   let validate_msg _ = None in
   let edit model_ref =
@@ -543,14 +549,25 @@ struct
     let model = !(s.model_ref) in
     let fields = S.spec.fields model in
     let cols = size.LTerm_geom.cols in
-    (* Truncate string to max length with ellipsis *)
+    (* Truncate string to max length with ellipsis (keeps prefix) *)
     let truncate max_len s =
       if String.length s <= max_len then s
       else String.sub s 0 (max_len - 1) ^ "…"
     in
-    (* Calculate available space for value + error message based on terminal width *)
-    (* Layout: label (~20 chars) + " │ " (3) + value + error + " │ " (3) + status (1) *)
-    let value_space = max 20 (cols - 30) in
+    (* Truncate path to max length, keeping the suffix (end of path) *)
+    let truncate_path max_len s =
+      if String.length s <= max_len then s
+      else "…" ^ String.sub s (String.length s - max_len + 1) (max_len - 1)
+    in
+    (* Smart truncate: use path truncation for paths, regular for others *)
+    let smart_truncate max_len s =
+      if String.length s <= max_len then s
+      else if String.length s > 0 && s.[0] = '/' then truncate_path max_len s
+      else truncate max_len s
+    in
+    (* Calculate available space for value column based on terminal width *)
+    (* Be conservative to account for table borders, padding, and parameter column *)
+    let value_space = max 20 (cols / 2) in
     let err_msg_space = max 15 (value_space * 2 / 3) in
     let value_truncate = max 10 (value_space / 3) in
     (* Validate each field once and collect results *)
@@ -561,7 +578,7 @@ struct
           let ok = f.validate model in
           let value_str = f.to_string value in
           let formatted_value =
-            if ok then value_str
+            if ok then smart_truncate value_space value_str
             else
               (* Show value and short error message *)
               let err_msg =
