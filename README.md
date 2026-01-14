@@ -2,7 +2,7 @@
 
 A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, signers, DAL nodes).
 
-![Octez Manager UI](assets/screenshot.gif)
+![Octez Manager UI](assets/octez-manager.gif)
 
 > **Warning**  
 > Octez Manager is in active development. Use at your own risk, especially on mainnet.
