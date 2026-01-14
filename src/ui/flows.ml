@@ -22,6 +22,13 @@ let invalid_instance_name_error_msg =
   "Instance name contains invalid characters. "
   ^ Installer.invalid_instance_name_chars_msg
 
+(** Strip "node-" prefix from instance name to create cleaner dependent names.
+    E.g., "node-shadownet" -> "shadownet" so baker becomes "baker-shadownet" *)
+let strip_node_prefix inst =
+  if String.starts_with ~prefix:"node-" inst then
+    String.sub inst 5 (String.length inst - 5)
+  else inst
+
 let require_package_manager () =
   match
     Miaou_interfaces.Capability.get
@@ -122,7 +129,7 @@ let create_baker_flow ~services ~on_success =
       ~on_select:(fun parent_node ->
         prompt_text_modal
           ~title:"Baker Instance Name"
-          ~initial:("baker-" ^ parent_node)
+          ~initial:("baker-" ^ strip_node_prefix parent_node)
           ~on_submit:(fun instance ->
             let instance = String.trim instance in
             if instance = "" then

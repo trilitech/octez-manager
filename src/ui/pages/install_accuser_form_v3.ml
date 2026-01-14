@@ -199,7 +199,14 @@ let node_selection_field =
             in
             model_ref := {!model_ref with client = new_client} ;
             if should_autoname then (
-              let new_name = Printf.sprintf "accuser-%s" svc.Service.instance in
+              (* Strip "node-" prefix to avoid "accuser-node-shadownet" *)
+              let dep_name =
+                let inst = svc.Service.instance in
+                if String.starts_with ~prefix:"node-" inst then
+                  String.sub inst 5 (String.length inst - 5)
+                else inst
+              in
+              let new_name = Printf.sprintf "accuser-%s" dep_name in
               let default_dir = Common.default_role_dir "accuser" new_name in
               let new_core = {!model_ref.core with instance_name = new_name} in
               let new_client =
