@@ -56,6 +56,12 @@ Select an instance and use these keys:
 | `e` | Edit configuration |
 | `d` | Delete instance |
 
+### Editing an Instance
+
+Press `e` on any instance to edit its configuration. Here's an example of editing a baker's delegates:
+
+![Edit Baker](../../../assets/gifs/edit_baker.gif)
+
 ## Installing Services
 
 Press `i` to open the install menu:
@@ -70,6 +76,10 @@ Press `i` to open the install menu:
 ```
 
 Navigate and press `Enter` to start the installation wizard.
+
+### Installing an Accuser
+
+![Install Accuser](../../../assets/gifs/install_accuser.gif)
 
 ## Log Viewer
 
