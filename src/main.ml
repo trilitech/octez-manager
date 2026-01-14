@@ -1627,6 +1627,7 @@ type instance_action =
   | Show_service
   | Logs
   | Edit
+  | Export_logs
 
 let instance_term =
   let instance =
@@ -1644,6 +1645,7 @@ let instance_term =
         ("show-service", Show_service);
         ("logs", Logs);
         ("edit", Edit);
+        ("export-logs", Export_logs);
       ]
     in
     Arg.(value & pos 1 (some (enum actions)) None & info [] ~docv:"ACTION")
@@ -1661,7 +1663,7 @@ let instance_term =
     | Some _, None ->
         cmdliner_error
           "ACTION required \
-           (start|stop|restart|remove|purge|show|show-service|logs|edit)"
+           (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit)"
     | Some inst, Some action -> (
         match action with
         | Start -> (
@@ -2705,7 +2707,19 @@ let instance_term =
                             msg ;
                           `Ok ())
                   | Error msg ->
-                      cmdliner_error (Printf.sprintf "Edit failed: %s" msg))))
+                      cmdliner_error (Printf.sprintf "Edit failed: %s" msg)))
+        | Export_logs -> (
+            match Service_registry.find ~instance:inst with
+            | Error (`Msg msg) -> cmdliner_error msg
+            | Ok None ->
+                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+            | Ok (Some svc) -> (
+                match Log_export.export_logs ~instance:inst ~svc with
+                | Ok archive_path ->
+                    Format.printf "Logs exported to: %s@." archive_path ;
+                    `Ok ()
+                | Error (`Msg msg) ->
+                    cmdliner_error (Printf.sprintf "Export failed: %s" msg))))
   in
   Term.(ret (const run $ instance $ action $ delete_data_dir))
 

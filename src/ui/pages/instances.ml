@@ -1544,7 +1544,17 @@ let instance_actions_modal state =
       let svc = svc_state.Service_state.service in
       Modal_helpers.open_choice_modal
         ~title:("Actions · " ^ svc.Service.instance)
-        ~items:[`Details; `Edit; `Start; `Stop; `Restart; `Logs; `Remove]
+        ~items:
+          [
+            `Details;
+            `Edit;
+            `Start;
+            `Stop;
+            `Restart;
+            `Logs;
+            `Export_logs;
+            `Remove;
+          ]
         ~to_string:(function
           | `Details -> "Details"
           | `Edit -> "Edit"
@@ -1552,6 +1562,7 @@ let instance_actions_modal state =
           | `Stop -> "Stop"
           | `Restart -> "Restart"
           | `Logs -> "View Logs"
+          | `Export_logs -> "Export Logs"
           | `Remove -> "Remove")
         ~on_select:(fun choice ->
           let instance = svc.Service.instance in
@@ -1576,6 +1587,13 @@ let instance_actions_modal state =
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
+          | `Export_logs -> (
+              match Log_export.export_logs ~instance ~svc with
+              | Ok path ->
+                  Context.toast_info
+                    (Printf.sprintf "Logs exported to: %s" path)
+              | Error (`Msg err) ->
+                  Context.toast_error (Printf.sprintf "Export failed: %s" err))
           | `Remove -> remove_modal state |> ignore)
         () ;
       state)

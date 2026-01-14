@@ -7,6 +7,7 @@
   system_user
   logging_mode
   log_viewer
+  log_export
   node_env
   systemd
   service
