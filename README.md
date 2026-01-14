@@ -37,7 +37,7 @@ make build
 ### Launch the UI
 
 ```sh
-octez-manager ui
+octez-manager
 ```
 
 The UI provides installation wizards, service monitoring, log viewing, and snapshot management.
