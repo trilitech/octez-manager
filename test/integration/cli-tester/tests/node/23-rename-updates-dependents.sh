@@ -38,8 +38,11 @@ om install-baker \
     --service-user tezos \
     --no-enable 2>&1
 
+# Registry is at /etc/octez_manager/services/ when running as root
+REGISTRY_DIR="/etc/octez_manager/services"
+
 # Verify initial setup - baker depends on original node
-BAKER_REGISTRY="/var/lib/octez/registry/${BAKER_INSTANCE}.json"
+BAKER_REGISTRY="${REGISTRY_DIR}/${BAKER_INSTANCE}.json"
 if ! grep -q "\"depends_on\": \"$NODE_INSTANCE\"" "$BAKER_REGISTRY"; then
     echo "ERROR: Baker should depend on $NODE_INSTANCE"
     cat "$BAKER_REGISTRY"
@@ -57,7 +60,7 @@ fi
 echo "Baker env correctly references $NODE_INSTANCE"
 
 # Verify node's dependents list includes baker
-NODE_REGISTRY="/var/lib/octez/registry/${NODE_INSTANCE}.json"
+NODE_REGISTRY="${REGISTRY_DIR}/${NODE_INSTANCE}.json"
 if ! grep -q "\"$BAKER_INSTANCE\"" "$NODE_REGISTRY"; then
     echo "ERROR: Node should have baker in dependents"
     cat "$NODE_REGISTRY"
