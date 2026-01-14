@@ -77,7 +77,7 @@ This document describes how to test the shell completion scripts for octez-manag
 To check for zsh syntax errors without running the completion:
 
 ```zsh
-zsh -n completions/_octez-manager
+zsh -n completions/octez-manager.zsh
 ```
 
 This will report syntax errors without executing the script.
@@ -85,7 +85,7 @@ This will report syntax errors without executing the script.
 To check for bash syntax errors without running the completion:
 
 ```bash
-bash -n completions/octez-manager
+bash -n completions/octez-manager.bash
 ```
 
 ### Debugging
