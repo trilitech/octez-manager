@@ -75,6 +75,7 @@ val client_fields_with_autoname :
   get_client:('model -> Form_builder_common.client_config) ->
   set_client:(Form_builder_common.client_config -> 'model -> 'model) ->
   ?edit_mode:bool ->
+  ?skip_base_dir:bool ->
   unit ->
   'model Form_builder.field list
 
