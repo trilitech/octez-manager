@@ -56,23 +56,37 @@ octez-manager --help
 
 ## Running Modes
 
-Octez Manager can run in two modes:
+Octez Manager creates systemd services to manage your Tezos infrastructure. How you run it determines where services and data are stored:
 
 ### User Mode (Recommended for testing)
 
-Run without root privileges. Services run as your user.
+Run as a regular user. Creates **user-level systemd services** (`systemctl --user`).
 
 ```bash
 octez-manager
 ```
 
+| Item | Location |
+|------|----------|
+| Services | `~/.config/systemd/user/` |
+| Configuration | `~/.config/octez/instances/` |
+| Data | `~/.local/share/octez/` |
+
 ### System Mode (Recommended for production)
 
-Run with root privileges. Creates dedicated service users and proper system directories.
+Run as root. Creates **system-level systemd services** with dedicated service users.
 
 ```bash
 sudo octez-manager
 ```
+
+| Item | Location |
+|------|----------|
+| Services | `/etc/systemd/system/` |
+| Configuration | `/etc/octez/instances/` |
+| Data | `/var/lib/octez/` |
+
+> **Note:** User mode and system mode are independent. Instances created in one mode are not visible in the other.
 
 ## Next Steps
 
