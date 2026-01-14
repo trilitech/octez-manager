@@ -7,7 +7,9 @@
 
 let pending_instance_detail : string option ref = ref None
 
-let instances_dirty = ref false
+(* Use Atomic for cross-domain visibility - mark_instances_dirty can be called
+   from background worker domains via Job_manager.on_complete *)
+let instances_dirty = Atomic.make false
 
 let set_pending_instance_detail inst = pending_instance_detail := Some inst
 
@@ -44,12 +46,9 @@ let take_pending_restart_dependents () =
   pending_restart_dependents := [] ;
   value
 
-let mark_instances_dirty () = instances_dirty := true
+let mark_instances_dirty () = Atomic.set instances_dirty true
 
-let consume_instances_dirty () =
-  let flag = !instances_dirty in
-  instances_dirty := false ;
-  flag
+let consume_instances_dirty () = Atomic.exchange instances_dirty false
 
 let pending_navigation : string option ref = ref None
 
