@@ -2106,9 +2106,8 @@ Press **Enter** to open instance menu.|}
     let num_cols = s.num_columns in
     if num_cols <= 1 then s
     else if s.selected < services_start_idx then
-      (* In menu area, just change column *)
-      let new_col = (s.active_column + delta + num_cols) mod num_cols in
-      {s with active_column = new_col}
+      (* In menu area, left/right should do nothing - menu spans all columns *)
+      s
     else
       (* In services area: move to same position in target column *)
       let current_idx = s.selected - services_start_idx in
