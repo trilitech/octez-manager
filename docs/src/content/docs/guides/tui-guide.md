@@ -133,4 +133,4 @@ Here's a typical workflow for a complete Shadownet baking setup:
 - **Use `?` for help** — Every screen has context-specific help
 - **Watch the hints** — The bottom bar shows available actions
 - **Check metrics** — Expanded instances show CPU, memory, and sync status
-- **Monitor bakers** — Baker instances show recent signing activity and delegate balances
+- **Monitor bakers** — Baker instances show signing activity, missed slots, and DAL participation
