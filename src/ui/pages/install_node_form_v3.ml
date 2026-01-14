@@ -280,10 +280,16 @@ let get_snapshot_url ~network snapshot =
               | None -> None
               | Some entry -> entry.download_url)))
 
-(** Check if there's enough space for the snapshot download.
+(** Check if there's enough space for the snapshot download and import.
     Returns [Ok ()] if space is sufficient or can't be determined.
-    Returns [Error msg] if space is definitely insufficient. *)
-let check_snapshot_space ~network ~snapshot ~tmp_dir =
+    Returns [Error msg] if space is definitely insufficient.
+
+    Checks both:
+    - tmp_dir: needs snapshot_size * 1.1 for download
+    - data_dir: needs snapshot_size * 1.2 for imported data
+
+    If both are on the same filesystem, checks combined requirement. *)
+let check_snapshot_space ~network ~snapshot ~tmp_dir ~data_dir =
   match get_snapshot_url ~network snapshot with
   | None -> Ok () (* No URL to check, or local file *)
   | Some url -> (
@@ -291,25 +297,72 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir =
       | Some size_opt -> (
           match size_opt with
           | None -> Ok () (* Size unknown, proceed *)
-          | Some size -> (
-              let dir =
+          | Some snapshot_size -> (
+              let tmp_path =
                 Option.value ~default:(Filename.get_temp_dir_name ()) tmp_dir
               in
-              match Common.get_available_space dir with
-              | None -> Ok () (* Can't determine space, proceed *)
-              | Some available ->
-                  (* Add 10% buffer for safety *)
-                  let required = Int64.add size (Int64.div size 10L) in
-                  if available >= required then Ok ()
-                  else
-                    Error
-                      (Printf.sprintf
-                         "Need %s (snapshot %s + 10%% buffer) but %s only has \
-                          %s"
-                         (format_bytes required)
-                         (format_bytes size)
-                         dir
-                         (format_bytes available))))
+              (* Space needed: download (1.1x) + imported data (1.2x) *)
+              let download_required =
+                Int64.add snapshot_size (Int64.div snapshot_size 10L)
+              in
+              let storage_required =
+                Int64.add snapshot_size (Int64.div snapshot_size 5L)
+              in
+              (* Check if tmp and data_dir are on same filesystem *)
+              let data_path =
+                (* Use parent dir if data_dir doesn't exist yet *)
+                if Sys.file_exists data_dir then data_dir
+                else Filename.dirname data_dir
+              in
+              let same_fs =
+                Common.same_filesystem tmp_path data_path
+                |> Option.value ~default:false
+              in
+              if same_fs then
+                (* Same filesystem: need space for both download and storage *)
+                let total_required =
+                  Int64.add download_required storage_required
+                in
+                match Common.get_available_space tmp_path with
+                | None -> Ok ()
+                | Some available ->
+                    if available >= total_required then Ok ()
+                    else
+                      Error
+                        (Printf.sprintf
+                           "Need %s total (%s for download + %s for storage) \
+                            but %s only has %s"
+                           (format_bytes total_required)
+                           (format_bytes download_required)
+                           (format_bytes storage_required)
+                           tmp_path
+                           (format_bytes available))
+              else
+                (* Different filesystems: check each separately *)
+                let* () =
+                  match Common.get_available_space tmp_path with
+                  | None -> Ok ()
+                  | Some available ->
+                      if available >= download_required then Ok ()
+                      else
+                        Error
+                          (Printf.sprintf
+                             "Need %s for download but %s only has %s"
+                             (format_bytes download_required)
+                             tmp_path
+                             (format_bytes available))
+                in
+                match Common.get_available_space data_path with
+                | None -> Ok ()
+                | Some available ->
+                    if available >= storage_required then Ok ()
+                    else
+                      Error
+                        (Printf.sprintf
+                           "Need %s for node storage but %s only has %s"
+                           (format_bytes storage_required)
+                           data_dir
+                           (format_bytes available))))
       | None ->
           (* Trigger background fetch *)
           let should_fetch =
@@ -656,6 +709,7 @@ let tmp_dir_field =
             ~network:m.node.network
             ~snapshot:m.snapshot
             ~tmp_dir:m.tmp_dir
+            ~data_dir:m.node.data_dir
         with
         | Ok () -> true
         | Error _ -> false)
@@ -672,6 +726,7 @@ let tmp_dir_field =
               ~network:m.node.network
               ~snapshot:m.snapshot
               ~tmp_dir:m.tmp_dir
+              ~data_dir:m.node.data_dir
           with
           | Ok () -> None
           | Error msg -> Some msg))
