@@ -109,23 +109,22 @@ octez-manager instance shadownet show
 
 <style>
 {`
-  .credits-logo {
-    height: 28px;
-  }
-  :root[data-theme='dark'] .credits-logo {
-    filter: invert(1);
-  }
+  .logo-light { display: inline; }
+  .logo-dark { display: none; }
+  :root[data-theme='dark'] .logo-light { display: none; }
+  :root[data-theme='dark'] .logo-dark { display: inline; }
 `}
 </style>
 
 <div style="display: flex; align-items: center; justify-content: center; gap: 1.5rem; margin-top: 2rem; opacity: 0.8;">
   <span style="font-size: 0.9rem;">Developed by</span>
   <a href="https://www.nomadic-labs.com/" target="_blank" rel="noopener">
-    <img src="/octez-manager/nomadic-labs-logo.png" alt="Nomadic Labs" class="credits-logo" />
+    <img src="/octez-manager/nomadic-labs-logo.png" alt="Nomadic Labs" class="logo-light" style="height: 28px;" />
+    <img src="/octez-manager/nomadic-labs-logo-white.png" alt="Nomadic Labs" class="logo-dark" style="height: 28px;" />
   </a>
   <span style="font-size: 0.9rem;">·</span>
   <span style="font-size: 0.9rem;">Hosted by</span>
   <a href="https://trili.tech/" target="_blank" rel="noopener">
-    <img src="/octez-manager/trilitech-logo.svg" alt="Trilitech" class="credits-logo" style="height: 20px;" />
+    <img src="/octez-manager/trilitech-logo.svg" alt="Trilitech" style="height: 20px;" />
   </a>
 </div>
