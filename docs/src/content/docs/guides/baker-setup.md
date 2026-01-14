@@ -15,7 +15,7 @@ This guide covers setting up a baker to participate in Tezos consensus. We'll us
 
 ## Import Your Baker Key
 
-Before setting up the baker, import your key:
+Before setting up the baker, import your key. See the [official Octez documentation](https://octez.tezos.com/docs/introduction/howtorun.html#running-a-delegate) for detailed instructions on key management and delegate setup.
 
 ```bash
 octez-client import secret key my-baker unencrypted:edsk...
@@ -104,7 +104,7 @@ octez-manager instance my-baker logs
 
 ## Security Considerations
 
-- **Key Management**: Consider using a remote signer or Ledger
+- **Key Management**: Consider using a [remote signer](https://octez.tezos.com/docs/user/key-management.html) or Ledger hardware wallet
 - **Firewall**: Only expose necessary ports
 - **Monitoring**: Set up alerts for missed blocks/attestations
 - **Redundancy**: Have a backup baker ready (but not running simultaneously)
