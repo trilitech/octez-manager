@@ -4,7 +4,7 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://mathiasbourgoin.github.io',
+	site: 'https://trilitech.github.io',
 	base: '/octez-manager',
 	integrations: [
 		starlight({
@@ -15,7 +15,7 @@ export default defineConfig({
 			favicon: '/favicon.png',
 			description: 'CLI and TUI for managing Tezos nodes, bakers, and DAL infrastructure',
 			social: [
-				{ icon: 'github', label: 'GitHub', href: 'https://github.com/mathiasbourgoin/octez-manager' },
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/trilitech/octez-manager' },
 			],
 			sidebar: [
 				{
