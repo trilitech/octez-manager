@@ -9,22 +9,31 @@ This guide covers setting up a baker to participate in Tezos consensus. We'll us
 
 ## Prerequisites
 
-1. **Running Node**: A synced Tezos node (e.g., your Shadownet node)
-2. **Staked Tez**: Minimum 6,000 tez staked to your baker address (use the faucet on testnets)
-3. **Baker Key**: Your baker's secret key imported into the client
+1. **Octez Binaries**: Install the Octez suite (`octez-client`, `octez-baker`, etc.). See [How to get Octez](https://octez.tezos.com/docs/introduction/howtoget.html) for installation options.
+2. **Running Node**: A synced Tezos node (e.g., your Shadownet node)
+3. **Staked Tez**: Minimum 6,000 tez staked to your baker address (use the faucet on testnets)
+4. **Baker Key**: Your baker's secret key imported into the client
 
-## Import Your Baker Key
+## Set Up Baker Directory
 
-Before setting up the baker, import your key. See the [official Octez documentation](https://octez.tezos.com/docs/introduction/howtorun.html#running-a-delegate) for detailed instructions on key management and delegate setup.
+Before installing the baker with Octez Manager, you need to create a base directory and import your baker key. This directory holds your baker's configuration and keys.
+
+> **Note:** Future versions of Octez Manager may automate this setup.
 
 ```bash
+# Create a base directory for your baker
+mkdir -p ~/.tezos-client
+
+# Import your key (see Octez docs for details)
 octez-client import secret key my-baker unencrypted:edsk...
 ```
 
-Or use a ledger:
+Or use a Ledger hardware wallet:
 ```bash
 octez-client import secret key my-baker "ledger://..."
 ```
+
+See the [Octez documentation](https://octez.tezos.com/docs/introduction/howtorun.html#running-a-delegate) for detailed instructions on key management and delegate setup.
 
 ## Installation via TUI
 

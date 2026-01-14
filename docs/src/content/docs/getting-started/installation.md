@@ -8,8 +8,11 @@ description: How to install Octez Manager
 ## Prerequisites
 
 - Linux (Ubuntu 22.04+, Debian 12+, or similar)
-- OCaml 5.1+ and opam (for building from source)
-- Octez binaries installed (for managing nodes/bakers)
+- OCaml 5.1+ and opam (for building Octez Manager from source)
+- **Octez binaries** (`octez-node`, `octez-client`, `octez-baker`, etc.) — See [How to get Octez](https://octez.tezos.com/docs/introduction/howtoget.html) for installation options including:
+  - Static binaries (easiest)
+  - Debian/Ubuntu packages
+  - Building from source
 
 ## From Source
 
