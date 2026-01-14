@@ -19,6 +19,7 @@ let name = "install_dal_node_form_v3"
 type model = {
   core : Form_builder_common.core_service_config;
   client : Form_builder_common.client_config;
+  dal_data_dir : string;  (** DAL node's data directory *)
   rpc_addr : string;  (** DAL node's own RPC address *)
   net_addr : string;  (** DAL node's P2P address *)
   (* Edit mode fields *)
@@ -47,6 +48,7 @@ let base_initial_model () =
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };
+    dal_data_dir = Common.default_role_dir "dal-node" "dal";
     rpc_addr = "127.0.0.1:10732";
     net_addr = "0.0.0.0:11732";
     edit_mode = false;
@@ -100,6 +102,10 @@ let make_initial_model () =
             node_endpoint =
               (if node_endpoint = "" then "127.0.0.1:8732" else node_endpoint);
           };
+        dal_data_dir =
+          (if dal_data_dir = "" then
+             Common.default_role_dir "dal-node" svc.Service.instance
+           else dal_data_dir);
         rpc_addr = (if dal_rpc = "" then "127.0.0.1:10732" else dal_rpc);
         net_addr = (if dal_net = "" then "0.0.0.0:11732" else dal_net);
         edit_mode = true;
@@ -206,6 +212,27 @@ let spec =
                       (Printf.sprintf
                          "DAL P2P Addr: %s"
                          (Port_validation.pp_error err)));
+            (* DAL node's data directory *)
+            Form_builder.custom
+              ~label:"DAL Data Dir"
+              ~get:(fun m -> m.dal_data_dir)
+              ~validate:(fun m ->
+                Form_builder_common.is_nonempty m.dal_data_dir)
+              ~validate_msg:(fun _ -> Some "Data directory is required")
+              ~edit:(fun model_ref ->
+                if model.edit_mode then
+                  Modal_helpers.show_error
+                    ~title:"DAL Data Dir"
+                    "Data directory cannot be changed after creation."
+                else
+                  Modal_helpers.open_file_browser_modal
+                    ~initial_path:!model_ref.dal_data_dir
+                    ~dirs_only:true
+                    ~require_writable:true
+                    ~on_select:(fun path ->
+                      model_ref := {!model_ref with dal_data_dir = path})
+                    ())
+              ();
           ]
         (* 7. Extra args *)
         @ core_service_fields
@@ -333,10 +360,17 @@ let spec =
 
         (* DAL data dir (for --data-dir command option) *)
         (* In edit mode, preserve existing data dir to avoid data loss *)
+        (* Otherwise, use the user-provided value from the form *)
         let dal_data_dir =
-          match model.original_dal_data_dir with
-          | Some dir when model.edit_mode -> dir
-          | _ -> Common.default_role_dir "dal-node" model.core.instance_name
+          if model.edit_mode then
+            match model.original_dal_data_dir with
+            | Some dir -> dir
+            | None -> model.dal_data_dir
+          else
+            let trimmed = String.trim model.dal_data_dir in
+            if trimmed = "" then
+              Common.default_role_dir "dal-node" model.core.instance_name
+            else trimmed
         in
 
         (* Service args are command options only (after "run --data-dir") *)
