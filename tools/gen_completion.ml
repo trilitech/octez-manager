@@ -244,9 +244,19 @@ let render_zsh ~commands ~instance_actions ~options_map =
     buf
     "                  --delete-data-dir[Delete data directory when removing] \\\n" ;
   Buffer.add_string buf "                ;;\n" ;
+  Buffer.add_string buf "              restart)\n" ;
+  Buffer.add_string buf "                _arguments \\\n" ;
+  Buffer.add_string buf "                  --help[Show help information] \\\n" ;
   Buffer.add_string
     buf
-    "              start|stop|restart|purge|show|show-service)\n" ;
+    "                  --no-wait[Skip health checks when restarting] \\\n" ;
+  Buffer.add_string
+    buf
+    "                  '--timeout[Health check timeout in seconds]:SECONDS:' \\\n" ;
+  Buffer.add_string buf "                ;;\n" ;
+  Buffer.add_string
+    buf
+    "              start|stop|purge|show|show-service|logs|export-logs|edit)\n" ;
   Buffer.add_string buf "                _arguments \\\n" ;
   Buffer.add_string buf "                  --help[Show help information] \\\n" ;
   Buffer.add_string buf "                ;;\n" ;
@@ -432,7 +442,12 @@ let render_bash ~commands ~instance_actions ~options_map ~kinds =
     \            ;;\n" ;
   Buffer.add_string
     buf
-    "          start|stop|restart|purge|show|show-service)\n\
+    "          restart)\n\
+    \            opts=\"--no-wait --timeout --help\"\n\
+    \            ;;\n" ;
+  Buffer.add_string
+    buf
+    "          start|stop|purge|show|show-service|logs|export-logs|edit)\n\
     \            opts=\"--help\"\n\
     \            ;;\n" ;
   Buffer.add_string buf "        esac\n" ;
