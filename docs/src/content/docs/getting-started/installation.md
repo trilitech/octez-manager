@@ -31,7 +31,7 @@ eval $(opam env)
 ### 2. Clone and Build
 
 ```bash
-git clone https://github.com/mathiasbourgoin/octez-manager.git
+git clone https://github.com/trilitech/octez-manager.git
 cd octez-manager
 
 # Install dependencies

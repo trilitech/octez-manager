@@ -40,7 +40,7 @@ This guide walks you through setting up a Tezos node with Octez Manager.
    - **Network**: `mainnet` or `ghostnet`
    - **History mode**: `rolling` (recommended)
    - **RPC address**: `127.0.0.1:8732` (default)
-   - **Net address**: `[::]:9732` (default)
+   - **Net address**: `0.0.0.0:9732` (default)
    - **Bootstrap**: `Snapshot` (recommended)
 
 ## Installation via CLI
@@ -51,7 +51,7 @@ octez-manager install-node \
   --network mainnet \
   --history-mode rolling \
   --rpc-addr 127.0.0.1:8732 \
-  --net-addr "[::]:9732" \
+  --net-addr 0.0.0.0:9732 \
   --snapshot
 ```
 
