@@ -616,6 +616,19 @@ let get_available_space dir =
       | _ :: value_line :: _ -> Int64.of_string_opt (String.trim value_line)
       | _ -> None)
 
+let get_filesystem_id path =
+  (* Use stat to get the filesystem (device) ID for a path *)
+  try
+    let stats = Unix.stat path in
+    Some stats.Unix.st_dev
+  with Unix.Unix_error _ -> None
+
+let same_filesystem path1 path2 =
+  (* Check if two paths are on the same filesystem *)
+  match (get_filesystem_id path1, get_filesystem_id path2) with
+  | Some id1, Some id2 -> Some (id1 = id2)
+  | _ -> None
+
 (** Map Octez exit codes to human-readable descriptions.
     See https://octez.tezos.com/docs/user/exits.html *)
 let octez_exit_code_description code =
