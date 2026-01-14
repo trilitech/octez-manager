@@ -21,4 +21,6 @@ val get : instance:string -> t option
 
 val set : instance:string -> t -> unit
 
+val clear_instance : instance:string -> unit
+
 val clear : unit -> unit
