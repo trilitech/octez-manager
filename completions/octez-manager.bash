@@ -28,7 +28,7 @@ _octez_manager() {
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
   local commands="cleanup-dependencies cleanup-orphans install-accuser install-baker install-dal-node install-node instance list list-available-networks list-snapshots purge-all ui"
-  local instance_actions="start stop restart remove purge show show-service logs edit"
+  local instance_actions="start stop restart remove purge show show-service logs edit export-logs"
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
   local lb_votes="on off pass"
@@ -98,93 +98,85 @@ _octez_manager() {
         COMPREPLY=( $(compgen -W "$instance_actions --help" -- "$cur") )
         return 0
       fi
-      action="${COMP_WORDS[3]}"
       if [[ $cur == -* ]]; then
-        case "$action" in
-          remove)
-            opts="--delete-data-dir --help"
-            ;;
-          start|stop|restart|purge|show|show-service)
-            opts="--help"
-            ;;
-        esac
+        opts="--delete-data-dir --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     cleanup-dependencies)
       if [[ $cur == -* ]]; then
-        opts="--help"
+        opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     cleanup-orphans)
       if [[ $cur == -* ]]; then
-        opts="-n --dry-run --help"
+        opts="-n --dry-run --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-accuser)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --base-dir --extra-arg --instance --no-enable --node-instance --service-user --help"
+        opts="--app-bin-dir --base-dir --extra-arg --instance --no-enable --node-instance --service-user --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-baker)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --base-dir --dal-endpoint --delegate --extra-arg --instance --liquidity-baking-vote --no-enable --node-instance --service-user --help"
+        opts="--app-bin-dir --base-dir --dal-endpoint --delegate --extra-arg --instance --liquidity-baking-vote --no-enable --node-instance --service-user --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-dal-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg --instance --net-addr --no-enable --node-instance --rpc-addr --service-user --help"
+        opts="--app-bin-dir --data-dir --extra-arg --instance --net-addr --no-enable --node-instance --rpc-addr --service-user --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --keep-snapshot --net-addr --network --no-enable --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --tmp-dir --help"
+        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --keep-snapshot --net-addr --network --no-enable --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --tmp-dir --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     list)
       if [[ $cur == -* ]]; then
-        opts="--help"
+        opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     list-available-networks)
       if [[ $cur == -* ]]; then
-        opts="--json --help"
+        opts="--json --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     list-snapshots)
       if [[ $cur == -* ]]; then
-        opts="--json --network --help"
+        opts="--json --network --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     purge-all)
       if [[ $cur == -* ]]; then
-        opts="--help"
+        opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     ui)
       if [[ $cur == -* ]]; then
-        opts="--page --ui-log --ui-logfile --help"
+        opts="--page --ui-log --ui-logfile --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0

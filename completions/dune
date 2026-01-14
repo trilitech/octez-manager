@@ -1,7 +1,7 @@
-; Install zsh completion script
+; Install shell completion scripts
 
 (install
  (section share)
  (files
-  (_octez-manager as zsh/site-functions/_octez-manager)
-  (octez-manager as bash-completion/completions/octez-manager)))
+  (octez-manager.zsh as zsh/site-functions/_octez-manager)
+  (octez-manager.bash as bash-completion/completions/octez-manager)))

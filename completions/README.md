@@ -11,8 +11,8 @@ dune exec tools/gen_completion.exe -- --binary ./octez-manager
 ```
 
 This updates:
-- `completions/_octez-manager`
-- `completions/octez-manager`
+- `completions/octez-manager.zsh`
+- `completions/octez-manager.bash`
 
 ## Zsh Completion
 
@@ -37,7 +37,7 @@ source ~/.zshrc
 #### Option 2: System-wide installation (requires sudo)
 
 ```bash
-sudo cp completions/_octez-manager /usr/share/zsh/site-functions/
+sudo cp completions/octez-manager.zsh /usr/share/zsh/site-functions/
 ```
 
 Then restart your shell or run:
@@ -54,7 +54,7 @@ compinit
 
 2. Copy the completion file:
    ```bash
-   cp completions/_octez-manager ~/.zsh/completions/
+   cp completions/octez-manager.zsh ~/.zsh/completions/
    ```
 
 3. Add the following to your `~/.zshrc` (before `compinit` is called):
@@ -71,7 +71,7 @@ compinit
 
 Add this line to your `~/.zshrc`:
 ```bash
-source /path/to/octez-manager/completions/_octez-manager
+source /path/to/octez-manager/completions/octez-manager.zsh
 ```
 
 Then restart your shell or run:
@@ -107,8 +107,8 @@ If you install `octez-manager` via opam or dune, the completion file is automati
 
 ```bash
 # Add to your ~/.bashrc:
-if [ -f "$(opam var share)/bash-completion/completions/octez-manager" ]; then
-  source "$(opam var share)/bash-completion/completions/octez-manager"
+if [ -f "$(opam var share)/bash-completion/completions/octez-manager.bash" ]; then
+  source "$(opam var share)/bash-completion/completions/octez-manager.bash"
 fi
 ```
 
@@ -120,7 +120,7 @@ source ~/.bashrc
 #### Option 2: System-wide installation (requires sudo)
 
 ```bash
-sudo cp completions/octez-manager /usr/share/bash-completion/completions/
+sudo cp completions/octez-manager.bash /usr/share/bash-completion/completions/
 ```
 
 Then restart your shell or run:
@@ -137,7 +137,7 @@ source /etc/bash_completion
 
 2. Copy the completion file:
    ```bash
-   cp completions/octez-manager ~/.bash_completion.d/
+   cp completions/octez-manager.bash ~/.bash_completion.d/
    ```
 
 3. Add the following to your `~/.bashrc`:
@@ -156,7 +156,7 @@ source /etc/bash_completion
 
 Add this line to your `~/.bashrc`:
 ```bash
-source /path/to/octez-manager/completions/octez-manager
+source /path/to/octez-manager/completions/octez-manager.bash
 ```
 
 Then restart your shell or run:
