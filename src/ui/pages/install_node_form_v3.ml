@@ -923,25 +923,28 @@ let spec =
               ~get:(fun m -> m.core.instance_name)
               ~set:(fun instance_name m ->
                 let old = m.core.instance_name in
-                let default_dir =
-                  Common.default_role_dir "node" instance_name
-                in
-                let keep_data_dir =
-                  String.trim m.node.data_dir <> ""
-                  && not
-                       (String.equal
-                          m.node.data_dir
-                          (Common.default_role_dir "node" old))
-                in
                 let new_core = {m.core with instance_name} in
-                let new_node =
-                  {
-                    m.node with
-                    data_dir =
-                      (if keep_data_dir then m.node.data_dir else default_dir);
-                  }
-                in
-                {m with core = new_core; node = new_node})
+                (* In edit mode, never change data_dir - data is already there *)
+                if m.edit_mode then {m with core = new_core}
+                else
+                  let default_dir =
+                    Common.default_role_dir "node" instance_name
+                  in
+                  let keep_data_dir =
+                    String.trim m.node.data_dir <> ""
+                    && not
+                         (String.equal
+                            m.node.data_dir
+                            (Common.default_role_dir "node" old))
+                  in
+                  let new_node =
+                    {
+                      m.node with
+                      data_dir =
+                        (if keep_data_dir then m.node.data_dir else default_dir);
+                    }
+                  in
+                  {m with core = new_core; node = new_node})
               ~validate:(fun m ->
                 (* Use non-blocking cache to avoid syscalls during typing *)
                 let states =

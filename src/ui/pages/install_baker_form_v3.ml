@@ -573,26 +573,29 @@ let spec =
               ~get:(fun m -> m.core.instance_name)
               ~set:(fun instance_name m ->
                 let old = m.core.instance_name in
-                let default_dir =
-                  Common.default_role_dir "baker" instance_name
-                in
-                let keep_base_dir =
-                  m.edit_mode
-                  || String.trim m.client.base_dir <> ""
-                     && not
-                          (String.equal
-                             m.client.base_dir
-                             (Common.default_role_dir "baker" old))
-                in
                 let new_core = {m.core with instance_name} in
-                let new_client =
-                  {
-                    m.client with
-                    base_dir =
-                      (if keep_base_dir then m.client.base_dir else default_dir);
-                  }
-                in
-                {m with core = new_core; client = new_client})
+                (* In edit mode, never change base_dir - data is already there *)
+                if m.edit_mode then {m with core = new_core}
+                else
+                  let default_dir =
+                    Common.default_role_dir "baker" instance_name
+                  in
+                  let keep_base_dir =
+                    String.trim m.client.base_dir <> ""
+                    && not
+                         (String.equal
+                            m.client.base_dir
+                            (Common.default_role_dir "baker" old))
+                  in
+                  let new_client =
+                    {
+                      m.client with
+                      base_dir =
+                        (if keep_base_dir then m.client.base_dir
+                         else default_dir);
+                    }
+                  in
+                  {m with core = new_core; client = new_client})
               ~validate:(fun m ->
                 let states = Form_builder_common.cached_service_states () in
                 if not (Form_builder_common.is_nonempty m.core.instance_name)
