@@ -737,12 +737,12 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
       dim_background = true;
     }
   in
-  (* Space commits via Miaou's commit_on, Enter/s handled manually in handle_key *)
+  (* Enter/s commits via Space handler in widget, Enter/s handled manually in handle_key *)
   Miaou.Core.Modal_manager.push
     (module Modal)
     ~init:(Modal.init ())
     ~ui
-    ~commit_on:["Space"; " "]
+    ~commit_on:[]
     ~cancel_on:["Esc"; "Escape"]
     ~on_close:(fun pstate -> function
       | `Commit -> (
