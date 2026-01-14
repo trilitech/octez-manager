@@ -64,16 +64,42 @@ if ! grep -q "OCTEZ_DAL_DATA_DIR=$CUSTOM_DATA_DIR" "$ENV_FILE"; then
 fi
 echo "Custom data directory configured correctly"
 
-# Verify the registry has the correct data_dir
-REGISTRY_DATA_DIR=$(om list --json 2>/dev/null | jq -r ".[] | select(.instance == \"$DAL_INSTANCE\") | .data_dir" 2>/dev/null || echo "")
-if [ "$REGISTRY_DATA_DIR" != "$CUSTOM_DATA_DIR" ]; then
-    echo "ERROR: Registry data_dir doesn't match"
-    echo "Expected: $CUSTOM_DATA_DIR"
-    echo "Got: $REGISTRY_DATA_DIR"
-    om list --json 2>&1 | jq . || true
+# Start the node first (DAL node depends on it)
+echo "Starting node..."
+om instance "$NODE_INSTANCE" start 2>&1
+wait_for_service "octez-node@$NODE_INSTANCE"
+echo "Node started"
+
+# Start the DAL node
+echo "Starting DAL node..."
+om instance "$DAL_INSTANCE" start 2>&1
+
+# Wait for service to start and create data
+echo "Waiting for DAL node to initialize..."
+sleep 5
+
+# Verify the custom data directory was created and populated
+if [ ! -d "$CUSTOM_DATA_DIR" ]; then
+    echo "ERROR: Custom data directory was not created"
+    echo "Expected directory: $CUSTOM_DATA_DIR"
+    ls -la /var/lib/octez/ || true
     exit 1
 fi
-echo "Registry data_dir matches"
+echo "Custom data directory exists"
+
+# Check that the directory contains data (config.json or other files)
+if [ -z "$(ls -A "$CUSTOM_DATA_DIR" 2>/dev/null)" ]; then
+    echo "ERROR: Custom data directory is empty"
+    echo "DAL node did not write data to the custom directory"
+    exit 1
+fi
+echo "Custom data directory contains data:"
+ls -la "$CUSTOM_DATA_DIR"
+
+# Stop services before cleanup
+echo "Stopping services..."
+om instance "$DAL_INSTANCE" stop 2>&1 || true
+om instance "$NODE_INSTANCE" stop 2>&1 || true
 
 # Cleanup
 cleanup_instance "$DAL_INSTANCE"
