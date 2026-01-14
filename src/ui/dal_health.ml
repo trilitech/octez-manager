@@ -80,5 +80,9 @@ let get ~instance = with_lock (fun () -> Hashtbl.find_opt cache instance)
 let set ~instance data =
   with_lock (fun () -> Hashtbl.replace cache instance data)
 
-(** Clear cache *)
+(** Clear cache for a specific instance *)
+let clear_instance ~instance =
+  with_lock (fun () -> Hashtbl.remove cache instance)
+
+(** Clear all cache *)
 let clear () = with_lock (fun () -> Hashtbl.clear cache)

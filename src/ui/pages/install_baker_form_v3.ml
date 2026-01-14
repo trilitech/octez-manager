@@ -702,6 +702,10 @@ let spec =
                 ()
           | _ -> Ok ()
         in
+        (* Refresh caches so UI shows updated data *)
+        Delegate_scheduler.invalidate_config ~instance:model.core.instance_name ;
+        Baker_highwatermarks.refresh ~instance:model.core.instance_name ;
+        Context.mark_instances_dirty () ;
         (* Queue restart dependents for modal on instances page *)
         if model.edit_mode && model.stopped_dependents <> [] then
           Context.set_pending_restart_dependents model.stopped_dependents ;
