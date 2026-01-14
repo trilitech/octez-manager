@@ -1,11 +1,11 @@
 ---
 title: Using the TUI
-description: Manage your Tezos infrastructure with the interactive terminal interface
+description: The recommended way to install and monitor your Tezos infrastructure
 ---
 
-# Using the TUI
+The TUI is the recommended way to use Octez Manager. It provides an intuitive interface for installing services, monitoring their status, and managing your infrastructure — no memorizing commands required.
 
-Octez Manager provides an interactive Terminal User Interface (TUI) for managing your Tezos infrastructure. This guide walks through common workflows using Shadownet as an example.
+This guide walks through common workflows using Shadownet as an example.
 
 > **Tip:** Press `?` at any time to see available actions for the current screen.
 

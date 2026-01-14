@@ -23,21 +23,22 @@ export default defineConfig({
 					items: [
 						{ label: 'Introduction', slug: 'getting-started/introduction' },
 						{ label: 'Installation', slug: 'getting-started/installation' },
-						{ label: 'Quick Start', slug: 'getting-started/quick-start' },
+						{ label: 'Using the TUI', slug: 'guides/tui-guide' },
 					],
 				},
 				{
 					label: 'Guides',
 					items: [
-						{ label: 'Setting Up a Node', slug: 'guides/node-setup' },
-						{ label: 'Becoming a Baker', slug: 'guides/baker-setup' },
+						{ label: 'Node Setup', slug: 'guides/node-setup' },
+						{ label: 'Baker Setup', slug: 'guides/baker-setup' },
 						{ label: 'DAL Node Setup', slug: 'guides/dal-node-setup' },
-						{ label: 'Using the TUI', slug: 'guides/tui-guide' },
 					],
 				},
 				{
 					label: 'Reference',
-					autogenerate: { directory: 'reference' },
+					items: [
+						{ label: 'CLI Reference', slug: 'reference/cli' },
+					],
 				},
 			],
 			customCss: ['./src/styles/custom.css'],

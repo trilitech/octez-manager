@@ -3,8 +3,6 @@ title: DAL Node Setup
 description: Set up a Data Availability Layer node
 ---
 
-# DAL Node Setup
-
 The Data Availability Layer (DAL) is Tezos's scalability solution. Running a DAL node allows your baker to attest to DAL slots. This guide uses Shadownet as an example.
 
 ## Prerequisites
