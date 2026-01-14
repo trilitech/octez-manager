@@ -20,7 +20,7 @@ The Data Availability Layer (DAL) is Tezos's scalability solution. Running a DAL
    - **Instance name**: `my-dal-node`
    - **Node**: Select your local node or enter endpoint
    - **RPC address**: `127.0.0.1:10732` (default)
-   - **Net address**: `[::]:11732` (default)
+   - **Net address**: `0.0.0.0:11732` (default)
 
 ## Installation via CLI
 
@@ -30,23 +30,22 @@ octez-manager install-dal-node \
   --instance my-dal-node \
   --node-instance my-node \
   --rpc-addr 127.0.0.1:10732 \
-  --net-addr "[::]:11732"
+  --net-addr 0.0.0.0:11732
 
 # Using remote endpoint
 octez-manager install-dal-node \
   --instance my-dal-node \
-  --node-endpoint http://localhost:8732 \
+  --node-instance http://localhost:8732 \
   --rpc-addr 127.0.0.1:10732
 ```
 
 ## Connecting Baker to DAL Node
 
-After setting up your DAL node, connect your baker:
+After setting up your DAL node, connect your baker by editing its configuration:
 
 ```bash
-# Edit existing baker
-octez-manager instance my-baker edit \
-  --dal-node my-dal-node
+# Edit existing baker configuration
+octez-manager instance my-baker edit
 ```
 
 Or specify during baker installation:
@@ -54,8 +53,9 @@ Or specify during baker installation:
 octez-manager install-baker \
   --instance my-baker \
   --node-instance my-node \
-  --delegates tz1... \
-  --dal-node my-dal-node
+  --delegate tz1... \
+  --dal-endpoint my-dal-node \
+  --liquidity-baking-vote pass
 ```
 
 ## Ports
