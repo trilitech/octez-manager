@@ -192,6 +192,10 @@ let get_baker_delegate_data ~instance =
   let delegates = get_baker_delegates ~instance in
   List.filter_map (fun pkh -> Delegate_data.get ~pkh) delegates
 
+(** Invalidate and refresh cached config for an instance (call after editing baker).
+    This immediately reloads the config from disk so the UI shows fresh data. *)
+let invalidate_config ~instance = refresh_config ~instance
+
 (** Clear all state *)
 let clear () =
   Delegate_data.clear () ;

@@ -485,6 +485,8 @@ let spec =
                 ()
           | _ -> Ok ()
         in
+        (* Invalidate caches and mark instances dirty to refresh UI *)
+        Context.mark_instances_dirty () ;
         (* Queue restart dependents for modal on instances page *)
         if model.edit_mode && model.stopped_dependents <> [] then
           Context.set_pending_restart_dependents model.stopped_dependents ;

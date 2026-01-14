@@ -1165,6 +1165,7 @@ let spec =
                   (Printf.sprintf
                      "Node %s installed successfully"
                      model.core.instance_name) ;
+                (* Invalidate caches and mark instances dirty to refresh UI *)
                 Context.mark_instances_dirty ()
             | Job_manager.Failed msg ->
                 (* Log to debug file for troubleshooting *)

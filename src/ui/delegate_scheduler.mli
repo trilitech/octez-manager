@@ -26,5 +26,9 @@ val get_baker_delegates : instance:string -> string list
 (** Check if baker has DAL enabled (from cache, never blocks). *)
 val baker_has_dal : instance:string -> bool
 
+(** Refresh cached config for an instance (call after editing baker).
+    Immediately reloads from disk so UI shows fresh data. *)
+val invalidate_config : instance:string -> unit
+
 (** Clear all state and cache. *)
 val clear : unit -> unit
