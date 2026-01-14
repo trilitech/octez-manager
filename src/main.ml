@@ -2928,58 +2928,61 @@ let list_snapshots_cmd =
   in
   Cmd.v info term
 
+let ui_term =
+  let open Cmdliner in
+  let page_arg =
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["page"] ~doc:"Start on a registered page" ~docv:"NAME")
+  in
+  let log_flag =
+    Arg.(value & flag & info ["ui-log"] ~doc:"Enable UI debug logs")
+  in
+  let logfile_arg =
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["ui-logfile"] ~doc:"Write UI logs to FILE" ~docv:"FILE")
+  in
+  Term.(
+    ret
+      (const (fun page log logfile ->
+           Capabilities.register () ;
+           (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
+           Sys.set_signal Sys.sigpipe Sys.Signal_ignore ;
+           (* Default to stable term driver if not explicitly set *)
+           (match Sys.getenv_opt "MIAOU_DRIVER" with
+           | None -> Unix.putenv "MIAOU_DRIVER" "term"
+           | Some _ -> ()) ;
+           let result =
+             (* Use POSIX backend to avoid io_uring resource exhaustion *)
+             Eio_posix.run @@ fun env ->
+             Eio.Switch.run @@ fun sw ->
+             Miaou_helpers.Fiber_runtime.init ~env ~sw ;
+             Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
+           in
+           match result with
+           | Ok () -> `Ok ()
+           | Error (`Msg msg) -> cmdliner_error msg)
+      $ page_arg $ log_flag $ logfile_arg))
+
 let ui_cmd =
   let open Cmdliner in
-  let term =
-    let page_arg =
-      Arg.(
-        value
-        & opt (some string) None
-        & info ["page"] ~doc:"Start on a registered page" ~docv:"NAME")
-    in
-    let log_flag =
-      Arg.(value & flag & info ["ui-log"] ~doc:"Enable UI debug logs")
-    in
-    let logfile_arg =
-      Arg.(
-        value
-        & opt (some string) None
-        & info ["ui-logfile"] ~doc:"Write UI logs to FILE" ~docv:"FILE")
-    in
-    Term.(
-      ret
-        (const (fun page log logfile ->
-             Capabilities.register () ;
-             (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
-             Sys.set_signal Sys.sigpipe Sys.Signal_ignore ;
-             (* Default to stable term driver if not explicitly set *)
-             (match Sys.getenv_opt "MIAOU_DRIVER" with
-             | None -> Unix.putenv "MIAOU_DRIVER" "term"
-             | Some _ -> ()) ;
-             let result =
-               (* Use POSIX backend to avoid io_uring resource exhaustion *)
-               Eio_posix.run @@ fun env ->
-               Eio.Switch.run @@ fun sw ->
-               Miaou_helpers.Fiber_runtime.init ~env ~sw ;
-               Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
-             in
-             match result with
-             | Ok () -> `Ok ()
-             | Error (`Msg msg) -> cmdliner_error msg)
-        $ page_arg $ log_flag $ logfile_arg))
-  in
   let info =
     Cmd.info
       "ui"
-      ~doc:"Launch the Miaou-based interactive interface (experimental)"
+      ~doc:
+        "Launch the interactive terminal UI (same as running without arguments)"
   in
-  Cmd.v info term
+  Cmd.v info ui_term
 
 let root_cmd =
-  let doc = "Minimal Octez service manager" in
-  let info = Cmd.info "octez-manager" ~doc in
+  let doc = "Terminal UI for managing Octez services" in
+  let info = Cmd.info "octez-manager" ~doc ~version:"0.0.2" in
   Cmd.group
     info
+    ~default:ui_term
     [
       instance_cmd;
       install_node_cmd;

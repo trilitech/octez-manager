@@ -11,10 +11,10 @@ Octez Manager provides a full-featured Terminal User Interface (TUI) for managin
 
 ```bash
 # User mode
-octez-manager ui
+octez-manager
 
 # System mode (as root)
-sudo octez-manager ui
+sudo octez-manager
 ```
 
 ## Main Dashboard

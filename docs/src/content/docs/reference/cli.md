@@ -135,10 +135,10 @@ octez-manager list [OPTIONS]
 
 ### `ui`
 
-Launch the interactive terminal UI.
+Launch the interactive terminal UI (default command).
 
 ```bash
-octez-manager ui [OPTIONS]
+octez-manager [OPTIONS]
 ```
 
 | Option | Description |
@@ -146,6 +146,8 @@ octez-manager ui [OPTIONS]
 | `--page <NAME>` | Start on a specific page |
 | `--ui-log` | Enable UI debug logs |
 | `--ui-logfile <FILE>` | Write UI logs to file |
+
+> **Note**: When run without arguments, `octez-manager` launches the TUI. Use explicit subcommands for CLI operations.
 
 ### `list-available-networks`
 
@@ -231,7 +233,7 @@ octez-manager instance mainnet logs
 octez-manager list --json
 
 # Launch the TUI
-octez-manager ui
+octez-manager
 
 # List available networks
 octez-manager list-available-networks
