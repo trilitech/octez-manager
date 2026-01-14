@@ -1,42 +1,38 @@
 # Octez Manager
 
-A command-line tool and terminal UI for managing Octez services (nodes, bakers, accusers, signers, DAL nodes) as systemd units.
+A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, signers, DAL nodes).
 
 ![Octez Manager UI](assets/screenshot.gif)
 
-> **Warning**
-> Octez Manager is experimental. Use at your own risk on testnets only.
+> **Warning**  
+> Octez Manager is in active development. Use at your own risk, especially on mainnet.
 
 ## Features
 
-- Install and manage Octez daemons as systemd services
-- Terminal UI for interactive management
-- Snapshot import from tzinit.org
-- Network discovery from teztnets.com
-- Service lifecycle management (start, stop, restart, purge)
+- **Install and manage** Octez services as systemd units
+- **Terminal UI** with real-time monitoring and logs
+- **Snapshot import** from tzinit.org with automatic download
+- **Multiple instances** per service type
+- **Network discovery** from teztnets.com (mainnet, ghostnet, etc.)
 
 ## Quick Start
 
-### Prerequisites
+### Installation
 
 ```sh
-# Pin miaou (not yet on opam)
-opam pin add https://github.com/trilitech/miaou.git
-
-# Install dependencies and build
-opam install . --deps-only --with-test
+# Clone and build
+git clone https://github.com/trilitech/octez-manager.git
+cd octez-manager
+opam install . --deps-only
 make build
 ```
 
-### Install a Node
+### Prerequisites
 
-```sh
-octez-manager install-node \
-  --instance my-node \
-  --network mainnet \
-  --history-mode rolling \
-  --snapshot rolling
-```
+- OCaml 5.1+, opam 2.1+
+- systemd
+- Octez binaries in PATH
+- sudo access (for system-wide services)
 
 ### Launch the UI
 
@@ -44,38 +40,45 @@ octez-manager install-node \
 octez-manager ui
 ```
 
-The UI provides:
-- Service overview with status monitoring
-- Installation wizards for all service types
-- Log viewing and service actions
-- Snapshot management
+The UI provides installation wizards, service monitoring, log viewing, and snapshot management.
 
-### CLI Commands
+### CLI Examples
 
 ```sh
+# Install a node with snapshot
+octez-manager install-node \
+  --instance mainnet-node \
+  --network mainnet \
+  --snapshot rolling
+
+# Install a baker
+octez-manager install-baker \
+  --instance mainnet-baker \
+  --node mainnet-node
+
 # List services
 octez-manager list
 
 # Service actions
 octez-manager instance <name> start|stop|restart|purge
 
-# Install other services
-octez-manager install-baker --help
-octez-manager install-accuser --help
-octez-manager install-signer --help
-octez-manager install-dal-node --help
-
-# Snapshot management
-octez-manager list-snapshots --network mainnet
-octez-manager snapshots import --instance my-node
+# View logs
+octez-manager logs <name>
 ```
 
 Run `octez-manager --help` for all commands.
 
 ## Documentation
 
-- [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
-- [SECURITY.md](./SECURITY.md) - Security policy
+- **[User Guide](https://trilitech.github.io/octez-manager/)** - Installation, tutorials, CLI reference
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Development guidelines
+- **[CHANGELOG.md](./CHANGELOG.md)** - Version history
+
+## License
+
+MIT - see [LICENSE](LICENSE).
+
+**Maintainer:** Nomadic Labs (<contact@nomadic-labs.com>)
 
 ## License
 
