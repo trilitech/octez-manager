@@ -8,6 +8,7 @@
   logging_mode
   log_viewer
   log_export
+  health_check
   node_env
   systemd
   service
