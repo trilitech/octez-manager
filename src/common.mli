@@ -108,5 +108,12 @@ val get_remote_file_size : string -> int64 option
 
 val get_available_space : string -> int64 option
 
+(** Get the filesystem device ID for a path. *)
+val get_filesystem_id : string -> int option
+
+(** Check if two paths are on the same filesystem.
+    Returns [Some true] if same, [Some false] if different, [None] if unknown. *)
+val same_filesystem : string -> string -> bool option
+
 (** Map Octez exit codes to human-readable descriptions. *)
 val octez_exit_code_description : int -> string

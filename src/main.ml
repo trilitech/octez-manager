@@ -498,6 +498,30 @@ let resolve_tmp_dir_for_snapshot ~snapshot_url ~tmp_dir =
                      tmp_path
                      (format_bytes available))))
 
+let check_data_dir_space ~snapshot_url ~data_dir =
+  (* Check if data directory has enough space for imported snapshot data *)
+  match Common.get_remote_file_size snapshot_url with
+  | None -> Ok () (* Can't determine size, proceed *)
+  | Some snapshot_size -> (
+      (* Storage needs ~1.2x snapshot size (imported data with buffer) *)
+      let required = Int64.add snapshot_size (Int64.div snapshot_size 5L) in
+      (* Use parent dir if data_dir doesn't exist yet *)
+      let check_path =
+        if Sys.file_exists data_dir then data_dir else Filename.dirname data_dir
+      in
+      match Common.get_available_space check_path with
+      | None -> Ok () (* Can't determine space, proceed *)
+      | Some available ->
+          if available >= required then Ok ()
+          else
+            Error
+              (Printf.sprintf
+                 "Data directory %s needs %s for node storage but only has %s \
+                  available."
+                 data_dir
+                 (format_bytes required)
+                 (format_bytes available)))
+
 (* Prompt with linenoise for autocompletion support *)
 let prompt_with_completion question completions =
   if not (is_interactive ()) then None
@@ -982,7 +1006,13 @@ let install_node_cmd =
             else if snapshot_requested then Snapshot {src = snapshot_uri}
             else Genesis
           in
-          (* Check snapshot size vs tmp space *)
+          (* Resolve actual data_dir (use default if not specified) *)
+          let actual_data_dir =
+            match data_dir with
+            | Some dir when String.trim dir <> "" -> dir
+            | _ -> Common.default_data_dir instance
+          in
+          (* Check snapshot size vs tmp space and data dir space *)
           let* tmp_dir =
             match bootstrap with
             | Snapshot _ -> (
@@ -1007,6 +1037,12 @@ let install_node_cmd =
                 in
                 match snapshot_url with
                 | Some url ->
+                    (* Check data directory has enough space for imported data *)
+                    let* () =
+                      check_data_dir_space
+                        ~snapshot_url:url
+                        ~data_dir:actual_data_dir
+                    in
                     resolve_tmp_dir_for_snapshot ~snapshot_url:url ~tmp_dir
                 | None -> Ok tmp_dir)
             | Genesis -> Ok tmp_dir
