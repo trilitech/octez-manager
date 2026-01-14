@@ -1629,6 +1629,121 @@ type instance_action =
   | Edit
   | Export_logs
 
+(** Sequential restart with health checks.
+    1. Stop all dependents
+    2. Restart target service
+    3. Wait for RPC to be ready (unless no_wait)
+    4. Start dependents in order *)
+let sequential_restart ~instance ~no_wait ~timeout =
+  let ( let* ) = Result.bind in
+  (* Get the service info *)
+  let* svc =
+    match Service_registry.find ~instance with
+    | Ok (Some svc) -> Ok svc
+    | Ok None -> Error (`Msg (Printf.sprintf "Unknown instance '%s'" instance))
+    | Error e -> Error e
+  in
+  let dependents = svc.S.dependents in
+  (* Get full service info for dependents *)
+  let get_dependent_svc inst =
+    match Service_registry.find ~instance:inst with
+    | Ok (Some s) -> Some s
+    | _ -> None
+  in
+  let dependent_svcs =
+    List.filter_map get_dependent_svc dependents
+    |> List.sort (fun a b ->
+        (* DAL nodes before bakers/accusers *)
+        let order r = match r with "dal-node" | "dal" -> 0 | _ -> 1 in
+        compare (order a.S.role) (order b.S.role))
+  in
+  if dependents <> [] then (
+    Printf.printf "Stopping dependent services...\n%!" ;
+    List.iter
+      (fun dep_svc ->
+        match
+          Installer.stop_service ~quiet:true ~instance:dep_svc.S.instance ()
+        with
+        | Ok () -> Printf.printf "  Stopped %s\n%!" dep_svc.S.instance
+        | Error (`Msg e) ->
+            Printf.eprintf
+              "  Warning: Failed to stop %s: %s\n%!"
+              dep_svc.S.instance
+              e)
+      (List.rev dependent_svcs)
+    (* Stop in reverse order *)) ;
+  (* Restart the target service *)
+  Printf.printf "Restarting %s...\n%!" instance ;
+  let* () = Installer.restart_service ~quiet:true ~instance () in
+  Printf.printf "  Service restarted\n%!" ;
+  (* Wait for RPC to be ready (for node/DAL roles) *)
+  let* () =
+    if no_wait then Ok ()
+    else
+      match svc.S.role with
+      | "node" | "dal-node" | "dal" ->
+          Printf.printf "Waiting for RPC at %s...\n%!" svc.S.rpc_addr ;
+          let timeout =
+            Option.value
+              timeout
+              ~default:
+                (if svc.S.role = "node" then Health_check.default_node_timeout
+                 else Health_check.default_dal_timeout)
+          in
+          let result =
+            Health_check.wait_for_service
+              ~timeout
+              ~on_progress:(fun elapsed ->
+                Printf.printf "\r  Waiting... %.0fs%!" elapsed)
+              svc
+          in
+          Printf.printf "\n%!" ;
+          if result.Health_check.ready then (
+            Printf.printf
+              "  RPC ready (took %.1fs)\n%!"
+              result.Health_check.elapsed ;
+            Ok ())
+          else (
+            Printf.eprintf
+              "  Warning: %s (continuing anyway)\n%!"
+              result.Health_check.message ;
+            Ok ())
+      | _ -> Ok ()
+  in
+  (* Start dependents in order *)
+  if dependent_svcs <> [] then (
+    Printf.printf "Starting dependent services...\n%!" ;
+    List.iter
+      (fun dep_svc ->
+        match
+          Installer.start_service ~quiet:true ~instance:dep_svc.S.instance ()
+        with
+        | Ok () ->
+            Printf.printf "  Started %s\n%!" dep_svc.S.instance ;
+            (* Wait for DAL node RPC if needed *)
+            if
+              (not no_wait)
+              && (dep_svc.S.role = "dal-node" || dep_svc.S.role = "dal")
+            then (
+              Printf.printf
+                "  Waiting for DAL RPC at %s...\n%!"
+                dep_svc.S.rpc_addr ;
+              let timeout =
+                Option.value timeout ~default:Health_check.default_dal_timeout
+              in
+              let result = Health_check.wait_for_service ~timeout dep_svc in
+              if result.Health_check.ready then
+                Printf.printf
+                  "    RPC ready (took %.1fs)\n%!"
+                  result.Health_check.elapsed
+              else
+                Printf.eprintf "    Warning: %s\n%!" result.Health_check.message)
+        | Error (`Msg e) ->
+            Printf.eprintf "  Failed to start %s: %s\n%!" dep_svc.S.instance e)
+      dependent_svcs) ;
+  Printf.printf "All services restarted successfully.\n%!" ;
+  Ok ()
+
 let instance_term =
   let instance =
     Arg.(value & pos 0 (some string) None & info [] ~docv:"INSTANCE")
@@ -1657,7 +1772,28 @@ let instance_term =
           ["delete-data-dir"]
           ~doc:"Also delete the recorded data directory when removing.")
   in
-  let run instance action delete_data_dir =
+  let no_wait =
+    Arg.(
+      value & flag
+      & info
+          ["no-wait"]
+          ~doc:
+            "Skip health checks when restarting services with dependents. By \
+             default, restart waits for RPC to be ready before starting \
+             dependents.")
+  in
+  let timeout =
+    Arg.(
+      value
+      & opt (some float) None
+      & info
+          ["timeout"]
+          ~docv:"SECONDS"
+          ~doc:
+            "Timeout for health checks in seconds (default: 120 for nodes, 30 \
+             for DAL nodes).")
+  in
+  let run instance action delete_data_dir no_wait timeout =
     match (instance, action) with
     | None, _ -> `Help (`Pager, None)
     | Some _, None ->
@@ -1821,7 +1957,7 @@ let instance_term =
         | Stop ->
             run_result (Installer.stop_service ~quiet:false ~instance:inst ())
         | Restart -> (
-            (* Check for stopped dependencies *)
+            (* Check for stopped dependencies first *)
             let dep_check =
               Installer.get_stopped_dependencies ~instance:inst ()
             in
@@ -1829,54 +1965,8 @@ let instance_term =
             | Error (`Msg e) ->
                 prerr_endline ("Error checking dependencies: " ^ e) ;
                 `Error (false, e)
-            | Ok [] -> (
-                (* No stopped dependencies, restart directly *)
-                let result =
-                  Installer.restart_service ~quiet:false ~instance:inst ()
-                in
-                match result with
-                | Ok () -> (
-                    (* Check for stopped dependents *)
-                    match
-                      Installer.get_stopped_dependents ~instance:inst ()
-                    with
-                    | Ok [] -> `Ok ()
-                    | Ok stopped_deps when is_interactive () ->
-                        let names =
-                          String.concat
-                            ", "
-                            (List.map
-                               (fun s -> s.Service.instance)
-                               stopped_deps)
-                        in
-                        let should_restart =
-                          prompt_yes_no
-                            (Printf.sprintf "Restart dependents? (%s)" names)
-                            ~default:true
-                        in
-                        if should_restart then
-                          List.iter
-                            (fun dep ->
-                              match
-                                Installer.restart_service
-                                  ~quiet:false
-                                  ~instance:dep.Service.instance
-                                  ()
-                              with
-                              | Ok () ->
-                                  Printf.printf
-                                    "Restarted %s\n%!"
-                                    dep.Service.instance
-                              | Error (`Msg e) ->
-                                  Printf.eprintf
-                                    "Failed to restart %s: %s\n%!"
-                                    dep.Service.instance
-                                    e)
-                            stopped_deps ;
-                        `Ok ()
-                    | _ -> `Ok ())
-                | Error (`Msg e) -> `Error (false, e))
-            | Ok stopped_deps ->
+            | Ok stopped_deps when stopped_deps <> [] ->
+                (* Dependencies not running - need to start them first *)
                 let names =
                   String.concat
                     ", "
@@ -1891,7 +1981,7 @@ let instance_term =
                       ~default:true
                   in
                   if should_start_deps then (
-                    (* Start dependencies in order *)
+                    (* Start dependencies *)
                     let failed = ref false in
                     List.iter
                       (fun dep ->
@@ -1916,62 +2006,19 @@ let instance_term =
                     if !failed then
                       `Error (false, "Failed to start dependencies")
                     else
-                      (* Now restart the target instance *)
-                      let result =
-                        Installer.restart_service ~quiet:false ~instance:inst ()
-                      in
-                      match result with
-                      | Ok () -> (
-                          (* Check for stopped dependents *)
-                          match
-                            Installer.get_stopped_dependents ~instance:inst ()
-                          with
-                          | Ok [] -> `Ok ()
-                          | Ok stopped_deps ->
-                              let names =
-                                String.concat
-                                  ", "
-                                  (List.map
-                                     (fun s -> s.Service.instance)
-                                     stopped_deps)
-                              in
-                              let should_restart =
-                                prompt_yes_no
-                                  (Printf.sprintf
-                                     "Restart dependents? (%s)"
-                                     names)
-                                  ~default:true
-                              in
-                              if should_restart then
-                                List.iter
-                                  (fun dep ->
-                                    match
-                                      Installer.restart_service
-                                        ~quiet:false
-                                        ~instance:dep.Service.instance
-                                        ()
-                                    with
-                                    | Ok () ->
-                                        Printf.printf
-                                          "Restarted %s\n%!"
-                                          dep.Service.instance
-                                    | Error (`Msg e) ->
-                                        Printf.eprintf
-                                          "Failed to restart %s: %s\n%!"
-                                          dep.Service.instance
-                                          e)
-                                  stopped_deps ;
-                              `Ok ()
-                          | _ -> `Ok ())
-                      | Error (`Msg e) -> `Error (false, e))
+                      run_result
+                        (sequential_restart ~instance:inst ~no_wait ~timeout))
                   else (
                     prerr_endline
                       "Cancelled - dependencies must be running first." ;
                     `Ok ())
                 else
-                  (* Non-interactive mode - just fail like before *)
-                  run_result
-                    (Installer.restart_service ~quiet:false ~instance:inst ()))
+                  `Error
+                    (false, Printf.sprintf "Dependencies not running: %s" names)
+            | _ ->
+                (* No stopped dependencies - proceed with sequential restart *)
+                run_result (sequential_restart ~instance:inst ~no_wait ~timeout)
+            )
         | Remove -> (
             (* Check for dependents and confirm if any *)
             match Service_registry.find ~instance:inst with
@@ -2721,7 +2768,8 @@ let instance_term =
                 | Error (`Msg msg) ->
                     cmdliner_error (Printf.sprintf "Export failed: %s" msg))))
   in
-  Term.(ret (const run $ instance $ action $ delete_data_dir))
+  Term.(
+    ret (const run $ instance $ action $ delete_data_dir $ no_wait $ timeout))
 
 let instance_cmd =
   let info = Cmd.info "instance" ~doc:"Manage existing Octez services." in
