@@ -14,7 +14,7 @@ let role_binary role =
   | "node" -> "octez-node"
   | "baker" -> "octez-baker"
   | "accuser" -> "octez-baker"
-  | "dal" | "dal-node" -> "octez-baker"
+  | "dal" | "dal-node" -> "octez-dal-node"
   | other -> "octez-" ^ other
 
 let system_unit_path role =
@@ -167,12 +167,9 @@ let exec_line role =
        \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
        accuser ${OCTEZ_SERVICE_ARGS:-}'"
   | "dal-node" | "dal" ->
-      (* DAL node is a subcommand of octez-baker: octez-baker [global] run dal [opts]
-         Note: --endpoint must be passed both as global option (for baker client)
-         and after "run dal" (for the DAL node component to connect to the L1 node) *)
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" --base-dir \
-       \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
-       dal --endpoint \"${OCTEZ_NODE_ENDPOINT}\" --data-dir \
+      (* DAL node uses octez-dal-node binary directly *)
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-dal-node\" run \
+       --endpoint \"${OCTEZ_NODE_ENDPOINT}\" --data-dir \
        \"${OCTEZ_DAL_DATA_DIR}\" --rpc-addr \"${OCTEZ_DAL_RPC_ADDR}\" \
        --net-addr \"${OCTEZ_DAL_NET_ADDR}\" ${OCTEZ_SERVICE_ARGS:-}'"
   | other ->

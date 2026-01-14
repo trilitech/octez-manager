@@ -35,7 +35,7 @@ let base_initial_model () =
         instance_name = "dal";
         service_user = Form_builder_common.default_service_user ();
         app_bin_dir =
-          Form_builder_common.default_app_bin_dir ~binary_name:"octez-baker";
+          Form_builder_common.default_app_bin_dir ~binary_name:"octez-dal-node";
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
@@ -134,8 +134,8 @@ let spec =
         (* 1. Dependencies: node (via client_fields_with_autoname) *)
         client_fields_with_autoname
           ~role:"dal"
-          ~binary:"octez-baker"
-          ~binary_validator:Form_builder_common.has_octez_baker_binary
+          ~binary:"octez-dal-node"
+          ~binary_validator:Form_builder_common.has_octez_dal_node_binary
           ~get_core:(fun m -> m.core)
           ~set_core:(fun core m -> {m with core})
           ~get_client:(fun m -> m.client)
@@ -147,9 +147,9 @@ let spec =
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
-            ~binary:"octez-baker"
-            ~subcommand:["run"; "dal"]
-            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~binary:"octez-dal-node"
+            ~subcommand:["run"]
+            ~binary_validator:Form_builder_common.has_octez_dal_node_binary
             ~skip_instance_name:true
             ~skip_extra_args:true
             ~skip_service_fields:true
@@ -211,9 +211,9 @@ let spec =
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
-            ~binary:"octez-baker"
-            ~subcommand:["run"; "dal"]
-            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~binary:"octez-dal-node"
+            ~subcommand:["run"]
+            ~binary_validator:Form_builder_common.has_octez_dal_node_binary
             ~skip_instance_name:true
             ~skip_app_bin_dir:true
             ~skip_service_fields:true
@@ -224,9 +224,9 @@ let spec =
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
-            ~binary:"octez-baker"
-            ~subcommand:["run"; "dal"]
-            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~binary:"octez-dal-node"
+            ~subcommand:["run"]
+            ~binary_validator:Form_builder_common.has_octez_dal_node_binary
             ~skip_instance_name:true
             ~skip_app_bin_dir:true
             ~skip_extra_args:true
@@ -237,9 +237,9 @@ let spec =
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
-            ~binary:"octez-baker"
-            ~subcommand:["run"; "dal"]
-            ~binary_validator:Form_builder_common.has_octez_baker_binary
+            ~binary:"octez-dal-node"
+            ~subcommand:["run"]
+            ~binary_validator:Form_builder_common.has_octez_dal_node_binary
             ~skip_app_bin_dir:true
             ~skip_extra_args:true
             ~skip_service_fields:true
@@ -339,7 +339,7 @@ let spec =
           | _ -> Common.default_role_dir "dal-node" model.core.instance_name
         in
 
-        (* Service args are command options only (after "run dal --data-dir") *)
+        (* Service args are command options only (after "run --data-dir") *)
         let service_args = extra_args in
 
         (* Build daemon request *)
