@@ -1,0 +1,8 @@
+description = "QR code encoder for OCaml"
+version = "0.2.0"
+requires = ""
+archive(byte) = "qrc.cma"
+archive(native) = "qrc.cmxa"
+plugin(byte) = "qrc.cma"
+plugin(native) = "qrc.cmxs"
+exists_if = "qrc.cma qrc.cmxa"

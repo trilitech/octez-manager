@@ -1,0 +1,21 @@
+opam-version: "2.0"
+added: [
+  "doc/psq" {"D"}
+  "doc/psq/CHANGES.md" {"F:S530T1768295770.71"}
+  "doc/psq/LICENSE.md" {"F:S742T1768295770.71"}
+  "doc/psq/README.md" {"F:S823T1768295770.71"}
+  "lib/psq" {"D"}
+  "lib/psq/META" {"F:S192T1768295770.71"}
+  "lib/psq/dune-package" {"F:S672T1768295770.71"}
+  "lib/psq/opam" {"F:S899T1768295770.71"}
+  "lib/psq/psq.a" {"F:S113970T1768295770.71"}
+  "lib/psq/psq.cma" {"F:S54086T1768295770.71"}
+  "lib/psq/psq.cmi" {"F:S3743T1768295770.71"}
+  "lib/psq/psq.cmt" {"F:S104138T1768295770.71"}
+  "lib/psq/psq.cmti" {"F:S20351T1768295770.71"}
+  "lib/psq/psq.cmx" {"F:S3131T1768295770.71"}
+  "lib/psq/psq.cmxa" {"F:S555T1768295770.71"}
+  "lib/psq/psq.cmxs" {"F:S110328T1768295770.71"}
+  "lib/psq/psq.ml" {"F:S14065T1768295770.71"}
+  "lib/psq/psq.mli" {"F:S7488T1768295770.71"}
+]

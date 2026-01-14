@@ -1,0 +1,355 @@
+(lang dune 3.20)
+(name alcotest)
+(version 1.9.1)
+(sections (lib .) (libexec .) (doc ../../doc/alcotest) (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   alcotest.a
+   alcotest.cma
+   alcotest.cmi
+   alcotest.cmt
+   alcotest.cmti
+   alcotest.cmx
+   alcotest.cmxa
+   alcotest.ml
+   alcotest.mli
+   alcotest__.cmi
+   alcotest__.cmt
+   alcotest__.cmx
+   alcotest__.ml
+   alcotest__Terminal.cmi
+   alcotest__Terminal.cmt
+   alcotest__Terminal.cmti
+   alcotest__Terminal.cmx
+   dune-package
+   engine/alcotest_engine.a
+   engine/alcotest_engine.cma
+   engine/alcotest_engine.cmi
+   engine/alcotest_engine.cmt
+   engine/alcotest_engine.cmti
+   engine/alcotest_engine.cmx
+   engine/alcotest_engine.cmxa
+   engine/alcotest_engine.ml
+   engine/alcotest_engine.mli
+   engine/alcotest_engine__.cmi
+   engine/alcotest_engine__.cmt
+   engine/alcotest_engine__.cmx
+   engine/alcotest_engine__.ml
+   engine/alcotest_engine__Callsite_loc.cmi
+   engine/alcotest_engine__Callsite_loc.cmt
+   engine/alcotest_engine__Callsite_loc.cmx
+   engine/alcotest_engine__Cli.cmi
+   engine/alcotest_engine__Cli.cmt
+   engine/alcotest_engine__Cli.cmti
+   engine/alcotest_engine__Cli.cmx
+   engine/alcotest_engine__Cli_intf.cmi
+   engine/alcotest_engine__Cli_intf.cmt
+   engine/alcotest_engine__Cli_intf.cmx
+   engine/alcotest_engine__Config.cmi
+   engine/alcotest_engine__Config.cmt
+   engine/alcotest_engine__Config.cmti
+   engine/alcotest_engine__Config.cmx
+   engine/alcotest_engine__Config_intf.cmi
+   engine/alcotest_engine__Config_intf.cmt
+   engine/alcotest_engine__Config_intf.cmx
+   engine/alcotest_engine__Core.cmi
+   engine/alcotest_engine__Core.cmt
+   engine/alcotest_engine__Core.cmti
+   engine/alcotest_engine__Core.cmx
+   engine/alcotest_engine__Core_intf.cmi
+   engine/alcotest_engine__Core_intf.cmt
+   engine/alcotest_engine__Core_intf.cmx
+   engine/alcotest_engine__Formatters.cmi
+   engine/alcotest_engine__Formatters.cmt
+   engine/alcotest_engine__Formatters.cmti
+   engine/alcotest_engine__Formatters.cmx
+   engine/alcotest_engine__Import.cmi
+   engine/alcotest_engine__Import.cmt
+   engine/alcotest_engine__Import.cmx
+   engine/alcotest_engine__Log_trap.cmi
+   engine/alcotest_engine__Log_trap.cmt
+   engine/alcotest_engine__Log_trap.cmti
+   engine/alcotest_engine__Log_trap.cmx
+   engine/alcotest_engine__Log_trap_intf.cmi
+   engine/alcotest_engine__Log_trap_intf.cmt
+   engine/alcotest_engine__Log_trap_intf.cmx
+   engine/alcotest_engine__Model.cmi
+   engine/alcotest_engine__Model.cmt
+   engine/alcotest_engine__Model.cmx
+   engine/alcotest_engine__Monad.cmi
+   engine/alcotest_engine__Monad.cmt
+   engine/alcotest_engine__Monad.cmti
+   engine/alcotest_engine__Monad.cmx
+   engine/alcotest_engine__Monad_intf.cmi
+   engine/alcotest_engine__Monad_intf.cmt
+   engine/alcotest_engine__Monad_intf.cmx
+   engine/alcotest_engine__Platform.cmi
+   engine/alcotest_engine__Platform.cmt
+   engine/alcotest_engine__Platform.cmx
+   engine/alcotest_engine__Pp.cmi
+   engine/alcotest_engine__Pp.cmt
+   engine/alcotest_engine__Pp.cmti
+   engine/alcotest_engine__Pp.cmx
+   engine/alcotest_engine__Pp_intf.cmi
+   engine/alcotest_engine__Pp_intf.cmt
+   engine/alcotest_engine__Pp_intf.cmx
+   engine/alcotest_engine__Safe_string.cmi
+   engine/alcotest_engine__Safe_string.cmt
+   engine/alcotest_engine__Safe_string.cmti
+   engine/alcotest_engine__Safe_string.cmx
+   engine/alcotest_engine__Test.cmi
+   engine/alcotest_engine__Test.cmt
+   engine/alcotest_engine__Test.cmti
+   engine/alcotest_engine__Test.cmx
+   engine/callsite_loc.ml
+   engine/cli.ml
+   engine/cli.mli
+   engine/cli_intf.ml
+   engine/config.ml
+   engine/config.mli
+   engine/config_intf.ml
+   engine/core.ml
+   engine/core.mli
+   engine/core_intf.ml
+   engine/formatters.ml
+   engine/formatters.mli
+   engine/import.ml
+   engine/log_trap.ml
+   engine/log_trap.mli
+   engine/log_trap_intf.ml
+   engine/model.ml
+   engine/monad.ml
+   engine/monad.mli
+   engine/monad_intf.ml
+   engine/platform.ml
+   engine/pp.ml
+   engine/pp.mli
+   engine/pp_intf.ml
+   engine/safe_string.ml
+   engine/safe_string.mli
+   engine/test.ml
+   engine/test.mli
+   libalcotest_stubs.a
+   opam
+   runtime.js
+   stdlib_ext/alcotest_stdlib_ext.a
+   stdlib_ext/alcotest_stdlib_ext.cma
+   stdlib_ext/alcotest_stdlib_ext.cmi
+   stdlib_ext/alcotest_stdlib_ext.cmt
+   stdlib_ext/alcotest_stdlib_ext.cmti
+   stdlib_ext/alcotest_stdlib_ext.cmx
+   stdlib_ext/alcotest_stdlib_ext.cmxa
+   stdlib_ext/alcotest_stdlib_ext.ml
+   stdlib_ext/alcotest_stdlib_ext.mli
+   terminal.ml
+   terminal.mli))
+ (libexec
+  (alcotest.cmxs
+   engine/alcotest_engine.cmxs
+   stdlib_ext/alcotest_stdlib_ext.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md))
+ (stublibs (dllalcotest_stubs.so)))
+(library
+ (name alcotest)
+ (kind normal)
+ (archives (byte alcotest.cma) (native alcotest.cmxa))
+ (plugins (byte alcotest.cma) (native alcotest.cmxs))
+ (foreign_objects alcotest_stubs.o)
+ (foreign_archives (archives (for all) (files libalcotest_stubs.a)))
+ (foreign_dll_files ../stublibs/dllalcotest_stubs.so)
+ (native_archives alcotest.a)
+ (jsoo_runtime runtime.js)
+ (requires alcotest.engine astring fmt fmt.tty unix)
+ (main_module_name Alcotest)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name alcotest__)
+     (visibility public)
+     (kind alias)
+     (source (path Alcotest__) (impl (path alcotest__.ml-gen))))
+    (name Alcotest)
+    (modules
+     (module
+      (obj_name alcotest)
+      (visibility public)
+      (source
+       (path Alcotest)
+       (intf (path alcotest.mli))
+       (impl (path alcotest.ml))))
+     (module
+      (obj_name alcotest__Terminal)
+      (visibility public)
+      (source
+       (path Terminal)
+       (intf (path terminal.mli))
+       (impl (path terminal.ml))))))
+   (wrapped true))))
+(library
+ (name alcotest.engine)
+ (kind normal)
+ (archives
+  (byte engine/alcotest_engine.cma)
+  (native engine/alcotest_engine.cmxa))
+ (plugins
+  (byte engine/alcotest_engine.cma)
+  (native engine/alcotest_engine.cmxs))
+ (native_archives engine/alcotest_engine.a)
+ (requires
+  alcotest.stdlib_ext
+  fmt
+  astring
+  cmdliner
+  fmt.cli
+  re
+  stdlib-shims
+  uutf)
+ (main_module_name Alcotest_engine)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name alcotest_engine__)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Alcotest_engine__)
+      (impl (path engine/alcotest_engine__.ml-gen))))
+    (name Alcotest_engine)
+    (modules
+     (module
+      (obj_name alcotest_engine)
+      (visibility public)
+      (source
+       (path Alcotest_engine)
+       (intf (path engine/alcotest_engine.mli))
+       (impl (path engine/alcotest_engine.ml))))
+     (module
+      (obj_name alcotest_engine__Callsite_loc)
+      (visibility public)
+      (source (path Callsite_loc) (impl (path engine/callsite_loc.ml))))
+     (module
+      (obj_name alcotest_engine__Cli)
+      (visibility public)
+      (source
+       (path Cli)
+       (intf (path engine/cli.mli))
+       (impl (path engine/cli.ml))))
+     (module
+      (obj_name alcotest_engine__Cli_intf)
+      (visibility public)
+      (source (path Cli_intf) (impl (path engine/cli_intf.ml))))
+     (module
+      (obj_name alcotest_engine__Config)
+      (visibility public)
+      (source
+       (path Config)
+       (intf (path engine/config.mli))
+       (impl (path engine/config.ml))))
+     (module
+      (obj_name alcotest_engine__Config_intf)
+      (visibility public)
+      (source (path Config_intf) (impl (path engine/config_intf.ml))))
+     (module
+      (obj_name alcotest_engine__Core)
+      (visibility public)
+      (source
+       (path Core)
+       (intf (path engine/core.mli))
+       (impl (path engine/core.ml))))
+     (module
+      (obj_name alcotest_engine__Core_intf)
+      (visibility public)
+      (source (path Core_intf) (impl (path engine/core_intf.ml))))
+     (module
+      (obj_name alcotest_engine__Formatters)
+      (visibility public)
+      (source
+       (path Formatters)
+       (intf (path engine/formatters.mli))
+       (impl (path engine/formatters.ml))))
+     (module
+      (obj_name alcotest_engine__Import)
+      (visibility public)
+      (source (path Import) (impl (path engine/import.ml))))
+     (module
+      (obj_name alcotest_engine__Log_trap)
+      (visibility public)
+      (source
+       (path Log_trap)
+       (intf (path engine/log_trap.mli))
+       (impl (path engine/log_trap.ml))))
+     (module
+      (obj_name alcotest_engine__Log_trap_intf)
+      (visibility public)
+      (source (path Log_trap_intf) (impl (path engine/log_trap_intf.ml))))
+     (module
+      (obj_name alcotest_engine__Model)
+      (visibility public)
+      (source (path Model) (impl (path engine/model.ml))))
+     (module
+      (obj_name alcotest_engine__Monad)
+      (visibility public)
+      (source
+       (path Monad)
+       (intf (path engine/monad.mli))
+       (impl (path engine/monad.ml))))
+     (module
+      (obj_name alcotest_engine__Monad_intf)
+      (visibility public)
+      (source (path Monad_intf) (impl (path engine/monad_intf.ml))))
+     (module
+      (obj_name alcotest_engine__Platform)
+      (visibility public)
+      (source (path Platform) (impl (path engine/platform.ml))))
+     (module
+      (obj_name alcotest_engine__Pp)
+      (visibility public)
+      (source
+       (path Pp)
+       (intf (path engine/pp.mli))
+       (impl (path engine/pp.ml))))
+     (module
+      (obj_name alcotest_engine__Pp_intf)
+      (visibility public)
+      (source (path Pp_intf) (impl (path engine/pp_intf.ml))))
+     (module
+      (obj_name alcotest_engine__Safe_string)
+      (visibility public)
+      (source
+       (path Safe_string)
+       (intf (path engine/safe_string.mli))
+       (impl (path engine/safe_string.ml))))
+     (module
+      (obj_name alcotest_engine__Test)
+      (visibility public)
+      (source
+       (path Test)
+       (intf (path engine/test.mli))
+       (impl (path engine/test.ml))))))
+   (wrapped true))))
+(library
+ (name alcotest.stdlib_ext)
+ (kind normal)
+ (archives
+  (byte stdlib_ext/alcotest_stdlib_ext.cma)
+  (native stdlib_ext/alcotest_stdlib_ext.cmxa))
+ (plugins
+  (byte stdlib_ext/alcotest_stdlib_ext.cma)
+  (native stdlib_ext/alcotest_stdlib_ext.cmxs))
+ (native_archives stdlib_ext/alcotest_stdlib_ext.a)
+ (requires astring cmdliner uutf)
+ (main_module_name Alcotest_stdlib_ext)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name alcotest_stdlib_ext)
+   (visibility public)
+   (source
+    (path Alcotest_stdlib_ext)
+    (intf (path stdlib_ext/alcotest_stdlib_ext.mli))
+    (impl (path stdlib_ext/alcotest_stdlib_ext.ml))))))

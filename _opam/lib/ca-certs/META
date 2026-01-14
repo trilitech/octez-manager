@@ -1,0 +1,17 @@
+version = "v1.0.1"
+description = ""
+requires =
+"bos
+ digestif
+ fpath
+ logs
+ mirage-crypto
+ ohex
+ ptime
+ ptime.clock
+ ptime.clock.os
+ x509"
+archive(byte) = "ca_certs.cma"
+archive(native) = "ca_certs.cmxa"
+plugin(byte) = "ca_certs.cma"
+plugin(native) = "ca_certs.cmxs"

@@ -1,0 +1,17 @@
+version = "20221222"
+description = "Image library"
+requires = "checkseum.ocaml decompress.zl stdlib-shims"
+archive(byte) = "imagelib.cma"
+archive(native) = "imagelib.cmxa"
+plugin(byte) = "imagelib.cma"
+plugin(native) = "imagelib.cmxs"
+package "unix" (
+  directory = "unix"
+  version = "20221222"
+  description = "Image library with unix bindings"
+  requires = "imagelib unix"
+  archive(byte) = "imagelib_unix.cma"
+  archive(native) = "imagelib_unix.cmxa"
+  plugin(byte) = "imagelib_unix.cma"
+  plugin(native) = "imagelib_unix.cmxs"
+)

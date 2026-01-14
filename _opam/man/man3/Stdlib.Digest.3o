@@ -1,0 +1,382 @@
+.TH "Stdlib.Digest" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Stdlib.Digest \- no description
+.SH Module
+Module   Stdlib.Digest
+.SH Documentation
+.sp
+Module
+.BI "Digest"
+ : 
+.B (module Stdlib__Digest)
+
+.sp
+
+.sp
+
+.sp
+.sp
+
+.PP
+.SS Basic functions
+
+.PP
+
+.PP
+The functions in this section use the MD5 hash function to produce
+128\-bit digests (16 bytes)\&.  MD5 is not cryptographically secure\&.
+Hence, these functions should not be used for security\-sensitive
+applications\&.  The BLAKE2 functions below are cryptographically secure\&.
+.PP
+.I type t 
+= 
+.B string
+
+.sp
+The type of digests: 16\-byte strings\&.
+
+.sp
+
+.I val compare 
+: 
+.B t -> t -> int
+.sp
+The comparison function for 16\-byte digests, with the same
+specification as 
+.ft B
+compare
+.ft R
+and the implementation
+shared with 
+.ft B
+String\&.compare
+.ft R
+\&. Along with the type 
+.ft B
+t
+.ft R
+, this
+function 
+.ft B
+compare
+.ft R
+allows the module 
+.ft B
+Digest
+.ft R
+to be passed as
+argument to the functors 
+.ft B
+Set\&.Make
+.ft R
+and 
+.ft B
+Map\&.Make
+.ft R
+\&.
+
+.sp
+.B "Since"
+4.00
+
+.sp
+
+.I val equal 
+: 
+.B t -> t -> bool
+.sp
+The equal function for 16\-byte digests\&.
+
+.sp
+.B "Since"
+4.03
+
+.sp
+
+.I val string 
+: 
+.B string -> t
+.sp
+Return the digest of the given string\&.
+
+.sp
+
+.I val bytes 
+: 
+.B bytes -> t
+.sp
+Return the digest of the given byte sequence\&.
+
+.sp
+.B "Since"
+4.02
+
+.sp
+
+.I val substring 
+: 
+.B string -> int -> int -> t
+.sp
+
+.ft B
+Digest\&.substring s ofs len
+.ft R
+returns the digest of the substring
+of 
+.ft B
+s
+.ft R
+starting at index 
+.ft B
+ofs
+.ft R
+and containing 
+.ft B
+len
+.ft R
+characters\&.
+
+.sp
+
+.I val subbytes 
+: 
+.B bytes -> int -> int -> t
+.sp
+
+.ft B
+Digest\&.subbytes s ofs len
+.ft R
+returns the digest of the subsequence
+of 
+.ft B
+s
+.ft R
+starting at index 
+.ft B
+ofs
+.ft R
+and containing 
+.ft B
+len
+.ft R
+bytes\&.
+
+.sp
+.B "Since"
+4.02
+
+.sp
+
+.I val channel 
+: 
+.B in_channel -> int -> t
+.sp
+If 
+.ft B
+len
+.ft R
+is nonnegative, 
+.ft B
+Digest\&.channel ic len
+.ft R
+reads 
+.ft B
+len
+.ft R
+characters from channel 
+.ft B
+ic
+.ft R
+and returns their digest, or raises
+.ft B
+End_of_file
+.ft R
+if end\-of\-file is reached before 
+.ft B
+len
+.ft R
+characters
+are read\&.  If 
+.ft B
+len
+.ft R
+is negative, 
+.ft B
+Digest\&.channel ic len
+.ft R
+reads
+all characters from 
+.ft B
+ic
+.ft R
+until end\-of\-file is reached and return
+their digest\&.
+
+.sp
+
+.I val file 
+: 
+.B string -> t
+.sp
+Return the digest of the file whose name is given\&.
+
+.sp
+
+.I val output 
+: 
+.B out_channel -> t -> unit
+.sp
+Write a digest on the given output channel\&.
+
+.sp
+
+.I val input 
+: 
+.B in_channel -> t
+.sp
+Read a digest from the given input channel\&.
+
+.sp
+
+.I val to_hex 
+: 
+.B t -> string
+.sp
+Return the printable hexadecimal representation of the given digest\&.
+
+.sp
+.B "Raises Invalid_argument"
+if the argument is not exactly 16 bytes\&.
+
+.sp
+
+.I val of_hex 
+: 
+.B string -> t
+.sp
+Convert a hexadecimal representation back into the corresponding digest\&.
+
+.sp
+.B "Since"
+5.2
+
+.sp
+.B "Raises Invalid_argument"
+if the argument is not exactly 32 hexadecimal
+characters\&.
+
+.sp
+
+.I val from_hex 
+: 
+.B string -> t
+.sp
+Same function as 
+.ft B
+Digest\&.of_hex
+.ft R
+\&.
+
+.sp
+.B "Since"
+4.00
+
+.sp
+
+.PP
+.SS Generic interface
+
+.PP
+.I module type S = 
+.B sig end
+
+.sp
+The signature for a hash function that produces digests of length
+.ft B
+hash_length
+.ft R
+from character strings, byte arrays, and files\&.
+
+.sp
+.B "Since"
+5.2
+
+.sp
+
+.PP
+.SS Specific hash functions
+
+.PP
+.I module BLAKE128 : 
+.B S
+
+.sp
+
+.ft B
+BLAKE128
+.ft R
+is the BLAKE2b hash function producing
+128\-bit (16\-byte) digests\&.  It is cryptographically secure\&.
+However, the small size of the digests enables brute\-force attacks
+in 
+.ft B
+2{^64}
+.ft R
+attempts\&.
+
+.sp
+.B "Since"
+5.2
+
+.sp
+.I module BLAKE256 : 
+.B S
+
+.sp
+
+.ft B
+BLAKE256
+.ft R
+is the BLAKE2b hash function producing
+256\-bit (32\-byte) digests\&.  It is cryptographically secure,
+and the digests are large enough to thwart brute\-force attacks\&.
+
+.sp
+.B "Since"
+5.2
+
+.sp
+.I module BLAKE512 : 
+.B S
+
+.sp
+
+.ft B
+BLAKE512
+.ft R
+is the BLAKE2b hash function producing
+512\-bit (64\-byte) digests\&.  It is cryptographically secure,
+and the digests are large enough to thwart brute\-force attacks\&.
+
+.sp
+.B "Since"
+5.2
+
+.sp
+.I module MD5 : 
+.B S
+
+.sp
+
+.ft B
+MD5
+.ft R
+is the MD5 hash function\&.  It produces 128\-bit (16\-byte) digests
+and is not cryptographically secure at all\&. It should be used only
+for compatibility with earlier designs that mandate the use of MD5\&.
+
+.sp
+.B "Since"
+5.2
+
+.sp

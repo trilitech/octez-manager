@@ -1,0 +1,32 @@
+opam-version: "2.0"
+added: [
+  "doc/tsdl-image" {"D"}
+  "doc/tsdl-image/CHANGELOG.md" {"F:S907T1768295783.37"}
+  "doc/tsdl-image/LICENSE" {"F:S1476T1768295783.37"}
+  "doc/tsdl-image/README.md" {"F:S1414T1768295783.37"}
+  "lib/tsdl-image" {"D"}
+  "lib/tsdl-image/.private" {"D"}
+  "lib/tsdl-image/.private/tsdl_image__Build_config.cmi"
+    {"F:S329T1768295783.37"}
+  "lib/tsdl-image/.private/tsdl_image__Build_config.cmt"
+    {"F:S1799T1768295783.37"}
+  "lib/tsdl-image/META" {"F:S186T1768295783.37"}
+  "lib/tsdl-image/build_config.ml" {"F:S20T1768295783.37"}
+  "lib/tsdl-image/dune-package" {"F:S1460T1768295783.37"}
+  "lib/tsdl-image/opam" {"F:S928T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.a" {"F:S68066T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.cma" {"F:S31325T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.cmi" {"F:S1998T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.cmt" {"F:S45339T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.cmti" {"F:S9420T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.cmx" {"F:S2932T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.cmxa" {"F:S1858T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.cmxs" {"F:S67176T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.ml" {"F:S8776T1768295783.37"}
+  "lib/tsdl-image/tsdl_image.mli" {"F:S2530T1768295783.37"}
+  "lib/tsdl-image/tsdl_image__.cmi" {"F:S223T1768295783.37"}
+  "lib/tsdl-image/tsdl_image__.cmt" {"F:S1585T1768295783.37"}
+  "lib/tsdl-image/tsdl_image__.cmx" {"F:S143T1768295783.37"}
+  "lib/tsdl-image/tsdl_image__.ml" {"F:S114T1768295783.37"}
+  "lib/tsdl-image/tsdl_image__Build_config.cmx" {"F:S285T1768295783.37"}
+]

@@ -1,0 +1,150 @@
+.TH "Misc.Style" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Misc.Style \- no description
+.SH Module
+Module   Misc.Style
+.SH Documentation
+.sp
+Module
+.BI "Style"
+ : 
+.B sig end
+
+.sp
+
+.sp
+
+.sp
+.sp
+.I type color 
+=
+ | Black
+ | Red
+ | Green
+ | Yellow
+ | Blue
+ | Magenta
+ | Cyan
+ | White
+ 
+.sp
+
+.sp
+.I type style 
+=
+ | FG
+.B of 
+.B color
+ | BG
+.B of 
+.B color
+ | Bold
+ | Reset
+ 
+.sp
+
+.sp
+.I type Format.stag 
++=
+ | Style
+.B of 
+.B style list
+ 
+.sp
+
+.sp
+
+.I val ansi_of_style_l 
+: 
+.B style list -> string
+.sp
+
+.sp
+.I type tag_style 
+= {
+ ansi : 
+.B style list
+;
+ text_open : 
+.B string
+;
+ text_close : 
+.B string
+;
+ }
+
+.sp
+
+.sp
+.I type styles 
+= {
+ error : 
+.B tag_style
+;
+ warning : 
+.B tag_style
+;
+ loc : 
+.B tag_style
+;
+ hint : 
+.B tag_style
+;
+ inline_code : 
+.B tag_style
+;
+ }
+
+.sp
+
+.sp
+
+.I val as_inline_code 
+: 
+.B (Format.formatter -> 'a -> unit) ->
+.B   Format.formatter -> 'a -> unit
+.sp
+
+.sp
+
+.I val inline_code 
+: 
+.B Format.formatter -> string -> unit
+.sp
+
+.sp
+
+.I val default_styles 
+: 
+.B styles
+.sp
+
+.sp
+
+.I val get_styles 
+: 
+.B unit -> styles
+.sp
+
+.sp
+
+.I val set_styles 
+: 
+.B styles -> unit
+.sp
+
+.sp
+
+.I val setup 
+: 
+.B Misc.Color.setting option -> unit
+.sp
+
+.sp
+
+.I val set_tag_handling 
+: 
+.B Format.formatter -> unit
+.sp
+
+.sp

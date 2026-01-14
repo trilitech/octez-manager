@@ -1,0 +1,52 @@
+(lang dune 3.20)
+(name miaou-runner)
+(version da71376)
+(sections (lib .) (libexec .) (bin ../../bin) (doc ../../doc/miaou-runner))
+(files
+ (lib
+  (META
+   dune-package
+   opam
+   tui/miaou_runner_tui.a
+   tui/miaou_runner_tui.cma
+   tui/miaou_runner_tui.cmi
+   tui/miaou_runner_tui.cmt
+   tui/miaou_runner_tui.cmx
+   tui/miaou_runner_tui.cmxa
+   tui/miaou_runner_tui.ml
+   tui/miaou_runner_tui__Runner_tui.cmi
+   tui/miaou_runner_tui__Runner_tui.cmt
+   tui/miaou_runner_tui__Runner_tui.cmx
+   tui/runner_tui.ml))
+ (libexec (tui/miaou_runner_tui.cmxs))
+ (bin (miaou-runner-tui))
+ (doc (CHANGELOG.md LICENSE.md README.md)))
+(library
+ (name miaou-runner.tui)
+ (kind normal)
+ (archives (byte tui/miaou_runner_tui.cma) (native tui/miaou_runner_tui.cmxa))
+ (plugins (byte tui/miaou_runner_tui.cma) (native tui/miaou_runner_tui.cmxs))
+ (native_archives tui/miaou_runner_tui.a)
+ (requires
+  miaou-core.runner-common
+  miaou-driver-term.driver
+  miaou-driver-matrix.driver)
+ (main_module_name Miaou_runner_tui)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_runner_tui)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_runner_tui)
+      (impl (path tui/miaou_runner_tui.ml-gen))))
+    (name Miaou_runner_tui)
+    (modules
+     (module
+      (obj_name miaou_runner_tui__Runner_tui)
+      (visibility public)
+      (source (path Runner_tui) (impl (path tui/runner_tui.ml))))))
+   (wrapped true))))

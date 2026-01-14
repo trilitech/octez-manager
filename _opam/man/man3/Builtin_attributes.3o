@@ -1,0 +1,468 @@
+.TH "Builtin_attributes" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Builtin_attributes \- Support for the builtin attributes:
+.SH Module
+Module   Builtin_attributes
+.SH Documentation
+.sp
+Module
+.BI "Builtin_attributes"
+ : 
+.B sig end
+
+.sp
+Support for the builtin attributes:
+.sp
+.sp
+\-ocaml\&.alert
+.sp
+\-ocaml\&.boxed
+.sp
+\-ocaml\&.deprecated
+.sp
+\-ocaml\&.deprecated_mutable
+.sp
+\-ocaml\&.explicit_arity
+.sp
+\-ocaml\&.immediate
+.sp
+\-ocaml\&.immediate64
+.sp
+\-ocaml\&.inline
+.sp
+\-ocaml\&.inlined
+.sp
+\-ocaml\&.noalloc
+.sp
+\-ocaml\&.poll
+.sp
+\-ocaml\&.ppwarning
+.sp
+\-ocaml\&.specialise
+.sp
+\-ocaml\&.specialised
+.sp
+\-ocaml\&.tailcall
+.sp
+\-ocaml\&.tail_mod_cons
+.sp
+\-ocaml\&.unboxed
+.sp
+\-ocaml\&.untagged
+.sp
+\-ocaml\&.unrolled
+.sp
+\-ocaml\&.warnerror
+.sp
+\-ocaml\&.warning
+.sp
+\-ocaml\&.warn_on_literal_pattern
+
+Warning: this module is unstable and part of
+.ft B
+Compiler_libs
+.ft R
+\&.
+
+.sp
+
+.sp
+.sp
+
+.PP
+.SS Attribute tracking for warning 53
+
+.PP
+.I type current_phase 
+=
+ | Parser
+ | Invariant_check
+ 
+.sp
+
+.ft B
+register_attr
+.ft R
+must be called on the locations of all attributes that
+should be tracked for the purpose of misplaced attribute warnings\&.  In
+particular, it should be called on all attributes that are present in the
+source program except those that are contained in the payload of another
+attribute (because these may be left behind by a ppx and intentionally
+ignored by the compiler)\&.
+.sp
+The 
+.ft B
+current_phase
+.ft R
+argument indicates when this function is being called
+.sp
+\-either when an attribute is created in the parser or when we see an
+attribute while running the check in the 
+.ft B
+Ast_invariants
+.ft R
+module\&.  This is
+used to ensure that we track only attributes from the final version of the
+parse tree: we skip adding attributes seen at parse time if we can see that
+a ppx will be run later, because the 
+.ft B
+Ast_invariants
+.ft R
+check is always run on
+the result of a ppx\&.
+
+Note that the 
+.ft B
+Ast_invariants
+.ft R
+check is also run on parse trees created from
+marshalled ast files if no ppx is being used, ensuring we don\&'t miss
+attributes in that case\&.
+
+.sp
+
+.I val register_attr 
+: 
+.B current_phase -> string Location.loc -> unit
+.sp
+
+.sp
+
+.I val mark_payload_attrs_used 
+: 
+.B Parsetree.payload -> unit
+.sp
+Marks the attributes hiding in the payload of another attribute used, for
+the purposes of misplaced attribute warnings (see comment on
+.ft B
+current_phase
+.ft R
+above)\&.  In the parser, it\&'s simplest to add these to
+the table and remove them later, rather than threading through state
+tracking whether we\&'re in an attribute payload\&.
+
+.sp
+
+.I val warn_unused 
+: 
+.B unit -> unit
+.sp
+Issue misplaced attribute warnings for all attributes created with
+.ft B
+mk_internal
+.ft R
+but not yet marked used\&.
+
+.sp
+
+.PP
+.SS Warning 53 helpers for environment attributes
+.sp
+Some attributes, like deprecation markers, do not affect the compilation of
+the definition on which they appear, but rather result in warnings on future
+uses of that definition\&.  This is implemented by moving the raw attributes
+into the environment, where they will be noticed on future accesses\&.
+.sp
+To make misplaced attribute warnings work appropriately for these
+attributes, we mark them "used" when they are moved into the environment\&.
+This is done with the helper functions in this section\&.
+.PP
+
+.I val mark_alert_used 
+: 
+.B Parsetree.attribute -> unit
+.sp
+Marks the attribute used for the purposes of misplaced attribute warnings if
+it is an alert\&.  Call this when moving things allowed to have alert
+attributes into the environment\&.
+
+.sp
+
+.I val mark_alerts_used 
+: 
+.B Parsetree.attributes -> unit
+.sp
+The same as 
+.ft B
+List\&.iter mark_alert_used
+.ft R
+\&.
+
+.sp
+
+.I val mark_warn_on_literal_pattern_used 
+: 
+.B Parsetree.attributes -> unit
+.sp
+Marks "warn_on_literal_pattern" attributes used for the purposes of
+misplaced attribute warnings\&.  Call this when moving constructors into the
+environment\&.
+
+.sp
+
+.I val mark_deprecated_mutable_used 
+: 
+.B Parsetree.attributes -> unit
+.sp
+Marks "deprecated_mutable" attributes used for the purposes of misplaced
+attribute warnings\&.  Call this when moving labels of mutable fields into the
+environment\&.
+
+.sp
+
+.PP
+.SS Helpers for alert and warning attributes
+
+.PP
+
+.I val check_alerts 
+: 
+.B Location.t -> Parsetree.attributes -> string -> unit
+.sp
+
+.sp
+
+.I val check_alerts_inclusion 
+: 
+.B def:Location.t ->
+.B   use:Location.t ->
+.B   Location.t -> Parsetree.attributes -> Parsetree.attributes -> string -> unit
+.sp
+
+.sp
+
+.I val alerts_of_attrs 
+: 
+.B Parsetree.attributes -> Misc.alerts
+.sp
+
+.sp
+
+.I val alerts_of_sig 
+: 
+.B Parsetree.signature -> Misc.alerts
+.sp
+
+.sp
+
+.I val alerts_of_str 
+: 
+.B Parsetree.structure -> Misc.alerts
+.sp
+
+.sp
+
+.I val check_deprecated_mutable 
+: 
+.B Location.t -> Parsetree.attributes -> string -> unit
+.sp
+
+.sp
+
+.I val check_deprecated_mutable_inclusion 
+: 
+.B def:Location.t ->
+.B   use:Location.t ->
+.B   Location.t -> Parsetree.attributes -> Parsetree.attributes -> string -> unit
+.sp
+
+.sp
+
+.I val error_of_extension 
+: 
+.B Parsetree.extension -> Location.error
+.sp
+
+.sp
+
+.I val warning_attribute 
+: 
+.B ?ppwarning:bool -> Parsetree.attribute -> unit
+.sp
+Apply warning settings from the specified attribute\&.
+"ocaml\&.warning"/"ocaml\&.warnerror" (and variants without the prefix) are
+processed and marked used for warning 53\&.  Other attributes are ignored\&.
+.sp
+Also implement ocaml\&.ppwarning (unless ~ppwarning:false is
+passed)\&.
+
+.sp
+
+.I val warning_scope 
+: 
+.B ?ppwarning:bool -> Parsetree.attributes -> (unit -> 'a) -> 'a
+.sp
+Execute a function in a new scope for warning settings\&.  This
+means that the effect of any call to 
+.ft B
+warning_attribute
+.ft R
+during
+the execution of this function will be discarded after
+execution\&.
+.sp
+The function also takes a list of attributes which are processed
+with 
+.ft B
+warning_attribute
+.ft R
+in the fresh scope before the function
+is executed\&.
+
+.sp
+
+.PP
+.SS Helpers for searching for particular attributes
+
+.PP
+
+.I val has_attribute 
+: 
+.B string -> Parsetree.attributes -> bool
+.sp
+
+.ft B
+has_attribute name attrs
+.ft R
+is true if an attribute with name 
+.ft B
+name
+.ft R
+or
+.ft B
+"ocaml\&." ^ name
+.ft R
+is present in 
+.ft B
+attrs
+.ft R
+\&.  It marks that attribute used for
+the purposes of misplaced attribute warnings\&.
+
+.sp
+.I type attr_action 
+=
+ | Mark_used_only
+ | Return
+ 
+.sp
+
+.ft B
+select_attributes actions attrs
+.ft R
+finds the elements of 
+.ft B
+attrs
+.ft R
+that appear
+in 
+.ft B
+actions
+.ft R
+and either returns them or just marks them used, according to
+the corresponding 
+.ft B
+attr_action
+.ft R
+\&.
+.sp
+Each element 
+.ft B
+(nm, action)
+.ft R
+of the 
+.ft B
+actions
+.ft R
+list is an attribute along with
+an 
+.ft B
+attr_action
+.ft R
+specifying what to do with that attribute\&.  The action is
+used to accommodate different compiler configurations\&.  If an attribute is
+used only in some compiler configurations, it\&'s important that we still look
+for it and mark it used when compiling with other configurations\&.
+Otherwise, we would issue spurious misplaced attribute warnings\&.
+
+.sp
+
+.I val select_attributes 
+: 
+.B (string * attr_action) list ->
+.B   Parsetree.attributes -> Parsetree.attributes
+.sp
+
+.sp
+
+.I val attr_equals_builtin 
+: 
+.B Parsetree.attribute -> string -> bool
+.sp
+
+.ft B
+attr_equals_builtin attr s
+.ft R
+is true if the name of the attribute is 
+.ft B
+s
+.ft R
+or
+.ft B
+"ocaml\&." ^ s
+.ft R
+\&.  This is useful for manually inspecting attribute names, but
+note that doing so will not result in marking the attribute used for the
+purpose of warning 53, so it is usually preferrable to use 
+.ft B
+has_attribute
+.ft R
+or 
+.ft B
+select_attributes
+.ft R
+\&.
+
+.sp
+
+.I val warn_on_literal_pattern 
+: 
+.B Parsetree.attributes -> bool
+.sp
+
+.sp
+
+.I val explicit_arity 
+: 
+.B Parsetree.attributes -> bool
+.sp
+
+.sp
+
+.I val immediate 
+: 
+.B Parsetree.attributes -> bool
+.sp
+
+.sp
+
+.I val immediate64 
+: 
+.B Parsetree.attributes -> bool
+.sp
+
+.sp
+
+.I val has_unboxed 
+: 
+.B Parsetree.attributes -> bool
+.sp
+
+.sp
+
+.I val has_boxed 
+: 
+.B Parsetree.attributes -> bool
+.sp
+
+.sp

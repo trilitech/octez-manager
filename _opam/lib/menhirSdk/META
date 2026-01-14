@@ -1,0 +1,7 @@
+version = "20250912"
+description = ""
+requires = ""
+archive(byte) = "menhirSdk.cma"
+archive(native) = "menhirSdk.cmxa"
+plugin(byte) = "menhirSdk.cma"
+plugin(native) = "menhirSdk.cmxs"

@@ -1,0 +1,1513 @@
+(lang dune 3.20)
+(name miaou-core)
+(version da71376)
+(sections (lib .) (libexec .) (doc ../../doc/miaou-core))
+(files
+ (lib
+  (META
+   core/capability.ml
+   core/capability.mli
+   core/file_browser_modal.ml
+   core/file_browser_modal.mli
+   core/help_hint.ml
+   core/help_hint.mli
+   core/keys.ml
+   core/keys.mli
+   core/lib_tui.ml
+   core/logger.ml
+   core/logger.mli
+   core/logger_alias.ml
+   core/miaou_core.a
+   core/miaou_core.cma
+   core/miaou_core.cmi
+   core/miaou_core.cmt
+   core/miaou_core.cmx
+   core/miaou_core.cmxa
+   core/miaou_core.ml
+   core/miaou_core__Capability.cmi
+   core/miaou_core__Capability.cmt
+   core/miaou_core__Capability.cmti
+   core/miaou_core__Capability.cmx
+   core/miaou_core__File_browser_modal.cmi
+   core/miaou_core__File_browser_modal.cmt
+   core/miaou_core__File_browser_modal.cmti
+   core/miaou_core__File_browser_modal.cmx
+   core/miaou_core__Help_hint.cmi
+   core/miaou_core__Help_hint.cmt
+   core/miaou_core__Help_hint.cmti
+   core/miaou_core__Help_hint.cmx
+   core/miaou_core__Keys.cmi
+   core/miaou_core__Keys.cmt
+   core/miaou_core__Keys.cmti
+   core/miaou_core__Keys.cmx
+   core/miaou_core__Lib_tui.cmi
+   core/miaou_core__Lib_tui.cmt
+   core/miaou_core__Lib_tui.cmx
+   core/miaou_core__Logger.cmi
+   core/miaou_core__Logger.cmt
+   core/miaou_core__Logger.cmti
+   core/miaou_core__Logger.cmx
+   core/miaou_core__Logger_alias.cmi
+   core/miaou_core__Logger_alias.cmt
+   core/miaou_core__Logger_alias.cmx
+   core/miaou_core__Modal_manager.cmi
+   core/miaou_core__Modal_manager.cmt
+   core/miaou_core__Modal_manager.cmti
+   core/miaou_core__Modal_manager.cmx
+   core/miaou_core__Narrow_modal.cmi
+   core/miaou_core__Narrow_modal.cmt
+   core/miaou_core__Narrow_modal.cmx
+   core/miaou_core__Navigation.cmi
+   core/miaou_core__Navigation.cmt
+   core/miaou_core__Navigation.cmti
+   core/miaou_core__Navigation.cmx
+   core/miaou_core__Quit_flag.cmi
+   core/miaou_core__Quit_flag.cmt
+   core/miaou_core__Quit_flag.cmx
+   core/miaou_core__Registry.cmi
+   core/miaou_core__Registry.cmt
+   core/miaou_core__Registry.cmti
+   core/miaou_core__Registry.cmx
+   core/miaou_core__Service_lifecycle.cmi
+   core/miaou_core__Service_lifecycle.cmt
+   core/miaou_core__Service_lifecycle.cmti
+   core/miaou_core__Service_lifecycle.cmx
+   core/miaou_core__System.cmi
+   core/miaou_core__System.cmt
+   core/miaou_core__System.cmti
+   core/miaou_core__System.cmx
+   core/miaou_core__Tui_capture.cmi
+   core/miaou_core__Tui_capture.cmt
+   core/miaou_core__Tui_capture.cmti
+   core/miaou_core__Tui_capture.cmx
+   core/miaou_core__Tui_logger.cmi
+   core/miaou_core__Tui_logger.cmt
+   core/miaou_core__Tui_logger.cmti
+   core/miaou_core__Tui_logger.cmx
+   core/miaou_core__Tui_page.cmi
+   core/miaou_core__Tui_page.cmt
+   core/miaou_core__Tui_page.cmti
+   core/miaou_core__Tui_page.cmx
+   core/miaou_core__Workflow.cmi
+   core/miaou_core__Workflow.cmt
+   core/miaou_core__Workflow.cmti
+   core/miaou_core__Workflow.cmx
+   core/modal_manager.ml
+   core/modal_manager.mli
+   core/narrow_modal.ml
+   core/navigation.ml
+   core/navigation.mli
+   core/quit_flag.ml
+   core/registry.ml
+   core/registry.mli
+   core/service_lifecycle.ml
+   core/service_lifecycle.mli
+   core/system.ml
+   core/system.mli
+   core/tui_capture.ml
+   core/tui_capture.mli
+   core/tui_logger.ml
+   core/tui_logger.mli
+   core/tui_page.ml
+   core/tui_page.mli
+   core/workflow.ml
+   core/workflow.mli
+   driver-common/driver_common.ml
+   driver-common/driver_common.mli
+   driver-common/input_parser.ml
+   driver-common/input_parser.mli
+   driver-common/miaou_driver_common.a
+   driver-common/miaou_driver_common.cma
+   driver-common/miaou_driver_common.cmi
+   driver-common/miaou_driver_common.cmt
+   driver-common/miaou_driver_common.cmx
+   driver-common/miaou_driver_common.cmxa
+   driver-common/miaou_driver_common.ml
+   driver-common/miaou_driver_common__Driver_common.cmi
+   driver-common/miaou_driver_common__Driver_common.cmt
+   driver-common/miaou_driver_common__Driver_common.cmti
+   driver-common/miaou_driver_common__Driver_common.cmx
+   driver-common/miaou_driver_common__Input_parser.cmi
+   driver-common/miaou_driver_common__Input_parser.cmt
+   driver-common/miaou_driver_common__Input_parser.cmti
+   driver-common/miaou_driver_common__Input_parser.cmx
+   driver-common/miaou_driver_common__Page_transition_utils.cmi
+   driver-common/miaou_driver_common__Page_transition_utils.cmt
+   driver-common/miaou_driver_common__Page_transition_utils.cmti
+   driver-common/miaou_driver_common__Page_transition_utils.cmx
+   driver-common/miaou_driver_common__Pager_notify.cmi
+   driver-common/miaou_driver_common__Pager_notify.cmt
+   driver-common/miaou_driver_common__Pager_notify.cmti
+   driver-common/miaou_driver_common__Pager_notify.cmx
+   driver-common/miaou_driver_common__Terminal_raw.cmi
+   driver-common/miaou_driver_common__Terminal_raw.cmt
+   driver-common/miaou_driver_common__Terminal_raw.cmti
+   driver-common/miaou_driver_common__Terminal_raw.cmx
+   driver-common/page_transition_utils.ml
+   driver-common/page_transition_utils.mli
+   driver-common/pager_notify.ml
+   driver-common/pager_notify.mli
+   driver-common/terminal_raw.ml
+   driver-common/terminal_raw.mli
+   dune-package
+   helpers/debounce.ml
+   helpers/debounce.mli
+   helpers/fiber_runtime.ml
+   helpers/fiber_runtime.mli
+   helpers/helpers.ml
+   helpers/helpers.mli
+   helpers/miaou_helpers.a
+   helpers/miaou_helpers.cma
+   helpers/miaou_helpers.cmi
+   helpers/miaou_helpers.cmt
+   helpers/miaou_helpers.cmx
+   helpers/miaou_helpers.cmxa
+   helpers/miaou_helpers.ml
+   helpers/miaou_helpers__Debounce.cmi
+   helpers/miaou_helpers__Debounce.cmt
+   helpers/miaou_helpers__Debounce.cmti
+   helpers/miaou_helpers__Debounce.cmx
+   helpers/miaou_helpers__Fiber_runtime.cmi
+   helpers/miaou_helpers__Fiber_runtime.cmt
+   helpers/miaou_helpers__Fiber_runtime.cmti
+   helpers/miaou_helpers__Fiber_runtime.cmx
+   helpers/miaou_helpers__Helpers.cmi
+   helpers/miaou_helpers__Helpers.cmt
+   helpers/miaou_helpers__Helpers.cmti
+   helpers/miaou_helpers__Helpers.cmx
+   helpers/miaou_helpers__Render_notify.cmi
+   helpers/miaou_helpers__Render_notify.cmt
+   helpers/miaou_helpers__Render_notify.cmti
+   helpers/miaou_helpers__Render_notify.cmx
+   helpers/render_notify.ml
+   helpers/render_notify.mli
+   interfaces/capability.ml
+   interfaces/capability.mli
+   interfaces/logger_capability.ml
+   interfaces/logger_capability.mli
+   interfaces/miaou_interfaces.a
+   interfaces/miaou_interfaces.cma
+   interfaces/miaou_interfaces.cmi
+   interfaces/miaou_interfaces.cmt
+   interfaces/miaou_interfaces.cmx
+   interfaces/miaou_interfaces.cmxa
+   interfaces/miaou_interfaces.ml
+   interfaces/miaou_interfaces__Capability.cmi
+   interfaces/miaou_interfaces__Capability.cmt
+   interfaces/miaou_interfaces__Capability.cmti
+   interfaces/miaou_interfaces__Capability.cmx
+   interfaces/miaou_interfaces__Logger_capability.cmi
+   interfaces/miaou_interfaces__Logger_capability.cmt
+   interfaces/miaou_interfaces__Logger_capability.cmti
+   interfaces/miaou_interfaces__Logger_capability.cmx
+   interfaces/miaou_interfaces__Palette.cmi
+   interfaces/miaou_interfaces__Palette.cmt
+   interfaces/miaou_interfaces__Palette.cmti
+   interfaces/miaou_interfaces__Palette.cmx
+   interfaces/miaou_interfaces__Service_lifecycle.cmi
+   interfaces/miaou_interfaces__Service_lifecycle.cmt
+   interfaces/miaou_interfaces__Service_lifecycle.cmti
+   interfaces/miaou_interfaces__Service_lifecycle.cmx
+   interfaces/miaou_interfaces__System.cmi
+   interfaces/miaou_interfaces__System.cmt
+   interfaces/miaou_interfaces__System.cmti
+   interfaces/miaou_interfaces__System.cmx
+   interfaces/palette.ml
+   interfaces/palette.mli
+   interfaces/service_lifecycle.ml
+   interfaces/service_lifecycle.mli
+   interfaces/system.ml
+   interfaces/system.mli
+   internals/focus_chain.ml
+   internals/focus_chain.mli
+   internals/key_handler_stack.ml
+   internals/key_handler_stack.mli
+   internals/miaou_internals.a
+   internals/miaou_internals.cma
+   internals/miaou_internals.cmi
+   internals/miaou_internals.cmt
+   internals/miaou_internals.cmx
+   internals/miaou_internals.cmxa
+   internals/miaou_internals.ml
+   internals/miaou_internals__Focus_chain.cmi
+   internals/miaou_internals__Focus_chain.cmt
+   internals/miaou_internals__Focus_chain.cmti
+   internals/miaou_internals__Focus_chain.cmx
+   internals/miaou_internals__Key_handler_stack.cmi
+   internals/miaou_internals__Key_handler_stack.cmt
+   internals/miaou_internals__Key_handler_stack.cmti
+   internals/miaou_internals__Key_handler_stack.cmx
+   internals/miaou_internals__Modal_renderer.cmi
+   internals/miaou_internals__Modal_renderer.cmt
+   internals/miaou_internals__Modal_renderer.cmti
+   internals/miaou_internals__Modal_renderer.cmx
+   internals/miaou_internals__Modal_snapshot.cmi
+   internals/miaou_internals__Modal_snapshot.cmt
+   internals/miaou_internals__Modal_snapshot.cmti
+   internals/miaou_internals__Modal_snapshot.cmx
+   internals/miaou_internals__Modal_utils.cmi
+   internals/miaou_internals__Modal_utils.cmt
+   internals/miaou_internals__Modal_utils.cmti
+   internals/miaou_internals__Modal_utils.cmx
+   internals/modal_renderer.ml
+   internals/modal_renderer.mli
+   internals/modal_snapshot.ml
+   internals/modal_snapshot.mli
+   internals/modal_utils.ml
+   internals/modal_utils.mli
+   lib/cohttp_net.ml
+   lib/miaou.a
+   lib/miaou.cma
+   lib/miaou.cmi
+   lib/miaou.cmt
+   lib/miaou.cmx
+   lib/miaou.cmxa
+   lib/miaou.ml
+   lib/miaou__.cmi
+   lib/miaou__.cmt
+   lib/miaou__.cmx
+   lib/miaou__.ml
+   lib/miaou__Cohttp_net.cmi
+   lib/miaou__Cohttp_net.cmt
+   lib/miaou__Cohttp_net.cmx
+   lib/miaou__Net.cmi
+   lib/miaou__Net.cmt
+   lib/miaou__Net.cmti
+   lib/miaou__Net.cmx
+   lib/net.ml
+   lib/net.mli
+   lib_miaou_internal/flash_bus.ml
+   lib_miaou_internal/flash_toast_renderer.ml
+   lib_miaou_internal/headless_driver.ml
+   lib_miaou_internal/lib_miaou_internal.a
+   lib_miaou_internal/lib_miaou_internal.cma
+   lib_miaou_internal/lib_miaou_internal.cmi
+   lib_miaou_internal/lib_miaou_internal.cmt
+   lib_miaou_internal/lib_miaou_internal.cmx
+   lib_miaou_internal/lib_miaou_internal.cmxa
+   lib_miaou_internal/lib_miaou_internal.ml
+   lib_miaou_internal/lib_miaou_internal__Flash_bus.cmi
+   lib_miaou_internal/lib_miaou_internal__Flash_bus.cmt
+   lib_miaou_internal/lib_miaou_internal__Flash_bus.cmx
+   lib_miaou_internal/lib_miaou_internal__Flash_toast_renderer.cmi
+   lib_miaou_internal/lib_miaou_internal__Flash_toast_renderer.cmt
+   lib_miaou_internal/lib_miaou_internal__Flash_toast_renderer.cmx
+   lib_miaou_internal/lib_miaou_internal__Headless_driver.cmi
+   lib_miaou_internal/lib_miaou_internal__Headless_driver.cmt
+   lib_miaou_internal/lib_miaou_internal__Headless_driver.cmx
+   opam
+   runner-common/html_driver.ml
+   runner-common/miaou_runner_common.a
+   runner-common/miaou_runner_common.cma
+   runner-common/miaou_runner_common.cmi
+   runner-common/miaou_runner_common.cmt
+   runner-common/miaou_runner_common.cmx
+   runner-common/miaou_runner_common.cmxa
+   runner-common/miaou_runner_common.ml
+   runner-common/miaou_runner_common__Html_driver.cmi
+   runner-common/miaou_runner_common__Html_driver.cmt
+   runner-common/miaou_runner_common__Html_driver.cmx
+   runner-common/miaou_runner_common__Runner_cli.cmi
+   runner-common/miaou_runner_common__Runner_cli.cmt
+   runner-common/miaou_runner_common__Runner_cli.cmx
+   runner-common/miaou_runner_common__Tui_driver_common.cmi
+   runner-common/miaou_runner_common__Tui_driver_common.cmt
+   runner-common/miaou_runner_common__Tui_driver_common.cmx
+   runner-common/runner_cli.ml
+   runner-common/tui_driver_common.ml
+   widgets/display/bar_chart_widget.ml
+   widgets/display/bar_chart_widget.mli
+   widgets/display/braille_canvas.ml
+   widgets/display/braille_canvas.mli
+   widgets/display/chart_utils.ml
+   widgets/display/chart_utils.mli
+   widgets/display/description_list.ml
+   widgets/display/description_list.mli
+   widgets/display/file_pager.ml
+   widgets/display/file_pager.mli
+   widgets/display/image_widget.ml
+   widgets/display/image_widget.mli
+   widgets/display/line_chart_widget.ml
+   widgets/display/line_chart_widget.mli
+   widgets/display/miaou_widgets_display.a
+   widgets/display/miaou_widgets_display.cma
+   widgets/display/miaou_widgets_display.cmi
+   widgets/display/miaou_widgets_display.cmt
+   widgets/display/miaou_widgets_display.cmx
+   widgets/display/miaou_widgets_display.cmxa
+   widgets/display/miaou_widgets_display.ml
+   widgets/display/miaou_widgets_display__Bar_chart_widget.cmi
+   widgets/display/miaou_widgets_display__Bar_chart_widget.cmt
+   widgets/display/miaou_widgets_display__Bar_chart_widget.cmti
+   widgets/display/miaou_widgets_display__Bar_chart_widget.cmx
+   widgets/display/miaou_widgets_display__Braille_canvas.cmi
+   widgets/display/miaou_widgets_display__Braille_canvas.cmt
+   widgets/display/miaou_widgets_display__Braille_canvas.cmti
+   widgets/display/miaou_widgets_display__Braille_canvas.cmx
+   widgets/display/miaou_widgets_display__Chart_utils.cmi
+   widgets/display/miaou_widgets_display__Chart_utils.cmt
+   widgets/display/miaou_widgets_display__Chart_utils.cmti
+   widgets/display/miaou_widgets_display__Chart_utils.cmx
+   widgets/display/miaou_widgets_display__Description_list.cmi
+   widgets/display/miaou_widgets_display__Description_list.cmt
+   widgets/display/miaou_widgets_display__Description_list.cmti
+   widgets/display/miaou_widgets_display__Description_list.cmx
+   widgets/display/miaou_widgets_display__File_pager.cmi
+   widgets/display/miaou_widgets_display__File_pager.cmt
+   widgets/display/miaou_widgets_display__File_pager.cmti
+   widgets/display/miaou_widgets_display__File_pager.cmx
+   widgets/display/miaou_widgets_display__Image_widget.cmi
+   widgets/display/miaou_widgets_display__Image_widget.cmt
+   widgets/display/miaou_widgets_display__Image_widget.cmti
+   widgets/display/miaou_widgets_display__Image_widget.cmx
+   widgets/display/miaou_widgets_display__Line_chart_widget.cmi
+   widgets/display/miaou_widgets_display__Line_chart_widget.cmt
+   widgets/display/miaou_widgets_display__Line_chart_widget.cmti
+   widgets/display/miaou_widgets_display__Line_chart_widget.cmx
+   widgets/display/miaou_widgets_display__Pager_widget.cmi
+   widgets/display/miaou_widgets_display__Pager_widget.cmt
+   widgets/display/miaou_widgets_display__Pager_widget.cmti
+   widgets/display/miaou_widgets_display__Pager_widget.cmx
+   widgets/display/miaou_widgets_display__Palette.cmi
+   widgets/display/miaou_widgets_display__Palette.cmt
+   widgets/display/miaou_widgets_display__Palette.cmx
+   widgets/display/miaou_widgets_display__Palette_sdl.cmi
+   widgets/display/miaou_widgets_display__Palette_sdl.cmt
+   widgets/display/miaou_widgets_display__Palette_sdl.cmx
+   widgets/display/miaou_widgets_display__Qr_code_widget.cmi
+   widgets/display/miaou_widgets_display__Qr_code_widget.cmt
+   widgets/display/miaou_widgets_display__Qr_code_widget.cmti
+   widgets/display/miaou_widgets_display__Qr_code_widget.cmx
+   widgets/display/miaou_widgets_display__Sdl_chart_context.cmi
+   widgets/display/miaou_widgets_display__Sdl_chart_context.cmt
+   widgets/display/miaou_widgets_display__Sdl_chart_context.cmx
+   widgets/display/miaou_widgets_display__Sparkline_widget.cmi
+   widgets/display/miaou_widgets_display__Sparkline_widget.cmt
+   widgets/display/miaou_widgets_display__Sparkline_widget.cmti
+   widgets/display/miaou_widgets_display__Sparkline_widget.cmx
+   widgets/display/miaou_widgets_display__Table_widget.cmi
+   widgets/display/miaou_widgets_display__Table_widget.cmt
+   widgets/display/miaou_widgets_display__Table_widget.cmti
+   widgets/display/miaou_widgets_display__Table_widget.cmx
+   widgets/display/miaou_widgets_display__Table_widget_sdl.cmi
+   widgets/display/miaou_widgets_display__Table_widget_sdl.cmt
+   widgets/display/miaou_widgets_display__Table_widget_sdl.cmx
+   widgets/display/miaou_widgets_display__Tree_widget.cmi
+   widgets/display/miaou_widgets_display__Tree_widget.cmt
+   widgets/display/miaou_widgets_display__Tree_widget.cmti
+   widgets/display/miaou_widgets_display__Tree_widget.cmx
+   widgets/display/miaou_widgets_display__Widgets.cmi
+   widgets/display/miaou_widgets_display__Widgets.cmt
+   widgets/display/miaou_widgets_display__Widgets.cmx
+   widgets/display/pager_widget.ml
+   widgets/display/pager_widget.mli
+   widgets/display/palette.ml
+   widgets/display/palette_sdl.ml
+   widgets/display/qr_code_widget.ml
+   widgets/display/qr_code_widget.mli
+   widgets/display/sdl_chart_context.ml
+   widgets/display/sparkline_widget.ml
+   widgets/display/sparkline_widget.mli
+   widgets/display/table_widget.ml
+   widgets/display/table_widget.mli
+   widgets/display/table_widget_sdl.ml
+   widgets/display/tree_widget.ml
+   widgets/display/tree_widget.mli
+   widgets/display/widgets.ml
+   widgets/input/button_widget.ml
+   widgets/input/button_widget.mli
+   widgets/input/checkbox_widget.ml
+   widgets/input/checkbox_widget.mli
+   widgets/input/event_result.ml
+   widgets/input/event_result.mli
+   widgets/input/miaou_widgets_input.a
+   widgets/input/miaou_widgets_input.cma
+   widgets/input/miaou_widgets_input.cmi
+   widgets/input/miaou_widgets_input.cmt
+   widgets/input/miaou_widgets_input.cmx
+   widgets/input/miaou_widgets_input.cmxa
+   widgets/input/miaou_widgets_input.ml
+   widgets/input/miaou_widgets_input__Button_widget.cmi
+   widgets/input/miaou_widgets_input__Button_widget.cmt
+   widgets/input/miaou_widgets_input__Button_widget.cmti
+   widgets/input/miaou_widgets_input__Button_widget.cmx
+   widgets/input/miaou_widgets_input__Checkbox_widget.cmi
+   widgets/input/miaou_widgets_input__Checkbox_widget.cmt
+   widgets/input/miaou_widgets_input__Checkbox_widget.cmti
+   widgets/input/miaou_widgets_input__Checkbox_widget.cmx
+   widgets/input/miaou_widgets_input__Event_result.cmi
+   widgets/input/miaou_widgets_input__Event_result.cmt
+   widgets/input/miaou_widgets_input__Event_result.cmti
+   widgets/input/miaou_widgets_input__Event_result.cmx
+   widgets/input/miaou_widgets_input__Radio_button_widget.cmi
+   widgets/input/miaou_widgets_input__Radio_button_widget.cmt
+   widgets/input/miaou_widgets_input__Radio_button_widget.cmti
+   widgets/input/miaou_widgets_input__Radio_button_widget.cmx
+   widgets/input/miaou_widgets_input__Select_widget.cmi
+   widgets/input/miaou_widgets_input__Select_widget.cmt
+   widgets/input/miaou_widgets_input__Select_widget.cmti
+   widgets/input/miaou_widgets_input__Select_widget.cmx
+   widgets/input/miaou_widgets_input__Select_widget_sdl.cmi
+   widgets/input/miaou_widgets_input__Select_widget_sdl.cmt
+   widgets/input/miaou_widgets_input__Select_widget_sdl.cmx
+   widgets/input/miaou_widgets_input__Switch_widget.cmi
+   widgets/input/miaou_widgets_input__Switch_widget.cmt
+   widgets/input/miaou_widgets_input__Switch_widget.cmti
+   widgets/input/miaou_widgets_input__Switch_widget.cmx
+   widgets/input/miaou_widgets_input__Textbox_widget.cmi
+   widgets/input/miaou_widgets_input__Textbox_widget.cmt
+   widgets/input/miaou_widgets_input__Textbox_widget.cmti
+   widgets/input/miaou_widgets_input__Textbox_widget.cmx
+   widgets/input/miaou_widgets_input__Validated_textbox_widget.cmi
+   widgets/input/miaou_widgets_input__Validated_textbox_widget.cmt
+   widgets/input/miaou_widgets_input__Validated_textbox_widget.cmti
+   widgets/input/miaou_widgets_input__Validated_textbox_widget.cmx
+   widgets/input/radio_button_widget.ml
+   widgets/input/radio_button_widget.mli
+   widgets/input/select_widget.ml
+   widgets/input/select_widget.mli
+   widgets/input/select_widget_sdl.ml
+   widgets/input/switch_widget.ml
+   widgets/input/switch_widget.mli
+   widgets/input/textbox_widget.ml
+   widgets/input/textbox_widget.mli
+   widgets/input/validated_textbox_widget.ml
+   widgets/input/validated_textbox_widget.mli
+   widgets/layout/card_widget.ml
+   widgets/layout/card_widget.mli
+   widgets/layout/file_browser_widget.ml
+   widgets/layout/file_browser_widget.mli
+   widgets/layout/flex_layout.ml
+   widgets/layout/flex_layout.mli
+   widgets/layout/list_nav.ml
+   widgets/layout/miaou_widgets_layout.a
+   widgets/layout/miaou_widgets_layout.cma
+   widgets/layout/miaou_widgets_layout.cmi
+   widgets/layout/miaou_widgets_layout.cmt
+   widgets/layout/miaou_widgets_layout.cmx
+   widgets/layout/miaou_widgets_layout.cmxa
+   widgets/layout/miaou_widgets_layout.ml
+   widgets/layout/miaou_widgets_layout__Card_widget.cmi
+   widgets/layout/miaou_widgets_layout__Card_widget.cmt
+   widgets/layout/miaou_widgets_layout__Card_widget.cmti
+   widgets/layout/miaou_widgets_layout__Card_widget.cmx
+   widgets/layout/miaou_widgets_layout__File_browser_widget.cmi
+   widgets/layout/miaou_widgets_layout__File_browser_widget.cmt
+   widgets/layout/miaou_widgets_layout__File_browser_widget.cmti
+   widgets/layout/miaou_widgets_layout__File_browser_widget.cmx
+   widgets/layout/miaou_widgets_layout__Flex_layout.cmi
+   widgets/layout/miaou_widgets_layout__Flex_layout.cmt
+   widgets/layout/miaou_widgets_layout__Flex_layout.cmti
+   widgets/layout/miaou_widgets_layout__Flex_layout.cmx
+   widgets/layout/miaou_widgets_layout__List_nav.cmi
+   widgets/layout/miaou_widgets_layout__List_nav.cmt
+   widgets/layout/miaou_widgets_layout__List_nav.cmx
+   widgets/layout/miaou_widgets_layout__Pane.cmi
+   widgets/layout/miaou_widgets_layout__Pane.cmt
+   widgets/layout/miaou_widgets_layout__Pane.cmti
+   widgets/layout/miaou_widgets_layout__Pane.cmx
+   widgets/layout/miaou_widgets_layout__Pane_layout.cmi
+   widgets/layout/miaou_widgets_layout__Pane_layout.cmt
+   widgets/layout/miaou_widgets_layout__Pane_layout.cmti
+   widgets/layout/miaou_widgets_layout__Pane_layout.cmx
+   widgets/layout/miaou_widgets_layout__Progress_widget.cmi
+   widgets/layout/miaou_widgets_layout__Progress_widget.cmt
+   widgets/layout/miaou_widgets_layout__Progress_widget.cmti
+   widgets/layout/miaou_widgets_layout__Progress_widget.cmx
+   widgets/layout/miaou_widgets_layout__Progress_widget_sdl.cmi
+   widgets/layout/miaou_widgets_layout__Progress_widget_sdl.cmt
+   widgets/layout/miaou_widgets_layout__Progress_widget_sdl.cmx
+   widgets/layout/miaou_widgets_layout__Sidebar_widget.cmi
+   widgets/layout/miaou_widgets_layout__Sidebar_widget.cmt
+   widgets/layout/miaou_widgets_layout__Sidebar_widget.cmti
+   widgets/layout/miaou_widgets_layout__Sidebar_widget.cmx
+   widgets/layout/miaou_widgets_layout__Spinner_widget.cmi
+   widgets/layout/miaou_widgets_layout__Spinner_widget.cmt
+   widgets/layout/miaou_widgets_layout__Spinner_widget.cmti
+   widgets/layout/miaou_widgets_layout__Spinner_widget.cmx
+   widgets/layout/miaou_widgets_layout__Spinner_widget_sdl.cmi
+   widgets/layout/miaou_widgets_layout__Spinner_widget_sdl.cmt
+   widgets/layout/miaou_widgets_layout__Spinner_widget_sdl.cmx
+   widgets/layout/miaou_widgets_layout__Toast_widget.cmi
+   widgets/layout/miaou_widgets_layout__Toast_widget.cmt
+   widgets/layout/miaou_widgets_layout__Toast_widget.cmti
+   widgets/layout/miaou_widgets_layout__Toast_widget.cmx
+   widgets/layout/miaou_widgets_layout__Vsection.cmi
+   widgets/layout/miaou_widgets_layout__Vsection.cmt
+   widgets/layout/miaou_widgets_layout__Vsection.cmti
+   widgets/layout/miaou_widgets_layout__Vsection.cmx
+   widgets/layout/pane.ml
+   widgets/layout/pane.mli
+   widgets/layout/pane_layout.ml
+   widgets/layout/pane_layout.mli
+   widgets/layout/progress_widget.ml
+   widgets/layout/progress_widget.mli
+   widgets/layout/progress_widget_sdl.ml
+   widgets/layout/sidebar_widget.ml
+   widgets/layout/sidebar_widget.mli
+   widgets/layout/spinner_widget.ml
+   widgets/layout/spinner_widget.mli
+   widgets/layout/spinner_widget_sdl.ml
+   widgets/layout/toast_widget.ml
+   widgets/layout/toast_widget.mli
+   widgets/layout/vsection.ml
+   widgets/layout/vsection.mli
+   widgets/navigation/breadcrumbs_widget.ml
+   widgets/navigation/breadcrumbs_widget.mli
+   widgets/navigation/link_widget.ml
+   widgets/navigation/link_widget.mli
+   widgets/navigation/miaou_widgets_navigation.a
+   widgets/navigation/miaou_widgets_navigation.cma
+   widgets/navigation/miaou_widgets_navigation.cmi
+   widgets/navigation/miaou_widgets_navigation.cmt
+   widgets/navigation/miaou_widgets_navigation.cmx
+   widgets/navigation/miaou_widgets_navigation.cmxa
+   widgets/navigation/miaou_widgets_navigation.ml
+   widgets/navigation/miaou_widgets_navigation__Breadcrumbs_widget.cmi
+   widgets/navigation/miaou_widgets_navigation__Breadcrumbs_widget.cmt
+   widgets/navigation/miaou_widgets_navigation__Breadcrumbs_widget.cmti
+   widgets/navigation/miaou_widgets_navigation__Breadcrumbs_widget.cmx
+   widgets/navigation/miaou_widgets_navigation__Link_widget.cmi
+   widgets/navigation/miaou_widgets_navigation__Link_widget.cmt
+   widgets/navigation/miaou_widgets_navigation__Link_widget.cmti
+   widgets/navigation/miaou_widgets_navigation__Link_widget.cmx
+   widgets/navigation/miaou_widgets_navigation__Tabs_widget.cmi
+   widgets/navigation/miaou_widgets_navigation__Tabs_widget.cmt
+   widgets/navigation/miaou_widgets_navigation__Tabs_widget.cmti
+   widgets/navigation/miaou_widgets_navigation__Tabs_widget.cmx
+   widgets/navigation/tabs_widget.ml
+   widgets/navigation/tabs_widget.mli))
+ (libexec
+  (core/miaou_core.cmxs
+   driver-common/miaou_driver_common.cmxs
+   helpers/miaou_helpers.cmxs
+   interfaces/miaou_interfaces.cmxs
+   internals/miaou_internals.cmxs
+   lib/miaou.cmxs
+   lib_miaou_internal/lib_miaou_internal.cmxs
+   runner-common/miaou_runner_common.cmxs
+   widgets/display/miaou_widgets_display.cmxs
+   widgets/input/miaou_widgets_input.cmxs
+   widgets/layout/miaou_widgets_layout.cmxs
+   widgets/navigation/miaou_widgets_navigation.cmxs))
+ (doc (CHANGELOG.md LICENSE.md README.md)))
+(library
+ (name miaou-core.core)
+ (kind normal)
+ (archives (byte core/miaou_core.cma) (native core/miaou_core.cmxa))
+ (plugins (byte core/miaou_core.cma) (native core/miaou_core.cmxs))
+ (native_archives core/miaou_core.a)
+ (requires
+  miaou-core.internals
+  yojson
+  str
+  unix
+  miaou-core.widgets.input
+  miaou-core.widgets.layout
+  miaou-core.widgets.display
+  miaou-core.helpers
+  miaou-core.interfaces
+  lambda-term)
+ (main_module_name Miaou_core)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_core)
+     (visibility public)
+     (kind alias)
+     (source (path Miaou_core) (impl (path core/miaou_core.ml-gen))))
+    (name Miaou_core)
+    (modules
+     (module
+      (obj_name miaou_core__Capability)
+      (visibility public)
+      (source
+       (path Capability)
+       (intf (path core/capability.mli))
+       (impl (path core/capability.ml))))
+     (module
+      (obj_name miaou_core__File_browser_modal)
+      (visibility public)
+      (source
+       (path File_browser_modal)
+       (intf (path core/file_browser_modal.mli))
+       (impl (path core/file_browser_modal.ml))))
+     (module
+      (obj_name miaou_core__Help_hint)
+      (visibility public)
+      (source
+       (path Help_hint)
+       (intf (path core/help_hint.mli))
+       (impl (path core/help_hint.ml))))
+     (module
+      (obj_name miaou_core__Keys)
+      (visibility public)
+      (source
+       (path Keys)
+       (intf (path core/keys.mli))
+       (impl (path core/keys.ml))))
+     (module
+      (obj_name miaou_core__Lib_tui)
+      (visibility public)
+      (source (path Lib_tui) (impl (path core/lib_tui.ml))))
+     (module
+      (obj_name miaou_core__Logger)
+      (visibility public)
+      (source
+       (path Logger)
+       (intf (path core/logger.mli))
+       (impl (path core/logger.ml))))
+     (module
+      (obj_name miaou_core__Logger_alias)
+      (visibility public)
+      (source (path Logger_alias) (impl (path core/logger_alias.ml))))
+     (module
+      (obj_name miaou_core__Modal_manager)
+      (visibility public)
+      (source
+       (path Modal_manager)
+       (intf (path core/modal_manager.mli))
+       (impl (path core/modal_manager.ml))))
+     (module
+      (obj_name miaou_core__Narrow_modal)
+      (visibility public)
+      (source (path Narrow_modal) (impl (path core/narrow_modal.ml))))
+     (module
+      (obj_name miaou_core__Navigation)
+      (visibility public)
+      (source
+       (path Navigation)
+       (intf (path core/navigation.mli))
+       (impl (path core/navigation.ml))))
+     (module
+      (obj_name miaou_core__Quit_flag)
+      (visibility public)
+      (source (path Quit_flag) (impl (path core/quit_flag.ml))))
+     (module
+      (obj_name miaou_core__Registry)
+      (visibility public)
+      (source
+       (path Registry)
+       (intf (path core/registry.mli))
+       (impl (path core/registry.ml))))
+     (module
+      (obj_name miaou_core__Service_lifecycle)
+      (visibility public)
+      (source
+       (path Service_lifecycle)
+       (intf (path core/service_lifecycle.mli))
+       (impl (path core/service_lifecycle.ml))))
+     (module
+      (obj_name miaou_core__System)
+      (visibility public)
+      (source
+       (path System)
+       (intf (path core/system.mli))
+       (impl (path core/system.ml))))
+     (module
+      (obj_name miaou_core__Tui_capture)
+      (visibility public)
+      (source
+       (path Tui_capture)
+       (intf (path core/tui_capture.mli))
+       (impl (path core/tui_capture.ml))))
+     (module
+      (obj_name miaou_core__Tui_logger)
+      (visibility public)
+      (source
+       (path Tui_logger)
+       (intf (path core/tui_logger.mli))
+       (impl (path core/tui_logger.ml))))
+     (module
+      (obj_name miaou_core__Tui_page)
+      (visibility public)
+      (source
+       (path Tui_page)
+       (intf (path core/tui_page.mli))
+       (impl (path core/tui_page.ml))))
+     (module
+      (obj_name miaou_core__Workflow)
+      (visibility public)
+      (source
+       (path Workflow)
+       (intf (path core/workflow.mli))
+       (impl (path core/workflow.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.driver-common)
+ (kind normal)
+ (archives
+  (byte driver-common/miaou_driver_common.cma)
+  (native driver-common/miaou_driver_common.cmxa))
+ (plugins
+  (byte driver-common/miaou_driver_common.cma)
+  (native driver-common/miaou_driver_common.cmxs))
+ (native_archives driver-common/miaou_driver_common.a)
+ (requires miaou-core.core miaou-core.internals unix)
+ (main_module_name Miaou_driver_common)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_driver_common)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_driver_common)
+      (impl (path driver-common/miaou_driver_common.ml-gen))))
+    (name Miaou_driver_common)
+    (modules
+     (module
+      (obj_name miaou_driver_common__Driver_common)
+      (visibility public)
+      (source
+       (path Driver_common)
+       (intf (path driver-common/driver_common.mli))
+       (impl (path driver-common/driver_common.ml))))
+     (module
+      (obj_name miaou_driver_common__Input_parser)
+      (visibility public)
+      (source
+       (path Input_parser)
+       (intf (path driver-common/input_parser.mli))
+       (impl (path driver-common/input_parser.ml))))
+     (module
+      (obj_name miaou_driver_common__Page_transition_utils)
+      (visibility public)
+      (source
+       (path Page_transition_utils)
+       (intf (path driver-common/page_transition_utils.mli))
+       (impl (path driver-common/page_transition_utils.ml))))
+     (module
+      (obj_name miaou_driver_common__Pager_notify)
+      (visibility public)
+      (source
+       (path Pager_notify)
+       (intf (path driver-common/pager_notify.mli))
+       (impl (path driver-common/pager_notify.ml))))
+     (module
+      (obj_name miaou_driver_common__Terminal_raw)
+      (visibility public)
+      (source
+       (path Terminal_raw)
+       (intf (path driver-common/terminal_raw.mli))
+       (impl (path driver-common/terminal_raw.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.helpers)
+ (kind normal)
+ (archives
+  (byte helpers/miaou_helpers.cma)
+  (native helpers/miaou_helpers.cmxa))
+ (plugins
+  (byte helpers/miaou_helpers.cma)
+  (native helpers/miaou_helpers.cmxs))
+ (native_archives helpers/miaou_helpers.a)
+ (requires eio eio.unix unix)
+ (main_module_name Miaou_helpers)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_helpers)
+     (visibility public)
+     (kind alias)
+     (source (path Miaou_helpers) (impl (path helpers/miaou_helpers.ml-gen))))
+    (name Miaou_helpers)
+    (modules
+     (module
+      (obj_name miaou_helpers__Debounce)
+      (visibility public)
+      (source
+       (path Debounce)
+       (intf (path helpers/debounce.mli))
+       (impl (path helpers/debounce.ml))))
+     (module
+      (obj_name miaou_helpers__Fiber_runtime)
+      (visibility public)
+      (source
+       (path Fiber_runtime)
+       (intf (path helpers/fiber_runtime.mli))
+       (impl (path helpers/fiber_runtime.ml))))
+     (module
+      (obj_name miaou_helpers__Helpers)
+      (visibility public)
+      (source
+       (path Helpers)
+       (intf (path helpers/helpers.mli))
+       (impl (path helpers/helpers.ml))))
+     (module
+      (obj_name miaou_helpers__Render_notify)
+      (visibility public)
+      (source
+       (path Render_notify)
+       (intf (path helpers/render_notify.mli))
+       (impl (path helpers/render_notify.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.interfaces)
+ (kind normal)
+ (archives
+  (byte interfaces/miaou_interfaces.cma)
+  (native interfaces/miaou_interfaces.cmxa))
+ (plugins
+  (byte interfaces/miaou_interfaces.cma)
+  (native interfaces/miaou_interfaces.cmxs))
+ (native_archives interfaces/miaou_interfaces.a)
+ (main_module_name Miaou_interfaces)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_interfaces)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_interfaces)
+      (impl (path interfaces/miaou_interfaces.ml-gen))))
+    (name Miaou_interfaces)
+    (modules
+     (module
+      (obj_name miaou_interfaces__Capability)
+      (visibility public)
+      (source
+       (path Capability)
+       (intf (path interfaces/capability.mli))
+       (impl (path interfaces/capability.ml))))
+     (module
+      (obj_name miaou_interfaces__Logger_capability)
+      (visibility public)
+      (source
+       (path Logger_capability)
+       (intf (path interfaces/logger_capability.mli))
+       (impl (path interfaces/logger_capability.ml))))
+     (module
+      (obj_name miaou_interfaces__Palette)
+      (visibility public)
+      (source
+       (path Palette)
+       (intf (path interfaces/palette.mli))
+       (impl (path interfaces/palette.ml))))
+     (module
+      (obj_name miaou_interfaces__Service_lifecycle)
+      (visibility public)
+      (source
+       (path Service_lifecycle)
+       (intf (path interfaces/service_lifecycle.mli))
+       (impl (path interfaces/service_lifecycle.ml))))
+     (module
+      (obj_name miaou_interfaces__System)
+      (visibility public)
+      (source
+       (path System)
+       (intf (path interfaces/system.mli))
+       (impl (path interfaces/system.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.internals)
+ (kind normal)
+ (archives
+  (byte internals/miaou_internals.cma)
+  (native internals/miaou_internals.cmxa))
+ (plugins
+  (byte internals/miaou_internals.cma)
+  (native internals/miaou_internals.cmxs))
+ (native_archives internals/miaou_internals.a)
+ (requires miaou-core.widgets.layout miaou-core.widgets.display lambda-term)
+ (main_module_name Miaou_internals)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_internals)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_internals)
+      (impl (path internals/miaou_internals.ml-gen))))
+    (name Miaou_internals)
+    (modules
+     (module
+      (obj_name miaou_internals__Focus_chain)
+      (visibility public)
+      (source
+       (path Focus_chain)
+       (intf (path internals/focus_chain.mli))
+       (impl (path internals/focus_chain.ml))))
+     (module
+      (obj_name miaou_internals__Key_handler_stack)
+      (visibility public)
+      (source
+       (path Key_handler_stack)
+       (intf (path internals/key_handler_stack.mli))
+       (impl (path internals/key_handler_stack.ml))))
+     (module
+      (obj_name miaou_internals__Modal_renderer)
+      (visibility public)
+      (source
+       (path Modal_renderer)
+       (intf (path internals/modal_renderer.mli))
+       (impl (path internals/modal_renderer.ml))))
+     (module
+      (obj_name miaou_internals__Modal_snapshot)
+      (visibility public)
+      (source
+       (path Modal_snapshot)
+       (intf (path internals/modal_snapshot.mli))
+       (impl (path internals/modal_snapshot.ml))))
+     (module
+      (obj_name miaou_internals__Modal_utils)
+      (visibility public)
+      (source
+       (path Modal_utils)
+       (intf (path internals/modal_utils.mli))
+       (impl (path internals/modal_utils.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.lib)
+ (kind normal)
+ (archives (byte lib/miaou.cma) (native lib/miaou.cmxa))
+ (plugins (byte lib/miaou.cma) (native lib/miaou.cmxs))
+ (native_archives lib/miaou.a)
+ (requires
+  http
+  cohttp
+  cohttp-eio
+  eio
+  eio.unix
+  miaou-core.core
+  miaou-core.interfaces
+  miaou-core.internals
+  miaou-core.widgets.display
+  miaou-core.widgets.input
+  miaou-core.widgets.layout
+  miaou-core.widgets.navigation
+  rresult
+  uri)
+ (main_module_name Miaou)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou__)
+     (visibility public)
+     (kind alias)
+     (source (path Miaou__) (impl (path lib/miaou__.ml-gen))))
+    (name Miaou)
+    (modules
+     (module
+      (obj_name miaou__Cohttp_net)
+      (visibility public)
+      (source (path Cohttp_net) (impl (path lib/cohttp_net.ml))))
+     (module
+      (obj_name miaou)
+      (visibility public)
+      (source (path Miaou) (impl (path lib/miaou.ml))))
+     (module
+      (obj_name miaou__Net)
+      (visibility public)
+      (source (path Net) (intf (path lib/net.mli)) (impl (path lib/net.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.lib_miaou_internal)
+ (kind normal)
+ (archives
+  (byte lib_miaou_internal/lib_miaou_internal.cma)
+  (native lib_miaou_internal/lib_miaou_internal.cmxa))
+ (plugins
+  (byte lib_miaou_internal/lib_miaou_internal.cma)
+  (native lib_miaou_internal/lib_miaou_internal.cmxs))
+ (native_archives lib_miaou_internal/lib_miaou_internal.a)
+ (requires
+  miaou-core.core
+  miaou-core.internals
+  miaou-core.widgets.layout
+  lambda-term
+  unix)
+ (main_module_name Lib_miaou_internal)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name lib_miaou_internal)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Lib_miaou_internal)
+      (impl (path lib_miaou_internal/lib_miaou_internal.ml-gen))))
+    (name Lib_miaou_internal)
+    (modules
+     (module
+      (obj_name lib_miaou_internal__Flash_bus)
+      (visibility public)
+      (source (path Flash_bus) (impl (path lib_miaou_internal/flash_bus.ml))))
+     (module
+      (obj_name lib_miaou_internal__Flash_toast_renderer)
+      (visibility public)
+      (source
+       (path Flash_toast_renderer)
+       (impl (path lib_miaou_internal/flash_toast_renderer.ml))))
+     (module
+      (obj_name lib_miaou_internal__Headless_driver)
+      (visibility public)
+      (source
+       (path Headless_driver)
+       (impl (path lib_miaou_internal/headless_driver.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.runner-common)
+ (kind normal)
+ (archives
+  (byte runner-common/miaou_runner_common.cma)
+  (native runner-common/miaou_runner_common.cmxa))
+ (plugins
+  (byte runner-common/miaou_runner_common.cma)
+  (native runner-common/miaou_runner_common.cmxs))
+ (native_archives runner-common/miaou_runner_common.a)
+ (requires
+  miaou-core.core
+  miaou-core.interfaces
+  miaou-core.widgets.display
+  miaou-core.helpers)
+ (main_module_name Miaou_runner_common)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_runner_common)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_runner_common)
+      (impl (path runner-common/miaou_runner_common.ml-gen))))
+    (name Miaou_runner_common)
+    (modules
+     (module
+      (obj_name miaou_runner_common__Html_driver)
+      (visibility public)
+      (source (path Html_driver) (impl (path runner-common/html_driver.ml))))
+     (module
+      (obj_name miaou_runner_common__Runner_cli)
+      (visibility public)
+      (source (path Runner_cli) (impl (path runner-common/runner_cli.ml))))
+     (module
+      (obj_name miaou_runner_common__Tui_driver_common)
+      (visibility public)
+      (source
+       (path Tui_driver_common)
+       (impl (path runner-common/tui_driver_common.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.widgets.display)
+ (kind normal)
+ (archives
+  (byte widgets/display/miaou_widgets_display.cma)
+  (native widgets/display/miaou_widgets_display.cmxa))
+ (plugins
+  (byte widgets/display/miaou_widgets_display.cma)
+  (native widgets/display/miaou_widgets_display.cmxs))
+ (native_archives widgets/display/miaou_widgets_display.a)
+ (requires
+  yojson
+  str
+  eio
+  eio.unix
+  unix
+  miaou-core.helpers
+  miaou-core.interfaces
+  qrc
+  imagelib
+  imagelib.unix)
+ (main_module_name Miaou_widgets_display)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_widgets_display)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_widgets_display)
+      (impl (path widgets/display/miaou_widgets_display.ml-gen))))
+    (name Miaou_widgets_display)
+    (modules
+     (module
+      (obj_name miaou_widgets_display__Bar_chart_widget)
+      (visibility public)
+      (source
+       (path Bar_chart_widget)
+       (intf (path widgets/display/bar_chart_widget.mli))
+       (impl (path widgets/display/bar_chart_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Braille_canvas)
+      (visibility public)
+      (source
+       (path Braille_canvas)
+       (intf (path widgets/display/braille_canvas.mli))
+       (impl (path widgets/display/braille_canvas.ml))))
+     (module
+      (obj_name miaou_widgets_display__Chart_utils)
+      (visibility public)
+      (source
+       (path Chart_utils)
+       (intf (path widgets/display/chart_utils.mli))
+       (impl (path widgets/display/chart_utils.ml))))
+     (module
+      (obj_name miaou_widgets_display__Description_list)
+      (visibility public)
+      (source
+       (path Description_list)
+       (intf (path widgets/display/description_list.mli))
+       (impl (path widgets/display/description_list.ml))))
+     (module
+      (obj_name miaou_widgets_display__File_pager)
+      (visibility public)
+      (source
+       (path File_pager)
+       (intf (path widgets/display/file_pager.mli))
+       (impl (path widgets/display/file_pager.ml))))
+     (module
+      (obj_name miaou_widgets_display__Image_widget)
+      (visibility public)
+      (source
+       (path Image_widget)
+       (intf (path widgets/display/image_widget.mli))
+       (impl (path widgets/display/image_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Line_chart_widget)
+      (visibility public)
+      (source
+       (path Line_chart_widget)
+       (intf (path widgets/display/line_chart_widget.mli))
+       (impl (path widgets/display/line_chart_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Pager_widget)
+      (visibility public)
+      (source
+       (path Pager_widget)
+       (intf (path widgets/display/pager_widget.mli))
+       (impl (path widgets/display/pager_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Palette)
+      (visibility public)
+      (source (path Palette) (impl (path widgets/display/palette.ml))))
+     (module
+      (obj_name miaou_widgets_display__Palette_sdl)
+      (visibility public)
+      (source (path Palette_sdl) (impl (path widgets/display/palette_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_display__Qr_code_widget)
+      (visibility public)
+      (source
+       (path Qr_code_widget)
+       (intf (path widgets/display/qr_code_widget.mli))
+       (impl (path widgets/display/qr_code_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Sdl_chart_context)
+      (visibility public)
+      (source
+       (path Sdl_chart_context)
+       (impl (path widgets/display/sdl_chart_context.ml))))
+     (module
+      (obj_name miaou_widgets_display__Sparkline_widget)
+      (visibility public)
+      (source
+       (path Sparkline_widget)
+       (intf (path widgets/display/sparkline_widget.mli))
+       (impl (path widgets/display/sparkline_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Table_widget)
+      (visibility public)
+      (source
+       (path Table_widget)
+       (intf (path widgets/display/table_widget.mli))
+       (impl (path widgets/display/table_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Table_widget_sdl)
+      (visibility public)
+      (source
+       (path Table_widget_sdl)
+       (impl (path widgets/display/table_widget_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_display__Tree_widget)
+      (visibility public)
+      (source
+       (path Tree_widget)
+       (intf (path widgets/display/tree_widget.mli))
+       (impl (path widgets/display/tree_widget.ml))))
+     (module
+      (obj_name miaou_widgets_display__Widgets)
+      (visibility public)
+      (source (path Widgets) (impl (path widgets/display/widgets.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.widgets.input)
+ (kind normal)
+ (archives
+  (byte widgets/input/miaou_widgets_input.cma)
+  (native widgets/input/miaou_widgets_input.cmxa))
+ (plugins
+  (byte widgets/input/miaou_widgets_input.cma)
+  (native widgets/input/miaou_widgets_input.cmxs))
+ (native_archives widgets/input/miaou_widgets_input.a)
+ (requires
+  miaou-core.widgets.display
+  miaou-core.helpers
+  miaou-core.interfaces
+  lambda-term)
+ (main_module_name Miaou_widgets_input)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_widgets_input)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_widgets_input)
+      (impl (path widgets/input/miaou_widgets_input.ml-gen))))
+    (name Miaou_widgets_input)
+    (modules
+     (module
+      (obj_name miaou_widgets_input__Button_widget)
+      (visibility public)
+      (source
+       (path Button_widget)
+       (intf (path widgets/input/button_widget.mli))
+       (impl (path widgets/input/button_widget.ml))))
+     (module
+      (obj_name miaou_widgets_input__Checkbox_widget)
+      (visibility public)
+      (source
+       (path Checkbox_widget)
+       (intf (path widgets/input/checkbox_widget.mli))
+       (impl (path widgets/input/checkbox_widget.ml))))
+     (module
+      (obj_name miaou_widgets_input__Event_result)
+      (visibility public)
+      (source
+       (path Event_result)
+       (intf (path widgets/input/event_result.mli))
+       (impl (path widgets/input/event_result.ml))))
+     (module
+      (obj_name miaou_widgets_input__Radio_button_widget)
+      (visibility public)
+      (source
+       (path Radio_button_widget)
+       (intf (path widgets/input/radio_button_widget.mli))
+       (impl (path widgets/input/radio_button_widget.ml))))
+     (module
+      (obj_name miaou_widgets_input__Select_widget)
+      (visibility public)
+      (source
+       (path Select_widget)
+       (intf (path widgets/input/select_widget.mli))
+       (impl (path widgets/input/select_widget.ml))))
+     (module
+      (obj_name miaou_widgets_input__Select_widget_sdl)
+      (visibility public)
+      (source
+       (path Select_widget_sdl)
+       (impl (path widgets/input/select_widget_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_input__Switch_widget)
+      (visibility public)
+      (source
+       (path Switch_widget)
+       (intf (path widgets/input/switch_widget.mli))
+       (impl (path widgets/input/switch_widget.ml))))
+     (module
+      (obj_name miaou_widgets_input__Textbox_widget)
+      (visibility public)
+      (source
+       (path Textbox_widget)
+       (intf (path widgets/input/textbox_widget.mli))
+       (impl (path widgets/input/textbox_widget.ml))))
+     (module
+      (obj_name miaou_widgets_input__Validated_textbox_widget)
+      (visibility public)
+      (source
+       (path Validated_textbox_widget)
+       (intf (path widgets/input/validated_textbox_widget.mli))
+       (impl (path widgets/input/validated_textbox_widget.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.widgets.layout)
+ (kind normal)
+ (archives
+  (byte widgets/layout/miaou_widgets_layout.cma)
+  (native widgets/layout/miaou_widgets_layout.cmxa))
+ (plugins
+  (byte widgets/layout/miaou_widgets_layout.cma)
+  (native widgets/layout/miaou_widgets_layout.cmxs))
+ (native_archives widgets/layout/miaou_widgets_layout.a)
+ (requires
+  miaou-core.widgets.display
+  miaou-core.widgets.input
+  miaou-core.helpers
+  miaou-core.interfaces
+  lambda-term)
+ (main_module_name Miaou_widgets_layout)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_widgets_layout)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_widgets_layout)
+      (impl (path widgets/layout/miaou_widgets_layout.ml-gen))))
+    (name Miaou_widgets_layout)
+    (modules
+     (module
+      (obj_name miaou_widgets_layout__Card_widget)
+      (visibility public)
+      (source
+       (path Card_widget)
+       (intf (path widgets/layout/card_widget.mli))
+       (impl (path widgets/layout/card_widget.ml))))
+     (module
+      (obj_name miaou_widgets_layout__File_browser_widget)
+      (visibility public)
+      (source
+       (path File_browser_widget)
+       (intf (path widgets/layout/file_browser_widget.mli))
+       (impl (path widgets/layout/file_browser_widget.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Flex_layout)
+      (visibility public)
+      (source
+       (path Flex_layout)
+       (intf (path widgets/layout/flex_layout.mli))
+       (impl (path widgets/layout/flex_layout.ml))))
+     (module
+      (obj_name miaou_widgets_layout__List_nav)
+      (visibility public)
+      (source (path List_nav) (impl (path widgets/layout/list_nav.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Pane)
+      (visibility public)
+      (source
+       (path Pane)
+       (intf (path widgets/layout/pane.mli))
+       (impl (path widgets/layout/pane.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Pane_layout)
+      (visibility public)
+      (source
+       (path Pane_layout)
+       (intf (path widgets/layout/pane_layout.mli))
+       (impl (path widgets/layout/pane_layout.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Progress_widget)
+      (visibility public)
+      (source
+       (path Progress_widget)
+       (intf (path widgets/layout/progress_widget.mli))
+       (impl (path widgets/layout/progress_widget.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Progress_widget_sdl)
+      (visibility public)
+      (source
+       (path Progress_widget_sdl)
+       (impl (path widgets/layout/progress_widget_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Sidebar_widget)
+      (visibility public)
+      (source
+       (path Sidebar_widget)
+       (intf (path widgets/layout/sidebar_widget.mli))
+       (impl (path widgets/layout/sidebar_widget.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Spinner_widget)
+      (visibility public)
+      (source
+       (path Spinner_widget)
+       (intf (path widgets/layout/spinner_widget.mli))
+       (impl (path widgets/layout/spinner_widget.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Spinner_widget_sdl)
+      (visibility public)
+      (source
+       (path Spinner_widget_sdl)
+       (impl (path widgets/layout/spinner_widget_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Toast_widget)
+      (visibility public)
+      (source
+       (path Toast_widget)
+       (intf (path widgets/layout/toast_widget.mli))
+       (impl (path widgets/layout/toast_widget.ml))))
+     (module
+      (obj_name miaou_widgets_layout__Vsection)
+      (visibility public)
+      (source
+       (path Vsection)
+       (intf (path widgets/layout/vsection.mli))
+       (impl (path widgets/layout/vsection.ml))))))
+   (wrapped true))))
+(library
+ (name miaou-core.widgets.navigation)
+ (kind normal)
+ (archives
+  (byte widgets/navigation/miaou_widgets_navigation.cma)
+  (native widgets/navigation/miaou_widgets_navigation.cmxa))
+ (plugins
+  (byte widgets/navigation/miaou_widgets_navigation.cma)
+  (native widgets/navigation/miaou_widgets_navigation.cmxs))
+ (native_archives widgets/navigation/miaou_widgets_navigation.a)
+ (requires
+  miaou-core.widgets.display
+  miaou-core.helpers
+  miaou-core.interfaces
+  miaou-core.core
+  lambda-term)
+ (main_module_name Miaou_widgets_navigation)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_widgets_navigation)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_widgets_navigation)
+      (impl (path widgets/navigation/miaou_widgets_navigation.ml-gen))))
+    (name Miaou_widgets_navigation)
+    (modules
+     (module
+      (obj_name miaou_widgets_navigation__Breadcrumbs_widget)
+      (visibility public)
+      (source
+       (path Breadcrumbs_widget)
+       (intf (path widgets/navigation/breadcrumbs_widget.mli))
+       (impl (path widgets/navigation/breadcrumbs_widget.ml))))
+     (module
+      (obj_name miaou_widgets_navigation__Link_widget)
+      (visibility public)
+      (source
+       (path Link_widget)
+       (intf (path widgets/navigation/link_widget.mli))
+       (impl (path widgets/navigation/link_widget.ml))))
+     (module
+      (obj_name miaou_widgets_navigation__Tabs_widget)
+      (visibility public)
+      (source
+       (path Tabs_widget)
+       (intf (path widgets/navigation/tabs_widget.mli))
+       (impl (path widgets/navigation/tabs_widget.ml))))))
+   (wrapped true))))

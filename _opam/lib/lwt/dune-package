@@ -1,0 +1,498 @@
+(lang dune 3.20)
+(name lwt)
+(version 5.9.2)
+(sections (lib .) (libexec .) (doc ../../doc/lwt) (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   dune-package
+   lwt.a
+   lwt.cma
+   lwt.cmi
+   lwt.cmt
+   lwt.cmti
+   lwt.cmx
+   lwt.cmxa
+   lwt.ml
+   lwt.mli
+   lwt_condition.cmi
+   lwt_condition.cmt
+   lwt_condition.cmti
+   lwt_condition.cmx
+   lwt_condition.ml
+   lwt_condition.mli
+   lwt_list.cmi
+   lwt_list.cmt
+   lwt_list.cmti
+   lwt_list.cmx
+   lwt_list.ml
+   lwt_list.mli
+   lwt_mutex.cmi
+   lwt_mutex.cmt
+   lwt_mutex.cmti
+   lwt_mutex.cmx
+   lwt_mutex.ml
+   lwt_mutex.mli
+   lwt_mvar.cmi
+   lwt_mvar.cmt
+   lwt_mvar.cmti
+   lwt_mvar.cmx
+   lwt_mvar.ml
+   lwt_mvar.mli
+   lwt_pool.cmi
+   lwt_pool.cmt
+   lwt_pool.cmti
+   lwt_pool.cmx
+   lwt_pool.ml
+   lwt_pool.mli
+   lwt_pqueue.cmi
+   lwt_pqueue.cmt
+   lwt_pqueue.cmti
+   lwt_pqueue.cmx
+   lwt_pqueue.ml
+   lwt_pqueue.mli
+   lwt_result.cmi
+   lwt_result.cmt
+   lwt_result.cmti
+   lwt_result.cmx
+   lwt_result.ml
+   lwt_result.mli
+   lwt_seq.cmi
+   lwt_seq.cmt
+   lwt_seq.cmti
+   lwt_seq.cmx
+   lwt_seq.ml
+   lwt_seq.mli
+   lwt_sequence.cmi
+   lwt_sequence.cmt
+   lwt_sequence.cmti
+   lwt_sequence.cmx
+   lwt_sequence.ml
+   lwt_sequence.mli
+   lwt_stream.cmi
+   lwt_stream.cmt
+   lwt_stream.cmti
+   lwt_stream.cmx
+   lwt_stream.ml
+   lwt_stream.mli
+   lwt_switch.cmi
+   lwt_switch.cmt
+   lwt_switch.cmti
+   lwt_switch.cmx
+   lwt_switch.ml
+   lwt_switch.mli
+   opam
+   unix/liblwt_unix_stubs.a
+   unix/lwt_bytes.cmi
+   unix/lwt_bytes.cmt
+   unix/lwt_bytes.cmti
+   unix/lwt_bytes.cmx
+   unix/lwt_bytes.ml
+   unix/lwt_bytes.mli
+   unix/lwt_config.cmi
+   unix/lwt_config.cmt
+   unix/lwt_config.cmx
+   unix/lwt_config.h
+   unix/lwt_config.ml
+   unix/lwt_engine.cmi
+   unix/lwt_engine.cmt
+   unix/lwt_engine.cmti
+   unix/lwt_engine.cmx
+   unix/lwt_engine.ml
+   unix/lwt_engine.mli
+   unix/lwt_features.cmi
+   unix/lwt_features.cmt
+   unix/lwt_features.cmx
+   unix/lwt_features.h
+   unix/lwt_features.ml
+   unix/lwt_fmt.cmi
+   unix/lwt_fmt.cmt
+   unix/lwt_fmt.cmti
+   unix/lwt_fmt.cmx
+   unix/lwt_fmt.ml
+   unix/lwt_fmt.mli
+   unix/lwt_gc.cmi
+   unix/lwt_gc.cmt
+   unix/lwt_gc.cmti
+   unix/lwt_gc.cmx
+   unix/lwt_gc.ml
+   unix/lwt_gc.mli
+   unix/lwt_io.cmi
+   unix/lwt_io.cmt
+   unix/lwt_io.cmti
+   unix/lwt_io.cmx
+   unix/lwt_io.ml
+   unix/lwt_io.mli
+   unix/lwt_main.cmi
+   unix/lwt_main.cmt
+   unix/lwt_main.cmti
+   unix/lwt_main.cmx
+   unix/lwt_main.ml
+   unix/lwt_main.mli
+   unix/lwt_preemptive.cmi
+   unix/lwt_preemptive.cmt
+   unix/lwt_preemptive.cmti
+   unix/lwt_preemptive.cmx
+   unix/lwt_preemptive.ml
+   unix/lwt_preemptive.mli
+   unix/lwt_process.cmi
+   unix/lwt_process.cmt
+   unix/lwt_process.cmti
+   unix/lwt_process.cmx
+   unix/lwt_process.ml
+   unix/lwt_process.mli
+   unix/lwt_sys.cmi
+   unix/lwt_sys.cmt
+   unix/lwt_sys.cmti
+   unix/lwt_sys.cmx
+   unix/lwt_sys.ml
+   unix/lwt_sys.mli
+   unix/lwt_throttle.cmi
+   unix/lwt_throttle.cmt
+   unix/lwt_throttle.cmti
+   unix/lwt_throttle.cmx
+   unix/lwt_throttle.ml
+   unix/lwt_throttle.mli
+   unix/lwt_timeout.cmi
+   unix/lwt_timeout.cmt
+   unix/lwt_timeout.cmti
+   unix/lwt_timeout.cmx
+   unix/lwt_timeout.ml
+   unix/lwt_timeout.mli
+   unix/lwt_unix.a
+   unix/lwt_unix.cma
+   unix/lwt_unix.cmi
+   unix/lwt_unix.cmt
+   unix/lwt_unix.cmti
+   unix/lwt_unix.cmx
+   unix/lwt_unix.cmxa
+   unix/lwt_unix.h
+   unix/lwt_unix.ml
+   unix/lwt_unix.mli))
+ (libexec (lwt.cmxs unix/lwt_unix.cmxs))
+ (doc
+  (CHANGES LICENSE.md README.md odoc-pages/index.mld odoc-pages/manual.mld))
+ (stublibs (dlllwt_unix_stubs.so)))
+(library
+ (name lwt)
+ (kind normal)
+ (synopsis "Monadic promises and concurrent I/O")
+ (archives (byte lwt.cma) (native lwt.cmxa))
+ (plugins (byte lwt.cma) (native lwt.cmxs))
+ (native_archives lwt.a)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name lwt)
+    (visibility public)
+    (source (path Lwt) (intf (path lwt.mli)) (impl (path lwt.ml))))
+   (module
+    (obj_name lwt_condition)
+    (visibility public)
+    (source
+     (path Lwt_condition)
+     (intf (path lwt_condition.mli))
+     (impl (path lwt_condition.ml))))
+   (module
+    (obj_name lwt_list)
+    (visibility public)
+    (source
+     (path Lwt_list)
+     (intf (path lwt_list.mli))
+     (impl (path lwt_list.ml))))
+   (module
+    (obj_name lwt_mutex)
+    (visibility public)
+    (source
+     (path Lwt_mutex)
+     (intf (path lwt_mutex.mli))
+     (impl (path lwt_mutex.ml))))
+   (module
+    (obj_name lwt_mvar)
+    (visibility public)
+    (source
+     (path Lwt_mvar)
+     (intf (path lwt_mvar.mli))
+     (impl (path lwt_mvar.ml))))
+   (module
+    (obj_name lwt_pool)
+    (visibility public)
+    (source
+     (path Lwt_pool)
+     (intf (path lwt_pool.mli))
+     (impl (path lwt_pool.ml))))
+   (module
+    (obj_name lwt_pqueue)
+    (visibility public)
+    (source
+     (path Lwt_pqueue)
+     (intf (path lwt_pqueue.mli))
+     (impl (path lwt_pqueue.ml))))
+   (module
+    (obj_name lwt_result)
+    (visibility public)
+    (source
+     (path Lwt_result)
+     (intf (path lwt_result.mli))
+     (impl (path lwt_result.ml))))
+   (module
+    (obj_name lwt_seq)
+    (visibility public)
+    (source (path Lwt_seq) (intf (path lwt_seq.mli)) (impl (path lwt_seq.ml))))
+   (module
+    (obj_name lwt_sequence)
+    (visibility public)
+    (source
+     (path Lwt_sequence)
+     (intf (path lwt_sequence.mli))
+     (impl (path lwt_sequence.ml))))
+   (module
+    (obj_name lwt_stream)
+    (visibility public)
+    (source
+     (path Lwt_stream)
+     (intf (path lwt_stream.mli))
+     (impl (path lwt_stream.ml))))
+   (module
+    (obj_name lwt_switch)
+    (visibility public)
+    (source
+     (path Lwt_switch)
+     (intf (path lwt_switch.mli))
+     (impl (path lwt_switch.ml)))))))
+(library
+ (name lwt.unix)
+ (kind normal)
+ (synopsis "Unix support for Lwt")
+ (archives (byte unix/lwt_unix.cma) (native unix/lwt_unix.cmxa))
+ (plugins (byte unix/lwt_unix.cma) (native unix/lwt_unix.cmxs))
+ (foreign_objects
+  unix/lwt_libev_stubs.o
+  unix/lwt_process_stubs.o
+  unix/lwt_unix_stubs.o
+  unix/unix_accept4.o
+  unix/unix_access_job.o
+  unix/unix_bind_job.o
+  unix/unix_bytes_read.o
+  unix/unix_bytes_read_job.o
+  unix/unix_bytes_recv.o
+  unix/unix_bytes_recvfrom.o
+  unix/unix_bytes_send.o
+  unix/unix_bytes_sendto.o
+  unix/unix_bytes_sendto_byte.o
+  unix/unix_bytes_write.o
+  unix/unix_bytes_write_job.o
+  unix/unix_chdir_job.o
+  unix/unix_chmod_job.o
+  unix/unix_chown_job.o
+  unix/unix_chroot_job.o
+  unix/unix_close_job.o
+  unix/unix_closedir_job.o
+  unix/unix_fchmod_job.o
+  unix/unix_fchown_job.o
+  unix/unix_fdatasync_job.o
+  unix/unix_fstat_64_job.o
+  unix/unix_fstat_job.o
+  unix/unix_fsync_job.o
+  unix/unix_ftruncate_job.o
+  unix/unix_get_affinity.o
+  unix/unix_get_cpu.o
+  unix/unix_get_credentials.o
+  unix/unix_get_network_information_utils.o
+  unix/unix_get_page_size.o
+  unix/unix_get_pw_gr_nam_id_job.o
+  unix/unix_getaddrinfo_job.o
+  unix/unix_getcwd_job.o
+  unix/unix_gethostbyaddr_job.o
+  unix/unix_gethostbyname_job.o
+  unix/unix_gethostname_job.o
+  unix/unix_getlogin_job.o
+  unix/unix_getnameinfo_job.o
+  unix/unix_getprotoby_getservby_job.o
+  unix/unix_guess_blocking_job.o
+  unix/unix_invalidate_dir.o
+  unix/unix_iov_max.o
+  unix/unix_isatty_job.o
+  unix/unix_link_job.o
+  unix/unix_lockf_job.o
+  unix/unix_lseek_job.o
+  unix/unix_lstat_64_job.o
+  unix/unix_lstat_job.o
+  unix/unix_madvise.o
+  unix/unix_mcast_modify_membership.o
+  unix/unix_mcast_set_loop.o
+  unix/unix_mcast_set_ttl.o
+  unix/unix_mcast_utils.o
+  unix/unix_mincore.o
+  unix/unix_mkdir_job.o
+  unix/unix_mkfifo_job.o
+  unix/unix_not_available.o
+  unix/unix_open_job.o
+  unix/unix_opendir_job.o
+  unix/unix_pread.o
+  unix/unix_pread_job.o
+  unix/unix_pwrite.o
+  unix/unix_pwrite_job.o
+  unix/unix_read.o
+  unix/unix_read_job.o
+  unix/unix_readable.o
+  unix/unix_readdir_job.o
+  unix/unix_readdir_n_job.o
+  unix/unix_readlink_job.o
+  unix/unix_readv.o
+  unix/unix_readv_job.o
+  unix/unix_readv_writev_utils.o
+  unix/unix_recv.o
+  unix/unix_recv_msg.o
+  unix/unix_recv_send_utils.o
+  unix/unix_recvfrom.o
+  unix/unix_rename_job.o
+  unix/unix_rewinddir_job.o
+  unix/unix_rmdir_job.o
+  unix/unix_send.o
+  unix/unix_send_msg.o
+  unix/unix_send_msg_byte.o
+  unix/unix_sendto.o
+  unix/unix_sendto_byte.o
+  unix/unix_set_affinity.o
+  unix/unix_somaxconn.o
+  unix/unix_stat_64_job.o
+  unix/unix_stat_job.o
+  unix/unix_stat_job_utils.o
+  unix/unix_symlink_job.o
+  unix/unix_tcdrain_job.o
+  unix/unix_tcflow_job.o
+  unix/unix_tcflush_job.o
+  unix/unix_tcgetattr_job.o
+  unix/unix_tcsendbreak_job.o
+  unix/unix_tcsetattr_job.o
+  unix/unix_termios_conversion.o
+  unix/unix_truncate_job.o
+  unix/unix_unlink_job.o
+  unix/unix_utimes_job.o
+  unix/unix_valid_dir.o
+  unix/unix_wait4.o
+  unix/unix_wait_mincore_job.o
+  unix/unix_writable.o
+  unix/unix_write.o
+  unix/unix_write_job.o
+  unix/unix_writev.o
+  unix/unix_writev_job.o
+  unix/windows_bytes_read.o
+  unix/windows_bytes_read_job.o
+  unix/windows_bytes_write.o
+  unix/windows_bytes_write_job.o
+  unix/windows_fsync_job.o
+  unix/windows_get_page_size.o
+  unix/windows_is_socket.o
+  unix/windows_not_available.o
+  unix/windows_pread.o
+  unix/windows_pread_job.o
+  unix/windows_pwrite.o
+  unix/windows_pwrite_job.o
+  unix/windows_read.o
+  unix/windows_read_job.o
+  unix/windows_somaxconn.o
+  unix/windows_system_job.o
+  unix/windows_write.o
+  unix/windows_write_job.o)
+ (foreign_archives (archives (for all) (files unix/liblwt_unix_stubs.a)))
+ (foreign_dll_files ../stublibs/dlllwt_unix_stubs.so)
+ (native_archives unix/lwt_unix.a)
+ (requires lwt ocplib-endian.bigstring threads unix)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name lwt_bytes)
+    (visibility public)
+    (source
+     (path Lwt_bytes)
+     (intf (path unix/lwt_bytes.mli))
+     (impl (path unix/lwt_bytes.ml))))
+   (module
+    (obj_name lwt_config)
+    (visibility public)
+    (source (path Lwt_config) (impl (path unix/lwt_config.ml))))
+   (module
+    (obj_name lwt_engine)
+    (visibility public)
+    (source
+     (path Lwt_engine)
+     (intf (path unix/lwt_engine.mli))
+     (impl (path unix/lwt_engine.ml))))
+   (module
+    (obj_name lwt_features)
+    (visibility public)
+    (source (path Lwt_features) (impl (path unix/lwt_features.ml))))
+   (module
+    (obj_name lwt_fmt)
+    (visibility public)
+    (source
+     (path Lwt_fmt)
+     (intf (path unix/lwt_fmt.mli))
+     (impl (path unix/lwt_fmt.ml))))
+   (module
+    (obj_name lwt_gc)
+    (visibility public)
+    (source
+     (path Lwt_gc)
+     (intf (path unix/lwt_gc.mli))
+     (impl (path unix/lwt_gc.ml))))
+   (module
+    (obj_name lwt_io)
+    (visibility public)
+    (source
+     (path Lwt_io)
+     (intf (path unix/lwt_io.mli))
+     (impl (path unix/lwt_io.ml))))
+   (module
+    (obj_name lwt_main)
+    (visibility public)
+    (source
+     (path Lwt_main)
+     (intf (path unix/lwt_main.mli))
+     (impl (path unix/lwt_main.ml))))
+   (module
+    (obj_name lwt_preemptive)
+    (visibility public)
+    (source
+     (path Lwt_preemptive)
+     (intf (path unix/lwt_preemptive.mli))
+     (impl (path unix/lwt_preemptive.ml))))
+   (module
+    (obj_name lwt_process)
+    (visibility public)
+    (source
+     (path Lwt_process)
+     (intf (path unix/lwt_process.mli))
+     (impl (path unix/lwt_process.ml))))
+   (module
+    (obj_name lwt_sys)
+    (visibility public)
+    (source
+     (path Lwt_sys)
+     (intf (path unix/lwt_sys.mli))
+     (impl (path unix/lwt_sys.ml))))
+   (module
+    (obj_name lwt_throttle)
+    (visibility public)
+    (source
+     (path Lwt_throttle)
+     (intf (path unix/lwt_throttle.mli))
+     (impl (path unix/lwt_throttle.ml))))
+   (module
+    (obj_name lwt_timeout)
+    (visibility public)
+    (source
+     (path Lwt_timeout)
+     (intf (path unix/lwt_timeout.mli))
+     (impl (path unix/lwt_timeout.ml))))
+   (module
+    (obj_name lwt_unix)
+    (visibility public)
+    (source
+     (path Lwt_unix)
+     (intf (path unix/lwt_unix.mli))
+     (impl (path unix/lwt_unix.ml)))))))

@@ -1,0 +1,2144 @@
+.TH "Stdlib.Dynarray" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Stdlib.Dynarray \- no description
+.SH Module
+Module   Stdlib.Dynarray
+.SH Documentation
+.sp
+Module
+.BI "Dynarray"
+ : 
+.B (module Stdlib__Dynarray)
+
+.sp
+
+.sp
+
+.sp
+.sp
+
+.PP
+Unsynchronized accesses
+.PP
+
+.PP
+Concurrent accesses to dynamic arrays must be synchronized
+(for instance with a 
+.ft B
+Mutex\&.t
+.ft R
+)\&. Unsynchronized accesses to
+a dynamic array are a programming error that may lead to an invalid
+dynamic array state, on which some operations would fail with an
+.ft B
+Invalid_argument
+.ft R
+exception\&.
+.PP
+
+.PP
+.SS Dynamic arrays
+
+.PP
+.I type 
+.B !'a
+.I t 
+
+.sp
+A dynamic array containing values of type 
+.ft B
+\&'a
+.ft R
+\&.
+.sp
+A dynamic array 
+.ft B
+a
+.ft R
+provides constant\-time 
+.ft B
+get
+.ft R
+and 
+.ft B
+set
+.ft R
+operations on indices between 
+.ft B
+0
+.ft R
+and 
+.ft B
+Dynarray\&.length a \- 1
+.ft R
+included\&. Its 
+.ft B
+Dynarray\&.length
+.ft R
+may change over time by adding or removing
+elements to the end of the array\&.
+.sp
+We say that an index into a dynarray 
+.ft B
+a
+.ft R
+is valid if it is in
+.ft B
+0 \&.\&. length a \- 1
+.ft R
+and invalid otherwise\&.
+
+.sp
+
+.I val create 
+: 
+.B unit -> 'a t
+.sp
+
+.ft B
+create ()
+.ft R
+is a new, empty array\&.
+
+.sp
+
+.I val make 
+: 
+.B int -> 'a -> 'a t
+.sp
+
+.ft B
+make n x
+.ft R
+is a new array of length 
+.ft B
+n
+.ft R
+, filled with 
+.ft B
+x
+.ft R
+\&.
+
+.sp
+.B "Raises Invalid_argument"
+if 
+.ft B
+n < 0
+.ft R
+or 
+.ft B
+n > Sys\&.max_array_length
+.ft R
+\&.
+
+.sp
+
+.I val init 
+: 
+.B int -> (int -> 'a) -> 'a t
+.sp
+
+.ft B
+init n f
+.ft R
+is a new array 
+.ft B
+a
+.ft R
+of length 
+.ft B
+n
+.ft R
+,
+such that 
+.ft B
+get a i
+.ft R
+is 
+.ft B
+f i
+.ft R
+\&. In other words,
+the elements of 
+.ft B
+a
+.ft R
+are 
+.ft B
+f 0
+.ft R
+, then 
+.ft B
+f 1
+.ft R
+,
+then 
+.ft B
+f 2
+.ft R
+\&.\&.\&. and 
+.ft B
+f (n \- 1)
+.ft R
+last, evaluated
+in that order\&.
+.sp
+This is similar to 
+.ft B
+Array\&.init
+.ft R
+\&.
+
+.sp
+.B "Raises Invalid_argument"
+if 
+.ft B
+n < 0
+.ft R
+or 
+.ft B
+n > Sys\&.max_array_length
+.ft R
+\&.
+
+.sp
+
+.I val get 
+: 
+.B 'a t -> int -> 'a
+.sp
+
+.ft B
+get a i
+.ft R
+is the 
+.ft B
+i
+.ft R
+\-th element of 
+.ft B
+a
+.ft R
+, starting with index 
+.ft B
+0
+.ft R
+\&.
+
+.sp
+.B "Raises Invalid_argument"
+if the index is invalid
+
+.sp
+
+.I val set 
+: 
+.B 'a t -> int -> 'a -> unit
+.sp
+
+.ft B
+set a i x
+.ft R
+sets the 
+.ft B
+i
+.ft R
+\-th element of 
+.ft B
+a
+.ft R
+to be 
+.ft B
+x
+.ft R
+\&.
+.sp
+
+.ft B
+i
+.ft R
+must be a valid index\&. 
+.ft B
+set
+.ft R
+does not add new elements to the
+array \-\- see 
+.ft B
+Dynarray\&.add_last
+.ft R
+to add an element\&.
+
+.sp
+.B "Raises Invalid_argument"
+if the index is invalid\&.
+
+.sp
+
+.I val length 
+: 
+.B 'a t -> int
+.sp
+
+.ft B
+length a
+.ft R
+is the number of elements in the array\&.
+
+.sp
+
+.I val is_empty 
+: 
+.B 'a t -> bool
+.sp
+
+.ft B
+is_empty a
+.ft R
+is 
+.ft B
+true
+.ft R
+if 
+.ft B
+a
+.ft R
+is empty, that is, if 
+.ft B
+length a = 0
+.ft R
+\&.
+
+.sp
+
+.I val get_last 
+: 
+.B 'a t -> 'a
+.sp
+
+.ft B
+get_last a
+.ft R
+is the element of 
+.ft B
+a
+.ft R
+at index 
+.ft B
+length a \- 1
+.ft R
+\&.
+
+.sp
+.B "Raises Invalid_argument"
+if 
+.ft B
+a
+.ft R
+is empty\&.
+
+.sp
+
+.I val find_last 
+: 
+.B 'a t -> 'a option
+.sp
+
+.ft B
+find_last a
+.ft R
+is 
+.ft B
+None
+.ft R
+if 
+.ft B
+a
+.ft R
+is empty
+and 
+.ft B
+Some (get_last a)
+.ft R
+otherwise\&.
+
+.sp
+
+.I val copy 
+: 
+.B 'a t -> 'a t
+.sp
+
+.ft B
+copy a
+.ft R
+is a shallow copy of 
+.ft B
+a
+.ft R
+, a new array
+containing the same elements as 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+
+.PP
+.SS Adding elements
+.sp
+Note: all operations adding elements raise 
+.ft B
+Invalid_argument
+.ft R
+if the
+length needs to grow beyond 
+.ft B
+Sys\&.max_array_length
+.ft R
+\&.
+.PP
+
+.I val add_last 
+: 
+.B 'a t -> 'a -> unit
+.sp
+
+.ft B
+add_last a x
+.ft R
+adds the element 
+.ft B
+x
+.ft R
+at the end of the array 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+
+.I val append_array 
+: 
+.B 'a t -> 'a array -> unit
+.sp
+
+.ft B
+append_array a b
+.ft R
+adds all elements of 
+.ft B
+b
+.ft R
+at the end of 
+.ft B
+a
+.ft R
+,
+in the order they appear in 
+.ft B
+b
+.ft R
+\&.
+.sp
+For example:
+.EX
+.ft B
+.br
+\&      let a = Dynarray\&.of_list [1;2] in
+.br
+\&      Dynarray\&.append_array a [|3; 4|];
+.br
+\&      assert (Dynarray\&.to_list a = [1; 2; 3; 4])
+.br
+\&    
+.ft R
+.EE
+
+.sp
+
+.I val append_list 
+: 
+.B 'a t -> 'a list -> unit
+.sp
+Like 
+.ft B
+Dynarray\&.append_array
+.ft R
+but with a list\&.
+
+.sp
+
+.I val append 
+: 
+.B 'a t -> 'a t -> unit
+.sp
+
+.ft B
+append a b
+.ft R
+is like 
+.ft B
+append_array a b
+.ft R
+,
+but 
+.ft B
+b
+.ft R
+is itself a dynamic array instead of a fixed\-size array\&.
+.sp
+Warning: 
+.ft B
+append a a
+.ft R
+is a programming error because it iterates
+on 
+.ft B
+a
+.ft R
+and adds elements to it at the same time \-\- see the
+.ft B
+Dynarray\&.iteration
+.ft R
+section below\&. It fails with
+.ft B
+Invalid_argument
+.ft R
+\&.
+If you really want to append a copy of 
+.ft B
+a
+.ft R
+to itself, you can use
+.ft B
+Dynarray\&.append_array a (Dynarray\&.to_array a)
+.ft R
+which copies 
+.ft B
+a
+.ft R
+into a temporary array\&.
+
+.sp
+
+.I val append_seq 
+: 
+.B 'a t -> 'a Seq.t -> unit
+.sp
+Like 
+.ft B
+Dynarray\&.append_array
+.ft R
+but with a sequence\&.
+.sp
+Warning: 
+.ft B
+append_seq a (to_seq_reentrant a)
+.ft R
+simultaneously
+traverses 
+.ft B
+a
+.ft R
+and adds element to it; the ordering of those
+operations is unspecified, and may result in an infinite loop \-\-
+the new elements may in turn be produced by 
+.ft B
+to_seq_reentrant a
+.ft R
+and get added again and again\&.
+
+.sp
+
+.I val append_iter 
+: 
+.B 'a t -> (('a -> unit) -> 'x -> unit) -> 'x -> unit
+.sp
+
+.ft B
+append_iter a iter x
+.ft R
+adds each element of 
+.ft B
+x
+.ft R
+to the end of 
+.ft B
+a
+.ft R
+\&.
+This is 
+.ft B
+iter (add_last a) x
+.ft R
+\&.
+.sp
+For example, 
+.ft B
+append_iter a List\&.iter [1;2;3]
+.ft R
+would add elements
+.ft B
+1
+.ft R
+, 
+.ft B
+2
+.ft R
+, and then 
+.ft B
+3
+.ft R
+at the end of 
+.ft B
+a
+.ft R
+\&.
+.ft B
+append_iter a Queue\&.iter q
+.ft R
+adds elements from the queue 
+.ft B
+q
+.ft R
+\&.
+
+.sp
+
+.PP
+.SS Removing elements
+
+.PP
+
+.I val pop_last_opt 
+: 
+.B 'a t -> 'a option
+.sp
+
+.ft B
+pop_last_opt a
+.ft R
+removes and returns the last element of 
+.ft B
+a
+.ft R
+,
+or 
+.ft B
+None
+.ft R
+if the array is empty\&.
+
+.sp
+
+.I val pop_last 
+: 
+.B 'a t -> 'a
+.sp
+
+.ft B
+pop_last a
+.ft R
+removes and returns the last element of 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+.B "Raises Not_found"
+on an empty array\&.
+
+.sp
+
+.I val remove_last 
+: 
+.B 'a t -> unit
+.sp
+
+.ft B
+remove_last a
+.ft R
+removes the last element of 
+.ft B
+a
+.ft R
+, if any\&.
+It does nothing if 
+.ft B
+a
+.ft R
+is empty\&.
+
+.sp
+
+.I val truncate 
+: 
+.B 'a t -> int -> unit
+.sp
+
+.ft B
+truncate a n
+.ft R
+truncates 
+.ft B
+a
+.ft R
+to have at most 
+.ft B
+n
+.ft R
+elements\&.
+.sp
+It removes elements whose index is greater or equal to 
+.ft B
+n
+.ft R
+\&.
+It does nothing if 
+.ft B
+n >= length a
+.ft R
+\&.
+.sp
+
+.ft B
+truncate a n
+.ft R
+is equivalent to:
+.EX
+.ft B
+.br
+\&      if n < 0 then invalid_argument "\&.\&.\&.";
+.br
+\&      while length a > n do
+.br
+\&        remove_last a
+.br
+\&      done
+.br
+\&    
+.ft R
+.EE
+
+.sp
+.B "Raises Invalid_argument"
+if 
+.ft B
+n < 0
+.ft R
+\&.
+
+.sp
+
+.I val clear 
+: 
+.B 'a t -> unit
+.sp
+
+.ft B
+clear a
+.ft R
+is 
+.ft B
+truncate a 0
+.ft R
+, it removes all the elements of 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+
+.PP
+.SS Iteration
+.sp
+The iteration functions traverse the elements of a dynamic array\&.
+Traversals of 
+.ft B
+a
+.ft R
+are computed in increasing index order: from
+the element of index 
+.ft B
+0
+.ft R
+to the element of index 
+.ft B
+length a \- 1
+.ft R
+\&.
+.sp
+It is a programming error to change the length of an array
+(by adding or removing elements) during an iteration on the
+array\&. Any iteration function will fail with 
+.ft B
+Invalid_argument
+.ft R
+if it detects such a length change\&.
+.PP
+
+.I val iter 
+: 
+.B ('a -> unit) -> 'a t -> unit
+.sp
+
+.ft B
+iter f a
+.ft R
+calls 
+.ft B
+f
+.ft R
+on each element of 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+
+.I val iteri 
+: 
+.B (int -> 'a -> unit) -> 'a t -> unit
+.sp
+
+.ft B
+iteri f a
+.ft R
+calls 
+.ft B
+f i x
+.ft R
+for each 
+.ft B
+x
+.ft R
+at index 
+.ft B
+i
+.ft R
+in 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+
+.I val map 
+: 
+.B ('a -> 'b) -> 'a t -> 'b t
+.sp
+
+.ft B
+map f a
+.ft R
+is a new array of elements of the form 
+.ft B
+f x
+.ft R
+for each element 
+.ft B
+x
+.ft R
+of 
+.ft B
+a
+.ft R
+\&.
+.sp
+For example, if the elements of 
+.ft B
+a
+.ft R
+are 
+.ft B
+x0
+.ft R
+, 
+.ft B
+x1
+.ft R
+, 
+.ft B
+x2
+.ft R
+,
+then the elements of 
+.ft B
+b
+.ft R
+are 
+.ft B
+f x0
+.ft R
+, 
+.ft B
+f x1
+.ft R
+, 
+.ft B
+f x2
+.ft R
+\&.
+
+.sp
+
+.I val mapi 
+: 
+.B (int -> 'a -> 'b) -> 'a t -> 'b t
+.sp
+
+.ft B
+mapi f a
+.ft R
+is a new array of elements of the form 
+.ft B
+f i x
+.ft R
+for each element 
+.ft B
+x
+.ft R
+of 
+.ft B
+a
+.ft R
+at index 
+.ft B
+i
+.ft R
+\&.
+.sp
+For example, if the elements of 
+.ft B
+a
+.ft R
+are 
+.ft B
+x0
+.ft R
+, 
+.ft B
+x1
+.ft R
+, 
+.ft B
+x2
+.ft R
+,
+then the elements of 
+.ft B
+b
+.ft R
+are 
+.ft B
+f 0 x0
+.ft R
+, 
+.ft B
+f 1 x1
+.ft R
+, 
+.ft B
+f 2 x2
+.ft R
+\&.
+
+.sp
+
+.I val fold_left 
+: 
+.B ('acc -> 'a -> 'acc) -> 'acc -> 'a t -> 'acc
+.sp
+
+.ft B
+fold_left f acc a
+.ft R
+folds 
+.ft B
+f
+.ft R
+over 
+.ft B
+a
+.ft R
+in order,
+starting with accumulator 
+.ft B
+acc
+.ft R
+\&.
+.sp
+For example, if the elements of 
+.ft B
+a
+.ft R
+are 
+.ft B
+x0
+.ft R
+, 
+.ft B
+x1
+.ft R
+,
+then 
+.ft B
+fold f acc a
+.ft R
+is
+.EX
+.ft B
+.br
+\&      let acc = f acc x0 in
+.br
+\&      let acc = f acc x1 in
+.br
+\&      acc
+.br
+\&    
+.ft R
+.EE
+
+.sp
+
+.I val fold_right 
+: 
+.B ('a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+.sp
+
+.ft B
+fold_right f a acc
+.ft R
+computes
+.ft B
+f x0 (f x1 (\&.\&.\&. (f xn acc) \&.\&.\&.))
+.ft R
+where 
+.ft B
+x0
+.ft R
+, 
+.ft B
+x1
+.ft R
+, \&.\&.\&., 
+.ft B
+xn
+.ft R
+are the elements of 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+
+.I val exists 
+: 
+.B ('a -> bool) -> 'a t -> bool
+.sp
+
+.ft B
+exists f a
+.ft R
+is 
+.ft B
+true
+.ft R
+if some element of 
+.ft B
+a
+.ft R
+satisfies 
+.ft B
+f
+.ft R
+\&.
+.sp
+For example, if the elements of 
+.ft B
+a
+.ft R
+are 
+.ft B
+x0
+.ft R
+, 
+.ft B
+x1
+.ft R
+, 
+.ft B
+x2
+.ft R
+, then
+.ft B
+exists f a
+.ft R
+is 
+.ft B
+f x0 || f x1 || f x2
+.ft R
+\&.
+
+.sp
+
+.I val for_all 
+: 
+.B ('a -> bool) -> 'a t -> bool
+.sp
+
+.ft B
+for_all f a
+.ft R
+is 
+.ft B
+true
+.ft R
+if all elements of 
+.ft B
+a
+.ft R
+satisfy 
+.ft B
+f
+.ft R
+\&.
+This includes the case where 
+.ft B
+a
+.ft R
+is empty\&.
+.sp
+For example, if the elements of 
+.ft B
+a
+.ft R
+are 
+.ft B
+x0
+.ft R
+, 
+.ft B
+x1
+.ft R
+, then
+.ft B
+exists f a
+.ft R
+is 
+.ft B
+f x0 && f x1 && f x2
+.ft R
+\&.
+
+.sp
+
+.I val filter 
+: 
+.B ('a -> bool) -> 'a t -> 'a t
+.sp
+
+.ft B
+filter f a
+.ft R
+is a new array of all the elements of 
+.ft B
+a
+.ft R
+that satisfy 
+.ft B
+f
+.ft R
+\&.
+In other words, it is an array 
+.ft B
+b
+.ft R
+such that, for each element 
+.ft B
+x
+.ft R
+in 
+.ft B
+a
+.ft R
+in order, 
+.ft B
+x
+.ft R
+is added to 
+.ft B
+b
+.ft R
+if 
+.ft B
+f x
+.ft R
+is 
+.ft B
+true
+.ft R
+\&.
+.sp
+For example, 
+.ft B
+filter (fun x \-> x >= 0) a
+.ft R
+is a new array
+of all non\-negative elements of 
+.ft B
+a
+.ft R
+, in order\&.
+
+.sp
+
+.I val filter_map 
+: 
+.B ('a -> 'b option) -> 'a t -> 'b t
+.sp
+
+.ft B
+filter_map f a
+.ft R
+is a new array of elements 
+.ft B
+y
+.ft R
+such that 
+.ft B
+f x
+.ft R
+is 
+.ft B
+Some y
+.ft R
+for an element 
+.ft B
+x
+.ft R
+of 
+.ft B
+a
+.ft R
+\&.
+In others words, it is an array 
+.ft B
+b
+.ft R
+such that, for each element
+.ft B
+x
+.ft R
+of 
+.ft B
+a
+.ft R
+in order:
+.sp
+\-if 
+.ft B
+f x = Some y
+.ft R
+, then 
+.ft B
+y
+.ft R
+is added to 
+.ft B
+b
+.ft R
+,
+.sp
+\-if 
+.ft B
+f x = None
+.ft R
+, then no element is added to 
+.ft B
+b
+.ft R
+\&.
+
+.sp
+For example, 
+.ft B
+filter_map int_of_string_opt inputs
+.ft R
+returns
+a new array of integers read from the strings in 
+.ft B
+inputs
+.ft R
+,
+ignoring strings that cannot be converted to integers\&.
+
+.sp
+
+.PP
+.SS Conversions to other data structures
+.sp
+Note: the 
+.ft B
+of_*
+.ft R
+functions raise 
+.ft B
+Invalid_argument
+.ft R
+if the
+length needs to grow beyond 
+.ft B
+Sys\&.max_array_length
+.ft R
+\&.
+.sp
+The 
+.ft B
+to_*
+.ft R
+functions, except those specifically marked
+"reentrant", iterate on their dynarray argument\&. In particular it
+is a programming error if the length of the dynarray changes
+during their execution, and the conversion functions raise
+.ft B
+Invalid_argument
+.ft R
+if they observe such a change\&.
+.PP
+
+.I val of_array 
+: 
+.B 'a array -> 'a t
+.sp
+
+.ft B
+of_array arr
+.ft R
+returns a dynamic array corresponding to the
+fixed\-sized array 
+.ft B
+a
+.ft R
+\&. Operates in 
+.ft B
+O(n)
+.ft R
+time by making a copy\&.
+
+.sp
+
+.I val to_array 
+: 
+.B 'a t -> 'a array
+.sp
+
+.ft B
+to_array a
+.ft R
+returns a fixed\-sized array corresponding to the
+dynamic array 
+.ft B
+a
+.ft R
+\&. This always allocate a new array and copies
+elements into it\&.
+
+.sp
+
+.I val of_list 
+: 
+.B 'a list -> 'a t
+.sp
+
+.ft B
+of_list l
+.ft R
+is the array containing the elements of 
+.ft B
+l
+.ft R
+in
+the same order\&.
+
+.sp
+
+.I val to_list 
+: 
+.B 'a t -> 'a list
+.sp
+
+.ft B
+to_list a
+.ft R
+is a list with the elements contained in the array 
+.ft B
+a
+.ft R
+\&.
+
+.sp
+
+.I val of_seq 
+: 
+.B 'a Seq.t -> 'a t
+.sp
+
+.ft B
+of_seq seq
+.ft R
+is an array containing the same elements as 
+.ft B
+seq
+.ft R
+\&.
+.sp
+It traverses 
+.ft B
+seq
+.ft R
+once and will terminate only if 
+.ft B
+seq
+.ft R
+is finite\&.
+
+.sp
+
+.I val to_seq 
+: 
+.B 'a t -> 'a Seq.t
+.sp
+
+.ft B
+to_seq a
+.ft R
+is the sequence of elements
+.ft B
+get a 0
+.ft R
+, 
+.ft B
+get a 1
+.ft R
+\&.\&.\&. 
+.ft B
+get a (length a \- 1)
+.ft R
+\&.
+
+.sp
+
+.I val to_seq_reentrant 
+: 
+.B 'a t -> 'a Seq.t
+.sp
+
+.ft B
+to_seq_reentrant a
+.ft R
+is a reentrant variant of 
+.ft B
+Dynarray\&.to_seq
+.ft R
+, in the
+sense that one may still access its elements after the length of
+.ft B
+a
+.ft R
+has changed\&.
+.sp
+Demanding the 
+.ft B
+i
+.ft R
+\-th element of the resulting sequence (which can
+happen zero, one or several times) will access the 
+.ft B
+i
+.ft R
+\-th element
+of 
+.ft B
+a
+.ft R
+at the time of the demand\&. The sequence stops if 
+.ft B
+a
+.ft R
+has
+less than 
+.ft B
+i
+.ft R
+elements at this point\&.
+
+.sp
+
+.I val to_seq_rev 
+: 
+.B 'a t -> 'a Seq.t
+.sp
+
+.ft B
+to_seq_rev a
+.ft R
+is the sequence of elements
+.ft B
+get a (l \- 1)
+.ft R
+, 
+.ft B
+get a (l \- 2)
+.ft R
+\&.\&.\&. 
+.ft B
+get a 0
+.ft R
+,
+where 
+.ft B
+l
+.ft R
+is 
+.ft B
+length a
+.ft R
+at the time 
+.ft B
+to_seq_rev
+.ft R
+is invoked\&.
+
+.sp
+
+.I val to_seq_rev_reentrant 
+: 
+.B 'a t -> 'a Seq.t
+.sp
+
+.ft B
+to_seq_rev_reentrant a
+.ft R
+is a reentrant variant of 
+.ft B
+Dynarray\&.to_seq_rev
+.ft R
+,
+in the sense that one may still access its elements after the
+length of 
+.ft B
+a
+.ft R
+has changed\&.
+.sp
+Elements that have been removed from the array by the time they
+are demanded in the sequence are skipped\&.
+
+.sp
+
+.PP
+.SS Advanced topics for performance
+
+.PP
+
+.PP
+.SS Backing array, capacity
+.sp
+Internally, a dynamic array uses a backing array (a fixed\-size
+array as provided by the 
+.ft B
+Array
+.ft R
+module) whose length is greater
+or equal to the length of the dynamic array\&. We define the     capacity of a dynamic array as the length of its backing array\&.
+.sp
+The capacity of a dynamic array is relevant in advanced scenarios,
+when reasoning about the performance of dynamic array programs:
+.sp
+\-The memory usage of a dynamic array is proportional to its capacity,
+rather than its length\&.
+.sp
+\-When there is no empty space left at the end of the backing array,
+adding elements requires allocating a new, larger backing array\&.
+
+.sp
+The implementation uses a standard exponential reallocation
+strategy which guarantees amortized constant\-time operation; in
+particular, the total capacity of all backing arrays allocated
+over the lifetime of a dynamic array is at worst proportional to
+the total number of elements added\&.
+.sp
+In other words, users need not care about capacity and reallocations,
+and they will get reasonable behavior by default\&. However, in some
+performance\-sensitive scenarios the functions below can help control
+memory usage or guarantee an optimal number of reallocations\&.
+.PP
+
+.I val capacity 
+: 
+.B 'a t -> int
+.sp
+
+.ft B
+capacity a
+.ft R
+is the length of 
+.ft B
+a
+.ft R
+\&'s backing array\&.
+
+.sp
+
+.I val ensure_capacity 
+: 
+.B 'a t -> int -> unit
+.sp
+
+.ft B
+ensure_capacity a n
+.ft R
+makes sure that the capacity of 
+.ft B
+a
+.ft R
+is at least 
+.ft B
+n
+.ft R
+\&.
+
+.sp
+.B "Raises Invalid_argument"
+if the requested capacity is
+outside the range 
+.ft B
+0 \&.\&. Sys\&.max_array_length
+.ft R
+\&.
+.sp
+An example would be to reimplement 
+.ft B
+Dynarray\&.of_array
+.ft R
+without using 
+.ft B
+Dynarray\&.init
+.ft R
+:
+.EX
+.ft B
+.br
+\&    let of_array arr =
+.br
+\&      let a = Dynarray\&.create () in
+.br
+\&      Dynarray\&.ensure_capacity a (Array\&.length arr);
+.br
+\&      Array\&.iter (fun v \-> add_last a v) arr
+.br
+\&    
+.ft R
+.EE
+.sp
+Using 
+.ft B
+ensure_capacity
+.ft R
+guarantees that at most one reallocation
+will take place, instead of possibly several\&.
+.sp
+Without this 
+.ft B
+ensure_capacity
+.ft R
+hint, the number of resizes would
+be logarithmic in the length of 
+.ft B
+arr
+.ft R
+, creating a constant\-factor
+slowdown noticeable when 
+.ft B
+arr
+.ft R
+is large\&.
+
+.sp
+
+.I val ensure_extra_capacity 
+: 
+.B 'a t -> int -> unit
+.sp
+
+.ft B
+ensure_extra_capacity a n
+.ft R
+is 
+.ft B
+ensure_capacity a (length a + n)
+.ft R
+,
+it makes sure that 
+.ft B
+a
+.ft R
+has room for 
+.ft B
+n
+.ft R
+extra items\&.
+
+.sp
+.B "Raises Invalid_argument"
+if the total requested capacity is
+outside the range 
+.ft B
+0 \&.\&. Sys\&.max_array_length
+.ft R
+\&.
+.sp
+A use case would be to implement 
+.ft B
+Dynarray\&.append_array
+.ft R
+:
+.EX
+.ft B
+.br
+\&    let append_array a arr =
+.br
+\&      ensure_extra_capacity a (Array\&.length arr);
+.br
+\&      Array\&.iter (fun v \-> add_last a v) arr
+.br
+\&    
+.ft R
+.EE
+
+.sp
+
+.I val fit_capacity 
+: 
+.B 'a t -> unit
+.sp
+
+.ft B
+fit_capacity a
+.ft R
+reallocates a backing array if necessary, so that
+the resulting capacity is exactly 
+.ft B
+length a
+.ft R
+, with no additional
+empty space at the end\&. This can be useful to make sure there is
+no memory wasted on a long\-lived array\&.
+.sp
+Note that calling 
+.ft B
+fit_capacity
+.ft R
+breaks the amortized complexity
+guarantees provided by the default reallocation strategy\&. Calling
+it repeatedly on an array may have quadratic complexity, both in
+time and in total number of words allocated\&.
+.sp
+If you know that a dynamic array has reached its final length,
+which will remain fixed in the future, it is sufficient to call
+.ft B
+to_array
+.ft R
+and only keep the resulting fixed\-size
+array\&. 
+.ft B
+fit_capacity
+.ft R
+is useful when you need to keep a dynamic
+array for eventual future resizes\&.
+
+.sp
+
+.I val set_capacity 
+: 
+.B 'a t -> int -> unit
+.sp
+
+.ft B
+set_capacity a n
+.ft R
+reallocates a backing array if necessary,
+so that the resulting capacity is exactly 
+.ft B
+n
+.ft R
+\&. In particular,
+all elements of index 
+.ft B
+n
+.ft R
+or greater are removed\&.
+.sp
+Like 
+.ft B
+Dynarray\&.fit_capacity
+.ft R
+, this function breaks the amortized
+complexity guarantees provided by the reallocation
+strategy\&. Calling it repeatedly on an array may have quadratic
+complexity, both in time and in total number of words allocated\&.
+.sp
+This is an advanced function; in particular, 
+.ft B
+Dynarray\&.ensure_capacity
+.ft R
+should be preferred to increase the capacity, as it preserves
+those amortized guarantees\&.
+
+.sp
+.B "Raises Invalid_argument"
+if 
+.ft B
+n < 0
+.ft R
+\&.
+
+.sp
+
+.I val reset 
+: 
+.B 'a t -> unit
+.sp
+
+.ft B
+reset a
+.ft R
+clears 
+.ft B
+a
+.ft R
+and replaces its backing array by an empty array\&.
+.sp
+It is equivalent to 
+.ft B
+set_capacity a 0
+.ft R
+or 
+.ft B
+clear a; fit_capacity a
+.ft R
+\&.
+
+.sp
+
+.PP
+.SS No leaks: preservation of memory liveness
+.sp
+The user\-provided values reachable from a dynamic array 
+.ft B
+a
+.ft R
+are
+exactly the elements in the positions 
+.ft B
+0
+.ft R
+to 
+.ft B
+length a \- 1
+.ft R
+\&. In
+particular, no user\-provided values are "leaked" by being present
+in the backing array in position 
+.ft B
+length a
+.ft R
+or later\&.
+.PP
+
+.PP
+.SS Memory layout of dynarrays
+.sp
+In the current implementation, the backing array of an
+.ft B
+\&'a Dynarray\&.t
+.ft R
+is not an 
+.ft B
+\&'a array
+.ft R
+, but something with the same
+representation as an 
+.ft B
+\&'a option array
+.ft R
+or 
+.ft B
+\&'a ref array
+.ft R
+\&.
+Each element is in a "box", allocated when the element is first
+added to the array \-\- see the implementation for more details\&.
+.sp
+Using an 
+.ft B
+\&'a array
+.ft R
+would be delicate, as there is no obvious
+type\-correct way to represent the empty space at the end of the
+backing array \-\- using user\-provided values would either
+complicate the API or violate the 
+.ft B
+Dynarray\&.noleaks
+.ft R
+guarantee\&. The constraint of remaining memory\-safe under
+unsynchronized concurrent usage makes it even more
+difficult\&. Various unsafe ways to do this have been discussed,
+with no consensus on a standard implementation so far\&.
+.sp
+On a realistic automated\-theorem\-proving program that relies
+heavily on dynamic arrays, we measured the overhead of this extra
+"boxing" as at most 25%\&. We believe that the overhead for most
+uses of dynarray is much smaller, negligible in many cases, but
+you may still prefer to use your own specialized implementation
+for performance\&. (If you know that you do not need the
+no leaks guarantee, you can also speed up deleting
+elements\&.)
+.PP
+
+.PP
+.SS Code examples
+.sp
+.SS Min-heaps for mutable priority queues
+.sp
+We can use dynamic arrays to implement a mutable priority
+queue\&. A priority queue provides a function to add elements, and
+a function to extract the minimum element \-\- according to some
+comparison function\&.
+.sp
+
+.EX
+.ft B
+.br
+\&(* We present our priority queues as a functor
+.br
+\&   parametrized on the comparison function\&. *)
+.br
+\&module Heap (Elem : Map\&.OrderedType) : sig
+.br
+\&  type t
+.br
+\&  val create : unit \-> t
+.br
+\&  val add : t \-> Elem\&.t \-> unit
+.br
+\&  val pop_min : t \-> Elem\&.t option
+.br
+\&end = struct
+.br
+\&
+.br
+\&  (* Our priority queues are implemented using the standard "min heap"
+.br
+\&     data structure, a dynamic array representing a binary tree\&. *)
+.br
+\&  type t = Elem\&.t Dynarray\&.t
+.br
+\&  let create = Dynarray\&.create
+.br
+\&
+.br
+\& (* The node of index [i] has as children the nodes of index [2 * i + 1]
+.br
+\&    and [2 * i + 2] \-\- if they are valid indices in the dynarray\&. *)
+.br
+\&  let left_child i = 2 * i + 1
+.br
+\&  let right_child i = 2 * i + 2
+.br
+\&  let parent_node i = (i \- 1) / 2
+.br
+\&
+.br
+\&  (* We use indexing operators for convenient notations\&. *)
+.br
+\&  let ( \&.!() ) = Dynarray\&.get
+.br
+\&  let ( \&.!()<\- ) = Dynarray\&.set
+.br
+\&
+.br
+\&  (* Auxiliary functions to compare and swap two elements
+.br
+\&     in the dynamic array\&. *)
+.br
+\&  let order h i j =
+.br
+\&    Elem\&.compare h\&.!(i) h\&.!(j)
+.br
+\&
+.br
+\&  let swap h i j =
+.br
+\&    let v = h\&.!(i) in
+.br
+\&    h\&.!(i) <\- h\&.!(j);
+.br
+\&    h\&.!(j) <\- v
+.br
+\&
+.br
+\&  (* We say that a heap respects the "heap ordering" if the value of
+.br
+\&     each node is smaller than the value of its children\&. The
+.br
+\&     algorithm manipulates arrays that respect the heap algorithm,
+.br
+\&     except for one node whose value may be too small or too large\&.
+.br
+\&
+.br
+\&     The auxiliary functions [heap_up] and [heap_down] take
+.br
+\&     such a misplaced value, and move it "up" (respectively: "down")
+.br
+\&     the tree by permuting it with its parent value (respectively:
+.br
+\&     a child value) until the heap ordering is restored\&. *)
+.br
+\&
+.br
+\&  let rec heap_up h i =
+.br
+\&    if i = 0 then () else
+.br
+\&    let parent = parent_node i in
+.br
+\&    if order h i parent < 0 then
+.br
+\&      (swap h i parent; heap_up h parent)
+.br
+\&
+.br
+\&  and heap_down h ~len i =
+.br
+\&    let left, right = left_child i, right_child i in
+.br
+\&    if left >= len then () (* no child, stop *) else
+.br
+\&    let smallest =
+.br
+\&      if right >= len then left (* no right child *) else
+.br
+\&      if order h left right < 0 then left else right
+.br
+\&    in
+.br
+\&    if order h i smallest > 0 then
+.br
+\&      (swap h i smallest; heap_down h ~len smallest)
+.br
+\&
+.br
+\&  let add h s =
+.br
+\&    let i = Dynarray\&.length h in
+.br
+\&    Dynarray\&.add_last h s;
+.br
+\&    heap_up h i
+.br
+\&
+.br
+\&  let pop_min h =
+.br
+\&    if Dynarray\&.is_empty h then None
+.br
+\&    else begin
+.br
+\&      (* Standard trick: swap the \&'best\&' value at index 0
+.br
+\&         with the last value of the array\&. *)
+.br
+\&      let last = Dynarray\&.length h \- 1 in
+.br
+\&      swap h 0 last;
+.br
+\&      (* At this point [pop_last] returns the \&'best\&' value,
+.br
+\&         and leaves a heap with one misplaced element at position 0\&. *)
+.br
+\&      let best = Dynarray\&.pop_last h in
+.br
+\&      (* Restore the heap ordering \-\- does nothing if the heap is empty\&. *)
+.br
+\&      heap_down h ~len:last 0;
+.br
+\&      Some best
+.br
+\&    end
+.br
+\&end
+.br
+\&
+.ft R
+.EE
+.sp
+The production code from which this example was inspired includes
+logic to free the backing array when the heap becomes empty, only in
+the case where the capacity is above a certain threshold\&. This can be
+done by calling the following function from 
+.ft B
+pop
+.ft R
+:
+.sp
+
+.EX
+.ft B
+.br
+\&let shrink h =
+.br
+\&  if Dynarray\&.length h = 0 && Dynarray\&.capacity h > 1 lsl 18 then
+.br
+\&    Dynarray\&.reset h
+.br
+\&
+.ft R
+.EE
+.sp
+The 
+.ft B
+Heap
+.ft R
+functor can be used to implement a sorting function, by
+adding all elements into a priority queue and then extracting them in
+order\&.
+.sp
+
+.EX
+.ft B
+.br
+\&let heap_sort (type a) cmp li =
+.br
+\&  let module Heap = Heap(struct type t = a let compare = cmp end) in
+.br
+\&  let heap = Heap\&.create () in
+.br
+\&  List\&.iter (Heap\&.add heap) li;
+.br
+\&  List\&.map (fun _ \-> Heap\&.pop_min heap |> Option\&.get) li
+.br
+\&
+.ft R
+.EE
+.PP

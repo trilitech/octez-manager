@@ -1,0 +1,8 @@
+(library
+ (name ppx_deriving_ord)
+ (public_name ppx_deriving.ord)
+ (synopsis "[@@deriving ord]")
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries compiler-libs.common ppxlib ppx_deriving.api)
+ (kind ppx_deriver))

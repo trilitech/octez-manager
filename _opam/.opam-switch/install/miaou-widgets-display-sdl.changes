@@ -1,0 +1,68 @@
+opam-version: "2.0"
+added: [
+  "doc/miaou-widgets-display-sdl" {"D"}
+  "doc/miaou-widgets-display-sdl/CHANGELOG.md" {"F:S21733T1768295993.15"}
+  "doc/miaou-widgets-display-sdl/LICENSE.md" {"F:S1096T1768295993.15"}
+  "doc/miaou-widgets-display-sdl/README.md" {"F:S29532T1768295993.15"}
+  "lib/miaou-widgets-display-sdl" {"D"}
+  "lib/miaou-widgets-display-sdl/META" {"F:S337T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/dune-package" {"F:S3337T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/opam" {"F:S617T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets" {"D"}
+  "lib/miaou-widgets-display-sdl/widgets/image_widget_sdl.ml"
+    {"F:S1991T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/line_chart_widget_sdl.ml"
+    {"F:S7632T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/line_chart_widget_sdl.mli"
+    {"F:S1982T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.a"
+    {"F:S67022T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.cma"
+    {"F:S39285T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.cmi"
+    {"F:S563T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.cmt"
+    {"F:S2473T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.cmx"
+    {"F:S344T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.cmxa"
+    {"F:S4037T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.cmxs"
+    {"F:S87272T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl.ml"
+    {"F:S585T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Image_widget_sdl.cmi"
+    {"F:S1280T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Image_widget_sdl.cmt"
+    {"F:S13042T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Image_widget_sdl.cmx"
+    {"F:S1094T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmi"
+    {"F:S1320T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmt"
+    {"F:S33843T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmti"
+    {"F:S5953T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmx"
+    {"F:S2144T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Qr_code_widget_sdl.cmi"
+    {"F:S935T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Qr_code_widget_sdl.cmt"
+    {"F:S8106T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Qr_code_widget_sdl.cmx"
+    {"F:S866T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmi"
+    {"F:S1426T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmt"
+    {"F:S22027T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmti"
+    {"F:S6686T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmx"
+    {"F:S1944T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/qr_code_widget_sdl.ml"
+    {"F:S1117T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/sparkline_widget_sdl.ml"
+    {"F:S4609T1768295993.15"}
+  "lib/miaou-widgets-display-sdl/widgets/sparkline_widget_sdl.mli"
+    {"F:S2367T1768295993.15"}
+]

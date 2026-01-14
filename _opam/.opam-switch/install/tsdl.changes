@@ -1,0 +1,38 @@
+opam-version: "2.0"
+added: [
+  "doc/tsdl" {"D"}
+  "doc/tsdl/CHANGES.md" {"F:S6771T1768295783.01"}
+  "doc/tsdl/LICENSE.md" {"F:S738T1768295783.01"}
+  "doc/tsdl/README.md" {"F:S1395T1768295783.01"}
+  "doc/tsdl/min.ml" {"F:S692T1768295783.01"}
+  "doc/tsdl/minc.c" {"F:S585T1768295783.01"}
+  "doc/tsdl/odoc-pages" {"D"}
+  "doc/tsdl/odoc-pages/index.mld" {"F:S1312T1768295783.01"}
+  "lib/stublibs/dlltsdl_stubs.so" {"F:S17576T1768295783.01"}
+  "lib/tsdl" {"D"}
+  "lib/tsdl/META" {"F:S442T1768295783.01"}
+  "lib/tsdl/libtsdl_stubs.a" {"F:S5768T1768295783.01"}
+  "lib/tsdl/opam" {"F:S1219T1768295783.01"}
+  "lib/tsdl/tsdl.a" {"F:S1290892T1768295783.01"}
+  "lib/tsdl/tsdl.cma" {"F:S679576T1768295783.01"}
+  "lib/tsdl/tsdl.cmi" {"F:S58587T1768295783.01"}
+  "lib/tsdl/tsdl.cmt" {"F:S952468T1768295783.01"}
+  "lib/tsdl/tsdl.cmti" {"F:S321758T1768295783.01"}
+  "lib/tsdl/tsdl.cmx" {"F:S62155T1768295783.01"}
+  "lib/tsdl/tsdl.cmxa" {"F:S2339T1768295783.01"}
+  "lib/tsdl/tsdl.cmxs" {"F:S909376T1768295783.01"}
+  "lib/tsdl/tsdl.ml" {"F:S179864T1768295783.01"}
+  "lib/tsdl/tsdl.mli" {"F:S133041T1768295783.01"}
+  "lib/tsdl/tsdl_consts.cmt" {"F:S112552T1768295783.01"}
+  "lib/tsdl/tsdl_consts.cmx" {"F:S6584T1768295783.01"}
+  "lib/tsdl/tsdl_consts.ml" {"F:S27322T1768295783.01"}
+  "lib/tsdl/tsdl_stubs.c" {"F:S572T1768295783.01"}
+  "lib/tsdl/tsdl_top.a" {"F:S4118T1768295783.01"}
+  "lib/tsdl/tsdl_top.cma" {"F:S2472T1768295783.01"}
+  "lib/tsdl/tsdl_top.cmt" {"F:S4164T1768295783.01"}
+  "lib/tsdl/tsdl_top.cmx" {"F:S1430T1768295783.01"}
+  "lib/tsdl/tsdl_top.cmxa" {"F:S1436T1768295783.01"}
+  "lib/tsdl/tsdl_top.cmxs" {"F:S18784T1768295783.01"}
+  "lib/tsdl/tsdl_top.ml" {"F:S331T1768295783.01"}
+  "lib/tsdl/tsdl_top_init.ml" {"F:S266T1768295783.01"}
+]

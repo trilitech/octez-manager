@@ -1,0 +1,48 @@
+opam-version: "2.0"
+synopsis: "Virtual package relying on a SDL2 system installation"
+description:
+  "This package can only install if libSDL2 is installed on the system."
+maintainer: "blue-prawn"
+authors: "Sam Lantinga"
+license: "Zlib"
+homepage: "http://libsdl.org/"
+bug-reports: "https://github.com/ocaml/opam-repository/issues"
+depends: [
+  "conf-pkg-config" {build}
+  ("host-arch-x86_32" {os = "win32" & os-distribution != "cygwinports"} &
+   "conf-mingw-w64-sdl2-i686"
+     {os = "win32" & os-distribution != "cygwinports"} |
+   "host-arch-x86_64" {os = "win32" & os-distribution != "cygwinports"} &
+   "conf-mingw-w64-sdl2-x86_64"
+     {os = "win32" & os-distribution != "cygwinports"})
+]
+flags: conf
+build: [
+  "pkgconf" {os = "win32" & os-distribution != "cygwinports"}
+  "--personality=i686-w64-mingw32"
+    {os = "win32" & os-distribution != "cygwinports" &
+     host-arch-x86_32:installed}
+  "--personality=x86_64-w64-mingw32"
+    {os = "win32" & os-distribution != "cygwinports" &
+     host-arch-x86_64:installed}
+  "pkg-config" {os != "win32" | os-distribution = "cygwinports"}
+  "sdl2"
+]
+depexts: [
+  ["sdl2-dev"] {os-distribution = "alpine"}
+  ["sdl2"] {os-distribution = "arch"}
+  ["libsdl2-dev"] {os-family = "debian"}
+  ["libsdl2-dev"] {os-family = "ubuntu"}
+  ["SDL2-devel"] {os-family = "fedora"}
+  ["adwaita-cursor-theme" "libwayland-egl" "SDL2-devel"]
+    {os-family = "fedora" & (os-version = "37" | os-version = "36")}
+  ["epel-release" "SDL2-devel"] {os-distribution = "centos"}
+  ["SDL2-devel"] {os-distribution = "ol"}
+  ["sdl2"] {os = "freebsd"}
+  ["sdl2"] {os = "macos" & os-distribution = "homebrew"}
+  ["libsdl2-devel"] {os-distribution = "mageia"}
+  ["sdl2"] {os = "openbsd"}
+  ["libSDL2-devel"] {os-family = "suse" | os-family = "opensuse"}
+  ["SDL2"] {os = "win32" & os-distribution = "cygwinports"}
+  ["SDL2"] {os = "nixos"}
+]

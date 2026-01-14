@@ -1,0 +1,11 @@
+opam-version: "2.0"
+added: [
+  "doc/miaou-tui" {"D"}
+  "doc/miaou-tui/CHANGELOG.md" {"F:S21733T1768295994.73"}
+  "doc/miaou-tui/LICENSE.md" {"F:S1096T1768295994.73"}
+  "doc/miaou-tui/README.md" {"F:S29532T1768295994.73"}
+  "lib/miaou-tui" {"D"}
+  "lib/miaou-tui/META" {"F:S0T1768295994.73"}
+  "lib/miaou-tui/dune-package" {"F:S180T1768295994.73"}
+  "lib/miaou-tui/opam" {"F:S659T1768295994.73"}
+]

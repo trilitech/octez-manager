@@ -1,0 +1,54 @@
+{0 Tsdl {%html: <span class="version">v1.2.0</span>%}}
+
+Tsdl is an OCaml library providing thin bindings to the cross-platform
+{{:https://www.libsdl.org/}SDL library}.
+
+See the {{!quick}quick start}.
+
+{1:tsdl Library [tsdl]}
+
+{!modules:
+Tsdl
+}
+
+{1:quick Quick start}
+
+{2:toplevel Toplevel}
+
+To use [Tsdl] in the toplevel with just issue:
+{@shell[
+ocaml
+# #use "topfind";;
+# #thread;; (* Only needed if you are using ocaml and < 5.0.0 *)
+# #require "tsdl.top";;
+]}
+
+This automatically loads the library and opens the {!Tsdl} module.
+
+{2:opengl OpenGL window}
+
+    The following is the minimum you need to get a working OpenGL window
+    with SDL.
+{[
+open Tsdl
+
+let main () = match Sdl.init Sdl.Init.(video + events) with
+| Error (`Msg e) -> Sdl.log "Init error: %s" e; 1
+| Ok () ->
+    match Sdl.create_window ~w:640 ~h:480 "SDL OpenGL" Sdl.Window.opengl with
+    | Error (`Msg e) -> Sdl.log "Create window error: %s" e; 1
+    | Ok w ->
+        Sdl.pump_events ();
+        Sdl.delay 3000l;
+        Sdl.destroy_window w;
+        Sdl.quit ();
+        0
+
+let () = if !Sys.interactive then () else exit (main ())
+]}
+
+This can be compiled to byte and native code with:
+{@shell[
+ocamlfind ocamlc -package tsdl -thread -linkpkg -o min.byte min.ml
+ocamlfind ocamlopt -package tsdl -thread -linkpkg -o min.native min.ml
+]}

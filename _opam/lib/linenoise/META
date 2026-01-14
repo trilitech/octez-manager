@@ -1,0 +1,7 @@
+version = "1.5.1"
+description = ""
+requires = ""
+archive(byte) = "linenoise.cma"
+archive(native) = "linenoise.cmxa"
+plugin(byte) = "linenoise.cma"
+plugin(native) = "linenoise.cmxs"

@@ -1,0 +1,29 @@
+opam-version: "2.0"
+added: [
+  "bin/qrtrip" {"F:S4348192T1768295974.81"}
+  "doc/qrc" {"D"}
+  "doc/qrc/CHANGES.md" {"F:S907T1768295974.82"}
+  "doc/qrc/LICENSE.md" {"F:S737T1768295974.82"}
+  "doc/qrc/README.md" {"F:S892T1768295974.82"}
+  "doc/qrc/odoc-pages" {"D"}
+  "doc/qrc/odoc-pages/index.mld" {"F:S545T1768295974.82"}
+  "lib/qrc" {"D"}
+  "lib/qrc/META" {"F:S213T1768295974.81"}
+  "lib/qrc/opam" {"F:S989T1768295974.81"}
+  "lib/qrc/qrc.a" {"F:S148940T1768295974.81"}
+  "lib/qrc/qrc.cma" {"F:S80842T1768295974.81"}
+  "lib/qrc/qrc.cmi" {"F:S2349T1768295974.81"}
+  "lib/qrc/qrc.cmt" {"F:S138851T1768295974.82"}
+  "lib/qrc/qrc.cmti" {"F:S16754T1768295974.82"}
+  "lib/qrc/qrc.cmx" {"F:S9085T1768295974.82"}
+  "lib/qrc/qrc.cmxa" {"F:S1352T1768295974.82"}
+  "lib/qrc/qrc.cmxs" {"F:S144384T1768295974.82"}
+  "lib/qrc/qrc.ml" {"F:S28237T1768295974.82"}
+  "lib/qrc/qrc.mli" {"F:S10464T1768295974.82"}
+  "lib/qrc/qrc_fmt.cmi" {"F:S920T1768295974.82"}
+  "lib/qrc/qrc_fmt.cmt" {"F:S19212T1768295974.82"}
+  "lib/qrc/qrc_fmt.cmti" {"F:S3849T1768295974.82"}
+  "lib/qrc/qrc_fmt.cmx" {"F:S2523T1768295974.82"}
+  "lib/qrc/qrc_fmt.ml" {"F:S3948T1768295974.82"}
+  "lib/qrc/qrc_fmt.mli" {"F:S1231T1768295974.82"}
+]

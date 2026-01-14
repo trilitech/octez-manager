@@ -1,0 +1,177 @@
+(lang dune 3.20)
+(name bisect_ppx)
+(sections (lib .) (libexec .) (bin ../../bin) (doc ../../doc/bisect_ppx))
+(files
+ (lib
+  (META
+   bisect_ppx.a
+   bisect_ppx.cma
+   bisect_ppx.cmi
+   bisect_ppx.cmt
+   bisect_ppx.cmx
+   bisect_ppx.cmxa
+   bisect_ppx.ml
+   bisect_ppx__Exclude.cmi
+   bisect_ppx__Exclude.cmt
+   bisect_ppx__Exclude.cmti
+   bisect_ppx__Exclude.cmx
+   bisect_ppx__Exclude_lexer.cmi
+   bisect_ppx__Exclude_lexer.cmt
+   bisect_ppx__Exclude_lexer.cmx
+   bisect_ppx__Exclude_parser.cmi
+   bisect_ppx__Exclude_parser.cmt
+   bisect_ppx__Exclude_parser.cmti
+   bisect_ppx__Exclude_parser.cmx
+   bisect_ppx__Exclusions.cmi
+   bisect_ppx__Exclusions.cmt
+   bisect_ppx__Exclusions.cmti
+   bisect_ppx__Exclusions.cmx
+   bisect_ppx__Instrument.cmi
+   bisect_ppx__Instrument.cmt
+   bisect_ppx__Instrument.cmti
+   bisect_ppx__Instrument.cmx
+   bisect_ppx__Register.cmi
+   bisect_ppx__Register.cmt
+   bisect_ppx__Register.cmx
+   common/bisect_common.a
+   common/bisect_common.cma
+   common/bisect_common.cmi
+   common/bisect_common.cmt
+   common/bisect_common.cmti
+   common/bisect_common.cmx
+   common/bisect_common.cmxa
+   common/bisect_common.ml
+   common/bisect_common.mli
+   dune-package
+   exclude.ml
+   exclude.mli
+   exclude_lexer.ml
+   exclude_parser.ml
+   exclude_parser.mli
+   exclusions.ml
+   exclusions.mli
+   instrument.ml
+   instrument.mli
+   opam
+   register.ml
+   runtime/bisect.a
+   runtime/bisect.cma
+   runtime/bisect.cmi
+   runtime/bisect.cmt
+   runtime/bisect.cmx
+   runtime/bisect.cmxa
+   runtime/bisect.ml
+   runtime/bisect__Runtime.cmi
+   runtime/bisect__Runtime.cmt
+   runtime/bisect__Runtime.cmti
+   runtime/bisect__Runtime.cmx
+   runtime/runtime.ml
+   runtime/runtime.mli))
+ (libexec
+  (bisect_ppx.cmxs common/bisect_common.cmxs ppx.exe runtime/bisect.cmxs))
+ (bin (bisect-ppx-report))
+ (doc (LICENSE.md README.md)))
+(library
+ (name bisect_ppx)
+ (kind ppx_rewriter)
+ (synopsis "Code coverage for OCaml")
+ (archives (byte bisect_ppx.cma) (native bisect_ppx.cmxa))
+ (plugins (byte bisect_ppx.cma) (native bisect_ppx.cmxs))
+ (native_archives bisect_ppx.a)
+ (requires bisect_ppx.common ppxlib.ast ppxlib str)
+ (ppx_runtime_deps bisect_ppx.runtime)
+ (main_module_name Bisect_ppx)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name bisect_ppx)
+     (visibility public)
+     (kind alias)
+     (source (path Bisect_ppx) (impl (path bisect_ppx.ml-gen))))
+    (name Bisect_ppx)
+    (modules
+     (module
+      (obj_name bisect_ppx__Exclude)
+      (visibility public)
+      (source
+       (path Exclude)
+       (intf (path exclude.mli))
+       (impl (path exclude.ml))))
+     (module
+      (obj_name bisect_ppx__Exclude_lexer)
+      (visibility public)
+      (source (path Exclude_lexer) (impl (path exclude_lexer.ml))))
+     (module
+      (obj_name bisect_ppx__Exclude_parser)
+      (visibility public)
+      (source
+       (path Exclude_parser)
+       (intf (path exclude_parser.mli))
+       (impl (path exclude_parser.ml))))
+     (module
+      (obj_name bisect_ppx__Exclusions)
+      (visibility public)
+      (source
+       (path Exclusions)
+       (intf (path exclusions.mli))
+       (impl (path exclusions.ml))))
+     (module
+      (obj_name bisect_ppx__Instrument)
+      (visibility public)
+      (source
+       (path Instrument)
+       (intf (path instrument.mli))
+       (impl (path instrument.ml))))
+     (module
+      (obj_name bisect_ppx__Register)
+      (visibility public)
+      (source (path Register) (impl (path register.ml))))))
+   (wrapped true)))
+ (instrumentation.backend bisect_ppx))
+(library
+ (name bisect_ppx.common)
+ (kind normal)
+ (synopsis "Bisect_ppx internal functions (internal)")
+ (archives (byte common/bisect_common.cma) (native common/bisect_common.cmxa))
+ (plugins (byte common/bisect_common.cma) (native common/bisect_common.cmxs))
+ (native_archives common/bisect_common.a)
+ (main_module_name Bisect_common)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name bisect_common)
+   (visibility public)
+   (source
+    (path Bisect_common)
+    (intf (path common/bisect_common.mli))
+    (impl (path common/bisect_common.ml))))))
+(library
+ (name bisect_ppx.runtime)
+ (kind normal)
+ (synopsis "Bisect_ppx runtime library (internal)")
+ (archives (byte runtime/bisect.cma) (native runtime/bisect.cmxa))
+ (plugins (byte runtime/bisect.cma) (native runtime/bisect.cmxs))
+ (native_archives runtime/bisect.a)
+ (requires bisect_ppx.common unix)
+ (main_module_name Bisect)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name bisect)
+     (visibility public)
+     (kind alias)
+     (source (path Bisect) (impl (path runtime/bisect.ml-gen))))
+    (name Bisect)
+    (modules
+     (module
+      (obj_name bisect__Runtime)
+      (visibility public)
+      (source
+       (path Runtime)
+       (intf (path runtime/runtime.mli))
+       (impl (path runtime/runtime.ml))))))
+   (wrapped true))))

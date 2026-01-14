@@ -1,0 +1,15 @@
+description = "Signed and unsigned integers of various sizes"
+requires = "stdlib-shims"
+archive(byte) = "integers.cma"
+archive(native) = "integers.cmxa"
+plugin(byte) = "integers.cma"
+plugin(native) = "integers.cmxs"
+package "top" (
+  directory = "top"
+  description = "toplevel pretty printers"
+  requires = "compiler-libs integers"
+  archive(byte) = "integers_top.cma"
+  archive(native) = ""
+  plugin(byte) = "integers_top.cma"
+  plugin(native) = ""
+)

@@ -1,0 +1,108 @@
+opam-version: "2.0"
+added: [
+  "doc/ocaml_intrinsics_kernel" {"D"}
+  "doc/ocaml_intrinsics_kernel/LICENSE.md" {"F:S1126T1768295770.69"}
+  "doc/ocaml_intrinsics_kernel/README.md" {"F:S474T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel" {"D"}
+  "lib/ocaml_intrinsics_kernel/META" {"F:S266T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/common.ml" {"F:S286T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/common.mli" {"F:S227T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/conditional.ml" {"F:S1293T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/dune-package" {"F:S4306T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/float.ml" {"F:S403T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/float.mli" {"F:S955T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/int.ml" {"F:S2819T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/int.mli" {"F:S1743T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/int32.ml" {"F:S2793T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/int32.mli" {"F:S1245T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/int64.ml" {"F:S2793T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/int64.mli" {"F:S1245T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/libocaml_intrinsics_kernel_stubs.a"
+    {"F:S35608T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/naive_ints.ml" {"F:S1583T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/naive_ints.mli" {"F:S439T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/nativeint.ml" {"F:S2930T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/nativeint.mli" {"F:S1327T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.a"
+    {"F:S70468T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.cma"
+    {"F:S38168T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.cmi"
+    {"F:S739T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.cmt"
+    {"F:S3298T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.cmx"
+    {"F:S426T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.cmxa"
+    {"F:S3750T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.cmxs"
+    {"F:S80464T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel.ml"
+    {"F:S826T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Common.cmi"
+    {"F:S358T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Common.cmt"
+    {"F:S2028T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Common.cmti"
+    {"F:S1853T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Common.cmx"
+    {"F:S372T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Conditional.cmi"
+    {"F:S1051T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Conditional.cmt"
+    {"F:S4488T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Conditional.cmx"
+    {"F:S281T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Float.cmi"
+    {"F:S624T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Float.cmt"
+    {"F:S2188T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Float.cmti"
+    {"F:S2999T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Float.cmx"
+    {"F:S267T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int.cmi"
+    {"F:S531T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int.cmt"
+    {"F:S10116T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int.cmti"
+    {"F:S3253T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int.cmx"
+    {"F:S2954T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int32.cmi"
+    {"F:S554T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int32.cmt"
+    {"F:S11023T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int32.cmti"
+    {"F:S3036T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int32.cmx"
+    {"F:S3053T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int64.cmi"
+    {"F:S553T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int64.cmt"
+    {"F:S11356T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int64.cmti"
+    {"F:S3032T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Int64.cmx"
+    {"F:S3053T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Naive_ints.cmi"
+    {"F:S890T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Naive_ints.cmt"
+    {"F:S8920T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Naive_ints.cmti"
+    {"F:S4058T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Naive_ints.cmx"
+    {"F:S556T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Nativeint.cmi"
+    {"F:S563T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Nativeint.cmt"
+    {"F:S11174T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Nativeint.cmti"
+    {"F:S3063T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/ocaml_intrinsics_kernel__Nativeint.cmx"
+    {"F:S3259T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/opam" {"F:S830T1768295770.69"}
+  "lib/ocaml_intrinsics_kernel/runtime.js" {"F:S378T1768295770.69"}
+  "lib/stublibs/dllocaml_intrinsics_kernel_stubs.so"
+    {"F:S32848T1768295770.69"}
+]

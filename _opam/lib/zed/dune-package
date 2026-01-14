@@ -1,0 +1,148 @@
+(lang dune 3.20)
+(name zed)
+(sections (lib .) (libexec .) (doc ../../doc/zed))
+(files
+ (lib
+  (META
+   dune-package
+   opam
+   zed.a
+   zed.cma
+   zed.cmxa
+   zed_char.cmi
+   zed_char.cmt
+   zed_char.cmti
+   zed_char.cmx
+   zed_char.ml
+   zed_char.mli
+   zed_cursor.cmi
+   zed_cursor.cmt
+   zed_cursor.cmti
+   zed_cursor.cmx
+   zed_cursor.ml
+   zed_cursor.mli
+   zed_edit.cmi
+   zed_edit.cmt
+   zed_edit.cmti
+   zed_edit.cmx
+   zed_edit.ml
+   zed_edit.mli
+   zed_input.cmi
+   zed_input.cmt
+   zed_input.cmti
+   zed_input.cmx
+   zed_input.ml
+   zed_input.mli
+   zed_lines.cmi
+   zed_lines.cmt
+   zed_lines.cmti
+   zed_lines.cmx
+   zed_lines.ml
+   zed_lines.mli
+   zed_macro.cmi
+   zed_macro.cmt
+   zed_macro.cmti
+   zed_macro.cmx
+   zed_macro.ml
+   zed_macro.mli
+   zed_rope.cmi
+   zed_rope.cmt
+   zed_rope.cmti
+   zed_rope.cmx
+   zed_rope.ml
+   zed_rope.mli
+   zed_string.cmi
+   zed_string.cmt
+   zed_string.cmti
+   zed_string.cmx
+   zed_string.ml
+   zed_string.mli
+   zed_utf8.cmi
+   zed_utf8.cmt
+   zed_utf8.cmti
+   zed_utf8.cmx
+   zed_utf8.ml
+   zed_utf8.mli
+   zed_utils.cmi
+   zed_utils.cmt
+   zed_utils.cmx
+   zed_utils.ml))
+ (libexec (zed.cmxs))
+ (doc (CHANGES.md LICENSE README.md)))
+(library
+ (name zed)
+ (kind normal)
+ (archives (byte zed.cma) (native zed.cmxa))
+ (plugins (byte zed.cma) (native zed.cmxs))
+ (native_archives zed.a)
+ (requires react result uchar uutf uucp uuseg)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name zed_char)
+    (visibility public)
+    (source
+     (path Zed_char)
+     (intf (path zed_char.mli))
+     (impl (path zed_char.ml))))
+   (module
+    (obj_name zed_cursor)
+    (visibility public)
+    (source
+     (path Zed_cursor)
+     (intf (path zed_cursor.mli))
+     (impl (path zed_cursor.ml))))
+   (module
+    (obj_name zed_edit)
+    (visibility public)
+    (source
+     (path Zed_edit)
+     (intf (path zed_edit.mli))
+     (impl (path zed_edit.ml))))
+   (module
+    (obj_name zed_input)
+    (visibility public)
+    (source
+     (path Zed_input)
+     (intf (path zed_input.mli))
+     (impl (path zed_input.ml))))
+   (module
+    (obj_name zed_lines)
+    (visibility public)
+    (source
+     (path Zed_lines)
+     (intf (path zed_lines.mli))
+     (impl (path zed_lines.ml))))
+   (module
+    (obj_name zed_macro)
+    (visibility public)
+    (source
+     (path Zed_macro)
+     (intf (path zed_macro.mli))
+     (impl (path zed_macro.ml))))
+   (module
+    (obj_name zed_rope)
+    (visibility public)
+    (source
+     (path Zed_rope)
+     (intf (path zed_rope.mli))
+     (impl (path zed_rope.ml))))
+   (module
+    (obj_name zed_string)
+    (visibility public)
+    (source
+     (path Zed_string)
+     (intf (path zed_string.mli))
+     (impl (path zed_string.ml))))
+   (module
+    (obj_name zed_utf8)
+    (visibility public)
+    (source
+     (path Zed_utf8)
+     (intf (path zed_utf8.mli))
+     (impl (path zed_utf8.ml))))
+   (module
+    (obj_name zed_utils)
+    (visibility public)
+    (source (path Zed_utils) (impl (path zed_utils.ml)))))))

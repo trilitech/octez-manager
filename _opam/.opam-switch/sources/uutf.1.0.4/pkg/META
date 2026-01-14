@@ -1,0 +1,8 @@
+description = "Non-blocking streaming Unicode codec for OCaml"
+version = "1.0.4"
+requires = ""
+archive(byte) = "uutf.cma"
+archive(native) = "uutf.cmxa"
+plugin(byte) = "uutf.cma"
+plugin(native) = "uutf.cmxs"
+exists_if = "uutf.cma uutf.cmxa"

@@ -1,0 +1,7 @@
+version = "0.6"
+description = ""
+requires = "tsdl"
+archive(byte) = "tsdl_ttf.cma"
+archive(native) = "tsdl_ttf.cmxa"
+plugin(byte) = "tsdl_ttf.cma"
+plugin(native) = "tsdl_ttf.cmxs"

@@ -1,0 +1,8 @@
+(library
+ (name ppx_deriving_eq)
+ (public_name ppx_deriving.eq)
+ (synopsis "[@@deriving eq]")
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries compiler-libs.common ppxlib ppx_deriving.api)
+ (kind ppx_deriver))

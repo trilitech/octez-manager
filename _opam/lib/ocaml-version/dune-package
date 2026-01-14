@@ -1,0 +1,35 @@
+(lang dune 3.20)
+(name ocaml-version)
+(sections (lib .) (libexec .) (doc ../../doc/ocaml-version))
+(files
+ (lib
+  (META
+   dune-package
+   ocaml_version.a
+   ocaml_version.cma
+   ocaml_version.cmi
+   ocaml_version.cmt
+   ocaml_version.cmti
+   ocaml_version.cmx
+   ocaml_version.cmxa
+   ocaml_version.ml
+   ocaml_version.mli
+   opam))
+ (libexec (ocaml_version.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md)))
+(library
+ (name ocaml-version)
+ (kind normal)
+ (archives (byte ocaml_version.cma) (native ocaml_version.cmxa))
+ (plugins (byte ocaml_version.cma) (native ocaml_version.cmxs))
+ (native_archives ocaml_version.a)
+ (main_module_name Ocaml_version)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name ocaml_version)
+   (visibility public)
+   (source
+    (path Ocaml_version)
+    (intf (path ocaml_version.mli))
+    (impl (path ocaml_version.ml))))))

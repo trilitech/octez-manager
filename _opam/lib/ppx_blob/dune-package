@@ -1,0 +1,32 @@
+(lang dune 3.20)
+(name ppx_blob)
+(version 0.9.0)
+(sections (lib .) (libexec .) (doc ../../doc/ppx_blob))
+(files
+ (lib
+  (META
+   dune-package
+   opam
+   ppx_blob.a
+   ppx_blob.cma
+   ppx_blob.cmi
+   ppx_blob.cmt
+   ppx_blob.cmx
+   ppx_blob.cmxa
+   ppx_blob.ml))
+ (libexec (ppx.exe ppx_blob.cmxs))
+ (doc (CHANGES.md LICENSE.txt README.md)))
+(library
+ (name ppx_blob)
+ (kind ppx_rewriter)
+ (archives (byte ppx_blob.cma) (native ppx_blob.cmxa))
+ (plugins (byte ppx_blob.cma) (native ppx_blob.cmxs))
+ (native_archives ppx_blob.a)
+ (requires ppxlib.ast ppxlib)
+ (main_module_name Ppx_blob)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name ppx_blob)
+   (visibility public)
+   (source (path Ppx_blob) (impl (path ppx_blob.ml))))))

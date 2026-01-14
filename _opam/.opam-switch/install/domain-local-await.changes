@@ -1,0 +1,32 @@
+opam-version: "2.0"
+added: [
+  "doc/domain-local-await" {"D"}
+  "doc/domain-local-await/CHANGES.md" {"F:S668T1768295771.17"}
+  "doc/domain-local-await/LICENSE.md" {"F:S730T1768295771.17"}
+  "doc/domain-local-await/README.md" {"F:S23297T1768295771.17"}
+  "lib/domain-local-await" {"D"}
+  "lib/domain-local-await/Domain_local_await.a" {"F:S23978T1768295771.17"}
+  "lib/domain-local-await/Domain_local_await.cma" {"F:S10858T1768295771.17"}
+  "lib/domain-local-await/Domain_local_await.cmxa" {"F:S1130T1768295771.17"}
+  "lib/domain-local-await/Domain_local_await.cmxs" {"F:S29864T1768295771.17"}
+  "lib/domain-local-await/Domain_local_await.ml" {"F:S3667T1768295771.17"}
+  "lib/domain-local-await/Domain_local_await.mli" {"F:S4675T1768295771.17"}
+  "lib/domain-local-await/META" {"F:S228T1768295771.17"}
+  "lib/domain-local-await/Thread_intf.ml" {"F:S184T1768295771.17"}
+  "lib/domain-local-await/domain_local_await.cmi" {"F:S832T1768295771.17"}
+  "lib/domain-local-await/domain_local_await.cmt" {"F:S17701T1768295771.17"}
+  "lib/domain-local-await/domain_local_await.cmti" {"F:S5718T1768295771.17"}
+  "lib/domain-local-await/domain_local_await.cmx" {"F:S1392T1768295771.17"}
+  "lib/domain-local-await/domain_local_await__.cmi" {"F:S357T1768295771.17"}
+  "lib/domain-local-await/domain_local_await__.cmt" {"F:S1876T1768295771.17"}
+  "lib/domain-local-await/domain_local_await__.cmx" {"F:S199T1768295771.17"}
+  "lib/domain-local-await/domain_local_await__.ml" {"F:S210T1768295771.17"}
+  "lib/domain-local-await/domain_local_await__Thread_intf.cmi"
+    {"F:S484T1768295771.17"}
+  "lib/domain-local-await/domain_local_await__Thread_intf.cmt"
+    {"F:S2323T1768295771.17"}
+  "lib/domain-local-await/domain_local_await__Thread_intf.cmx"
+    {"F:S266T1768295771.17"}
+  "lib/domain-local-await/dune-package" {"F:S1703T1768295771.17"}
+  "lib/domain-local-await/opam" {"F:S1050T1768295771.17"}
+]

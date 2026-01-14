@@ -1,0 +1,5 @@
+(library
+ (name mirage_crypto_pk)
+ (public_name mirage-crypto-pk)
+ (libraries zarith mirage-crypto mirage-crypto-rng eqaf)
+ (private_modules common dh dsa rsa z_extra))

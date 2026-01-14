@@ -1,0 +1,21 @@
+opam-version: "2.0"
+added: [
+  "doc/domain-name" {"D"}
+  "doc/domain-name/CHANGES.md" {"F:S2018T1768295822.2"}
+  "doc/domain-name/LICENSE.md" {"F:S802T1768295822.2"}
+  "doc/domain-name/README.md" {"F:S966T1768295822.2"}
+  "lib/domain-name" {"D"}
+  "lib/domain-name/META" {"F:S188T1768295822.19"}
+  "lib/domain-name/domain_name.a" {"F:S74664T1768295822.19"}
+  "lib/domain-name/domain_name.cma" {"F:S40638T1768295822.19"}
+  "lib/domain-name/domain_name.cmi" {"F:S12239T1768295822.19"}
+  "lib/domain-name/domain_name.cmt" {"F:S66755T1768295822.19"}
+  "lib/domain-name/domain_name.cmti" {"F:S45001T1768295822.19"}
+  "lib/domain-name/domain_name.cmx" {"F:S11538T1768295822.19"}
+  "lib/domain-name/domain_name.cmxa" {"F:S797T1768295822.19"}
+  "lib/domain-name/domain_name.cmxs" {"F:S72904T1768295822.19"}
+  "lib/domain-name/domain_name.ml" {"F:S7234T1768295822.19"}
+  "lib/domain-name/domain_name.mli" {"F:S10395T1768295822.19"}
+  "lib/domain-name/dune-package" {"F:S828T1768295822.19"}
+  "lib/domain-name/opam" {"F:S1086T1768295822.19"}
+]

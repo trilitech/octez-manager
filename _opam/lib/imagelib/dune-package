@@ -1,0 +1,145 @@
+(lang dune 3.20)
+(name imagelib)
+(version 20221222)
+(sections (lib .) (libexec .) (bin ../../bin) (doc ../../doc/imagelib))
+(files
+ (lib
+  (META
+   dune-package
+   image.cmi
+   image.cmt
+   image.cmti
+   image.cmx
+   image.ml
+   image.mli
+   imageBMP.cmi
+   imageBMP.cmt
+   imageBMP.cmx
+   imageBMP.ml
+   imageGIF.cmi
+   imageGIF.cmt
+   imageGIF.cmti
+   imageGIF.cmx
+   imageGIF.ml
+   imageGIF.mli
+   imageJPG.cmi
+   imageJPG.cmt
+   imageJPG.cmx
+   imageJPG.ml
+   imageLib.cmi
+   imageLib.cmt
+   imageLib.cmti
+   imageLib.cmx
+   imageLib.ml
+   imageLib.mli
+   imagePNG.cmi
+   imagePNG.cmt
+   imagePNG.cmx
+   imagePNG.ml
+   imagePPM.cmi
+   imagePPM.cmt
+   imagePPM.cmx
+   imagePPM.ml
+   imageUtil.cmi
+   imageUtil.cmt
+   imageUtil.cmx
+   imageUtil.ml
+   imageXCF.cmi
+   imageXCF.cmt
+   imageXCF.cmx
+   imageXCF.ml
+   imagelib.a
+   imagelib.cma
+   imagelib.cmxa
+   opam
+   unix/imageLib_unix.cmi
+   unix/imageLib_unix.cmt
+   unix/imageLib_unix.cmti
+   unix/imageLib_unix.cmx
+   unix/imageLib_unix.ml
+   unix/imageLib_unix.mli
+   unix/imageUtil_unix.cmi
+   unix/imageUtil_unix.cmt
+   unix/imageUtil_unix.cmx
+   unix/imageUtil_unix.ml
+   unix/imagelib_unix.a
+   unix/imagelib_unix.cma
+   unix/imagelib_unix.cmxa))
+ (libexec (imagelib.cmxs unix/imagelib_unix.cmxs))
+ (bin (imagelib-convert imagetool))
+ (doc (CHANGES LICENSE README.md)))
+(library
+ (name imagelib)
+ (kind normal)
+ (synopsis "Image library")
+ (archives (byte imagelib.cma) (native imagelib.cmxa))
+ (plugins (byte imagelib.cma) (native imagelib.cmxs))
+ (native_archives imagelib.a)
+ (requires stdlib-shims checkseum.ocaml decompress.zl)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name image)
+    (visibility public)
+    (source (path Image) (intf (path image.mli)) (impl (path image.ml))))
+   (module
+    (obj_name imageBMP)
+    (visibility public)
+    (source (path ImageBMP) (impl (path imageBMP.ml))))
+   (module
+    (obj_name imageGIF)
+    (visibility public)
+    (source
+     (path ImageGIF)
+     (intf (path imageGIF.mli))
+     (impl (path imageGIF.ml))))
+   (module
+    (obj_name imageJPG)
+    (visibility public)
+    (source (path ImageJPG) (impl (path imageJPG.ml))))
+   (module
+    (obj_name imageLib)
+    (visibility public)
+    (source
+     (path ImageLib)
+     (intf (path imageLib.mli))
+     (impl (path imageLib.ml))))
+   (module
+    (obj_name imagePNG)
+    (visibility public)
+    (source (path ImagePNG) (impl (path imagePNG.ml))))
+   (module
+    (obj_name imagePPM)
+    (visibility public)
+    (source (path ImagePPM) (impl (path imagePPM.ml))))
+   (module
+    (obj_name imageUtil)
+    (visibility public)
+    (source (path ImageUtil) (impl (path imageUtil.ml))))
+   (module
+    (obj_name imageXCF)
+    (visibility public)
+    (source (path ImageXCF) (impl (path imageXCF.ml)))))))
+(library
+ (name imagelib.unix)
+ (kind normal)
+ (synopsis "Image library with unix bindings")
+ (archives (byte unix/imagelib_unix.cma) (native unix/imagelib_unix.cmxa))
+ (plugins (byte unix/imagelib_unix.cma) (native unix/imagelib_unix.cmxs))
+ (native_archives unix/imagelib_unix.a)
+ (requires imagelib unix)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name imageLib_unix)
+    (visibility public)
+    (source
+     (path ImageLib_unix)
+     (intf (path unix/imageLib_unix.mli))
+     (impl (path unix/imageLib_unix.ml))))
+   (module
+    (obj_name imageUtil_unix)
+    (visibility public)
+    (source (path ImageUtil_unix) (impl (path unix/imageUtil_unix.ml)))))))

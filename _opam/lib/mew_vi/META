@@ -1,0 +1,6 @@
+description = ""
+requires = "mew react"
+archive(byte) = "mew_vi.cma"
+archive(native) = "mew_vi.cmxa"
+plugin(byte) = "mew_vi.cma"
+plugin(native) = "mew_vi.cmxs"

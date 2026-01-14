@@ -1,0 +1,60 @@
+(lang dune 3.20)
+(name tsdl-image)
+(version 0.5)
+(sections (lib .) (libexec .) (doc ../../doc/tsdl-image))
+(files
+ (lib
+  (.private/tsdl_image__Build_config.cmi
+   .private/tsdl_image__Build_config.cmt
+   META
+   build_config.ml
+   dune-package
+   opam
+   tsdl_image.a
+   tsdl_image.cma
+   tsdl_image.cmi
+   tsdl_image.cmt
+   tsdl_image.cmti
+   tsdl_image.cmx
+   tsdl_image.cmxa
+   tsdl_image.ml
+   tsdl_image.mli
+   tsdl_image__.cmi
+   tsdl_image__.cmt
+   tsdl_image__.cmx
+   tsdl_image__.ml
+   tsdl_image__Build_config.cmx))
+ (libexec (tsdl_image.cmxs))
+ (doc (CHANGELOG.md LICENSE README.md)))
+(library
+ (name tsdl-image)
+ (kind normal)
+ (archives (byte tsdl_image.cma) (native tsdl_image.cmxa))
+ (plugins (byte tsdl_image.cma) (native tsdl_image.cmxs))
+ (native_archives tsdl_image.a)
+ (requires tsdl)
+ (main_module_name Tsdl_image)
+ (modes byte native)
+ (obj_dir (private_dir .private))
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name tsdl_image__)
+     (visibility public)
+     (kind alias)
+     (source (path Tsdl_image__) (impl (path tsdl_image__.ml-gen))))
+    (name Tsdl_image)
+    (modules
+     (module
+      (obj_name tsdl_image__Build_config)
+      (visibility private)
+      (source (path Build_config) (impl (path build_config.ml))))
+     (module
+      (obj_name tsdl_image)
+      (visibility public)
+      (source
+       (path Tsdl_image)
+       (intf (path tsdl_image.mli))
+       (impl (path tsdl_image.ml))))))
+   (wrapped true))))

@@ -1,0 +1,17 @@
+version = "2.0.2"
+description = ""
+requires = "digestif logs mirage-crypto"
+archive(byte) = "mirage_crypto_rng.cma"
+archive(native) = "mirage_crypto_rng.cmxa"
+plugin(byte) = "mirage_crypto_rng.cma"
+plugin(native) = "mirage_crypto_rng.cmxs"
+package "unix" (
+  directory = "unix"
+  version = "2.0.2"
+  description = ""
+  requires = "logs mirage-crypto-rng threads.posix unix"
+  archive(byte) = "mirage_crypto_rng_unix.cma"
+  archive(native) = "mirage_crypto_rng_unix.cmxa"
+  plugin(byte) = "mirage_crypto_rng_unix.cma"
+  plugin(native) = "mirage_crypto_rng_unix.cmxs"
+)

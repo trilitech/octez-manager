@@ -1,0 +1,27 @@
+version = "1.3.0"
+description = ""
+requires = "eqaf"
+archive(byte) = ""
+archive(native) = ""
+plugin(byte) = ""
+plugin(native) = ""
+package "c" (
+  directory = "c"
+  version = "1.3.0"
+  description = ""
+  requires = "digestif eqaf"
+  archive(byte) = "digestif_c.cma"
+  archive(native) = "digestif_c.cmxa"
+  plugin(byte) = "digestif_c.cma"
+  plugin(native) = "digestif_c.cmxs"
+)
+package "ocaml" (
+  directory = "ocaml"
+  version = "1.3.0"
+  description = ""
+  requires = "digestif eqaf"
+  archive(byte) = "digestif_ocaml.cma"
+  archive(native) = "digestif_ocaml.cmxa"
+  plugin(byte) = "digestif_ocaml.cma"
+  plugin(native) = "digestif_ocaml.cmxs"
+)

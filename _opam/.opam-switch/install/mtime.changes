@@ -1,0 +1,47 @@
+opam-version: "2.0"
+added: [
+  "doc/mtime" {"D"}
+  "doc/mtime/CHANGES.md" {"F:S5264T1768295764.94"}
+  "doc/mtime/LICENSE.md" {"F:S739T1768295764.94"}
+  "doc/mtime/README.md" {"F:S1246T1768295764.94"}
+  "doc/mtime/min_clock.ml" {"F:S672T1768295764.94"}
+  "doc/mtime/odoc-pages" {"D"}
+  "doc/mtime/odoc-pages/index.mld" {"F:S651T1768295764.94"}
+  "lib/mtime" {"D"}
+  "lib/mtime/META" {"F:S1131T1768295764.94"}
+  "lib/mtime/clock" {"D"}
+  "lib/mtime/clock/libmtime_clock_stubs.a" {"F:S16860T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.a" {"F:S8980T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.cma" {"F:S3060T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.cmi" {"F:S887T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.cmt" {"F:S4415T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.cmti" {"F:S5871T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.cmx" {"F:S1014T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.cmxa" {"F:S500T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.cmxs" {"F:S30984T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.ml" {"F:S877T1768295764.94"}
+  "lib/mtime/clock/mtime_clock.mli" {"F:S4319T1768295764.94"}
+  "lib/mtime/clock/mtime_clock_stubs.c" {"F:S5791T1768295764.94"}
+  "lib/mtime/clock/runtime.js" {"F:S3171T1768295764.94"}
+  "lib/mtime/mtime.a" {"F:S42798T1768295764.94"}
+  "lib/mtime/mtime.cma" {"F:S20131T1768295764.94"}
+  "lib/mtime/mtime.cmi" {"F:S1943T1768295764.94"}
+  "lib/mtime/mtime.cmt" {"F:S36114T1768295764.94"}
+  "lib/mtime/mtime.cmti" {"F:S13516T1768295764.94"}
+  "lib/mtime/mtime.cmx" {"F:S4329T1768295764.94"}
+  "lib/mtime/mtime.cmxa" {"F:S591T1768295764.94"}
+  "lib/mtime/mtime.cmxs" {"F:S53944T1768295764.94"}
+  "lib/mtime/mtime.ml" {"F:S6067T1768295764.94"}
+  "lib/mtime/mtime.mli" {"F:S7197T1768295764.94"}
+  "lib/mtime/mtime_top_init.ml" {"F:S318T1768295764.94"}
+  "lib/mtime/opam" {"F:S1231T1768295764.94"}
+  "lib/mtime/top" {"D"}
+  "lib/mtime/top/mtime_top.a" {"F:S4158T1768295764.94"}
+  "lib/mtime/top/mtime_top.cma" {"F:S2477T1768295764.94"}
+  "lib/mtime/top/mtime_top.cmt" {"F:S4134T1768295764.94"}
+  "lib/mtime/top/mtime_top.cmx" {"F:S1431T1768295764.94"}
+  "lib/mtime/top/mtime_top.cmxa" {"F:S1437T1768295764.94"}
+  "lib/mtime/top/mtime_top.cmxs" {"F:S18816T1768295764.94"}
+  "lib/mtime/top/mtime_top.ml" {"F:S333T1768295764.94"}
+  "lib/stublibs/dllmtime_clock_stubs.so" {"F:S23112T1768295764.94"}
+]

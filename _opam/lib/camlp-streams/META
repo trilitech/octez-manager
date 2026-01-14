@@ -1,0 +1,6 @@
+description = ""
+requires = ""
+archive(byte) = "camlp_streams.cma"
+archive(native) = "camlp_streams.cmxa"
+plugin(byte) = "camlp_streams.cma"
+plugin(native) = "camlp_streams.cmxs"

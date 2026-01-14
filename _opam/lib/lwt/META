@@ -1,0 +1,17 @@
+version = "5.9.2"
+description = "Monadic promises and concurrent I/O"
+requires = ""
+archive(byte) = "lwt.cma"
+archive(native) = "lwt.cmxa"
+plugin(byte) = "lwt.cma"
+plugin(native) = "lwt.cmxs"
+package "unix" (
+  directory = "unix"
+  version = "5.9.2"
+  description = "Unix support for Lwt"
+  requires = "lwt ocplib-endian.bigstring threads unix"
+  archive(byte) = "lwt_unix.cma"
+  archive(native) = "lwt_unix.cmxa"
+  plugin(byte) = "lwt_unix.cma"
+  plugin(native) = "lwt_unix.cmxs"
+)

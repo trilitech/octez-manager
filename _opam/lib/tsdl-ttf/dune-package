@@ -1,0 +1,60 @@
+(lang dune 3.20)
+(name tsdl-ttf)
+(version 0.6)
+(sections (lib .) (libexec .) (doc ../../doc/tsdl-ttf))
+(files
+ (lib
+  (.private/tsdl_ttf__Build_config.cmi
+   .private/tsdl_ttf__Build_config.cmt
+   META
+   build_config.ml
+   dune-package
+   opam
+   tsdl_ttf.a
+   tsdl_ttf.cma
+   tsdl_ttf.cmi
+   tsdl_ttf.cmt
+   tsdl_ttf.cmti
+   tsdl_ttf.cmx
+   tsdl_ttf.cmxa
+   tsdl_ttf.ml
+   tsdl_ttf.mli
+   tsdl_ttf__.cmi
+   tsdl_ttf__.cmt
+   tsdl_ttf__.cmx
+   tsdl_ttf__.ml
+   tsdl_ttf__Build_config.cmx))
+ (libexec (tsdl_ttf.cmxs))
+ (doc (CHANGELOG.md LICENSE README.md)))
+(library
+ (name tsdl-ttf)
+ (kind normal)
+ (archives (byte tsdl_ttf.cma) (native tsdl_ttf.cmxa))
+ (plugins (byte tsdl_ttf.cma) (native tsdl_ttf.cmxs))
+ (native_archives tsdl_ttf.a)
+ (requires tsdl)
+ (main_module_name Tsdl_ttf)
+ (modes byte native)
+ (obj_dir (private_dir .private))
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name tsdl_ttf__)
+     (visibility public)
+     (kind alias)
+     (source (path Tsdl_ttf__) (impl (path tsdl_ttf__.ml-gen))))
+    (name Tsdl_ttf)
+    (modules
+     (module
+      (obj_name tsdl_ttf__Build_config)
+      (visibility private)
+      (source (path Build_config) (impl (path build_config.ml))))
+     (module
+      (obj_name tsdl_ttf)
+      (visibility public)
+      (source
+       (path Tsdl_ttf)
+       (intf (path tsdl_ttf.mli))
+       (impl (path tsdl_ttf.ml))))))
+   (wrapped true))))

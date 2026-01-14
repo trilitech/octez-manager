@@ -1,0 +1,3 @@
+(library
+ (name dune_thread_pool)
+ (libraries stdune threads.posix))

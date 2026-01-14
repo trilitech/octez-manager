@@ -1,0 +1,39 @@
+opam-version: "2.0"
+added: [
+  "doc/iomux" {"D"}
+  "doc/iomux/CHANGES.md" {"F:S741T1768295773.25"}
+  "doc/iomux/LICENSE.md" {"F:S762T1768295773.25"}
+  "doc/iomux/README.md" {"F:S3013T1768295773.25"}
+  "lib/iomux" {"D"}
+  "lib/iomux/META" {"F:S167T1768295773.24"}
+  "lib/iomux/config.ml" {"F:S155T1768295773.24"}
+  "lib/iomux/dune-package" {"F:S1772T1768295773.24"}
+  "lib/iomux/iomux.a" {"F:S31382T1768295773.24"}
+  "lib/iomux/iomux.cma" {"F:S15685T1768295773.24"}
+  "lib/iomux/iomux.cmi" {"F:S308T1768295773.24"}
+  "lib/iomux/iomux.cmt" {"F:S1757T1768295773.24"}
+  "lib/iomux/iomux.cmx" {"F:S201T1768295773.24"}
+  "lib/iomux/iomux.cmxa" {"F:S1529T1768295773.24"}
+  "lib/iomux/iomux.cmxs" {"F:S56696T1768295773.25"}
+  "lib/iomux/iomux.ml" {"F:S38T1768295773.24"}
+  "lib/iomux/iomux__.cmi" {"F:S402T1768295773.24"}
+  "lib/iomux/iomux__.cmt" {"F:S2252T1768295773.24"}
+  "lib/iomux/iomux__.cmx" {"F:S172T1768295773.24"}
+  "lib/iomux/iomux__.ml" {"F:S268T1768295773.24"}
+  "lib/iomux/iomux__Config.cmi" {"F:S506T1768295773.24"}
+  "lib/iomux/iomux__Config.cmt" {"F:S2599T1768295773.24"}
+  "lib/iomux/iomux__Config.cmx" {"F:S245T1768295773.24"}
+  "lib/iomux/iomux__Poll.cmi" {"F:S1637T1768295773.24"}
+  "lib/iomux/iomux__Poll.cmt" {"F:S20592T1768295773.24"}
+  "lib/iomux/iomux__Poll.cmti" {"F:S11109T1768295773.24"}
+  "lib/iomux/iomux__Poll.cmx" {"F:S2495T1768295773.24"}
+  "lib/iomux/iomux__Util.cmi" {"F:S702T1768295773.24"}
+  "lib/iomux/iomux__Util.cmt" {"F:S3422T1768295773.24"}
+  "lib/iomux/iomux__Util.cmx" {"F:S700T1768295773.24"}
+  "lib/iomux/libiomux_stubs.a" {"F:S37338T1768295773.24"}
+  "lib/iomux/opam" {"F:S947T1768295773.24"}
+  "lib/iomux/poll.ml" {"F:S3887T1768295773.24"}
+  "lib/iomux/poll.mli" {"F:S5493T1768295773.24"}
+  "lib/iomux/util.ml" {"F:S264T1768295773.24"}
+  "lib/stublibs/dlliomux_stubs.so" {"F:S32576T1768295773.25"}
+]

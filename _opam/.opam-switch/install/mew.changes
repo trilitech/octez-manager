@@ -1,0 +1,43 @@
+opam-version: "2.0"
+added: [
+  "doc/mew" {"D"}
+  "doc/mew/CHANGES.md" {"F:S56T1768295771.2"}
+  "doc/mew/LICENSE" {"F:S1091T1768295771.2"}
+  "doc/mew/README.md" {"F:S509T1768295771.2"}
+  "lib/mew" {"D"}
+  "lib/mew/META" {"F:S149T1768295771.19"}
+  "lib/mew/concurrent.ml" {"F:S722T1768295771.19"}
+  "lib/mew/dune-package" {"F:S1792T1768295771.19"}
+  "lib/mew/key.ml" {"F:S893T1768295771.19"}
+  "lib/mew/mew.a" {"F:S61226T1768295771.19"}
+  "lib/mew/mew.cma" {"F:S43368T1768295771.19"}
+  "lib/mew/mew.cmi" {"F:S6870T1768295771.19"}
+  "lib/mew/mew.cmt" {"F:S34441T1768295771.19"}
+  "lib/mew/mew.cmx" {"F:S838T1768295771.19"}
+  "lib/mew/mew.cmxa" {"F:S2878T1768295771.19"}
+  "lib/mew/mew.cmxs" {"F:S64000T1768295771.2"}
+  "lib/mew/mew.ml" {"F:S3819T1768295771.19"}
+  "lib/mew/mew__.cmi" {"F:S390T1768295771.19"}
+  "lib/mew/mew__.cmt" {"F:S2426T1768295771.19"}
+  "lib/mew/mew__.cmx" {"F:S173T1768295771.19"}
+  "lib/mew/mew__.ml" {"F:S305T1768295771.19"}
+  "lib/mew/mew__Concurrent.cmi" {"F:S1046T1768295771.19"}
+  "lib/mew/mew__Concurrent.cmt" {"F:S5318T1768295771.19"}
+  "lib/mew/mew__Concurrent.cmx" {"F:S219T1768295771.19"}
+  "lib/mew/mew__Key.cmi" {"F:S1016T1768295771.19"}
+  "lib/mew/mew__Key.cmt" {"F:S7271T1768295771.19"}
+  "lib/mew/mew__Key.cmx" {"F:S428T1768295771.19"}
+  "lib/mew/mew__Modal.cmi" {"F:S4256T1768295771.19"}
+  "lib/mew/mew__Modal.cmt" {"F:S15527T1768295771.19"}
+  "lib/mew/mew__Modal.cmx" {"F:S495T1768295771.19"}
+  "lib/mew/mew__Mode.cmi" {"F:S4201T1768295771.19"}
+  "lib/mew/mew__Mode.cmt" {"F:S17086T1768295771.19"}
+  "lib/mew/mew__Mode.cmx" {"F:S4491T1768295771.19"}
+  "lib/mew/mew__Utils.cmi" {"F:S628T1768295771.19"}
+  "lib/mew/mew__Utils.cmt" {"F:S4482T1768295771.19"}
+  "lib/mew/mew__Utils.cmx" {"F:S771T1768295771.19"}
+  "lib/mew/modal.ml" {"F:S273T1768295771.19"}
+  "lib/mew/mode.ml" {"F:S903T1768295771.2"}
+  "lib/mew/opam" {"F:S488T1768295771.2"}
+  "lib/mew/utils.ml" {"F:S435T1768295771.2"}
+]

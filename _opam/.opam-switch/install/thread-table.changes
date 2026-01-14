@@ -1,0 +1,29 @@
+opam-version: "2.0"
+added: [
+  "doc/thread-table" {"D"}
+  "doc/thread-table/CHANGES.md" {"F:S397T1768295770.95"}
+  "doc/thread-table/LICENSE.md" {"F:S730T1768295770.95"}
+  "doc/thread-table/README.md" {"F:S456T1768295770.95"}
+  "lib/thread-table" {"D"}
+  "lib/thread-table/META" {"F:S192T1768295770.95"}
+  "lib/thread-table/Thread_table.a" {"F:S31942T1768295770.95"}
+  "lib/thread-table/Thread_table.cma" {"F:S17000T1768295770.95"}
+  "lib/thread-table/Thread_table.cmxa" {"F:S842T1768295770.95"}
+  "lib/thread-table/Thread_table.cmxs" {"F:S45656T1768295770.95"}
+  "lib/thread-table/dune-package" {"F:S1400T1768295770.95"}
+  "lib/thread-table/mix.ml" {"F:S358T1768295770.95"}
+  "lib/thread-table/opam" {"F:S954T1768295770.95"}
+  "lib/thread-table/thread_table.cmi" {"F:S587T1768295770.95"}
+  "lib/thread-table/thread_table.cmt" {"F:S29771T1768295770.95"}
+  "lib/thread-table/thread_table.cmti" {"F:S3651T1768295770.95"}
+  "lib/thread-table/thread_table.cmx" {"F:S3302T1768295770.95"}
+  "lib/thread-table/thread_table.ml" {"F:S5061T1768295770.95"}
+  "lib/thread-table/thread_table.mli" {"F:S1278T1768295770.95"}
+  "lib/thread-table/thread_table__.cmi" {"F:S209T1768295770.95"}
+  "lib/thread-table/thread_table__.cmt" {"F:S1509T1768295770.95"}
+  "lib/thread-table/thread_table__.cmx" {"F:S140T1768295770.95"}
+  "lib/thread-table/thread_table__.ml" {"F:S91T1768295770.95"}
+  "lib/thread-table/thread_table__Mix.cmi" {"F:S326T1768295770.95"}
+  "lib/thread-table/thread_table__Mix.cmt" {"F:S3250T1768295770.95"}
+  "lib/thread-table/thread_table__Mix.cmx" {"F:S642T1768295770.95"}
+]

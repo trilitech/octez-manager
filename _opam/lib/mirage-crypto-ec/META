@@ -1,0 +1,7 @@
+version = "2.0.2"
+description = ""
+requires = "digestif eqaf mirage-crypto-rng"
+archive(byte) = "mirage_crypto_ec.cma"
+archive(native) = "mirage_crypto_ec.cmxa"
+plugin(byte) = "mirage_crypto_ec.cma"
+plugin(native) = "mirage_crypto_ec.cmxs"

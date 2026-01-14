@@ -1,0 +1,7 @@
+version = "0.5"
+description = ""
+requires = "tsdl"
+archive(byte) = "tsdl_image.cma"
+archive(native) = "tsdl_image.cmxa"
+plugin(byte) = "tsdl_image.cma"
+plugin(native) = "tsdl_image.cmxs"

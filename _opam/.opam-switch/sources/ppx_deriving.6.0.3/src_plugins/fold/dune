@@ -1,0 +1,8 @@
+(library
+ (name ppx_deriving_fold)
+ (public_name ppx_deriving.fold)
+ (synopsis "[@@deriving fold]")
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries compiler-libs.common ppxlib ppx_deriving.api)
+ (kind ppx_deriver))

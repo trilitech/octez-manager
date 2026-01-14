@@ -1,0 +1,30 @@
+package "hkdf" (
+  directory = "hkdf"
+  version = "1.0.0"
+  description = ""
+  requires = "digestif"
+  archive(byte) = "hkdf.cma"
+  archive(native) = "hkdf.cmxa"
+  plugin(byte) = "hkdf.cma"
+  plugin(native) = "hkdf.cmxs"
+)
+package "pbkdf" (
+  directory = "pbkdf"
+  version = "1.0.0"
+  description = ""
+  requires = "digestif mirage-crypto"
+  archive(byte) = "pbkdf.cma"
+  archive(native) = "pbkdf.cmxa"
+  plugin(byte) = "pbkdf.cma"
+  plugin(native) = "pbkdf.cmxs"
+)
+package "scrypt" (
+  directory = "scrypt"
+  version = "1.0.0"
+  description = ""
+  requires = "kdf.pbkdf mirage-crypto"
+  archive(byte) = "scrypt.cma"
+  archive(native) = "scrypt.cmxa"
+  plugin(byte) = "scrypt.cma"
+  plugin(native) = "scrypt.cmxs"
+)

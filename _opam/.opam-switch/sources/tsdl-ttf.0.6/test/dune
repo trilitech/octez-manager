@@ -1,0 +1,11 @@
+(test
+ (name show_string)
+ (modules show_string)
+ (libraries bigarray tsdl tsdl-ttf)
+ (deps "f500.ttf")
+ (action
+  (setenv
+   SDL_VIDEODRIVER
+   dummy
+   (run ./show_string.exe)))
+ (modes exe))

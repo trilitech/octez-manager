@@ -1,0 +1,8 @@
+(lang dune 3.20)
+(name cppo)
+(version 1.8.0)
+(sections (lib .) (bin ../../bin) (doc ../../doc/cppo))
+(files
+ (lib (META dune-package opam))
+ (bin (cppo))
+ (doc (LICENSE.md README.md)))

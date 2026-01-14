@@ -1,0 +1,136 @@
+(lang dune 3.20)
+(name ctypes-foreign)
+(version 0.24.0)
+(sections
+ (lib /home/valentin/work/octez-manager/_opam/lib/ctypes-foreign)
+ (libexec /home/valentin/work/octez-manager/_opam/lib/ctypes-foreign)
+ (doc /home/valentin/work/octez-manager/_opam/doc/ctypes-foreign)
+ (stublibs /home/valentin/work/octez-manager/_opam/lib/stublibs))
+(files
+ (lib
+  (.private/ctypes_foreign_threaded_stubs.cmi
+   .private/ctypes_foreign_threaded_stubs.cmt
+   META
+   ctypes_closure_properties.cmi
+   ctypes_closure_properties.cmt
+   ctypes_closure_properties.cmti
+   ctypes_closure_properties.cmx
+   ctypes_closure_properties.ml
+   ctypes_closure_properties.mli
+   ctypes_ffi.cmi
+   ctypes_ffi.cmt
+   ctypes_ffi.cmti
+   ctypes_ffi.cmx
+   ctypes_ffi.ml
+   ctypes_ffi.mli
+   ctypes_ffi_stubs.cmi
+   ctypes_ffi_stubs.cmt
+   ctypes_ffi_stubs.cmx
+   ctypes_ffi_stubs.ml
+   ctypes_foreign.a
+   ctypes_foreign.cma
+   ctypes_foreign.cmxa
+   ctypes_foreign_basis.cmi
+   ctypes_foreign_basis.cmt
+   ctypes_foreign_basis.cmx
+   ctypes_foreign_basis.ml
+   ctypes_foreign_threaded_stubs.cmx
+   ctypes_foreign_threaded_stubs.ml
+   ctypes_weak_ref.cmi
+   ctypes_weak_ref.cmt
+   ctypes_weak_ref.cmti
+   ctypes_weak_ref.cmx
+   ctypes_weak_ref.ml
+   ctypes_weak_ref.mli
+   dl.cmi
+   dl.cmt
+   dl.cmti
+   dl.cmx
+   dl.ml
+   dl.mli
+   dune-package
+   foreign.cmi
+   foreign.cmt
+   foreign.cmti
+   foreign.cmx
+   foreign.ml
+   foreign.mli
+   libctypes_foreign_stubs.a
+   libffi_abi.cmi
+   libffi_abi.cmt
+   libffi_abi.cmti
+   libffi_abi.cmx
+   libffi_abi.ml
+   libffi_abi.mli
+   opam))
+ (libexec (ctypes_foreign.cmxs))
+ (doc (CHANGES.md LICENSE README.md))
+ (stublibs (dllctypes_foreign_stubs.so)))
+(library
+ (name ctypes-foreign)
+ (kind normal)
+ (archives (byte ctypes_foreign.cma) (native ctypes_foreign.cmxa))
+ (plugins (byte ctypes_foreign.cma) (native ctypes_foreign.cmxs))
+ (foreign_objects
+  dl_stubs.o
+  ffi_call_stubs.o
+  ffi_type_stubs.o
+  foreign_threaded_stubs.o)
+ (foreign_archives (archives (for all) (files libctypes_foreign_stubs.a)))
+ (foreign_dll_files ../stublibs/dllctypes_foreign_stubs.so)
+ (native_archives ctypes_foreign.a)
+ (requires ctypes threads)
+ (modes byte native)
+ (obj_dir (private_dir .private))
+ (modules
+  (unwrapped
+   (module
+    (obj_name ctypes_closure_properties)
+    (visibility public)
+    (source
+     (path Ctypes_closure_properties)
+     (intf (path ctypes_closure_properties.mli))
+     (impl (path ctypes_closure_properties.ml))))
+   (module
+    (obj_name ctypes_ffi)
+    (visibility public)
+    (source
+     (path Ctypes_ffi)
+     (intf (path ctypes_ffi.mli))
+     (impl (path ctypes_ffi.ml))))
+   (module
+    (obj_name ctypes_ffi_stubs)
+    (visibility public)
+    (source (path Ctypes_ffi_stubs) (impl (path ctypes_ffi_stubs.ml))))
+   (module
+    (obj_name ctypes_foreign_basis)
+    (visibility public)
+    (source (path Ctypes_foreign_basis) (impl (path ctypes_foreign_basis.ml))))
+   (module
+    (obj_name ctypes_foreign_threaded_stubs)
+    (visibility private)
+    (source
+     (path Ctypes_foreign_threaded_stubs)
+     (impl (path ctypes_foreign_threaded_stubs.ml))))
+   (module
+    (obj_name ctypes_weak_ref)
+    (visibility public)
+    (source
+     (path Ctypes_weak_ref)
+     (intf (path ctypes_weak_ref.mli))
+     (impl (path ctypes_weak_ref.ml))))
+   (module
+    (obj_name dl)
+    (visibility public)
+    (source (path Dl) (intf (path dl.mli)) (impl (path dl.ml))))
+   (module
+    (obj_name foreign)
+    (visibility public)
+    (source (path Foreign) (intf (path foreign.mli)) (impl (path foreign.ml))))
+   (module
+    (obj_name libffi_abi)
+    (visibility public)
+    (source
+     (path Libffi_abi)
+     (intf (path libffi_abi.mli))
+     (impl (path libffi_abi.ml)))))))

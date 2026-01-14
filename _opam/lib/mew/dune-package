@@ -1,0 +1,85 @@
+(lang dune 3.20)
+(name mew)
+(sections (lib .) (libexec .) (doc ../../doc/mew))
+(files
+ (lib
+  (META
+   concurrent.ml
+   dune-package
+   key.ml
+   mew.a
+   mew.cma
+   mew.cmi
+   mew.cmt
+   mew.cmx
+   mew.cmxa
+   mew.ml
+   mew__.cmi
+   mew__.cmt
+   mew__.cmx
+   mew__.ml
+   mew__Concurrent.cmi
+   mew__Concurrent.cmt
+   mew__Concurrent.cmx
+   mew__Key.cmi
+   mew__Key.cmt
+   mew__Key.cmx
+   mew__Modal.cmi
+   mew__Modal.cmt
+   mew__Modal.cmx
+   mew__Mode.cmi
+   mew__Mode.cmt
+   mew__Mode.cmx
+   mew__Utils.cmi
+   mew__Utils.cmt
+   mew__Utils.cmx
+   modal.ml
+   mode.ml
+   opam
+   utils.ml))
+ (libexec (mew.cmxs))
+ (doc (CHANGES.md LICENSE README.md)))
+(library
+ (name mew)
+ (kind normal)
+ (archives (byte mew.cma) (native mew.cmxa))
+ (plugins (byte mew.cma) (native mew.cmxs))
+ (native_archives mew.a)
+ (requires result trie)
+ (main_module_name Mew)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name mew__)
+     (visibility public)
+     (kind alias)
+     (source (path Mew__) (impl (path mew__.ml-gen))))
+    (name Mew)
+    (modules
+     (module
+      (obj_name mew__Concurrent)
+      (visibility public)
+      (source (path Concurrent) (impl (path concurrent.ml))))
+     (module
+      (obj_name mew__Key)
+      (visibility public)
+      (source (path Key) (impl (path key.ml))))
+     (module
+      (obj_name mew)
+      (visibility public)
+      (source (path Mew) (impl (path mew.ml))))
+     (module
+      (obj_name mew__Modal)
+      (visibility public)
+      (source (path Modal) (impl (path modal.ml))))
+     (module
+      (obj_name mew__Mode)
+      (visibility public)
+      (source (path Mode) (impl (path mode.ml))))
+     (module
+      (obj_name mew__Utils)
+      (visibility public)
+      (source (path Utils) (impl (path utils.ml))))))
+   (wrapped true))))

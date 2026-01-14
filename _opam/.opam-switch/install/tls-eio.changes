@@ -1,0 +1,27 @@
+opam-version: "2.0"
+added: [
+  "doc/tls-eio" {"D"}
+  "doc/tls-eio/CHANGES.md" {"F:S21359T1768295981.69"}
+  "doc/tls-eio/LICENSE.md" {"F:S1314T1768295981.69"}
+  "doc/tls-eio/README.md" {"F:S4304T1768295981.69"}
+  "lib/tls-eio" {"D"}
+  "lib/tls-eio/META" {"F:S212T1768295981.69"}
+  "lib/tls-eio/dune-package" {"F:S1017T1768295981.69"}
+  "lib/tls-eio/opam" {"F:S1825T1768295981.69"}
+  "lib/tls-eio/tls_eio.a" {"F:S63378T1768295981.69"}
+  "lib/tls-eio/tls_eio.cma" {"F:S39677T1768295981.69"}
+  "lib/tls-eio/tls_eio.cmi" {"F:S3328T1768295981.69"}
+  "lib/tls-eio/tls_eio.cmt" {"F:S49568T1768295981.69"}
+  "lib/tls-eio/tls_eio.cmti" {"F:S10496T1768295981.69"}
+  "lib/tls-eio/tls_eio.cmx" {"F:S5654T1768295981.69"}
+  "lib/tls-eio/tls_eio.cmxa" {"F:S5757T1768295981.69"}
+  "lib/tls-eio/tls_eio.cmxs" {"F:S76352T1768295981.69"}
+  "lib/tls-eio/tls_eio.ml" {"F:S8276T1768295981.69"}
+  "lib/tls-eio/tls_eio.mli" {"F:S2446T1768295981.69"}
+  "lib/tls-eio/x509_eio.cmi" {"F:S3100T1768295981.69"}
+  "lib/tls-eio/x509_eio.cmt" {"F:S23185T1768295981.69"}
+  "lib/tls-eio/x509_eio.cmti" {"F:S8759T1768295981.69"}
+  "lib/tls-eio/x509_eio.cmx" {"F:S3135T1768295981.69"}
+  "lib/tls-eio/x509_eio.ml" {"F:S2871T1768295981.69"}
+  "lib/tls-eio/x509_eio.mli" {"F:S1082T1768295981.69"}
+]

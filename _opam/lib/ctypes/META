@@ -1,0 +1,33 @@
+version = "0.24.0"
+description = ""
+requires = "integers"
+archive(byte) = "ctypes.cma"
+archive(native) = "ctypes.cmxa"
+plugin(byte) = "ctypes.cma"
+plugin(native) = "ctypes.cmxs"
+package "foreign" (
+  directory = "foreign"
+  version = "0.24.0"
+  requires = "ctypes-foreign"
+  exports = "ctypes-foreign"
+)
+package "stubs" (
+  directory = "stubs"
+  version = "0.24.0"
+  description = ""
+  requires = "ctypes str"
+  archive(byte) = "ctypes_stubs.cma"
+  archive(native) = "ctypes_stubs.cmxa"
+  plugin(byte) = "ctypes_stubs.cma"
+  plugin(native) = "ctypes_stubs.cmxs"
+)
+package "top" (
+  directory = "top"
+  version = "0.24.0"
+  description = ""
+  requires = "compiler-libs ctypes"
+  archive(byte) = "ctypes_top.cma"
+  archive(native) = "ctypes_top.cmxa"
+  plugin(byte) = "ctypes_top.cma"
+  plugin(native) = "ctypes_top.cmxs"
+)

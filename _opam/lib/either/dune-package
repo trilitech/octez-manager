@@ -1,0 +1,53 @@
+(lang dune 3.20)
+(name either)
+(version 1.0.0)
+(sections (lib .) (libexec .) (doc ../../doc/either))
+(files
+ (lib
+  (META
+   dune-package
+   either.a
+   either.cma
+   either.cmi
+   either.cmt
+   either.cmx
+   either.cmxa
+   either.ml
+   either__.cmi
+   either__.cmt
+   either__.cmx
+   either__.ml
+   either__Either_intf.cmi
+   either__Either_intf.cmt
+   either__Either_intf.cmx
+   either_intf.ml
+   opam))
+ (libexec (either.cmxs))
+ (doc (CHANGES.md LICENSE README.md)))
+(library
+ (name either)
+ (kind normal)
+ (archives (byte either.cma) (native either.cmxa))
+ (plugins (byte either.cma) (native either.cmxs))
+ (native_archives either.a)
+ (main_module_name Either)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name either__)
+     (visibility public)
+     (kind alias)
+     (source (path Either__) (impl (path either__.ml-gen))))
+    (name Either)
+    (modules
+     (module
+      (obj_name either)
+      (visibility public)
+      (source (path Either) (impl (path either.ml))))
+     (module
+      (obj_name either__Either_intf)
+      (visibility public)
+      (source (path Either_intf) (impl (path either_intf.ml))))))
+   (wrapped true))))

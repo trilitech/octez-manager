@@ -1,0 +1,9 @@
+(library
+ (public_name lwt)
+ (synopsis "Monadic promises and concurrent I/O")
+ (wrapped false)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(documentation
+ (package lwt))

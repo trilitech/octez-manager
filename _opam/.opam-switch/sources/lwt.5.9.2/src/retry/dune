@@ -1,0 +1,7 @@
+(library
+ (public_name lwt_retry)
+ (synopsis "A utility for retrying Lwt computations")
+ (wrapped false)
+ (libraries lwt lwt.unix)
+ (instrumentation
+  (backend bisect_ppx)))

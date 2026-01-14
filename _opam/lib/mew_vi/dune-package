@@ -1,0 +1,101 @@
+(lang dune 3.20)
+(name mew_vi)
+(sections (lib .) (libexec .) (doc ../../doc/mew_vi))
+(files
+ (lib
+  (META
+   core.ml
+   dune-package
+   edit_action.ml
+   interpret.ml
+   key.ml
+   mew_vi.a
+   mew_vi.cma
+   mew_vi.cmi
+   mew_vi.cmt
+   mew_vi.cmx
+   mew_vi.cmxa
+   mew_vi.ml
+   mew_vi__.cmi
+   mew_vi__.cmt
+   mew_vi__.cmx
+   mew_vi__.ml
+   mew_vi__Core.cmi
+   mew_vi__Core.cmt
+   mew_vi__Core.cmx
+   mew_vi__Edit_action.cmi
+   mew_vi__Edit_action.cmt
+   mew_vi__Edit_action.cmx
+   mew_vi__Interpret.cmi
+   mew_vi__Interpret.cmt
+   mew_vi__Interpret.cmx
+   mew_vi__Key.cmi
+   mew_vi__Key.cmt
+   mew_vi__Key.cmx
+   mew_vi__Modal.cmi
+   mew_vi__Modal.cmt
+   mew_vi__Modal.cmx
+   mew_vi__Mode.cmi
+   mew_vi__Mode.cmt
+   mew_vi__Mode.cmx
+   mew_vi__Vi_action.cmi
+   mew_vi__Vi_action.cmt
+   mew_vi__Vi_action.cmx
+   modal.ml
+   mode.ml
+   opam
+   vi_action.ml))
+ (libexec (mew_vi.cmxs))
+ (doc (CHANGES.md LICENSE README.md)))
+(library
+ (name mew_vi)
+ (kind normal)
+ (archives (byte mew_vi.cma) (native mew_vi.cmxa))
+ (plugins (byte mew_vi.cma) (native mew_vi.cmxs))
+ (native_archives mew_vi.a)
+ (requires mew react)
+ (main_module_name Mew_vi)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name mew_vi__)
+     (visibility public)
+     (kind alias)
+     (source (path Mew_vi__) (impl (path mew_vi__.ml-gen))))
+    (name Mew_vi)
+    (modules
+     (module
+      (obj_name mew_vi__Core)
+      (visibility public)
+      (source (path Core) (impl (path core.ml))))
+     (module
+      (obj_name mew_vi__Edit_action)
+      (visibility public)
+      (source (path Edit_action) (impl (path edit_action.ml))))
+     (module
+      (obj_name mew_vi__Interpret)
+      (visibility public)
+      (source (path Interpret) (impl (path interpret.ml))))
+     (module
+      (obj_name mew_vi__Key)
+      (visibility public)
+      (source (path Key) (impl (path key.ml))))
+     (module
+      (obj_name mew_vi)
+      (visibility public)
+      (source (path Mew_vi) (impl (path mew_vi.ml))))
+     (module
+      (obj_name mew_vi__Modal)
+      (visibility public)
+      (source (path Modal) (impl (path modal.ml))))
+     (module
+      (obj_name mew_vi__Mode)
+      (visibility public)
+      (source (path Mode) (impl (path mode.ml))))
+     (module
+      (obj_name mew_vi__Vi_action)
+      (visibility public)
+      (source (path Vi_action) (impl (path vi_action.ml))))))
+   (wrapped true))))

@@ -1,0 +1,47 @@
+opam-version: "2.0"
+added: [
+  "doc/ptime" {"D"}
+  "doc/ptime/CHANGES.md" {"F:S3901T1768295764.99"}
+  "doc/ptime/LICENSE.md" {"F:S739T1768295764.99"}
+  "doc/ptime/README.md" {"F:S1392T1768295764.99"}
+  "doc/ptime/min_clock.ml" {"F:S958T1768295764.99"}
+  "doc/ptime/odoc-pages" {"D"}
+  "doc/ptime/odoc-pages/index.mld" {"F:S804T1768295764.99"}
+  "lib/ptime" {"D"}
+  "lib/ptime/META" {"F:S1116T1768295764.99"}
+  "lib/ptime/clock" {"D"}
+  "lib/ptime/clock/libptime_clock_stubs.a" {"F:S23738T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.a" {"F:S6970T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.cma" {"F:S2639T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.cmi" {"F:S788T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.cmt" {"F:S3646T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.cmti" {"F:S4941T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.cmx" {"F:S1061T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.cmxa" {"F:S466T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.cmxs" {"F:S32896T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.ml" {"F:S911T1768295764.99"}
+  "lib/ptime/clock/ptime_clock.mli" {"F:S3372T1768295764.99"}
+  "lib/ptime/clock/ptime_clock_stubs.c" {"F:S7401T1768295764.99"}
+  "lib/ptime/clock/runtime.js" {"F:S1706T1768295764.99"}
+  "lib/ptime/opam" {"F:S1388T1768295764.99"}
+  "lib/ptime/ptime.a" {"F:S122482T1768295764.99"}
+  "lib/ptime/ptime.cma" {"F:S69340T1768295764.99"}
+  "lib/ptime/ptime.cmi" {"F:S3404T1768295764.99"}
+  "lib/ptime/ptime.cmt" {"F:S138773T1768295764.99"}
+  "lib/ptime/ptime.cmti" {"F:S28433T1768295764.99"}
+  "lib/ptime/ptime.cmx" {"F:S7052T1768295764.99"}
+  "lib/ptime/ptime.cmxa" {"F:S744T1768295764.99"}
+  "lib/ptime/ptime.cmxs" {"F:S123848T1768295764.99"}
+  "lib/ptime/ptime.ml" {"F:S26272T1768295764.99"}
+  "lib/ptime/ptime.mli" {"F:S25302T1768295764.99"}
+  "lib/ptime/ptime_top_init.ml" {"F:S318T1768295764.99"}
+  "lib/ptime/top" {"D"}
+  "lib/ptime/top/ptime_top.a" {"F:S4158T1768295764.99"}
+  "lib/ptime/top/ptime_top.cma" {"F:S2476T1768295764.99"}
+  "lib/ptime/top/ptime_top.cmt" {"F:S4150T1768295764.99"}
+  "lib/ptime/top/ptime_top.cmx" {"F:S1431T1768295764.99"}
+  "lib/ptime/top/ptime_top.cmxa" {"F:S1437T1768295764.99"}
+  "lib/ptime/top/ptime_top.cmxs" {"F:S18816T1768295764.99"}
+  "lib/ptime/top/ptime_top.ml" {"F:S333T1768295764.99"}
+  "lib/stublibs/dllptime_clock_stubs.so" {"F:S25736T1768295764.99"}
+]

@@ -1,0 +1,28 @@
+opam-version: "2.0"
+added: [
+  "bin/miaou-runner-tui" {"F:S7636336T1768295994.52"}
+  "doc/miaou-runner" {"D"}
+  "doc/miaou-runner/CHANGELOG.md" {"F:S21733T1768295994.52"}
+  "doc/miaou-runner/LICENSE.md" {"F:S1096T1768295994.52"}
+  "doc/miaou-runner/README.md" {"F:S29532T1768295994.52"}
+  "lib/miaou-runner" {"D"}
+  "lib/miaou-runner/META" {"F:S346T1768295994.52"}
+  "lib/miaou-runner/dune-package" {"F:S1449T1768295994.52"}
+  "lib/miaou-runner/opam" {"F:S687T1768295994.52"}
+  "lib/miaou-runner/tui" {"D"}
+  "lib/miaou-runner/tui/miaou_runner_tui.a" {"F:S7518T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui.cma" {"F:S7793T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui.cmi" {"F:S237T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui.cmt" {"F:S1554T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui.cmx" {"F:S155T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui.cmxa" {"F:S5202T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui.cmxs" {"F:S23664T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui.ml" {"F:S120T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui__Runner_tui.cmi"
+    {"F:S5038T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui__Runner_tui.cmt"
+    {"F:S12125T1768295994.52"}
+  "lib/miaou-runner/tui/miaou_runner_tui__Runner_tui.cmx"
+    {"F:S5120T1768295994.52"}
+  "lib/miaou-runner/tui/runner_tui.ml" {"F:S657T1768295994.52"}
+]

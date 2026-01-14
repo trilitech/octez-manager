@@ -1,0 +1,8 @@
+(library
+ (name ppx_deriving_enum)
+ (public_name ppx_deriving.enum)
+ (synopsis "[@@deriving enum]")
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries compiler-libs.common ppxlib ppx_deriving.api)
+ (kind ppx_deriver))

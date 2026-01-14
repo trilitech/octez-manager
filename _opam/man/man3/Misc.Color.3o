@@ -1,0 +1,36 @@
+.TH "Misc.Color" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Misc.Color \-  Color support detection 
+.SH Module
+Module   Misc.Color
+.SH Documentation
+.sp
+Module
+.BI "Color"
+ : 
+.B sig end
+
+.sp
+.SS Color support detection 
+
+
+.sp
+
+.sp
+.sp
+.I type setting 
+=
+ | Auto
+ | Always
+ | Never
+ 
+.sp
+
+.sp
+
+.I val default_setting 
+: 
+.B setting
+.sp
+
+.sp

@@ -1,0 +1,27 @@
+version = "0.5.2"
+description = ""
+requires = "optint"
+archive(byte) = ""
+archive(native) = ""
+plugin(byte) = ""
+plugin(native) = ""
+package "c" (
+  directory = "c"
+  version = "0.5.2"
+  description = ""
+  requires = "checkseum optint"
+  archive(byte) = "checkseum_c.cma"
+  archive(native) = "checkseum_c.cmxa"
+  plugin(byte) = "checkseum_c.cma"
+  plugin(native) = "checkseum_c.cmxs"
+)
+package "ocaml" (
+  directory = "ocaml"
+  version = "0.5.2"
+  description = ""
+  requires = "checkseum optint"
+  archive(byte) = "checkseum_ocaml.cma"
+  archive(native) = "checkseum_ocaml.cmxa"
+  plugin(byte) = "checkseum_ocaml.cma"
+  plugin(native) = "checkseum_ocaml.cmxs"
+)

@@ -1,0 +1,21 @@
+opam-version: "2.0"
+added: [
+  "doc/ohex" {"D"}
+  "doc/ohex/CHANGES.md" {"F:S164T1768295822.31"}
+  "doc/ohex/LICENSE.md" {"F:S1297T1768295822.31"}
+  "doc/ohex/README.md" {"F:S329T1768295822.31"}
+  "lib/ohex" {"D"}
+  "lib/ohex/META" {"F:S142T1768295822.31"}
+  "lib/ohex/dune-package" {"F:S639T1768295822.31"}
+  "lib/ohex/ohex.a" {"F:S25438T1768295822.31"}
+  "lib/ohex/ohex.cma" {"F:S12714T1768295822.31"}
+  "lib/ohex/ohex.cmi" {"F:S952T1768295822.31"}
+  "lib/ohex/ohex.cmt" {"F:S26738T1768295822.31"}
+  "lib/ohex/ohex.cmti" {"F:S5017T1768295822.31"}
+  "lib/ohex/ohex.cmx" {"F:S1932T1768295822.31"}
+  "lib/ohex/ohex.cmxa" {"F:S659T1768295822.31"}
+  "lib/ohex/ohex.cmxs" {"F:S39368T1768295822.31"}
+  "lib/ohex/ohex.ml" {"F:S3529T1768295822.31"}
+  "lib/ohex/ohex.mli" {"F:S2656T1768295822.31"}
+  "lib/ohex/opam" {"F:S678T1768295822.31"}
+]

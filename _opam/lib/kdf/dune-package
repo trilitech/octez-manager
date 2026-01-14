@@ -1,0 +1,91 @@
+(lang dune 3.20)
+(name kdf)
+(version 1.0.0)
+(sections (lib .) (libexec .) (doc ../../doc/kdf) (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   dune-package
+   hkdf/hkdf.a
+   hkdf/hkdf.cma
+   hkdf/hkdf.cmi
+   hkdf/hkdf.cmt
+   hkdf/hkdf.cmti
+   hkdf/hkdf.cmx
+   hkdf/hkdf.cmxa
+   hkdf/hkdf.ml
+   hkdf/hkdf.mli
+   opam
+   pbkdf/pbkdf.a
+   pbkdf/pbkdf.cma
+   pbkdf/pbkdf.cmi
+   pbkdf/pbkdf.cmt
+   pbkdf/pbkdf.cmti
+   pbkdf/pbkdf.cmx
+   pbkdf/pbkdf.cmxa
+   pbkdf/pbkdf.ml
+   pbkdf/pbkdf.mli
+   scrypt/libscrypt_stubs.a
+   scrypt/scrypt.a
+   scrypt/scrypt.cma
+   scrypt/scrypt.cmi
+   scrypt/scrypt.cmt
+   scrypt/scrypt.cmti
+   scrypt/scrypt.cmx
+   scrypt/scrypt.cmxa
+   scrypt/scrypt.ml
+   scrypt/scrypt.mli))
+ (libexec (hkdf/hkdf.cmxs pbkdf/pbkdf.cmxs scrypt/scrypt.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md))
+ (stublibs (dllscrypt_stubs.so)))
+(library
+ (name kdf.hkdf)
+ (kind normal)
+ (archives (byte hkdf/hkdf.cma) (native hkdf/hkdf.cmxa))
+ (plugins (byte hkdf/hkdf.cma) (native hkdf/hkdf.cmxs))
+ (native_archives hkdf/hkdf.a)
+ (requires digestif)
+ (main_module_name Hkdf)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name hkdf)
+   (visibility public)
+   (source (path Hkdf) (intf (path hkdf/hkdf.mli)) (impl (path hkdf/hkdf.ml))))))
+(library
+ (name kdf.pbkdf)
+ (kind normal)
+ (archives (byte pbkdf/pbkdf.cma) (native pbkdf/pbkdf.cmxa))
+ (plugins (byte pbkdf/pbkdf.cma) (native pbkdf/pbkdf.cmxs))
+ (native_archives pbkdf/pbkdf.a)
+ (requires digestif mirage-crypto)
+ (main_module_name Pbkdf)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name pbkdf)
+   (visibility public)
+   (source
+    (path Pbkdf)
+    (intf (path pbkdf/pbkdf.mli))
+    (impl (path pbkdf/pbkdf.ml))))))
+(library
+ (name kdf.scrypt)
+ (kind normal)
+ (archives (byte scrypt/scrypt.cma) (native scrypt/scrypt.cmxa))
+ (plugins (byte scrypt/scrypt.cma) (native scrypt/scrypt.cmxs))
+ (foreign_objects scrypt/salsa-core.o)
+ (foreign_archives (archives (for all) (files scrypt/libscrypt_stubs.a)))
+ (foreign_dll_files ../stublibs/dllscrypt_stubs.so)
+ (native_archives scrypt/scrypt.a)
+ (requires mirage-crypto kdf.pbkdf)
+ (main_module_name Scrypt)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name scrypt)
+   (visibility public)
+   (source
+    (path Scrypt)
+    (intf (path scrypt/scrypt.mli))
+    (impl (path scrypt/scrypt.ml))))))

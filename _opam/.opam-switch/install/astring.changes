@@ -1,0 +1,47 @@
+opam-version: "2.0"
+added: [
+  "doc/astring" {"D"}
+  "doc/astring/CHANGES.md" {"F:S934T1768295823.26"}
+  "doc/astring/LICENSE.md" {"F:S741T1768295823.26"}
+  "doc/astring/README.md" {"F:S1345T1768295823.26"}
+  "doc/astring/examples.ml" {"F:S2980T1768295823.26"}
+  "lib/astring" {"D"}
+  "lib/astring/META" {"F:S461T1768295823.26"}
+  "lib/astring/astring.a" {"F:S364118T1768295823.26"}
+  "lib/astring/astring.cma" {"F:S204293T1768295823.26"}
+  "lib/astring/astring.cmi" {"F:S12006T1768295823.26"}
+  "lib/astring/astring.cmt" {"F:S27415T1768295823.26"}
+  "lib/astring/astring.cmti" {"F:S81019T1768295823.26"}
+  "lib/astring/astring.cmx" {"F:S28277T1768295823.26"}
+  "lib/astring/astring.cmxa" {"F:S6065T1768295823.26"}
+  "lib/astring/astring.cmxs" {"F:S304656T1768295823.26"}
+  "lib/astring/astring.ml" {"F:S1352T1768295823.26"}
+  "lib/astring/astring.mli" {"F:S52930T1768295823.26"}
+  "lib/astring/astring_base.cmt" {"F:S17036T1768295823.26"}
+  "lib/astring/astring_base.cmx" {"F:S2112T1768295823.26"}
+  "lib/astring/astring_base.ml" {"F:S3230T1768295823.26"}
+  "lib/astring/astring_char.cmt" {"F:S17858T1768295823.26"}
+  "lib/astring/astring_char.cmx" {"F:S3192T1768295823.26"}
+  "lib/astring/astring_char.ml" {"F:S3140T1768295823.26"}
+  "lib/astring/astring_escape.cmt" {"F:S38707T1768295823.26"}
+  "lib/astring/astring_escape.cmx" {"F:S1608T1768295823.26"}
+  "lib/astring/astring_escape.ml" {"F:S6938T1768295823.26"}
+  "lib/astring/astring_string.cmt" {"F:S162499T1768295823.26"}
+  "lib/astring/astring_string.cmx" {"F:S19033T1768295823.26"}
+  "lib/astring/astring_string.ml" {"F:S24822T1768295823.26"}
+  "lib/astring/astring_sub.cmt" {"F:S146245T1768295823.26"}
+  "lib/astring/astring_sub.cmx" {"F:S12836T1768295823.26"}
+  "lib/astring/astring_sub.ml" {"F:S24485T1768295823.26"}
+  "lib/astring/astring_top.a" {"F:S4182T1768295823.26"}
+  "lib/astring/astring_top.cma" {"F:S2475T1768295823.26"}
+  "lib/astring/astring_top.cmt" {"F:S4703T1768295823.26"}
+  "lib/astring/astring_top.cmx" {"F:S1433T1768295823.26"}
+  "lib/astring/astring_top.cmxa" {"F:S1439T1768295823.26"}
+  "lib/astring/astring_top.cmxs" {"F:S18840T1768295823.26"}
+  "lib/astring/astring_top.ml" {"F:S1310T1768295823.26"}
+  "lib/astring/astring_top_init.ml" {"F:S1424T1768295823.26"}
+  "lib/astring/astring_unsafe.cmt" {"F:S6663T1768295823.26"}
+  "lib/astring/astring_unsafe.cmx" {"F:S1170T1768295823.26"}
+  "lib/astring/astring_unsafe.ml" {"F:S2258T1768295823.26"}
+  "lib/astring/opam" {"F:S1269T1768295823.26"}
+]

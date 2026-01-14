@@ -1,0 +1,27 @@
+version = "0.10"
+description = ""
+requires = ""
+archive(byte) = "eqaf.cma"
+archive(native) = "eqaf.cmxa"
+plugin(byte) = "eqaf.cma"
+plugin(native) = "eqaf.cmxs"
+package "bigstring" (
+  directory = "bigstring"
+  version = "0.10"
+  description = ""
+  requires = "eqaf"
+  archive(byte) = "eqaf_bigstring.cma"
+  archive(native) = "eqaf_bigstring.cmxa"
+  plugin(byte) = "eqaf_bigstring.cma"
+  plugin(native) = "eqaf_bigstring.cmxs"
+)
+package "bytes" (
+  directory = "bytes"
+  version = "0.10"
+  description = ""
+  requires = "eqaf"
+  archive(byte) = "eqaf_bytes.cma"
+  archive(native) = "eqaf_bytes.cmxa"
+  plugin(byte) = "eqaf_bytes.cma"
+  plugin(native) = "eqaf_bytes.cmxs"
+)

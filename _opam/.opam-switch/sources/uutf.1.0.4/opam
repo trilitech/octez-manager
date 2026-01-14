@@ -1,0 +1,39 @@
+version: "1.0.4"
+opam-version: "2.0"
+name: "uutf"
+synopsis: "Non-blocking streaming Unicode codec for OCaml"
+description: """\
+**Warning.** You are encouraged not to use this library.
+
+- As of OCaml 4.14, both UTF encoding and decoding are available
+  in the standard library, see the `String` and `Buffer` modules.
+- If you are looking for a stream abstraction compatible with
+  effect based concurrency look into [`bytesrw`] package."""
+maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
+authors: "The uutf programmers"
+license: "ISC"
+tags: ["unicode" "text" "utf-8" "utf-16" "codec" "org:erratique"]
+homepage: "https://erratique.ch/software/uutf"
+doc: "https://erratique.ch/software/uutf/doc/"
+bug-reports: "https://github.com/dbuenzli/uutf/issues"
+depends: [
+  "ocaml" {>= "4.08.0"}
+  "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "topkg" {build & >= "1.0.3"}
+]
+depopts: ["cmdliner"]
+conflicts: [
+  "cmdliner" {< "1.3.0"}
+]
+build: [
+  "ocaml"
+  "pkg/pkg.ml"
+  "build"
+  "--dev-pkg"
+  "%{dev}%"
+  "--with-cmdliner"
+  "%{cmdliner:installed}%"
+]
+dev-repo: "git+https://erratique.ch/repos/uutf.git"
+x-maintenance-intent: ["(latest)"]

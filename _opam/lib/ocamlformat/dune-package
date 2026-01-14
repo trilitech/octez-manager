@@ -1,0 +1,165 @@
+(lang dune 3.20)
+(name ocamlformat)
+(version 0.28.1)
+(sections
+ (lib .)
+ (libexec .)
+ (bin ../../bin)
+ (share_root ../../share)
+ (doc ../../doc/ocamlformat)
+ (man ../../man))
+(files
+ (lib
+  (META
+   bin_conf/Bin_conf.ml
+   bin_conf/Bin_conf.mli
+   bin_conf/File_system.ml
+   bin_conf/File_system.mli
+   bin_conf/bin_conf.a
+   bin_conf/bin_conf.cma
+   bin_conf/bin_conf.cmi
+   bin_conf/bin_conf.cmt
+   bin_conf/bin_conf.cmti
+   bin_conf/bin_conf.cmx
+   bin_conf/bin_conf.cmxa
+   bin_conf/bin_conf__.cmi
+   bin_conf/bin_conf__.cmt
+   bin_conf/bin_conf__.cmx
+   bin_conf/bin_conf__.ml
+   bin_conf/bin_conf__File_system.cmi
+   bin_conf/bin_conf__File_system.cmt
+   bin_conf/bin_conf__File_system.cmti
+   bin_conf/bin_conf__File_system.cmx
+   dune-package
+   opam
+   rpc/ocamlformat_rpc.a
+   rpc/ocamlformat_rpc.cma
+   rpc/ocamlformat_rpc.cmi
+   rpc/ocamlformat_rpc.cmt
+   rpc/ocamlformat_rpc.cmx
+   rpc/ocamlformat_rpc.cmxa
+   rpc/ocamlformat_rpc.ml
+   rpc_lib_protocol/IO.ml
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.a
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cma
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cmi
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cmt
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cmx
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cmxa
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.ml
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol__IO.cmi
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol__IO.cmt
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol__IO.cmx
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol__Protocol.cmi
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol__Protocol.cmt
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol__Protocol.cmti
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol__Protocol.cmx
+   rpc_lib_protocol/protocol.ml
+   rpc_lib_protocol/protocol.mli))
+ (libexec
+  (bin_conf/bin_conf.cmxs
+   rpc/ocamlformat_rpc.cmxs
+   rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cmxs))
+ (bin (ocamlformat ocamlformat-rpc))
+ (share_root (emacs/site-lisp/ocamlformat.el))
+ (doc
+  (CHANGES.md
+   LICENSE
+   README.md
+   odoc-pages/api.mld
+   odoc-pages/configuration.mld
+   odoc-pages/doc_comments.mld
+   odoc-pages/editor_setup.mld
+   odoc-pages/faq.mld
+   odoc-pages/getting_started.mld
+   odoc-pages/howtos.mld
+   odoc-pages/index.mld
+   odoc-pages/manpage_ocamlformat.mld
+   odoc-pages/manpage_ocamlformat_rpc.mld
+   odoc-pages/rpc.mld))
+ (man (man1/ocamlformat-rpc.1 man1/ocamlformat.1)))
+(library
+ (name ocamlformat.bin_conf)
+ (kind normal)
+ (archives (byte bin_conf/bin_conf.cma) (native bin_conf/bin_conf.cmxa))
+ (plugins (byte bin_conf/bin_conf.cma) (native bin_conf/bin_conf.cmxs))
+ (native_archives bin_conf/bin_conf.a)
+ (requires ocamlformat-lib re)
+ (main_module_name Bin_conf)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name bin_conf__)
+     (visibility public)
+     (kind alias)
+     (source (path Bin_conf__) (impl (path bin_conf/bin_conf__.ml-gen))))
+    (name Bin_conf)
+    (modules
+     (module
+      (obj_name bin_conf)
+      (visibility public)
+      (source
+       (path Bin_conf)
+       (intf (path bin_conf/Bin_conf.mli))
+       (impl (path bin_conf/Bin_conf.ml))))
+     (module
+      (obj_name bin_conf__File_system)
+      (visibility public)
+      (source
+       (path File_system)
+       (intf (path bin_conf/File_system.mli))
+       (impl (path bin_conf/File_system.ml))))))
+   (wrapped true))))
+(library
+ (name ocamlformat.rpc)
+ (kind normal)
+ (archives (byte rpc/ocamlformat_rpc.cma) (native rpc/ocamlformat_rpc.cmxa))
+ (plugins (byte rpc/ocamlformat_rpc.cma) (native rpc/ocamlformat_rpc.cmxs))
+ (native_archives rpc/ocamlformat_rpc.a)
+ (requires ocamlformat-lib ocamlformat.bin_conf ocamlformat.rpc_lib_protocol)
+ (main_module_name Ocamlformat_rpc)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name ocamlformat_rpc)
+   (visibility public)
+   (source (path Ocamlformat_rpc) (impl (path rpc/ocamlformat_rpc.ml))))))
+(library
+ (name ocamlformat.rpc_lib_protocol)
+ (kind normal)
+ (archives
+  (byte rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cma)
+  (native rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cmxa))
+ (plugins
+  (byte rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cma)
+  (native rpc_lib_protocol/ocamlformat_rpc_lib_protocol.cmxs))
+ (native_archives rpc_lib_protocol/ocamlformat_rpc_lib_protocol.a)
+ (requires csexp)
+ (main_module_name Ocamlformat_rpc_lib_protocol)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name ocamlformat_rpc_lib_protocol)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Ocamlformat_rpc_lib_protocol)
+      (impl (path rpc_lib_protocol/ocamlformat_rpc_lib_protocol.ml-gen))))
+    (name Ocamlformat_rpc_lib_protocol)
+    (modules
+     (module
+      (obj_name ocamlformat_rpc_lib_protocol__IO)
+      (visibility public)
+      (source (path IO) (impl (path rpc_lib_protocol/IO.ml))))
+     (module
+      (obj_name ocamlformat_rpc_lib_protocol__Protocol)
+      (visibility public)
+      (source
+       (path Protocol)
+       (intf (path rpc_lib_protocol/protocol.mli))
+       (impl (path rpc_lib_protocol/protocol.ml))))))
+   (wrapped true))))

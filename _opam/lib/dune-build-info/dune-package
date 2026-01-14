@@ -1,0 +1,59 @@
+(lang dune 3.20)
+(name dune-build-info)
+(version 3.20.2)
+(sections (lib .) (libexec .) (doc ../../doc/dune-build-info))
+(files
+ (lib
+  (META
+   build_info.a
+   build_info.cma
+   build_info.cmi
+   build_info.cmt
+   build_info.cmti
+   build_info.cmx
+   build_info.cmxa
+   build_info.ml
+   build_info.mli
+   build_info__.cmi
+   build_info__.cmt
+   build_info__.cmx
+   build_info__.ml
+   build_info__Build_info_data.cmi
+   build_info__Build_info_data.cmti
+   build_info_data.mli
+   dune-package
+   opam))
+ (libexec (build_info.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md odoc-pages/index.mld)))
+(library
+ (name dune-build-info)
+ (kind normal)
+ (archives (byte build_info.cma) (native build_info.cmxa))
+ (plugins (byte build_info.cma) (native build_info.cmxs))
+ (native_archives build_info.a)
+ (main_module_name Build_info)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name build_info__)
+     (visibility public)
+     (kind alias)
+     (source (path Build_info__) (impl (path build_info__.ml-gen))))
+    (name Build_info)
+    (modules
+     (module
+      (obj_name build_info)
+      (visibility public)
+      (source
+       (path Build_info)
+       (intf (path build_info.mli))
+       (impl (path build_info.ml))))
+     (module
+      (obj_name build_info__Build_info_data)
+      (visibility public)
+      (source (path Build_info_data) (intf (path build_info_data.mli))))))
+   (wrapped true)))
+ (special_builtin_support
+  (build_info (data_module Build_info_data) (api_version 1))))

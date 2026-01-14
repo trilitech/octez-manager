@@ -1,0 +1,37 @@
+opam-version: "2.0"
+added: [
+  "doc/eio_main" {"D"}
+  "doc/eio_main/CHANGES.md" {"F:S34064T1768295978.48"}
+  "doc/eio_main/LICENSE.md" {"F:S3303T1768295978.48"}
+  "doc/eio_main/README.md" {"F:S64877T1768295978.48"}
+  "lib/eio_main" {"D"}
+  "lib/eio_main/META" {"F:S177T1768295978.48"}
+  "lib/eio_main/dune-package" {"F:S1882T1768295978.48"}
+  "lib/eio_main/eio_main.a" {"F:S26772T1768295978.48"}
+  "lib/eio_main/eio_main.cma" {"F:S14244T1768295978.48"}
+  "lib/eio_main/eio_main.cmi" {"F:S1938T1768295978.48"}
+  "lib/eio_main/eio_main.cmt" {"F:S6989T1768295978.48"}
+  "lib/eio_main/eio_main.cmti" {"F:S5615T1768295978.48"}
+  "lib/eio_main/eio_main.cmx" {"F:S2388T1768295978.48"}
+  "lib/eio_main/eio_main.cmxa" {"F:S6539T1768295978.48"}
+  "lib/eio_main/eio_main.cmxs" {"F:S34840T1768295978.48"}
+  "lib/eio_main/eio_main.ml" {"F:S538T1768295978.48"}
+  "lib/eio_main/eio_main.mli" {"F:S1037T1768295978.48"}
+  "lib/eio_main/eio_main__.cmi" {"F:S457T1768295978.48"}
+  "lib/eio_main/eio_main__.cmt" {"F:S2328T1768295978.48"}
+  "lib/eio_main/eio_main__.cmx" {"F:S217T1768295978.48"}
+  "lib/eio_main/eio_main__.ml" {"F:S370T1768295978.48"}
+  "lib/eio_main/eio_main__Linux_backend.cmi" {"F:S2101T1768295978.48"}
+  "lib/eio_main/eio_main__Linux_backend.cmt" {"F:S6077T1768295978.48"}
+  "lib/eio_main/eio_main__Linux_backend.cmx" {"F:S1986T1768295978.48"}
+  "lib/eio_main/eio_main__Posix_backend.cmi" {"F:S2060T1768295978.48"}
+  "lib/eio_main/eio_main__Posix_backend.cmt" {"F:S5629T1768295978.48"}
+  "lib/eio_main/eio_main__Posix_backend.cmx" {"F:S1986T1768295978.48"}
+  "lib/eio_main/eio_main__Windows_backend.cmi" {"F:S403T1768295978.48"}
+  "lib/eio_main/eio_main__Windows_backend.cmt" {"F:S2337T1768295978.48"}
+  "lib/eio_main/eio_main__Windows_backend.cmx" {"F:S580T1768295978.48"}
+  "lib/eio_main/linux_backend.ml" {"F:S133T1768295978.48"}
+  "lib/eio_main/opam" {"F:S1099T1768295978.48"}
+  "lib/eio_main/posix_backend.ml" {"F:S125T1768295978.48"}
+  "lib/eio_main/windows_backend.ml" {"F:S132T1768295978.48"}
+]

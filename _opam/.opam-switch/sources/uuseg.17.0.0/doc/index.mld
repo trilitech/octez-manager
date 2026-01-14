@@ -1,0 +1,10 @@
+{0 Uuseg {%html: <span class="version">v17.0.0</span>%}}
+
+Uuseg segments Unicode text. See {!Uuseg} for more details.
+
+{1:library_uuseg Library [uuseg]}
+
+{!modules:
+Uuseg
+Uuseg_string
+}

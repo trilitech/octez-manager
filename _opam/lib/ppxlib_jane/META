@@ -1,0 +1,7 @@
+version = "v0.17.0"
+description = ""
+requires = "compiler-libs.common ppxlib.ast ppxlib.stdppx"
+archive(byte) = "ppxlib_jane.cma"
+archive(native) = "ppxlib_jane.cmxa"
+plugin(byte) = "ppxlib_jane.cma"
+plugin(native) = "ppxlib_jane.cmxs"

@@ -1,0 +1,31 @@
+opam-version: "2.0"
+added: [
+  "doc/tsdl-ttf" {"D"}
+  "doc/tsdl-ttf/CHANGELOG.md" {"F:S863T1768295783.34"}
+  "doc/tsdl-ttf/LICENSE" {"F:S1474T1768295783.34"}
+  "doc/tsdl-ttf/README.md" {"F:S1362T1768295783.34"}
+  "lib/tsdl-ttf" {"D"}
+  "lib/tsdl-ttf/.private" {"D"}
+  "lib/tsdl-ttf/.private/tsdl_ttf__Build_config.cmi" {"F:S323T1768295783.34"}
+  "lib/tsdl-ttf/.private/tsdl_ttf__Build_config.cmt"
+    {"F:S1788T1768295783.34"}
+  "lib/tsdl-ttf/META" {"F:S178T1768295783.34"}
+  "lib/tsdl-ttf/build_config.ml" {"F:S20T1768295783.34"}
+  "lib/tsdl-ttf/dune-package" {"F:S1390T1768295783.34"}
+  "lib/tsdl-ttf/opam" {"F:S911T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.a" {"F:S84210T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.cma" {"F:S42608T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.cmi" {"F:S3070T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.cmt" {"F:S65185T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.cmti" {"F:S14983T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.cmx" {"F:S2570T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.cmxa" {"F:S1859T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.cmxs" {"F:S81232T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.ml" {"F:S11683T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf.mli" {"F:S3411T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf__.cmi" {"F:S217T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf__.cmt" {"F:S1571T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf__.cmx" {"F:S137T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf__.ml" {"F:S110T1768295783.34"}
+  "lib/tsdl-ttf/tsdl_ttf__Build_config.cmx" {"F:S277T1768295783.34"}
+]

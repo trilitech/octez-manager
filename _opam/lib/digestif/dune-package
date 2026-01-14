@@ -1,0 +1,299 @@
+(lang dune 3.20)
+(name digestif)
+(version 1.3.0)
+(sections (lib .) (libexec .) (doc ../../doc/digestif) (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   c/.private/digestif_bi.cmi
+   c/.private/digestif_bi.cmt
+   c/.private/digestif_by.cmi
+   c/.private/digestif_by.cmt
+   c/.private/digestif_conv.cmi
+   c/.private/digestif_conv.cmt
+   c/.private/digestif_eq.cmi
+   c/.private/digestif_eq.cmt
+   c/.private/digestif_native.cmi
+   c/.private/digestif_native.cmt
+   c/digestif.cmi
+   c/digestif.cmt
+   c/digestif.cmx
+   c/digestif.ml
+   c/digestif_bi.cmx
+   c/digestif_bi.ml
+   c/digestif_by.cmx
+   c/digestif_by.ml
+   c/digestif_c.a
+   c/digestif_c.cma
+   c/digestif_c.cmxa
+   c/digestif_conv.cmx
+   c/digestif_conv.ml
+   c/digestif_eq.cmx
+   c/digestif_eq.ml
+   c/digestif_native.cmx
+   c/digestif_native.ml
+   c/libdigestif_c_stubs.a
+   digestif.cmi
+   digestif.cmti
+   digestif.mli
+   dune-package
+   ocaml/.private/baijiu_blake2b.cmi
+   ocaml/.private/baijiu_blake2b.cmt
+   ocaml/.private/baijiu_blake2s.cmi
+   ocaml/.private/baijiu_blake2s.cmt
+   ocaml/.private/baijiu_md5.cmi
+   ocaml/.private/baijiu_md5.cmt
+   ocaml/.private/baijiu_rmd160.cmi
+   ocaml/.private/baijiu_rmd160.cmt
+   ocaml/.private/baijiu_sha1.cmi
+   ocaml/.private/baijiu_sha1.cmt
+   ocaml/.private/baijiu_sha224.cmi
+   ocaml/.private/baijiu_sha224.cmt
+   ocaml/.private/baijiu_sha256.cmi
+   ocaml/.private/baijiu_sha256.cmt
+   ocaml/.private/baijiu_sha384.cmi
+   ocaml/.private/baijiu_sha384.cmt
+   ocaml/.private/baijiu_sha3_224.cmi
+   ocaml/.private/baijiu_sha3_224.cmt
+   ocaml/.private/baijiu_sha3_384.cmi
+   ocaml/.private/baijiu_sha3_384.cmt
+   ocaml/.private/baijiu_sha3_512.cmi
+   ocaml/.private/baijiu_sha3_512.cmt
+   ocaml/.private/baijiu_sha512.cmi
+   ocaml/.private/baijiu_sha512.cmt
+   ocaml/.private/baijiu_whirlpool.cmi
+   ocaml/.private/baijiu_whirlpool.cmt
+   ocaml/.private/digestif_bi.cmi
+   ocaml/.private/digestif_bi.cmt
+   ocaml/.private/digestif_by.cmi
+   ocaml/.private/digestif_by.cmt
+   ocaml/.private/digestif_conv.cmi
+   ocaml/.private/digestif_conv.cmt
+   ocaml/.private/digestif_eq.cmi
+   ocaml/.private/digestif_eq.cmt
+   ocaml/.private/xor.cmi
+   ocaml/.private/xor.cmt
+   ocaml/baijiu_blake2b.cmx
+   ocaml/baijiu_blake2b.ml
+   ocaml/baijiu_blake2s.cmx
+   ocaml/baijiu_blake2s.ml
+   ocaml/baijiu_keccak_256.cmi
+   ocaml/baijiu_keccak_256.cmt
+   ocaml/baijiu_keccak_256.cmx
+   ocaml/baijiu_keccak_256.ml
+   ocaml/baijiu_md5.cmx
+   ocaml/baijiu_md5.ml
+   ocaml/baijiu_rmd160.cmx
+   ocaml/baijiu_rmd160.ml
+   ocaml/baijiu_sha1.cmx
+   ocaml/baijiu_sha1.ml
+   ocaml/baijiu_sha224.cmx
+   ocaml/baijiu_sha224.ml
+   ocaml/baijiu_sha256.cmx
+   ocaml/baijiu_sha256.ml
+   ocaml/baijiu_sha3.cmi
+   ocaml/baijiu_sha3.cmt
+   ocaml/baijiu_sha3.cmx
+   ocaml/baijiu_sha3.ml
+   ocaml/baijiu_sha384.cmx
+   ocaml/baijiu_sha384.ml
+   ocaml/baijiu_sha3_224.cmx
+   ocaml/baijiu_sha3_224.ml
+   ocaml/baijiu_sha3_256.cmi
+   ocaml/baijiu_sha3_256.cmt
+   ocaml/baijiu_sha3_256.cmx
+   ocaml/baijiu_sha3_256.ml
+   ocaml/baijiu_sha3_384.cmx
+   ocaml/baijiu_sha3_384.ml
+   ocaml/baijiu_sha3_512.cmx
+   ocaml/baijiu_sha3_512.ml
+   ocaml/baijiu_sha512.cmx
+   ocaml/baijiu_sha512.ml
+   ocaml/baijiu_whirlpool.cmx
+   ocaml/baijiu_whirlpool.ml
+   ocaml/digestif.cmi
+   ocaml/digestif.cmt
+   ocaml/digestif.cmx
+   ocaml/digestif.ml
+   ocaml/digestif_bi.cmx
+   ocaml/digestif_bi.ml
+   ocaml/digestif_by.cmx
+   ocaml/digestif_by.ml
+   ocaml/digestif_conv.cmx
+   ocaml/digestif_conv.ml
+   ocaml/digestif_eq.cmx
+   ocaml/digestif_eq.ml
+   ocaml/digestif_ocaml.a
+   ocaml/digestif_ocaml.cma
+   ocaml/digestif_ocaml.cmxa
+   ocaml/xor.cmx
+   ocaml/xor.ml
+   opam))
+ (libexec (c/digestif_c.cmxs ocaml/digestif_ocaml.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md))
+ (stublibs (dlldigestif_c_stubs.so)))
+(library
+ (name digestif)
+ (kind normal)
+ (virtual)
+ (requires eqaf)
+ (default_implementation digestif.c)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name digestif)
+   (visibility public)
+   (kind virtual)
+   (source (path Digestif) (intf (path digestif.mli))))))
+(library
+ (name digestif.c)
+ (kind normal)
+ (archives (byte c/digestif_c.cma) (native c/digestif_c.cmxa))
+ (plugins (byte c/digestif_c.cma) (native c/digestif_c.cmxs))
+ (foreign_objects
+  c/blake2b.o
+  c/blake2s.o
+  c/md5.o
+  c/misc.o
+  c/ripemd160.o
+  c/sha1.o
+  c/sha256.o
+  c/sha3.o
+  c/sha512.o
+  c/stubs.o
+  c/whirlpool.o)
+ (foreign_archives (archives (for all) (files c/libdigestif_c_stubs.a)))
+ (foreign_dll_files ../stublibs/dlldigestif_c_stubs.so)
+ (native_archives c/digestif_c.a)
+ (requires digestif eqaf)
+ (implements digestif)
+ (modes byte native)
+ (obj_dir (private_dir .private))
+ (modules
+  (unwrapped
+   (module
+    (obj_name digestif)
+    (visibility public)
+    (kind impl_vmodule)
+    (source (path Digestif) (impl (path c/digestif.ml))))
+   (module
+    (obj_name digestif_bi)
+    (visibility private)
+    (source (path Digestif_bi) (impl (path c/digestif_bi.ml))))
+   (module
+    (obj_name digestif_by)
+    (visibility private)
+    (source (path Digestif_by) (impl (path c/digestif_by.ml))))
+   (module
+    (obj_name digestif_conv)
+    (visibility private)
+    (source (path Digestif_conv) (impl (path c/digestif_conv.ml))))
+   (module
+    (obj_name digestif_eq)
+    (visibility private)
+    (source (path Digestif_eq) (impl (path c/digestif_eq.ml))))
+   (module
+    (obj_name digestif_native)
+    (visibility private)
+    (source (path Digestif_native) (impl (path c/digestif_native.ml)))))))
+(library
+ (name digestif.ocaml)
+ (kind normal)
+ (archives (byte ocaml/digestif_ocaml.cma) (native ocaml/digestif_ocaml.cmxa))
+ (plugins (byte ocaml/digestif_ocaml.cma) (native ocaml/digestif_ocaml.cmxs))
+ (native_archives ocaml/digestif_ocaml.a)
+ (requires digestif eqaf)
+ (implements digestif)
+ (modes byte native)
+ (obj_dir (private_dir .private))
+ (modules
+  (unwrapped
+   (module
+    (obj_name baijiu_blake2b)
+    (visibility private)
+    (source (path Baijiu_blake2b) (impl (path ocaml/baijiu_blake2b.ml))))
+   (module
+    (obj_name baijiu_blake2s)
+    (visibility private)
+    (source (path Baijiu_blake2s) (impl (path ocaml/baijiu_blake2s.ml))))
+   (module
+    (obj_name baijiu_keccak_256)
+    (visibility public)
+    (source (path Baijiu_keccak_256) (impl (path ocaml/baijiu_keccak_256.ml))))
+   (module
+    (obj_name baijiu_md5)
+    (visibility private)
+    (source (path Baijiu_md5) (impl (path ocaml/baijiu_md5.ml))))
+   (module
+    (obj_name baijiu_rmd160)
+    (visibility private)
+    (source (path Baijiu_rmd160) (impl (path ocaml/baijiu_rmd160.ml))))
+   (module
+    (obj_name baijiu_sha1)
+    (visibility private)
+    (source (path Baijiu_sha1) (impl (path ocaml/baijiu_sha1.ml))))
+   (module
+    (obj_name baijiu_sha224)
+    (visibility private)
+    (source (path Baijiu_sha224) (impl (path ocaml/baijiu_sha224.ml))))
+   (module
+    (obj_name baijiu_sha256)
+    (visibility private)
+    (source (path Baijiu_sha256) (impl (path ocaml/baijiu_sha256.ml))))
+   (module
+    (obj_name baijiu_sha3)
+    (visibility public)
+    (source (path Baijiu_sha3) (impl (path ocaml/baijiu_sha3.ml))))
+   (module
+    (obj_name baijiu_sha384)
+    (visibility private)
+    (source (path Baijiu_sha384) (impl (path ocaml/baijiu_sha384.ml))))
+   (module
+    (obj_name baijiu_sha3_224)
+    (visibility private)
+    (source (path Baijiu_sha3_224) (impl (path ocaml/baijiu_sha3_224.ml))))
+   (module
+    (obj_name baijiu_sha3_256)
+    (visibility public)
+    (source (path Baijiu_sha3_256) (impl (path ocaml/baijiu_sha3_256.ml))))
+   (module
+    (obj_name baijiu_sha3_384)
+    (visibility private)
+    (source (path Baijiu_sha3_384) (impl (path ocaml/baijiu_sha3_384.ml))))
+   (module
+    (obj_name baijiu_sha3_512)
+    (visibility private)
+    (source (path Baijiu_sha3_512) (impl (path ocaml/baijiu_sha3_512.ml))))
+   (module
+    (obj_name baijiu_sha512)
+    (visibility private)
+    (source (path Baijiu_sha512) (impl (path ocaml/baijiu_sha512.ml))))
+   (module
+    (obj_name baijiu_whirlpool)
+    (visibility private)
+    (source (path Baijiu_whirlpool) (impl (path ocaml/baijiu_whirlpool.ml))))
+   (module
+    (obj_name digestif)
+    (visibility public)
+    (kind impl_vmodule)
+    (source (path Digestif) (impl (path ocaml/digestif.ml))))
+   (module
+    (obj_name digestif_bi)
+    (visibility private)
+    (source (path Digestif_bi) (impl (path ocaml/digestif_bi.ml))))
+   (module
+    (obj_name digestif_by)
+    (visibility private)
+    (source (path Digestif_by) (impl (path ocaml/digestif_by.ml))))
+   (module
+    (obj_name digestif_conv)
+    (visibility private)
+    (source (path Digestif_conv) (impl (path ocaml/digestif_conv.ml))))
+   (module
+    (obj_name digestif_eq)
+    (visibility private)
+    (source (path Digestif_eq) (impl (path ocaml/digestif_eq.ml))))
+   (module
+    (obj_name xor)
+    (visibility private)
+    (source (path Xor) (impl (path ocaml/xor.ml)))))))

@@ -1,0 +1,41 @@
+opam-version: "2.0"
+added: [
+  "bin/miaou.bar_chart-demo" {"F:S7832680T1768295996.51"}
+  "bin/miaou.braille-demo" {"F:S7904528T1768295996.51"}
+  "bin/miaou.breadcrumbs-demo" {"F:S7790368T1768295996.52"}
+  "bin/miaou.button-demo" {"F:S7829328T1768295996.52"}
+  "bin/miaou.card_sidebar-demo" {"F:S7804352T1768295996.52"}
+  "bin/miaou.checkbox-demo" {"F:S7790440T1768295996.52"}
+  "bin/miaou.demo" {"F:S10371496T1768295996.53"}
+  "bin/miaou.demo-matrix" {"F:S10371728T1768295996.53"}
+  "bin/miaou.demo-sdl" {"F:S12182048T1768295996.54"}
+  "bin/miaou.description_list-demo" {"F:S7786560T1768295996.54"}
+  "bin/miaou.flex_layout-demo" {"F:S7808080T1768295996.54"}
+  "bin/miaou.image-demo" {"F:S8941936T1768295996.55"}
+  "bin/miaou.key_handling-demo" {"F:S7770864T1768295996.55"}
+  "bin/miaou.layout_helpers-demo" {"F:S7789680T1768295996.55"}
+  "bin/miaou.line_chart-demo" {"F:S7851816T1768295996.55"}
+  "bin/miaou.link-demo" {"F:S7774480T1768295996.56"}
+  "bin/miaou.logger-demo" {"F:S7827256T1768295996.56"}
+  "bin/miaou.pager-demo" {"F:S7862400T1768295996.56"}
+  "bin/miaou.palette-demo" {"F:S7788880T1768295996.57"}
+  "bin/miaou.qr_code-demo" {"F:S7879480T1768295996.57"}
+  "bin/miaou.radio-demo" {"F:S7789368T1768295996.57"}
+  "bin/miaou.sparkline-demo" {"F:S7851408T1768295996.58"}
+  "bin/miaou.spinner_progress-demo" {"F:S7829936T1768295996.58"}
+  "bin/miaou.switch-demo" {"F:S7779536T1768295996.58"}
+  "bin/miaou.system_monitor-demo" {"F:S7924928T1768295996.58"}
+  "bin/miaou.table-demo" {"F:S7917336T1768295996.59"}
+  "bin/miaou.tabs-demo" {"F:S7789216T1768295996.59"}
+  "bin/miaou.toast-demo" {"F:S7804848T1768295996.59"}
+  "bin/miaou.tree-demo" {"F:S7779072T1768295996.59"}
+  "bin/miaou.validated_textbox-demo" {"F:S7810848T1768295996.6"}
+  "doc/miaou" {"D"}
+  "doc/miaou/CHANGELOG.md" {"F:S21733T1768295996.6"}
+  "doc/miaou/LICENSE.md" {"F:S1096T1768295996.6"}
+  "doc/miaou/README.md" {"F:S29532T1768295996.6"}
+  "lib/miaou" {"D"}
+  "lib/miaou/META" {"F:S0T1768295996.6"}
+  "lib/miaou/dune-package" {"F:S889T1768295996.6"}
+  "lib/miaou/opam" {"F:S685T1768295996.6"}
+]

@@ -1,0 +1,7 @@
+version = "1.2.0"
+description = "Reactive programming helpers for Lwt"
+requires = "lwt react"
+archive(byte) = "lwt_react.cma"
+archive(native) = "lwt_react.cmxa"
+plugin(byte) = "lwt_react.cma"
+plugin(native) = "lwt_react.cmxs"

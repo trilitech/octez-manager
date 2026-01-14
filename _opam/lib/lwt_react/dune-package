@@ -1,0 +1,37 @@
+(lang dune 3.20)
+(name lwt_react)
+(version 1.2.0)
+(sections (lib .) (libexec .) (doc ../../doc/lwt_react))
+(files
+ (lib
+  (META
+   dune-package
+   lwt_react.a
+   lwt_react.cma
+   lwt_react.cmi
+   lwt_react.cmt
+   lwt_react.cmti
+   lwt_react.cmx
+   lwt_react.cmxa
+   lwt_react.ml
+   lwt_react.mli
+   opam))
+ (libexec (lwt_react.cmxs))
+ (doc (CHANGES LICENSE.md README.md)))
+(library
+ (name lwt_react)
+ (kind normal)
+ (synopsis "Reactive programming helpers for Lwt")
+ (archives (byte lwt_react.cma) (native lwt_react.cmxa))
+ (plugins (byte lwt_react.cma) (native lwt_react.cmxs))
+ (native_archives lwt_react.a)
+ (requires lwt react)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name lwt_react)
+   (visibility public)
+   (source
+    (path Lwt_react)
+    (intf (path lwt_react.mli))
+    (impl (path lwt_react.ml))))))

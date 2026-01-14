@@ -1,0 +1,4 @@
+*.ml linguist-language=OCaml
+
+# Shell scripts are required to be LF
+*.sh text eol=lf

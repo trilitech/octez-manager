@@ -1,0 +1,7 @@
+(library
+ (name scrypt)
+ (public_name kdf.scrypt)
+ (modules scrypt)
+ (libraries mirage-crypto kdf.pbkdf)
+ (c_names salsa-core)
+ (c_flags (:standard --std=c99 -Wall -Wextra -O3)))

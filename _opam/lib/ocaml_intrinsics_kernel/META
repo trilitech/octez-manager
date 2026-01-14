@@ -1,0 +1,8 @@
+version = "v0.17.1"
+description = ""
+requires = ""
+archive(byte) = "ocaml_intrinsics_kernel.cma"
+archive(native) = "ocaml_intrinsics_kernel.cmxa"
+plugin(byte) = "ocaml_intrinsics_kernel.cma"
+plugin(native) = "ocaml_intrinsics_kernel.cmxs"
+jsoo_runtime = "runtime.js"

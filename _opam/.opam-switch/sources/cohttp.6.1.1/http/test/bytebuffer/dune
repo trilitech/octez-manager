@@ -1,0 +1,6 @@
+(library
+ (name bytebuffer_tests)
+ (libraries http_bytebuffer)
+ (inline_tests)
+ (preprocess
+  (pps ppx_expect)))

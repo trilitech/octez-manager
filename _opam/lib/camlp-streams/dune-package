@@ -1,0 +1,42 @@
+(lang dune 3.20)
+(name camlp-streams)
+(sections (lib .) (libexec .) (doc ../../doc/camlp-streams))
+(files
+ (lib
+  (META
+   camlp_streams.a
+   camlp_streams.cma
+   camlp_streams.cmxa
+   dune-package
+   genlex.cmi
+   genlex.cmt
+   genlex.cmti
+   genlex.cmx
+   genlex.ml
+   genlex.mli
+   opam
+   stream.cmi
+   stream.cmt
+   stream.cmti
+   stream.cmx
+   stream.ml
+   stream.mli))
+ (libexec (camlp_streams.cmxs))
+ (doc (CHANGES.md LICENSE README.md)))
+(library
+ (name camlp-streams)
+ (kind normal)
+ (archives (byte camlp_streams.cma) (native camlp_streams.cmxa))
+ (plugins (byte camlp_streams.cma) (native camlp_streams.cmxs))
+ (native_archives camlp_streams.a)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name genlex)
+    (visibility public)
+    (source (path Genlex) (intf (path genlex.mli)) (impl (path genlex.ml))))
+   (module
+    (obj_name stream)
+    (visibility public)
+    (source (path Stream) (intf (path stream.mli)) (impl (path stream.ml)))))))

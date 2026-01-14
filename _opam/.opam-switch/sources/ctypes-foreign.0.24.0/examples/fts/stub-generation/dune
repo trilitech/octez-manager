@@ -1,0 +1,10 @@
+(test
+ (name fts_cmd)
+ (build_if
+  (= %{os_type} Unix))
+ (libraries fts_stubs fts_generated)
+ (package ctypes)
+ (action (progn))
+ (link_flags
+  :standard
+  (:include config/c_library_flags.sexp)))

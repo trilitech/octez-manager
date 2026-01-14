@@ -1,0 +1,279 @@
+(lang dune 3.20)
+(name fix)
+(sections (lib .) (libexec .) (doc ../../doc/fix))
+(files
+ (lib
+  (Boolean.ml
+   Boolean.mli
+   CompactQueue.ml
+   CompactQueue.mli
+   Core.ml
+   Core.mli
+   CoreDependencyGraph.ml
+   CoreDependencyGraph.mli
+   DataFlow.ml
+   DataFlow.mli
+   Enum.ml
+   Enum.mli
+   Fix.ml
+   Gensym.ml
+   Gensym.mli
+   Glue.ml
+   Glue.mli
+   GraphNumbering.ml
+   GraphNumbering.mli
+   HashCons.ml
+   HashCons.mli
+   Indexing.ml
+   Indexing.mli
+   META
+   Memoize.ml
+   Memoize.mli
+   Minimize.ml
+   Minimize.mli
+   Numbering.ml
+   Numbering.mli
+   Option.ml
+   Option.mli
+   Partition.ml
+   Partition.mli
+   SCC.ml
+   SCC.mli
+   Set.ml
+   Set.mli
+   Sigs.ml
+   Tabulate.ml
+   Tabulate.mli
+   dune-package
+   fix.a
+   fix.cma
+   fix.cmi
+   fix.cmt
+   fix.cmx
+   fix.cmxa
+   fix__.cmi
+   fix__.cmt
+   fix__.cmx
+   fix__.ml
+   fix__Boolean.cmi
+   fix__Boolean.cmt
+   fix__Boolean.cmti
+   fix__Boolean.cmx
+   fix__CompactQueue.cmi
+   fix__CompactQueue.cmt
+   fix__CompactQueue.cmti
+   fix__CompactQueue.cmx
+   fix__Core.cmi
+   fix__Core.cmt
+   fix__Core.cmti
+   fix__Core.cmx
+   fix__CoreDependencyGraph.cmi
+   fix__CoreDependencyGraph.cmt
+   fix__CoreDependencyGraph.cmti
+   fix__CoreDependencyGraph.cmx
+   fix__DataFlow.cmi
+   fix__DataFlow.cmt
+   fix__DataFlow.cmti
+   fix__DataFlow.cmx
+   fix__Enum.cmi
+   fix__Enum.cmt
+   fix__Enum.cmti
+   fix__Enum.cmx
+   fix__Gensym.cmi
+   fix__Gensym.cmt
+   fix__Gensym.cmti
+   fix__Gensym.cmx
+   fix__Glue.cmi
+   fix__Glue.cmt
+   fix__Glue.cmti
+   fix__Glue.cmx
+   fix__GraphNumbering.cmi
+   fix__GraphNumbering.cmt
+   fix__GraphNumbering.cmti
+   fix__GraphNumbering.cmx
+   fix__HashCons.cmi
+   fix__HashCons.cmt
+   fix__HashCons.cmti
+   fix__HashCons.cmx
+   fix__Indexing.cmi
+   fix__Indexing.cmt
+   fix__Indexing.cmti
+   fix__Indexing.cmx
+   fix__Memoize.cmi
+   fix__Memoize.cmt
+   fix__Memoize.cmti
+   fix__Memoize.cmx
+   fix__Minimize.cmi
+   fix__Minimize.cmt
+   fix__Minimize.cmti
+   fix__Minimize.cmx
+   fix__Numbering.cmi
+   fix__Numbering.cmt
+   fix__Numbering.cmti
+   fix__Numbering.cmx
+   fix__Option.cmi
+   fix__Option.cmt
+   fix__Option.cmti
+   fix__Option.cmx
+   fix__Partition.cmi
+   fix__Partition.cmt
+   fix__Partition.cmti
+   fix__Partition.cmx
+   fix__SCC.cmi
+   fix__SCC.cmt
+   fix__SCC.cmti
+   fix__SCC.cmx
+   fix__Set.cmi
+   fix__Set.cmt
+   fix__Set.cmti
+   fix__Set.cmx
+   fix__Sigs.cmi
+   fix__Sigs.cmt
+   fix__Sigs.cmx
+   fix__Tabulate.cmi
+   fix__Tabulate.cmt
+   fix__Tabulate.cmti
+   fix__Tabulate.cmx
+   opam))
+ (libexec (fix.cmxs))
+ (doc (CHANGES.md LICENSE README.md odoc-pages/index.mld)))
+(library
+ (name fix)
+ (kind normal)
+ (synopsis "An on-demand, incremental fixed point computation algorithm")
+ (archives (byte fix.cma) (native fix.cmxa))
+ (plugins (byte fix.cma) (native fix.cmxs))
+ (native_archives fix.a)
+ (main_module_name Fix)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name fix__)
+     (visibility public)
+     (kind alias)
+     (source (path Fix__) (impl (path fix__.ml-gen))))
+    (name Fix)
+    (modules
+     (module
+      (obj_name fix__Boolean)
+      (visibility public)
+      (source
+       (path Boolean)
+       (intf (path Boolean.mli))
+       (impl (path Boolean.ml))))
+     (module
+      (obj_name fix__CompactQueue)
+      (visibility public)
+      (source
+       (path CompactQueue)
+       (intf (path CompactQueue.mli))
+       (impl (path CompactQueue.ml))))
+     (module
+      (obj_name fix__Core)
+      (visibility public)
+      (source (path Core) (intf (path Core.mli)) (impl (path Core.ml))))
+     (module
+      (obj_name fix__CoreDependencyGraph)
+      (visibility public)
+      (source
+       (path CoreDependencyGraph)
+       (intf (path CoreDependencyGraph.mli))
+       (impl (path CoreDependencyGraph.ml))))
+     (module
+      (obj_name fix__DataFlow)
+      (visibility public)
+      (source
+       (path DataFlow)
+       (intf (path DataFlow.mli))
+       (impl (path DataFlow.ml))))
+     (module
+      (obj_name fix__Enum)
+      (visibility public)
+      (source (path Enum) (intf (path Enum.mli)) (impl (path Enum.ml))))
+     (module
+      (obj_name fix)
+      (visibility public)
+      (source (path Fix) (impl (path Fix.ml))))
+     (module
+      (obj_name fix__Gensym)
+      (visibility public)
+      (source (path Gensym) (intf (path Gensym.mli)) (impl (path Gensym.ml))))
+     (module
+      (obj_name fix__Glue)
+      (visibility public)
+      (source (path Glue) (intf (path Glue.mli)) (impl (path Glue.ml))))
+     (module
+      (obj_name fix__GraphNumbering)
+      (visibility public)
+      (source
+       (path GraphNumbering)
+       (intf (path GraphNumbering.mli))
+       (impl (path GraphNumbering.ml))))
+     (module
+      (obj_name fix__HashCons)
+      (visibility public)
+      (source
+       (path HashCons)
+       (intf (path HashCons.mli))
+       (impl (path HashCons.ml))))
+     (module
+      (obj_name fix__Indexing)
+      (visibility public)
+      (source
+       (path Indexing)
+       (intf (path Indexing.mli))
+       (impl (path Indexing.ml))))
+     (module
+      (obj_name fix__Memoize)
+      (visibility public)
+      (source
+       (path Memoize)
+       (intf (path Memoize.mli))
+       (impl (path Memoize.ml))))
+     (module
+      (obj_name fix__Minimize)
+      (visibility public)
+      (source
+       (path Minimize)
+       (intf (path Minimize.mli))
+       (impl (path Minimize.ml))))
+     (module
+      (obj_name fix__Numbering)
+      (visibility public)
+      (source
+       (path Numbering)
+       (intf (path Numbering.mli))
+       (impl (path Numbering.ml))))
+     (module
+      (obj_name fix__Option)
+      (visibility public)
+      (source (path Option) (intf (path Option.mli)) (impl (path Option.ml))))
+     (module
+      (obj_name fix__Partition)
+      (visibility public)
+      (source
+       (path Partition)
+       (intf (path Partition.mli))
+       (impl (path Partition.ml))))
+     (module
+      (obj_name fix__SCC)
+      (visibility public)
+      (source (path SCC) (intf (path SCC.mli)) (impl (path SCC.ml))))
+     (module
+      (obj_name fix__Set)
+      (visibility public)
+      (source (path Set) (intf (path Set.mli)) (impl (path Set.ml))))
+     (module
+      (obj_name fix__Sigs)
+      (visibility public)
+      (source (path Sigs) (impl (path Sigs.ml))))
+     (module
+      (obj_name fix__Tabulate)
+      (visibility public)
+      (source
+       (path Tabulate)
+       (intf (path Tabulate.mli))
+       (impl (path Tabulate.ml))))))
+   (wrapped true))))

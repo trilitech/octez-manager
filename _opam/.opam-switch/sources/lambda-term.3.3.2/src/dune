@@ -1,0 +1,24 @@
+(library
+  (name lambda_term)
+  (public_name lambda-term)
+  (wrapped false)
+  (libraries logs logs.lwt lwt lwt.unix lwt_react zed mew_vi uucp)
+  (flags (:standard -safe-string))
+  (synopsis "Cross-platform library for terminal manipulation")
+  (c_library_flags (:standard (:include c_library_flags)))
+  (foreign_stubs
+    (language c)
+    (names lTerm_term_stubs lTerm_unix_stubs lTerm_windows_stubs)
+    (flags
+      (:standard
+        (:include c_flags)))))
+
+(ocamllex lTerm_inputrc lTerm_resource_lexer)
+
+(rule
+  (targets c_flags c_library_flags lTerm_config.h)
+  (deps ocamlc-config)
+  (action (run %{ocaml} %{dep:config/gen.ml})))
+
+(rule
+ (with-stdout-to ocamlc-config (run %{ocamlc} -config)))

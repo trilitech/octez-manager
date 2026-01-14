@@ -1,0 +1,52 @@
+opam-version: "2.0"
+added: [
+  "doc/http" {"D"}
+  "doc/http/CHANGES.md" {"F:S43020T1768295770.66"}
+  "doc/http/LICENSE.md" {"F:S832T1768295770.66"}
+  "doc/http/README.md" {"F:S18660T1768295770.66"}
+  "lib/http" {"D"}
+  "lib/http/META" {"F:S557T1768295770.66"}
+  "lib/http/__private__" {"D"}
+  "lib/http/__private__/http_bytebuffer" {"D"}
+  "lib/http/__private__/http_bytebuffer/.public_cmi" {"D"}
+  "lib/http/__private__/http_bytebuffer/.public_cmi/http_bytebuffer.cmi"
+    {"F:S237T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/.public_cmi/http_bytebuffer.cmt"
+    {"F:S1552T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/.public_cmi/http_bytebuffer__Bytebuffer.cmi"
+    {"F:S1339T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/.public_cmi/http_bytebuffer__Bytebuffer.cmt"
+    {"F:S22497T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/.public_cmi/http_bytebuffer__Bytebuffer.cmti"
+    {"F:S6183T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/bytebuffer.ml"
+    {"F:S3991T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/bytebuffer.mli"
+    {"F:S1448T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/http_bytebuffer.a"
+    {"F:S24794T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/http_bytebuffer.cma"
+    {"F:S11799T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/http_bytebuffer.cmx"
+    {"F:S152T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/http_bytebuffer.cmxa"
+    {"F:S769T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/http_bytebuffer.cmxs"
+    {"F:S39640T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/http_bytebuffer.ml"
+    {"F:S118T1768295770.66"}
+  "lib/http/__private__/http_bytebuffer/http_bytebuffer__Bytebuffer.cmx"
+    {"F:S2348T1768295770.66"}
+  "lib/http/dune-package" {"F:S2613T1768295770.66"}
+  "lib/http/http.a" {"F:S169906T1768295770.66"}
+  "lib/http/http.cma" {"F:S87156T1768295770.66"}
+  "lib/http/http.cmi" {"F:S6218T1768295770.66"}
+  "lib/http/http.cmt" {"F:S155365T1768295770.66"}
+  "lib/http/http.cmti" {"F:S38109T1768295770.66"}
+  "lib/http/http.cmx" {"F:S17016T1768295770.66"}
+  "lib/http/http.cmxa" {"F:S1113T1768295770.66"}
+  "lib/http/http.cmxs" {"F:S149800T1768295770.66"}
+  "lib/http/http.ml" {"F:S35792T1768295770.66"}
+  "lib/http/http.mli" {"F:S20176T1768295770.66"}
+  "lib/http/opam" {"F:S1352T1768295770.66"}
+]

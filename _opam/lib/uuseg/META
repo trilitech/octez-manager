@@ -1,0 +1,16 @@
+description = "Unicode text segmentation for OCaml"
+version = "17.0.0"
+requires = "uucp"
+archive(byte) = "uuseg.cma"
+archive(native) = "uuseg.cmxa"
+plugin(byte) = "uuseg.cma"
+plugin(native) = "uuseg.cmxs"
+exists_if = "uuseg.cma uuseg.cmxa"
+
+package "string" (
+  description = "The uuseg.string library (deprecated)"
+  version = "17.0.0"
+  requires = "uuseg"
+  exports = "uuseg"
+  warning = "Deprecated, use the uuseg library."
+)

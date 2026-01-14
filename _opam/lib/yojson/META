@@ -1,0 +1,7 @@
+version = "3.0.0"
+description = "JSON parsing and printing"
+requires = ""
+archive(byte) = "yojson.cma"
+archive(native) = "yojson.cmxa"
+plugin(byte) = "yojson.cma"
+plugin(native) = "yojson.cmxs"

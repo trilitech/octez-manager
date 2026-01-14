@@ -1,0 +1,81 @@
+(lang dune 3.20)
+(name ocplib-endian)
+(sections (lib .) (libexec .) (doc ../../doc/ocplib-endian))
+(files
+ (lib
+  (META
+   bigstring/endianBigstring.cmi
+   bigstring/endianBigstring.cmt
+   bigstring/endianBigstring.cmti
+   bigstring/endianBigstring.cmx
+   bigstring/endianBigstring.ml
+   bigstring/endianBigstring.mli
+   bigstring/ocplib_endian_bigstring.a
+   bigstring/ocplib_endian_bigstring.cma
+   bigstring/ocplib_endian_bigstring.cmxa
+   dune-package
+   endianBytes.cmi
+   endianBytes.cmt
+   endianBytes.cmti
+   endianBytes.cmx
+   endianBytes.ml
+   endianBytes.mli
+   endianString.cmi
+   endianString.cmt
+   endianString.cmti
+   endianString.cmx
+   endianString.ml
+   endianString.mli
+   ocplib_endian.a
+   ocplib_endian.cma
+   ocplib_endian.cmxa
+   opam))
+ (libexec (bigstring/ocplib_endian_bigstring.cmxs ocplib_endian.cmxs))
+ (doc (CHANGES.md README.md)))
+(library
+ (name ocplib-endian)
+ (kind normal)
+ (synopsis
+  "Optimised functions to read and write int16/32/64 from strings and bytes")
+ (archives (byte ocplib_endian.cma) (native ocplib_endian.cmxa))
+ (plugins (byte ocplib_endian.cma) (native ocplib_endian.cmxs))
+ (native_archives ocplib_endian.a)
+ (requires bytes)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name endianBytes)
+    (visibility public)
+    (source
+     (path EndianBytes)
+     (intf (path endianBytes.mli))
+     (impl (path endianBytes.ml))))
+   (module
+    (obj_name endianString)
+    (visibility public)
+    (source
+     (path EndianString)
+     (intf (path endianString.mli))
+     (impl (path endianString.ml)))))))
+(library
+ (name ocplib-endian.bigstring)
+ (kind normal)
+ (synopsis "Optimised functions to read and write int16/32/64 from bigarrays")
+ (archives
+  (byte bigstring/ocplib_endian_bigstring.cma)
+  (native bigstring/ocplib_endian_bigstring.cmxa))
+ (plugins
+  (byte bigstring/ocplib_endian_bigstring.cma)
+  (native bigstring/ocplib_endian_bigstring.cmxs))
+ (native_archives bigstring/ocplib_endian_bigstring.a)
+ (requires ocplib-endian bytes)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name endianBigstring)
+   (visibility public)
+   (source
+    (path EndianBigstring)
+    (intf (path bigstring/endianBigstring.mli))
+    (impl (path bigstring/endianBigstring.ml))))))

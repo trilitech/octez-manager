@@ -1,0 +1,9 @@
+(tests
+ (names test)
+ (libraries alcotest)
+ (preprocess (pps ppx_blob))
+ (preprocessor_deps
+   (file root.inc)
+   (file common.inc)
+   (file test/common.inc)
+   (file subdir/sub.inc)))

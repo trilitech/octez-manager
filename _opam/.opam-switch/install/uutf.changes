@@ -1,0 +1,23 @@
+opam-version: "2.0"
+added: [
+  "bin/utftrip" {"F:S4331456T1768295974.81"}
+  "doc/uutf" {"D"}
+  "doc/uutf/CHANGES.md" {"F:S2294T1768295974.81"}
+  "doc/uutf/LICENSE.md" {"F:S738T1768295974.81"}
+  "doc/uutf/README.md" {"F:S1439T1768295974.81"}
+  "doc/uutf/odoc-pages" {"D"}
+  "doc/uutf/odoc-pages/index.mld" {"F:S901T1768295974.81"}
+  "lib/uutf" {"D"}
+  "lib/uutf/META" {"F:S240T1768295974.81"}
+  "lib/uutf/opam" {"F:S1142T1768295974.81"}
+  "lib/uutf/uutf.a" {"F:S115170T1768295974.81"}
+  "lib/uutf/uutf.cma" {"F:S74070T1768295974.81"}
+  "lib/uutf/uutf.cmi" {"F:S2741T1768295974.81"}
+  "lib/uutf/uutf.cmt" {"F:S144882T1768295974.81"}
+  "lib/uutf/uutf.cmti" {"F:S21335T1768295974.81"}
+  "lib/uutf/uutf.cmx" {"F:S8174T1768295974.81"}
+  "lib/uutf/uutf.cmxa" {"F:S798T1768295974.81"}
+  "lib/uutf/uutf.cmxs" {"F:S107416T1768295974.81"}
+  "lib/uutf/uutf.ml" {"F:S31672T1768295974.81"}
+  "lib/uutf/uutf.mli" {"F:S20893T1768295974.81"}
+]

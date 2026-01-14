@@ -1,0 +1,6 @@
+description = ""
+requires = "react result uchar uucp uuseg uutf"
+archive(byte) = "zed.cma"
+archive(native) = "zed.cmxa"
+plugin(byte) = "zed.cma"
+plugin(native) = "zed.cmxs"

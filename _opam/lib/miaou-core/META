@@ -1,0 +1,181 @@
+package "core" (
+  directory = "core"
+  version = "da71376"
+  description = ""
+  requires =
+  "lambda-term
+   miaou-core.helpers
+   miaou-core.interfaces
+   miaou-core.internals
+   miaou-core.widgets.display
+   miaou-core.widgets.input
+   miaou-core.widgets.layout
+   str
+   unix
+   yojson"
+  archive(byte) = "miaou_core.cma"
+  archive(native) = "miaou_core.cmxa"
+  plugin(byte) = "miaou_core.cma"
+  plugin(native) = "miaou_core.cmxs"
+)
+package "driver-common" (
+  directory = "driver-common"
+  version = "da71376"
+  description = ""
+  requires = "miaou-core.core miaou-core.internals unix"
+  archive(byte) = "miaou_driver_common.cma"
+  archive(native) = "miaou_driver_common.cmxa"
+  plugin(byte) = "miaou_driver_common.cma"
+  plugin(native) = "miaou_driver_common.cmxs"
+)
+package "helpers" (
+  directory = "helpers"
+  version = "da71376"
+  description = ""
+  requires = "eio eio.unix unix"
+  archive(byte) = "miaou_helpers.cma"
+  archive(native) = "miaou_helpers.cmxa"
+  plugin(byte) = "miaou_helpers.cma"
+  plugin(native) = "miaou_helpers.cmxs"
+)
+package "interfaces" (
+  directory = "interfaces"
+  version = "da71376"
+  description = ""
+  requires = ""
+  archive(byte) = "miaou_interfaces.cma"
+  archive(native) = "miaou_interfaces.cmxa"
+  plugin(byte) = "miaou_interfaces.cma"
+  plugin(native) = "miaou_interfaces.cmxs"
+)
+package "internals" (
+  directory = "internals"
+  version = "da71376"
+  description = ""
+  requires =
+  "lambda-term miaou-core.widgets.display miaou-core.widgets.layout"
+  archive(byte) = "miaou_internals.cma"
+  archive(native) = "miaou_internals.cmxa"
+  plugin(byte) = "miaou_internals.cma"
+  plugin(native) = "miaou_internals.cmxs"
+)
+package "lib" (
+  directory = "lib"
+  version = "da71376"
+  description = ""
+  requires =
+  "cohttp
+   cohttp-eio
+   eio
+   eio.unix
+   http
+   miaou-core.core
+   miaou-core.interfaces
+   miaou-core.internals
+   miaou-core.widgets.display
+   miaou-core.widgets.input
+   miaou-core.widgets.layout
+   miaou-core.widgets.navigation
+   rresult
+   uri"
+  archive(byte) = "miaou.cma"
+  archive(native) = "miaou.cmxa"
+  plugin(byte) = "miaou.cma"
+  plugin(native) = "miaou.cmxs"
+)
+package "lib_miaou_internal" (
+  directory = "lib_miaou_internal"
+  version = "da71376"
+  description = ""
+  requires =
+  "lambda-term
+   miaou-core.core
+   miaou-core.internals
+   miaou-core.widgets.layout
+   unix"
+  archive(byte) = "lib_miaou_internal.cma"
+  archive(native) = "lib_miaou_internal.cmxa"
+  plugin(byte) = "lib_miaou_internal.cma"
+  plugin(native) = "lib_miaou_internal.cmxs"
+)
+package "runner-common" (
+  directory = "runner-common"
+  version = "da71376"
+  description = ""
+  requires =
+  "miaou-core.core
+   miaou-core.helpers
+   miaou-core.interfaces
+   miaou-core.widgets.display"
+  archive(byte) = "miaou_runner_common.cma"
+  archive(native) = "miaou_runner_common.cmxa"
+  plugin(byte) = "miaou_runner_common.cma"
+  plugin(native) = "miaou_runner_common.cmxs"
+)
+package "widgets" (
+  directory = "widgets"
+  package "display" (
+    directory = "display"
+    version = "da71376"
+    description = ""
+    requires =
+    "eio
+     eio.unix
+     imagelib
+     imagelib.unix
+     miaou-core.helpers
+     miaou-core.interfaces
+     qrc
+     str
+     unix
+     yojson"
+    archive(byte) = "miaou_widgets_display.cma"
+    archive(native) = "miaou_widgets_display.cmxa"
+    plugin(byte) = "miaou_widgets_display.cma"
+    plugin(native) = "miaou_widgets_display.cmxs"
+  )
+  package "input" (
+    directory = "input"
+    version = "da71376"
+    description = ""
+    requires =
+    "lambda-term
+     miaou-core.helpers
+     miaou-core.interfaces
+     miaou-core.widgets.display"
+    archive(byte) = "miaou_widgets_input.cma"
+    archive(native) = "miaou_widgets_input.cmxa"
+    plugin(byte) = "miaou_widgets_input.cma"
+    plugin(native) = "miaou_widgets_input.cmxs"
+  )
+  package "layout" (
+    directory = "layout"
+    version = "da71376"
+    description = ""
+    requires =
+    "lambda-term
+     miaou-core.helpers
+     miaou-core.interfaces
+     miaou-core.widgets.display
+     miaou-core.widgets.input"
+    archive(byte) = "miaou_widgets_layout.cma"
+    archive(native) = "miaou_widgets_layout.cmxa"
+    plugin(byte) = "miaou_widgets_layout.cma"
+    plugin(native) = "miaou_widgets_layout.cmxs"
+  )
+  package "navigation" (
+    directory = "navigation"
+    version = "da71376"
+    description = ""
+    requires =
+    "lambda-term
+     miaou-core.core
+     miaou-core.helpers
+     miaou-core.interfaces
+     miaou-core.widgets.display"
+    archive(byte) = "miaou_widgets_navigation.cma"
+    archive(native) = "miaou_widgets_navigation.cmxa"
+    plugin(byte) = "miaou_widgets_navigation.cma"
+    plugin(native) = "miaou_widgets_navigation.cmxs"
+  )
+)

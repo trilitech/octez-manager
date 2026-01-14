@@ -1,0 +1,32 @@
+description = "Code coverage for OCaml"
+requires(ppx_driver) = "bisect_ppx.common ppxlib ppxlib.ast str"
+archive(ppx_driver,byte) = "bisect_ppx.cma"
+archive(ppx_driver,native) = "bisect_ppx.cmxa"
+plugin(ppx_driver,byte) = "bisect_ppx.cma"
+plugin(ppx_driver,native) = "bisect_ppx.cmxs"
+# This is what dune uses to find out the runtime dependencies of
+# a preprocessor
+ppx_runtime_deps = "bisect_ppx.runtime"
+# This line makes things transparent for people mixing preprocessors
+# and normal dependencies
+requires(-ppx_driver) = "bisect_ppx.runtime"
+ppx(-ppx_driver,-custom_ppx) = "./ppx.exe --as-ppx"
+library_kind = "ppx_rewriter"
+package "common" (
+  directory = "common"
+  description = "Bisect_ppx internal functions (internal)"
+  requires = ""
+  archive(byte) = "bisect_common.cma"
+  archive(native) = "bisect_common.cmxa"
+  plugin(byte) = "bisect_common.cma"
+  plugin(native) = "bisect_common.cmxs"
+)
+package "runtime" (
+  directory = "runtime"
+  description = "Bisect_ppx runtime library (internal)"
+  requires = "bisect_ppx.common unix"
+  archive(byte) = "bisect.cma"
+  archive(native) = "bisect.cmxa"
+  plugin(byte) = "bisect.cma"
+  plugin(native) = "bisect.cmxs"
+)

@@ -1,0 +1,52 @@
+(lang dune 3.20)
+(name ca-certs)
+(version v1.0.1)
+(sections (lib .) (libexec .) (doc ../../doc/ca-certs) (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   ca_certs.a
+   ca_certs.cma
+   ca_certs.cmi
+   ca_certs.cmt
+   ca_certs.cmti
+   ca_certs.cmx
+   ca_certs.cmxa
+   ca_certs.ml
+   ca_certs.mli
+   dune-package
+   libca_certs_stubs.a
+   opam))
+ (libexec (ca_certs.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md))
+ (stublibs (dllca_certs_stubs.so)))
+(library
+ (name ca-certs)
+ (kind normal)
+ (archives (byte ca_certs.cma) (native ca_certs.cmxa))
+ (plugins (byte ca_certs.cma) (native ca_certs.cmxs))
+ (foreign_objects ca_certs_stubs.o)
+ (foreign_archives (archives (for all) (files libca_certs_stubs.a)))
+ (foreign_dll_files ../stublibs/dllca_certs_stubs.so)
+ (native_archives ca_certs.a)
+ (requires
+  mirage-crypto
+  x509
+  bos
+  fpath
+  logs
+  ptime
+  ptime.clock
+  ptime.clock.os
+  digestif
+  ohex)
+ (main_module_name Ca_certs)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name ca_certs)
+   (visibility public)
+   (source
+    (path Ca_certs)
+    (intf (path ca_certs.mli))
+    (impl (path ca_certs.ml))))))

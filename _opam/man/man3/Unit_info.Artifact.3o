@@ -1,0 +1,105 @@
+.TH "Unit_info.Artifact" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Unit_info.Artifact \-  Build artifacts 
+.SH Module
+Module   Unit_info.Artifact
+.SH Documentation
+.sp
+Module
+.BI "Artifact"
+ : 
+.B sig end
+
+.sp
+.SS Build artifacts 
+
+
+.sp
+
+.sp
+.sp
+.I type t 
+
+.sp
+Metadata for a single compilation artifact:
+.sp
+\-the module name associated to the artifact
+.sp
+\-the filesystem path
+.sp
+\-the input source file if it exists
+
+
+.sp
+
+.I val source_file 
+: 
+.B t -> Unit_info.filename option
+.sp
+
+.ft B
+source_file a
+.ft R
+is the source file of 
+.ft B
+a
+.ft R
+if it exists\&.
+
+.sp
+
+.I val prefix 
+: 
+.B t -> Unit_info.file_prefix
+.sp
+
+.ft B
+prefix a
+.ft R
+is the filename prefix of the compilation artifact\&.
+
+.sp
+
+.I val filename 
+: 
+.B t -> Unit_info.filename
+.sp
+
+.ft B
+filename u
+.ft R
+is the filesystem path for a compilation artifact\&.
+
+.sp
+
+.I val modname 
+: 
+.B t -> Unit_info.modname
+.sp
+
+.ft B
+modname a
+.ft R
+is the module name of the compilation artifact\&.
+
+.sp
+
+.I val from_filename 
+: 
+.B Unit_info.filename -> t
+.sp
+
+.ft B
+from_filename filename
+.ft R
+reconstructs the module name
+.ft B
+modname_from_source filename
+.ft R
+associated to the artifact 
+.ft B
+filename
+.ft R
+\&.
+
+.sp

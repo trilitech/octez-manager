@@ -1,0 +1,10 @@
+opam-version: "2.0"
+synopsis: "/home/valentin/work/octez-manager"
+opam-root: "/home/valentin/.opam"
+paths {
+  
+}
+variables {
+  user: "valentin"
+  group: "valentin"
+}

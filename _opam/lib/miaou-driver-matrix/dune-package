@@ -1,0 +1,178 @@
+(lang dune 3.20)
+(name miaou-driver-matrix)
+(version da71376)
+(sections (lib .) (libexec .) (doc ../../doc/miaou-driver-matrix))
+(files
+ (lib
+  (META
+   driver/matrix_ansi_parser.ml
+   driver/matrix_ansi_parser.mli
+   driver/matrix_ansi_writer.ml
+   driver/matrix_ansi_writer.mli
+   driver/matrix_buffer.ml
+   driver/matrix_buffer.mli
+   driver/matrix_cell.ml
+   driver/matrix_cell.mli
+   driver/matrix_config.ml
+   driver/matrix_config.mli
+   driver/matrix_diff.ml
+   driver/matrix_diff.mli
+   driver/matrix_driver.ml
+   driver/matrix_input.ml
+   driver/matrix_input.mli
+   driver/matrix_render_loop.ml
+   driver/matrix_render_loop.mli
+   driver/matrix_terminal.ml
+   driver/matrix_terminal.mli
+   driver/miaou_driver_matrix.a
+   driver/miaou_driver_matrix.cma
+   driver/miaou_driver_matrix.cmi
+   driver/miaou_driver_matrix.cmt
+   driver/miaou_driver_matrix.cmx
+   driver/miaou_driver_matrix.cmxa
+   driver/miaou_driver_matrix.ml
+   driver/miaou_driver_matrix__Matrix_ansi_parser.cmi
+   driver/miaou_driver_matrix__Matrix_ansi_parser.cmt
+   driver/miaou_driver_matrix__Matrix_ansi_parser.cmti
+   driver/miaou_driver_matrix__Matrix_ansi_parser.cmx
+   driver/miaou_driver_matrix__Matrix_ansi_writer.cmi
+   driver/miaou_driver_matrix__Matrix_ansi_writer.cmt
+   driver/miaou_driver_matrix__Matrix_ansi_writer.cmti
+   driver/miaou_driver_matrix__Matrix_ansi_writer.cmx
+   driver/miaou_driver_matrix__Matrix_buffer.cmi
+   driver/miaou_driver_matrix__Matrix_buffer.cmt
+   driver/miaou_driver_matrix__Matrix_buffer.cmti
+   driver/miaou_driver_matrix__Matrix_buffer.cmx
+   driver/miaou_driver_matrix__Matrix_cell.cmi
+   driver/miaou_driver_matrix__Matrix_cell.cmt
+   driver/miaou_driver_matrix__Matrix_cell.cmti
+   driver/miaou_driver_matrix__Matrix_cell.cmx
+   driver/miaou_driver_matrix__Matrix_config.cmi
+   driver/miaou_driver_matrix__Matrix_config.cmt
+   driver/miaou_driver_matrix__Matrix_config.cmti
+   driver/miaou_driver_matrix__Matrix_config.cmx
+   driver/miaou_driver_matrix__Matrix_diff.cmi
+   driver/miaou_driver_matrix__Matrix_diff.cmt
+   driver/miaou_driver_matrix__Matrix_diff.cmti
+   driver/miaou_driver_matrix__Matrix_diff.cmx
+   driver/miaou_driver_matrix__Matrix_driver.cmi
+   driver/miaou_driver_matrix__Matrix_driver.cmt
+   driver/miaou_driver_matrix__Matrix_driver.cmx
+   driver/miaou_driver_matrix__Matrix_input.cmi
+   driver/miaou_driver_matrix__Matrix_input.cmt
+   driver/miaou_driver_matrix__Matrix_input.cmti
+   driver/miaou_driver_matrix__Matrix_input.cmx
+   driver/miaou_driver_matrix__Matrix_render_loop.cmi
+   driver/miaou_driver_matrix__Matrix_render_loop.cmt
+   driver/miaou_driver_matrix__Matrix_render_loop.cmti
+   driver/miaou_driver_matrix__Matrix_render_loop.cmx
+   driver/miaou_driver_matrix__Matrix_terminal.cmi
+   driver/miaou_driver_matrix__Matrix_terminal.cmt
+   driver/miaou_driver_matrix__Matrix_terminal.cmti
+   driver/miaou_driver_matrix__Matrix_terminal.cmx
+   dune-package
+   opam))
+ (libexec (driver/miaou_driver_matrix.cmxs))
+ (doc (CHANGELOG.md LICENSE.md README.md)))
+(library
+ (name miaou-driver-matrix.driver)
+ (kind normal)
+ (archives
+  (byte driver/miaou_driver_matrix.cma)
+  (native driver/miaou_driver_matrix.cmxa))
+ (plugins
+  (byte driver/miaou_driver_matrix.cma)
+  (native driver/miaou_driver_matrix.cmxs))
+ (native_archives driver/miaou_driver_matrix.a)
+ (requires
+  miaou-core.core
+  miaou-core.helpers
+  miaou-core.driver-common
+  miaou-core.interfaces
+  miaou-core.internals
+  miaou-core.widgets.display
+  eio
+  eio_main
+  eio.unix)
+ (main_module_name Miaou_driver_matrix)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_driver_matrix)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_driver_matrix)
+      (impl (path driver/miaou_driver_matrix.ml-gen))))
+    (name Miaou_driver_matrix)
+    (modules
+     (module
+      (obj_name miaou_driver_matrix__Matrix_ansi_parser)
+      (visibility public)
+      (source
+       (path Matrix_ansi_parser)
+       (intf (path driver/matrix_ansi_parser.mli))
+       (impl (path driver/matrix_ansi_parser.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_ansi_writer)
+      (visibility public)
+      (source
+       (path Matrix_ansi_writer)
+       (intf (path driver/matrix_ansi_writer.mli))
+       (impl (path driver/matrix_ansi_writer.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_buffer)
+      (visibility public)
+      (source
+       (path Matrix_buffer)
+       (intf (path driver/matrix_buffer.mli))
+       (impl (path driver/matrix_buffer.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_cell)
+      (visibility public)
+      (source
+       (path Matrix_cell)
+       (intf (path driver/matrix_cell.mli))
+       (impl (path driver/matrix_cell.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_config)
+      (visibility public)
+      (source
+       (path Matrix_config)
+       (intf (path driver/matrix_config.mli))
+       (impl (path driver/matrix_config.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_diff)
+      (visibility public)
+      (source
+       (path Matrix_diff)
+       (intf (path driver/matrix_diff.mli))
+       (impl (path driver/matrix_diff.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_driver)
+      (visibility public)
+      (source (path Matrix_driver) (impl (path driver/matrix_driver.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_input)
+      (visibility public)
+      (source
+       (path Matrix_input)
+       (intf (path driver/matrix_input.mli))
+       (impl (path driver/matrix_input.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_render_loop)
+      (visibility public)
+      (source
+       (path Matrix_render_loop)
+       (intf (path driver/matrix_render_loop.mli))
+       (impl (path driver/matrix_render_loop.ml))))
+     (module
+      (obj_name miaou_driver_matrix__Matrix_terminal)
+      (visibility public)
+      (source
+       (path Matrix_terminal)
+       (intf (path driver/matrix_terminal.mli))
+       (impl (path driver/matrix_terminal.ml))))))
+   (wrapped true))))

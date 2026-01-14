@@ -1,0 +1,107 @@
+opam-version: "2.0"
+added: [
+  "doc/miaou-driver-term" {"D"}
+  "doc/miaou-driver-term/CHANGELOG.md" {"F:S21733T1768295993.25"}
+  "doc/miaou-driver-term/LICENSE.md" {"F:S1096T1768295993.25"}
+  "doc/miaou-driver-term/README.md" {"F:S29532T1768295993.25"}
+  "lib/miaou-driver-term" {"D"}
+  "lib/miaou-driver-term/META" {"F:S521T1768295993.25"}
+  "lib/miaou-driver-term/driver" {"D"}
+  "lib/miaou-driver-term/driver/lambda_term_driver.ml"
+    {"F:S58728T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.a"
+    {"F:S237932T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.cma"
+    {"F:S138911T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.cmi"
+    {"F:S791T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.cmt"
+    {"F:S3375T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.cmx"
+    {"F:S439T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.cmxa"
+    {"F:S16688T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.cmxs"
+    {"F:S217528T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term.ml"
+    {"F:S940T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Lambda_term_driver.cmi"
+    {"F:S5889T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Lambda_term_driver.cmt"
+    {"F:S169593T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Lambda_term_driver.cmx"
+    {"F:S6404T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_event_reader.cmi"
+    {"F:S1342T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_event_reader.cmt"
+    {"F:S38215T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_event_reader.cmx"
+    {"F:S1183T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_events.cmi"
+    {"F:S679T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_events.cmt"
+    {"F:S3464T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_events.cmti"
+    {"F:S3520T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_events.cmx"
+    {"F:S342T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_render.cmi"
+    {"F:S3918T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_render.cmt"
+    {"F:S32869T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_render.cmx"
+    {"F:S4055T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_renderer.cmi"
+    {"F:S967T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_renderer.cmt"
+    {"F:S28873T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_renderer.cmti"
+    {"F:S4919T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_renderer.cmx"
+    {"F:S4065T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_size_detection.cmi"
+    {"F:S490T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_size_detection.cmt"
+    {"F:S5988T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_size_detection.cmti"
+    {"F:S3364T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_size_detection.cmx"
+    {"F:S852T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_terminal_setup.cmi"
+    {"F:S625T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_terminal_setup.cmt"
+    {"F:S5000T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_terminal_setup.cmti"
+    {"F:S3461T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_terminal_setup.cmx"
+    {"F:S1404T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_test_runner.cmi"
+    {"F:S1051T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_test_runner.cmt"
+    {"F:S13944T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_test_runner.cmti"
+    {"F:S4575T1768295993.25"}
+  "lib/miaou-driver-term/driver/miaou_driver_term__Term_test_runner.cmx"
+    {"F:S721T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_event_reader.ml"
+    {"F:S8626T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_events.ml" {"F:S682T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_events.mli" {"F:S637T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_render.ml" {"F:S5230T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_renderer.ml" {"F:S5185T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_renderer.mli" {"F:S769T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_size_detection.ml"
+    {"F:S1281T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_size_detection.mli"
+    {"F:S1041T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_terminal_setup.ml"
+    {"F:S1180T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_terminal_setup.mli"
+    {"F:S691T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_test_runner.ml"
+    {"F:S3174T1768295993.25"}
+  "lib/miaou-driver-term/driver/term_test_runner.mli"
+    {"F:S861T1768295993.25"}
+  "lib/miaou-driver-term/dune-package" {"F:S4900T1768295993.25"}
+  "lib/miaou-driver-term/opam" {"F:S597T1768295993.25"}
+]

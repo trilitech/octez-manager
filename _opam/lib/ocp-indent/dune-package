@@ -1,0 +1,206 @@
+(lang dune 3.20)
+(name ocp-indent)
+(version 1.9.0)
+(sections
+ (lib .)
+ (libexec .)
+ (bin ../../bin)
+ (share_root ../../share)
+ (doc ../../doc/ocp-indent)
+ (man ../../man))
+(files
+ (lib
+  (META
+   dune-package
+   dynlink/indentLoader.cmi
+   dynlink/indentLoader.cmt
+   dynlink/indentLoader.cmti
+   dynlink/indentLoader.cmx
+   dynlink/indentLoader.ml
+   dynlink/indentLoader.mli
+   dynlink/ocp_indent_dynlink.a
+   dynlink/ocp_indent_dynlink.cma
+   dynlink/ocp_indent_dynlink.cmxa
+   lexer/approx_lexer.cmi
+   lexer/approx_lexer.cmt
+   lexer/approx_lexer.cmx
+   lexer/approx_lexer.ml
+   lexer/approx_tokens.cmi
+   lexer/approx_tokens.cmt
+   lexer/approx_tokens.cmx
+   lexer/approx_tokens.ml
+   lexer/indentExtend.cmi
+   lexer/indentExtend.cmt
+   lexer/indentExtend.cmti
+   lexer/indentExtend.cmx
+   lexer/indentExtend.ml
+   lexer/indentExtend.mli
+   lexer/ocp_indent_lexer.a
+   lexer/ocp_indent_lexer.cma
+   lexer/ocp_indent_lexer.cmxa
+   lib/indentBlock.cmi
+   lib/indentBlock.cmt
+   lib/indentBlock.cmti
+   lib/indentBlock.cmx
+   lib/indentBlock.ml
+   lib/indentBlock.mli
+   lib/indentConfig.cmi
+   lib/indentConfig.cmt
+   lib/indentConfig.cmti
+   lib/indentConfig.cmx
+   lib/indentConfig.ml
+   lib/indentConfig.mli
+   lib/indentPrinter.cmi
+   lib/indentPrinter.cmt
+   lib/indentPrinter.cmti
+   lib/indentPrinter.cmx
+   lib/indentPrinter.ml
+   lib/indentPrinter.mli
+   lib/ocp_indent_lib.a
+   lib/ocp_indent_lib.cma
+   lib/ocp_indent_lib.cmxa
+   opam
+   utils/compat.cmi
+   utils/compat.cmt
+   utils/compat.cmx
+   utils/compat.ml
+   utils/nstream.cmi
+   utils/nstream.cmt
+   utils/nstream.cmti
+   utils/nstream.cmx
+   utils/nstream.ml
+   utils/nstream.mli
+   utils/ocp_indent_utils.a
+   utils/ocp_indent_utils.cma
+   utils/ocp_indent_utils.cmxa
+   utils/pos.cmi
+   utils/pos.cmt
+   utils/pos.cmti
+   utils/pos.cmx
+   utils/pos.ml
+   utils/pos.mli
+   utils/util.cmi
+   utils/util.cmt
+   utils/util.cmx
+   utils/util.ml))
+ (libexec
+  (dynlink/ocp_indent_dynlink.cmxs
+   lexer/ocp_indent_lexer.cmxs
+   lib/ocp_indent_lib.cmxs
+   utils/ocp_indent_utils.cmxs))
+ (bin (ocp-indent ocp-indent-gen-rules))
+ (share_root (emacs/site-lisp/ocp-indent.el ocp-indent/vim/indent/ocaml.vim))
+ (doc (CHANGELOG.md LICENSE README.md))
+ (man (man1/ocp-indent.1)))
+(library
+ (name ocp-indent.dynlink)
+ (kind normal)
+ (archives
+  (byte dynlink/ocp_indent_dynlink.cma)
+  (native dynlink/ocp_indent_dynlink.cmxa))
+ (plugins
+  (byte dynlink/ocp_indent_dynlink.cma)
+  (native dynlink/ocp_indent_dynlink.cmxs))
+ (native_archives dynlink/ocp_indent_dynlink.a)
+ (requires findlib dynlink ocp-indent.lexer ocp-indent.utils)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name indentLoader)
+   (visibility public)
+   (source
+    (path IndentLoader)
+    (intf (path dynlink/indentLoader.mli))
+    (impl (path dynlink/indentLoader.ml))))))
+(library
+ (name ocp-indent.lexer)
+ (kind normal)
+ (archives
+  (byte lexer/ocp_indent_lexer.cma)
+  (native lexer/ocp_indent_lexer.cmxa))
+ (plugins
+  (byte lexer/ocp_indent_lexer.cma)
+  (native lexer/ocp_indent_lexer.cmxs))
+ (native_archives lexer/ocp_indent_lexer.a)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name approx_lexer)
+    (visibility public)
+    (source (path Approx_lexer) (impl (path lexer/approx_lexer.ml))))
+   (module
+    (obj_name approx_tokens)
+    (visibility public)
+    (source (path Approx_tokens) (impl (path lexer/approx_tokens.ml))))
+   (module
+    (obj_name indentExtend)
+    (visibility public)
+    (source
+     (path IndentExtend)
+     (intf (path lexer/indentExtend.mli))
+     (impl (path lexer/indentExtend.ml)))))))
+(library
+ (name ocp-indent.lib)
+ (kind normal)
+ (archives (byte lib/ocp_indent_lib.cma) (native lib/ocp_indent_lib.cmxa))
+ (plugins (byte lib/ocp_indent_lib.cma) (native lib/ocp_indent_lib.cmxs))
+ (native_archives lib/ocp_indent_lib.a)
+ (requires ocp-indent.utils)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name indentBlock)
+    (visibility public)
+    (source
+     (path IndentBlock)
+     (intf (path lib/indentBlock.mli))
+     (impl (path lib/indentBlock.ml))))
+   (module
+    (obj_name indentConfig)
+    (visibility public)
+    (source
+     (path IndentConfig)
+     (intf (path lib/indentConfig.mli))
+     (impl (path lib/indentConfig.ml))))
+   (module
+    (obj_name indentPrinter)
+    (visibility public)
+    (source
+     (path IndentPrinter)
+     (intf (path lib/indentPrinter.mli))
+     (impl (path lib/indentPrinter.ml)))))))
+(library
+ (name ocp-indent.utils)
+ (kind normal)
+ (archives
+  (byte utils/ocp_indent_utils.cma)
+  (native utils/ocp_indent_utils.cmxa))
+ (plugins
+  (byte utils/ocp_indent_utils.cma)
+  (native utils/ocp_indent_utils.cmxs))
+ (native_archives utils/ocp_indent_utils.a)
+ (requires ocp-indent.lexer)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name compat)
+    (visibility public)
+    (source (path Compat) (impl (path utils/compat.ml))))
+   (module
+    (obj_name nstream)
+    (visibility public)
+    (source
+     (path Nstream)
+     (intf (path utils/nstream.mli))
+     (impl (path utils/nstream.ml))))
+   (module
+    (obj_name pos)
+    (visibility public)
+    (source (path Pos) (intf (path utils/pos.mli)) (impl (path utils/pos.ml))))
+   (module
+    (obj_name util)
+    (visibility public)
+    (source (path Util) (impl (path utils/util.ml)))))))

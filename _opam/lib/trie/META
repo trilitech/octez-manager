@@ -1,0 +1,6 @@
+description = ""
+requires = ""
+archive(byte) = "trie.cma"
+archive(native) = "trie.cmxa"
+plugin(byte) = "trie.cma"
+plugin(native) = "trie.cmxs"

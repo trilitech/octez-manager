@@ -1,0 +1,85 @@
+.TH "Attr_helper" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Attr_helper \- Helpers for attributes
+.SH Module
+Module   Attr_helper
+.SH Documentation
+.sp
+Module
+.BI "Attr_helper"
+ : 
+.B sig end
+
+.sp
+Helpers for attributes
+.sp
+Warning: this module is unstable and part of
+.ft B
+Compiler_libs
+.ft R
+\&.
+
+.sp
+
+.sp
+.sp
+.I type error 
+=
+ | Multiple_attributes
+.B of 
+.B string
+ | No_payload_expected
+.B of 
+.B string
+ 
+.sp
+
+.sp
+
+.I val get_no_payload_attribute 
+: 
+.B string -> Parsetree.attributes -> string Asttypes.loc option
+.sp
+The 
+.ft B
+string
+.ft R
+argument of the following functions is the name of the
+attribute we are looking for\&.  If the argument is 
+.ft B
+"foo"
+.ft R
+, these functions
+will find attributes with the name 
+.ft B
+"foo"
+.ft R
+or 
+.ft B
+"ocaml\&.foo"
+.ft R
+
+
+.sp
+
+.I val has_no_payload_attribute 
+: 
+.B string -> Parsetree.attributes -> bool
+.sp
+
+.sp
+
+.I exception Error 
+.B of 
+.B Location.t * error
+
+.sp
+
+.sp
+
+.I val report_error 
+: 
+.B Format.formatter -> error -> unit
+.sp
+
+.sp

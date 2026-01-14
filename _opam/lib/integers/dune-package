@@ -1,0 +1,88 @@
+(lang dune 3.20)
+(name integers)
+(sections (lib .) (libexec .) (doc ../../doc/integers) (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   dune-package
+   integers.a
+   integers.cma
+   integers.cmxa
+   libintegers_stubs.a
+   ocaml_integers.h
+   opam
+   signed.cmi
+   signed.cmt
+   signed.cmti
+   signed.cmx
+   signed.ml
+   signed.mli
+   top/install_integer_printers.cmi
+   top/install_integer_printers.cmt
+   top/install_integer_printers.cmti
+   top/install_integer_printers.ml
+   top/install_integer_printers.mli
+   top/integer_printers.cmi
+   top/integer_printers.cmt
+   top/integer_printers.cmti
+   top/integer_printers.ml
+   top/integer_printers.mli
+   top/integers_top.cma
+   unsigned.cmi
+   unsigned.cmt
+   unsigned.cmti
+   unsigned.cmx
+   unsigned.ml
+   unsigned.mli))
+ (libexec (integers.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md))
+ (stublibs (dllintegers_stubs.so)))
+(library
+ (name integers)
+ (kind normal)
+ (synopsis "Signed and unsigned integers of various sizes")
+ (archives (byte integers.cma) (native integers.cmxa))
+ (plugins (byte integers.cma) (native integers.cmxs))
+ (foreign_objects unsigned_stubs.o)
+ (foreign_archives (archives (for all) (files libintegers_stubs.a)))
+ (foreign_dll_files ../stublibs/dllintegers_stubs.so)
+ (native_archives integers.a)
+ (requires stdlib-shims)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name signed)
+    (visibility public)
+    (source (path Signed) (intf (path signed.mli)) (impl (path signed.ml))))
+   (module
+    (obj_name unsigned)
+    (visibility public)
+    (source
+     (path Unsigned)
+     (intf (path unsigned.mli))
+     (impl (path unsigned.ml)))))))
+(library
+ (name integers.top)
+ (kind normal)
+ (synopsis "toplevel pretty printers")
+ (archives (byte top/integers_top.cma))
+ (plugins (byte top/integers_top.cma))
+ (requires integers compiler-libs)
+ (modes byte)
+ (modules
+  (unwrapped
+   (module
+    (obj_name install_integer_printers)
+    (visibility public)
+    (source
+     (path Install_integer_printers)
+     (intf (path top/install_integer_printers.mli))
+     (impl (path top/install_integer_printers.ml))))
+   (module
+    (obj_name integer_printers)
+    (visibility public)
+    (source
+     (path Integer_printers)
+     (intf (path top/integer_printers.mli))
+     (impl (path top/integer_printers.ml)))))))

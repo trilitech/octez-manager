@@ -1,0 +1,8 @@
+(library
+ (name ppx_deriving_make)
+ (public_name ppx_deriving.make)
+ (synopsis "[@@deriving make]")
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries compiler-libs.common ppxlib ppx_deriving.api)
+ (kind ppx_deriver))

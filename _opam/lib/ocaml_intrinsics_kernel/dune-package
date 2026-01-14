@@ -1,0 +1,139 @@
+(lang dune 3.20)
+(name ocaml_intrinsics_kernel)
+(version v0.17.1)
+(sections
+ (lib .)
+ (libexec .)
+ (doc ../../doc/ocaml_intrinsics_kernel)
+ (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   common.ml
+   common.mli
+   conditional.ml
+   dune-package
+   float.ml
+   float.mli
+   int.ml
+   int.mli
+   int32.ml
+   int32.mli
+   int64.ml
+   int64.mli
+   libocaml_intrinsics_kernel_stubs.a
+   naive_ints.ml
+   naive_ints.mli
+   nativeint.ml
+   nativeint.mli
+   ocaml_intrinsics_kernel.a
+   ocaml_intrinsics_kernel.cma
+   ocaml_intrinsics_kernel.cmi
+   ocaml_intrinsics_kernel.cmt
+   ocaml_intrinsics_kernel.cmx
+   ocaml_intrinsics_kernel.cmxa
+   ocaml_intrinsics_kernel.ml
+   ocaml_intrinsics_kernel__Common.cmi
+   ocaml_intrinsics_kernel__Common.cmt
+   ocaml_intrinsics_kernel__Common.cmti
+   ocaml_intrinsics_kernel__Common.cmx
+   ocaml_intrinsics_kernel__Conditional.cmi
+   ocaml_intrinsics_kernel__Conditional.cmt
+   ocaml_intrinsics_kernel__Conditional.cmx
+   ocaml_intrinsics_kernel__Float.cmi
+   ocaml_intrinsics_kernel__Float.cmt
+   ocaml_intrinsics_kernel__Float.cmti
+   ocaml_intrinsics_kernel__Float.cmx
+   ocaml_intrinsics_kernel__Int.cmi
+   ocaml_intrinsics_kernel__Int.cmt
+   ocaml_intrinsics_kernel__Int.cmti
+   ocaml_intrinsics_kernel__Int.cmx
+   ocaml_intrinsics_kernel__Int32.cmi
+   ocaml_intrinsics_kernel__Int32.cmt
+   ocaml_intrinsics_kernel__Int32.cmti
+   ocaml_intrinsics_kernel__Int32.cmx
+   ocaml_intrinsics_kernel__Int64.cmi
+   ocaml_intrinsics_kernel__Int64.cmt
+   ocaml_intrinsics_kernel__Int64.cmti
+   ocaml_intrinsics_kernel__Int64.cmx
+   ocaml_intrinsics_kernel__Naive_ints.cmi
+   ocaml_intrinsics_kernel__Naive_ints.cmt
+   ocaml_intrinsics_kernel__Naive_ints.cmti
+   ocaml_intrinsics_kernel__Naive_ints.cmx
+   ocaml_intrinsics_kernel__Nativeint.cmi
+   ocaml_intrinsics_kernel__Nativeint.cmt
+   ocaml_intrinsics_kernel__Nativeint.cmti
+   ocaml_intrinsics_kernel__Nativeint.cmx
+   opam
+   runtime.js))
+ (libexec (ocaml_intrinsics_kernel.cmxs))
+ (doc (LICENSE.md README.md))
+ (stublibs (dllocaml_intrinsics_kernel_stubs.so)))
+(library
+ (name ocaml_intrinsics_kernel)
+ (kind normal)
+ (archives
+  (byte ocaml_intrinsics_kernel.cma)
+  (native ocaml_intrinsics_kernel.cmxa))
+ (plugins
+  (byte ocaml_intrinsics_kernel.cma)
+  (native ocaml_intrinsics_kernel.cmxs))
+ (foreign_objects conditional_stubs.o float_stubs.o int_stubs.o)
+ (foreign_archives
+  (archives (for all) (files libocaml_intrinsics_kernel_stubs.a)))
+ (foreign_dll_files ../stublibs/dllocaml_intrinsics_kernel_stubs.so)
+ (native_archives ocaml_intrinsics_kernel.a)
+ (jsoo_runtime runtime.js)
+ (main_module_name Ocaml_intrinsics_kernel)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name ocaml_intrinsics_kernel)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Ocaml_intrinsics_kernel)
+      (impl (path ocaml_intrinsics_kernel.ml-gen))))
+    (name Ocaml_intrinsics_kernel)
+    (modules
+     (module
+      (obj_name ocaml_intrinsics_kernel__Common)
+      (visibility public)
+      (source (path Common) (intf (path common.mli)) (impl (path common.ml))))
+     (module
+      (obj_name ocaml_intrinsics_kernel__Conditional)
+      (visibility public)
+      (source (path Conditional) (impl (path conditional.ml))))
+     (module
+      (obj_name ocaml_intrinsics_kernel__Float)
+      (visibility public)
+      (source (path Float) (intf (path float.mli)) (impl (path float.ml))))
+     (module
+      (obj_name ocaml_intrinsics_kernel__Int)
+      (visibility public)
+      (source (path Int) (intf (path int.mli)) (impl (path int.ml))))
+     (module
+      (obj_name ocaml_intrinsics_kernel__Int32)
+      (visibility public)
+      (source (path Int32) (intf (path int32.mli)) (impl (path int32.ml))))
+     (module
+      (obj_name ocaml_intrinsics_kernel__Int64)
+      (visibility public)
+      (source (path Int64) (intf (path int64.mli)) (impl (path int64.ml))))
+     (module
+      (obj_name ocaml_intrinsics_kernel__Naive_ints)
+      (visibility public)
+      (source
+       (path Naive_ints)
+       (intf (path naive_ints.mli))
+       (impl (path naive_ints.ml))))
+     (module
+      (obj_name ocaml_intrinsics_kernel__Nativeint)
+      (visibility public)
+      (source
+       (path Nativeint)
+       (intf (path nativeint.mli))
+       (impl (path nativeint.ml))))))
+   (wrapped true))))

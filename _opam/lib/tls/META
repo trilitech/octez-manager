@@ -1,0 +1,30 @@
+version = "2.0.3"
+description = ""
+requires =
+"digestif
+ domain-name
+ fmt
+ ipaddr
+ kdf.hkdf
+ logs
+ mirage-crypto
+ mirage-crypto-ec
+ mirage-crypto-pk
+ mirage-crypto-rng
+ ohex
+ x509"
+archive(byte) = "tls.cma"
+archive(native) = "tls.cmxa"
+plugin(byte) = "tls.cma"
+plugin(native) = "tls.cmxs"
+package "unix" (
+  directory = "unix"
+  version = "2.0.3"
+  description = ""
+  requires =
+  "mirage-crypto-rng.unix ptime ptime.clock ptime.clock.os tls unix"
+  archive(byte) = "tls_unix.cma"
+  archive(native) = "tls_unix.cmxa"
+  plugin(byte) = "tls_unix.cma"
+  plugin(native) = "tls_unix.cmxs"
+)

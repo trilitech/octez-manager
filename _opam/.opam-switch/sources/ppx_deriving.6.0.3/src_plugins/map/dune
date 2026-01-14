@@ -1,0 +1,8 @@
+(library
+ (name ppx_deriving_map)
+ (public_name ppx_deriving.map)
+ (synopsis "[@@deriving map]")
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries compiler-libs.common ppxlib ppx_deriving.api)
+ (kind ppx_deriver))

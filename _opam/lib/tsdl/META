@@ -1,0 +1,17 @@
+version = "v1.2.0"
+description = "Thin bindings to SDL for OCaml"
+requires = "ctypes ctypes-foreign"
+archive(byte) = "tsdl.cma"
+archive(native) = "tsdl.cmxa"
+plugin(byte) = "tsdl.cma"
+plugin(native) = "tsdl.cmxs"
+
+package "top" (
+ version = "v1.2.0"
+ description = "Tsdl toplevel support"
+ requires = "tsdl"
+ archive(byte) = "tsdl_top.cma"
+ archive(native) = "tsdl_top.cmxa"
+ plugin(byte) = "tsdl_top.cma"
+ plugin(native) = "tsdl_top.cmxs"
+)

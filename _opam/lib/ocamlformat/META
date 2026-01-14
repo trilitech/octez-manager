@@ -1,0 +1,31 @@
+package "bin_conf" (
+  directory = "bin_conf"
+  version = "0.28.1"
+  description = ""
+  requires = "ocamlformat-lib re"
+  archive(byte) = "bin_conf.cma"
+  archive(native) = "bin_conf.cmxa"
+  plugin(byte) = "bin_conf.cma"
+  plugin(native) = "bin_conf.cmxs"
+)
+package "rpc" (
+  directory = "rpc"
+  version = "0.28.1"
+  description = ""
+  requires =
+  "ocamlformat-lib ocamlformat.bin_conf ocamlformat.rpc_lib_protocol"
+  archive(byte) = "ocamlformat_rpc.cma"
+  archive(native) = "ocamlformat_rpc.cmxa"
+  plugin(byte) = "ocamlformat_rpc.cma"
+  plugin(native) = "ocamlformat_rpc.cmxs"
+)
+package "rpc_lib_protocol" (
+  directory = "rpc_lib_protocol"
+  version = "0.28.1"
+  description = ""
+  requires = "csexp"
+  archive(byte) = "ocamlformat_rpc_lib_protocol.cma"
+  archive(native) = "ocamlformat_rpc_lib_protocol.cmxa"
+  plugin(byte) = "ocamlformat_rpc_lib_protocol.cma"
+  plugin(native) = "ocamlformat_rpc_lib_protocol.cmxs"
+)

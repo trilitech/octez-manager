@@ -1,0 +1,120 @@
+(lang dune 3.20)
+(name checkseum)
+(version 0.5.2)
+(sections
+ (lib .)
+ (libexec .)
+ (bin ../../bin)
+ (doc ../../doc/checkseum)
+ (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   c/checkseum.cmi
+   c/checkseum.cmt
+   c/checkseum.cmx
+   c/checkseum.ml
+   c/checkseum_c.a
+   c/checkseum_c.cma
+   c/checkseum_c.cmxa
+   c/libcheckseum_c_stubs.a
+   checkseum.cmi
+   checkseum.cmti
+   checkseum.mli
+   dune-package
+   ocaml/.private/gin_adler32.cmi
+   ocaml/.private/gin_adler32.cmt
+   ocaml/.private/gin_crc24.cmi
+   ocaml/.private/gin_crc24.cmt
+   ocaml/.private/gin_crc32.cmi
+   ocaml/.private/gin_crc32.cmt
+   ocaml/.private/gin_crc32c.cmi
+   ocaml/.private/gin_crc32c.cmt
+   ocaml/checkseum.cmi
+   ocaml/checkseum.cmt
+   ocaml/checkseum.cmx
+   ocaml/checkseum.ml
+   ocaml/checkseum_ocaml.a
+   ocaml/checkseum_ocaml.cma
+   ocaml/checkseum_ocaml.cmxa
+   ocaml/gin_adler32.cmx
+   ocaml/gin_adler32.ml
+   ocaml/gin_crc24.cmx
+   ocaml/gin_crc24.ml
+   ocaml/gin_crc32.cmx
+   ocaml/gin_crc32.ml
+   ocaml/gin_crc32c.cmx
+   ocaml/gin_crc32c.ml
+   opam))
+ (libexec (c/checkseum_c.cmxs ocaml/checkseum_ocaml.cmxs))
+ (bin (checkseum.checkseum))
+ (doc (CHANGES.md LICENSE.md README.md))
+ (stublibs (dllcheckseum_c_stubs.so)))
+(library
+ (name checkseum)
+ (kind normal)
+ (virtual)
+ (requires optint)
+ (default_implementation checkseum.c)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name checkseum)
+   (visibility public)
+   (kind virtual)
+   (source (path Checkseum) (intf (path checkseum.mli))))))
+(library
+ (name checkseum.c)
+ (kind normal)
+ (archives (byte c/checkseum_c.cma) (native c/checkseum_c.cmxa))
+ (plugins (byte c/checkseum_c.cma) (native c/checkseum_c.cmxs))
+ (foreign_objects c/adler32.o c/crc24.o c/crc32.o c/crc32c.o c/stubs.o)
+ (foreign_archives (archives (for all) (files c/libcheckseum_c_stubs.a)))
+ (foreign_dll_files ../stublibs/dllcheckseum_c_stubs.so)
+ (native_archives c/checkseum_c.a)
+ (requires checkseum optint)
+ (implements checkseum)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name checkseum)
+   (visibility public)
+   (kind impl_vmodule)
+   (source (path Checkseum) (impl (path c/checkseum.ml))))))
+(library
+ (name checkseum.ocaml)
+ (kind normal)
+ (archives
+  (byte ocaml/checkseum_ocaml.cma)
+  (native ocaml/checkseum_ocaml.cmxa))
+ (plugins
+  (byte ocaml/checkseum_ocaml.cma)
+  (native ocaml/checkseum_ocaml.cmxs))
+ (native_archives ocaml/checkseum_ocaml.a)
+ (requires checkseum optint)
+ (implements checkseum)
+ (modes byte native)
+ (obj_dir (private_dir .private))
+ (modules
+  (unwrapped
+   (module
+    (obj_name checkseum)
+    (visibility public)
+    (kind impl_vmodule)
+    (source (path Checkseum) (impl (path ocaml/checkseum.ml))))
+   (module
+    (obj_name gin_adler32)
+    (visibility private)
+    (source (path Gin_adler32) (impl (path ocaml/gin_adler32.ml))))
+   (module
+    (obj_name gin_crc24)
+    (visibility private)
+    (source (path Gin_crc24) (impl (path ocaml/gin_crc24.ml))))
+   (module
+    (obj_name gin_crc32)
+    (visibility private)
+    (source (path Gin_crc32) (impl (path ocaml/gin_crc32.ml))))
+   (module
+    (obj_name gin_crc32c)
+    (visibility private)
+    (source (path Gin_crc32c) (impl (path ocaml/gin_crc32c.ml)))))))

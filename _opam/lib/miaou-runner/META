@@ -1,0 +1,13 @@
+package "tui" (
+  directory = "tui"
+  version = "da71376"
+  description = ""
+  requires =
+  "miaou-core.runner-common
+   miaou-driver-matrix.driver
+   miaou-driver-term.driver"
+  archive(byte) = "miaou_runner_tui.cma"
+  archive(native) = "miaou_runner_tui.cmxa"
+  plugin(byte) = "miaou_runner_tui.cma"
+  plugin(native) = "miaou_runner_tui.cmxs"
+)

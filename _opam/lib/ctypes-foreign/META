@@ -1,0 +1,7 @@
+version = "0.24.0"
+description = ""
+requires = "ctypes threads"
+archive(byte) = "ctypes_foreign.cma"
+archive(native) = "ctypes_foreign.cmxa"
+plugin(byte) = "ctypes_foreign.cma"
+plugin(native) = "ctypes_foreign.cmxs"

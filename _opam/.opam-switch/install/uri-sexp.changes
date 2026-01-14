@@ -1,0 +1,21 @@
+opam-version: "2.0"
+added: [
+  "doc/uri-sexp" {"D"}
+  "doc/uri-sexp/CHANGES.md" {"F:S11283T1768295786.19"}
+  "doc/uri-sexp/LICENSE.md" {"F:S803T1768295786.19"}
+  "doc/uri-sexp/README.md" {"F:S1871T1768295786.19"}
+  "lib/uri-sexp" {"D"}
+  "lib/uri-sexp/META" {"F:S214T1768295786.19"}
+  "lib/uri-sexp/dune-package" {"F:S810T1768295786.19"}
+  "lib/uri-sexp/opam" {"F:S751T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.a" {"F:S33344T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.cma" {"F:S18711T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.cmi" {"F:S1140T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.cmt" {"F:S31055T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.cmti" {"F:S4484T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.cmx" {"F:S1994T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.cmxa" {"F:S1317T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.cmxs" {"F:S42512T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.ml" {"F:S1508T1768295786.19"}
+  "lib/uri-sexp/uri_sexp.mli" {"F:S293T1768295786.19"}
+]

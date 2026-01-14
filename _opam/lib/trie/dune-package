@@ -1,0 +1,32 @@
+(lang dune 3.20)
+(name trie)
+(sections (lib .) (libexec .) (doc ../../doc/trie))
+(files
+ (lib
+  (META
+   dune-package
+   opam
+   trie.a
+   trie.cma
+   trie.cmi
+   trie.cmt
+   trie.cmti
+   trie.cmx
+   trie.cmxa
+   trie.ml
+   trie.mli))
+ (libexec (trie.cmxs))
+ (doc (LICENSE)))
+(library
+ (name trie)
+ (kind normal)
+ (archives (byte trie.cma) (native trie.cmxa))
+ (plugins (byte trie.cma) (native trie.cmxs))
+ (native_archives trie.a)
+ (main_module_name Trie)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name trie)
+   (visibility public)
+   (source (path Trie) (intf (path trie.mli)) (impl (path trie.ml))))))

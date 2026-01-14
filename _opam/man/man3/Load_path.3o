@@ -1,0 +1,302 @@
+.TH "Load_path" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Load_path \- Management of include directories.
+.SH Module
+Module   Load_path
+.SH Documentation
+.sp
+Module
+.BI "Load_path"
+ : 
+.B sig end
+
+.sp
+Management of include directories\&.
+.sp
+This module offers a high level interface to locating files in the load
+path, which is constructed from 
+.ft B
+\-I
+.ft R
+and 
+.ft B
+\-H
+.ft R
+command line flags and a few
+other parameters\&.
+.sp
+It makes the assumption that the contents of include directories
+doesn\&'t change during the execution of the compiler\&.
+
+.sp
+
+.sp
+.sp
+
+.I val add_dir 
+: 
+.B hidden:bool -> string -> unit
+.sp
+Add a directory to the end of the load path (i\&.e\&. at lowest priority\&.)
+
+.sp
+
+.I val remove_dir 
+: 
+.B string -> unit
+.sp
+Remove a directory from the load path
+
+.sp
+
+.I val reset 
+: 
+.B unit -> unit
+.sp
+Remove all directories
+
+.sp
+.I module Dir : 
+.B sig end
+
+.sp
+
+.sp
+.I type auto_include_callback 
+= 
+.B (Dir.t -> string -> string option) -> string -> string
+
+.sp
+The type of callback functions on for 
+.ft B
+init ~auto_include
+.ft R
+
+
+.sp
+
+.I val no_auto_include 
+: 
+.B auto_include_callback
+.sp
+No automatic directory inclusion: misses in the load path raise 
+.ft B
+Not_found
+.ft R
+as normal\&.
+
+.sp
+
+.I val init 
+: 
+.B auto_include:auto_include_callback ->
+.B   visible:string list -> hidden:string list -> unit
+.sp
+
+.ft B
+init ~visible ~hidden
+.ft R
+is the same as
+.ft B
+reset ();
+.br
+\&     List\&.iter add_dir (List\&.rev hidden);
+.br
+\&     List\&.iter add_dir (List\&.rev visible)
+.ft R
+
+
+.sp
+
+.I val auto_include_otherlibs 
+: 
+.B (string -> unit) -> auto_include_callback
+.sp
+
+.ft B
+auto_include_otherlibs alert
+.ft R
+is a callback function to be passed to
+.ft B
+Load_path\&.init
+.ft R
+and automatically adds 
+.ft B
+\-I +lib
+.ft R
+to the load path after
+calling 
+.ft B
+alert lib
+.ft R
+\&.
+
+.sp
+
+.I val get_path_list 
+: 
+.B unit -> string list
+.sp
+Return the list of directories passed to 
+.ft B
+add_dir
+.ft R
+so far\&.
+
+.sp
+.I type paths 
+= {
+ visible : 
+.B string list
+;
+ hidden : 
+.B string list
+;
+ }
+
+.sp
+
+.sp
+
+.I val get_paths 
+: 
+.B unit -> paths
+.sp
+Return the directories passed to 
+.ft B
+add_dir
+.ft R
+so far\&.
+
+.sp
+
+.I val find 
+: 
+.B string -> string
+.sp
+Locate a file in the load path\&. Raise 
+.ft B
+Not_found
+.ft R
+if the file
+cannot be found\&. This function is optimized for the case where the
+filename is a basename, i\&.e\&. doesn\&'t contain a directory
+separator\&.
+
+.sp
+
+.I val find_normalized 
+: 
+.B string -> string
+.sp
+Same as 
+.ft B
+find
+.ft R
+, but search also for normalized unit name (see
+.ft B
+Misc\&.normalized_unit_filename
+.ft R
+), i\&.e\&. if name is 
+.ft B
+Foo\&.ml
+.ft R
+, allow
+.ft B
+/path/Foo\&.ml
+.ft R
+and 
+.ft B
+/path/foo\&.ml
+.ft R
+to match\&.
+
+.sp
+.I type visibility 
+=
+ | Visible
+ | Hidden
+ 
+.sp
+
+.sp
+
+.I val find_normalized_with_visibility 
+: 
+.B string -> string * visibility
+.sp
+Same as 
+.ft B
+find_normalized
+.ft R
+, but also reports whether the cmi was found in a
+\-I directory (Visible) or a \-H directory (Hidden)
+
+.sp
+
+.I val add 
+: 
+.B Dir.t -> unit
+.sp
+.B "Deprecated."
+
+
+.sp
+Old name for 
+.ft B
+Load_path\&.append_dir
+.ft R
+
+
+.sp
+
+.I val append_dir 
+: 
+.B Dir.t -> unit
+.sp
+
+.ft B
+append_dir d
+.ft R
+adds 
+.ft B
+d
+.ft R
+to the end of the load path (i\&.e\&. at lowest
+priority\&.
+
+.sp
+
+.I val prepend_dir 
+: 
+.B Dir.t -> unit
+.sp
+
+.ft B
+prepend_dir d
+.ft R
+adds 
+.ft B
+d
+.ft R
+to the start of the load path (i\&.e\&. at highest
+priority\&.
+
+.sp
+
+.I val get_visible 
+: 
+.B unit -> Dir.t list
+.sp
+Same as 
+.ft B
+get_paths ()
+.ft R
+, except that it returns a 
+.ft B
+Dir\&.t list
+.ft R
+, and doesn\&'t
+include the \-H paths\&.
+
+.sp

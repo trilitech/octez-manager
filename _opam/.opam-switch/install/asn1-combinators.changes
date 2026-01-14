@@ -1,0 +1,62 @@
+opam-version: "2.0"
+added: [
+  "doc/asn1-combinators" {"D"}
+  "doc/asn1-combinators/CHANGES.md" {"F:S3233T1768295822.38"}
+  "doc/asn1-combinators/LICENSE.md" {"F:S747T1768295822.38"}
+  "doc/asn1-combinators/README.md" {"F:S686T1768295822.38"}
+  "lib/asn1-combinators" {"D"}
+  "lib/asn1-combinators/.private" {"D"}
+  "lib/asn1-combinators/.private/asn_ber_der.cmi" {"F:S6772T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_ber_der.cmt" {"F:S127216T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_cache.cmi" {"F:S671T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_cache.cmt" {"F:S7074T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_cache.cmti" {"F:S3438T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_combinators.cmi"
+    {"F:S4854T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_combinators.cmt"
+    {"F:S88430T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_core.cmi" {"F:S5695T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_core.cmt" {"F:S65224T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_oid.cmi" {"F:S1092T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_oid.cmt" {"F:S18675T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_oid.cmti" {"F:S4850T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_prim.cmi" {"F:S5938T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_prim.cmt" {"F:S85040T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_random.cmi" {"F:S1408T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_random.cmt" {"F:S14666T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_writer.cmi" {"F:S813T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_writer.cmt" {"F:S11562T1768295822.38"}
+  "lib/asn1-combinators/.private/asn_writer.cmti" {"F:S3997T1768295822.38"}
+  "lib/asn1-combinators/META" {"F:S248T1768295822.38"}
+  "lib/asn1-combinators/asn.cmi" {"F:S4636T1768295822.38"}
+  "lib/asn1-combinators/asn.cmt" {"F:S21136T1768295822.38"}
+  "lib/asn1-combinators/asn.cmti" {"F:S31060T1768295822.38"}
+  "lib/asn1-combinators/asn.cmx" {"F:S9436T1768295822.38"}
+  "lib/asn1-combinators/asn.ml" {"F:S1281T1768295822.38"}
+  "lib/asn1-combinators/asn.mli" {"F:S12910T1768295822.38"}
+  "lib/asn1-combinators/asn1_combinators.a" {"F:S420446T1768295822.38"}
+  "lib/asn1-combinators/asn1_combinators.cma" {"F:S212217T1768295822.38"}
+  "lib/asn1-combinators/asn1_combinators.cmxa" {"F:S8913T1768295822.38"}
+  "lib/asn1-combinators/asn1_combinators.cmxs" {"F:S351592T1768295822.38"}
+  "lib/asn1-combinators/asn_ber_der.cmx" {"F:S8361T1768295822.38"}
+  "lib/asn1-combinators/asn_ber_der.ml" {"F:S16167T1768295822.38"}
+  "lib/asn1-combinators/asn_cache.cmx" {"F:S1221T1768295822.38"}
+  "lib/asn1-combinators/asn_cache.ml" {"F:S751T1768295822.38"}
+  "lib/asn1-combinators/asn_cache.mli" {"F:S325T1768295822.38"}
+  "lib/asn1-combinators/asn_combinators.cmx" {"F:S6971T1768295822.38"}
+  "lib/asn1-combinators/asn_combinators.ml" {"F:S10364T1768295822.38"}
+  "lib/asn1-combinators/asn_core.cmx" {"F:S6419T1768295822.38"}
+  "lib/asn1-combinators/asn_core.ml" {"F:S7324T1768295822.38"}
+  "lib/asn1-combinators/asn_oid.cmx" {"F:S1654T1768295822.38"}
+  "lib/asn1-combinators/asn_oid.ml" {"F:S1931T1768295822.38"}
+  "lib/asn1-combinators/asn_oid.mli" {"F:S568T1768295822.38"}
+  "lib/asn1-combinators/asn_prim.cmx" {"F:S9831T1768295822.38"}
+  "lib/asn1-combinators/asn_prim.ml" {"F:S9818T1768295822.38"}
+  "lib/asn1-combinators/asn_random.cmx" {"F:S1462T1768295822.38"}
+  "lib/asn1-combinators/asn_random.ml" {"F:S1412T1768295822.38"}
+  "lib/asn1-combinators/asn_writer.cmx" {"F:S1708T1768295822.38"}
+  "lib/asn1-combinators/asn_writer.ml" {"F:S1154T1768295822.38"}
+  "lib/asn1-combinators/asn_writer.mli" {"F:S474T1768295822.38"}
+  "lib/asn1-combinators/dune-package" {"F:S2798T1768295822.38"}
+  "lib/asn1-combinators/opam" {"F:S1081T1768295822.38"}
+]

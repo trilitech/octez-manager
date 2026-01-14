@@ -1,0 +1,7 @@
+true : bin_annot, safe_string
+<_b0> : -traverse
+
+<src> : include
+<src/top/mtime_top*> : package(compiler-libs.toplevel)
+<src/clock/mtime_clock.{cma,cmxa}> : record_mtime_clock_stubs
+<src/clock/mtime_clock.cmxs> : link_mtime_clock_stubs

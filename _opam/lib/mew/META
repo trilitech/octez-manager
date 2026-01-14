@@ -1,0 +1,6 @@
+description = ""
+requires = "result trie"
+archive(byte) = "mew.cma"
+archive(native) = "mew.cmxa"
+plugin(byte) = "mew.cma"
+plugin(native) = "mew.cmxs"

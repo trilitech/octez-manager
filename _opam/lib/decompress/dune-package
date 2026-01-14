@@ -1,0 +1,126 @@
+(lang dune 3.20)
+(name decompress)
+(version 1.5.3)
+(sections (lib .) (libexec .) (bin ../../bin) (doc ../../doc/decompress))
+(files
+ (lib
+  (META
+   de/de.a
+   de/de.cma
+   de/de.cmi
+   de/de.cmt
+   de/de.cmti
+   de/de.cmx
+   de/de.cmxa
+   de/de.ml
+   de/de.mli
+   dune-package
+   gz/gz.a
+   gz/gz.cma
+   gz/gz.cmi
+   gz/gz.cmt
+   gz/gz.cmti
+   gz/gz.cmx
+   gz/gz.cmxa
+   gz/gz.ml
+   gz/gz.mli
+   lz/lz.a
+   lz/lz.cma
+   lz/lz.cmi
+   lz/lz.cmt
+   lz/lz.cmti
+   lz/lz.cmx
+   lz/lz.cmxa
+   lz/lz.ml
+   lz/lz.mli
+   lzo/lzo.a
+   lzo/lzo.cma
+   lzo/lzo.cmi
+   lzo/lzo.cmt
+   lzo/lzo.cmti
+   lzo/lzo.cmx
+   lzo/lzo.cmxa
+   lzo/lzo.ml
+   lzo/lzo.mli
+   opam
+   zl/zl.a
+   zl/zl.cma
+   zl/zl.cmi
+   zl/zl.cmt
+   zl/zl.cmti
+   zl/zl.cmx
+   zl/zl.cmxa
+   zl/zl.ml
+   zl/zl.mli))
+ (libexec (de/de.cmxs gz/gz.cmxs lz/lz.cmxs lzo/lzo.cmxs zl/zl.cmxs))
+ (bin (decompress))
+ (doc (CHANGES.md LICENSE.md README.md)))
+(library
+ (name decompress.de)
+ (kind normal)
+ (archives (byte de/de.cma) (native de/de.cmxa))
+ (plugins (byte de/de.cma) (native de/de.cmxs))
+ (native_archives de/de.a)
+ (requires optint checkseum)
+ (main_module_name De)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name de)
+   (visibility public)
+   (source (path De) (intf (path de/de.mli)) (impl (path de/de.ml))))))
+(library
+ (name decompress.gz)
+ (kind normal)
+ (archives (byte gz/gz.cma) (native gz/gz.cmxa))
+ (plugins (byte gz/gz.cma) (native gz/gz.cmxs))
+ (native_archives gz/gz.a)
+ (requires optint checkseum decompress.de)
+ (main_module_name Gz)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name gz)
+   (visibility public)
+   (source (path Gz) (intf (path gz/gz.mli)) (impl (path gz/gz.ml))))))
+(library
+ (name decompress.lz)
+ (kind normal)
+ (archives (byte lz/lz.cma) (native lz/lz.cmxa))
+ (plugins (byte lz/lz.cma) (native lz/lz.cmxs))
+ (native_archives lz/lz.a)
+ (requires optint checkseum decompress.de)
+ (main_module_name Lz)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name lz)
+   (visibility public)
+   (source (path Lz) (intf (path lz/lz.mli)) (impl (path lz/lz.ml))))))
+(library
+ (name decompress.lzo)
+ (kind normal)
+ (archives (byte lzo/lzo.cma) (native lzo/lzo.cmxa))
+ (plugins (byte lzo/lzo.cma) (native lzo/lzo.cmxs))
+ (native_archives lzo/lzo.a)
+ (main_module_name Lzo)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name lzo)
+   (visibility public)
+   (source (path Lzo) (intf (path lzo/lzo.mli)) (impl (path lzo/lzo.ml))))))
+(library
+ (name decompress.zl)
+ (kind normal)
+ (archives (byte zl/zl.cma) (native zl/zl.cmxa))
+ (plugins (byte zl/zl.cma) (native zl/zl.cmxs))
+ (native_archives zl/zl.a)
+ (requires optint checkseum decompress.de)
+ (main_module_name Zl)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name zl)
+   (visibility public)
+   (source (path Zl) (intf (path zl/zl.mli)) (impl (path zl/zl.ml))))))

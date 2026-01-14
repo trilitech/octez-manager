@@ -1,0 +1,11 @@
+(test
+ (name test)
+ (modules test)
+ (libraries bigarray tsdl tsdl-image)
+ (deps "what.png")
+ (action
+  (setenv
+   SDL_VIDEODRIVER
+   dummy
+   (run ./test.exe)))
+ (modes exe))

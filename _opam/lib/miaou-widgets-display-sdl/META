@@ -1,0 +1,10 @@
+package "widgets" (
+  directory = "widgets"
+  version = "da71376"
+  description = ""
+  requires = "miaou-core.widgets.display tsdl"
+  archive(byte) = "miaou_widgets_display_sdl.cma"
+  archive(native) = "miaou_widgets_display_sdl.cmxa"
+  plugin(byte) = "miaou_widgets_display_sdl.cma"
+  plugin(native) = "miaou_widgets_display_sdl.cmxs"
+)

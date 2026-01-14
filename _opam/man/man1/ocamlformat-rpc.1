@@ -1,0 +1,61 @@
+.\" Pipe this output to groff -m man -K utf8 -T utf8 | less -R
+.\"
+.mso an.tmac
+.TH "OCAMLFORMAT-RPC" 1 "" "Ocamlformat-rpc 0.28.1" "Ocamlformat-rpc Manual"
+.\" Disable hyphenation and ragged-right
+.nh
+.ad l
+.SH NAME
+.P
+ocamlformat\N'45'rpc \N'45' RPC mode for OCamlFormat, a tool to format OCaml code\N'46'
+.SH SYNOPSIS
+.P
+\fBocamlformat\N'45'rpc\fR [\fIOPTION\fR]…
+.SH DESCRIPTION
+.P
+\fBocamlformat\N'45'rpc\fR listens to RPC requests, provided on the standard input, and prints the response on the standard output\N'46'
+.SH COMMANDS
+.P
+Before the client and the server agree on a common version to use the following commands are available: \fBHalt\fR to close the connection to the RPC; \fBVersion\fR \fIv\fR to ask the server to use version \fIv\fR\N'46' If the server agrees upon the version he will send the reply \fBVersion\fR \fIv\fR and the protocol version is set to \fIv\fR, to use another version later the client has to close the connexion and start a new one\N'46' If the server cannot use version \fIv\fR he might propose another version \fIw\fR by sending the reply \fBVersion\fR \fIw\fR that the client can accept by sending the same request for version \fIw\fR, or propose another version\N'46' If the server cannot propose another version it will close the connection\N'46' Unknown commands are ignored\N'46'
+.P
+Once the client and the server agree on a common version, the requests you can send may differ from one version to another\N'46'
+.P
+All versions support the following commands:
+.P
+\N'45' \fBHalt\fR to end the communication with the RPC server\N'46' The caller must close the input and output channels\N'46'
+.P
+Some RPC versions offer specific commands, that are detailed below\N'46'
+.P
+Specific commands supported on version \fBv1\fR are:
+.P
+\N'45' \fBConfig\fR \fICSEXP\fR: submits a list of (key, value) pairs (as a canonical s\N'45'expression) to update OCamlFormat\N'39's configuration (please refer to \fIocamlformat \N'45'\N'45'help\fR to know more about the available options)\N'46' The accepted configuration is sent as a reply of the same form\N'46' The configuration can be reset to its default value by sending the pair \fI("profile", "default"\fR)\N'46'
+.P
+\N'45' \fBFormat\fR \fICSEXP\fR: submits a canonical s\N'45'expression \fICSEXP\fR to be formatted by OCamlFormat, the formatted output is sent as a reply of the same form \fBFormat\fR \fICSEXP\fR
+.P
+Specific commands supported on version \fBv2\fR are:
+.P
+\N'45' \fBFormat\fR \fICSEXP\fR: submits a list as canonical s\N'45'expression \fICSEXP\fR, where the first element of the list is a string to be formatted by OCamlFormat\N'46' The other arguments are (key, value) pairs, where key can be either \fI"Path"\fR and/or \fI"Config"\fR\N'46' They modify the server\N'39's configuration temporarily, for the current request\N'46' The formatted output is sent as a reply of the same form\N'46'
+.P
+Unknown commands are ignored\N'46'
+.SH COMMON OPTIONS
+.TP 4
+\fB\N'45'\N'45'help\fR[=\fIFMT\fR] (default=\fBauto\fR)
+Show this help in format \fIFMT\fR\N'46' The value \fIFMT\fR must be one of \fBauto\fR, \fBpager\fR, \fBgroff\fR or \fBplain\fR\N'46' With \fBauto\fR, the format is \fBpager\fR or \fBplain\fR whenever the \fBTERM\fR env var is \fBdumb\fR or undefined\N'46'
+.TP 4
+\fB\N'45'\N'45'version\fR
+Show version information\N'46'
+.SH EXIT STATUS
+.P
+\fBocamlformat\N'45'rpc\fR exits with:
+.TP 4
+0
+on success\N'46'
+.TP 4
+123
+on indiscriminate errors reported on standard error\N'46'
+.TP 4
+124
+on command line parsing errors\N'46'
+.TP 4
+125
+on unexpected internal errors (bugs)\N'46'

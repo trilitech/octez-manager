@@ -1,0 +1,410 @@
+(lang dune 3.20)
+(name lambda-term)
+(version 3.2.0)
+(sections
+ (lib .)
+ (libexec .)
+ (bin ../../bin)
+ (share_root ../../share)
+ (doc ../../doc/lambda-term)
+ (stublibs ../stublibs)
+ (man ../../man))
+(files
+ (lib
+  (META
+   dune-package
+   lTerm.cmi
+   lTerm.cmt
+   lTerm.cmti
+   lTerm.cmx
+   lTerm.ml
+   lTerm.mli
+   lTerm_buttons_impl.cmi
+   lTerm_buttons_impl.cmt
+   lTerm_buttons_impl.cmx
+   lTerm_buttons_impl.ml
+   lTerm_color_mappings.cmi
+   lTerm_color_mappings.cmt
+   lTerm_color_mappings.cmx
+   lTerm_color_mappings.ml
+   lTerm_containers_impl.cmi
+   lTerm_containers_impl.cmt
+   lTerm_containers_impl.cmx
+   lTerm_containers_impl.ml
+   lTerm_dlist.cmi
+   lTerm_dlist.cmt
+   lTerm_dlist.cmti
+   lTerm_dlist.cmx
+   lTerm_dlist.ml
+   lTerm_dlist.mli
+   lTerm_draw.cmi
+   lTerm_draw.cmt
+   lTerm_draw.cmti
+   lTerm_draw.cmx
+   lTerm_draw.ml
+   lTerm_draw.mli
+   lTerm_edit.cmi
+   lTerm_edit.cmt
+   lTerm_edit.cmti
+   lTerm_edit.cmx
+   lTerm_edit.ml
+   lTerm_edit.mli
+   lTerm_editor.cmi
+   lTerm_editor.cmt
+   lTerm_editor.cmti
+   lTerm_editor.cmx
+   lTerm_editor.ml
+   lTerm_editor.mli
+   lTerm_event.cmi
+   lTerm_event.cmt
+   lTerm_event.cmti
+   lTerm_event.cmx
+   lTerm_event.ml
+   lTerm_event.mli
+   lTerm_geom.cmi
+   lTerm_geom.cmt
+   lTerm_geom.cmti
+   lTerm_geom.cmx
+   lTerm_geom.ml
+   lTerm_geom.mli
+   lTerm_history.cmi
+   lTerm_history.cmt
+   lTerm_history.cmti
+   lTerm_history.cmx
+   lTerm_history.ml
+   lTerm_history.mli
+   lTerm_inputrc.cmi
+   lTerm_inputrc.cmt
+   lTerm_inputrc.cmti
+   lTerm_inputrc.cmx
+   lTerm_inputrc.ml
+   lTerm_inputrc.mli
+   lTerm_key.cmi
+   lTerm_key.cmt
+   lTerm_key.cmti
+   lTerm_key.cmx
+   lTerm_key.ml
+   lTerm_key.mli
+   lTerm_mouse.cmi
+   lTerm_mouse.cmt
+   lTerm_mouse.cmti
+   lTerm_mouse.cmx
+   lTerm_mouse.ml
+   lTerm_mouse.mli
+   lTerm_read_line.cmi
+   lTerm_read_line.cmt
+   lTerm_read_line.cmti
+   lTerm_read_line.cmx
+   lTerm_read_line.ml
+   lTerm_read_line.mli
+   lTerm_read_line_base.cmi
+   lTerm_read_line_base.cmt
+   lTerm_read_line_base.cmx
+   lTerm_read_line_base.ml
+   lTerm_resource_lexer.cmi
+   lTerm_resource_lexer.cmt
+   lTerm_resource_lexer.cmx
+   lTerm_resource_lexer.ml
+   lTerm_resources.cmi
+   lTerm_resources.cmt
+   lTerm_resources.cmti
+   lTerm_resources.cmx
+   lTerm_resources.ml
+   lTerm_resources.mli
+   lTerm_running_impl.cmi
+   lTerm_running_impl.cmt
+   lTerm_running_impl.cmx
+   lTerm_running_impl.ml
+   lTerm_scroll_impl.cmi
+   lTerm_scroll_impl.cmt
+   lTerm_scroll_impl.cmx
+   lTerm_scroll_impl.ml
+   lTerm_style.cmi
+   lTerm_style.cmt
+   lTerm_style.cmti
+   lTerm_style.cmx
+   lTerm_style.ml
+   lTerm_style.mli
+   lTerm_text.cmi
+   lTerm_text.cmt
+   lTerm_text.cmti
+   lTerm_text.cmx
+   lTerm_text.ml
+   lTerm_text.mli
+   lTerm_text_impl.cmi
+   lTerm_text_impl.cmt
+   lTerm_text_impl.cmx
+   lTerm_text_impl.ml
+   lTerm_toplevel_impl.cmi
+   lTerm_toplevel_impl.cmt
+   lTerm_toplevel_impl.cmx
+   lTerm_toplevel_impl.ml
+   lTerm_ui.cmi
+   lTerm_ui.cmt
+   lTerm_ui.cmti
+   lTerm_ui.cmx
+   lTerm_ui.ml
+   lTerm_ui.mli
+   lTerm_unix.cmi
+   lTerm_unix.cmt
+   lTerm_unix.cmti
+   lTerm_unix.cmx
+   lTerm_unix.ml
+   lTerm_unix.mli
+   lTerm_vi.cmi
+   lTerm_vi.cmt
+   lTerm_vi.cmti
+   lTerm_vi.cmx
+   lTerm_vi.ml
+   lTerm_vi.mli
+   lTerm_widget.cmi
+   lTerm_widget.cmt
+   lTerm_widget.cmti
+   lTerm_widget.cmx
+   lTerm_widget.ml
+   lTerm_widget.mli
+   lTerm_widget_base_impl.cmi
+   lTerm_widget_base_impl.cmt
+   lTerm_widget_base_impl.cmx
+   lTerm_widget_base_impl.ml
+   lTerm_widget_callbacks.cmi
+   lTerm_widget_callbacks.cmt
+   lTerm_widget_callbacks.cmti
+   lTerm_widget_callbacks.cmx
+   lTerm_widget_callbacks.ml
+   lTerm_widget_callbacks.mli
+   lTerm_widget_impl.cmi
+   lTerm_widget_impl.cmt
+   lTerm_widget_impl.cmx
+   lTerm_widget_impl.ml
+   lTerm_windows.cmi
+   lTerm_windows.cmt
+   lTerm_windows.cmti
+   lTerm_windows.cmx
+   lTerm_windows.ml
+   lTerm_windows.mli
+   lambda_term.a
+   lambda_term.cma
+   lambda_term.cmxa
+   liblambda_term_stubs.a
+   literalIntf.cmi
+   literalIntf.cmt
+   literalIntf.cmx
+   literalIntf.ml
+   opam))
+ (libexec (lambda_term.cmxs))
+ (bin (lambda-term-actions))
+ (share_root (lambda-term-inputrc lambda-termrc))
+ (doc (CHANGES.md LICENSE README.md))
+ (stublibs (dlllambda_term_stubs.so))
+ (man (man1/lambda-term-actions.1 man5/lambda-term-inputrc.5)))
+(library
+ (name lambda-term)
+ (kind normal)
+ (synopsis "Cross-platform library for terminal manipulation")
+ (archives (byte lambda_term.cma) (native lambda_term.cmxa))
+ (plugins (byte lambda_term.cma) (native lambda_term.cmxs))
+ (foreign_objects lTerm_term_stubs.o lTerm_unix_stubs.o lTerm_windows_stubs.o)
+ (foreign_archives (archives (for all) (files liblambda_term_stubs.a)))
+ (foreign_dll_files ../stublibs/dlllambda_term_stubs.so)
+ (native_archives lambda_term.a)
+ (requires logs logs.lwt lwt lwt.unix lwt_react zed mew_vi uucp)
+ (modes byte native)
+ (modules
+  (unwrapped
+   (module
+    (obj_name lTerm)
+    (visibility public)
+    (source (path LTerm) (intf (path lTerm.mli)) (impl (path lTerm.ml))))
+   (module
+    (obj_name lTerm_buttons_impl)
+    (visibility public)
+    (source (path LTerm_buttons_impl) (impl (path lTerm_buttons_impl.ml))))
+   (module
+    (obj_name lTerm_color_mappings)
+    (visibility public)
+    (source (path LTerm_color_mappings) (impl (path lTerm_color_mappings.ml))))
+   (module
+    (obj_name lTerm_containers_impl)
+    (visibility public)
+    (source
+     (path LTerm_containers_impl)
+     (impl (path lTerm_containers_impl.ml))))
+   (module
+    (obj_name lTerm_dlist)
+    (visibility public)
+    (source
+     (path LTerm_dlist)
+     (intf (path lTerm_dlist.mli))
+     (impl (path lTerm_dlist.ml))))
+   (module
+    (obj_name lTerm_draw)
+    (visibility public)
+    (source
+     (path LTerm_draw)
+     (intf (path lTerm_draw.mli))
+     (impl (path lTerm_draw.ml))))
+   (module
+    (obj_name lTerm_edit)
+    (visibility public)
+    (source
+     (path LTerm_edit)
+     (intf (path lTerm_edit.mli))
+     (impl (path lTerm_edit.ml))))
+   (module
+    (obj_name lTerm_editor)
+    (visibility public)
+    (source
+     (path LTerm_editor)
+     (intf (path lTerm_editor.mli))
+     (impl (path lTerm_editor.ml))))
+   (module
+    (obj_name lTerm_event)
+    (visibility public)
+    (source
+     (path LTerm_event)
+     (intf (path lTerm_event.mli))
+     (impl (path lTerm_event.ml))))
+   (module
+    (obj_name lTerm_geom)
+    (visibility public)
+    (source
+     (path LTerm_geom)
+     (intf (path lTerm_geom.mli))
+     (impl (path lTerm_geom.ml))))
+   (module
+    (obj_name lTerm_history)
+    (visibility public)
+    (source
+     (path LTerm_history)
+     (intf (path lTerm_history.mli))
+     (impl (path lTerm_history.ml))))
+   (module
+    (obj_name lTerm_inputrc)
+    (visibility public)
+    (source
+     (path LTerm_inputrc)
+     (intf (path lTerm_inputrc.mli))
+     (impl (path lTerm_inputrc.ml))))
+   (module
+    (obj_name lTerm_key)
+    (visibility public)
+    (source
+     (path LTerm_key)
+     (intf (path lTerm_key.mli))
+     (impl (path lTerm_key.ml))))
+   (module
+    (obj_name lTerm_mouse)
+    (visibility public)
+    (source
+     (path LTerm_mouse)
+     (intf (path lTerm_mouse.mli))
+     (impl (path lTerm_mouse.ml))))
+   (module
+    (obj_name lTerm_read_line)
+    (visibility public)
+    (source
+     (path LTerm_read_line)
+     (intf (path lTerm_read_line.mli))
+     (impl (path lTerm_read_line.ml))))
+   (module
+    (obj_name lTerm_read_line_base)
+    (visibility public)
+    (source (path LTerm_read_line_base) (impl (path lTerm_read_line_base.ml))))
+   (module
+    (obj_name lTerm_resource_lexer)
+    (visibility public)
+    (source (path LTerm_resource_lexer) (impl (path lTerm_resource_lexer.ml))))
+   (module
+    (obj_name lTerm_resources)
+    (visibility public)
+    (source
+     (path LTerm_resources)
+     (intf (path lTerm_resources.mli))
+     (impl (path lTerm_resources.ml))))
+   (module
+    (obj_name lTerm_running_impl)
+    (visibility public)
+    (source (path LTerm_running_impl) (impl (path lTerm_running_impl.ml))))
+   (module
+    (obj_name lTerm_scroll_impl)
+    (visibility public)
+    (source (path LTerm_scroll_impl) (impl (path lTerm_scroll_impl.ml))))
+   (module
+    (obj_name lTerm_style)
+    (visibility public)
+    (source
+     (path LTerm_style)
+     (intf (path lTerm_style.mli))
+     (impl (path lTerm_style.ml))))
+   (module
+    (obj_name lTerm_text)
+    (visibility public)
+    (source
+     (path LTerm_text)
+     (intf (path lTerm_text.mli))
+     (impl (path lTerm_text.ml))))
+   (module
+    (obj_name lTerm_text_impl)
+    (visibility public)
+    (source (path LTerm_text_impl) (impl (path lTerm_text_impl.ml))))
+   (module
+    (obj_name lTerm_toplevel_impl)
+    (visibility public)
+    (source (path LTerm_toplevel_impl) (impl (path lTerm_toplevel_impl.ml))))
+   (module
+    (obj_name lTerm_ui)
+    (visibility public)
+    (source
+     (path LTerm_ui)
+     (intf (path lTerm_ui.mli))
+     (impl (path lTerm_ui.ml))))
+   (module
+    (obj_name lTerm_unix)
+    (visibility public)
+    (source
+     (path LTerm_unix)
+     (intf (path lTerm_unix.mli))
+     (impl (path lTerm_unix.ml))))
+   (module
+    (obj_name lTerm_vi)
+    (visibility public)
+    (source
+     (path LTerm_vi)
+     (intf (path lTerm_vi.mli))
+     (impl (path lTerm_vi.ml))))
+   (module
+    (obj_name lTerm_widget)
+    (visibility public)
+    (source
+     (path LTerm_widget)
+     (intf (path lTerm_widget.mli))
+     (impl (path lTerm_widget.ml))))
+   (module
+    (obj_name lTerm_widget_base_impl)
+    (visibility public)
+    (source
+     (path LTerm_widget_base_impl)
+     (impl (path lTerm_widget_base_impl.ml))))
+   (module
+    (obj_name lTerm_widget_callbacks)
+    (visibility public)
+    (source
+     (path LTerm_widget_callbacks)
+     (intf (path lTerm_widget_callbacks.mli))
+     (impl (path lTerm_widget_callbacks.ml))))
+   (module
+    (obj_name lTerm_widget_impl)
+    (visibility public)
+    (source (path LTerm_widget_impl) (impl (path lTerm_widget_impl.ml))))
+   (module
+    (obj_name lTerm_windows)
+    (visibility public)
+    (source
+     (path LTerm_windows)
+     (intf (path lTerm_windows.mli))
+     (impl (path lTerm_windows.ml))))
+   (module
+    (obj_name literalIntf)
+    (visibility public)
+    (source (path LiteralIntf) (impl (path literalIntf.ml)))))))

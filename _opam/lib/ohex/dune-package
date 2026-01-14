@@ -1,0 +1,32 @@
+(lang dune 3.20)
+(name ohex)
+(sections (lib .) (libexec .) (doc ../../doc/ohex))
+(files
+ (lib
+  (META
+   dune-package
+   ohex.a
+   ohex.cma
+   ohex.cmi
+   ohex.cmt
+   ohex.cmti
+   ohex.cmx
+   ohex.cmxa
+   ohex.ml
+   ohex.mli
+   opam))
+ (libexec (ohex.cmxs))
+ (doc (CHANGES.md LICENSE.md README.md)))
+(library
+ (name ohex)
+ (kind normal)
+ (archives (byte ohex.cma) (native ohex.cmxa))
+ (plugins (byte ohex.cma) (native ohex.cmxs))
+ (native_archives ohex.a)
+ (main_module_name Ohex)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name ohex)
+   (visibility public)
+   (source (path Ohex) (intf (path ohex.mli)) (impl (path ohex.ml))))))

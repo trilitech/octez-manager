@@ -1,0 +1,73 @@
+opam-version: "2.0"
+added: [
+  "doc/ctypes-foreign" {"D"}
+  "doc/ctypes-foreign/CHANGES.md" {"F:S24482T1768295780.43"}
+  "doc/ctypes-foreign/LICENSE" {"F:S1056T1768295780.43"}
+  "doc/ctypes-foreign/README.md" {"F:S4065T1768295780.43"}
+  "lib/ctypes-foreign" {"D"}
+  "lib/ctypes-foreign/.private" {"D"}
+  "lib/ctypes-foreign/.private/ctypes_foreign_threaded_stubs.cmi"
+    {"F:S368T1768295780.43"}
+  "lib/ctypes-foreign/.private/ctypes_foreign_threaded_stubs.cmt"
+    {"F:S1944T1768295780.43"}
+  "lib/ctypes-foreign/META" {"F:S215T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_closure_properties.cmi" {"F:S761T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_closure_properties.cmt"
+    {"F:S13505T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_closure_properties.cmti"
+    {"F:S3813T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_closure_properties.cmx"
+    {"F:S2913T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_closure_properties.ml" {"F:S2557T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_closure_properties.mli" {"F:S736T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi.cmi" {"F:S1862T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi.cmt" {"F:S57321T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi.cmti" {"F:S7517T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi.cmx" {"F:S2516T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi.ml" {"F:S12315T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi.mli" {"F:S1773T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi_stubs.cmi" {"F:S2398T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi_stubs.cmt" {"F:S10097T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi_stubs.cmx" {"F:S1045T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_ffi_stubs.ml" {"F:S2933T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign.a" {"F:S124554T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign.cma" {"F:S67283T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign.cmxa" {"F:S8745T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign.cmxs" {"F:S183016T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign_basis.cmi" {"F:S3518T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign_basis.cmt" {"F:S22265T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign_basis.cmx" {"F:S4457T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign_basis.ml" {"F:S2880T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign_threaded_stubs.cmx"
+    {"F:S221T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_foreign_threaded_stubs.ml"
+    {"F:S238T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_weak_ref.cmi" {"F:S561T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_weak_ref.cmt" {"F:S4648T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_weak_ref.cmti" {"F:S3289T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_weak_ref.cmx" {"F:S1056T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_weak_ref.ml" {"F:S437T1768295780.43"}
+  "lib/ctypes-foreign/ctypes_weak_ref.mli" {"F:S642T1768295780.43"}
+  "lib/ctypes-foreign/dl.cmi" {"F:S807T1768295780.43"}
+  "lib/ctypes-foreign/dl.cmt" {"F:S7794T1768295780.43"}
+  "lib/ctypes-foreign/dl.cmti" {"F:S4261T1768295780.43"}
+  "lib/ctypes-foreign/dl.cmx" {"F:S693T1768295780.43"}
+  "lib/ctypes-foreign/dl.ml" {"F:S1723T1768295780.43"}
+  "lib/ctypes-foreign/dl.mli" {"F:S1335T1768295780.43"}
+  "lib/ctypes-foreign/dune-package" {"F:S3692T1768295780.43"}
+  "lib/ctypes-foreign/foreign.cmi" {"F:S2093T1768295780.43"}
+  "lib/ctypes-foreign/foreign.cmt" {"F:S8921T1768295780.43"}
+  "lib/ctypes-foreign/foreign.cmti" {"F:S10977T1768295780.43"}
+  "lib/ctypes-foreign/foreign.cmx" {"F:S4502T1768295780.43"}
+  "lib/ctypes-foreign/foreign.ml" {"F:S454T1768295780.43"}
+  "lib/ctypes-foreign/foreign.mli" {"F:S7017T1768295780.43"}
+  "lib/ctypes-foreign/libctypes_foreign_stubs.a" {"F:S112630T1768295780.43"}
+  "lib/ctypes-foreign/libffi_abi.cmi" {"F:S953T1768295780.43"}
+  "lib/ctypes-foreign/libffi_abi.cmt" {"F:S7344T1768295780.43"}
+  "lib/ctypes-foreign/libffi_abi.cmti" {"F:S4894T1768295780.43"}
+  "lib/ctypes-foreign/libffi_abi.cmx" {"F:S2413T1768295780.43"}
+  "lib/ctypes-foreign/libffi_abi.ml" {"F:S1355T1768295780.43"}
+  "lib/ctypes-foreign/libffi_abi.mli" {"F:S694T1768295780.43"}
+  "lib/ctypes-foreign/opam" {"F:S1142T1768295780.43"}
+  "lib/stublibs/dllctypes_foreign_stubs.so" {"F:S66440T1768295780.43"}
+]

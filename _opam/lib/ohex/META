@@ -1,0 +1,6 @@
+description = ""
+requires = ""
+archive(byte) = "ohex.cma"
+archive(native) = "ohex.cmxa"
+plugin(byte) = "ohex.cma"
+plugin(native) = "ohex.cmxs"

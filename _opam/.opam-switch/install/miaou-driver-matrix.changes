@@ -1,0 +1,136 @@
+opam-version: "2.0"
+added: [
+  "doc/miaou-driver-matrix" {"D"}
+  "doc/miaou-driver-matrix/CHANGELOG.md" {"F:S21733T1768295993.25"}
+  "doc/miaou-driver-matrix/LICENSE.md" {"F:S1096T1768295993.25"}
+  "doc/miaou-driver-matrix/README.md" {"F:S29532T1768295993.25"}
+  "lib/miaou-driver-matrix" {"D"}
+  "lib/miaou-driver-matrix/META" {"F:S457T1768295993.24"}
+  "lib/miaou-driver-matrix/driver" {"D"}
+  "lib/miaou-driver-matrix/driver/matrix_ansi_parser.ml"
+    {"F:S7825T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_ansi_parser.mli"
+    {"F:S2308T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_ansi_writer.ml"
+    {"F:S2633T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_ansi_writer.mli"
+    {"F:S1456T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_buffer.ml" {"F:S8189T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_buffer.mli"
+    {"F:S5110T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_cell.ml" {"F:S1442T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_cell.mli" {"F:S2062T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_config.ml" {"F:S1587T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_config.mli"
+    {"F:S1350T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_diff.ml" {"F:S5429T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_diff.mli" {"F:S1879T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_driver.ml"
+    {"F:S16331T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_input.ml" {"F:S3125T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_input.mli" {"F:S1768T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_render_loop.ml"
+    {"F:S4109T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_render_loop.mli"
+    {"F:S2344T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_terminal.ml"
+    {"F:S1184T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/matrix_terminal.mli"
+    {"F:S2183T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.a"
+    {"F:S232056T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.cma"
+    {"F:S109573T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.cmi"
+    {"F:S919T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.cmt"
+    {"F:S3815T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.cmx"
+    {"F:S531T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.cmxa"
+    {"F:S11625T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.cmxs"
+    {"F:S203104T1768295993.25"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix.ml"
+    {"F:S1170T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_parser.cmi"
+    {"F:S1017T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_parser.cmt"
+    {"F:S39377T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_parser.cmti"
+    {"F:S6248T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_parser.cmx"
+    {"F:S2333T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_writer.cmi"
+    {"F:S955T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_writer.cmt"
+    {"F:S13129T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_writer.cmti"
+    {"F:S5341T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_ansi_writer.cmx"
+    {"F:S1776T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_buffer.cmi"
+    {"F:S1884T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_buffer.cmt"
+    {"F:S42728T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_buffer.cmti"
+    {"F:S12761T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_buffer.cmx"
+    {"F:S4620T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_cell.cmi"
+    {"F:S1021T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_cell.cmt"
+    {"F:S8480T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_cell.cmti"
+    {"F:S6510T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_cell.cmx"
+    {"F:S1768T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_config.cmi"
+    {"F:S689T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_config.cmt"
+    {"F:S7719T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_config.cmti"
+    {"F:S4448T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_config.cmx"
+    {"F:S505T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_diff.cmi"
+    {"F:S937T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_diff.cmt"
+    {"F:S21405T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_diff.cmti"
+    {"F:S5506T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_diff.cmx"
+    {"F:S972T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_driver.cmi"
+    {"F:S4828T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_driver.cmt"
+    {"F:S68781T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_driver.cmx"
+    {"F:S5183T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_input.cmi"
+    {"F:S997T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_input.cmt"
+    {"F:S12747T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_input.cmti"
+    {"F:S5656T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_input.cmx"
+    {"F:S1566T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_render_loop.cmi"
+    {"F:S1345T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_render_loop.cmt"
+    {"F:S18086T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_render_loop.cmti"
+    {"F:S6730T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_render_loop.cmx"
+    {"F:S3362T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_terminal.cmi"
+    {"F:S1142T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_terminal.cmt"
+    {"F:S6093T1768295993.24"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_terminal.cmti"
+    {"F:S6874T1768295993.25"}
+  "lib/miaou-driver-matrix/driver/miaou_driver_matrix__Matrix_terminal.cmx"
+    {"F:S2481T1768295993.25"}
+  "lib/miaou-driver-matrix/dune-package" {"F:S6092T1768295993.25"}
+  "lib/miaou-driver-matrix/opam" {"F:S655T1768295993.25"}
+]

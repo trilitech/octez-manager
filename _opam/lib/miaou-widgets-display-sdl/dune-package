@@ -1,0 +1,90 @@
+(lang dune 3.20)
+(name miaou-widgets-display-sdl)
+(version da71376)
+(sections (lib .) (libexec .) (doc ../../doc/miaou-widgets-display-sdl))
+(files
+ (lib
+  (META
+   dune-package
+   opam
+   widgets/image_widget_sdl.ml
+   widgets/line_chart_widget_sdl.ml
+   widgets/line_chart_widget_sdl.mli
+   widgets/miaou_widgets_display_sdl.a
+   widgets/miaou_widgets_display_sdl.cma
+   widgets/miaou_widgets_display_sdl.cmi
+   widgets/miaou_widgets_display_sdl.cmt
+   widgets/miaou_widgets_display_sdl.cmx
+   widgets/miaou_widgets_display_sdl.cmxa
+   widgets/miaou_widgets_display_sdl.ml
+   widgets/miaou_widgets_display_sdl__Image_widget_sdl.cmi
+   widgets/miaou_widgets_display_sdl__Image_widget_sdl.cmt
+   widgets/miaou_widgets_display_sdl__Image_widget_sdl.cmx
+   widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmi
+   widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmt
+   widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmti
+   widgets/miaou_widgets_display_sdl__Line_chart_widget_sdl.cmx
+   widgets/miaou_widgets_display_sdl__Qr_code_widget_sdl.cmi
+   widgets/miaou_widgets_display_sdl__Qr_code_widget_sdl.cmt
+   widgets/miaou_widgets_display_sdl__Qr_code_widget_sdl.cmx
+   widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmi
+   widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmt
+   widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmti
+   widgets/miaou_widgets_display_sdl__Sparkline_widget_sdl.cmx
+   widgets/qr_code_widget_sdl.ml
+   widgets/sparkline_widget_sdl.ml
+   widgets/sparkline_widget_sdl.mli))
+ (libexec (widgets/miaou_widgets_display_sdl.cmxs))
+ (doc (CHANGELOG.md LICENSE.md README.md)))
+(library
+ (name miaou-widgets-display-sdl.widgets)
+ (kind normal)
+ (archives
+  (byte widgets/miaou_widgets_display_sdl.cma)
+  (native widgets/miaou_widgets_display_sdl.cmxa))
+ (plugins
+  (byte widgets/miaou_widgets_display_sdl.cma)
+  (native widgets/miaou_widgets_display_sdl.cmxs))
+ (native_archives widgets/miaou_widgets_display_sdl.a)
+ (requires miaou-core.widgets.display tsdl)
+ (main_module_name Miaou_widgets_display_sdl)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_widgets_display_sdl)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_widgets_display_sdl)
+      (impl (path widgets/miaou_widgets_display_sdl.ml-gen))))
+    (name Miaou_widgets_display_sdl)
+    (modules
+     (module
+      (obj_name miaou_widgets_display_sdl__Image_widget_sdl)
+      (visibility public)
+      (source
+       (path Image_widget_sdl)
+       (impl (path widgets/image_widget_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_display_sdl__Line_chart_widget_sdl)
+      (visibility public)
+      (source
+       (path Line_chart_widget_sdl)
+       (intf (path widgets/line_chart_widget_sdl.mli))
+       (impl (path widgets/line_chart_widget_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_display_sdl__Qr_code_widget_sdl)
+      (visibility public)
+      (source
+       (path Qr_code_widget_sdl)
+       (impl (path widgets/qr_code_widget_sdl.ml))))
+     (module
+      (obj_name miaou_widgets_display_sdl__Sparkline_widget_sdl)
+      (visibility public)
+      (source
+       (path Sparkline_widget_sdl)
+       (intf (path widgets/sparkline_widget_sdl.mli))
+       (impl (path widgets/sparkline_widget_sdl.ml))))))
+   (wrapped true))))

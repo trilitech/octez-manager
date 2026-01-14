@@ -1,0 +1,50 @@
+package "de" (
+  directory = "de"
+  version = "1.5.3"
+  description = ""
+  requires = "checkseum optint"
+  archive(byte) = "de.cma"
+  archive(native) = "de.cmxa"
+  plugin(byte) = "de.cma"
+  plugin(native) = "de.cmxs"
+)
+package "gz" (
+  directory = "gz"
+  version = "1.5.3"
+  description = ""
+  requires = "checkseum decompress.de optint"
+  archive(byte) = "gz.cma"
+  archive(native) = "gz.cmxa"
+  plugin(byte) = "gz.cma"
+  plugin(native) = "gz.cmxs"
+)
+package "lz" (
+  directory = "lz"
+  version = "1.5.3"
+  description = ""
+  requires = "checkseum decompress.de optint"
+  archive(byte) = "lz.cma"
+  archive(native) = "lz.cmxa"
+  plugin(byte) = "lz.cma"
+  plugin(native) = "lz.cmxs"
+)
+package "lzo" (
+  directory = "lzo"
+  version = "1.5.3"
+  description = ""
+  requires = ""
+  archive(byte) = "lzo.cma"
+  archive(native) = "lzo.cmxa"
+  plugin(byte) = "lzo.cma"
+  plugin(native) = "lzo.cmxs"
+)
+package "zl" (
+  directory = "zl"
+  version = "1.5.3"
+  description = ""
+  requires = "checkseum decompress.de optint"
+  archive(byte) = "zl.cma"
+  archive(native) = "zl.cmxa"
+  plugin(byte) = "zl.cma"
+  plugin(native) = "zl.cmxs"
+)

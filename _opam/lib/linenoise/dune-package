@@ -1,0 +1,41 @@
+(lang dune 3.20)
+(name linenoise)
+(version 1.5.1)
+(sections
+ (lib .)
+ (libexec .)
+ (doc ../../doc/linenoise)
+ (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   dune-package
+   lNoise.cmi
+   lNoise.cmt
+   lNoise.cmti
+   lNoise.cmx
+   lNoise.ml
+   lNoise.mli
+   liblinenoise_stubs.a
+   linenoise.a
+   linenoise.cma
+   linenoise.cmxa
+   opam))
+ (libexec (linenoise.cmxs))
+ (doc (CHANGES.md README.md))
+ (stublibs (dlllinenoise_stubs.so)))
+(library
+ (name linenoise)
+ (kind normal)
+ (archives (byte linenoise.cma) (native linenoise.cmxa))
+ (plugins (byte linenoise.cma) (native linenoise.cmxs))
+ (foreign_objects linenoise_src.o linenoise_stubs.o)
+ (foreign_archives (archives (for all) (files liblinenoise_stubs.a)))
+ (foreign_dll_files ../stublibs/dlllinenoise_stubs.so)
+ (native_archives linenoise.a)
+ (modes byte native)
+ (modules
+  (singleton
+   (obj_name lNoise)
+   (visibility public)
+   (source (path LNoise) (intf (path lNoise.mli)) (impl (path lNoise.ml))))))

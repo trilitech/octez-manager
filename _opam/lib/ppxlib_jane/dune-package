@@ -1,0 +1,142 @@
+(lang dune 3.20)
+(name ppxlib_jane)
+(version v0.17.0)
+(sections (lib .) (libexec .) (doc ../../doc/ppxlib_jane))
+(files
+ (lib
+  (META
+   ast_builder.ml
+   ast_builder.mli
+   ast_builder_intf.ml
+   dune-package
+   jane_asttypes.ml
+   jane_asttypes.mli
+   jane_syntax.ml
+   jane_syntax.mli
+   jane_syntax_parsing.ml
+   jane_syntax_parsing.mli
+   language_extension.ml
+   language_extension.mli
+   language_extension_kernel.ml
+   language_extension_kernel.mli
+   opam
+   ppxlib_jane.a
+   ppxlib_jane.cma
+   ppxlib_jane.cmi
+   ppxlib_jane.cmt
+   ppxlib_jane.cmx
+   ppxlib_jane.cmxa
+   ppxlib_jane.ml
+   ppxlib_jane__.cmi
+   ppxlib_jane__.cmt
+   ppxlib_jane__.cmx
+   ppxlib_jane__.ml
+   ppxlib_jane__Ast_builder.cmi
+   ppxlib_jane__Ast_builder.cmt
+   ppxlib_jane__Ast_builder.cmti
+   ppxlib_jane__Ast_builder.cmx
+   ppxlib_jane__Ast_builder_intf.cmi
+   ppxlib_jane__Ast_builder_intf.cmt
+   ppxlib_jane__Ast_builder_intf.cmx
+   ppxlib_jane__Jane_asttypes.cmi
+   ppxlib_jane__Jane_asttypes.cmt
+   ppxlib_jane__Jane_asttypes.cmti
+   ppxlib_jane__Jane_asttypes.cmx
+   ppxlib_jane__Jane_syntax.cmi
+   ppxlib_jane__Jane_syntax.cmt
+   ppxlib_jane__Jane_syntax.cmti
+   ppxlib_jane__Jane_syntax.cmx
+   ppxlib_jane__Jane_syntax_parsing.cmi
+   ppxlib_jane__Jane_syntax_parsing.cmt
+   ppxlib_jane__Jane_syntax_parsing.cmti
+   ppxlib_jane__Jane_syntax_parsing.cmx
+   ppxlib_jane__Language_extension.cmi
+   ppxlib_jane__Language_extension.cmt
+   ppxlib_jane__Language_extension.cmti
+   ppxlib_jane__Language_extension.cmx
+   ppxlib_jane__Language_extension_kernel.cmi
+   ppxlib_jane__Language_extension_kernel.cmt
+   ppxlib_jane__Language_extension_kernel.cmti
+   ppxlib_jane__Language_extension_kernel.cmx
+   ppxlib_jane__Shadow_compiler_distribution.cmi
+   ppxlib_jane__Shadow_compiler_distribution.cmt
+   ppxlib_jane__Shadow_compiler_distribution.cmx
+   shadow_compiler_distribution.ml))
+ (libexec (ppxlib_jane.cmxs))
+ (doc (LICENSE.md README.md)))
+(library
+ (name ppxlib_jane)
+ (kind normal)
+ (archives (byte ppxlib_jane.cma) (native ppxlib_jane.cmxa))
+ (plugins (byte ppxlib_jane.cma) (native ppxlib_jane.cmxs))
+ (native_archives ppxlib_jane.a)
+ (requires compiler-libs.common ppxlib.ast ppxlib.stdppx)
+ (main_module_name Ppxlib_jane)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name ppxlib_jane__)
+     (visibility public)
+     (kind alias)
+     (source (path Ppxlib_jane__) (impl (path ppxlib_jane__.ml-gen))))
+    (name Ppxlib_jane)
+    (modules
+     (module
+      (obj_name ppxlib_jane__Ast_builder)
+      (visibility public)
+      (source
+       (path Ast_builder)
+       (intf (path ast_builder.mli))
+       (impl (path ast_builder.ml))))
+     (module
+      (obj_name ppxlib_jane__Ast_builder_intf)
+      (visibility public)
+      (source (path Ast_builder_intf) (impl (path ast_builder_intf.ml))))
+     (module
+      (obj_name ppxlib_jane__Jane_asttypes)
+      (visibility public)
+      (source
+       (path Jane_asttypes)
+       (intf (path jane_asttypes.mli))
+       (impl (path jane_asttypes.ml))))
+     (module
+      (obj_name ppxlib_jane__Jane_syntax)
+      (visibility public)
+      (source
+       (path Jane_syntax)
+       (intf (path jane_syntax.mli))
+       (impl (path jane_syntax.ml))))
+     (module
+      (obj_name ppxlib_jane__Jane_syntax_parsing)
+      (visibility public)
+      (source
+       (path Jane_syntax_parsing)
+       (intf (path jane_syntax_parsing.mli))
+       (impl (path jane_syntax_parsing.ml))))
+     (module
+      (obj_name ppxlib_jane__Language_extension)
+      (visibility public)
+      (source
+       (path Language_extension)
+       (intf (path language_extension.mli))
+       (impl (path language_extension.ml))))
+     (module
+      (obj_name ppxlib_jane__Language_extension_kernel)
+      (visibility public)
+      (source
+       (path Language_extension_kernel)
+       (intf (path language_extension_kernel.mli))
+       (impl (path language_extension_kernel.ml))))
+     (module
+      (obj_name ppxlib_jane)
+      (visibility public)
+      (source (path Ppxlib_jane) (impl (path ppxlib_jane.ml))))
+     (module
+      (obj_name ppxlib_jane__Shadow_compiler_distribution)
+      (visibility public)
+      (source
+       (path Shadow_compiler_distribution)
+       (impl (path shadow_compiler_distribution.ml))))))
+   (wrapped true))))

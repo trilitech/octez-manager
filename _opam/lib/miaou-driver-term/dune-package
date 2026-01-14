@@ -1,0 +1,149 @@
+(lang dune 3.20)
+(name miaou-driver-term)
+(version da71376)
+(sections (lib .) (libexec .) (doc ../../doc/miaou-driver-term))
+(files
+ (lib
+  (META
+   driver/lambda_term_driver.ml
+   driver/miaou_driver_term.a
+   driver/miaou_driver_term.cma
+   driver/miaou_driver_term.cmi
+   driver/miaou_driver_term.cmt
+   driver/miaou_driver_term.cmx
+   driver/miaou_driver_term.cmxa
+   driver/miaou_driver_term.ml
+   driver/miaou_driver_term__Lambda_term_driver.cmi
+   driver/miaou_driver_term__Lambda_term_driver.cmt
+   driver/miaou_driver_term__Lambda_term_driver.cmx
+   driver/miaou_driver_term__Term_event_reader.cmi
+   driver/miaou_driver_term__Term_event_reader.cmt
+   driver/miaou_driver_term__Term_event_reader.cmx
+   driver/miaou_driver_term__Term_events.cmi
+   driver/miaou_driver_term__Term_events.cmt
+   driver/miaou_driver_term__Term_events.cmti
+   driver/miaou_driver_term__Term_events.cmx
+   driver/miaou_driver_term__Term_render.cmi
+   driver/miaou_driver_term__Term_render.cmt
+   driver/miaou_driver_term__Term_render.cmx
+   driver/miaou_driver_term__Term_renderer.cmi
+   driver/miaou_driver_term__Term_renderer.cmt
+   driver/miaou_driver_term__Term_renderer.cmti
+   driver/miaou_driver_term__Term_renderer.cmx
+   driver/miaou_driver_term__Term_size_detection.cmi
+   driver/miaou_driver_term__Term_size_detection.cmt
+   driver/miaou_driver_term__Term_size_detection.cmti
+   driver/miaou_driver_term__Term_size_detection.cmx
+   driver/miaou_driver_term__Term_terminal_setup.cmi
+   driver/miaou_driver_term__Term_terminal_setup.cmt
+   driver/miaou_driver_term__Term_terminal_setup.cmti
+   driver/miaou_driver_term__Term_terminal_setup.cmx
+   driver/miaou_driver_term__Term_test_runner.cmi
+   driver/miaou_driver_term__Term_test_runner.cmt
+   driver/miaou_driver_term__Term_test_runner.cmti
+   driver/miaou_driver_term__Term_test_runner.cmx
+   driver/term_event_reader.ml
+   driver/term_events.ml
+   driver/term_events.mli
+   driver/term_render.ml
+   driver/term_renderer.ml
+   driver/term_renderer.mli
+   driver/term_size_detection.ml
+   driver/term_size_detection.mli
+   driver/term_terminal_setup.ml
+   driver/term_terminal_setup.mli
+   driver/term_test_runner.ml
+   driver/term_test_runner.mli
+   dune-package
+   opam))
+ (libexec (driver/miaou_driver_term.cmxs))
+ (doc (CHANGELOG.md LICENSE.md README.md)))
+(library
+ (name miaou-driver-term.driver)
+ (kind normal)
+ (archives
+  (byte driver/miaou_driver_term.cma)
+  (native driver/miaou_driver_term.cmxa))
+ (plugins
+  (byte driver/miaou_driver_term.cma)
+  (native driver/miaou_driver_term.cmxs))
+ (native_archives driver/miaou_driver_term.a)
+ (requires
+  miaou-core.core
+  miaou-core.helpers
+  miaou-core.driver-common
+  miaou-core.interfaces
+  miaou-core.internals
+  miaou-core.widgets.display
+  miaou-core.widgets.input
+  miaou-core.widgets.layout
+  eio
+  eio_main
+  eio.unix
+  lambda-term)
+ (main_module_name Miaou_driver_term)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name miaou_driver_term)
+     (visibility public)
+     (kind alias)
+     (source
+      (path Miaou_driver_term)
+      (impl (path driver/miaou_driver_term.ml-gen))))
+    (name Miaou_driver_term)
+    (modules
+     (module
+      (obj_name miaou_driver_term__Lambda_term_driver)
+      (visibility public)
+      (source
+       (path Lambda_term_driver)
+       (impl (path driver/lambda_term_driver.ml))))
+     (module
+      (obj_name miaou_driver_term__Term_event_reader)
+      (visibility public)
+      (source
+       (path Term_event_reader)
+       (impl (path driver/term_event_reader.ml))))
+     (module
+      (obj_name miaou_driver_term__Term_events)
+      (visibility public)
+      (source
+       (path Term_events)
+       (intf (path driver/term_events.mli))
+       (impl (path driver/term_events.ml))))
+     (module
+      (obj_name miaou_driver_term__Term_render)
+      (visibility public)
+      (source (path Term_render) (impl (path driver/term_render.ml))))
+     (module
+      (obj_name miaou_driver_term__Term_renderer)
+      (visibility public)
+      (source
+       (path Term_renderer)
+       (intf (path driver/term_renderer.mli))
+       (impl (path driver/term_renderer.ml))))
+     (module
+      (obj_name miaou_driver_term__Term_size_detection)
+      (visibility public)
+      (source
+       (path Term_size_detection)
+       (intf (path driver/term_size_detection.mli))
+       (impl (path driver/term_size_detection.ml))))
+     (module
+      (obj_name miaou_driver_term__Term_terminal_setup)
+      (visibility public)
+      (source
+       (path Term_terminal_setup)
+       (intf (path driver/term_terminal_setup.mli))
+       (impl (path driver/term_terminal_setup.ml))))
+     (module
+      (obj_name miaou_driver_term__Term_test_runner)
+      (visibility public)
+      (source
+       (path Term_test_runner)
+       (intf (path driver/term_test_runner.mli))
+       (impl (path driver/term_test_runner.ml))))))
+   (wrapped true))))

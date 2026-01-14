@@ -1,0 +1,203 @@
+.TH "Digest.BLAKE512" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Digest.BLAKE512 \- BLAKE512 is the BLAKE2b hash function producing 512-bit (64-byte) digests.
+.SH Module
+Module   Digest.BLAKE512
+.SH Documentation
+.sp
+Module
+.BI "BLAKE512"
+ : 
+.B S
+
+.sp
+
+.ft B
+BLAKE512
+.ft R
+is the BLAKE2b hash function producing
+512\-bit (64\-byte) digests\&.  It is cryptographically secure,
+and the digests are large enough to thwart brute\-force attacks\&.
+
+.sp
+.B "Since"
+5.2
+
+.sp
+
+.sp
+.sp
+.I type t 
+= 
+.B string
+
+.sp
+The type of digests\&.
+
+.sp
+
+.I val hash_length 
+: 
+.B int
+.sp
+The length of digests, in bytes\&.
+
+.sp
+
+.I val compare 
+: 
+.B t -> t -> int
+.sp
+Compare two digests, with the same specification as
+.ft B
+compare
+.ft R
+\&.
+
+.sp
+
+.I val equal 
+: 
+.B t -> t -> bool
+.sp
+Test two digests for equality\&.
+
+.sp
+
+.I val string 
+: 
+.B string -> t
+.sp
+Return the digest of the given string\&.
+
+.sp
+
+.I val bytes 
+: 
+.B bytes -> t
+.sp
+Return the digest of the given byte sequence\&.
+
+.sp
+
+.I val substring 
+: 
+.B string -> int -> int -> t
+.sp
+
+.ft B
+substring s ofs len
+.ft R
+returns the digest of the substring
+of 
+.ft B
+s
+.ft R
+starting at index 
+.ft B
+ofs
+.ft R
+and containing 
+.ft B
+len
+.ft R
+characters\&.
+
+.sp
+
+.I val subbytes 
+: 
+.B bytes -> int -> int -> t
+.sp
+
+.ft B
+subbytes s ofs len
+.ft R
+returns the digest of the subsequence
+of 
+.ft B
+s
+.ft R
+starting at index 
+.ft B
+ofs
+.ft R
+and containing 
+.ft B
+len
+.ft R
+bytes\&.
+
+.sp
+
+.I val channel 
+: 
+.B in_channel -> int -> t
+.sp
+Read characters from the channel and return their digest\&.
+See 
+.ft B
+Digest\&.channel
+.ft R
+for the full specification\&.
+
+.sp
+
+.I val file 
+: 
+.B string -> t
+.sp
+Return the digest of the file whose name is given\&.
+
+.sp
+
+.I val output 
+: 
+.B out_channel -> t -> unit
+.sp
+Write a digest on the given output channel\&.
+
+.sp
+
+.I val input 
+: 
+.B in_channel -> t
+.sp
+Read a digest from the given input channel\&.
+
+.sp
+
+.I val to_hex 
+: 
+.B t -> string
+.sp
+Return the printable hexadecimal representation of the given digest\&.
+
+.sp
+.B "Raises Invalid_argument"
+if the length of the argument
+is not 
+.ft B
+hash_length
+.ft R
+,
+
+.sp
+
+.I val of_hex 
+: 
+.B string -> t
+.sp
+Convert a hexadecimal representation back into the corresponding digest\&.
+
+.sp
+.B "Raises Invalid_argument"
+if the length of the argument
+is not 
+.ft B
+2 * hash_length
+.ft R
+, or if the arguments contains non\-hexadecimal
+characters\&.
+
+.sp

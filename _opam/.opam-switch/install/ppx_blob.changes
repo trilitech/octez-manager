@@ -1,0 +1,20 @@
+opam-version: "2.0"
+added: [
+  "doc/ppx_blob" {"D"}
+  "doc/ppx_blob/CHANGES.md" {"F:S1458T1768295783.68"}
+  "doc/ppx_blob/LICENSE.txt" {"F:S1211T1768295783.68"}
+  "doc/ppx_blob/README.md" {"F:S879T1768295783.68"}
+  "lib/ppx_blob" {"D"}
+  "lib/ppx_blob/META" {"F:S453T1768295783.67"}
+  "lib/ppx_blob/dune-package" {"F:S732T1768295783.67"}
+  "lib/ppx_blob/opam" {"F:S926T1768295783.67"}
+  "lib/ppx_blob/ppx.exe" {"F:S23128784T1768295783.67"}
+  "lib/ppx_blob/ppx_blob.a" {"F:S14772T1768295783.67"}
+  "lib/ppx_blob/ppx_blob.cma" {"F:S9325T1768295783.67"}
+  "lib/ppx_blob/ppx_blob.cmi" {"F:S4452T1768295783.67"}
+  "lib/ppx_blob/ppx_blob.cmt" {"F:S19308T1768295783.67"}
+  "lib/ppx_blob/ppx_blob.cmx" {"F:S5031T1768295783.67"}
+  "lib/ppx_blob/ppx_blob.cmxa" {"F:S4229T1768295783.67"}
+  "lib/ppx_blob/ppx_blob.cmxs" {"F:S30576T1768295783.68"}
+  "lib/ppx_blob/ppx_blob.ml" {"F:S1762T1768295783.67"}
+]

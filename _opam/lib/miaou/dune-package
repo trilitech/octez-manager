@@ -1,0 +1,38 @@
+(lang dune 3.20)
+(name miaou)
+(version da71376)
+(sections (lib .) (bin ../../bin) (doc ../../doc/miaou))
+(files
+ (lib (META dune-package opam))
+ (bin
+  (miaou.bar_chart-demo
+   miaou.braille-demo
+   miaou.breadcrumbs-demo
+   miaou.button-demo
+   miaou.card_sidebar-demo
+   miaou.checkbox-demo
+   miaou.demo
+   miaou.demo-matrix
+   miaou.demo-sdl
+   miaou.description_list-demo
+   miaou.flex_layout-demo
+   miaou.image-demo
+   miaou.key_handling-demo
+   miaou.layout_helpers-demo
+   miaou.line_chart-demo
+   miaou.link-demo
+   miaou.logger-demo
+   miaou.pager-demo
+   miaou.palette-demo
+   miaou.qr_code-demo
+   miaou.radio-demo
+   miaou.sparkline-demo
+   miaou.spinner_progress-demo
+   miaou.switch-demo
+   miaou.system_monitor-demo
+   miaou.table-demo
+   miaou.tabs-demo
+   miaou.toast-demo
+   miaou.tree-demo
+   miaou.validated_textbox-demo))
+ (doc (CHANGELOG.md LICENSE.md README.md)))

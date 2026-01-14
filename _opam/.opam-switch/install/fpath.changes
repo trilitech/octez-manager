@@ -1,0 +1,28 @@
+opam-version: "2.0"
+added: [
+  "doc/fpath" {"D"}
+  "doc/fpath/CHANGES.md" {"F:S661T1768295823.96"}
+  "doc/fpath/LICENSE.md" {"F:S739T1768295823.96"}
+  "doc/fpath/README.md" {"F:S929T1768295823.96"}
+  "lib/fpath" {"D"}
+  "lib/fpath/META" {"F:S452T1768295823.95"}
+  "lib/fpath/fpath.a" {"F:S180994T1768295823.96"}
+  "lib/fpath/fpath.cma" {"F:S92375T1768295823.96"}
+  "lib/fpath/fpath.cmi" {"F:S6174T1768295823.96"}
+  "lib/fpath/fpath.cmt" {"F:S152718T1768295823.96"}
+  "lib/fpath/fpath.cmti" {"F:S42201T1768295823.96"}
+  "lib/fpath/fpath.cmx" {"F:S16362T1768295823.96"}
+  "lib/fpath/fpath.cmxa" {"F:S874T1768295823.96"}
+  "lib/fpath/fpath.cmxs" {"F:S160448T1768295823.96"}
+  "lib/fpath/fpath.ml" {"F:S28811T1768295823.96"}
+  "lib/fpath/fpath.mli" {"F:S41651T1768295823.96"}
+  "lib/fpath/fpath_top.a" {"F:S4134T1768295823.96"}
+  "lib/fpath/fpath_top.cma" {"F:S2471T1768295823.96"}
+  "lib/fpath/fpath_top.cmt" {"F:S4727T1768295823.96"}
+  "lib/fpath/fpath_top.cmx" {"F:S1431T1768295823.96"}
+  "lib/fpath/fpath_top.cmxa" {"F:S1437T1768295823.96"}
+  "lib/fpath/fpath_top.cmxs" {"F:S18792T1768295823.96"}
+  "lib/fpath/fpath_top.ml" {"F:S1320T1768295823.96"}
+  "lib/fpath/fpath_top_init.ml" {"F:S1272T1768295823.96"}
+  "lib/fpath/opam" {"F:S992T1768295823.95"}
+]

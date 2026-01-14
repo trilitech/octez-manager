@@ -1,0 +1,86 @@
+opam-version: "2.0"
+added: [
+  "doc/ocaml-compiler-libs" {"D"}
+  "doc/ocaml-compiler-libs/CHANGES.md" {"F:S128T1768295770.67"}
+  "doc/ocaml-compiler-libs/LICENSE.md" {"F:S1117T1768295770.67"}
+  "doc/ocaml-compiler-libs/README.org" {"F:S338T1768295770.67"}
+  "lib/ocaml-compiler-libs" {"D"}
+  "lib/ocaml-compiler-libs/META" {"F:S1379T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp" {"D"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.a"
+    {"F:S2148T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.cma"
+    {"F:S1606T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.cmi"
+    {"F:S698T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.cmt"
+    {"F:S3215T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.cmx"
+    {"F:S320T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.cmxa"
+    {"F:S326T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.cmxs"
+    {"F:S16440T1768295770.67"}
+  "lib/ocaml-compiler-libs/bytecomp/ocaml_bytecomp.ml"
+    {"F:S373T1768295770.67"}
+  "lib/ocaml-compiler-libs/common" {"D"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.a" {"F:S2038T1768295770.67"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.cma" {"F:S6150T1768295770.67"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.cmi" {"F:S5044T1768295770.67"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.cmt"
+    {"F:S19405T1768295770.67"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.cmx" {"F:S1788T1768295770.67"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.cmxa"
+    {"F:S1794T1768295770.67"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.cmxs"
+    {"F:S17896T1768295770.67"}
+  "lib/ocaml-compiler-libs/common/ocaml_common.ml" {"F:S6015T1768295770.67"}
+  "lib/ocaml-compiler-libs/dune-package" {"F:S3887T1768295770.67"}
+  "lib/ocaml-compiler-libs/opam" {"F:S680T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp" {"D"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.a" {"F:S2054T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.cma"
+    {"F:S7416T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.cmi"
+    {"F:S6285T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.cmt"
+    {"F:S22636T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.cmx"
+    {"F:S2432T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.cmxa"
+    {"F:S2438T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.cmxs"
+    {"F:S18552T1768295770.67"}
+  "lib/ocaml-compiler-libs/optcomp/ocaml_optcomp.ml"
+    {"F:S7356T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow" {"D"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.a" {"F:S3790T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.cma"
+    {"F:S20763T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.cmi"
+    {"F:S18988T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.cmt"
+    {"F:S68309T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.cmx" {"F:S212T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.cmxa" {"F:S193T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.cmxs"
+    {"F:S17264T1768295770.67"}
+  "lib/ocaml-compiler-libs/shadow/ocaml_shadow.ml" {"F:S39703T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel" {"D"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.a"
+    {"F:S2148T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.cma"
+    {"F:S1489T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.cmi"
+    {"F:S574T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.cmt"
+    {"F:S2845T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.cmx"
+    {"F:S287T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.cmxa"
+    {"F:S293T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.cmxs"
+    {"F:S16408T1768295770.67"}
+  "lib/ocaml-compiler-libs/toplevel/ocaml_toplevel.ml"
+    {"F:S284T1768295770.67"}
+]

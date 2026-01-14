@@ -1,0 +1,4 @@
+(library
+  (name eio__core)
+  (public_name eio.core)
+  (libraries hmap lwt-dllist fmt optint eio.runtime_events))

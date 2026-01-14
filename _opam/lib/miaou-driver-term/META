@@ -1,0 +1,22 @@
+package "driver" (
+  directory = "driver"
+  version = "da71376"
+  description = ""
+  requires =
+  "eio
+   eio.unix
+   eio_main
+   lambda-term
+   miaou-core.core
+   miaou-core.driver-common
+   miaou-core.helpers
+   miaou-core.interfaces
+   miaou-core.internals
+   miaou-core.widgets.display
+   miaou-core.widgets.input
+   miaou-core.widgets.layout"
+  archive(byte) = "miaou_driver_term.cma"
+  archive(native) = "miaou_driver_term.cmxa"
+  plugin(byte) = "miaou_driver_term.cma"
+  plugin(native) = "miaou_driver_term.cmxs"
+)

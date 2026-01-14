@@ -1,0 +1,8 @@
+OPAM_SWITCH_PREFIX	=	/home/valentin/work/octez-manager/_opam	:	target	Prefix\ of\ the\ current\ opam\ switch
+CAML_LD_LIBRARY_PATH	=	/home/valentin/work/octez-manager/_opam/lib/stublibs	:	target	Updated\ by\ package\ ocaml-base-compiler
+OCAMLTOP_INCLUDE_PATH	+=	/home/valentin/work/octez-manager/_opam/lib/toplevel	:	target	Updated\ by\ package\ ocaml
+CAML_LD_LIBRARY_PATH	=	/home/valentin/work/octez-manager/_opam/lib/ocaml/stublibs:/home/valentin/work/octez-manager/_opam/lib/ocaml	:	target	Updated\ by\ package\ ocaml
+CAML_LD_LIBRARY_PATH	+=	/home/valentin/work/octez-manager/_opam/lib/stublibs	:	target	Updated\ by\ package\ ocaml
+OCAML_TOPLEVEL_PATH	=	/home/valentin/work/octez-manager/_opam/lib/toplevel	Updated\ by\ package\ ocaml
+MANPATH	=:	/home/valentin/work/octez-manager/_opam/man	:	host	Current\ opam\ switch\ man\ dir
+PATH	=+=	/home/valentin/work/octez-manager/_opam/bin	:	target	Binary\ dir\ for\ opam\ switch\ /home/valentin/work/octez-manager

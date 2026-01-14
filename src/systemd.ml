@@ -168,13 +168,13 @@ let exec_line role =
        accuser ${OCTEZ_SERVICE_ARGS:-}'"
   | "dal-node" | "dal" ->
       (* DAL node is a subcommand of octez-baker: octez-baker [global] run dal [opts]
-         Note: --endpoint must be passed both as global option (for baker client)
+         Note: -E must be passed both as global option (for baker client)
          and after "run dal" (for the DAL node component to connect to the L1 node) *)
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" --base-dir \
-       \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
-       dal --endpoint \"${OCTEZ_NODE_ENDPOINT}\" --data-dir \
-       \"${OCTEZ_DAL_DATA_DIR}\" --rpc-addr \"${OCTEZ_DAL_RPC_ADDR}\" \
-       --net-addr \"${OCTEZ_DAL_NET_ADDR}\" ${OCTEZ_SERVICE_ARGS:-}'"
+       \"${OCTEZ_CLIENT_BASE_DIR}\" -E \"${OCTEZ_NODE_ENDPOINT}\" run dal -E \
+       \"${OCTEZ_NODE_ENDPOINT}\" --data-dir \"${OCTEZ_DAL_DATA_DIR}\" \
+       --rpc-addr \"${OCTEZ_DAL_RPC_ADDR}\" --net-addr \
+       \"${OCTEZ_DAL_NET_ADDR}\" ${OCTEZ_SERVICE_ARGS:-}'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \

@@ -1,0 +1,4 @@
+(lang dune 1.11)
+(name ppx_blob)
+(version 0.9.0)
+(explicit_js_mode)

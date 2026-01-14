@@ -1,0 +1,488 @@
+.TH "Unit_info" 3 2026-01-13 OCamldoc "OCaml library"
+.SH NAME
+Unit_info \- This module centralize the handling of compilation files and their metadata.
+.SH Module
+Module   Unit_info
+.SH Documentation
+.sp
+Module
+.BI "Unit_info"
+ : 
+.B sig end
+
+.sp
+This module centralize the handling of compilation files and their metadata\&.
+.sp
+Maybe more importantly, this module provides functions for deriving module
+names from strings or filenames\&.
+
+.sp
+
+.sp
+.sp
+
+.PP
+.SS Module name convention and computation
+
+.PP
+.I type modname 
+= 
+.B string
+
+.sp
+
+.sp
+.I type filename 
+= 
+.B string
+
+.sp
+
+.sp
+.I type file_prefix 
+= 
+.B string
+
+.sp
+
+.sp
+
+.I val modulize 
+: 
+.B string -> modname
+.sp
+
+.ft B
+modulize s
+.ft R
+capitalizes the first letter of 
+.ft B
+s
+.ft R
+\&.
+
+.sp
+
+.I val normalize 
+: 
+.B string -> string
+.sp
+
+.ft B
+normalize s
+.ft R
+uncapitalizes the first letter of 
+.ft B
+s
+.ft R
+\&.
+
+.sp
+
+.I val modname_from_source 
+: 
+.B filename -> modname
+.sp
+
+.ft B
+modname_from_source filename
+.ft R
+is 
+.ft B
+modulize stem
+.ft R
+where 
+.ft B
+stem
+.ft R
+is the
+basename of the filename 
+.ft B
+filename
+.ft R
+stripped from all its extensions\&.
+For instance, 
+.ft B
+modname_from_source "/pa\&.th/x\&.ml\&.pp"
+.ft R
+is 
+.ft B
+"X"
+.ft R
+\&.
+
+.sp
+
+.PP
+.SS Module name validation function
+
+.PP
+
+.I val is_unit_name 
+: 
+.B modname -> bool
+.sp
+
+.ft B
+is_unit_name ~strict name
+.ft R
+is true only if 
+.ft B
+name
+.ft R
+can be used as a
+valid module name\&.
+
+.sp
+
+.PP
+.SS Metadata for compilation unit
+
+.PP
+.I type t 
+
+.sp
+Metadata for a compilation unit:
+.sp
+\-the module name associated to the unit
+.sp
+\-the filename prefix (dirname + basename with all extensions stripped)
+for compilation artifacts
+.sp
+\-the input source file
+For instance, when calling 
+.ft B
+ocamlopt dir/x\&.mli \-o target/y\&.cmi
+.ft R
+,
+.sp
+\-the input source file is 
+.ft B
+dir/x\&.mli
+.ft R
+
+.sp
+\-the module name is 
+.ft B
+Y
+.ft R
+
+.sp
+\-the prefix is 
+.ft B
+target/y
+.ft R
+
+
+
+.sp
+
+.I val source_file 
+: 
+.B t -> filename
+.sp
+
+.ft B
+source_file u
+.ft R
+is the source file of 
+.ft B
+u
+.ft R
+\&.
+
+.sp
+
+.I val prefix 
+: 
+.B t -> file_prefix
+.sp
+
+.ft B
+prefix u
+.ft R
+is the filename prefix of the unit\&.
+
+.sp
+
+.I val modname 
+: 
+.B t -> modname
+.sp
+
+.ft B
+modname u
+.ft R
+or 
+.ft B
+artifact_modname a
+.ft R
+is the module name of the unit
+or compilation artifact\&.
+
+.sp
+
+.I val check_unit_name 
+: 
+.B t -> unit
+.sp
+
+.ft B
+check_unit_name u
+.ft R
+prints a warning if the derived module name 
+.ft B
+modname u
+.ft R
+should not be used as a module name as specified
+by 
+.ft B
+Unit_info\&.is_unit_name
+.ft R
+.ft B
+~strict:true
+.ft R
+\&.
+
+.sp
+
+.I val make 
+: 
+.B ?check_modname:bool ->
+.B   source_file:filename -> file_prefix -> t
+.sp
+
+.ft B
+make ~check ~source_file prefix
+.ft R
+associates both the
+.ft B
+source_file
+.ft R
+and the module name 
+.ft B
+Unit_info\&.modname_from_source
+.ft R
+.ft B
+target_prefix
+.ft R
+to
+the prefix filesystem path 
+.ft B
+prefix
+.ft R
+\&.
+.sp
+If 
+.ft B
+check_modname=true
+.ft R
+, this function emits a warning if the derived module
+name is not valid according to 
+.ft B
+Unit_info\&.check_unit_name
+.ft R
+\&.
+
+.sp
+.I module Artifact : 
+.B sig end
+
+.sp
+.SS Build artifacts 
+
+
+.sp
+
+.PP
+.SS Derived build artifact metadata
+
+.PP
+
+.I val cmi 
+: 
+.B t -> Artifact.t
+.sp
+Those functions derive a specific 
+.ft B
+artifact
+.ft R
+metadata from an 
+.ft B
+unit
+.ft R
+metadata\&.
+
+.sp
+
+.I val cmo 
+: 
+.B t -> Artifact.t
+.sp
+
+.sp
+
+.I val cmx 
+: 
+.B t -> Artifact.t
+.sp
+
+.sp
+
+.I val obj 
+: 
+.B t -> Artifact.t
+.sp
+
+.sp
+
+.I val cmt 
+: 
+.B t -> Artifact.t
+.sp
+
+.sp
+
+.I val cmti 
+: 
+.B t -> Artifact.t
+.sp
+
+.sp
+
+.I val annot 
+: 
+.B t -> Artifact.t
+.sp
+
+.sp
+
+.I val companion_obj 
+: 
+.B Artifact.t -> Artifact.t
+.sp
+The functions below change the type of an artifact by updating the
+extension of its filename\&.
+Those functions purposefully do not cover all artifact kinds because we want
+to track which artifacts are assumed to be bundled together\&.
+
+.sp
+
+.I val companion_cmt 
+: 
+.B Artifact.t -> Artifact.t
+.sp
+
+.sp
+
+.I val companion_cmi 
+: 
+.B Artifact.t -> Artifact.t
+.sp
+Beware that 
+.ft B
+companion_cmi a
+.ft R
+strips all extensions from the
+filename of 
+.ft B
+a
+.ft R
+before adding the 
+.ft B
+"\&.cmi"
+.ft R
+suffix contrarily to
+the other functions which only remove the rightmost extension\&.
+In other words, the companion cmi of a file 
+.ft B
+something\&.d\&.cmo
+.ft R
+is
+.ft B
+something\&.cmi
+.ft R
+and not 
+.ft B
+something\&.d\&.cmi
+.ft R
+\&.
+
+.sp
+
+.PP
+.SS Mli and cmi derived from implementation files 
+
+.PP
+
+.PP
+The compilation of module implementation changes in presence of mli and cmi
+files, the function belows help to handle this\&.
+.PP
+
+.I val mli_from_source 
+: 
+.B t -> filename
+.sp
+
+.ft B
+mli_from_source u
+.ft R
+is the interface source filename associated to the unit
+.ft B
+u
+.ft R
+\&. The actual suffix depends on 
+.ft B
+Config\&.interface_suffix
+.ft R
+\&.
+
+.sp
+
+.I val mli_from_artifact 
+: 
+.B Artifact.t -> filename
+.sp
+
+.ft B
+mli_from_artifact t
+.ft R
+is the name of the interface source file derived from
+the artifact 
+.ft B
+t
+.ft R
+\&. This variant is necessary when handling artifacts derived
+from an unknown source files (e\&.g\&. packed modules)\&.
+
+.sp
+
+.I val is_cmi 
+: 
+.B Artifact.t -> bool
+.sp
+Check if the artifact is a cmi
+
+.sp
+
+.I val find_normalized_cmi 
+: 
+.B t -> Artifact.t
+.sp
+
+.ft B
+find_normalized_cmi u
+.ft R
+finds in the load_path a file matching the module
+name 
+.ft B
+modname u
+.ft R
+\&.
+
+.sp
+.B "Raises Not_found"
+if no such cmi exists
+
+.sp
