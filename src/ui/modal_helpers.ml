@@ -5,6 +5,7 @@
 (*                                                                            *)
 (******************************************************************************)
 
+open Octez_manager_lib
 module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
@@ -621,6 +622,8 @@ let show_error ~title message =
 let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     ~on_select () =
   let module File_browser = Miaou_widgets_layout.File_browser_widget in
+  let default_path = if Common.is_root () then "/" else Common.home_dir () in
+  let start_path = Option.value initial_path ~default:default_path in
   let module Modal = struct
     type state = File_browser.t
 
@@ -633,7 +636,7 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     let init () =
       Navigation.make
         (File_browser.open_centered
-           ?path:initial_path
+           ~path:start_path
            ~dirs_only
            ~require_writable
            ())
@@ -666,6 +669,8 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
         [
           Up;
           Down;
+          Left;
+          Right;
           PageUp;
           PageDown;
           Char " ";
@@ -674,6 +679,9 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
           Backspace;
           Tab;
           Char "h";
+          Char "j";
+          Char "k";
+          Char "l";
           Char "n";
           Char "s";
         ]
@@ -681,22 +689,31 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     let handle_modal_key ps key ~size:_ =
       Navigation.update
         (fun s ->
+          (* Remap keys for navigation *)
+          let key =
+            match Miaou.Core.Keys.of_string key with
+            | Some Miaou.Core.Keys.Right -> "Right"
+            | Some Miaou.Core.Keys.Left -> "Left"
+            | Some (Miaou.Core.Keys.Char "h") -> "Left"
+            | _ -> key
+          in
+
           let s' = File_browser.handle_key s ~key in
           let s'' = File_browser.apply_pending_updates s' in
           (* Check for cancel *)
           if File_browser.is_cancelled s'' then (
             Miaou.Core.Modal_manager.close_top `Cancel ;
             s'' (* Commit on Enter for files or "." directory *))
-          else if key = "Enter" then
-            match File_browser.get_selected_entry s'' with
-            | Some e when (not e.is_dir) || e.name = "." ->
+          else
+            match File_browser.get_pending_selection s'' with
+            | Some _ ->
                 Miaou.Core.Modal_manager.close_top `Commit ;
                 s''
-            | _ -> s'' (* Commit on 's' key *)
-          else if key = "s" && File_browser.can_commit s'' then (
-            Miaou.Core.Modal_manager.close_top `Commit ;
-            s'')
-          else s'')
+            | None ->
+                if key = "s" && File_browser.can_commit s'' then (
+                  Miaou.Core.Modal_manager.close_top `Commit ;
+                  s'')
+                else s'')
         ps
 
     let handle_key = handle_modal_key
