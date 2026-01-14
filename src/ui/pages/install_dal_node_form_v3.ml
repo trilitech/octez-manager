@@ -147,6 +147,7 @@ let spec =
           ~get_client:(fun m -> m.client)
           ~set_client:(fun client m -> {m with client})
           ~edit_mode:model.edit_mode
+          ~skip_base_dir:true (* DAL node doesn't use client base dir *)
           ()
         (* 2. Network params - N/A *)
         (* 3. App bin dir *)
@@ -349,15 +350,6 @@ let spec =
           | _ -> None
         in
 
-        (* Build base_dir (client base dir for global --base-dir) *)
-        (* In edit mode, always preserve existing base_dir *)
-        let client_base_dir =
-          let trimmed = String.trim model.client.base_dir in
-          if trimmed = "" then
-            Common.default_role_dir "dal-node" model.core.instance_name
-          else trimmed
-        in
-
         (* DAL data dir (for --data-dir command option) *)
         (* In edit mode, preserve existing data dir to avoid data loss *)
         (* Otherwise, use the user-provided value from the form *)
@@ -397,13 +389,12 @@ let spec =
             service_args;
             extra_env =
               [
-                ("OCTEZ_CLIENT_BASE_DIR", client_base_dir);
                 ("OCTEZ_NODE_ENDPOINT", node_endpoint);
                 ("OCTEZ_DAL_DATA_DIR", dal_data_dir);
                 ("OCTEZ_DAL_RPC_ADDR", model.rpc_addr);
                 ("OCTEZ_DAL_NET_ADDR", model.net_addr);
               ];
-            extra_paths = [client_base_dir; dal_data_dir];
+            extra_paths = [dal_data_dir];
             auto_enable = model.core.enable_on_boot;
             depends_on;
             preserve_data = model.edit_mode;
