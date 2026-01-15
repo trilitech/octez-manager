@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-01-15
+
+### Added
+
+- One-liner install script (`curl -fsSL ... | sh`)
+- Binary accessibility validation for service users
+- Tab shortcut hint in TUI for folding sections
+- Ubuntu and Debian `.deb` packages in releases
+
+### Fixed
+
+- Hero button text color in dark mode
+- Temp directory cleanup on install script error
+- Use official Tezos logo
+
+### Changed
+
+- Documentation examples now target shadownet instead of mainnet
+- Documentation styling aligned with Tezlink/Tezos design
+
 ## [0.1.0] - 2026-01-14
 
 ### Added
