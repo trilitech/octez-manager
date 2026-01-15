@@ -180,6 +180,8 @@ octez-manager list-snapshots [OPTIONS]
 
 Purge all registered instances. Removes services, data directories, and log files.
 
+> **Warning:** This command is destructive and intended for testing purposes. It will permanently delete all instance data and cannot be undone.
+
 ```bash
 octez-manager purge-all
 ```
