@@ -52,10 +52,22 @@ dune fmt            # Format code (MUST pass before commit)
 ### Code Duplication Prevention
 
 **Search First Policy:** Before writing any new function, especially helpers or utilities:
-1. Search the existing codebase for similar functionality
-2. Check `src/common.ml` for general utilities
-3. Check scheduler modules for cached data accessors
-4. Refactor existing code to be more generic rather than duplicating
+
+1. **Query the architecture database** (quick first check):
+   ```bash
+   sqlite3 docs/architecture.db "SELECT m.path, f.name, f.intent FROM functions f JOIN modules m ON f.module_id = m.id WHERE f.name LIKE '%your_keyword%'"
+   ```
+
+2. **Search the actual codebase** (database may be incomplete):
+   ```bash
+   grep -rn "your_keyword" src/
+   ```
+
+3. Check `src/common.ml` for general utilities
+4. Check scheduler modules for cached data accessors
+5. Refactor existing code to be more generic rather than duplicating
+
+**Important:** The architecture database is a helpful tool but is NOT complete. It may be missing functions, have outdated information, or lack intent descriptions. Always verify by searching the actual code.
 
 ---
 
@@ -241,3 +253,81 @@ When unsure about:
 - Breaking changes
 
 Ask for confirmation before proceeding.
+
+---
+
+## Gardening & Architecture Index
+
+The project uses a "gardening" approach for ongoing code maintenance. See `GARDENING.md` for the full guide.
+
+### Architecture Database
+
+An SQLite database at `docs/architecture.db` can index the codebase. The database is gitignored and must be generated locally from the schema:
+
+```bash
+# Generate the database (one-time setup)
+sqlite3 docs/architecture.db < docs/architecture-schema.sql
+```
+
+> **Note:** Full tooling to populate this database (#274) is not yet implemented.
+> Until then, the database serves as a schema reference and manual queries work
+> if you populate it yourself.
+
+Once populated, you can query it:
+
+```bash
+# Check for similar functions before creating new ones
+sqlite3 docs/architecture.db "SELECT m.path, f.name, f.signature, f.intent
+  FROM functions f JOIN modules m ON f.module_id = m.id
+  WHERE f.name LIKE '%install%'"
+
+# Find large files that may need splitting
+sqlite3 docs/architecture.db "SELECT * FROM v_large_files"
+
+# Find functions without documentation
+sqlite3 docs/architecture.db "SELECT * FROM v_undocumented"
+```
+
+### CRITICAL: Database Limitations
+
+**The database is NOT complete and may never be.** It is a helpful tool but does NOT replace searching the actual codebase.
+
+When looking for existing functionality:
+1. Query the database first (fast initial check)
+2. **Always also search the actual code** with grep/ripgrep
+3. Read relevant files to understand context
+
+The database may be:
+- Missing recently added functions
+- Missing functions from modules not yet indexed
+- Lacking intent descriptions for many functions
+- Out of date with current signatures
+
+### When Creating New Functions
+
+If you create a new function, especially in a public module:
+
+1. **Check it doesn't already exist** (both database AND grep)
+2. Add it to the database if the module is already indexed:
+   ```bash
+   sqlite3 docs/architecture.db "INSERT INTO functions (module_id, name, signature, line_start, line_end, exposed, intent)
+     SELECT id, 'my_new_function', '?quiet:bool -> string -> unit', 42, 55, 1, 'Brief description of purpose'
+     FROM modules WHERE path = 'src/mymodule.ml'"
+   ```
+3. If the function is a utility that others might need, consider adding it to `src/common.ml`
+
+### Gardening Tasks
+
+When you notice code health issues during development:
+- Large files (>500 lines)
+- Large functions (>50 lines)
+- String parameters that should be typed
+- Missing .mli files
+- Duplicated code
+
+Create a gardening issue:
+```bash
+gh issue create --label gardening --title "gardening: [category] description"
+```
+
+Don't fix unrelated issues opportunistically in the same PR - create an issue for later.
