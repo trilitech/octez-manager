@@ -250,8 +250,7 @@ let parent_node_field =
       (* Same validation logic as accuser: must not be None *)
       m.parent_node <> "")
     ~validate_msg:(fun m ->
-      if m.parent_node = "" then
-        Some "Parent Node selection is required"
+      if m.parent_node = "" then Some "Parent Node selection is required"
       else None)
     ~edit:(fun model_ref ->
       let states = Form_builder_common.cached_service_states () in
@@ -548,8 +547,12 @@ let spec =
               ~to_string:(fun x -> x);
           ]
         (* 6. Addresses and ports: node data dir only (when using local node) *)
-        @ (let states = Form_builder_common.cached_service_states_nonblocking () in
-           let is_local_node = Option.is_some (find_node states model.parent_node) in
+        @ (let states =
+             Form_builder_common.cached_service_states_nonblocking ()
+           in
+           let is_local_node =
+             Option.is_some (find_node states model.parent_node)
+           in
            if is_local_node then
              [
                (if model.edit_mode then
