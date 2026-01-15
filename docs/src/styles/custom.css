@@ -45,6 +45,11 @@
   color: var(--sl-color-gray-1);
 }
 
+/* Hero action buttons - ensure readable text in dark mode */
+.hero a.primary {
+  color: #ffffff !important;
+}
+
 /* Code blocks - terminal style */
 pre {
   border-radius: 8px;
