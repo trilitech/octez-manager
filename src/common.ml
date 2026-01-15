@@ -606,15 +606,18 @@ let get_remote_file_size url =
       find_content_length lines
 
 let get_available_space dir =
-  (* Use df to get available space in bytes *)
-  match run_out ["df"; "-B1"; "--output=avail"; dir] with
-  | Error _ -> None
-  | Ok output -> (
-      let lines = String.split_on_char '\n' output in
-      (* Skip header line, get second line *)
-      match lines with
-      | _ :: value_line :: _ -> Int64.of_string_opt (String.trim value_line)
-      | _ -> None)
+  (* Check if path exists before calling df to avoid stderr noise *)
+  if not (Sys.file_exists dir) then None
+  else
+    (* Use df to get available space in bytes *)
+    match run_out ["df"; "-B1"; "--output=avail"; dir] with
+    | Error _ -> None
+    | Ok output -> (
+        let lines = String.split_on_char '\n' output in
+        (* Skip header line, get second line *)
+        match lines with
+        | _ :: value_line :: _ -> Int64.of_string_opt (String.trim value_line)
+        | _ -> None)
 
 let get_filesystem_id path =
   (* Use stat to get the filesystem (device) ID for a path *)
