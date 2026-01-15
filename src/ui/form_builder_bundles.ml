@@ -136,11 +136,12 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
             let user = (get_core m).service_user in
             (* First check if binary exists *)
             binary_validator app_bin_dir
-            && (not (Common.is_root ())
-               || not (is_nonempty user)
+            && ((not (Common.is_root ()))
+               || (not (is_nonempty user))
                ||
                (* In root mode with user, verify service user can access *)
-               binary_accessible_to_user ~user ~app_bin_dir ~binary_name:binary))
+               binary_accessible_to_user ~user ~app_bin_dir ~binary_name:binary
+               ))
           ~validate_msg:(fun m ->
             let app_bin_dir = (get_core m).app_bin_dir in
             let user = (get_core m).service_user in
@@ -151,8 +152,7 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
                    binary
                    app_bin_dir)
             else if
-              Common.is_root ()
-              && is_nonempty user
+              Common.is_root () && is_nonempty user
               && not
                    (binary_accessible_to_user
                       ~user
