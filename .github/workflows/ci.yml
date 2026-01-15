@@ -230,8 +230,115 @@ jobs:
           cp _build/default/src/main.exe release/octez-manager-${{ github.ref_name }}-linux-x86_64
           chmod +x release/octez-manager-${{ github.ref_name }}-linux-x86_64
 
+      - name: Upload binary for packaging jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binary
+          path: release/octez-manager-${{ github.ref_name }}-linux-x86_64
+          retention-days: 1
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release/octez-manager-${{ github.ref_name }}-linux-x86_64
           generate_release_notes: true
+
+  package-ubuntu:
+    name: Package (.deb Ubuntu)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: release-binary
+          path: bin
+
+      - name: Install fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential
+          sudo gem install fpm
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build Ubuntu .deb package
+        run: |
+          chmod +x bin/octez-manager-*
+          fpm -s dir -t deb \
+            -n octez-manager \
+            -v ${{ steps.version.outputs.version }} \
+            --architecture amd64 \
+            --description "CLI and TUI for managing Tezos infrastructure" \
+            --url "https://github.com/trilitech/octez-manager" \
+            --license "MIT" \
+            --maintainer "Nomadic Labs <contact@nomadic-labs.com>" \
+            --vendor "Nomadic Labs" \
+            --category "utils" \
+            --deb-priority optional \
+            --deb-dist stable \
+            bin/octez-manager-${{ github.ref_name }}-linux-x86_64=/usr/local/bin/octez-manager
+          mv *.deb octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb
+
+  package-debian:
+    name: Package (.deb Debian)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    permissions:
+      contents: write
+    container:
+      image: debian:bookworm
+
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y ruby ruby-dev rubygems build-essential curl
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: release-binary
+          path: bin
+
+      - name: Install fpm
+        run: gem install fpm
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build Debian .deb package
+        run: |
+          chmod +x bin/octez-manager-*
+          fpm -s dir -t deb \
+            -n octez-manager \
+            -v ${{ steps.version.outputs.version }} \
+            --architecture amd64 \
+            --description "CLI and TUI for managing Tezos infrastructure" \
+            --url "https://github.com/trilitech/octez-manager" \
+            --license "MIT" \
+            --maintainer "Nomadic Labs <contact@nomadic-labs.com>" \
+            --vendor "Nomadic Labs" \
+            --category "utils" \
+            --deb-priority optional \
+            --deb-dist bookworm \
+            bin/octez-manager-${{ github.ref_name }}-linux-x86_64=/usr/local/bin/octez-manager
+          mv *.deb octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb
