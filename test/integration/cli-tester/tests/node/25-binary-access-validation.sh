@@ -28,15 +28,15 @@ fi
 echo "✓ Installation succeeded with accessible binaries"
 cleanup_instance "$INSTANCE"
 
-# Test 2: Create a restricted directory and copy binaries there
+# Test 2: Create a restricted directory in /tmp (writable location)
 echo "Test 2: Testing restricted directory (should fail validation)"
-RESTRICTED_DIR="/root/restricted-bin"
+RESTRICTED_DIR="/tmp/restricted-bin"
 mkdir -p "$RESTRICTED_DIR"
 cp /usr/local/bin/octez-node "$RESTRICTED_DIR/"
 chmod 755 "$RESTRICTED_DIR/octez-node"
 chmod 700 "$RESTRICTED_DIR"  # Owner (root) only
 
-# This should fail because tezos user cannot access /root/restricted-bin
+# This should fail because tezos user cannot access the directory
 if om install-node \
     --instance "$INSTANCE" \
     --network shadownet \
