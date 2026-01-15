@@ -103,7 +103,62 @@ code {
   border-radius: 4px;
 }
 
-/* Logo styling */
+/* Header / Title bar - clean, minimal style */
+.page > .header {
+  border-bottom: 1px solid var(--sl-color-gray-5);
+}
+
+/* Site title styling */
+.site-title {
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+.site-title:hover {
+  color: var(--sl-color-accent);
+}
+
 .site-title img {
   height: 2rem;
+}
+
+/* Header right-side icons */
+.header .social-icons a {
+  color: var(--sl-color-gray-2);
+}
+
+.header .social-icons a:hover {
+  color: var(--sl-color-accent);
+}
+
+/* Sidebar - Tezlink-aligned styling */
+
+/* Group titles - cleaner typography */
+.sidebar-content .large {
+  font-size: var(--sl-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sl-color-gray-2);
+  font-weight: 600;
+}
+
+/* Active page indicator - subtle left border instead of full background */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background-color: var(--sl-color-accent-low);
+  color: var(--sl-color-accent);
+  border-left: 3px solid var(--sl-color-accent);
+  margin-left: -3px;
+  font-weight: 600;
+}
+
+/* Regular sidebar links */
+.sidebar-content a {
+  color: var(--sl-color-gray-1);
+}
+
+.sidebar-content a:hover,
+.sidebar-content a:focus {
+  color: var(--sl-color-accent);
 }
