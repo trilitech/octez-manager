@@ -37,6 +37,7 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
 
 echo "Downloading $ASSET_NAME..."
 TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
 curl -fsSL "$DOWNLOAD_URL" -o "$TMPDIR/$BINARY_NAME"
 chmod +x "$TMPDIR/$BINARY_NAME"
 
@@ -47,8 +48,6 @@ if [ -w "$INSTALL_DIR" ]; then
 else
     sudo mv "$TMPDIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
 fi
-
-rm -rf "$TMPDIR"
 
 echo "Successfully installed $BINARY_NAME $VERSION"
 echo "Run 'octez-manager --help' to get started"
