@@ -226,6 +226,7 @@ Keep the first line under 72 characters.
 
 ## Git Hygiene
 
+- **Always use pull requests** - never push directly to main
 - Keep diffs minimal and focused on the task
 - Don't opportunistically fix unrelated issues
 - Never commit secrets or credentials
