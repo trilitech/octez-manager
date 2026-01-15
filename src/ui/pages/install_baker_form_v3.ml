@@ -547,9 +547,8 @@ let spec =
               ~items:["pass"; "on"; "off"]
               ~to_string:(fun x -> x);
           ]
-        (* 6. Addresses and ports: node endpoint, node data dir *)
+        (* 6. Addresses and ports: node data dir only *)
         @ [
-            node_endpoint_field;
             (if model.edit_mode then
                readonly ~label:"Node Data Dir" ~get:(fun m ->
                    let states =
