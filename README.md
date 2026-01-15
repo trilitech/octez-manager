@@ -1,8 +1,16 @@
-# Octez Manager
+<p align="center">
+  <img src="assets/logo.png" alt="Octez Manager" width="200">
+</p>
 
-A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, signers, DAL nodes).
+<h1 align="center">Octez Manager</h1>
 
-![Octez Manager UI](assets/octez-manager.gif)
+<p align="center">
+  A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, DAL nodes).
+</p>
+
+<p align="center">
+  <img src="assets/octez-manager.gif" alt="Octez Manager UI">
+</p>
 
 > **Warning**  
 > Octez Manager is in active development. Use at your own risk, especially on mainnet.
@@ -78,10 +86,15 @@ Run `octez-manager --help` for all commands.
 
 MIT - see [LICENSE](LICENSE).
 
-**Maintainer:** Nomadic Labs (<contact@nomadic-labs.com>)
+---
 
-## License
-
-MIT - see [LICENSE](LICENSE).
-
-**Maintainer:** Nomadic Labs (<contact@nomadic-labs.com>)
+<p align="center">
+  <span>Developed by</span>
+  <a href="https://www.nomadic-labs.com/">
+    <img src="assets/nomadic-labs-logo.png" alt="Nomadic Labs" height="28">
+  </a>
+  <span>&nbsp;·&nbsp;Hosted by&nbsp;</span>
+  <a href="https://trili.tech/">
+    <img src="assets/trilitech-logo.svg" alt="Trilitech" height="20">
+  </a>
+</p>
