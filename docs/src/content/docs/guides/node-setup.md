@@ -24,8 +24,8 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 | Mode | Storage | Use Case |
 |------|---------|----------|
 | **Rolling** | ~50GB | Most users, bakers |
-| **Full** | ~400GB+ | Block explorers, indexers |
-| **Archive** | 3TB+ | Complete history access |
+| **Full** | ~500GB+ | Block explorers, indexers |
+| **Archive** | 4TB+ | Complete history access |
 
 ### Bootstrap Method
 
