@@ -245,7 +245,7 @@ let resolve_dal_config model states =
 let parent_node_field =
   Form_builder.custom
     ~label:"Parent Node"
-    ~get:(fun m -> if m.parent_node = "" then "External" else m.parent_node)
+    ~get:(fun m -> if m.parent_node = "" then "None" else m.parent_node)
     ~edit:(fun model_ref ->
       let states = Form_builder_common.cached_service_states () in
       let nodes = node_services states in
