@@ -125,7 +125,7 @@ let binary_accessible_cache =
   Cache.create_keyed ~name:"binary_accessible" ~ttl:5.0 (fun key ->
       match String.split_on_char '|' key with
       | [user; app_bin_dir; binary_name] ->
-          let role = 
+          let role =
             match binary_name with
             | "octez-node" -> "node"
             | "octez-baker" -> "baker"
