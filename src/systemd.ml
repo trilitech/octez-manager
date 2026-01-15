@@ -345,6 +345,31 @@ let validate_bin_dir ~user ~app_bin_dir ~role =
     | Ok () -> Ok ()
     | Error (`Msg m) -> R.error_msgf "Cannot execute %s: %s" binary m
 
+(** Validate that service user can access a binary by path.
+    This is a convenience wrapper that accepts the full binary path directly
+    instead of deriving it from a role. *)
+let validate_binary_access ~user ~binary_path =
+  if not (Sys.file_exists binary_path) then
+    R.error_msgf "Binary not found: %s" binary_path
+  else if Common.is_root () then
+    match Common.run ["sudo"; "-n"; "-u"; user; "test"; "-x"; binary_path] with
+    | Ok () -> Ok ()
+    | Error _ -> (
+        let cmd = Printf.sprintf "test -x %s" (Common.sh_quote binary_path) in
+        match Common.run ["su"; "-s"; "/bin/sh"; "-c"; cmd; user] with
+        | Ok () -> Ok ()
+        | Error (`Msg m) ->
+            R.error_msgf
+              "User %s cannot execute %s: %s. Adjust permissions or pick a \
+               different service user."
+              user
+              binary_path
+              m)
+  else
+    match Common.run ["test"; "-x"; binary_path] with
+    | Ok () -> Ok ()
+    | Error (`Msg m) -> R.error_msgf "Cannot execute %s: %s" binary_path m
+
 let install_unit ?(quiet = false) ~role ~app_bin_dir ~user () =
   let path = unit_path role in
   let owner, group =
