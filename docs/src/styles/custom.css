@@ -1,33 +1,38 @@
-/* Octez Manager - Tezos-inspired theme */
+/* Octez Manager - Tezos-inspired theme (aligned with Tezlink style) */
 
 :root {
-  /* Tezos blue palette - works for both themes */
-  --sl-color-accent-low: #0a2540;
-  --sl-color-accent: #0D61FF;
-  --sl-color-accent-high: #4d94ff;
-}
-
-/* Dark theme specific */
-:root[data-theme='dark'] {
-  --sl-color-bg: #0f1419;
-  --sl-color-bg-nav: #0a0f14;
-  --sl-color-bg-sidebar: #0a0f14;
-  --sl-color-white: #f0f6fc;
-  --sl-color-gray-1: #c9d1d9;
-  --sl-color-gray-2: #8b949e;
-  --sl-color-bg-inline-code: #161b22;
-}
-
-/* Light theme specific */
-:root[data-theme='light'] {
+  /* Tezos blue palette */
   --sl-color-accent-low: #e6f0ff;
+  --sl-color-accent: #0D61FF;
+  --sl-color-accent-high: #0a4fd6;
+}
+
+/* Light theme (default) */
+:root,
+:root[data-theme='light'] {
   --sl-color-bg: #ffffff;
-  --sl-color-bg-nav: #f6f8fa;
-  --sl-color-bg-sidebar: #f6f8fa;
-  --sl-color-white: #1f2328;
-  --sl-color-gray-1: #424a53;
-  --sl-color-gray-2: #656d76;
-  --sl-color-bg-inline-code: #f0f3f6;
+  --sl-color-bg-nav: #f8f9fa;
+  --sl-color-bg-sidebar: #f8f9fa;
+  --sl-color-white: #1a1a1a;
+  --sl-color-gray-1: #374151;
+  --sl-color-gray-2: #6b7280;
+  --sl-color-gray-3: #9ca3af;
+  --sl-color-gray-5: #e5e7eb;
+  --sl-color-bg-inline-code: #f3f4f6;
+}
+
+/* Dark theme */
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #1e3a5f;
+  --sl-color-bg: #18181b;
+  --sl-color-bg-nav: #1f1f23;
+  --sl-color-bg-sidebar: #1f1f23;
+  --sl-color-white: #fafafa;
+  --sl-color-gray-1: #d4d4d8;
+  --sl-color-gray-2: #a1a1aa;
+  --sl-color-gray-3: #71717a;
+  --sl-color-gray-5: #3f3f46;
+  --sl-color-bg-inline-code: #27272a;
 }
 
 /* Hero section */
@@ -68,9 +73,19 @@ td {
   border-bottom: 1px solid var(--sl-color-gray-5);
 }
 
-/* Cards */
+/* Cards - clean, professional style */
 .card {
   border: 1px solid var(--sl-color-gray-5);
+  background: var(--sl-color-bg);
+}
+
+.card .icon {
+  color: var(--sl-color-accent);
+}
+
+/* CardGrid - consistent spacing */
+.sl-link-card {
+  border-color: var(--sl-color-gray-5);
 }
 
 /* Horizontal rules */
