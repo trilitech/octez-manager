@@ -1696,7 +1696,7 @@ struct
       if Common.is_root () then Widgets.red "● SYSTEM"
       else Widgets.green "● USER"
     in
-    let hint = "Hint: ↑/↓ move · Enter open · Esc back" in
+    let hint = "Hint: ↑/↓ move · Enter open · Tab fold · Esc back" in
     [
       Printf.sprintf
         "%s   %s    %s"
