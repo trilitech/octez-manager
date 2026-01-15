@@ -15,6 +15,8 @@ type t = {
   net_addr : string;
   service_user : string;
   app_bin_dir : string;
+  bin_source : Binary_registry.bin_source option;
+      (** How binaries are referenced. None for legacy configs. *)
   created_at : string;
   logging_mode : Logging_mode.t;
   snapshot_auto : bool;
@@ -36,6 +38,7 @@ val make :
   net_addr:string ->
   service_user:string ->
   app_bin_dir:string ->
+  ?bin_source:Binary_registry.bin_source ->
   logging_mode:Logging_mode.t ->
   ?snapshot_auto:bool ->
   ?snapshot_uri:string option ->
@@ -46,6 +49,9 @@ val make :
   ?dependents:string list ->
   unit ->
   t
+
+(** Get the bin_source, falling back to Raw_path of app_bin_dir for legacy configs *)
+val get_bin_source : t -> Binary_registry.bin_source
 
 val now : unit -> string
 

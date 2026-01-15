@@ -10,6 +10,7 @@
   log_export
   node_env
   systemd
+  binary_registry
   service
   service_registry
   base_dir_registry
