@@ -246,27 +246,40 @@ let parent_node_field =
   Form_builder.custom
     ~label:"Parent Node"
     ~get:(fun m -> if m.parent_node = "" then "None" else m.parent_node)
+    ~validate:(fun m ->
+      (* Same validation logic as accuser: must not be None *)
+      m.parent_node <> "")
+    ~validate_msg:(fun m ->
+      if m.parent_node = "" then
+        Some "Parent Node selection is required"
+      else None)
     ~edit:(fun model_ref ->
       let states = Form_builder_common.cached_service_states () in
       let nodes = node_services states in
-      let items = `External :: List.map (fun n -> `Node n) nodes in
+      let items = (nodes |> List.map (fun n -> `Node n)) @ [`Custom] in
       let to_string = function
-        | `External -> "External/None (use custom endpoint)"
         | `Node n ->
             let svc = n.Data.Service_state.service in
             Printf.sprintf
               "Node · %s (%s)"
               svc.Service.instance
               svc.Service.network
+        | `Custom -> "Custom endpoint (host:port)..."
       in
       let on_select = function
-        | `External ->
-            model_ref :=
-              {
-                !model_ref with
-                parent_node = "";
-                client = {!model_ref.client with node = `None};
-              }
+        | `Custom ->
+            Modal_helpers.prompt_text_modal
+              ~title:"Node Endpoint"
+              ~placeholder:(Some "host:port (e.g., 127.0.0.1:8732)")
+              ~initial:!model_ref.client.node_endpoint
+              ~on_submit:(fun ep ->
+                model_ref :=
+                  {
+                    !model_ref with
+                    parent_node = ep;
+                    client = {!model_ref.client with node_endpoint = ep};
+                  })
+              ()
         | `Node n ->
             let svc = n.Data.Service_state.service in
             let current_name =
