@@ -24,6 +24,12 @@ val get_unit_state :
 val cat_unit :
   role:string -> instance:string -> (string, [`Msg of string]) result
 
+val validate_bin_dir :
+  user:string ->
+  app_bin_dir:string ->
+  role:string ->
+  (unit, [`Msg of string]) result
+
 val install_unit :
   ?quiet:bool ->
   role:string ->

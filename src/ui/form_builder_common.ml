@@ -117,6 +117,38 @@ let has_octez_signer_binary = has_binary "octez-signer"
 (** Check if octez-dal-node binary exists and is executable. *)
 let has_octez_dal_node_binary = has_binary "octez-dal-node"
 
+(** Cache for binary accessibility validation.
+    Checks if service user can execute the binary.
+    Cache key is "user|app_bin_dir|binary_name".
+    TTL is 5s since this involves subprocess calls. *)
+let binary_accessible_cache =
+  Cache.create_keyed ~name:"binary_accessible" ~ttl:5.0 (fun key ->
+      match String.split_on_char '|' key with
+      | [user; app_bin_dir; binary_name] ->
+          let role = 
+            match binary_name with
+            | "octez-node" -> "node"
+            | "octez-baker" -> "baker"
+            | "octez-dal-node" -> "dal-node"
+            | _ -> "node"
+          in
+          Result.is_ok (Systemd.validate_bin_dir ~user ~app_bin_dir ~role)
+      | _ -> false)
+
+(** Validate that the service user can access and execute the binary.
+    This is more comprehensive than just checking if the binary exists -
+    it verifies the service user has permission to execute it.
+    Returns true if accessible, false otherwise.
+    Uses caching to avoid excessive subprocess calls. *)
+let binary_accessible_to_user ~user ~app_bin_dir ~binary_name =
+  if not (Common.is_root ()) then
+    (* In user mode, just check if current user can access *)
+    has_binary binary_name app_bin_dir
+  else
+    (* In root mode, verify service user can access *)
+    let cache_key = Printf.sprintf "%s|%s|%s" user app_bin_dir binary_name in
+    Cache.get_keyed binary_accessible_cache cache_key
+
 let endpoint_with_scheme rpc_addr =
   let trimmed = String.trim rpc_addr in
   if trimmed = "" then "http://127.0.0.1:8732"

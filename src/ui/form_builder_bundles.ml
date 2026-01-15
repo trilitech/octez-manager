@@ -124,19 +124,63 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
   let app_bin_dir_field =
     if skip_app_bin_dir then []
     else
-      [
-        app_bin_dir
+      let app_bin_dir_custom =
+        custom_field
           ~label:"App Bin Dir"
           ~get:(fun m -> (get_core m).app_bin_dir)
           ~set:(fun app_bin_dir m ->
             let core = get_core m in
             set_core {core with app_bin_dir} m)
-          ~validate:(fun m -> binary_validator (get_core m).app_bin_dir)
+          ~validate:(fun m ->
+            let app_bin_dir = (get_core m).app_bin_dir in
+            let user = (get_core m).service_user in
+            (* First check if binary exists *)
+            binary_validator app_bin_dir
+            && (not (Common.is_root ())
+               || not (is_nonempty user)
+               ||
+               (* In root mode with user, verify service user can access *)
+               binary_accessible_to_user ~user ~app_bin_dir ~binary_name:binary))
+          ~validate_msg:(fun m ->
+            let app_bin_dir = (get_core m).app_bin_dir in
+            let user = (get_core m).service_user in
+            if not (binary_validator app_bin_dir) then
+              Some
+                (Printf.sprintf
+                   "Binary '%s' not found in %s or not executable"
+                   binary
+                   app_bin_dir)
+            else if
+              Common.is_root ()
+              && is_nonempty user
+              && not
+                   (binary_accessible_to_user
+                      ~user
+                      ~app_bin_dir
+                      ~binary_name:binary)
+            then
+              Some
+                (Printf.sprintf
+                   "User '%s' cannot access %s in %s. The binary may be in a \
+                    directory with restricted permissions (e.g., a user's home \
+                    directory). Consider copying binaries to /opt or \
+                    /usr/local/bin."
+                   user
+                   binary
+                   app_bin_dir)
+            else None)
+          ~edit:(fun model_ref ->
+            let on_select path =
+              let core = get_core !model_ref in
+              model_ref := set_core {core with app_bin_dir = path} !model_ref
+            in
+            Modal_helpers.select_app_bin_dir_modal ~on_select ())
           ()
         |> with_hint
-             "Directory containing octez binaries. Must include the required \
-              executable.";
-      ]
+             "Directory containing octez binaries. Must be accessible to the \
+              service user."
+      in
+      [app_bin_dir_custom]
   in
   let extra_args_field =
     if skip_extra_args then []

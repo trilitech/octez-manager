@@ -166,6 +166,10 @@ let client_base_dir ~label ~get ~set ?(validate = fun _ -> true) () =
   in
   Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
+let custom_field ~label ~get ~set ~validate ~validate_msg ~edit () =
+  let to_string v = v in
+  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
+
 let app_bin_dir ~label ~get ~set ?(validate = fun _ -> true) () =
   let to_string v = v in
   let validate_msg _ = None in

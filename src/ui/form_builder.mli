@@ -167,6 +167,18 @@ val client_base_dir :
   unit ->
   'model field
 
+(** [custom_field] creates a field with full control over validation and editing behavior.
+    Use for complex fields that need custom validation messages and edit dialogs. *)
+val custom_field :
+  label:string ->
+  get:('model -> string) ->
+  set:(string -> 'model -> 'model) ->
+  validate:('model -> bool) ->
+  validate_msg:('model -> string option) ->
+  edit:('model ref -> unit) ->
+  unit ->
+  'model field
+
 (** Application binary directory selector. *)
 val app_bin_dir :
   label:string ->
