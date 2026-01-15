@@ -547,18 +547,22 @@ let spec =
               ~items:["pass"; "on"; "off"]
               ~to_string:(fun x -> x);
           ]
-        (* 6. Addresses and ports: node data dir only *)
-        @ [
-            (if model.edit_mode then
-               readonly ~label:"Node Data Dir" ~get:(fun m ->
-                   let states =
-                     Form_builder_common.cached_service_states_nonblocking ()
-                   in
-                   resolve_node_data_dir m states)
-               |> with_hint
-                    "Node data directory cannot be changed after creation."
-             else node_data_dir_field);
-          ]
+        (* 6. Addresses and ports: node data dir only (when using local node) *)
+        @ (let states = Form_builder_common.cached_service_states_nonblocking () in
+           let is_local_node = Option.is_some (find_node states model.parent_node) in
+           if is_local_node then
+             [
+               (if model.edit_mode then
+                  readonly ~label:"Node Data Dir" ~get:(fun m ->
+                      let states =
+                        Form_builder_common.cached_service_states_nonblocking ()
+                      in
+                      resolve_node_data_dir m states)
+                  |> with_hint
+                       "Node data directory cannot be changed after creation."
+                else node_data_dir_field);
+             ]
+           else [])
         (* 7. Extra args *)
         @ core_service_fields
             ~get_core:(fun m -> m.core)
