@@ -18,3 +18,4 @@ docs/dist/
 docs/node_modules/
 docs/.astro/
 test/integration/cli-tester/octez-manager
+docs/architecture.db
