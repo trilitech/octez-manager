@@ -65,7 +65,7 @@ octez-manager install-node \
 ```bash
 octez-manager install-node \
   --instance my-node \
-  --network mainnet \
+  --network shadownet \
   --snapshot \
   --snapshot-uri https://example.com/snapshot.rolling
 ```
@@ -75,7 +75,7 @@ octez-manager install-node \
 ```bash
 octez-manager install-node \
   --instance my-node \
-  --network mainnet \
+  --network shadownet \
   --data-dir /mnt/fast-ssd/tezos-node
 ```
 
