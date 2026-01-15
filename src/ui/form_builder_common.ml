@@ -119,20 +119,16 @@ let has_octez_dal_node_binary = has_binary "octez-dal-node"
 
 (** Cache for binary accessibility validation.
     Checks if service user can execute the binary.
-    Cache key is "user|app_bin_dir|binary_name".
+    Cache key format: "user|app_bin_dir|binary_name"
+    Note: Uses pipe (|) as separator which is safe since it's not a valid
+    character in Unix usernames or filesystem paths.
     TTL is 5s since this involves subprocess calls. *)
 let binary_accessible_cache =
   Cache.create_keyed ~name:"binary_accessible" ~ttl:5.0 (fun key ->
       match String.split_on_char '|' key with
       | [user; app_bin_dir; binary_name] ->
-          let role =
-            match binary_name with
-            | "octez-node" -> "node"
-            | "octez-baker" -> "baker"
-            | "octez-dal-node" -> "dal-node"
-            | _ -> "node"
-          in
-          Result.is_ok (Systemd.validate_bin_dir ~user ~app_bin_dir ~role)
+          let binary_path = Filename.concat app_bin_dir binary_name in
+          Result.is_ok (Systemd.validate_binary_access ~user ~binary_path)
       | _ -> false)
 
 (** Validate that the service user can access and execute the binary.

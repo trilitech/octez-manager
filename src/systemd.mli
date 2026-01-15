@@ -30,6 +30,11 @@ val validate_bin_dir :
   role:string ->
   (unit, [`Msg of string]) result
 
+(** [validate_binary_access] validates that a service user can execute a binary.
+    This accepts the full binary path directly instead of deriving from role. *)
+val validate_binary_access :
+  user:string -> binary_path:string -> (unit, [`Msg of string]) result
+
 val install_unit :
   ?quiet:bool ->
   role:string ->
