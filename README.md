@@ -28,7 +28,12 @@
 ### Installation
 
 ```sh
-# Clone and build
+curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+```
+
+Or build from source:
+
+```sh
 git clone https://github.com/trilitech/octez-manager.git
 cd octez-manager
 opam install . --deps-only
