@@ -142,6 +142,7 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     net_addr = "0.0.0.0:9732";
     service_user = "octez";
     app_bin_dir = "/opt/octez";
+    bin_source = None;
     created_at = "2024-01-01 00:00:00";
     logging_mode;
     snapshot_auto = false;
@@ -3281,6 +3282,207 @@ let systemd_unit_state_success_result () =
   let state = Systemd.For_tests.parse_unit_state_output output in
   Alcotest.(check (option string)) "result" None state.result
 
+(* Binary registry tests *)
+module Binary_registry = Octez_manager_lib.Binary_registry
+
+let bin_source_testable =
+  Alcotest.testable
+    (fun fmt bs ->
+      Format.pp_print_string fmt (Binary_registry.bin_source_to_string bs))
+    ( = )
+
+let binary_registry_bin_source_to_string () =
+  Alcotest.(check string)
+    "managed"
+    "v24.0 (managed)"
+    (Binary_registry.bin_source_to_string
+       (Binary_registry.Managed_version "24.0")) ;
+  Alcotest.(check string)
+    "linked"
+    "dev-build (linked)"
+    (Binary_registry.bin_source_to_string
+       (Binary_registry.Linked_alias "dev-build")) ;
+  Alcotest.(check string)
+    "raw"
+    "/usr/local/bin"
+    (Binary_registry.bin_source_to_string
+       (Binary_registry.Raw_path "/usr/local/bin"))
+
+let binary_registry_bin_source_roundtrip () =
+  let test_roundtrip bs =
+    let json = Binary_registry.bin_source_to_yojson bs in
+    match Binary_registry.bin_source_of_yojson json with
+    | Ok bs' -> Alcotest.(check bin_source_testable) "roundtrip" bs bs'
+    | Error (`Msg e) -> Alcotest.fail e
+  in
+  test_roundtrip (Binary_registry.Managed_version "24.0") ;
+  test_roundtrip (Binary_registry.Linked_alias "dev-build") ;
+  test_roundtrip (Binary_registry.Raw_path "/usr/local/bin")
+
+let binary_registry_bin_source_legacy () =
+  (* Test backward compatibility: plain string JSON should parse as Raw_path *)
+  let json = `String "/opt/octez" in
+  match Binary_registry.bin_source_of_yojson json with
+  | Ok bs ->
+      Alcotest.(check bin_source_testable)
+        "legacy path"
+        (Binary_registry.Raw_path "/opt/octez")
+        bs
+  | Error (`Msg e) -> Alcotest.fail e
+
+let binary_registry_linked_dirs_crud () =
+  with_fake_xdg (fun _ ->
+      (* Initially empty *)
+      let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
+      Alcotest.(check int) "initial empty" 0 (List.length dirs) ;
+      (* Add a linked directory *)
+      expect_ok (Binary_registry.add_linked_dir ~alias:"test" ~path:"/tmp/test") ;
+      let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
+      Alcotest.(check int) "after add" 1 (List.length dirs) ;
+      let ld = List.hd dirs in
+      Alcotest.(check string) "alias" "test" ld.alias ;
+      Alcotest.(check string) "path" "/tmp/test" ld.path ;
+      (* Find by alias *)
+      let found = expect_ok (Binary_registry.find_linked_dir "test") in
+      Alcotest.(check bool) "found" true (Option.is_some found) ;
+      let not_found =
+        expect_ok (Binary_registry.find_linked_dir "nonexistent")
+      in
+      Alcotest.(check bool) "not found" true (Option.is_none not_found) ;
+      (* Add duplicate should fail *)
+      (match Binary_registry.add_linked_dir ~alias:"test" ~path:"/other" with
+      | Error _ -> ()
+      | Ok () -> Alcotest.fail "duplicate add should fail") ;
+      (* Rename *)
+      expect_ok
+        (Binary_registry.rename_linked_dir
+           ~old_alias:"test"
+           ~new_alias:"renamed") ;
+      let found = expect_ok (Binary_registry.find_linked_dir "renamed") in
+      Alcotest.(check bool) "renamed found" true (Option.is_some found) ;
+      let old = expect_ok (Binary_registry.find_linked_dir "test") in
+      Alcotest.(check bool) "old not found" true (Option.is_none old) ;
+      (* Remove *)
+      expect_ok (Binary_registry.remove_linked_dir "renamed") ;
+      let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
+      Alcotest.(check int) "after remove" 0 (List.length dirs))
+
+let binary_registry_managed_versions () =
+  with_fake_xdg (fun xdg ->
+      (* Initially no versions *)
+      let versions = expect_ok (Binary_registry.list_managed_versions ()) in
+      Alcotest.(check int) "initial empty" 0 (List.length versions) ;
+      (* Create some version directories *)
+      let bin_dir = Filename.concat xdg.data "octez-manager/binaries" in
+      expect_ok (Common.ensure_dir_path ~owner:"" ~group:"" ~mode:0o755 bin_dir) ;
+      Unix.mkdir (Filename.concat bin_dir "v24.0") 0o755 ;
+      Unix.mkdir (Filename.concat bin_dir "v23.1") 0o755 ;
+      (* List should find them, sorted newest first *)
+      let versions = expect_ok (Binary_registry.list_managed_versions ()) in
+      Alcotest.(check int) "count" 2 (List.length versions) ;
+      Alcotest.(check (list string)) "versions" ["24.0"; "23.1"] versions ;
+      (* Existence check *)
+      Alcotest.(check bool)
+        "24.0 exists"
+        true
+        (Binary_registry.managed_version_exists "24.0") ;
+      Alcotest.(check bool)
+        "99.0 not exists"
+        false
+        (Binary_registry.managed_version_exists "99.0"))
+
+let binary_registry_path_resolution () =
+  with_fake_xdg (fun xdg ->
+      (* Create test directories *)
+      let bin_dir = Filename.concat xdg.data "octez-manager/binaries" in
+      expect_ok (Common.ensure_dir_path ~owner:"" ~group:"" ~mode:0o755 bin_dir) ;
+      let v24_dir = Filename.concat bin_dir "v24.0" in
+      Unix.mkdir v24_dir 0o755 ;
+      (* Test managed version resolution *)
+      (match
+         Binary_registry.resolve_bin_source
+           (Binary_registry.Managed_version "24.0")
+       with
+      | Ok path -> Alcotest.(check string) "managed path" v24_dir path
+      | Error (`Msg e) -> Alcotest.fail e) ;
+      (* Test uninstalled managed version *)
+      (match
+         Binary_registry.resolve_bin_source
+           (Binary_registry.Managed_version "99.0")
+       with
+      | Ok _ -> Alcotest.fail "should fail for uninstalled"
+      | Error _ -> ()) ;
+      (* Test linked alias *)
+      expect_ok (Binary_registry.add_linked_dir ~alias:"test" ~path:v24_dir) ;
+      (match
+         Binary_registry.resolve_bin_source
+           (Binary_registry.Linked_alias "test")
+       with
+      | Ok path -> Alcotest.(check string) "linked path" v24_dir path
+      | Error (`Msg e) -> Alcotest.fail e) ;
+      (* Test unknown alias *)
+      (match
+         Binary_registry.resolve_bin_source
+           (Binary_registry.Linked_alias "unknown")
+       with
+      | Ok _ -> Alcotest.fail "should fail for unknown alias"
+      | Error _ -> ()) ;
+      (* Test raw path *)
+      (match
+         Binary_registry.resolve_bin_source (Binary_registry.Raw_path v24_dir)
+       with
+      | Ok path -> Alcotest.(check string) "raw path" v24_dir path
+      | Error (`Msg e) -> Alcotest.fail e) ;
+      (* Test nonexistent raw path *)
+      match
+        Binary_registry.resolve_bin_source
+          (Binary_registry.Raw_path "/nonexistent")
+      with
+      | Ok _ -> Alcotest.fail "should fail for nonexistent path"
+      | Error _ -> ())
+
+let service_bin_source_roundtrip () =
+  let svc = sample_service () in
+  (* Test with None bin_source (legacy) *)
+  let json = Service.to_yojson svc in
+  (match Service.of_yojson json with
+  | Ok svc' ->
+      Alcotest.(check (option bin_source_testable))
+        "none preserved"
+        None
+        svc'.bin_source
+  | Error (`Msg e) -> Alcotest.fail e) ;
+  (* Test with Some bin_source *)
+  let svc_with_bs =
+    {svc with bin_source = Some (Binary_registry.Managed_version "24.0")}
+  in
+  let json = Service.to_yojson svc_with_bs in
+  match Service.of_yojson json with
+  | Ok svc' ->
+      Alcotest.(check (option bin_source_testable))
+        "managed preserved"
+        (Some (Binary_registry.Managed_version "24.0"))
+        svc'.bin_source
+  | Error (`Msg e) -> Alcotest.fail e
+
+let service_get_bin_source () =
+  let svc = sample_service () in
+  (* Legacy service (no bin_source) should return Raw_path *)
+  let bs = Service.get_bin_source svc in
+  Alcotest.(check bin_source_testable)
+    "legacy"
+    (Binary_registry.Raw_path "/opt/octez")
+    bs ;
+  (* Service with bin_source should return it *)
+  let svc_with_bs =
+    {svc with bin_source = Some (Binary_registry.Managed_version "24.0")}
+  in
+  let bs = Service.get_bin_source svc_with_bs in
+  Alcotest.(check bin_source_testable)
+    "with bin_source"
+    (Binary_registry.Managed_version "24.0")
+    bs
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -3803,5 +4005,40 @@ let () =
             "parse success result"
             `Quick
             systemd_unit_state_success_result;
+        ] );
+      ( "binary_registry",
+        [
+          Alcotest.test_case
+            "bin_source to_string"
+            `Quick
+            binary_registry_bin_source_to_string;
+          Alcotest.test_case
+            "bin_source roundtrip"
+            `Quick
+            binary_registry_bin_source_roundtrip;
+          Alcotest.test_case
+            "bin_source legacy"
+            `Quick
+            binary_registry_bin_source_legacy;
+          Alcotest.test_case
+            "linked dirs CRUD"
+            `Quick
+            binary_registry_linked_dirs_crud;
+          Alcotest.test_case
+            "managed versions"
+            `Quick
+            binary_registry_managed_versions;
+          Alcotest.test_case
+            "path resolution"
+            `Quick
+            binary_registry_path_resolution;
+          Alcotest.test_case
+            "service bin_source roundtrip"
+            `Quick
+            service_bin_source_roundtrip;
+          Alcotest.test_case
+            "service get_bin_source"
+            `Quick
+            service_get_bin_source;
         ] );
     ]

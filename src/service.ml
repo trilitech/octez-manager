@@ -15,6 +15,7 @@ type t = {
   net_addr : string;
   service_user : string;
   app_bin_dir : string;
+  bin_source : Binary_registry.bin_source option;
   created_at : string;
   logging_mode : Logging_mode.t;
   snapshot_auto : bool;
@@ -38,10 +39,10 @@ let now () =
     tm.tm_sec
 
 let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
-    ~service_user ~app_bin_dir ~logging_mode ?(snapshot_auto = false)
-    ?(snapshot_uri = None) ?(snapshot_network_slug = None)
-    ?(snapshot_no_check = false) ?(extra_args = []) ?(depends_on = None)
-    ?(dependents = []) () =
+    ~service_user ~app_bin_dir ?bin_source ~logging_mode
+    ?(snapshot_auto = false) ?(snapshot_uri = None)
+    ?(snapshot_network_slug = None) ?(snapshot_no_check = false)
+    ?(extra_args = []) ?(depends_on = None) ?(dependents = []) () =
   {
     instance;
     role;
@@ -52,6 +53,7 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     net_addr;
     service_user;
     app_bin_dir;
+    bin_source;
     created_at = now ();
     logging_mode;
     snapshot_auto;
@@ -63,13 +65,18 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     dependents;
   }
 
+let get_bin_source t =
+  match t.bin_source with
+  | Some bs -> bs
+  | None -> Binary_registry.Raw_path t.app_bin_dir
+
 let logging_mode_to_yojson = Logging_mode.to_yojson
 
 let logging_mode_of_yojson json =
   Logging_mode.of_yojson json |> Result.map_error (fun msg -> `Msg msg)
 
 let to_yojson t =
-  `Assoc
+  let base =
     [
       ("instance", `String t.instance);
       ("role", `String t.role);
@@ -94,6 +101,14 @@ let to_yojson t =
         match t.depends_on with Some s -> `String s | None -> `Null );
       ("dependents", `List (List.map (fun s -> `String s) t.dependents));
     ]
+  in
+  (* Add bin_source if present *)
+  let fields =
+    match t.bin_source with
+    | Some bs -> ("bin_source", Binary_registry.bin_source_to_yojson bs) :: base
+    | None -> base
+  in
+  `Assoc fields
 
 let of_yojson json =
   let open Yojson.Safe.Util in
@@ -112,6 +127,14 @@ let of_yojson json =
     let net_addr = json |> member "net_addr" |> to_string in
     let service_user = json |> member "service_user" |> to_string in
     let app_bin_dir = json |> member "app_bin_dir" |> to_string in
+    let bin_source =
+      match json |> member "bin_source" with
+      | `Null -> None
+      | bs_json -> (
+          match Binary_registry.bin_source_of_yojson bs_json with
+          | Ok bs -> Some bs
+          | Error _ -> None (* Fall back to legacy mode on parse error *))
+    in
     let created_at = json |> member "created_at" |> to_string in
     let snapshot_auto =
       match json |> member "snapshot_auto" with `Bool b -> b | _ -> false
@@ -160,6 +183,7 @@ let of_yojson json =
                 net_addr;
                 service_user;
                 app_bin_dir;
+                bin_source;
                 created_at;
                 logging_mode;
                 snapshot_auto;
