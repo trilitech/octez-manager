@@ -91,10 +91,16 @@ MIT - see [LICENSE](LICENSE).
 <p align="center">
   <span>Developed by</span>
   <a href="https://www.nomadic-labs.com/">
-    <img src="assets/nomadic-labs-logo.png" alt="Nomadic Labs" height="28">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/nomadic-labs-logo-white.png">
+      <img src="assets/nomadic-labs-logo.png" alt="Nomadic Labs" height="28">
+    </picture>
   </a>
   <span>&nbsp;·&nbsp;Hosted by&nbsp;</span>
   <a href="https://trili.tech/">
-    <img src="assets/trilitech-logo.svg" alt="Trilitech" height="20">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/trilitech-logo.svg">
+      <img src="assets/trilitech-logo.png" alt="Trilitech" height="20">
+    </picture>
   </a>
 </p>
