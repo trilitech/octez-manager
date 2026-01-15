@@ -103,9 +103,32 @@ code {
   border-radius: 4px;
 }
 
-/* Logo styling */
+/* Header / Title bar - clean, minimal style */
+.page > .header {
+  border-bottom: 1px solid var(--sl-color-gray-5);
+}
+
+/* Site title styling */
+.site-title {
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+.site-title:hover {
+  color: var(--sl-color-accent);
+}
+
 .site-title img {
   height: 2rem;
+}
+
+/* Header right-side icons */
+.header .social-icons a {
+  color: var(--sl-color-gray-2);
+}
+
+.header .social-icons a:hover {
+  color: var(--sl-color-accent);
 }
 
 /* Sidebar - Tezlink-aligned styling */
