@@ -93,6 +93,15 @@ val has_octez_signer_binary : string -> bool
 (** Check if octez-dal-node binary exists and is executable in the given directory. *)
 val has_octez_dal_node_binary : string -> bool
 
+(** [binary_accessible_to_user ~user ~app_bin_dir ~binary_name] validates
+    that [user] can execute [binary_name] in [app_bin_dir].
+    This checks both existence and permission.
+    In root mode, verifies the service user can access the binary.
+    In user mode, checks if current user can access it.
+    Uses caching (5s TTL) to avoid excessive subprocess calls. *)
+val binary_accessible_to_user :
+  user:string -> app_bin_dir:string -> binary_name:string -> bool
+
 (** Add http:// scheme if missing, defaulting to localhost when empty. *)
 val endpoint_with_scheme : string -> string
 
