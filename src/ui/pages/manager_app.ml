@@ -52,7 +52,9 @@ let run ?page ?(log = false) ?logfile () =
     if !quit_requested then raise Exit
     else
       let* current_page = find_page_or_default current_name Instances.name in
-      let result = Miaou_runner_tui.Runner_tui.run current_page in
+      let result =
+        Miaou_runner_tui.Runner_tui.run ~enable_mouse:false current_page
+      in
       match result with
       | `Quit -> raise Exit
       | `SwitchTo "__EXIT__" -> raise Exit
