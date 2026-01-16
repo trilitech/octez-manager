@@ -60,7 +60,8 @@ om install-accuser \
     --node-instance "$NODE_INSTANCE" \
     --extra-arg="-f" \
     --extra-arg="$PASSWORD_FILE" \
-    --extra-arg="--preserved-levels=10" \
+    --extra-arg="--preserved-levels" \
+    --extra-arg="10" \
     --service-user tezos \
     --no-enable 2>&1
 
