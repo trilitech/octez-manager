@@ -92,6 +92,7 @@ jobs:
         run: aws s3 sync dist/ ${{ secrets.AWS_S3_BUCKET_STAGING }} --delete
 
       - name: Invalidate CloudFront cache
+        continue-on-error: true
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING }} \
@@ -137,6 +138,7 @@ jobs:
         run: aws s3 sync dist/ ${{ secrets.AWS_S3_BUCKET }} --delete
 
       - name: Invalidate CloudFront cache
+        continue-on-error: true
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} \
