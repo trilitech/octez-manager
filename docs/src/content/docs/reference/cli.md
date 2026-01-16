@@ -3,7 +3,7 @@ title: CLI Reference
 description: Command reference for scripting and automation
 ---
 
-The CLI is for advanced users who prefer command-line workflows or need to automate deployments with scripts. For interactive use, see [Using the TUI](/octez-manager/guides/tui-guide).
+The CLI is for advanced users who prefer command-line workflows or need to automate deployments with scripts. For interactive use, see [Using the TUI](/guides/tui-guide).
 
 ## Global Options
 
