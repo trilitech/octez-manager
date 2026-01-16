@@ -72,7 +72,6 @@ let register_clickable_region ~row_start ~row_end ~col_start ~col_end
   clickable_regions :=
     {row_start; row_end; col_start; col_end; selection_index}
     :: !clickable_regions
-[@@warning "-32"]
 
 let find_clickable_region ~row ~col =
   List.find_opt
@@ -982,6 +981,39 @@ let table_lines_single state =
   in
   install_row :: "" :: instance_rows
 
+(** Register clickable regions for single-column layout 
+    @param row_offset absolute row in terminal (includes Vsection header) 
+    @param cols terminal width *)
+let register_single_column_regions ~row_offset ~cols state =
+  (* Install button is at row_offset + 0 *)
+  register_clickable_region
+    ~row_start:row_offset
+    ~row_end:(row_offset + 1)
+    ~col_start:0
+    ~col_end:cols
+    ~selection_index:0 ;
+  (* Separator line at row_offset + 1 is not clickable *)
+  (* Services start at row_offset + 2 *)
+  let rec register_services current_row idx services =
+    match services with
+    | [] -> ()
+    | (svc : Service_state.t) :: rest ->
+        let is_folded =
+          StringSet.mem svc.service.Service.instance state.folded
+        in
+        let height = if is_folded then 2 else 6 in
+        (* Skip role headers - they are inserted between services but we can't easily track them here.
+           Instead, we'll be generous with the clickable area to include headers. *)
+        register_clickable_region
+          ~row_start:current_row
+          ~row_end:(current_row + height)
+          ~col_start:0
+          ~col_end:cols
+          ~selection_index:(idx + services_start_idx) ;
+        register_services (current_row + height) (idx + 1) rest
+  in
+  register_services (row_offset + 2) 0 state.services
+
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   let num_columns = calc_num_columns ~cols in
@@ -1014,6 +1046,51 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
       ~columns_content
   in
   install_row :: "" :: instance_rows
+
+(** Register clickable regions for multi-column layout *)
+let register_matrix_regions ~row_offset ~cols ~column_scroll state =
+  let num_columns = calc_num_columns ~cols in
+  let col_width =
+    (cols - ((num_columns - 1) * String.length column_separator)) / num_columns
+  in
+  let sep_width = String.length column_separator in
+  (* Install button spans full width at row_offset + 0 *)
+  register_clickable_region
+    ~row_start:row_offset
+    ~row_end:(row_offset + 1)
+    ~col_start:0
+    ~col_end:cols
+    ~selection_index:0 ;
+  (* Services start at row_offset + 2, register each column *)
+  for col_idx = 0 to num_columns - 1 do
+    let col_start = (col_width + sep_width) * col_idx in
+    let col_end = col_start + col_width in
+    let col_services =
+      services_in_column ~num_columns ~services:state.services col_idx
+    in
+    let scroll_offset = column_scroll.(col_idx) in
+    let rec register_col_services current_row services_indices =
+      match services_indices with
+      | [] -> ()
+      | svc_idx :: rest ->
+          let svc = List.nth state.services svc_idx in
+          let is_folded =
+            StringSet.mem svc.service.Service.instance state.folded
+          in
+          let height = if is_folded then 2 else 6 in
+          (* Only register if visible (not scrolled out) *)
+          let visible_row = current_row - scroll_offset in
+          if visible_row >= 0 then
+            register_clickable_region
+              ~row_start:(row_offset + 2 + visible_row)
+              ~row_end:(row_offset + 2 + visible_row + height)
+              ~col_start
+              ~col_end
+              ~selection_index:(svc_idx + services_start_idx) ;
+          register_col_services (current_row + height) rest
+    in
+    register_col_services 0 col_services
+  done
 
 let table_lines ?(cols = 80) ?(visible_height = 20) state =
   (* Clear visibility markers at start of render pass *)
@@ -1923,9 +2000,21 @@ Press **Enter** to open instance menu.|}
         (* Update visible height for scroll calculations - subtract menu rows *)
         last_visible_height_ref := avail_rows - services_start_idx ;
         let num_columns = calc_num_columns ~cols in
+        (* Calculate absolute row offset for clickable regions:
+           - Vsection adds 2 lines for header
+           - Progress bar adds progress_lines
+           - Table content starts after that *)
+        let vsection_header_lines = 2 in
+        let table_row_offset = vsection_header_lines + progress_lines in
         (* Matrix layout handles its own scrolling per-column *)
-        if num_columns > 1 then
+        if num_columns > 1 then (
           let table = table_lines ~cols ~visible_height:avail_rows s in
+          (* Register clickable regions for multi-column layout *)
+          register_matrix_regions
+            ~row_offset:table_row_offset
+            ~cols
+            ~column_scroll:s.column_scroll
+            s ;
           let body = String.concat "\n" table in
           let body =
             if String.trim progress = "" then body else progress ^ "\n" ^ body
@@ -1933,10 +2022,12 @@ Press **Enter** to open instance menu.|}
           let body = if job_logs = "" then body else body ^ job_logs in
           if String.length toast_lines_str > 0 then
             body ^ "\n" ^ toast_lines_str
-          else body
+          else body)
         else
           (* Single column: use global scrolling *)
           let table = table_lines ~cols ~visible_height:avail_rows s in
+          (* Register clickable regions for single-column layout *)
+          register_single_column_regions ~row_offset:table_row_offset ~cols s ;
           let all_lines =
             List.concat_map (fun s -> String.split_on_char '\n' s) table
           in
