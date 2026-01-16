@@ -1056,6 +1056,8 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
 (** Register clickable regions for multi-column layout *)
 let register_matrix_regions ~row_offset ~cols ~column_scroll state =
   let num_columns = calc_num_columns ~cols in
+  let role_groups = group_by_role state.services in
+  let columns = distribute_to_columns ~num_columns role_groups in
   let col_width =
     (cols - ((num_columns - 1) * String.length column_separator)) / num_columns
   in
@@ -1071,20 +1073,22 @@ let register_matrix_regions ~row_offset ~cols ~column_scroll state =
   for col_idx = 0 to num_columns - 1 do
     let col_start = (col_width + sep_width) * col_idx in
     let col_end = col_start + col_width in
-    let col_services =
-      services_in_column ~num_columns ~services:state.services col_idx
-    in
+    let column_groups = columns.(col_idx) in
+    let items = column_items ~column_groups ~global_services:state.services in
     let scroll_offset = column_scroll.(col_idx) in
-    let rec register_col_services current_row services_indices =
-      match services_indices with
+    (* Iterate through items (headers + instances) and track row positions *)
+    let rec register_items current_row is_first items =
+      match items with
       | [] -> ()
-      | svc_idx :: rest ->
-          let svc = List.nth state.services svc_idx in
+      | Header _ :: rest ->
+          (* Header adds 1 line if first, 2 otherwise (empty + header) *)
+          let header_lines = if is_first then 1 else 2 in
+          register_items (current_row + header_lines) false rest
+      | Instance (idx, svc) :: rest ->
           let is_folded =
             StringSet.mem svc.service.Service.instance state.folded
           in
           let height = if is_folded then 2 else 6 in
-          (* Only register if visible (not scrolled out) *)
           let visible_row = current_row - scroll_offset in
           if visible_row >= 0 then
             register_clickable_region
@@ -1092,10 +1096,10 @@ let register_matrix_regions ~row_offset ~cols ~column_scroll state =
               ~row_end:(row_offset + 2 + visible_row + height)
               ~col_start
               ~col_end
-              ~selection_index:(svc_idx + services_start_idx) ;
-          register_col_services (current_row + height) rest
+              ~selection_index:(idx + services_start_idx) ;
+          register_items (current_row + height) false rest
     in
-    register_col_services 0 col_services
+    register_items 0 true items
   done
 
 let table_lines ?(cols = 80) ?(visible_height = 20) state =
