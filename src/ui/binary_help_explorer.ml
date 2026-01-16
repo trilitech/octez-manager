@@ -160,7 +160,7 @@ let format_tokens rows =
   |> List.filter (fun r -> r.selected)
   |> List.concat_map (fun r ->
       let flag = primary_name r.opt.names in
-      match r.value with None -> [flag] | Some v -> [flag ^ "=" ^ v])
+      match r.value with None -> [flag] | Some v -> [flag; v])
 
 (* Parse initial args string into (flag, value option) pairs.
    Handles formats like: --flag --flag=value --flag value *)

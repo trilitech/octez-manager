@@ -2873,6 +2873,20 @@ let installer_split_baker_extra_args_fallback () =
     "command args after long form"
     ["--some-cmd-opt"]
     command_args2 ;
+  (* Test with = syntax (e.g. --password-filename=test) *)
+  let global_args3, command_args3 =
+    Installer.For_tests.split_baker_extra_args
+      ~app_bin_dir
+      ["--password-filename=test"; "--keep-alive"]
+  in
+  Alcotest.(check (list string))
+    "equals syntax global arg"
+    ["--password-filename=test"]
+    global_args3 ;
+  Alcotest.(check (list string))
+    "command args after equals syntax"
+    ["--keep-alive"]
+    command_args3 ;
   (* Test empty args *)
   let g_empty, c_empty =
     Installer.For_tests.split_baker_extra_args ~app_bin_dir []
