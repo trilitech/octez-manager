@@ -52,6 +52,35 @@ let menu_item_count = 1
 (** Index where services start (after menu items + separator line) *)
 let services_start_idx = menu_item_count + 1
 
+(** Clickable region for mouse support *)
+type clickable_region = {
+  row_start : int; (* absolute row in terminal (0-based) *)
+  row_end : int; (* exclusive *)
+  col_start : int; (* absolute column in terminal (0-based) *)
+  col_end : int; (* exclusive *)
+  selection_index : int;
+      (* which item to select (0 for Install, services_start_idx+ for services) *)
+}
+
+(** Global registry of clickable regions, populated during each render *)
+let clickable_regions : clickable_region list ref = ref []
+
+let clear_clickable_regions () = clickable_regions := []
+
+let register_clickable_region ~row_start ~row_end ~col_start ~col_end
+    ~selection_index =
+  clickable_regions :=
+    {row_start; row_end; col_start; col_end; selection_index}
+    :: !clickable_regions
+[@@warning "-32"]
+
+let find_clickable_region ~row ~col =
+  List.find_opt
+    (fun r ->
+      row >= r.row_start && row < r.row_end && col >= r.col_start
+      && col < r.col_end)
+    !clickable_regions
+
 type state = {
   services : Service_state.t list;
   selected : int;
@@ -1809,6 +1838,8 @@ Press **Enter** to open instance menu.|}
 
   let view ps ~focus:_ ~size =
     let s = ps.Navigation.s in
+    (* Clear clickable regions from previous render *)
+    clear_clickable_regions () ;
     (* Set contextual help hint based on selection *)
     (match current_service s with
     | Some st when st.service.Service.role = "node" ->
@@ -2174,6 +2205,41 @@ Press **Enter** to open instance menu.|}
           selected = target_idx + services_start_idx;
         }
 
+  (** Parse mouse click from key string "Mouse:row:col" *)
+  let parse_mouse_click key =
+    match String.split_on_char ':' key with
+    | ["Mouse"; row_str; col_str] -> (
+        match (int_of_string_opt row_str, int_of_string_opt col_str) with
+        | Some row, Some col -> Some (row, col)
+        | _ -> None)
+    | _ -> None
+
+  (** Handle mouse click using the clickable regions registry *)
+  let handle_mouse_click s ~row ~col =
+    match find_clickable_region ~row ~col with
+    | Some region ->
+        (* Found a clickable region *)
+        if s.selected = region.selection_index then
+          (* Clicking already-selected item activates it *)
+          activate_selection s
+        else
+          (* Select the clicked item *)
+          let new_selected = region.selection_index in
+          (* Update active column if in multi-column mode *)
+          if s.num_columns > 1 && new_selected >= services_start_idx then
+            let svc_idx = new_selected - services_start_idx in
+            let col =
+              column_for_service
+                ~num_columns:s.num_columns
+                ~services:s.services
+                svc_idx
+            in
+            {s with selected = new_selected; active_column = col}
+          else {s with selected = new_selected}
+    | None ->
+        (* Click outside any registered region - ignore *)
+        s
+
   let handle_key ps key ~size =
     let s = ps.Navigation.s in
     (* Update num_columns based on current terminal size *)
@@ -2186,31 +2252,39 @@ Press **Enter** to open instance menu.|}
       check_navigation ps)
     else if is_quit_key key then back ps
     else
+      (* Check for mouse click first *)
       let ps =
-        match Keys.of_string key with
-        | Some Keys.Up -> Navigation.update (fun s -> move_selection s (-1)) ps
-        | Some Keys.Down -> Navigation.update (fun s -> move_selection s 1) ps
-        | Some (Keys.Char "k") ->
-            Navigation.update (fun s -> move_selection s (-1)) ps
-        | Some (Keys.Char "j") ->
-            Navigation.update (fun s -> move_selection s 1) ps
-        | Some Keys.Left -> Navigation.update (fun s -> move_column s (-1)) ps
-        | Some Keys.Right -> Navigation.update (fun s -> move_column s 1) ps
-        | Some (Keys.Char "h") ->
-            Navigation.update (fun s -> move_column s (-1)) ps
-        | Some (Keys.Char "l") ->
-            Navigation.update (fun s -> move_column s 1) ps
-        | Some Keys.Tab -> Navigation.update toggle_fold ps
-        | Some Keys.Enter -> Navigation.update activate_selection ps
-        | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
-        | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
-        | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
-        | Some (Keys.Char "Esc")
-        | Some (Keys.Char "Escape")
-        | Some (Keys.Char "q")
-        | Some (Keys.Char "C-c") ->
-            back ps
-        | _ -> ps
+        match parse_mouse_click key with
+        | Some (row, col) ->
+            Navigation.update (fun s -> handle_mouse_click s ~row ~col) ps
+        | None -> (
+            match Keys.of_string key with
+            | Some Keys.Up ->
+                Navigation.update (fun s -> move_selection s (-1)) ps
+            | Some Keys.Down ->
+                Navigation.update (fun s -> move_selection s 1) ps
+            | Some (Keys.Char "k") ->
+                Navigation.update (fun s -> move_selection s (-1)) ps
+            | Some (Keys.Char "j") ->
+                Navigation.update (fun s -> move_selection s 1) ps
+            | Some Keys.Left ->
+                Navigation.update (fun s -> move_column s (-1)) ps
+            | Some Keys.Right -> Navigation.update (fun s -> move_column s 1) ps
+            | Some (Keys.Char "h") ->
+                Navigation.update (fun s -> move_column s (-1)) ps
+            | Some (Keys.Char "l") ->
+                Navigation.update (fun s -> move_column s 1) ps
+            | Some Keys.Tab -> Navigation.update toggle_fold ps
+            | Some Keys.Enter -> Navigation.update activate_selection ps
+            | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
+            | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
+            | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
+            | Some (Keys.Char "Esc")
+            | Some (Keys.Char "Escape")
+            | Some (Keys.Char "q")
+            | Some (Keys.Char "C-c") ->
+                back ps
+            | _ -> ps)
       in
       (* Keep active_column in sync with selection *)
       let ps =
