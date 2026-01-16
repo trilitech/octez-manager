@@ -114,7 +114,6 @@ jobs:
     needs: [changes, build-and-test]
     if: needs.changes.outputs.needs-integration == 'true'
     timeout-minutes: 20
-    continue-on-error: ${{ matrix.category == 'baker' }}
     strategy:
       fail-fast: false
       matrix:
