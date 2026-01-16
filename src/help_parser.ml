@@ -433,3 +433,88 @@ let parse_cmdliner_commands output =
             loop acc (Some {cmd with doc}) rest)
   in
   loop [] None cmd_lines
+
+(* Baker/accuser global options parsing.
+   The octez-baker --help output has a section:
+   "Global options (must come before the command):"
+   followed by option lines like:
+   "  -f --password-filename <filename>: path to the password filename"
+*)
+
+let is_baker_global_section_header line =
+  let trimmed = String.trim line in
+  (* Only match lines that START with "Global options" - not usage lines that
+     happen to contain "[global options]" *)
+  String.length trimmed > 0
+  &&
+  let lower = String.lowercase_ascii trimmed in
+  let prefix = "global options" in
+  String.length lower >= String.length prefix
+  && String.sub lower 0 (String.length prefix) = prefix
+
+let extract_baker_global_section lines =
+  let rec find = function
+    | [] -> []
+    | line :: rest ->
+        if is_baker_global_section_header line then collect [] rest
+        else find rest
+  and collect acc = function
+    | [] -> List.rev acc
+    | line :: _ when String.trim line = "" && acc <> [] ->
+        (* Stop at first blank line after collecting some options *)
+        List.rev acc
+    | line :: rest ->
+        let trimmed = String.trim line in
+        if trimmed = "" then collect acc rest
+        else if
+          (* Stop if we hit a new section (e.g. "Commands related to...") *)
+          String.length trimmed > 0
+          && trimmed.[0] <> '-'
+          && contains ~needle:":" trimmed
+          && not (contains ~needle:"--" trimmed)
+        then List.rev acc
+        else collect (line :: acc) rest
+  in
+  find lines
+
+let parse_baker_global_options output =
+  let lines = String.split_on_char '\n' output in
+  let global_lines = extract_baker_global_section lines in
+  let section_text = String.concat "\n" global_lines in
+  parse_help_with
+    ~is_option_line:is_option_line_baker
+    ~split_spec_doc:split_spec_doc_baker
+    ~parse_spec
+    section_text
+
+let extract_baker_global_option_names output =
+  let options = parse_baker_global_options output in
+  List.concat_map (fun opt -> opt.names) options
+
+(** Classify an argument as global or command based on known global option names.
+    Returns `Global if the arg starts with a known global option, `Command otherwise. *)
+let classify_arg ~global_options arg =
+  let starts_with_opt opt =
+    let len = String.length opt in
+    String.length arg >= len && String.sub arg 0 len = opt
+  in
+  if List.exists starts_with_opt global_options then `Global else `Command
+
+(** Split a list of extra args into (global_args, command_args).
+    Global args are those that match known global option names.
+    Handles option values: if a global option is followed by a non-option value,
+    that value is also considered global. *)
+let split_extra_args ~global_options args =
+  let rec loop globals commands = function
+    | [] -> (List.rev globals, List.rev commands)
+    | arg :: rest -> (
+        match classify_arg ~global_options arg with
+        | `Global -> (
+            (* Check if next arg is the option's value (doesn't start with -) *)
+            match rest with
+            | value :: rest' when String.length value > 0 && value.[0] <> '-' ->
+                loop (value :: arg :: globals) commands rest'
+            | _ -> loop (arg :: globals) commands rest)
+        | `Command -> loop globals (arg :: commands) rest)
+  in
+  loop [] [] args

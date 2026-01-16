@@ -35,6 +35,16 @@ let string_contains ~needle haystack =
   in
   if nlen = 0 then true else loop 0
 
+let string_index_opt ~needle haystack =
+  let nlen = String.length needle in
+  let hlen = String.length haystack in
+  let rec loop idx =
+    if idx + nlen > hlen then None
+    else if String.sub haystack idx nlen = needle then Some idx
+    else loop (idx + 1)
+  in
+  if nlen = 0 then Some 0 else loop 0
+
 type fake_xdg = {config : string; data : string}
 
 let with_env overrides f =
@@ -2635,6 +2645,134 @@ let systemd_baker_exec_line_dal_config () =
     true
     (string_contains ~needle:"= \"disabled\"" exec)
 
+let systemd_baker_exec_line_global_args () =
+  let exec = Systemd.For_tests.exec_line "baker" in
+  (* Global args should appear before the subcommand *)
+  Alcotest.(check bool)
+    "references OCTEZ_BAKER_GLOBAL_ARGS env var"
+    true
+    (string_contains ~needle:"OCTEZ_BAKER_GLOBAL_ARGS" exec) ;
+  Alcotest.(check bool)
+    "references OCTEZ_BAKER_COMMAND_ARGS env var"
+    true
+    (string_contains ~needle:"OCTEZ_BAKER_COMMAND_ARGS" exec) ;
+  (* Verify global args come before the subcommand by checking order *)
+  let global_pos =
+    match string_index_opt ~needle:"OCTEZ_BAKER_GLOBAL_ARGS" exec with
+    | Some p -> p
+    | None -> -1
+  in
+  let run_pos =
+    match string_index_opt ~needle:"run with local node" exec with
+    | Some p -> p
+    | None -> 9999
+  in
+  Alcotest.(check bool)
+    "global args appear before 'run with local node'"
+    true
+    (global_pos < run_pos && global_pos >= 0)
+
+let systemd_accuser_exec_line_global_args () =
+  let exec = Systemd.For_tests.exec_line "accuser" in
+  (* Global args should appear before 'run accuser' *)
+  Alcotest.(check bool)
+    "references OCTEZ_BAKER_GLOBAL_ARGS env var"
+    true
+    (string_contains ~needle:"OCTEZ_BAKER_GLOBAL_ARGS" exec) ;
+  Alcotest.(check bool)
+    "references OCTEZ_BAKER_COMMAND_ARGS env var"
+    true
+    (string_contains ~needle:"OCTEZ_BAKER_COMMAND_ARGS" exec) ;
+  (* Verify global args come before 'run accuser' *)
+  let global_pos =
+    match string_index_opt ~needle:"OCTEZ_BAKER_GLOBAL_ARGS" exec with
+    | Some p -> p
+    | None -> -1
+  in
+  let run_pos =
+    match string_index_opt ~needle:"run accuser" exec with
+    | Some p -> p
+    | None -> 9999
+  in
+  Alcotest.(check bool)
+    "global args appear before 'run accuser'"
+    true
+    (global_pos < run_pos && global_pos >= 0)
+
+let help_parser_extract_global_options () =
+  let sample_help =
+    {|Usage:
+  octez-baker [global options] command [command options]
+
+Global options (must come before the command):
+  -d --base-dir <path>: client data directory
+  -f --password-filename <filename>: path to the password filename
+  -E --endpoint <uri>: HTTP(S) endpoint of the node
+
+Commands related to the baker daemon:
+  run with local node <path>
+|}
+  in
+  let global_opts = Help_parser.extract_baker_global_option_names sample_help in
+  Alcotest.(check bool) "extracts -d" true (List.mem "-d" global_opts) ;
+  Alcotest.(check bool)
+    "extracts --base-dir"
+    true
+    (List.mem "--base-dir" global_opts) ;
+  Alcotest.(check bool) "extracts -f" true (List.mem "-f" global_opts) ;
+  Alcotest.(check bool)
+    "extracts --password-filename"
+    true
+    (List.mem "--password-filename" global_opts) ;
+  Alcotest.(check bool) "extracts -E" true (List.mem "-E" global_opts) ;
+  Alcotest.(check bool)
+    "extracts --endpoint"
+    true
+    (List.mem "--endpoint" global_opts)
+
+let help_parser_split_extra_args () =
+  let global_options = ["-f"; "--password-filename"; "-d"; "--base-dir"] in
+  (* Test: global option with value *)
+  let g1, c1 =
+    Help_parser.split_extra_args
+      ~global_options
+      ["-f"; "/path/to/password"; "--some-opt"; "value"]
+  in
+  Alcotest.(check (list string))
+    "global args with value"
+    ["-f"; "/path/to/password"]
+    g1 ;
+  Alcotest.(check (list string))
+    "command args after global"
+    ["--some-opt"; "value"]
+    c1 ;
+  (* Test: only command args *)
+  let g2, c2 =
+    Help_parser.split_extra_args
+      ~global_options
+      ["--liquidity-baking-toggle-vote"; "pass"]
+  in
+  Alcotest.(check (list string)) "no global args" [] g2 ;
+  Alcotest.(check (list string))
+    "all command args"
+    ["--liquidity-baking-toggle-vote"; "pass"]
+    c2 ;
+  (* Test: mixed args *)
+  let g3, c3 =
+    Help_parser.split_extra_args
+      ~global_options
+      ["--base-dir"; "/custom/dir"; "--keep-alive"; "-f"; "/pw"]
+  in
+  Alcotest.(check (list string))
+    "multiple global args"
+    ["--base-dir"; "/custom/dir"; "-f"; "/pw"]
+    g3 ;
+  Alcotest.(check (list string)) "remaining command args" ["--keep-alive"] c3 ;
+  (* Test: empty args *)
+  let g4, c4 = Help_parser.split_extra_args ~global_options [] in
+  Alcotest.(check (list string)) "empty global" [] g4 ;
+  Alcotest.(check (list string)) "empty command" [] c4
+
 let system_user_validate_missing () =
   match
     System_user.validate_user_for_service ~user:"__missing_octez_user__"
@@ -3589,6 +3727,17 @@ let () =
         [
           Alcotest.test_case "parse_initial_args" `Quick parse_initial_args_tests;
         ] );
+      ( "help_parser",
+        [
+          Alcotest.test_case
+            "extract global options"
+            `Quick
+            help_parser_extract_global_options;
+          Alcotest.test_case
+            "split extra args"
+            `Quick
+            help_parser_split_extra_args;
+        ] );
       ( "snapshots.basic",
         [
           Alcotest.test_case "slug_of_network" `Quick snapshots_slug_of_network;
@@ -3881,6 +4030,14 @@ let () =
             "baker exec line dal config"
             `Quick
             systemd_baker_exec_line_dal_config;
+          Alcotest.test_case
+            "baker exec line global args"
+            `Quick
+            systemd_baker_exec_line_global_args;
+          Alcotest.test_case
+            "accuser exec line global args"
+            `Quick
+            systemd_accuser_exec_line_global_args;
         ] );
       ( "system_user",
         [
