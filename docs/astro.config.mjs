@@ -4,8 +4,8 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://trilitech.github.io',
-	base: '/octez-manager',
+	site: 'https://octez-manager.tezos.com',
+	base: '/',
 	integrations: [
 		starlight({
 			title: 'Octez Manager',
