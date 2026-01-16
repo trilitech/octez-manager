@@ -36,7 +36,7 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 
 ## Installation via TUI
 
-![Install Node](/octez-manager/gifs/install_node.gif)
+![Install Node](/gifs/install_node.gif)
 
 1. Launch `octez-manager`
 2. Select **[ Install new instance ]** → **Node**

@@ -105,5 +105,5 @@ sudo octez-manager
 
 ## Next Steps
 
-- [Quick Start Guide](/octez-manager/getting-started/quick-start)
-- [Setting Up a Node](/octez-manager/guides/node-setup)
+- [Quick Start Guide](/getting-started/quick-start)
+- [Setting Up a Node](/guides/node-setup)

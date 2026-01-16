@@ -37,7 +37,7 @@ The TUI provides access to all Octez Manager features:
 
 From the main screen, select **[ Install new instance ]** and choose **Node**.
 
-![Install Node](/octez-manager/gifs/install_node.gif)
+![Install Node](/gifs/install_node.gif)
 
 The installation wizard guides you through:
 
@@ -69,7 +69,7 @@ Select any instance with arrow keys and press `Enter` to see details, or use the
 
 After your node is synced, you can add a baker. Select **[ Install new instance ]** → **Baker**.
 
-![Install Baker](/octez-manager/gifs/install_baker.gif)
+![Install Baker](/gifs/install_baker.gif)
 
 The wizard will:
 1. Ask which node to connect to (select your Shadownet node)
@@ -81,7 +81,7 @@ The wizard will:
 
 Need to change delegates or other settings? Select the instance and press `e` to edit.
 
-![Edit Baker](/octez-manager/gifs/edit_baker.gif)
+![Edit Baker](/gifs/edit_baker.gif)
 
 Changes take effect after saving. The TUI will restart the service if needed.
 
@@ -126,7 +126,7 @@ Here's a typical workflow for a complete Shadownet baking setup:
 5. **Install an accuser** (recommended)
    - Monitors for double-baking
 
-![Install Accuser](/octez-manager/gifs/install_accuser.gif)
+![Install Accuser](/gifs/install_accuser.gif)
 
 ## Tips
 

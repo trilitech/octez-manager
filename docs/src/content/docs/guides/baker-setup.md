@@ -37,7 +37,7 @@ See the [Octez documentation](https://octez.tezos.com/docs/introduction/howtorun
 
 ## Installation via TUI
 
-![Install Baker](/octez-manager/gifs/install_baker.gif)
+![Install Baker](/gifs/install_baker.gif)
 
 1. Launch `octez-manager`
 2. Select **[ Install new instance ]** → **Baker**
