@@ -2730,6 +2730,74 @@ Commands related to the baker daemon:
     true
     (List.mem "--endpoint" global_opts)
 
+(* Test with real octez-baker --help output format (more verbose) *)
+let help_parser_extract_global_options_real_format () =
+  let real_help =
+    {|Usage:
+  octez-baker [global options] command [command options]
+  octez-baker --help (for global options)
+  octez-baker [global options] command --help (for command options)
+  octez-baker --version (for version information)
+
+To browse the documentation:
+  octez-baker [global options] man (for a list of commands)
+  octez-baker [global options] man -v 3 (for the full manual)
+
+Global options (must come before the command):
+  -d --base-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+  -n --no-base-dir-warnings: silence warnings about client data directory
+  -c --config-file <path>: configuration file
+  -t --timings: show RPC request times
+  --chain <hash|tag>: chain on which to apply contextual commands (commands dependent on the
+    context associated with the specified chain). Possible tags are 'main' and 'test'.
+  -b --block <hash|level|tag>: block on which to apply contextual commands (commands dependent
+    on the context associated with the specified block). Possible tags include 'head' and
+    'genesis' +/- an optional offset (e.g. "octez-client -b head-1 get timestamp"). Note that
+    block queried must exist in node's storage.
+  -w --wait <none|<int>>: how many confirmation blocks are needed before an operation is
+    considered included
+  -p --protocol <hash>: use commands of a specific protocol
+  -l --log-requests: log all requests to the node
+  --better-errors: Error reporting is more detailed. Can be used if a call to an RPC fails or
+    if you don't know the input accepted by the RPC. It may happen that the RPC calls take
+    more time however.
+  -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address of the node
+  -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the node
+  -S --tls: [DEPRECATED: use --endpoint instead] use TLS to connect to node.
+  -m --media-type <json, binary, any or default>: Sets the "media-type" value for the "accept"
+    header for RPC requests to the node. The media accept header indicates to the node which
+    format of data serialisation is supported. Use the value "json" for serialisation to the
+    JSON format.
+  -E --endpoint <uri>: HTTP(S) endpoint of the node RPC interface; e.g.
+    'http://localhost:8732'
+  -s --sources <path>: path to JSON file containing sources for --mode light. Example file
+    content: {"min_agreement": 1.0, "uris": ["http://localhost:8732",
+    "https://localhost:8733"]}
+  -R --remote-signer <uri>: URI of the remote signer
+  -f --password-filename <filename>: path to the password filename
+  -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs.
+    Coloring is enabled by default.
+  --allow-fixed-random-seed: Allow the use of a fixed random seed specified with
+    TEZOS_CLIENT_FIXED_RANDOM_SEED for testing purposes. This is insecure and should never be
+    used in production.
+|}
+  in
+  let global_opts = Help_parser.extract_baker_global_option_names real_help in
+  if List.length global_opts = 0 then
+    Alcotest.failf "No global options extracted from real help output" ;
+  Alcotest.(check bool) "extracts -d from real" true (List.mem "-d" global_opts) ;
+  Alcotest.(check bool) "extracts -f from real" true (List.mem "-f" global_opts) ;
+  Alcotest.(check bool)
+    "extracts --password-filename from real"
+    true
+    (List.mem "--password-filename" global_opts) ;
+  Alcotest.(check bool) "extracts -E from real" true (List.mem "-E" global_opts) ;
+  Alcotest.(check bool)
+    "extracts --endpoint from real"
+    true
+    (List.mem "--endpoint" global_opts)
+
 let help_parser_split_extra_args () =
   let global_options = ["-f"; "--password-filename"; "-d"; "--base-dir"] in
   (* Test: global option with value *)
@@ -2772,6 +2840,59 @@ let help_parser_split_extra_args () =
   let g4, c4 = Help_parser.split_extra_args ~global_options [] in
   Alcotest.(check (list string)) "empty global" [] g4 ;
   Alcotest.(check (list string)) "empty command" [] c4
+
+(* Test Installer.split_baker_extra_args with fallback to known options *)
+let installer_split_baker_extra_args_fallback () =
+  (* Use a non-existent binary path to trigger the fallback *)
+  let app_bin_dir = "/nonexistent/path/that/does/not/exist" in
+  (* Test with -f (global) and --keep-alive (command) *)
+  let global_args, command_args =
+    Installer.For_tests.split_baker_extra_args
+      ~app_bin_dir
+      ["-f"; "/tmp/password.txt"; "--keep-alive"]
+  in
+  Alcotest.(check (list string))
+    "global args via fallback"
+    ["-f"; "/tmp/password.txt"]
+    global_args ;
+  Alcotest.(check (list string))
+    "command args via fallback"
+    ["--keep-alive"]
+    command_args ;
+  (* Test with --password-filename (long form) *)
+  let global_args2, command_args2 =
+    Installer.For_tests.split_baker_extra_args
+      ~app_bin_dir
+      ["--password-filename"; "/pw"; "--some-cmd-opt"]
+  in
+  Alcotest.(check (list string))
+    "long form global arg"
+    ["--password-filename"; "/pw"]
+    global_args2 ;
+  Alcotest.(check (list string))
+    "command args after long form"
+    ["--some-cmd-opt"]
+    command_args2 ;
+  (* Test empty args *)
+  let g_empty, c_empty =
+    Installer.For_tests.split_baker_extra_args ~app_bin_dir []
+  in
+  Alcotest.(check (list string)) "empty global" [] g_empty ;
+  Alcotest.(check (list string)) "empty command" [] c_empty
+
+(* Verify known_baker_global_options contains expected options *)
+let installer_known_baker_global_options () =
+  let opts = Installer.For_tests.known_baker_global_options in
+  Alcotest.(check bool) "-f in known options" true (List.mem "-f" opts) ;
+  Alcotest.(check bool)
+    "--password-filename in known options"
+    true
+    (List.mem "--password-filename" opts) ;
+  Alcotest.(check bool) "-d in known options" true (List.mem "-d" opts) ;
+  Alcotest.(check bool)
+    "--base-dir in known options"
+    true
+    (List.mem "--base-dir" opts)
 
 let system_user_validate_missing () =
   match
@@ -3734,9 +3855,24 @@ let () =
             `Quick
             help_parser_extract_global_options;
           Alcotest.test_case
+            "extract global options (real format)"
+            `Quick
+            help_parser_extract_global_options_real_format;
+          Alcotest.test_case
             "split extra args"
             `Quick
             help_parser_split_extra_args;
+        ] );
+      ( "installer.extra_args",
+        [
+          Alcotest.test_case
+            "split with fallback"
+            `Quick
+            installer_split_baker_extra_args_fallback;
+          Alcotest.test_case
+            "known global options"
+            `Quick
+            installer_known_baker_global_options;
         ] );
       ( "snapshots.basic",
         [
