@@ -701,7 +701,6 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
             match Miaou.Core.Keys.of_string key with
             | Some Miaou.Core.Keys.Right -> "Right"
             | Some Miaou.Core.Keys.Left -> "Left"
-            | Some (Miaou.Core.Keys.Char "h") -> "Left"
             | _ -> key
           in
 
