@@ -994,25 +994,31 @@ let register_single_column_regions ~row_offset ~cols state =
     ~selection_index:0 ;
   (* Separator line at row_offset + 1 is not clickable *)
   (* Services start at row_offset + 2 *)
-  let rec register_services current_row idx services =
+  let rec register_services current_row idx prev_role services =
     match services with
     | [] -> ()
     | (svc : Service_state.t) :: rest ->
+        let role = svc.service.Service.role in
+        (* Add space for role header if role changed *)
+        let current_row =
+          if Some role <> prev_role then
+            (* Role header + empty line *)
+            current_row + 2
+          else current_row
+        in
         let is_folded =
           StringSet.mem svc.service.Service.instance state.folded
         in
         let height = if is_folded then 2 else 6 in
-        (* Skip role headers - they are inserted between services but we can't easily track them here.
-           Instead, we'll be generous with the clickable area to include headers. *)
         register_clickable_region
           ~row_start:current_row
           ~row_end:(current_row + height)
           ~col_start:0
           ~col_end:cols
           ~selection_index:(idx + services_start_idx) ;
-        register_services (current_row + height) (idx + 1) rest
+        register_services (current_row + height) (idx + 1) (Some role) rest
   in
-  register_services (row_offset + 2) 0 state.services
+  register_services (row_offset + 2) 0 None state.services
 
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
