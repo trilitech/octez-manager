@@ -134,12 +134,16 @@ let find_linked_dir alias =
   Ok (List.find_opt (fun ld -> ld.alias = alias) dirs)
 
 let add_linked_dir ~alias ~path =
-  let* dirs = load_linked_dirs () in
-  if List.exists (fun ld -> ld.alias = alias) dirs then
-    R.error_msgf "Alias '%s' already exists" alias
+  if not (Sys.file_exists path) then R.error_msgf "Path does not exist: %s" path
+  else if not (Sys.is_directory path) then
+    R.error_msgf "Path is not a directory: %s" path
   else
-    let dirs = {alias; path} :: dirs in
-    save_linked_dirs dirs
+    let* dirs = load_linked_dirs () in
+    if List.exists (fun ld -> ld.alias = alias) dirs then
+      R.error_msgf "Alias '%s' already exists" alias
+    else
+      let dirs = {alias; path} :: dirs in
+      save_linked_dirs dirs
 
 let remove_linked_dir alias =
   let* dirs = load_linked_dirs () in
@@ -166,6 +170,23 @@ let rename_linked_dir ~old_alias ~new_alias =
 
 (* Managed versions *)
 
+(* Compare version strings numerically (e.g., "24.0" > "9.0") *)
+let compare_versions a b =
+  let parse_version v =
+    String.split_on_char '.' v
+    |> List.map (fun s -> try int_of_string s with _ -> 0)
+  in
+  let rec cmp l1 l2 =
+    match (l1, l2) with
+    | [], [] -> 0
+    | [], _ -> -1
+    | _, [] -> 1
+    | h1 :: t1, h2 :: t2 ->
+        let c = compare h1 h2 in
+        if c <> 0 then c else cmp t1 t2
+  in
+  cmp (parse_version a) (parse_version b)
+
 let list_managed_versions () =
   let dir = binaries_dir () in
   if Sys.file_exists dir && Sys.is_directory dir then
@@ -178,7 +199,7 @@ let list_managed_versions () =
             && e.[0] = 'v'
             && Sys.is_directory (Filename.concat dir e))
         |> List.map (fun e -> String.sub e 1 (String.length e - 1))
-        |> List.sort (fun a b -> compare b a)
+        |> List.sort (fun a b -> compare_versions b a)
         (* newest first *)
       in
       Ok versions

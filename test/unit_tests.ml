@@ -3331,17 +3331,20 @@ let binary_registry_bin_source_legacy () =
   | Error (`Msg e) -> Alcotest.fail e
 
 let binary_registry_linked_dirs_crud () =
-  with_fake_xdg (fun _ ->
+  with_fake_xdg (fun xdg ->
+      (* Create a test directory for linking *)
+      let test_dir = Filename.concat xdg.data "test-linked-dir" in
+      Unix.mkdir test_dir 0o755 ;
       (* Initially empty *)
       let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
       Alcotest.(check int) "initial empty" 0 (List.length dirs) ;
       (* Add a linked directory *)
-      expect_ok (Binary_registry.add_linked_dir ~alias:"test" ~path:"/tmp/test") ;
+      expect_ok (Binary_registry.add_linked_dir ~alias:"test" ~path:test_dir) ;
       let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
       Alcotest.(check int) "after add" 1 (List.length dirs) ;
       let ld = List.hd dirs in
       Alcotest.(check string) "alias" "test" ld.alias ;
-      Alcotest.(check string) "path" "/tmp/test" ld.path ;
+      Alcotest.(check string) "path" test_dir ld.path ;
       (* Find by alias *)
       let found = expect_ok (Binary_registry.find_linked_dir "test") in
       Alcotest.(check bool) "found" true (Option.is_some found) ;
@@ -3349,8 +3352,14 @@ let binary_registry_linked_dirs_crud () =
         expect_ok (Binary_registry.find_linked_dir "nonexistent")
       in
       Alcotest.(check bool) "not found" true (Option.is_none not_found) ;
+      (* Add with nonexistent path should fail *)
+      (match
+         Binary_registry.add_linked_dir ~alias:"bad" ~path:"/nonexistent"
+       with
+      | Error _ -> ()
+      | Ok () -> Alcotest.fail "add with nonexistent path should fail") ;
       (* Add duplicate should fail *)
-      (match Binary_registry.add_linked_dir ~alias:"test" ~path:"/other" with
+      (match Binary_registry.add_linked_dir ~alias:"test" ~path:test_dir with
       | Error _ -> ()
       | Ok () -> Alcotest.fail "duplicate add should fail") ;
       (* Rename *)
