@@ -73,7 +73,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
     environment:
       name: staging
-      url: https://staging.octez-manager.tezos.com
+      url: https://next-octez-manager-tezos-com.tzstaging.com
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -92,7 +92,6 @@ jobs:
         run: aws s3 sync dist/ ${{ secrets.AWS_S3_BUCKET_STAGING }} --delete
 
       - name: Invalidate CloudFront cache
-        continue-on-error: true
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING }} \
@@ -107,7 +106,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '📚 Docs preview deployed to staging: https://staging.octez-manager.tezos.com'
+              body: '📚 Docs preview deployed to staging: https://next-octez-manager-tezos-com.tzstaging.com'
             })
 
   deploy-production:
@@ -138,7 +137,6 @@ jobs:
         run: aws s3 sync dist/ ${{ secrets.AWS_S3_BUCKET }} --delete
 
       - name: Invalidate CloudFront cache
-        continue-on-error: true
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} \

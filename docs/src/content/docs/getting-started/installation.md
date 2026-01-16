@@ -11,23 +11,37 @@ description: How to install Octez Manager
   - Debian/Ubuntu packages
   - Building from source
 
-## Pre-built Binary (Recommended)
+## Quick Install (Recommended)
 
-Download the latest binary from GitHub releases:
+Install with a single command:
 
 ```bash
-# Download
-curl -LO https://github.com/trilitech/octez-manager/releases/latest/download/octez-manager-v0.1.0-linux-x86_64
+curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+```
+
+This downloads the latest release and installs it to `/usr/local/bin/`.
+
+Verify the installation:
+
+```bash
+octez-manager --version
+```
+
+## Manual Binary Download
+
+If you prefer to download manually, get the binary from [GitHub Releases](https://github.com/trilitech/octez-manager/releases/latest):
+
+```bash
+# Download (replace vX.Y.Z with the latest version)
+curl -LO https://github.com/trilitech/octez-manager/releases/latest/download/octez-manager-vX.Y.Z-linux-x86_64
 
 # Make executable and move to PATH
-chmod +x octez-manager-v0.1.0-linux-x86_64
-sudo mv octez-manager-v0.1.0-linux-x86_64 /usr/local/bin/octez-manager
+chmod +x octez-manager-v*-linux-x86_64
+sudo mv octez-manager-v*-linux-x86_64 /usr/local/bin/octez-manager
 
 # Verify
 octez-manager --version
 ```
-
-See all releases at [GitHub Releases](https://github.com/trilitech/octez-manager/releases).
 
 ## From Source
 
@@ -105,5 +119,5 @@ sudo octez-manager
 
 ## Next Steps
 
-- [Quick Start Guide](/getting-started/quick-start)
-- [Setting Up a Node](/guides/node-setup)
+- [Using the TUI](/guides/tui-guide/)
+- [Setting Up a Node](/guides/node-setup/)

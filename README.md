@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="https://octez-manager.tezos.com"><strong>Documentation</strong></a>
+</p>
+
+<p align="center">
   <img src="assets/octez-manager.gif" alt="Octez Manager UI">
 </p>
 
@@ -83,7 +87,6 @@ Run `octez-manager --help` for all commands.
 
 ## Documentation
 
-- **[User Guide](https://trilitech.github.io/octez-manager/)** - Installation, tutorials, CLI reference
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Development guidelines
 - **[CHANGELOG.md](./CHANGELOG.md)** - Version history
 
