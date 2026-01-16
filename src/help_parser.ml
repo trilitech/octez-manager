@@ -466,14 +466,29 @@ let extract_baker_global_section lines =
     | line :: rest ->
         let trimmed = String.trim line in
         if trimmed = "" then collect acc rest
-        else if
-          (* Stop if we hit a new section (e.g. "Commands related to...") *)
-          String.length trimmed > 0
-          && trimmed.[0] <> '-'
-          && contains ~needle:":" trimmed
-          && not (contains ~needle:"--" trimmed)
-        then List.rev acc
-        else collect (line :: acc) rest
+        else
+          (* Check if this is a new section header:
+             - Starts at column 0 or with minimal indent (not a continuation line)
+             - Doesn't start with '-'
+             - Contains ':' (like "Commands related to the baker daemon:")
+             - Doesn't contain '--' (option lines have --optname)
+             Continuation lines are heavily indented (4+ spaces) *)
+          let leading_spaces =
+            let len = String.length line in
+            let rec count i =
+              if i < len && line.[i] = ' ' then count (i + 1) else i
+            in
+            count 0
+          in
+          let is_continuation_line = leading_spaces >= 4 in
+          if
+            (not is_continuation_line)
+            && String.length trimmed > 0
+            && trimmed.[0] <> '-'
+            && contains ~needle:":" trimmed
+            && not (contains ~needle:"--" trimmed)
+          then List.rev acc
+          else collect (line :: acc) rest
   in
   find lines
 

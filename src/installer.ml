@@ -1685,4 +1685,8 @@ module For_tests = struct
   let resolve_snapshot_download = resolve_snapshot_download
 
   let history_mode_matches = history_mode_matches
+
+  let known_baker_global_options = known_baker_global_options
+
+  let split_baker_extra_args = split_baker_extra_args
 end

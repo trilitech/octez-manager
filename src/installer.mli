@@ -167,4 +167,9 @@ module For_tests : sig
 
   val history_mode_matches :
     requested:History_mode.t -> snapshot_mode:string -> bool
+
+  val known_baker_global_options : string list
+
+  val split_baker_extra_args :
+    app_bin_dir:string -> string list -> string list * string list
 end
