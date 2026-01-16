@@ -52,6 +52,48 @@ let normalize_optional_string = function
 (* Logging is via journald - no logrotate needed *)
 let logrotate_specs_of (_services : Service.t list) = []
 
+(** Well-known global options for octez-baker/octez-client.
+    These must appear before the subcommand. Used as fallback when dynamic
+    discovery from --help fails. *)
+let known_baker_global_options =
+  [
+    "-d";
+    "--base-dir";
+    "-c";
+    "--config-file";
+    "-f";
+    "--password-filename";
+    "-E";
+    "--endpoint";
+    "-S";
+    "--sources";
+    "-l";
+    "--log-requests";
+    "-M";
+    "--media-type";
+  ]
+
+(** Discover global options from octez-baker --help and split extra args.
+    Returns (global_args, command_args) where global_args must come before
+    the subcommand and command_args come after.
+    Falls back to known_baker_global_options if dynamic discovery fails. *)
+let split_baker_extra_args ~app_bin_dir extra_args =
+  if extra_args = [] then ([], [])
+  else
+    let global_options =
+      let binary = Filename.concat app_bin_dir "octez-baker" in
+      if not (Sys.file_exists binary) then known_baker_global_options
+      else
+        match Common.run_out [binary; "--help"] with
+        | Error _ -> known_baker_global_options
+        | Ok output ->
+            let discovered =
+              Help_parser.extract_baker_global_option_names output
+            in
+            if discovered = [] then known_baker_global_options else discovered
+    in
+    Help_parser.split_extra_args ~global_options extra_args
+
 let is_http_url s =
   let trimmed = String.trim s |> String.lowercase_ascii in
   String.starts_with ~prefix:"http://" trimmed
@@ -986,7 +1028,12 @@ let install_baker ?(quiet = false) (request : baker_request) =
   in
   (* Delegates are positional arguments, not --delegate flags *)
   let delegate_args = String.concat " " request.delegates |> String.trim in
-  let extra_args_str = String.concat " " request.extra_args |> String.trim in
+  (* Split extra args into global (before subcommand) and command (after) *)
+  let global_args, command_args =
+    split_baker_extra_args ~app_bin_dir:request.app_bin_dir request.extra_args
+  in
+  let global_args_str = String.concat " " global_args |> String.trim in
+  let command_args_str = String.concat " " command_args |> String.trim in
   let depends_on =
     match node_mode with
     | Local svc -> Some svc.Service.instance
@@ -1025,7 +1072,8 @@ let install_baker ?(quiet = false) (request : baker_request) =
             ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
             ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
             ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
-            ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
+            ("OCTEZ_BAKER_GLOBAL_ARGS", global_args_str);
+            ("OCTEZ_BAKER_COMMAND_ARGS", command_args_str);
           ];
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;
@@ -1099,7 +1147,12 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
     | Some dir when String.trim dir <> "" -> dir
     | _ -> Common.default_role_dir "accuser" request.instance
   in
-  let extra_args_str = String.concat " " request.extra_args |> String.trim in
+  (* Split extra args into global (before subcommand) and command (after) *)
+  let global_args, command_args =
+    split_baker_extra_args ~app_bin_dir:request.app_bin_dir request.extra_args
+  in
+  let global_args_str = String.concat " " global_args |> String.trim in
+  let command_args_str = String.concat " " command_args |> String.trim in
   let depends_on =
     match node_mode with
     | Local svc -> Some svc.Service.instance
@@ -1128,7 +1181,8 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
               match node_mode with
               | Local svc -> svc.Service.instance
               | Remote _ -> "" );
-            ("OCTEZ_BAKER_EXTRA_ARGS", extra_args_str);
+            ("OCTEZ_BAKER_GLOBAL_ARGS", global_args_str);
+            ("OCTEZ_BAKER_COMMAND_ARGS", command_args_str);
           ];
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;

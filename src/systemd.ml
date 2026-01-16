@@ -145,10 +145,11 @@ let env_file_template user_mode =
 let exec_line role =
   match String.lowercase_ascii role with
   | "baker" ->
-      (* Order: global opts, subcommand, delegates (positional), command opts *)
+      (* Order: binary, global opts, subcommand, delegates (positional), command opts *)
+      (* Global args (like -f for password file) must come before the subcommand *)
       "ExecStart=/bin/sh -lc 'MODE=${OCTEZ_BAKER_NODE_MODE:-local}; \
-       CMD=\"${APP_BIN_DIR}/octez-baker --base-dir \
-       \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
+       CMD=\"${APP_BIN_DIR}/octez-baker ${OCTEZ_BAKER_GLOBAL_ARGS:-} \
+       --base-dir \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
        \\\"${OCTEZ_NODE_ENDPOINT}\\\"\"; if [ \"$MODE\" = \"remote\" ]; then \
        CMD=\"$CMD run remotely\"; else CMD=\"$CMD run with local node \
        \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; CMD=\"$CMD \
@@ -157,15 +158,17 @@ let exec_line role =
        elif [ -n \"$DAL_CFG\" ]; then CMD=\"$CMD --dal-node \
        \\\"$DAL_CFG\\\"\"; fi; CMD=\"$CMD --liquidity-baking-toggle-vote \
        \\\"${OCTEZ_BAKER_LB_VOTE}\\\"\"; exec $CMD \
-       ${OCTEZ_BAKER_EXTRA_ARGS:-}'"
+       ${OCTEZ_BAKER_COMMAND_ARGS:-}'"
   | "node" ->
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \
        --data-dir=\"${OCTEZ_DATA_DIR}\" ${OCTEZ_NODE_ARGS:-}'"
   | "accuser" ->
       (* Accuser is a subcommand of octez-baker: octez-baker [global] run accuser [opts] *)
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" --base-dir \
-       \"${OCTEZ_CLIENT_BASE_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
-       accuser ${OCTEZ_SERVICE_ARGS:-}'"
+      (* Global args (like -f for password file) must come before 'run accuser' *)
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-baker\" \
+       ${OCTEZ_BAKER_GLOBAL_ARGS:-} --base-dir \"${OCTEZ_CLIENT_BASE_DIR}\" \
+       --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run accuser \
+       ${OCTEZ_BAKER_COMMAND_ARGS:-}'"
   | "dal-node" | "dal" ->
       (* DAL node uses octez-dal-node binary directly *)
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-dal-node\" run \
