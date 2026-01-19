@@ -23,7 +23,11 @@ include Instances_layout
 
 let init_state () =
   let services = load_services () in
-  (* Start with all instances folded by default *)
+  let external_services = load_external_services () in
+  Format.eprintf
+    "[DEBUG] Loaded %d external services@."
+    (List.length external_services) ;
+  (* Start with all managed instances folded by default *)
   let all_folded =
     List.fold_left
       (fun acc (st : Service_state.t) ->
@@ -31,13 +35,23 @@ let init_state () =
       StringSet.empty
       services
   in
+  (* Start with all external instances folded by default *)
+  let all_external_folded =
+    List.fold_left
+      (fun acc (ext : External_service.t) ->
+        StringSet.add ext.suggested_instance_name acc)
+      StringSet.empty
+      external_services
+  in
   (* Default to 1 column, will be updated on first render with actual cols *)
   let num_columns = 1 in
   Navigation.make
     {
       services;
+      external_services;
       selected = 0;
       folded = all_folded;
+      external_folded = all_external_folded;
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
@@ -46,10 +60,19 @@ let init_state () =
     }
 
 let force_refresh state =
+  (* Trigger immediate refresh of external services *)
+  External_services_scheduler.refresh () ;
   let services = load_services_fresh () in
-  let selected = clamp_selection services state.selected in
+  let external_services = load_external_services () in
+  let selected = clamp_selection services external_services state.selected in
   let state =
-    {state with services; selected; last_updated = Unix.gettimeofday ()}
+    {
+      state with
+      services;
+      external_services;
+      selected;
+      last_updated = Unix.gettimeofday ();
+    }
   in
   ensure_valid_column state
 
@@ -521,90 +544,206 @@ Press **Enter** to open instance menu.|}
     || lower = "^c" || String.equal key "\003"
 
   let move_selection s delta =
-    if s.services = [] then
-      (* Only Install button (0) when no services - ignore navigation *)
-      {s with selected = 0}
-    else if s.num_columns <= 1 then
+    Format.eprintf
+      "[DEBUG NAV] move_selection: selected=%d delta=%d services=%d \
+       external=%d num_columns=%d@."
+      s.selected
+      delta
+      (List.length s.services)
+      (List.length s.external_services)
+      s.num_columns ;
+
+    if s.services = [] && s.external_services = [] then (
+      (* Only Install button (0) when no services at all - ignore navigation *)
+      Format.eprintf "[DEBUG NAV] No services, staying at 0@." ;
+      {s with selected = 0})
+    else if s.num_columns <= 1 then (
       (* Single column mode: simple linear navigation *)
+      Format.eprintf "[DEBUG NAV] Single column mode@." ;
       let raw = s.selected + delta in
-      let selected = clamp_selection s.services raw in
+      Format.eprintf "[DEBUG NAV] raw=%d@." raw ;
+      let selected = clamp_selection s.services s.external_services raw in
+      Format.eprintf "[DEBUG NAV] after first clamp=%d@." selected ;
       (* Skip separator during navigation *)
       let selected =
-        if selected = menu_item_count then selected + delta else selected
+        if selected = menu_item_count then (
+          Format.eprintf
+            "[DEBUG NAV] Hit separator, skipping: %d + %d@."
+            selected
+            delta ;
+          selected + delta)
+        else selected
       in
-      let selected = clamp_selection s.services selected in
-      {s with selected}
+      Format.eprintf "[DEBUG NAV] after separator skip=%d@." selected ;
+      let selected = clamp_selection s.services s.external_services selected in
+      Format.eprintf "[DEBUG NAV] final selected=%d@." selected ;
+      {s with selected})
     else if
       (* Multi-column mode: navigate within current column *)
       s.selected < services_start_idx
-    then
+    then (
       (* In menu area, simple navigation *)
+      Format.eprintf "[DEBUG NAV] Multi-column: in menu area@." ;
       let selected = max 0 (min menu_item_count (s.selected + delta)) in
       (* Jump from menu to first service in active column *)
-      if selected >= menu_item_count && delta > 0 then
+      if selected >= menu_item_count && delta > 0 then (
+        Format.eprintf "[DEBUG NAV] Jumping from menu to services@." ;
         let first_svc =
           first_service_in_column
             ~num_columns:s.num_columns
             ~services:s.services
             s.active_column
         in
-        {s with selected = first_svc + services_start_idx}
-      else {s with selected}
-    else
+        Format.eprintf
+          "[DEBUG NAV] first_svc=%d, final=%d@."
+          first_svc
+          (first_svc + services_start_idx) ;
+        {s with selected = first_svc + services_start_idx})
+      else (
+        Format.eprintf "[DEBUG NAV] Staying in menu, selected=%d@." selected ;
+        {s with selected}))
+    else (
       (* In services area: stay within column *)
+      Format.eprintf "[DEBUG NAV] Multi-column: in services area@." ;
       let current_idx = s.selected - services_start_idx in
-      let col_indices =
-        services_in_column
-          ~num_columns:s.num_columns
-          ~services:s.services
-          s.active_column
-      in
-      let current_pos =
-        List.find_mapi
-          (fun i idx -> if idx = current_idx then Some i else None)
-          col_indices
-        |> Option.value ~default:0
-      in
-      let new_pos = current_pos + delta in
-      if new_pos < 0 then (
-        (* Moving up from first service goes to Install button *)
-        (* Scroll to top of column *)
-        s.column_scroll.(s.active_column) <- 0 ;
-        {s with selected = 0})
-      else if new_pos >= List.length col_indices then
-        (* At bottom of column, stay put *)
-        s
+      Format.eprintf
+        "[DEBUG NAV] current_idx=%d active_column=%d@."
+        current_idx
+        s.active_column ;
+
+      (* Check if we're in external services area *)
+      let external_start_idx = List.length s.services in
+      let in_external = current_idx >= external_start_idx in
+      Format.eprintf
+        "[DEBUG NAV] external_start_idx=%d in_external=%b@."
+        external_start_idx
+        in_external ;
+
+      if in_external then (
+        (* External services: simple linear navigation (no multi-column support yet) *)
+        Format.eprintf
+          "[DEBUG NAV] In external services, using linear navigation@." ;
+        (* Check if moving up from first external service *)
+        let first_external = services_start_idx + List.length s.services in
+        if s.selected = first_external && delta < 0 then (
+          (* Move to last managed service, or menu if no managed services *)
+          Format.eprintf
+            "[DEBUG NAV] At first external, moving up to managed/menu@." ;
+          if List.length s.services > 0 then (
+            (* Jump to last managed service *)
+            let last_managed =
+              services_start_idx + List.length s.services - 1
+            in
+            Format.eprintf
+              "[DEBUG NAV] Jumping to last managed service: %d@."
+              last_managed ;
+            {s with selected = last_managed})
+          else (
+            (* No managed services, jump to menu *)
+            Format.eprintf "[DEBUG NAV] No managed services, jumping to menu@." ;
+            {s with selected = 0}))
+        else
+          (* Normal external service navigation *)
+          let raw = s.selected + delta in
+          let selected = clamp_selection s.services s.external_services raw in
+          Format.eprintf
+            "[DEBUG NAV] external nav: raw=%d selected=%d@."
+            raw
+            selected ;
+          {s with selected})
       else
-        let new_idx = List.nth col_indices new_pos in
-        (* Adjust scroll to keep selection visible *)
-        let line_start, line_count =
-          service_line_position
+        (* Managed services: column-based navigation *)
+        let col_indices =
+          services_in_column
             ~num_columns:s.num_columns
             ~services:s.services
-            ~folded:s.folded
-            new_idx
             s.active_column
         in
-        adjust_column_scroll
-          ~column_scroll:s.column_scroll
-          ~col:s.active_column
-          ~line_start
-          ~line_count
-          ~visible_height:!last_visible_height_ref ;
-        {s with selected = new_idx + services_start_idx}
+        Format.eprintf
+          "[DEBUG NAV] col_indices=[%s] (length=%d)@."
+          (String.concat "," (List.map string_of_int col_indices))
+          (List.length col_indices) ;
+        let current_pos =
+          List.find_mapi
+            (fun i idx -> if idx = current_idx then Some i else None)
+            col_indices
+          |> Option.value ~default:0
+        in
+        Format.eprintf "[DEBUG NAV] current_pos in column=%d@." current_pos ;
+        let new_pos = current_pos + delta in
+        Format.eprintf "[DEBUG NAV] new_pos=%d@." new_pos ;
+        if new_pos < 0 then (
+          (* Moving up from first service goes to Install button *)
+          (* Scroll to top of column *)
+          Format.eprintf "[DEBUG NAV] Moving up to Install button@." ;
+          s.column_scroll.(s.active_column) <- 0 ;
+          {s with selected = 0})
+        else if new_pos >= List.length col_indices then
+          if
+            (* At bottom of managed services column *)
+            List.length s.external_services > 0
+          then (
+            (* Jump to first external service *)
+            Format.eprintf
+              "[DEBUG NAV] At bottom of managed, jumping to first external@." ;
+            let first_external = services_start_idx + List.length s.services in
+            {s with selected = first_external})
+          else (
+            (* No external services, stay put *)
+            Format.eprintf "[DEBUG NAV] At bottom of column, staying put@." ;
+            s)
+        else
+          let new_idx = List.nth col_indices new_pos in
+          Format.eprintf
+            "[DEBUG NAV] new_idx=%d, final selected=%d@."
+            new_idx
+            (new_idx + services_start_idx) ;
+          (* Adjust scroll to keep selection visible *)
+          let line_start, line_count =
+            service_line_position
+              ~num_columns:s.num_columns
+              ~services:s.services
+              ~folded:s.folded
+              new_idx
+              s.active_column
+          in
+          adjust_column_scroll
+            ~column_scroll:s.column_scroll
+            ~col:s.active_column
+            ~line_start
+            ~line_count
+            ~visible_height:!last_visible_height_ref ;
+          {s with selected = new_idx + services_start_idx})
 
   let force_refresh_cmd s = force_refresh s
 
   let toggle_fold s =
-    match current_service s with
-    | None -> s
-    | Some st ->
-        let inst = st.service.Service.instance in
-        let folded =
-          if StringSet.mem inst s.folded then StringSet.remove inst s.folded
-          else StringSet.add inst s.folded
-        in
-        {s with folded}
+    (* Check if we're on an external service *)
+    let external_start_idx = services_start_idx + List.length s.services in
+    if s.selected >= external_start_idx then
+      (* Toggle external service *)
+      let ext_idx = s.selected - external_start_idx in
+      match List.nth_opt s.external_services ext_idx with
+      | None -> s
+      | Some ext ->
+          let inst = ext.External_service.suggested_instance_name in
+          let external_folded =
+            if StringSet.mem inst s.external_folded then
+              StringSet.remove inst s.external_folded
+            else StringSet.add inst s.external_folded
+          in
+          {s with external_folded}
+    else
+      (* Toggle managed service *)
+      match current_service s with
+      | None -> s (* In menu area, Tab does nothing now *)
+      | Some st ->
+          let inst = st.service.Service.instance in
+          let folded =
+            if StringSet.mem inst s.folded then StringSet.remove inst s.folded
+            else StringSet.add inst s.folded
+          in
+          {s with folded}
 
   (** Move to a different column (for matrix layout) *)
   let move_column s delta =

@@ -28,8 +28,10 @@ val services_start_idx : int
 (** Instances page state *)
 type state = {
   services : Service_state.t list;
+  external_services : Octez_manager_lib.External_service.t list;
   selected : int;
-  folded : StringSet.t;
+  folded : StringSet.t; (* managed instance names that are folded *)
+  external_folded : StringSet.t; (* external instance names that are folded *)
   last_updated : float;
   num_columns : int;
   active_column : int;
@@ -41,7 +43,11 @@ type msg = unit
 type pstate = state Miaou.Core.Navigation.t
 
 (** Clamp selection index to valid range *)
-val clamp_selection : Service_state.t list -> int -> int
+val clamp_selection :
+  Service_state.t list ->
+  Octez_manager_lib.External_service.t list ->
+  int ->
+  int
 
 (** Get currently selected service, if any *)
 val current_service : state -> Service_state.t option

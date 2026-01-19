@@ -37,8 +37,10 @@ let services_start_idx = menu_item_count + 1
 
 type state = {
   services : Service_state.t list;
+  external_services : Octez_manager_lib.External_service.t list;
   selected : int;
-  folded : StringSet.t; (* instance names that are folded *)
+  folded : StringSet.t; (* managed instance names that are folded *)
+  external_folded : StringSet.t; (* external instance names that are folded *)
   last_updated : float;
   (* Matrix layout state *)
   num_columns : int; (* number of columns based on terminal width *)
@@ -50,8 +52,11 @@ type msg = unit
 
 type pstate = state Miaou.Core.Navigation.t
 
-let clamp_selection services idx =
-  let len = List.length services + services_start_idx in
+let clamp_selection services external_services idx =
+  (* Total selectable items: menu + managed services + external services *)
+  let len =
+    services_start_idx + List.length services + List.length external_services
+  in
   max 0 (min idx (len - 1))
 
 let current_service state =
