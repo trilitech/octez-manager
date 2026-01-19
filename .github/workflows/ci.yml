@@ -84,6 +84,11 @@ jobs:
           restore-keys: |
             dune-${{ runner.os }}-
 
+      - name: Check copyright headers
+        run: |
+          echo "Checking copyright headers..."
+          ./scripts/check-copyright.sh
+
       - name: Build
         run: |
           echo '(-ccopt -static)' > static_flags.sexp
