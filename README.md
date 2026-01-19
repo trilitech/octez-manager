@@ -66,7 +66,8 @@ The UI provides installation wizards, service monitoring, log viewing, and snaps
 octez-manager install-node \
   --instance mainnet-node \
   --network mainnet \
-  --snapshot rolling
+  --snapshot \
+  --history-mode rolling
 
 # Install a baker
 octez-manager install-baker \
