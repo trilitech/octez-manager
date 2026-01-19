@@ -607,6 +607,10 @@ let render_external_service ~folded (ext : External_service.t) =
     line1 :: line2 :: detail_lines
 
 let render_external_services_section state =
+  Format.eprintf
+    "[DEBUG RENDER] external_services count: %d, external_folded: %b@."
+    (List.length state.external_services)
+    state.external_folded ;
   if state.external_services = [] then []
   else
     let header_marker = if state.external_folded then "▸" else "▾" in
@@ -619,14 +623,23 @@ let render_external_services_section state =
            (Printf.sprintf "(%d)" (List.length state.external_services)))
     in
 
-    if state.external_folded then [header]
-    else
+    if state.external_folded then (
+      Format.eprintf "[DEBUG RENDER] Returning folded header@." ;
+      [header])
+    else (
+      Format.eprintf
+        "[DEBUG RENDER] Rendering %d services unfolded@."
+        (List.length state.external_services) ;
       let service_lines =
         List.concat_map
           (fun ext -> render_external_service ~folded:false ext)
           state.external_services
       in
-      header :: service_lines
+      let result = header :: service_lines in
+      Format.eprintf
+        "[DEBUG RENDER] Total external lines: %d@."
+        (List.length result) ;
+      result)
 
 (** Single-column layout (original) *)
 let table_lines_single state =
