@@ -104,7 +104,7 @@ let maybe_refresh ps =
 include Instances_render
 
 (* Action handlers extracted to instances/instances_actions.ml *)
-include Instances_actions
+open Instances_actions
 
 module Page_Impl :
   Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg =
