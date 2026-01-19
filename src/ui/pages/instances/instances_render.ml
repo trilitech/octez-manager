@@ -721,7 +721,11 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
       let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
       Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
     in
-    [install_row; ""; "  No managed instances."]
+    let external_rows = render_external_services_section state in
+    let external_rows =
+      if external_rows = [] then [] else "" :: external_rows
+    in
+    install_row :: "" :: "  No managed instances." :: external_rows
   else if num_columns <= 1 then table_lines_single state
   else
     (* For matrix layout, subtract for menu rows (install + separator) *)
