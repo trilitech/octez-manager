@@ -681,7 +681,7 @@ let spec =
                 model.original_instance
             in
             match
-              Installer.stop_service ~quiet:true ~instance:stop_instance ()
+              Lifecycle.stop_service ~quiet:true ~instance:stop_instance ()
             with
             | Ok () -> Ok ()
             | Error (`Msg _) ->

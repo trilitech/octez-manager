@@ -9,24 +9,6 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val start_service :
-  ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
-
-val stop_service :
-  ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
-
-(** Get stopped parent dependencies for an instance.
-    Returns services in order: topmost parent first, so they can be started in sequence. *)
-val get_stopped_dependencies :
-  instance:string -> unit -> (Service.t list, [`Msg of string]) result
-
-(** Get stopped dependents (children) for an instance. *)
-val get_stopped_dependents :
-  instance:string -> unit -> (Service.t list, [`Msg of string]) result
-
-val restart_service :
-  ?quiet:bool -> instance:string -> unit -> (unit, [`Msg of string]) result
-
 val remove_service :
   ?quiet:bool ->
   delete_data_dir:bool ->

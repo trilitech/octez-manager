@@ -62,7 +62,7 @@ let instance_term =
         | Start -> (
             (* Check for stopped dependencies *)
             let dep_check =
-              Installer.get_stopped_dependencies ~instance:inst ()
+              Lifecycle.get_stopped_dependencies ~instance:inst ()
             in
             match dep_check with
             | Error (`Msg e) ->
@@ -71,13 +71,13 @@ let instance_term =
             | Ok [] -> (
                 (* No stopped dependencies, start directly *)
                 let result =
-                  Installer.start_service ~quiet:false ~instance:inst ()
+                  Lifecycle.start_service ~quiet:false ~instance:inst ()
                 in
                 match result with
                 | Ok () -> (
                     (* Check for stopped dependents *)
                     match
-                      Installer.get_stopped_dependents ~instance:inst ()
+                      Lifecycle.get_stopped_dependents ~instance:inst ()
                     with
                     | Ok [] -> `Ok ()
                     | Ok stopped_deps when Cli_helpers.is_interactive () ->
@@ -97,7 +97,7 @@ let instance_term =
                           List.iter
                             (fun dep ->
                               match
-                                Installer.start_service
+                                Lifecycle.start_service
                                   ~quiet:false
                                   ~instance:dep.Service.instance
                                   ()
@@ -136,7 +136,7 @@ let instance_term =
                       (fun dep ->
                         if not !failed then
                           match
-                            Installer.start_service
+                            Lifecycle.start_service
                               ~quiet:false
                               ~instance:dep.Service.instance
                               ()
@@ -157,13 +157,13 @@ let instance_term =
                     else
                       (* Now start the target instance *)
                       let result =
-                        Installer.start_service ~quiet:false ~instance:inst ()
+                        Lifecycle.start_service ~quiet:false ~instance:inst ()
                       in
                       match result with
                       | Ok () -> (
                           (* Check for stopped dependents *)
                           match
-                            Installer.get_stopped_dependents ~instance:inst ()
+                            Lifecycle.get_stopped_dependents ~instance:inst ()
                           with
                           | Ok [] -> `Ok ()
                           | Ok stopped_deps ->
@@ -185,7 +185,7 @@ let instance_term =
                                 List.iter
                                   (fun dep ->
                                     match
-                                      Installer.start_service
+                                      Lifecycle.start_service
                                         ~quiet:false
                                         ~instance:dep.Service.instance
                                         ()
@@ -210,14 +210,14 @@ let instance_term =
                 else
                   (* Non-interactive mode - just fail like before *)
                   Cli_helpers.run_result
-                    (Installer.start_service ~quiet:false ~instance:inst ()))
+                    (Lifecycle.start_service ~quiet:false ~instance:inst ()))
         | Stop ->
             Cli_helpers.run_result
-              (Installer.stop_service ~quiet:false ~instance:inst ())
+              (Lifecycle.stop_service ~quiet:false ~instance:inst ())
         | Restart -> (
             (* Check for stopped dependencies *)
             let dep_check =
-              Installer.get_stopped_dependencies ~instance:inst ()
+              Lifecycle.get_stopped_dependencies ~instance:inst ()
             in
             match dep_check with
             | Error (`Msg e) ->
@@ -226,13 +226,13 @@ let instance_term =
             | Ok [] -> (
                 (* No stopped dependencies, restart directly *)
                 let result =
-                  Installer.restart_service ~quiet:false ~instance:inst ()
+                  Lifecycle.restart_service ~quiet:false ~instance:inst ()
                 in
                 match result with
                 | Ok () -> (
                     (* Check for stopped dependents *)
                     match
-                      Installer.get_stopped_dependents ~instance:inst ()
+                      Lifecycle.get_stopped_dependents ~instance:inst ()
                     with
                     | Ok [] -> `Ok ()
                     | Ok stopped_deps when Cli_helpers.is_interactive () ->
@@ -252,7 +252,7 @@ let instance_term =
                           List.iter
                             (fun dep ->
                               match
-                                Installer.restart_service
+                                Lifecycle.restart_service
                                   ~quiet:false
                                   ~instance:dep.Service.instance
                                   ()
@@ -291,7 +291,7 @@ let instance_term =
                       (fun dep ->
                         if not !failed then
                           match
-                            Installer.start_service
+                            Lifecycle.start_service
                               ~quiet:false
                               ~instance:dep.Service.instance
                               ()
@@ -312,13 +312,13 @@ let instance_term =
                     else
                       (* Now restart the target instance *)
                       let result =
-                        Installer.restart_service ~quiet:false ~instance:inst ()
+                        Lifecycle.restart_service ~quiet:false ~instance:inst ()
                       in
                       match result with
                       | Ok () -> (
                           (* Check for stopped dependents *)
                           match
-                            Installer.get_stopped_dependents ~instance:inst ()
+                            Lifecycle.get_stopped_dependents ~instance:inst ()
                           with
                           | Ok [] -> `Ok ()
                           | Ok stopped_deps ->
@@ -340,7 +340,7 @@ let instance_term =
                                 List.iter
                                   (fun dep ->
                                     match
-                                      Installer.restart_service
+                                      Lifecycle.restart_service
                                         ~quiet:false
                                         ~instance:dep.Service.instance
                                         ()
@@ -365,7 +365,7 @@ let instance_term =
                 else
                   (* Non-interactive mode - just fail like before *)
                   Cli_helpers.run_result
-                    (Installer.restart_service ~quiet:false ~instance:inst ()))
+                    (Lifecycle.restart_service ~quiet:false ~instance:inst ()))
         | Remove -> (
             (* Check for dependents and confirm if any *)
             match Service_registry.find ~instance:inst with
@@ -513,7 +513,7 @@ let instance_term =
                 else (
                   (* Stop the instance (cascade stops dependents) *)
                   (match
-                     Installer.stop_service ~quiet:false ~instance:inst ()
+                     Lifecycle.stop_service ~quiet:false ~instance:inst ()
                    with
                   | Ok () -> ()
                   | Error (`Msg msg) ->
