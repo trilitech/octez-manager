@@ -20,6 +20,7 @@
   help_parser
   keys_reader
   installer
+  helpers
   teztnets
   snapshots
   settings
