@@ -65,15 +65,7 @@ let pp_external_service fmt (ext : External_service.t) =
       let base_dir =
         match cfg.base_dir.value with Some b -> b | None -> "?"
       in
-      let data_dir =
-        match cfg.data_dir.value with Some d -> d | None -> "?"
-      in
-      Format.fprintf
-        fmt
-        "  Node: %-24s Base: %-24s Data: %s@."
-        node_ep
-        base_dir
-        data_dir
+      Format.fprintf fmt "  Node: %-24s Base: %s@." node_ep base_dir
   | Some Accuser ->
       let node_ep =
         match cfg.node_endpoint.value with Some e -> e | None -> "?"
