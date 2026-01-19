@@ -229,10 +229,20 @@ let get_running_command ~unit_name =
   match Common.run_out cmd with
   | Ok output -> (
       let trimmed = String.trim output in
+      Format.eprintf
+        "[DEBUG] %s: MainPID query returned: '%s'@."
+        unit_name
+        trimmed ;
       match int_of_string_opt trimmed with
-      | Some pid when pid > 0 -> read_proc_cmdline pid
-      | _ -> None)
-  | Error _ -> None
+      | Some pid when pid > 0 ->
+          Format.eprintf "[DEBUG] %s: Reading /proc/%d/cmdline@." unit_name pid ;
+          read_proc_cmdline pid
+      | _ ->
+          Format.eprintf "[DEBUG] %s: Invalid PID: %s@." unit_name trimmed ;
+          None)
+  | Error _ ->
+      Format.eprintf "[DEBUG] %s: MainPID query failed@." unit_name ;
+      None
 
 (** {1 Detection Logic} *)
 
@@ -285,15 +295,41 @@ let build_external_service ~unit_name ~exec_start ~properties =
 
   (* Try to get actual running command for active services *)
   let command_to_parse, command_source =
-    if active_state = "active" then
+    if active_state = "active" then (
+      Format.eprintf
+        "[DEBUG] %s: ActiveState=active, trying /proc/PID/cmdline@."
+        unit_name ;
       match get_running_command ~unit_name with
-      | Some running_cmd -> (running_cmd, "/proc/PID/cmdline")
-      | None -> (exec_start, "ExecStart")
-    else (exec_start, "ExecStart")
+      | Some running_cmd ->
+          Format.eprintf
+            "[DEBUG] %s: Got running command: %s@."
+            unit_name
+            (String.sub running_cmd 0 (min 80 (String.length running_cmd))) ;
+          (running_cmd, "/proc/PID/cmdline")
+      | None ->
+          Format.eprintf
+            "[DEBUG] %s: Failed to get running command, using ExecStart@."
+            unit_name ;
+          (exec_start, "ExecStart"))
+    else (
+      Format.eprintf
+        "[DEBUG] %s: ActiveState=%s, using ExecStart@."
+        unit_name
+        active_state ;
+      (exec_start, "ExecStart"))
   in
 
   (* Parse command line *)
+  Format.eprintf
+    "[DEBUG] %s: Parsing command from %s@."
+    unit_name
+    command_source ;
   let parsed = Execstart_parser.parse command_to_parse in
+  Format.eprintf
+    "[DEBUG] %s: Parsed binary_path=%s data_dir=%s@."
+    unit_name
+    (match parsed.binary_path with Some b -> b | None -> "NONE")
+    (match parsed.data_dir with Some d -> d | None -> "NONE") ;
 
   (* Read environment files if parsing found unexpanded variables *)
   let env_vars =
