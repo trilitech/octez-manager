@@ -19,6 +19,7 @@ om install-node \
     --instance "$INSTANCE" \
     --network shadownet \
     --snapshot \
+    --snapshot-no-check \
     --snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
     --rpc-addr "$RPC_ADDR" \
     --net-addr "$NET_ADDR" \
