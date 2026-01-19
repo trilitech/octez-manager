@@ -25,6 +25,7 @@
   config
   node
   dal_node
+  baker
   teztnets
   snapshots
   settings

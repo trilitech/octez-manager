@@ -223,8 +223,8 @@ let install_baker_cmd =
           preserve_data = false;
         }
       in
-      (* Installer.install_baker returns an Rresult-style error; convert it to a string-error Result *)
-      match Installer.install_baker req with
+      (* Baker.install_baker returns an Rresult-style error; convert it to a string-error Result *)
+      match Baker.install_baker req with
       | Ok service ->
           Format.printf "Installed %s (%s)\n" service.S.instance service.network ;
           Ok ()
