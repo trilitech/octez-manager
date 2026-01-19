@@ -92,13 +92,6 @@ val cleanup_orphans :
 
 val endpoint_of_rpc : string -> string
 
-(** Resolve snapshot download URL from tzinit for a given network and history mode.
-    Used for space checks before downloading. *)
-val resolve_snapshot_download :
-  network:string ->
-  history_mode:History_mode.t ->
-  (snapshot_resolution, [`Msg of string]) result
-
 module For_tests : sig
   type file_backup
 
