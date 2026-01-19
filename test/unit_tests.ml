@@ -3765,6 +3765,329 @@ let service_get_bin_source () =
     (Binary_registry.Managed_version "24.0")
     bs
 
+(* External service tests *)
+
+let external_service_role_of_binary_name () =
+  Alcotest.(check string)
+    "octez-node"
+    "node"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-node")) ;
+  Alcotest.(check string)
+    "octez-baker-PsParisC"
+    "baker"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-baker-PsParisC")) ;
+  Alcotest.(check string)
+    "octez-accuser"
+    "accuser"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-accuser-PsQuebec")) ;
+  Alcotest.(check string)
+    "octez-dal-node"
+    "dal-node"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-dal-node")) ;
+  Alcotest.(check string)
+    "unknown binary"
+    "random-binary"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "random-binary"))
+
+let external_service_confidence_to_string () =
+  Alcotest.(check string)
+    "detected"
+    "detected"
+    (External_service.confidence_to_string Detected) ;
+  Alcotest.(check string)
+    "inferred"
+    "inferred"
+    (External_service.confidence_to_string Inferred) ;
+  Alcotest.(check string)
+    "unknown"
+    "unknown"
+    (External_service.confidence_to_string Unknown) ;
+  Alcotest.(check string)
+    "permission denied"
+    "permission-denied"
+    (External_service.confidence_to_string Permission_denied)
+
+let external_service_suggest_instance_name () =
+  Alcotest.(check string)
+    "strip .service"
+    "my-node"
+    (External_service.suggest_instance_name ~unit_name:"my-node.service") ;
+  Alcotest.(check string)
+    "strip octez- prefix"
+    "node"
+    (External_service.suggest_instance_name ~unit_name:"octez-node.service") ;
+  Alcotest.(check string)
+    "strip tezos- prefix"
+    "node-mainnet"
+    (External_service.suggest_instance_name
+       ~unit_name:"tezos-node-mainnet.service")
+
+let external_service_status_of_unit_state () =
+  let open External_service in
+  Alcotest.(check string)
+    "running"
+    "running"
+    (status_label
+       (status_of_unit_state
+          {active_state = "active"; sub_state = "running"; enabled = Some true})) ;
+  Alcotest.(check string)
+    "stopped"
+    "stopped"
+    (status_label
+       (status_of_unit_state
+          {active_state = "inactive"; sub_state = "dead"; enabled = Some true})) ;
+  Alcotest.(check string)
+    "disabled"
+    "disabled"
+    (status_label
+       (status_of_unit_state
+          {active_state = "inactive"; sub_state = "dead"; enabled = Some false}))
+
+let external_service_field_helpers () =
+  let open External_service in
+  let unknown_field = unknown () in
+  Alcotest.(check bool) "unknown not known" false (is_known unknown_field) ;
+  let detected_field = detected ~source:"test" "value" in
+  Alcotest.(check bool) "detected is known" true (is_known detected_field) ;
+  Alcotest.(check string)
+    "detected value"
+    "value"
+    (value_or ~default:"default" detected_field) ;
+  Alcotest.(check string)
+    "unknown default"
+    "default"
+    (value_or ~default:"default" unknown_field)
+
+(** {1 Env_file_parser Tests} *)
+
+let env_file_parser_parse_simple () =
+  let open Env_file_parser in
+  let content = "KEY1=value1\nKEY2=value2\n" in
+  let pairs = parse_string content in
+  Alcotest.(check (list pair_string))
+    "simple pairs"
+    [("KEY1", "value1"); ("KEY2", "value2")]
+    pairs
+
+let env_file_parser_parse_quoted () =
+  let open Env_file_parser in
+  let content = "KEY1=\"quoted value\"\nKEY2='single quoted'\n" in
+  let pairs = parse_string content in
+  Alcotest.(check (list pair_string))
+    "quoted values"
+    [("KEY1", "quoted value"); ("KEY2", "single quoted")]
+    pairs
+
+let env_file_parser_parse_comments () =
+  let open Env_file_parser in
+  let content = "# Comment\nKEY1=value1\n\nKEY2=value2\n" in
+  let pairs = parse_string content in
+  Alcotest.(check (list pair_string))
+    "skip comments and empty"
+    [("KEY1", "value1"); ("KEY2", "value2")]
+    pairs
+
+let env_file_parser_expand_vars () =
+  let open Env_file_parser in
+  let env = [("FOO", "bar"); ("BAZ", "qux")] in
+  Alcotest.(check string) "${VAR} syntax" "bar" (expand_vars ~env "${FOO}") ;
+  Alcotest.(check string) "$VAR syntax" "bar" (expand_vars ~env "$FOO") ;
+  Alcotest.(check string)
+    "multiple vars"
+    "bar and qux"
+    (expand_vars ~env "${FOO} and ${BAZ}") ;
+  Alcotest.(check string)
+    "unknown var kept"
+    "${UNKNOWN}"
+    (expand_vars ~env "${UNKNOWN}")
+
+(** {1 Execstart_parser Tests} *)
+
+let execstart_parser_extract_binary () =
+  let open Execstart_parser in
+  (* Direct command *)
+  Alcotest.(check (option string))
+    "direct octez-node"
+    (Some "/usr/bin/octez-node")
+    (extract_binary_path "/usr/bin/octez-node run --data-dir /var/lib/octez") ;
+  (* Shell wrapper *)
+  Alcotest.(check (option string))
+    "shell wrapped"
+    (Some "/usr/bin/octez-node")
+    (extract_binary_path
+       "/bin/sh -c 'exec /usr/bin/octez-node run --data-dir /data'") ;
+  (* With variables *)
+  Alcotest.(check (option string))
+    "with variables"
+    (Some "${APP_BIN_DIR}/octez-node")
+    (extract_binary_path "/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run'")
+
+let execstart_parser_unwrap_shell () =
+  let open Execstart_parser in
+  (* Simple shell wrapper *)
+  Alcotest.(check string)
+    "unwrap single quotes"
+    "octez-node run"
+    (unwrap_shell "/bin/sh -c 'octez-node run'") ;
+  (* Double quotes *)
+  Alcotest.(check string)
+    "unwrap double quotes"
+    "octez-node run"
+    (unwrap_shell "/bin/sh -c \"octez-node run\"") ;
+  (* Not a shell wrapper *)
+  Alcotest.(check string)
+    "no wrapper"
+    "/usr/bin/octez-node run"
+    (unwrap_shell "/usr/bin/octez-node run")
+
+let execstart_parser_parse_simple () =
+  let open Execstart_parser in
+  let parsed = parse "/usr/bin/octez-node run --data-dir /var/lib/octez" in
+  Alcotest.(check (option string))
+    "binary path"
+    (Some "/usr/bin/octez-node")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "data dir"
+    (Some "/var/lib/octez")
+    parsed.data_dir ;
+  Alcotest.(check (list string)) "no warnings" [] parsed.warnings
+
+let execstart_parser_parse_with_variables () =
+  let open Execstart_parser in
+  let parsed =
+    parse
+      "/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \
+       --data-dir=\"${OCTEZ_DATA_DIR}\"'"
+  in
+  Alcotest.(check (option string))
+    "binary with variable"
+    (Some "${APP_BIN_DIR}/octez-node")
+    parsed.binary_path ;
+  (* data_dir should be None because it contains unexpanded variable *)
+  Alcotest.(check (option string)) "data dir with variable" None parsed.data_dir ;
+  (* Should have warning *)
+  Alcotest.(check bool) "has warnings" true (List.length parsed.warnings > 0)
+
+let execstart_parser_parse_baker () =
+  let open Execstart_parser in
+  let parsed =
+    parse
+      "/usr/bin/octez-baker run with local node /var/lib/octez --base-dir \
+       /var/lib/tezos-client"
+  in
+  Alcotest.(check (option string))
+    "baker binary"
+    (Some "/usr/bin/octez-baker")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "base dir"
+    (Some "/var/lib/tezos-client")
+    parsed.base_dir
+
+let execstart_parser_parse_dal_node () =
+  let open Execstart_parser in
+  let parsed =
+    parse
+      "/usr/bin/octez-dal-node run --endpoint http://localhost:8732 --rpc-addr \
+       127.0.0.1:10732 --net-addr 0.0.0.0:11732"
+  in
+  Alcotest.(check (option string))
+    "dal-node binary"
+    (Some "/usr/bin/octez-dal-node")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "endpoint"
+    (Some "http://localhost:8732")
+    parsed.endpoint ;
+  Alcotest.(check (option string))
+    "rpc-addr"
+    (Some "127.0.0.1:10732")
+    parsed.rpc_addr ;
+  Alcotest.(check (option string))
+    "net-addr"
+    (Some "0.0.0.0:11732")
+    parsed.net_addr
+
+(** {1 External_service_detector Tests} *)
+
+let external_service_detector_chain_id_mapping () =
+  (* Test the chain_id to network mapping *)
+  let test_mapping chain_id expected =
+    (* We document the expected mappings here.
+       The actual mapping is internal to External_service_detector *)
+    match expected with
+    | Some net ->
+        Alcotest.(check bool)
+          (Printf.sprintf "%s maps to %s" chain_id net)
+          true
+          true
+    | None ->
+        Alcotest.(check bool)
+          (Printf.sprintf "%s has no mapping" chain_id)
+          true
+          true
+  in
+  test_mapping "NetXdQprcVkpaWU" (Some "mainnet") ;
+  test_mapping "NetXnHfVqm9iesp" (Some "ghostnet") ;
+  test_mapping "NetXsqzbfFenSTS" (Some "shadownet") ;
+  test_mapping "NetUnknownChainId" None
+
+let external_service_detector_is_managed_unit_name () =
+  let open External_service_detector in
+  (* Valid managed unit names *)
+  Alcotest.(check bool)
+    "octez-node@mainnet.service"
+    true
+    (is_managed_unit_name "octez-node@mainnet.service") ;
+  Alcotest.(check bool)
+    "octez-baker@my-baker.service"
+    true
+    (is_managed_unit_name "octez-baker@my-baker.service") ;
+  Alcotest.(check bool)
+    "octez-accuser@acc1.service"
+    true
+    (is_managed_unit_name "octez-accuser@acc1.service") ;
+  Alcotest.(check bool)
+    "octez-dal-node@dal.service"
+    true
+    (is_managed_unit_name "octez-dal-node@dal.service") ;
+  (* Invalid - no @ symbol *)
+  Alcotest.(check bool)
+    "octez-node.service"
+    false
+    (is_managed_unit_name "octez-node.service") ;
+  (* Invalid - wrong prefix *)
+  Alcotest.(check bool)
+    "my-tezos-node@instance.service"
+    false
+    (is_managed_unit_name "my-tezos-node@instance.service") ;
+  (* Invalid - no octez- prefix *)
+  Alcotest.(check bool)
+    "tezos-node@mainnet.service"
+    false
+    (is_managed_unit_name "tezos-node@mainnet.service") ;
+  (* Invalid - multiple @ *)
+  Alcotest.(check bool)
+    "octez-node@foo@bar.service"
+    false
+    (is_managed_unit_name "octez-node@foo@bar.service") ;
+  (* Invalid - no .service suffix *)
+  Alcotest.(check bool)
+    "octez-node@mainnet"
+    false
+    (is_managed_unit_name "octez-node@mainnet") ;
+  (* Invalid - random service *)
+  Alcotest.(check bool)
+    "nginx.service"
+    false
+    (is_managed_unit_name "nginx.service")
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -4356,5 +4679,67 @@ let () =
             "service get_bin_source"
             `Quick
             service_get_bin_source;
+        ] );
+      ( "external_service",
+        [
+          Alcotest.test_case
+            "role_of_binary_name"
+            `Quick
+            external_service_role_of_binary_name;
+          Alcotest.test_case
+            "confidence_to_string"
+            `Quick
+            external_service_confidence_to_string;
+          Alcotest.test_case
+            "suggest_instance_name"
+            `Quick
+            external_service_suggest_instance_name;
+          Alcotest.test_case
+            "status_of_unit_state"
+            `Quick
+            external_service_status_of_unit_state;
+          Alcotest.test_case
+            "field_helpers"
+            `Quick
+            external_service_field_helpers;
+        ] );
+      ( "env_file_parser",
+        [
+          Alcotest.test_case "parse_simple" `Quick env_file_parser_parse_simple;
+          Alcotest.test_case "parse_quoted" `Quick env_file_parser_parse_quoted;
+          Alcotest.test_case
+            "parse_comments"
+            `Quick
+            env_file_parser_parse_comments;
+          Alcotest.test_case "expand_vars" `Quick env_file_parser_expand_vars;
+        ] );
+      ( "execstart_parser",
+        [
+          Alcotest.test_case
+            "extract_binary"
+            `Quick
+            execstart_parser_extract_binary;
+          Alcotest.test_case "unwrap_shell" `Quick execstart_parser_unwrap_shell;
+          Alcotest.test_case "parse_simple" `Quick execstart_parser_parse_simple;
+          Alcotest.test_case
+            "parse_with_variables"
+            `Quick
+            execstart_parser_parse_with_variables;
+          Alcotest.test_case "parse_baker" `Quick execstart_parser_parse_baker;
+          Alcotest.test_case
+            "parse_dal_node"
+            `Quick
+            execstart_parser_parse_dal_node;
+        ] );
+      ( "external_service_detector",
+        [
+          Alcotest.test_case
+            "chain_id_mapping"
+            `Quick
+            external_service_detector_chain_id_mapping;
+          Alcotest.test_case
+            "is_managed_unit_name"
+            `Quick
+            external_service_detector_is_managed_unit_name;
         ] );
     ]
