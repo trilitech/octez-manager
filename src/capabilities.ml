@@ -107,7 +107,7 @@ end
 module Package_manager : Package_manager = struct
   let install_node = Node.install_node
 
-  let install_daemon = Installer.install_daemon
+  let install_daemon = Dal_node.install_daemon
 
   let install_baker = Installer.install_baker
 end

@@ -24,6 +24,7 @@
   snapshot
   config
   node
+  dal_node
   teztnets
   snapshots
   settings
