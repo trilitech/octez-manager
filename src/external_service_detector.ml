@@ -134,20 +134,23 @@ let get_exec_start ~unit_name =
   | Error _ -> None
 
 let get_unit_properties ~unit_name ~props =
-  (* Build comma-separated property list *)
-  let prop_list = String.concat "," props in
-  let cmd = systemctl_cmd () @ ["show"; unit_name; "-p"; prop_list] in
+  (* Query all properties at once without -p flag to avoid parsing issues *)
+  let cmd = systemctl_cmd () @ ["show"; unit_name] in
   match Common.run_out cmd with
   | Ok output ->
       let lines = String.split_on_char '\n' output in
-      List.filter_map
-        (fun line ->
-          match String.split_on_char '=' line with
-          | [] | [_] -> None
-          | prop :: rest ->
-              let value = String.concat "=" rest in
-              Some (String.trim prop, String.trim value))
-        lines
+      let all_props =
+        List.filter_map
+          (fun line ->
+            match String.split_on_char '=' line with
+            | [] | [_] -> None
+            | prop :: rest ->
+                let value = String.concat "=" rest in
+                Some (String.trim prop, String.trim value))
+          lines
+      in
+      (* Filter to only requested properties *)
+      List.filter (fun (prop, _) -> List.mem prop props) all_props
   | Error _ -> []
 
 let get_unit_content ~unit_name =
