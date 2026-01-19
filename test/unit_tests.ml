@@ -3863,6 +3863,114 @@ let external_service_field_helpers () =
     "default"
     (value_or ~default:"default" unknown_field)
 
+(** {1 Execstart_parser Tests} *)
+
+let execstart_parser_extract_binary () =
+  let open Execstart_parser in
+  (* Direct command *)
+  Alcotest.(check (option string))
+    "direct octez-node"
+    (Some "/usr/bin/octez-node")
+    (extract_binary_path "/usr/bin/octez-node run --data-dir /var/lib/octez") ;
+  (* Shell wrapper *)
+  Alcotest.(check (option string))
+    "shell wrapped"
+    (Some "/usr/bin/octez-node")
+    (extract_binary_path
+       "/bin/sh -c 'exec /usr/bin/octez-node run --data-dir /data'") ;
+  (* With variables *)
+  Alcotest.(check (option string))
+    "with variables"
+    (Some "${APP_BIN_DIR}/octez-node")
+    (extract_binary_path "/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run'")
+
+let execstart_parser_unwrap_shell () =
+  let open Execstart_parser in
+  (* Simple shell wrapper *)
+  Alcotest.(check string)
+    "unwrap single quotes"
+    "octez-node run"
+    (unwrap_shell "/bin/sh -c 'octez-node run'") ;
+  (* Double quotes *)
+  Alcotest.(check string)
+    "unwrap double quotes"
+    "octez-node run"
+    (unwrap_shell "/bin/sh -c \"octez-node run\"") ;
+  (* Not a shell wrapper *)
+  Alcotest.(check string)
+    "no wrapper"
+    "/usr/bin/octez-node run"
+    (unwrap_shell "/usr/bin/octez-node run")
+
+let execstart_parser_parse_simple () =
+  let open Execstart_parser in
+  let parsed = parse "/usr/bin/octez-node run --data-dir /var/lib/octez" in
+  Alcotest.(check (option string))
+    "binary path"
+    (Some "/usr/bin/octez-node")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "data dir"
+    (Some "/var/lib/octez")
+    parsed.data_dir ;
+  Alcotest.(check (list string)) "no warnings" [] parsed.warnings
+
+let execstart_parser_parse_with_variables () =
+  let open Execstart_parser in
+  let parsed =
+    parse
+      "/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-node\" run \
+       --data-dir=\"${OCTEZ_DATA_DIR}\"'"
+  in
+  Alcotest.(check (option string))
+    "binary with variable"
+    (Some "${APP_BIN_DIR}/octez-node")
+    parsed.binary_path ;
+  (* data_dir should be None because it contains unexpanded variable *)
+  Alcotest.(check (option string)) "data dir with variable" None parsed.data_dir ;
+  (* Should have warning *)
+  Alcotest.(check bool) "has warnings" true (List.length parsed.warnings > 0)
+
+let execstart_parser_parse_baker () =
+  let open Execstart_parser in
+  let parsed =
+    parse
+      "/usr/bin/octez-baker run with local node /var/lib/octez --base-dir \
+       /var/lib/tezos-client"
+  in
+  Alcotest.(check (option string))
+    "baker binary"
+    (Some "/usr/bin/octez-baker")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "base dir"
+    (Some "/var/lib/tezos-client")
+    parsed.base_dir
+
+let execstart_parser_parse_dal_node () =
+  let open Execstart_parser in
+  let parsed =
+    parse
+      "/usr/bin/octez-dal-node run --endpoint http://localhost:8732 --rpc-addr \
+       127.0.0.1:10732 --net-addr 0.0.0.0:11732"
+  in
+  Alcotest.(check (option string))
+    "dal-node binary"
+    (Some "/usr/bin/octez-dal-node")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "endpoint"
+    (Some "http://localhost:8732")
+    parsed.endpoint ;
+  Alcotest.(check (option string))
+    "rpc-addr"
+    (Some "127.0.0.1:10732")
+    parsed.rpc_addr ;
+  Alcotest.(check (option string))
+    "net-addr"
+    (Some "0.0.0.0:11732")
+    parsed.net_addr
+
 (** {1 External_service_detector Tests} *)
 
 let external_service_detector_is_managed_unit_name () =
@@ -4529,6 +4637,24 @@ let () =
             "field_helpers"
             `Quick
             external_service_field_helpers;
+        ] );
+      ( "execstart_parser",
+        [
+          Alcotest.test_case
+            "extract_binary"
+            `Quick
+            execstart_parser_extract_binary;
+          Alcotest.test_case "unwrap_shell" `Quick execstart_parser_unwrap_shell;
+          Alcotest.test_case "parse_simple" `Quick execstart_parser_parse_simple;
+          Alcotest.test_case
+            "parse_with_variables"
+            `Quick
+            execstart_parser_parse_with_variables;
+          Alcotest.test_case "parse_baker" `Quick execstart_parser_parse_baker;
+          Alcotest.test_case
+            "parse_dal_node"
+            `Quick
+            execstart_parser_parse_dal_node;
         ] );
       ( "external_service_detector",
         [

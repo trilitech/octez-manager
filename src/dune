@@ -38,6 +38,7 @@
   capabilities
   port_validation
   external_service
+  execstart_parser
   external_service_detector)
  (libraries
   rresult
