@@ -169,7 +169,7 @@ let install_dal_node_cmd =
                                 preserve_data = false;
                               }
                             in
-                            match Installer.install_daemon req with
+                            match Dal_node.install_daemon req with
                             | Ok service ->
                                 Format.printf
                                   "Installed %s (%s)\n"

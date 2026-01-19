@@ -9,9 +9,6 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val install_daemon :
-  ?quiet:bool -> daemon_request -> (Service.t, [`Msg of string]) result
-
 val install_baker :
   ?quiet:bool -> baker_request -> (Service.t, [`Msg of string]) result
 

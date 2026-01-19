@@ -1079,7 +1079,7 @@ let instance_term =
                         in
                         Result.map_error
                           (fun (`Msg s) -> s)
-                          (Installer.install_daemon req)
+                          (Dal_node.install_daemon req)
                     | _ ->
                         Error
                           (Printf.sprintf
