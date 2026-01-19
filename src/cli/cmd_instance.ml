@@ -678,7 +678,7 @@ let instance_term =
                         in
                         Result.map_error
                           (fun (`Msg s) -> s)
-                          (Installer.install_node req)
+                          (Node.install_node req)
                     | "baker" ->
                         (* Baker: edit delegates, LB vote, extra args *)
                         let delegates = lookup "OCTEZ_BAKER_DELEGATES_CSV" in
