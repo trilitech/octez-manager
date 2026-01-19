@@ -23,6 +23,7 @@ include Instances_layout
 
 let init_state () =
   let services = load_services () in
+  let external_services = load_external_services () in
   (* Start with all instances folded by default *)
   let all_folded =
     List.fold_left
@@ -36,8 +37,11 @@ let init_state () =
   Navigation.make
     {
       services;
+      external_services;
       selected = 0;
       folded = all_folded;
+      external_folded = true;
+      (* Start with external section folded *)
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
@@ -47,9 +51,16 @@ let init_state () =
 
 let force_refresh state =
   let services = load_services_fresh () in
+  let external_services = load_external_services () in
   let selected = clamp_selection services state.selected in
   let state =
-    {state with services; selected; last_updated = Unix.gettimeofday ()}
+    {
+      state with
+      services;
+      external_services;
+      selected;
+      last_updated = Unix.gettimeofday ();
+    }
   in
   ensure_valid_column state
 
@@ -597,8 +608,11 @@ Press **Enter** to open instance menu.|}
 
   let toggle_fold s =
     match current_service s with
-    | None -> s
+    | None ->
+        (* No service selected (in menu area) - toggle external services section *)
+        {s with external_folded = not s.external_folded}
     | Some st ->
+        (* Service selected - toggle that specific service *)
         let inst = st.service.Service.instance in
         let folded =
           if StringSet.mem inst s.folded then StringSet.remove inst s.folded
