@@ -30,8 +30,8 @@ type state = {
   services : Service_state.t list;
   external_services : Octez_manager_lib.External_service.t list;
   selected : int;
-  folded : StringSet.t;
-  external_folded : bool;
+  folded : StringSet.t; (* managed instance names that are folded *)
+  external_folded : StringSet.t; (* external instance names that are folded *)
   last_updated : float;
   num_columns : int;
   active_column : int;

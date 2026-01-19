@@ -27,13 +27,21 @@ let init_state () =
   Format.eprintf
     "[DEBUG] Loaded %d external services@."
     (List.length external_services) ;
-  (* Start with all instances folded by default *)
+  (* Start with all managed instances folded by default *)
   let all_folded =
     List.fold_left
       (fun acc (st : Service_state.t) ->
         StringSet.add st.service.Service.instance acc)
       StringSet.empty
       services
+  in
+  (* Start with all external instances folded by default *)
+  let all_external_folded =
+    List.fold_left
+      (fun acc (ext : External_service.t) ->
+        StringSet.add ext.suggested_instance_name acc)
+      StringSet.empty
+      external_services
   in
   (* Default to 1 column, will be updated on first render with actual cols *)
   let num_columns = 1 in
@@ -43,8 +51,7 @@ let init_state () =
       external_services;
       selected = 0;
       folded = all_folded;
-      external_folded = false;
-      (* Start with external section UNFOLDED for testing *)
+      external_folded = all_external_folded;
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
@@ -610,18 +617,32 @@ Press **Enter** to open instance menu.|}
   let force_refresh_cmd s = force_refresh s
 
   let toggle_fold s =
-    match current_service s with
-    | None ->
-        (* No service selected (in menu area) - toggle external services section *)
-        {s with external_folded = not s.external_folded}
-    | Some st ->
-        (* Service selected - toggle that specific service *)
-        let inst = st.service.Service.instance in
-        let folded =
-          if StringSet.mem inst s.folded then StringSet.remove inst s.folded
-          else StringSet.add inst s.folded
-        in
-        {s with folded}
+    (* Check if we're on an external service *)
+    let external_start_idx = services_start_idx + List.length s.services in
+    if s.selected >= external_start_idx then
+      (* Toggle external service *)
+      let ext_idx = s.selected - external_start_idx in
+      match List.nth_opt s.external_services ext_idx with
+      | None -> s
+      | Some ext ->
+          let inst = ext.External_service.suggested_instance_name in
+          let external_folded =
+            if StringSet.mem inst s.external_folded then
+              StringSet.remove inst s.external_folded
+            else StringSet.add inst s.external_folded
+          in
+          {s with external_folded}
+    else
+      (* Toggle managed service *)
+      match current_service s with
+      | None -> s (* In menu area, Tab does nothing now *)
+      | Some st ->
+          let inst = st.service.Service.instance in
+          let folded =
+            if StringSet.mem inst s.folded then StringSet.remove inst s.folded
+            else StringSet.add inst s.folded
+          in
+          {s with folded}
 
   (** Move to a different column (for matrix layout) *)
   let move_column s delta =
@@ -691,11 +712,6 @@ Press **Enter** to open instance menu.|}
         | Some (Keys.Char "l") ->
             Navigation.update (fun s -> move_column s 1) ps
         | Some Keys.Tab -> Navigation.update toggle_fold ps
-        | Some (Keys.Char "e") ->
-            (* Toggle external services section *)
-            Navigation.update
-              (fun s -> {s with external_folded = not s.external_folded})
-              ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
         | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps

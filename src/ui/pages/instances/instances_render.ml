@@ -527,7 +527,8 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
       String.concat column_separator parts)
 
 (** Render external services section *)
-let render_external_service ~folded (ext : External_service.t) =
+let render_external_service ~selected_idx ~current_idx ~folded
+    (ext : External_service.t) =
   let open External_service in
   let cfg = ext.config in
   let role_str =
@@ -536,110 +537,124 @@ let render_external_service ~folded (ext : External_service.t) =
   let network_str = match cfg.network.value with Some n -> n | None -> "?" in
   let status_str = status_label (status_of_unit_state cfg.unit_state) in
 
-  (* First line: instance, role, network, status *)
-  let line1 =
-    Printf.sprintf
-      "  %s%-18s %-10s %-12s %s"
-      (if folded then "▸ " else "▾ ")
-      ext.suggested_instance_name
-      role_str
-      network_str
-      (match cfg.unit_state.active_state with
-      | "active" -> Widgets.green status_str
-      | "failed" -> Widgets.red status_str
-      | _ -> Widgets.yellow status_str)
+  let marker = if current_idx = selected_idx then Widgets.bold "➤" else " " in
+  let fold_indicator = if folded then "+" else "−" in
+  let status =
+    match cfg.unit_state.active_state with
+    | "active" -> Widgets.green "●"
+    | "failed" -> Widgets.red "●"
+    | _ -> Widgets.yellow "●"
   in
 
-  if folded then [line1]
-  else
-    (* Unfold state: show more details *)
-    let line2 = Printf.sprintf "    Unit: %s" cfg.unit_name in
+  (* First line: like managed services *)
+  let instance_str = Printf.sprintf "%-16s" ext.suggested_instance_name in
+  let role_str = Printf.sprintf "%-10s" role_str in
+  let network = Printf.sprintf "%-12s" network_str in
+  let first_line =
+    Printf.sprintf
+      "%s %s %s %s %s %s [external]"
+      marker
+      fold_indicator
+      status
+      instance_str
+      role_str
+      network
+  in
 
-    (* Role-specific details *)
-    let detail_lines =
+  if folded then [first_line]
+  else
+    (* Mark as visible for system metrics *)
+    let role_for_metrics =
+      match cfg.role.value with
+      | Some Node -> "node"
+      | Some Baker -> "baker"
+      | Some Accuser -> "accuser"
+      | Some Dal_node -> "dal-node"
+      | _ -> "unknown"
+    in
+    System_metrics_scheduler.mark_visible
+      ~role:role_for_metrics
+      ~instance:ext.suggested_instance_name ;
+
+    (* Second line: RPC/endpoint status *)
+    let indent = "      " in
+    let line2 =
       match cfg.role.value with
       | Some Node ->
           let rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
-          let data =
-            match cfg.data_dir.value with Some d -> d | None -> "?"
-          in
-          [Printf.sprintf "    RPC: %s" rpc; Printf.sprintf "    Data: %s" data]
-      | Some Baker ->
-          let node_ep =
+          indent ^ "RPC: " ^ rpc
+      | Some (Baker | Accuser | Dal_node) ->
+          let ep =
             match cfg.node_endpoint.value with Some e -> e | None -> "?"
           in
-          let base =
-            match cfg.base_dir.value with Some b -> b | None -> "?"
-          in
-          [
-            Printf.sprintf "    Node: %s" node_ep;
-            Printf.sprintf "    Base: %s" base;
-          ]
-      | Some Accuser ->
-          let node_ep =
-            match cfg.node_endpoint.value with Some e -> e | None -> "?"
-          in
-          let base =
-            match cfg.base_dir.value with Some b -> b | None -> "?"
-          in
-          [
-            Printf.sprintf "    Node: %s" node_ep;
-            Printf.sprintf "    Base: %s" base;
-          ]
-      | Some Dal_node ->
-          let node_ep =
-            match cfg.node_endpoint.value with Some e -> e | None -> "?"
-          in
-          let data =
-            match cfg.data_dir.value with Some d -> d | None -> "?"
-          in
-          [
-            Printf.sprintf "    Node: %s" node_ep;
-            Printf.sprintf "    Data: %s" data;
-          ]
-      | _ ->
-          let data =
-            match cfg.data_dir.value with Some d -> d | None -> "?"
-          in
-          [Printf.sprintf "    Data: %s" data]
+          indent ^ "Node: " ^ ep
+      | _ -> indent ^ "Status: " ^ status_str
     in
 
-    line1 :: line2 :: detail_lines
+    (* System metrics *)
+    let focus = current_idx = selected_idx in
+    let version =
+      match
+        System_metrics_scheduler.get_version
+          ~role:role_for_metrics
+          ~instance:ext.suggested_instance_name
+      with
+      | Some v -> System_metrics_scheduler.format_version_colored v
+      | None -> Widgets.dim "v?"
+    in
+    let mem =
+      System_metrics_scheduler.render_mem_sparkline
+        ~role:role_for_metrics
+        ~instance:ext.suggested_instance_name
+        ~focus
+    in
+    let metrics_parts = [version] @ if mem = "" then [] else ["MEM " ^ mem] in
+    let metrics_line = indent ^ String.concat " · " metrics_parts in
+
+    (* CPU chart *)
+    let cpu_lines =
+      match
+        System_metrics_scheduler.render_cpu_chart
+          ~role:role_for_metrics
+          ~instance:ext.suggested_instance_name
+          ~focus
+      with
+      | None -> []
+      | Some (chart, _avg_cpu) ->
+          (* Chart is multi-line, split and indent *)
+          String.split_on_char '\n' chart
+          |> List.map (fun line -> indent ^ line)
+    in
+
+    [first_line; line2; metrics_line] @ cpu_lines
 
 let render_external_services_section state =
   Format.eprintf
-    "[DEBUG RENDER] external_services count: %d, external_folded: %b@."
-    (List.length state.external_services)
-    state.external_folded ;
+    "[DEBUG RENDER] external_services count: %d@."
+    (List.length state.external_services) ;
   if state.external_services = [] then []
   else
-    let header_marker = if state.external_folded then "▸" else "▾" in
-    let header =
-      Printf.sprintf
-        "%s %s %s"
-        header_marker
-        (Widgets.bold "── External Services ──")
-        (Widgets.dim
-           (Printf.sprintf "(%d)" (List.length state.external_services)))
+    let header = Widgets.bold "── External Services ──" in
+    (* Calculate base index for external services (after menu and managed services) *)
+    let external_start_idx = services_start_idx + List.length state.services in
+    let service_lines =
+      List.mapi
+        (fun idx ext ->
+          let current_idx = external_start_idx + idx in
+          let is_folded =
+            StringSet.mem
+              ext.External_service.suggested_instance_name
+              state.external_folded
+          in
+          render_external_service
+            ~selected_idx:state.selected
+            ~current_idx
+            ~folded:is_folded
+            ext)
+        state.external_services
+      |> List.concat
     in
-
-    if state.external_folded then (
-      Format.eprintf "[DEBUG RENDER] Returning folded header@." ;
-      [header])
-    else (
-      Format.eprintf
-        "[DEBUG RENDER] Rendering %d services unfolded@."
-        (List.length state.external_services) ;
-      let service_lines =
-        List.concat_map
-          (fun ext -> render_external_service ~folded:false ext)
-          state.external_services
-      in
-      let result = header :: service_lines in
-      Format.eprintf
-        "[DEBUG RENDER] Total external lines: %d@."
-        (List.length result) ;
-      result)
+    header :: service_lines
 
 (** Single-column layout (original) *)
 let table_lines_single state =
