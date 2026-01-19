@@ -3863,6 +3863,49 @@ let external_service_field_helpers () =
     "default"
     (value_or ~default:"default" unknown_field)
 
+(** {1 Env_file_parser Tests} *)
+
+let env_file_parser_parse_simple () =
+  let open Env_file_parser in
+  let content = "KEY1=value1\nKEY2=value2\n" in
+  let pairs = parse_string content in
+  Alcotest.(check (list pair_string))
+    "simple pairs"
+    [("KEY1", "value1"); ("KEY2", "value2")]
+    pairs
+
+let env_file_parser_parse_quoted () =
+  let open Env_file_parser in
+  let content = "KEY1=\"quoted value\"\nKEY2='single quoted'\n" in
+  let pairs = parse_string content in
+  Alcotest.(check (list pair_string))
+    "quoted values"
+    [("KEY1", "quoted value"); ("KEY2", "single quoted")]
+    pairs
+
+let env_file_parser_parse_comments () =
+  let open Env_file_parser in
+  let content = "# Comment\nKEY1=value1\n\nKEY2=value2\n" in
+  let pairs = parse_string content in
+  Alcotest.(check (list pair_string))
+    "skip comments and empty"
+    [("KEY1", "value1"); ("KEY2", "value2")]
+    pairs
+
+let env_file_parser_expand_vars () =
+  let open Env_file_parser in
+  let env = [("FOO", "bar"); ("BAZ", "qux")] in
+  Alcotest.(check string) "${VAR} syntax" "bar" (expand_vars ~env "${FOO}") ;
+  Alcotest.(check string) "$VAR syntax" "bar" (expand_vars ~env "$FOO") ;
+  Alcotest.(check string)
+    "multiple vars"
+    "bar and qux"
+    (expand_vars ~env "${FOO} and ${BAZ}") ;
+  Alcotest.(check string)
+    "unknown var kept"
+    "${UNKNOWN}"
+    (expand_vars ~env "${UNKNOWN}")
+
 (** {1 Execstart_parser Tests} *)
 
 let execstart_parser_extract_binary () =
@@ -4637,6 +4680,16 @@ let () =
             "field_helpers"
             `Quick
             external_service_field_helpers;
+        ] );
+      ( "env_file_parser",
+        [
+          Alcotest.test_case "parse_simple" `Quick env_file_parser_parse_simple;
+          Alcotest.test_case "parse_quoted" `Quick env_file_parser_parse_quoted;
+          Alcotest.test_case
+            "parse_comments"
+            `Quick
+            env_file_parser_parse_comments;
+          Alcotest.test_case "expand_vars" `Quick env_file_parser_expand_vars;
         ] );
       ( "execstart_parser",
         [
