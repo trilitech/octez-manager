@@ -10,501 +10,6 @@ open Octez_manager_lib
 open Installer_types
 module S = Service
 
-let cmdliner_error msg = `Error (false, msg)
-
-let resolve_app_bin_dir = function
-  | Some dir when String.trim dir <> "" -> (
-      match Common.make_absolute_path dir with
-      | Ok abs_path -> Ok abs_path
-      | Error msg -> Error msg)
-  | _ -> (
-      match Common.which "octez-node" with
-      | Some path -> Ok (Filename.dirname path)
-      | None ->
-          Error
-            "Unable to locate octez-node in PATH. Install Octez binaries or \
-             pass --app-bin-dir")
-
-let interactive_tty =
-  lazy
-    (let fd_isatty fd = try Unix.isatty fd with Unix.Unix_error _ -> false in
-     fd_isatty Unix.stdin && fd_isatty Unix.stdout)
-
-let is_interactive () = Lazy.force interactive_tty
-
-let normalize_opt_string = function
-  | Some s ->
-      let trimmed = String.trim s in
-      if String.equal trimmed "" then None else Some trimmed
-  | None -> None
-
-let prompt_input ?default question =
-  if not (is_interactive ()) then None
-  else
-    let suffix =
-      match default with
-      | Some (display, _) when String.trim display <> "" ->
-          Printf.sprintf " [%s]" display
-      | _ -> ""
-    in
-    let prompt = Printf.sprintf "%s%s: " question suffix in
-    match LNoise.linenoise prompt with
-    | exception Sys.Break ->
-        prerr_endline "" ;
-        exit 130 (* Standard exit code for Ctrl-C *)
-    | exception End_of_file -> Option.map snd default
-    | None -> Option.map snd default
-    | Some line ->
-        let trimmed = String.trim line in
-        if String.equal trimmed "" then Option.map snd default else Some trimmed
-
-let rec prompt_required_string question =
-  match prompt_input question with
-  | Some value -> value
-  | None ->
-      prerr_endline "A value is required." ;
-      prompt_required_string question
-
-(** Prompt with filesystem directory completion *)
-let prompt_directory question =
-  if not (is_interactive ()) then None
-  else (
-    (* Set up directory completion *)
-    LNoise.set_completion_callback (fun line_so_far ln_completions ->
-        let dir, prefix =
-          if String.ends_with ~suffix:"/" line_so_far then (line_so_far, "")
-          else (Filename.dirname line_so_far, Filename.basename line_so_far)
-        in
-        let dir = if dir = "" then "." else dir in
-        try
-          let entries = Sys.readdir dir in
-          Array.iter
-            (fun entry ->
-              if
-                String.starts_with
-                  ~prefix:(String.lowercase_ascii prefix)
-                  (String.lowercase_ascii entry)
-              then
-                let full_path = Filename.concat dir entry in
-                if Sys.is_directory full_path then
-                  LNoise.add_completion ln_completions (full_path ^ "/"))
-            entries
-        with _ -> ()) ;
-    LNoise.set_hints_callback (fun _ -> None) ;
-    match LNoise.linenoise (question ^ ": ") with
-    | None -> None
-    | Some line ->
-        let trimmed = String.trim line in
-        if trimmed = "" then None else Some trimmed)
-
-let rec prompt_required_directory question =
-  match prompt_directory question with
-  | Some value -> value
-  | None ->
-      prerr_endline "A directory path is required." ;
-      prompt_required_directory question
-
-(* Inline copy of prompt_with_completion placed before prompt_history_mode so it
-   can be referenced. This mirrors the main prompt_with_completion later in the
-   file. *)
-let prompt_with_completion_inline question completions =
-  if not (is_interactive ()) then None
-  else
-    let completions_lower =
-      List.map (fun c -> (c, String.lowercase_ascii c)) completions
-    in
-    LNoise.set_completion_callback (fun line_so_far ln_completions ->
-        let prefix = String.lowercase_ascii line_so_far in
-        List.iter
-          (fun (candidate, candidate_lower) ->
-            if String.starts_with ~prefix candidate_lower then
-              LNoise.add_completion ln_completions candidate)
-          completions_lower) ;
-    LNoise.set_hints_callback (fun line_so_far ->
-        let prefix = String.lowercase_ascii line_so_far in
-        match
-          List.find_opt
-            (fun (_, candidate_lower) ->
-              String.starts_with ~prefix candidate_lower)
-            completions_lower
-        with
-        | Some (hint, _) when String.length hint > String.length line_so_far ->
-            Some
-              ( String.sub
-                  hint
-                  (String.length line_so_far)
-                  (String.length hint - String.length line_so_far),
-                LNoise.Yellow,
-                false )
-        | _ -> None) ;
-    let res =
-      match LNoise.linenoise (question ^ ": ") with
-      | exception Sys.Break ->
-          prerr_endline "" ;
-          exit 130
-      | None -> None
-      | Some line ->
-          let trimmed = String.trim line in
-          if String.equal trimmed "" then None else Some trimmed
-    in
-    LNoise.set_completion_callback (fun _ _ -> ()) ;
-    LNoise.set_hints_callback (fun _ -> None) ;
-    res
-
-let prompt_history_mode default =
-  if not (is_interactive ()) then default
-  else
-    let rec loop () =
-      let choices = ["rolling"; "full"; "archive"] in
-      match prompt_with_completion_inline "History mode" choices with
-      | Some "" | None ->
-          prerr_endline "Please enter rolling, full or archive." ;
-          loop ()
-      | Some raw_value -> (
-          let value = String.trim raw_value in
-          (* First try direct parse *)
-          match History_mode.of_string value with
-          | Ok hm -> hm
-          | Error _ -> (
-              (* If value looks like "full:50" try the prefix before ':' *)
-              let prefix_opt =
-                try Some (String.sub value 0 (String.index value ':'))
-                with Not_found -> None
-              in
-              match prefix_opt with
-              | Some p -> (
-                  match History_mode.of_string p with
-                  | Ok hm -> hm
-                  | Error _ ->
-                      prerr_endline "Please enter rolling, full or archive." ;
-                      loop ())
-              | None ->
-                  prerr_endline "Please enter rolling, full or archive." ;
-                  loop ()))
-    in
-    loop ()
-
-let prompt_yes_no question ~default =
-  if not (is_interactive ()) then default
-  else
-    let rec loop () =
-      let label = if default then "Y/n" else "y/N" in
-      let fallback = if default then "yes" else "no" in
-      match prompt_input ~default:(label, fallback) question with
-      | Some answer -> (
-          match String.lowercase_ascii (String.trim answer) with
-          | "y" | "yes" | "true" | "1" -> true
-          | "n" | "no" | "false" | "0" -> false
-          | _ ->
-              prerr_endline "Please answer yes or no." ;
-              loop ())
-      | None -> loop ()
-    in
-    loop ()
-
-let resolve_tmp_dir_for_snapshot ~snapshot_url ~tmp_dir =
-  (* If tmp_dir is already specified, use it *)
-  match tmp_dir with
-  | Some dir -> Ok (Some dir)
-  | None -> (
-      (* Check snapshot size vs /tmp space *)
-      match Common.get_remote_file_size snapshot_url with
-      | None ->
-          (* Can't determine size, proceed with default /tmp *)
-          Ok None
-      | Some size -> (
-          let tmp_path = Filename.get_temp_dir_name () in
-          match Common.get_available_space tmp_path with
-          | None ->
-              (* Can't determine space, proceed with default *)
-              Ok None
-          | Some available ->
-              (* Add 10% buffer for safety *)
-              let required = Int64.add size (Int64.div size 10L) in
-              if available >= required then Ok None
-              else if is_interactive () then (
-                Printf.printf
-                  "Snapshot size is %s but %s only has %s available.\n"
-                  (Cli_output.format_bytes size)
-                  tmp_path
-                  (Cli_output.format_bytes available) ;
-                let rec prompt_dir () =
-                  let dir =
-                    prompt_required_directory
-                      "Enter a directory with enough space for the download"
-                  in
-                  if Sys.file_exists dir && Sys.is_directory dir then (
-                    match Common.get_available_space dir with
-                    | Some space when space >= required -> Some dir
-                    | Some space ->
-                        Printf.printf
-                          "%s only has %s available, need %s.\n"
-                          dir
-                          (Cli_output.format_bytes space)
-                          (Cli_output.format_bytes required) ;
-                        prompt_dir ()
-                    | None ->
-                        Printf.printf "Cannot determine space in %s.\n" dir ;
-                        prompt_dir ())
-                  else (
-                    Printf.printf "%s is not a valid directory.\n" dir ;
-                    prompt_dir ())
-                in
-                Ok (prompt_dir ()))
-              else
-                Error
-                  (Printf.sprintf
-                     "Snapshot size is %s but %s only has %s available. Use \
-                      --tmp-dir to specify an alternative download location."
-                     (Cli_output.format_bytes size)
-                     tmp_path
-                     (Cli_output.format_bytes available))))
-
-let check_data_dir_space ~snapshot_url ~data_dir =
-  (* Check if data directory has enough space for imported snapshot data *)
-  match Common.get_remote_file_size snapshot_url with
-  | None -> Ok () (* Can't determine size, proceed *)
-  | Some snapshot_size -> (
-      (* Storage needs ~1.2x snapshot size (imported data with buffer) *)
-      let required = Int64.add snapshot_size (Int64.div snapshot_size 5L) in
-      (* Use parent dir if data_dir doesn't exist yet *)
-      let check_path =
-        if Sys.file_exists data_dir then data_dir else Filename.dirname data_dir
-      in
-      match Common.get_available_space check_path with
-      | None -> Ok () (* Can't determine space, proceed *)
-      | Some available ->
-          if available >= required then Ok ()
-          else
-            Error
-              (Printf.sprintf
-                 "Data directory %s needs %s for node storage but only has %s \
-                  available."
-                 data_dir
-                 (Cli_output.format_bytes required)
-                 (Cli_output.format_bytes available)))
-
-(* Prompt with linenoise for autocompletion support *)
-let prompt_with_completion question completions =
-  if not (is_interactive ()) then None
-  else
-    (* Pre-compute lowercase versions for efficient matching *)
-    let completions_lower =
-      List.map (fun c -> (c, String.lowercase_ascii c)) completions
-    in
-    (* Set up completions *)
-    LNoise.set_completion_callback (fun line_so_far ln_completions ->
-        let prefix = String.lowercase_ascii line_so_far in
-        List.iter
-          (fun (candidate, candidate_lower) ->
-            if String.starts_with ~prefix candidate_lower then
-              LNoise.add_completion ln_completions candidate)
-          completions_lower) ;
-    (* Set hints *)
-    LNoise.set_hints_callback (fun line_so_far ->
-        let prefix = String.lowercase_ascii line_so_far in
-        match
-          List.find_opt
-            (fun (_, candidate_lower) ->
-              String.starts_with ~prefix candidate_lower)
-            completions_lower
-        with
-        | Some (hint, _) when String.length hint > String.length line_so_far ->
-            Some
-              ( String.sub
-                  hint
-                  (String.length line_so_far)
-                  (String.length hint - String.length line_so_far),
-                LNoise.Yellow,
-                false )
-        | _ -> None) ;
-    (* Read a line, then clear callbacks to avoid leaking completions to later prompts *)
-    let res =
-      match LNoise.linenoise (question ^ ": ") with
-      | exception Sys.Break ->
-          prerr_endline "" ;
-          exit 130
-      | None -> None
-      | Some line ->
-          let trimmed = String.trim line in
-          if String.equal trimmed "" then None else Some trimmed
-    in
-    (* Clear callbacks *)
-    LNoise.set_completion_callback (fun _ _ -> ()) ;
-    LNoise.set_hints_callback (fun _ -> None) ;
-    res
-
-(* Prompt with linenoise for comma-separated multi-value autocompletion.
-   Each value after a comma gets its own completion. *)
-let prompt_with_multi_completion question completions =
-  if not (is_interactive ()) then None
-  else
-    (* Pre-compute lowercase versions for efficient matching *)
-    let completions_lower =
-      List.map (fun c -> (c, String.lowercase_ascii c)) completions
-    in
-    (* Helper to get prefix (text after last comma) and already-entered values *)
-    let split_at_last_comma line =
-      match String.rindex_opt line ',' with
-      | None -> ("", String.trim line)
-      | Some idx ->
-          let before = String.sub line 0 (idx + 1) in
-          let after =
-            String.trim
-              (String.sub line (idx + 1) (String.length line - idx - 1))
-          in
-          (before, after)
-    in
-    (* Set up completions - complete based on text after last comma *)
-    LNoise.set_completion_callback (fun line_so_far ln_completions ->
-        let before, current = split_at_last_comma line_so_far in
-        let prefix = String.lowercase_ascii current in
-        (* Get already-selected values to exclude them *)
-        let already_selected =
-          String.split_on_char ',' before
-          |> List.map (fun s -> String.lowercase_ascii (String.trim s))
-          |> List.filter (fun s -> s <> "")
-        in
-        List.iter
-          (fun (candidate, candidate_lower) ->
-            if
-              String.starts_with ~prefix candidate_lower
-              && not (List.mem candidate_lower already_selected)
-            then LNoise.add_completion ln_completions (before ^ candidate))
-          completions_lower) ;
-    (* Set hints - show hint based on text after last comma *)
-    LNoise.set_hints_callback (fun line_so_far ->
-        let _before, current = split_at_last_comma line_so_far in
-        let prefix = String.lowercase_ascii current in
-        (* Get already-selected values to exclude them *)
-        let already_selected =
-          String.split_on_char ',' line_so_far
-          |> List.map (fun s -> String.lowercase_ascii (String.trim s))
-          |> List.filter (fun s -> s <> "")
-        in
-        match
-          List.find_opt
-            (fun (_, candidate_lower) ->
-              String.starts_with ~prefix candidate_lower
-              && not (List.mem candidate_lower already_selected))
-            completions_lower
-        with
-        | Some (hint, _) when String.length hint > String.length current ->
-            Some
-              ( String.sub
-                  hint
-                  (String.length current)
-                  (String.length hint - String.length current),
-                LNoise.Yellow,
-                false )
-        | _ -> None) ;
-    (* Read a line, then clear callbacks *)
-    let res =
-      match LNoise.linenoise (question ^ ": ") with
-      | exception Sys.Break ->
-          prerr_endline "" ;
-          exit 130
-      | None -> None
-      | Some line ->
-          let trimmed = String.trim line in
-          if String.equal trimmed "" then None else Some trimmed
-    in
-    (* Clear callbacks *)
-    LNoise.set_completion_callback (fun _ _ -> ()) ;
-    LNoise.set_hints_callback (fun _ -> None) ;
-    res
-
-(** Validate a port address, re-prompting in interactive mode if invalid.
-    @param label Label for error messages (e.g., "RPC address")
-    @param addr The address to validate
-    @param default Default address if none provided (also used as example in error messages)
-    @param exclude_instance Instance to exclude from "in use" checks (for edit mode)
-    @return Ok addr if valid, Error msg if invalid in non-interactive mode *)
-let rec validate_port_addr ~label ~addr ~default ?exclude_instance () =
-  let validate a =
-    Port_validation.validate_addr ~addr:a ?exclude_instance ~example:default ()
-  in
-  match validate addr with
-  | Ok () -> Ok addr
-  | Error err ->
-      if is_interactive () then (
-        Printf.eprintf "%s: %s\n%!" label (Port_validation.pp_error err) ;
-        let new_addr =
-          prompt_input ~default:(default, default) label
-          |> Option.value ~default
-        in
-        validate_port_addr ~label ~addr:new_addr ~default ?exclude_instance ())
-      else Error (Printf.sprintf "%s: %s" label (Port_validation.pp_error err))
-
-let rec resolve_node_instance_or_endpoint ~node_instance =
-  let ( let* ) = Result.bind in
-  let* services = Service_registry.list () in
-  let node_services =
-    List.filter (fun (svc : Service.t) -> String.equal svc.role "node") services
-  in
-  let default = "127.0.0.1:8732" in
-  let choice =
-    match node_instance with
-    | Some ni -> Some ni
-    | None ->
-        if not (is_interactive ()) then Some default
-        else
-          let instance_names =
-            List.map (fun (svc : Service.t) -> svc.instance) node_services
-          in
-          (if node_services = [] then
-             prerr_endline
-               "No node instances found. You can specify a custom endpoint."
-           else
-             let instance_map =
-               List.map
-                 (fun (svc : Service.t) -> (svc.instance, svc.network))
-                 node_services
-             in
-             Format.printf
-               "Available node instances: %s@."
-               (String.concat
-                  ", "
-                  (List.map
-                     (fun (inst, net) -> Printf.sprintf "%s (%s)" inst net)
-                     instance_map))) ;
-          prompt_with_completion "Node instance" (default :: instance_names)
-  in
-  match choice with
-  | None ->
-      prerr_endline "Enter a node instance or custom endpoint" ;
-      resolve_node_instance_or_endpoint ~node_instance
-  | Some choice ->
-      if
-        List.exists
-          (fun (svc : Service.t) -> String.equal svc.instance choice)
-          node_services
-      then Ok (`Instance choice)
-      else Ok (`Endpoint choice)
-
-let run_result = function
-  | Ok () -> `Ok ()
-  | Error (`Msg msg) -> cmdliner_error msg
-
-(* Logging is always via journald - octez binaries handle their own file logging *)
-let logging_mode_term = Term.(const Logging_mode.default)
-
-let history_mode_doc =
-  "History mode to configure on octez-node (rolling|full|archive)."
-
-let history_mode_choices =
-  [
-    ("rolling", History_mode.Rolling);
-    ("full", History_mode.Full);
-    ("archive", History_mode.Archive);
-  ]
-
-let history_mode_opt_term =
-  Arg.(
-    value
-    & opt (some (enum history_mode_choices)) None
-    & info ["history-mode"] ~doc:history_mode_doc ~docv:"MODE")
-
 let install_node_cmd =
   let instance =
     let doc = "Instance name used for node.env and systemd units." in
@@ -598,13 +103,16 @@ let install_node_cmd =
       logging_mode =
     let res =
       let ( let* ) = Result.bind in
-      let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
+      let* app_bin_dir = Cli_helpers.resolve_app_bin_dir app_bin_dir in
       (* When preserve_data is set, require data_dir to be specified *)
       let* data_dir =
         match (preserve_data, data_dir) with
         | true, None ->
-            if is_interactive () then
-              Ok (Some (prompt_required_string "Data directory to preserve"))
+            if Cli_helpers.is_interactive () then
+              Ok
+                (Some
+                   (Cli_helpers.prompt_required_string
+                      "Data directory to preserve"))
             else
               Error
                 "--data-dir is required when using --preserve-data in \
@@ -629,11 +137,11 @@ let install_node_cmd =
         | _ -> Ok ()
       in
       let instance () =
-        match normalize_opt_string instance_opt with
+        match Cli_helpers.normalize_opt_string instance_opt with
         | Some inst -> Ok inst
         | None ->
-            if is_interactive () then
-              Ok (prompt_required_string "Instance name")
+            if Cli_helpers.is_interactive () then
+              Ok (Cli_helpers.prompt_required_string "Instance name")
             else Error "Instance name is required in non-interactive mode"
       in
       match data_dir_config with
@@ -679,7 +187,7 @@ let install_node_cmd =
           in
           (* Validate ports - exclude self in edit/preserve-data mode *)
           let* rpc_addr =
-            validate_port_addr
+            Cli_helpers.validate_port_addr
               ~label:"RPC address"
               ~addr:rpc_addr
               ~default:"127.0.0.1:8732"
@@ -687,7 +195,7 @@ let install_node_cmd =
               ()
           in
           let* net_addr =
-            validate_port_addr
+            Cli_helpers.validate_port_addr
               ~label:"P2P address"
               ~addr:net_addr
               ~default:"0.0.0.0:9732"
@@ -723,17 +231,19 @@ let install_node_cmd =
       | Some (`Path _) | None ->
           let* instance = instance () in
           let* network =
-            match normalize_opt_string network_opt with
+            match Cli_helpers.normalize_opt_string network_opt with
             | Some net -> Ok net
             | None ->
-                if is_interactive () then
+                if Cli_helpers.is_interactive () then
                   match Teztnets.list_networks () with
                   | Ok infos ->
                       let aliases =
                         List.map (fun Teztnets.{alias; _} -> alias) infos
                       in
                       let rec loop () =
-                        match prompt_with_completion "Network" aliases with
+                        match
+                          Cli_helpers.prompt_with_completion "Network" aliases
+                        with
                         | Some sel -> sel
                         | None ->
                             prerr_endline "Please enter a network." ;
@@ -746,20 +256,20 @@ let install_node_cmd =
           let history_mode =
             match history_mode_opt with
             | Some hm -> hm
-            | None -> prompt_history_mode History_mode.default
+            | None -> Cli_helpers.prompt_history_mode History_mode.default
           in
           let snapshot_requested_initial =
             snapshot_flag || Option.is_some snapshot_uri
           in
           let snapshot_requested =
             if snapshot_requested_initial then true
-            else if is_interactive () then
-              prompt_yes_no
+            else if Cli_helpers.is_interactive () then
+              Cli_helpers.prompt_yes_no
                 "Download and import a tzinit snapshot before starting?"
                 ~default:true
             else false
           in
-          let snapshot_uri = normalize_opt_string snapshot_uri in
+          let snapshot_uri = Cli_helpers.normalize_opt_string snapshot_uri in
           let snapshot_requested =
             snapshot_requested || Option.is_some snapshot_uri
           in
@@ -801,24 +311,26 @@ let install_node_cmd =
                 | Some url ->
                     (* Check data directory has enough space for imported data *)
                     let* () =
-                      check_data_dir_space
+                      Cli_helpers.check_data_dir_space
                         ~snapshot_url:url
                         ~data_dir:actual_data_dir
                     in
-                    resolve_tmp_dir_for_snapshot ~snapshot_url:url ~tmp_dir
+                    Cli_helpers.resolve_tmp_dir_for_snapshot
+                      ~snapshot_url:url
+                      ~tmp_dir
                 | None -> Ok tmp_dir)
             | Genesis -> Ok tmp_dir
           in
           (* Validate ports for new install *)
           let* rpc_addr =
-            validate_port_addr
+            Cli_helpers.validate_port_addr
               ~label:"RPC address"
               ~addr:rpc_addr
               ~default:"127.0.0.1:8732"
               ()
           in
           let* net_addr =
-            validate_port_addr
+            Cli_helpers.validate_port_addr
               ~label:"P2P address"
               ~addr:net_addr
               ~default:"0.0.0.0:9732"
@@ -850,15 +362,16 @@ let install_node_cmd =
     | Ok service ->
         Format.printf "Installed %s (%s)\n" service.S.instance service.network ;
         `Ok ()
-    | Error msg -> cmdliner_error msg
+    | Error msg -> Cli_helpers.cmdliner_error msg
   in
   let term =
     Term.(
       ret
-        (const make $ instance $ network $ history_mode_opt_term $ data_dir
-       $ rpc_addr $ net_addr $ service_user $ app_bin_dir $ extra_args
-       $ snapshot_flag $ snapshot_uri $ snapshot_no_check $ auto_enable
-       $ preserve_data $ tmp_dir $ keep_snapshot $ logging_mode_term))
+        (const make $ instance $ network $ Cli_helpers.history_mode_opt_term
+       $ data_dir $ rpc_addr $ net_addr $ service_user $ app_bin_dir
+       $ extra_args $ snapshot_flag $ snapshot_uri $ snapshot_no_check
+       $ auto_enable $ preserve_data $ tmp_dir $ keep_snapshot
+       $ Cli_helpers.logging_mode_term))
   in
   let info =
     Cmd.info "install-node" ~doc:"Install an octez-node systemd instance"
@@ -937,18 +450,18 @@ let install_baker_cmd =
       logging_mode =
     let res =
       let ( let* ) = Result.bind in
-      let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
+      let* app_bin_dir = Cli_helpers.resolve_app_bin_dir app_bin_dir in
       let* instance =
-        match normalize_opt_string instance_opt with
+        match Cli_helpers.normalize_opt_string instance_opt with
         | Some inst -> Ok inst
         | None ->
-            if is_interactive () then
-              Ok (prompt_required_string "Instance name")
+            if Cli_helpers.is_interactive () then
+              Ok (Cli_helpers.prompt_required_string "Instance name")
             else Error "Instance name is required in non-interactive mode"
       in
       let* choice =
         Result.map_error (fun (`Msg s) -> s)
-        @@ resolve_node_instance_or_endpoint ~node_instance
+        @@ Cli_helpers.resolve_node_instance_or_endpoint ~node_instance
       in
       let node_mode =
         match choice with
@@ -956,14 +469,16 @@ let install_baker_cmd =
         | `Endpoint endpoint -> Remote_endpoint endpoint
       in
       let* liquidity_baking_vote =
-        match normalize_opt_string liquidity_baking_vote_opt with
+        match Cli_helpers.normalize_opt_string liquidity_baking_vote_opt with
         | Some vote -> Ok (Some vote)
         | None ->
-            if is_interactive () then
+            if Cli_helpers.is_interactive () then
               let completions = ["on"; "off"; "pass"] in
               let rec ask () =
                 match
-                  prompt_with_completion "Liquidity baking vote" completions
+                  Cli_helpers.prompt_with_completion
+                    "Liquidity baking vote"
+                    completions
                 with
                 | Some v -> Ok (Some v)
                 | None ->
@@ -977,13 +492,13 @@ let install_baker_cmd =
       (* Prompt for dal_endpoint if not provided in interactive mode *)
       (* Track both DAL config and DAL node instance name *)
       let* dal_config, dal_node =
-        match normalize_opt_string dal_endpoint_opt with
+        match Cli_helpers.normalize_opt_string dal_endpoint_opt with
         | Some ep ->
             let normalized = String.lowercase_ascii (String.trim ep) in
             if normalized = "none" then Ok (Dal_disabled, None)
             else Ok (Dal_endpoint ep, None)
         | None ->
-            if is_interactive () then
+            if Cli_helpers.is_interactive () then
               (* Get list of available DAL node instances *)
               match Service_registry.list () with
               | Error (`Msg msg) ->
@@ -1000,7 +515,9 @@ let install_baker_cmd =
                   in
                   if dal_services = [] then
                     let choice =
-                      prompt_with_completion_inline "DAL Node endpoint" ["none"]
+                      Cli_helpers.prompt_with_completion_inline
+                        "DAL Node endpoint"
+                        ["none"]
                       |> Option.map (fun choice ->
                           String.lowercase_ascii @@ String.trim choice)
                     in
@@ -1029,7 +546,7 @@ let install_baker_cmd =
                                 Printf.sprintf "%s (%s)" inst addr)
                               instance_map)) ;
                       match
-                        prompt_with_completion
+                        Cli_helpers.prompt_with_completion
                           "DAL node instance"
                           ("none" :: instance_names)
                       with
@@ -1082,14 +599,16 @@ let install_baker_cmd =
           Ok ()
       | Error (`Msg s) -> Error s
     in
-    match res with Ok () -> `Ok () | Error msg -> cmdliner_error msg
+    match res with
+    | Ok () -> `Ok ()
+    | Error msg -> Cli_helpers.cmdliner_error msg
   in
   let term =
     Term.(
       ret
         (const make $ instance $ node_instance $ base_dir $ delegates
        $ dal_endpoint $ liquidity_baking_vote $ extra_args $ service_user
-       $ app_bin_dir $ auto_enable $ logging_mode_term))
+       $ app_bin_dir $ auto_enable $ Cli_helpers.logging_mode_term))
   in
   let info = Cmd.info "install-baker" ~doc:"Install an octez-baker service" in
   Cmd.v info term
@@ -1147,18 +666,18 @@ let install_accuser_cmd =
       app_bin_dir no_enable logging_mode =
     let res =
       let ( let* ) = Result.bind in
-      let* app_bin_dir = resolve_app_bin_dir app_bin_dir in
+      let* app_bin_dir = Cli_helpers.resolve_app_bin_dir app_bin_dir in
       let* instance =
-        match normalize_opt_string instance_opt with
+        match Cli_helpers.normalize_opt_string instance_opt with
         | Some inst -> Ok inst
         | None ->
-            if is_interactive () then
-              Ok (prompt_required_string "Instance name")
+            if Cli_helpers.is_interactive () then
+              Ok (Cli_helpers.prompt_required_string "Instance name")
             else Error "Instance name is required in non-interactive mode"
       in
       let* choice =
         Result.map_error (fun (`Msg s) -> s)
-        @@ resolve_node_instance_or_endpoint ~node_instance
+        @@ Cli_helpers.resolve_node_instance_or_endpoint ~node_instance
       in
       let node_mode =
         match choice with
@@ -1186,13 +705,14 @@ let install_accuser_cmd =
     | Ok service ->
         Format.printf "Installed  %s (%s)\n" service.S.instance service.network ;
         `Ok ()
-    | Error msg -> cmdliner_error msg
+    | Error msg -> Cli_helpers.cmdliner_error msg
   in
   let term =
     Term.(
       ret
         (const make $ instance $ node_instance $ base_dir $ extra_args
-       $ service_user $ app_bin_dir $ auto_enable $ logging_mode_term))
+       $ service_user $ app_bin_dir $ auto_enable
+       $ Cli_helpers.logging_mode_term))
   in
   let info =
     Cmd.info "install-accuser" ~doc:"Install an octez-accuser service"
@@ -1261,27 +781,29 @@ let install_dal_node_cmd =
   in
   let make instance_opt data_dir_opt rpc_addr net_addr node_instance extra_args
       service_user app_bin_dir no_enable logging_mode =
-    match resolve_app_bin_dir app_bin_dir with
-    | Error msg -> cmdliner_error msg
+    match Cli_helpers.resolve_app_bin_dir app_bin_dir with
+    | Error msg -> Cli_helpers.cmdliner_error msg
     | Ok app_bin_dir -> (
         let instance_result =
-          match normalize_opt_string instance_opt with
+          match Cli_helpers.normalize_opt_string instance_opt with
           | Some inst -> Ok inst
           | None ->
-              if is_interactive () then
-                Ok (prompt_required_string "Instance name")
+              if Cli_helpers.is_interactive () then
+                Ok (Cli_helpers.prompt_required_string "Instance name")
               else Error "Instance name is required in non-interactive mode"
         in
         match instance_result with
-        | Error msg -> cmdliner_error msg
+        | Error msg -> Cli_helpers.cmdliner_error msg
         | Ok instance -> (
             let data_dir =
               match data_dir_opt with
               | Some dir when String.trim dir <> "" -> dir
               | _ -> Common.default_role_dir "dal-node" instance
             in
-            match resolve_node_instance_or_endpoint ~node_instance with
-            | Error (`Msg msg) -> cmdliner_error msg
+            match
+              Cli_helpers.resolve_node_instance_or_endpoint ~node_instance
+            with
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok node_mode -> (
                 let node_endpoint =
                   match node_mode with
@@ -1304,7 +826,7 @@ let install_dal_node_cmd =
                       Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
                 in
                 match maybe_network with
-                | Error (`Msg msg) -> cmdliner_error msg
+                | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
                 | Ok network -> (
                     let depends_on =
                       match node_mode with
@@ -1313,22 +835,22 @@ let install_dal_node_cmd =
                     in
                     (* Validate DAL node ports *)
                     match
-                      validate_port_addr
+                      Cli_helpers.validate_port_addr
                         ~label:"DAL RPC address"
                         ~addr:rpc_addr
                         ~default:"127.0.0.1:10732"
                         ()
                     with
-                    | Error msg -> cmdliner_error msg
+                    | Error msg -> Cli_helpers.cmdliner_error msg
                     | Ok rpc_addr -> (
                         match
-                          validate_port_addr
+                          Cli_helpers.validate_port_addr
                             ~label:"DAL P2P address"
                             ~addr:net_addr
                             ~default:"0.0.0.0:11732"
                             ()
                         with
-                        | Error msg -> cmdliner_error msg
+                        | Error msg -> Cli_helpers.cmdliner_error msg
                         | Ok net_addr -> (
                             let req : daemon_request =
                               {
@@ -1363,14 +885,15 @@ let install_dal_node_cmd =
                                   service.S.instance
                                   service.network ;
                                 `Ok ()
-                            | Error (`Msg msg) -> cmdliner_error msg))))))
+                            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+                            ))))))
   in
   let term =
     Term.(
       ret
         (const make $ instance $ data_dir_opt $ rpc_addr $ net_addr
        $ node_instance $ extra_args $ service_user $ app_bin_dir $ auto_enable
-       $ logging_mode_term))
+       $ Cli_helpers.logging_mode_term))
   in
   let info =
     Cmd.info
@@ -1423,7 +946,7 @@ let instance_term =
     match (instance, action) with
     | None, _ -> `Help (`Pager, None)
     | Some _, None ->
-        cmdliner_error
+        Cli_helpers.cmdliner_error
           "ACTION required \
            (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit)"
     | Some inst, Some action -> (
@@ -1449,7 +972,7 @@ let instance_term =
                       Installer.get_stopped_dependents ~instance:inst ()
                     with
                     | Ok [] -> `Ok ()
-                    | Ok stopped_deps when is_interactive () ->
+                    | Ok stopped_deps when Cli_helpers.is_interactive () ->
                         let names =
                           String.concat
                             ", "
@@ -1458,7 +981,7 @@ let instance_term =
                                stopped_deps)
                         in
                         let should_start =
-                          prompt_yes_no
+                          Cli_helpers.prompt_yes_no
                             (Printf.sprintf "Start dependents? (%s)" names)
                             ~default:true
                         in
@@ -1490,9 +1013,9 @@ let instance_term =
                     ", "
                     (List.map (fun s -> s.Service.instance) stopped_deps)
                 in
-                if is_interactive () then
+                if Cli_helpers.is_interactive () then
                   let should_start_deps =
-                    prompt_yes_no
+                    Cli_helpers.prompt_yes_no
                       (Printf.sprintf
                          "Dependencies not running (%s). Start them first?"
                          names)
@@ -1544,7 +1067,7 @@ let instance_term =
                                      stopped_deps)
                               in
                               let should_start =
-                                prompt_yes_no
+                                Cli_helpers.prompt_yes_no
                                   (Printf.sprintf
                                      "Start dependents? (%s)"
                                      names)
@@ -1578,10 +1101,11 @@ let instance_term =
                     `Ok ())
                 else
                   (* Non-interactive mode - just fail like before *)
-                  run_result
+                  Cli_helpers.run_result
                     (Installer.start_service ~quiet:false ~instance:inst ()))
         | Stop ->
-            run_result (Installer.stop_service ~quiet:false ~instance:inst ())
+            Cli_helpers.run_result
+              (Installer.stop_service ~quiet:false ~instance:inst ())
         | Restart -> (
             (* Check for stopped dependencies *)
             let dep_check =
@@ -1603,7 +1127,7 @@ let instance_term =
                       Installer.get_stopped_dependents ~instance:inst ()
                     with
                     | Ok [] -> `Ok ()
-                    | Ok stopped_deps when is_interactive () ->
+                    | Ok stopped_deps when Cli_helpers.is_interactive () ->
                         let names =
                           String.concat
                             ", "
@@ -1612,7 +1136,7 @@ let instance_term =
                                stopped_deps)
                         in
                         let should_restart =
-                          prompt_yes_no
+                          Cli_helpers.prompt_yes_no
                             (Printf.sprintf "Restart dependents? (%s)" names)
                             ~default:true
                         in
@@ -1644,9 +1168,9 @@ let instance_term =
                     ", "
                     (List.map (fun s -> s.Service.instance) stopped_deps)
                 in
-                if is_interactive () then
+                if Cli_helpers.is_interactive () then
                   let should_start_deps =
-                    prompt_yes_no
+                    Cli_helpers.prompt_yes_no
                       (Printf.sprintf
                          "Dependencies not running (%s). Start them first?"
                          names)
@@ -1698,7 +1222,7 @@ let instance_term =
                                      stopped_deps)
                               in
                               let should_restart =
-                                prompt_yes_no
+                                Cli_helpers.prompt_yes_no
                                   (Printf.sprintf
                                      "Restart dependents? (%s)"
                                      names)
@@ -1732,22 +1256,25 @@ let instance_term =
                     `Ok ())
                 else
                   (* Non-interactive mode - just fail like before *)
-                  run_result
+                  Cli_helpers.run_result
                     (Installer.restart_service ~quiet:false ~instance:inst ()))
         | Remove -> (
             (* Check for dependents and confirm if any *)
             match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> cmdliner_error msg
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let proceed =
                   if svc.S.dependents = [] then true
-                  else if is_interactive () then (
+                  else if Cli_helpers.is_interactive () then (
                     Format.printf
                       "This will stop dependent instances: %s@."
                       (String.concat ", " svc.S.dependents) ;
-                    prompt_yes_no "Proceed with removal?" ~default:false)
+                    Cli_helpers.prompt_yes_no
+                      "Proceed with removal?"
+                      ~default:false)
                   else (
                     Format.printf
                       "Instance has dependents: %s. Use --yes to confirm.@."
@@ -1755,7 +1282,7 @@ let instance_term =
                     false)
                 in
                 if proceed then
-                  run_result
+                  Cli_helpers.run_result
                     (Installer.remove_service
                        ~quiet:false
                        ~delete_data_dir
@@ -1763,11 +1290,12 @@ let instance_term =
                        ())
                 else `Ok ())
         | Purge ->
-            run_result
+            Cli_helpers.run_result
               (Installer.purge_service
                  ~quiet:false
                  ~prompt_yes_no:
-                   (if is_interactive () then prompt_yes_no
+                   (if Cli_helpers.is_interactive () then
+                      Cli_helpers.prompt_yes_no
                     else fun _ ~default:_ -> false)
                  ~instance:inst
                  ())
@@ -1777,13 +1305,15 @@ let instance_term =
                 Cli_output.print_service_details svc ;
                 `Ok ()
             | Ok None ->
-                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
-            | Error (`Msg msg) -> cmdliner_error msg)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
         | Show_service -> (
             match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> cmdliner_error msg
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let role = svc.S.role in
                 let unit = Systemd.unit_name role inst in
@@ -1826,9 +1356,10 @@ let instance_term =
                 `Ok ())
         | Logs -> (
             match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> cmdliner_error msg
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let role = svc.S.role in
                 let user_flag = if Common.is_root () then "" else "--user " in
@@ -1846,9 +1377,10 @@ let instance_term =
                 `Ok ())
         | Edit -> (
             match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> cmdliner_error msg
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let role = svc.S.role in
                 (* List dependents that will be stopped *)
@@ -1863,8 +1395,9 @@ let instance_term =
                 in
                 (* Confirm before proceeding in interactive mode *)
                 let proceed =
-                  if not (is_interactive ()) then true
-                  else prompt_yes_no "Proceed with edit?" ~default:true
+                  if not (Cli_helpers.is_interactive ()) then true
+                  else
+                    Cli_helpers.prompt_yes_no "Proceed with edit?" ~default:true
                 in
                 if not proceed then (
                   print_endline "Cancelled." ;
@@ -1964,7 +1497,9 @@ let instance_term =
                     "@.Enter new values (press Enter to keep current):@." ;
                   (* Prompt for new instance name first *)
                   let new_instance =
-                    prompt_input ~default:(inst, inst) "Instance name"
+                    Cli_helpers.prompt_input
+                      ~default:(inst, inst)
+                      "Instance name"
                     |> Option.value ~default:inst
                   in
                   let is_rename = new_instance <> inst in
@@ -1973,19 +1508,19 @@ let instance_term =
                     | "node" ->
                         (* Node: edit RPC addr, P2P addr, extra args *)
                         let new_rpc =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(svc.rpc_addr, svc.rpc_addr)
                             "RPC address"
                           |> Option.value ~default:svc.rpc_addr
                         in
                         let new_net =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(svc.net_addr, svc.net_addr)
                             "P2P address"
                           |> Option.value ~default:svc.net_addr
                         in
                         let new_extra =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(extra_args_str, extra_args_str)
                             "Extra args"
                           |> Option.value ~default:extra_args_str
@@ -1998,7 +1533,7 @@ let instance_term =
                         (* Validate ports *)
                         let ( let* ) = Result.bind in
                         let* new_rpc =
-                          validate_port_addr
+                          Cli_helpers.validate_port_addr
                             ~label:"RPC address"
                             ~addr:new_rpc
                             ~default:svc.rpc_addr
@@ -2006,7 +1541,7 @@ let instance_term =
                             ()
                         in
                         let* new_net =
-                          validate_port_addr
+                          Cli_helpers.validate_port_addr
                             ~label:"P2P address"
                             ~addr:new_net
                             ~default:svc.net_addr
@@ -2054,7 +1589,7 @@ let instance_term =
                         in
                         let new_delegates =
                           if known_delegates = [] then
-                            prompt_input
+                            Cli_helpers.prompt_input
                               ~default:(delegates, delegates)
                               "Delegates (comma-separated)"
                             |> Option.value ~default:delegates
@@ -2063,7 +1598,7 @@ let instance_term =
                               "  Known delegates: %s@."
                               (String.concat ", " known_delegates) ;
                             match
-                              prompt_with_multi_completion
+                              Cli_helpers.prompt_with_multi_completion
                                 "Delegates (comma-separated)"
                                 known_delegates
                             with
@@ -2076,13 +1611,15 @@ let instance_term =
                             if lb_vote = "" then "pass" else lb_vote
                           in
                           match
-                            prompt_with_completion "LB vote" completions
+                            Cli_helpers.prompt_with_completion
+                              "LB vote"
+                              completions
                           with
                           | Some "" | None -> default_val
                           | Some v -> String.trim v
                         in
                         let new_extra =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(extra_args_str, extra_args_str)
                             "Extra args"
                           |> Option.value ~default:extra_args_str
@@ -2123,7 +1660,9 @@ let instance_term =
                               "  Available nodes: %s@."
                               (String.concat ", " node_names) ;
                             match
-                              prompt_with_completion "Node instance" node_names
+                              Cli_helpers.prompt_with_completion
+                                "Node instance"
+                                node_names
                             with
                             | Some "" | None -> current_node
                             | Some v -> String.trim v)
@@ -2169,7 +1708,7 @@ let instance_term =
                               "  Available DAL nodes: %s@."
                               (String.concat ", " ("none" :: dal_names)) ;
                             match
-                              prompt_with_completion
+                              Cli_helpers.prompt_with_completion
                                 "DAL node"
                                 ("none" :: "auto" :: dal_names)
                             with
@@ -2268,7 +1807,9 @@ let instance_term =
                               "  Available nodes: %s@."
                               (String.concat ", " node_names) ;
                             match
-                              prompt_with_completion "Node instance" node_names
+                              Cli_helpers.prompt_with_completion
+                                "Node instance"
+                                node_names
                             with
                             | Some "" | None -> current_node
                             | Some v -> String.trim v)
@@ -2279,7 +1820,7 @@ let instance_term =
                           else Installer_types.Remote_endpoint new_node
                         in
                         let new_extra =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(extra_args_str, extra_args_str)
                             "Extra args"
                           |> Option.value ~default:extra_args_str
@@ -2333,7 +1874,9 @@ let instance_term =
                               "  Available nodes: %s@."
                               (String.concat ", " node_names) ;
                             match
-                              prompt_with_completion "Node instance" node_names
+                              Cli_helpers.prompt_with_completion
+                                "Node instance"
+                                node_names
                             with
                             | Some "" | None -> current_node
                             | Some v -> String.trim v)
@@ -2359,19 +1902,19 @@ let instance_term =
                         let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
                         let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
                         let new_rpc =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(dal_rpc, dal_rpc)
                             "DAL RPC address"
                           |> Option.value ~default:dal_rpc
                         in
                         let new_net =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(dal_net, dal_net)
                             "DAL P2P address"
                           |> Option.value ~default:dal_net
                         in
                         let new_extra =
-                          prompt_input
+                          Cli_helpers.prompt_input
                             ~default:(extra_args_str, extra_args_str)
                             "Extra args"
                           |> Option.value ~default:extra_args_str
@@ -2384,7 +1927,7 @@ let instance_term =
                         (* Validate ports *)
                         let ( let* ) = Result.bind in
                         let* new_rpc =
-                          validate_port_addr
+                          Cli_helpers.validate_port_addr
                             ~label:"DAL RPC address"
                             ~addr:new_rpc
                             ~default:dal_rpc
@@ -2392,7 +1935,7 @@ let instance_term =
                             ()
                         in
                         let* new_net =
-                          validate_port_addr
+                          Cli_helpers.validate_port_addr
                             ~label:"DAL P2P address"
                             ~addr:new_net
                             ~default:dal_net
@@ -2469,19 +2012,22 @@ let instance_term =
                             msg ;
                           `Ok ())
                   | Error msg ->
-                      cmdliner_error (Printf.sprintf "Edit failed: %s" msg)))
+                      Cli_helpers.cmdliner_error
+                        (Printf.sprintf "Edit failed: %s" msg)))
         | Export_logs -> (
             match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> cmdliner_error msg
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) -> (
                 match Log_export.export_logs ~instance:inst ~svc with
                 | Ok archive_path ->
                     Format.printf "Logs exported to: %s@." archive_path ;
                     `Ok ()
                 | Error (`Msg msg) ->
-                    cmdliner_error (Printf.sprintf "Export failed: %s" msg))))
+                    Cli_helpers.cmdliner_error
+                      (Printf.sprintf "Export failed: %s" msg))))
   in
   Term.(ret (const run $ instance $ action $ delete_data_dir))
 
@@ -2503,8 +2049,9 @@ let list_cmd =
           | Ok services ->
               Cli_output.print_services services ;
               `Ok ()
-          | Error (`Msg msg) -> cmdliner_error msg)
-      | None -> cmdliner_error "Service manager capability not available"
+          | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
+      | None ->
+          Cli_helpers.cmdliner_error "Service manager capability not available"
     in
     Term.(ret (const run $ const ()))
   in
@@ -2516,7 +2063,7 @@ let purge_all_cmd =
     let run () =
       Capabilities.register () ;
       match Service_registry.list () with
-      | Error (`Msg msg) -> cmdliner_error msg
+      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok services ->
           if services = [] then (
             print_endline "No services registered to purge." ;
@@ -2539,7 +2086,8 @@ let purge_all_cmd =
                   Installer.purge_service
                     ~quiet:false
                     ~prompt_yes_no:
-                      (if is_interactive () then prompt_yes_no
+                      (if Cli_helpers.is_interactive () then
+                         Cli_helpers.prompt_yes_no
                        else fun _ ~default:_ -> false)
                     ~instance
                     ()
@@ -2566,7 +2114,7 @@ let purge_all_cmd =
                   "@.%d instance(s) failed to purge"
                   (List.length !failures)
               in
-              cmdliner_error error_summary
+              Cli_helpers.cmdliner_error error_summary
     in
     Term.(ret (const run $ const ()))
   in
@@ -2592,7 +2140,7 @@ let cleanup_orphans_cmd =
     let run dry_run =
       Capabilities.register () ;
       match Installer.find_orphan_directories () with
-      | Error (`Msg msg) -> cmdliner_error msg
+      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok (orphan_dirs, orphan_logs) -> (
           if orphan_dirs = [] && orphan_logs = [] then (
             print_endline "No orphan directories or files found." ;
@@ -2604,7 +2152,7 @@ let cleanup_orphans_cmd =
             `Ok ())
           else
             match Installer.cleanup_orphans ~dry_run:false with
-            | Error (`Msg msg) -> cmdliner_error msg
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok (removed, errors) ->
                 List.iter (fun p -> Format.printf "  ✓ Removed: %s@." p) removed ;
                 List.iter
@@ -2617,7 +2165,7 @@ let cleanup_orphans_cmd =
                     (List.length removed) ;
                   `Ok ())
                 else
-                  cmdliner_error
+                  Cli_helpers.cmdliner_error
                     (Printf.sprintf
                        "%d item(s) failed to remove"
                        (List.length errors)))
@@ -2638,7 +2186,7 @@ let cleanup_dependencies_cmd =
     let run () =
       Capabilities.register () ;
       match Installer.cleanup_dependencies () with
-      | Error (`Msg msg) -> cmdliner_error msg
+      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok 0 ->
           print_endline "No stale dependency entries found." ;
           `Ok ()
@@ -2698,7 +2246,7 @@ let list_networks_cmd =
                   n.network_url)
               infos ;
           `Ok ()
-      | Error (`Msg msg) -> cmdliner_error msg
+      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
     in
     Term.(ret (const run $ output_json))
   in
@@ -2720,7 +2268,7 @@ let list_snapshots_cmd =
   let term =
     let run network output_json =
       match Snapshots.slug_of_network network with
-      | None -> cmdliner_error "--network cannot be empty"
+      | None -> Cli_helpers.cmdliner_error "--network cannot be empty"
       | Some slug -> (
           match Snapshots.list ~network_slug:slug with
           | Ok entries ->
@@ -2731,7 +2279,7 @@ let list_snapshots_cmd =
                 Yojson.Safe.pretty_to_string json |> print_endline
               else List.iter Cli_output.print_snapshot_entry entries ;
               `Ok ()
-          | Error (`Msg msg) -> cmdliner_error msg)
+          | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
     in
     Term.(ret (const run $ network $ output_json))
   in
@@ -2774,7 +2322,7 @@ let ui_term =
            in
            match result with
            | Ok () -> `Ok ()
-           | Error (`Msg msg) -> cmdliner_error msg)
+           | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
       $ page_arg $ log_flag $ logfile_arg))
 
 let ui_cmd =
