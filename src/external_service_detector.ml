@@ -500,6 +500,73 @@ let build_external_service ~unit_name ~exec_start ~properties =
 
   {External_service.config; suggested_instance_name}
 
+let infer_network_from_endpoint services =
+  (* Build a map of RPC addr -> network for nodes *)
+  let node_networks = Hashtbl.create 17 in
+  List.iter
+    (fun (svc : External_service.t) ->
+      match
+        ( svc.config.role.value,
+          svc.config.network.value,
+          svc.config.rpc_addr.value )
+      with
+      | Some External_service.Node, Some network, Some rpc_addr ->
+          (* Normalize rpc_addr: remove http:// prefix if present *)
+          let normalized_addr =
+            if String.starts_with ~prefix:"http://" rpc_addr then
+              String.sub rpc_addr 7 (String.length rpc_addr - 7)
+            else rpc_addr
+          in
+          Format.eprintf
+            "[DEBUG] Registering node network mapping: %s -> %s@."
+            normalized_addr
+            network ;
+          Hashtbl.replace node_networks normalized_addr network
+      | _ -> ())
+    services ;
+
+  (* Now update bakers/accusers/dal-nodes that have unknown network but known endpoint *)
+  List.map
+    (fun (svc : External_service.t) ->
+      match
+        ( svc.config.role.value,
+          svc.config.network.value,
+          svc.config.node_endpoint.value )
+      with
+      | ( Some
+            ( External_service.Baker | External_service.Accuser
+            | External_service.Dal_node ),
+          None,
+          Some endpoint ) -> (
+          (* Normalize endpoint *)
+          let normalized_endpoint =
+            if String.starts_with ~prefix:"http://" endpoint then
+              String.sub endpoint 7 (String.length endpoint - 7)
+            else endpoint
+          in
+          Format.eprintf
+            "[DEBUG] %s: Looking up network for endpoint %s@."
+            svc.config.unit_name
+            normalized_endpoint ;
+          match Hashtbl.find_opt node_networks normalized_endpoint with
+          | Some network ->
+              Format.eprintf
+                "[DEBUG] %s: Found network %s from connected node@."
+                svc.config.unit_name
+                network ;
+              let new_network =
+                External_service.inferred ~source:"connected node" network
+              in
+              {svc with config = {svc.config with network = new_network}}
+          | None ->
+              Format.eprintf
+                "[DEBUG] %s: No node found for endpoint %s@."
+                svc.config.unit_name
+                normalized_endpoint ;
+              svc)
+      | _ -> svc)
+    services
+
 let detect () =
   try
     (* List all service units *)
@@ -536,10 +603,13 @@ let detect () =
         all_units
     in
 
-    (* Update cache *)
-    Mutex.protect cache_lock (fun () -> cache := external_services) ;
+    (* Infer networks from connected nodes *)
+    let enriched_services = infer_network_from_endpoint external_services in
 
-    Ok external_services
+    (* Update cache *)
+    Mutex.protect cache_lock (fun () -> cache := enriched_services) ;
+
+    Ok enriched_services
   with e ->
     let msg = Printf.sprintf "Detection failed: %s" (Printexc.to_string e) in
     Error msg
