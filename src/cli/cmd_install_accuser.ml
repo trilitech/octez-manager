@@ -94,7 +94,7 @@ let install_accuser_cmd =
           preserve_data = false;
         }
       in
-      match Installer.install_accuser req with
+      match Accuser.install_accuser req with
       | Ok svc -> Ok svc
       | Error (`Msg msg) -> Error msg
     in
