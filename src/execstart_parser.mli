@@ -17,6 +17,8 @@
 (** Parsed command line arguments and flags *)
 type parsed_args = {
   binary_path : string option;
+  subcommand : string option;
+      (** Subcommand after binary, e.g., "run", "dal" *)
   data_dir : string option;
   base_dir : string option;
   rpc_addr : string option;

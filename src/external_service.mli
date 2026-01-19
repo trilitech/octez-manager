@@ -21,8 +21,9 @@ val role_to_string : role -> string
 val role_of_string : string -> role
 
 (** Map binary name to role.
+    @param subcommand Optional subcommand (e.g., "dal" for octez-baker run dal)
     @param binary_name e.g., "octez-node", "octez-baker-PsParisC" *)
-val role_of_binary_name : string -> role
+val role_of_binary_name : ?subcommand:string -> string -> role
 
 (** {1 Confidence Tracking} *)
 
