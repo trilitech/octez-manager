@@ -195,13 +195,12 @@ let install_baker_cmd =
                           | Some svc ->
                               Ok
                                 ( Dal_endpoint
-                                    (Installer.endpoint_of_rpc
+                                    (Config.endpoint_of_rpc
                                        svc.Service.rpc_addr),
                                   Some svc.instance )
                           | None ->
                               Ok
-                                ( Dal_endpoint
-                                    (Installer.endpoint_of_rpc selected),
+                                ( Dal_endpoint (Config.endpoint_of_rpc selected),
                                   None ))
                     in
                     loop ()

@@ -123,7 +123,7 @@ let install_node_cmd =
         match data_dir with
         | None -> Ok None
         | Some data_dir ->
-            let* r = Installer.resolve_from_data_dir data_dir in
+            let* r = Config.resolve_from_data_dir data_dir in
             Ok (Some r)
       in
       (* When preserving data, config.json must exist in the data directory *)

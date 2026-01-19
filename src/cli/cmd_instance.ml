@@ -823,7 +823,7 @@ let instance_term =
                             | Some "" | None ->
                                 if current_dal <> "" then
                                   ( Installer_types.Dal_endpoint
-                                      (Installer.endpoint_of_rpc
+                                      (Config.endpoint_of_rpc
                                          (match
                                             List.find_opt
                                               (fun (s : Service.t) ->
@@ -858,11 +858,11 @@ let instance_term =
                                     | None -> "127.0.0.1:10732"
                                   in
                                   ( Installer_types.Dal_endpoint
-                                      (Installer.endpoint_of_rpc rpc),
+                                      (Config.endpoint_of_rpc rpc),
                                     Some selected )
                                 else
                                   ( Installer_types.Dal_endpoint
-                                      (Installer.endpoint_of_rpc selected),
+                                      (Config.endpoint_of_rpc selected),
                                     None ))
                         in
                         let req : Installer_types.baker_request =
@@ -999,13 +999,13 @@ let instance_term =
                             in
                             let ep =
                               match node_svc with
-                              | Some s -> Installer.endpoint_of_rpc s.rpc_addr
+                              | Some s -> Config.endpoint_of_rpc s.rpc_addr
                               | None -> "http://127.0.0.1:8732"
                             in
                             (Some new_node, ep)
                           else
                             (* Remote endpoint *)
-                            (None, Installer.endpoint_of_rpc new_node)
+                            (None, Config.endpoint_of_rpc new_node)
                         in
                         let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
                         let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in

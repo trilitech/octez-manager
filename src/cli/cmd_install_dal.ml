@@ -98,12 +98,12 @@ let install_dal_node_cmd =
             | Ok node_mode -> (
                 let node_endpoint =
                   match node_mode with
-                  | `Endpoint ep -> Installer.endpoint_of_rpc ep
+                  | `Endpoint ep -> Config.endpoint_of_rpc ep
                   | `Instance inst -> (
                       match Service_registry.find ~instance:inst with
                       | Ok (Some svc) ->
-                          Installer.endpoint_of_rpc svc.Service.rpc_addr
-                      | _ -> Installer.endpoint_of_rpc "127.0.0.1:8732")
+                          Config.endpoint_of_rpc svc.Service.rpc_addr
+                      | _ -> Config.endpoint_of_rpc "127.0.0.1:8732")
                 in
                 let maybe_network =
                   match node_mode with
