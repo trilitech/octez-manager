@@ -24,6 +24,9 @@ include Instances_layout
 let init_state () =
   let services = load_services () in
   let external_services = load_external_services () in
+  Format.eprintf
+    "[DEBUG] Loaded %d external services@."
+    (List.length external_services) ;
   (* Start with all instances folded by default *)
   let all_folded =
     List.fold_left
@@ -40,8 +43,8 @@ let init_state () =
       external_services;
       selected = 0;
       folded = all_folded;
-      external_folded = true;
-      (* Start with external section folded *)
+      external_folded = false;
+      (* Start with external section UNFOLDED for testing *)
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
