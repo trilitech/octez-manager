@@ -10,6 +10,11 @@
 module Service_state = Data.Service_state
 open Instances_state
 
+(** Layout configuration constants *)
+val min_column_width : int
+
+val column_separator : string
+
 (** Role ordering for grouping *)
 val role_order : string -> int
 
