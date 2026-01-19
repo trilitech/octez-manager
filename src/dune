@@ -26,6 +26,7 @@
   node
   dal_node
   baker
+  accuser
   teztnets
   snapshots
   settings
