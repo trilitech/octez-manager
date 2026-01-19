@@ -69,21 +69,61 @@ let init () =
   let make_state instance role source pager cleanup_files =
     Navigation.make {instance; role; source; pager; cleanup_files}
   in
-  match Context.take_pending_instance_detail () with
-  | Some instance -> (
-      match Service_registry.find ~instance with
-      | Ok (Some svc) ->
-          (* Try journalctl first (primary source), fall back to daily logs *)
-          let source, pager, cleanup =
-            match
-              Log_viewer.get_log_cmd
-                ~role:svc.Service.role
-                ~instance
-                ~source:Journald
-            with
-            | Ok cmd -> (
-                match open_stream_via_file ~title:"journalctl" cmd with
-                | Ok (fp, tmp) -> (Log_viewer.Journald, FileTail fp, [tmp])
+  (* Check for external service first *)
+  match Context.take_pending_external_unit () with
+  | Some unit_name ->
+      (* External service - use journalctl with unit name directly *)
+      let cmd =
+        if Common.is_root () then
+          Printf.sprintf
+            "journalctl -u %s -f -n 1000 -o cat"
+            (Filename.quote unit_name)
+        else
+          Printf.sprintf
+            "journalctl --user -u %s -f -n 1000 -o cat"
+            (Filename.quote unit_name)
+      in
+      let source, pager, cleanup =
+        match open_stream_via_file ~title:"journalctl" cmd with
+        | Ok (fp, tmp) -> (Log_viewer.Journald, FileTail fp, [tmp])
+        | Error (`Msg e) ->
+            let p = Pager.open_text ~title:"Error" e in
+            (Log_viewer.Journald, Static p, [])
+      in
+      make_state unit_name "external" source pager cleanup
+  | None -> (
+      (* Managed service - use instance detail *)
+      match Context.take_pending_instance_detail () with
+      | Some instance -> (
+          match Service_registry.find ~instance with
+          | Ok (Some svc) ->
+              (* Try journalctl first (primary source), fall back to daily logs *)
+              let source, pager, cleanup =
+                match
+                  Log_viewer.get_log_cmd
+                    ~role:svc.Service.role
+                    ~instance
+                    ~source:Journald
+                with
+                | Ok cmd -> (
+                    match open_stream_via_file ~title:"journalctl" cmd with
+                    | Ok (fp, tmp) -> (Log_viewer.Journald, FileTail fp, [tmp])
+                    | Error _ -> (
+                        (* Fall back to daily logs *)
+                        match
+                          Log_viewer.get_daily_log_file
+                            ~role:svc.Service.role
+                            ~instance
+                        with
+                        | Ok log_file -> (
+                            match open_file_with_tail log_file with
+                            | Ok fp -> (Log_viewer.DailyLogs, FileTail fp, [])
+                            | Error e ->
+                                let p = Pager.open_text ~title:"Error" e in
+                                (Log_viewer.DailyLogs, Static p, []))
+                        | Error (`Msg e) ->
+                            let p = Pager.open_text ~title:"Error" e in
+                            (Log_viewer.DailyLogs, Static p, [])))
                 | Error _ -> (
                     (* Fall back to daily logs *)
                     match
@@ -99,36 +139,22 @@ let init () =
                             (Log_viewer.DailyLogs, Static p, []))
                     | Error (`Msg e) ->
                         let p = Pager.open_text ~title:"Error" e in
-                        (Log_viewer.DailyLogs, Static p, [])))
-            | Error _ -> (
-                (* Fall back to daily logs *)
-                match
-                  Log_viewer.get_daily_log_file ~role:svc.Service.role ~instance
-                with
-                | Ok log_file -> (
-                    match open_file_with_tail log_file with
-                    | Ok fp -> (Log_viewer.DailyLogs, FileTail fp, [])
-                    | Error e ->
-                        let p = Pager.open_text ~title:"Error" e in
                         (Log_viewer.DailyLogs, Static p, []))
-                | Error (`Msg e) ->
-                    let p = Pager.open_text ~title:"Error" e in
-                    (Log_viewer.DailyLogs, Static p, []))
-          in
-          make_state instance svc.Service.role source pager cleanup
-      | Ok None ->
+              in
+              make_state instance svc.Service.role source pager cleanup
+          | Ok None ->
+              let pager =
+                Static (Pager.open_text ~title:"Error" "Instance not found")
+              in
+              make_state instance "" Journald pager []
+          | Error (`Msg e) ->
+              let pager = Static (Pager.open_text ~title:"Error" e) in
+              make_state instance "" Journald pager [])
+      | None ->
           let pager =
-            Static (Pager.open_text ~title:"Error" "Instance not found")
+            Static (Pager.open_text ~title:"Error" "No instance selected")
           in
-          make_state instance "" Journald pager []
-      | Error (`Msg e) ->
-          let pager = Static (Pager.open_text ~title:"Error" e) in
-          make_state instance "" Journald pager [])
-  | None ->
-      let pager =
-        Static (Pager.open_text ~title:"Error" "No instance selected")
-      in
-      make_state "" "" Journald pager []
+          make_state "" "" Journald pager [])
 
 let update ps _ = ps
 
