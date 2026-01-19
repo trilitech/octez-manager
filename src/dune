@@ -23,6 +23,7 @@
   helpers
   snapshot
   config
+  node
   teztnets
   snapshots
   settings

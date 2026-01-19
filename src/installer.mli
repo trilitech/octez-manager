@@ -9,12 +9,6 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val install_node :
-  ?quiet:bool ->
-  ?on_log:(string -> unit) ->
-  node_request ->
-  (Service.t, [`Msg of string]) result
-
 val install_daemon :
   ?quiet:bool -> daemon_request -> (Service.t, [`Msg of string]) result
 

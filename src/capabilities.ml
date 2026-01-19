@@ -105,7 +105,7 @@ module Service_lifecycle_impl = struct
 end
 
 module Package_manager : Package_manager = struct
-  let install_node = Installer.install_node
+  let install_node = Node.install_node
 
   let install_daemon = Installer.install_daemon
 
