@@ -688,6 +688,11 @@ Press **Enter** to open instance menu.|}
         | Some (Keys.Char "l") ->
             Navigation.update (fun s -> move_column s 1) ps
         | Some Keys.Tab -> Navigation.update toggle_fold ps
+        | Some (Keys.Char "e") ->
+            (* Toggle external services section *)
+            Navigation.update
+              (fun s -> {s with external_folded = not s.external_folded})
+              ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
         | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
