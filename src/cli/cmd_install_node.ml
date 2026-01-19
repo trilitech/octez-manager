@@ -227,7 +227,7 @@ let install_node_cmd =
               keep_snapshot;
             }
           in
-          Result.map_error (fun (`Msg s) -> s) @@ Installer.install_node req
+          Result.map_error (fun (`Msg s) -> s) @@ Node.install_node req
       | Some (`Path _) | None ->
           let* instance = instance () in
           let* network =
@@ -356,7 +356,7 @@ let install_node_cmd =
               keep_snapshot;
             }
           in
-          Result.map_error (fun (`Msg s) -> s) @@ Installer.install_node req
+          Result.map_error (fun (`Msg s) -> s) @@ Node.install_node req
     in
     match res with
     | Ok service ->
