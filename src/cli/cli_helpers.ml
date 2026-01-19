@@ -7,7 +7,6 @@
 
 open Cmdliner
 open Octez_manager_lib
-
 module Term = Cmdliner.Term
 
 let cmdliner_error msg = `Error (false, msg)
@@ -504,4 +503,3 @@ let history_mode_opt_term =
     value
     & opt (some (enum history_mode_choices)) None
     & info ["history-mode"] ~doc:history_mode_doc ~docv:"MODE")
-

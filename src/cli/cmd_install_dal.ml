@@ -8,7 +8,6 @@
 open Cmdliner
 open Octez_manager_lib
 open Installer_types
-
 module S = Service
 
 let install_dal_node_cmd =
@@ -92,7 +91,9 @@ let install_dal_node_cmd =
               | Some dir when String.trim dir <> "" -> dir
               | _ -> Common.default_role_dir "dal-node" instance
             in
-            match Cli_helpers.resolve_node_instance_or_endpoint ~node_instance with
+            match
+              Cli_helpers.resolve_node_instance_or_endpoint ~node_instance
+            with
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok node_mode -> (
                 let node_endpoint =
@@ -175,7 +176,8 @@ let install_dal_node_cmd =
                                   service.S.instance
                                   service.network ;
                                 `Ok ()
-                            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg))))))
+                            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+                            ))))))
   in
   let term =
     Term.(
@@ -190,4 +192,3 @@ let install_dal_node_cmd =
       ~doc:"Install a DAL node service (octez-dal-node)"
   in
   Cmd.v info term
-

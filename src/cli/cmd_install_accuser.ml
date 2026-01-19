@@ -8,7 +8,6 @@
 open Cmdliner
 open Octez_manager_lib
 open Installer_types
-
 module S = Service
 
 let install_accuser_cmd =
@@ -109,10 +108,10 @@ let install_accuser_cmd =
     Term.(
       ret
         (const make $ instance $ node_instance $ base_dir $ extra_args
-       $ service_user $ app_bin_dir $ auto_enable $ Cli_helpers.logging_mode_term))
+       $ service_user $ app_bin_dir $ auto_enable
+       $ Cli_helpers.logging_mode_term))
   in
   let info =
     Cmd.info "install-accuser" ~doc:"Install an octez-accuser service"
   in
   Cmd.v info term
-

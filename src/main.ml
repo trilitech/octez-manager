@@ -109,7 +109,10 @@ let install_node_cmd =
         match (preserve_data, data_dir) with
         | true, None ->
             if Cli_helpers.is_interactive () then
-              Ok (Some (Cli_helpers.prompt_required_string "Data directory to preserve"))
+              Ok
+                (Some
+                   (Cli_helpers.prompt_required_string
+                      "Data directory to preserve"))
             else
               Error
                 "--data-dir is required when using --preserve-data in \
@@ -238,7 +241,9 @@ let install_node_cmd =
                         List.map (fun Teztnets.{alias; _} -> alias) infos
                       in
                       let rec loop () =
-                        match Cli_helpers.prompt_with_completion "Network" aliases with
+                        match
+                          Cli_helpers.prompt_with_completion "Network" aliases
+                        with
                         | Some sel -> sel
                         | None ->
                             prerr_endline "Please enter a network." ;
@@ -310,7 +315,9 @@ let install_node_cmd =
                         ~snapshot_url:url
                         ~data_dir:actual_data_dir
                     in
-                    Cli_helpers.resolve_tmp_dir_for_snapshot ~snapshot_url:url ~tmp_dir
+                    Cli_helpers.resolve_tmp_dir_for_snapshot
+                      ~snapshot_url:url
+                      ~tmp_dir
                 | None -> Ok tmp_dir)
             | Genesis -> Ok tmp_dir
           in
@@ -360,243 +367,15 @@ let install_node_cmd =
   let term =
     Term.(
       ret
-        (const make $ instance $ network $ Cli_helpers.history_mode_opt_term $ data_dir
-       $ rpc_addr $ net_addr $ service_user $ app_bin_dir $ extra_args
-       $ snapshot_flag $ snapshot_uri $ snapshot_no_check $ auto_enable
-       $ preserve_data $ tmp_dir $ keep_snapshot $ Cli_helpers.logging_mode_term))
+        (const make $ instance $ network $ Cli_helpers.history_mode_opt_term
+       $ data_dir $ rpc_addr $ net_addr $ service_user $ app_bin_dir
+       $ extra_args $ snapshot_flag $ snapshot_uri $ snapshot_no_check
+       $ auto_enable $ preserve_data $ tmp_dir $ keep_snapshot
+       $ Cli_helpers.logging_mode_term))
   in
   let info =
     Cmd.info "install-node" ~doc:"Install an octez-node systemd instance"
   in
-  Cmd.v info term
-
-let install_baker_cmd =
-  let instance =
-    let doc = "Instance name for the baker systemd unit." in
-    Arg.(value & opt (some string) None & info ["instance"] ~doc ~docv:"NAME")
-  in
-  let node_instance =
-    let doc =
-      "Existing octez-manager node instance to reuse for data-dir and network. \
-       Use 'octez-manager list' to see available node instances. It can also \
-       be a custom RPC endpoint for the baker to contact. Defaults to \
-       http://127.0.0.1:8732"
-    in
-    Arg.(
-      value & opt (some string) None & info ["node-instance"] ~doc ~docv:"NODE")
-  in
-  let base_dir =
-    let doc =
-      "Baker base directory for wallets (defaults to an instance-specific \
-       path)."
-    in
-    Arg.(value & opt (some string) None & info ["base-dir"] ~doc ~docv:"DIR")
-  in
-  let delegates =
-    let doc = "Delegate key hash or alias passed as --delegate." in
-    Arg.(value & opt_all string [] & info ["delegate"] ~doc ~docv:"KEY")
-  in
-  let dal_endpoint =
-    let doc =
-      "DAL node endpoint (e.g., http://localhost:10732). Use 'none' to opt-out \
-       with --without-dal flag. Defaults to 'none'."
-    in
-    Arg.(
-      value
-      & opt (some string) None
-      & info ["dal-endpoint"] ~doc ~docv:"ENDPOINT")
-  in
-  let liquidity_baking_vote =
-    let doc =
-      "Liquidity baking toggle vote (on, off or pass). Defaults to 'pass'."
-    in
-    Arg.(
-      value
-      & opt (some string) None
-      & info ["liquidity-baking-vote"] ~doc ~docv:"VOTE")
-  in
-  let extra_args =
-    let doc = "Additional arguments appended to the baker command." in
-    Arg.(value & opt_all string [] & info ["extra-arg"] ~doc ~docv:"ARG")
-  in
-  let default_user =
-    if Common.is_root () then "octez"
-    else fst (Common.current_user_group_names ())
-  in
-  let service_user =
-    Arg.(
-      value & opt string default_user
-      & info ["service-user"] ~doc:"System user owning the service" ~docv:"USER")
-  in
-  let app_bin_dir =
-    let doc = "Directory containing Octez binaries." in
-    Arg.(value & opt (some string) None & info ["app-bin-dir"] ~doc ~docv:"DIR")
-  in
-  let auto_enable =
-    Arg.(
-      value & flag
-      & info ["no-enable"] ~doc:"Disable automatic systemctl enable --now")
-  in
-  let make instance_opt node_instance base_dir delegates dal_endpoint_opt
-      liquidity_baking_vote_opt extra_args service_user app_bin_dir no_enable
-      logging_mode =
-    let res =
-      let ( let* ) = Result.bind in
-      let* app_bin_dir = Cli_helpers.resolve_app_bin_dir app_bin_dir in
-      let* instance =
-        match Cli_helpers.normalize_opt_string instance_opt with
-        | Some inst -> Ok inst
-        | None ->
-            if Cli_helpers.is_interactive () then
-              Ok (Cli_helpers.prompt_required_string "Instance name")
-            else Error "Instance name is required in non-interactive mode"
-      in
-      let* choice =
-        Result.map_error (fun (`Msg s) -> s)
-        @@ Cli_helpers.resolve_node_instance_or_endpoint ~node_instance
-      in
-      let node_mode =
-        match choice with
-        | `Instance ins -> Local_instance ins
-        | `Endpoint endpoint -> Remote_endpoint endpoint
-      in
-      let* liquidity_baking_vote =
-        match Cli_helpers.normalize_opt_string liquidity_baking_vote_opt with
-        | Some vote -> Ok (Some vote)
-        | None ->
-            if Cli_helpers.is_interactive () then
-              let completions = ["on"; "off"; "pass"] in
-              let rec ask () =
-                match
-                  Cli_helpers.prompt_with_completion "Liquidity baking vote" completions
-                with
-                | Some v -> Ok (Some v)
-                | None ->
-                    prerr_endline "Please choose 'on', 'off', or 'pass'." ;
-                    ask ()
-              in
-              ask ()
-            else
-              Error "Liquidity baking vote is required in non-interactive mode"
-      in
-      (* Prompt for dal_endpoint if not provided in interactive mode *)
-      (* Track both DAL config and DAL node instance name *)
-      let* dal_config, dal_node =
-        match Cli_helpers.normalize_opt_string dal_endpoint_opt with
-        | Some ep ->
-            let normalized = String.lowercase_ascii (String.trim ep) in
-            if normalized = "none" then Ok (Dal_disabled, None)
-            else Ok (Dal_endpoint ep, None)
-        | None ->
-            if Cli_helpers.is_interactive () then
-              (* Get list of available DAL node instances *)
-              match Service_registry.list () with
-              | Error (`Msg msg) ->
-                  prerr_endline ("Warning: Could not load services: " ^ msg) ;
-                  Ok (Dal_disabled, None)
-              | Ok services ->
-                  let dal_services =
-                    List.filter
-                      (fun (svc : Service.t) ->
-                        let role_lower = String.lowercase_ascii svc.role in
-                        String.equal role_lower "dal-node"
-                        || String.equal role_lower "dal")
-                      services
-                  in
-                  if dal_services = [] then
-                    let choice =
-                      Cli_helpers.prompt_with_completion_inline "DAL Node endpoint" ["none"]
-                      |> Option.map (fun choice ->
-                          String.lowercase_ascii @@ String.trim choice)
-                    in
-                    match choice with
-                    | Some "" | Some "none" | None -> Ok (Dal_disabled, None)
-                    | Some endpoint -> Ok (Dal_endpoint endpoint, None)
-                  else
-                    let rec loop () =
-                      let instance_names =
-                        List.map
-                          (fun (svc : Service.t) -> svc.instance)
-                          dal_services
-                      in
-                      let instance_map =
-                        List.map
-                          (fun (svc : Service.t) ->
-                            (svc.instance, svc.rpc_addr))
-                          dal_services
-                      in
-                      Format.printf
-                        "Available DAL node instances: %s@."
-                        (String.concat
-                           ", "
-                           (List.map
-                              (fun (inst, addr) ->
-                                Printf.sprintf "%s (%s)" inst addr)
-                              instance_map)) ;
-                      match
-                        Cli_helpers.prompt_with_completion
-                          "DAL node instance"
-                          ("none" :: instance_names)
-                      with
-                      | Some "" | None -> loop ()
-                      | Some "none" -> Ok (Dal_disabled, None)
-                      | Some selected -> (
-                          (* Check if input matches existing DAL instance name, otherwise treat as endpoint *)
-                          match
-                            List.find_opt
-                              (fun (svc : Service.t) ->
-                                String.equal svc.instance selected)
-                              dal_services
-                          with
-                          | Some svc ->
-                              Ok
-                                ( Dal_endpoint
-                                    (Installer.endpoint_of_rpc
-                                       svc.Service.rpc_addr),
-                                  Some svc.instance )
-                          | None ->
-                              Ok
-                                ( Dal_endpoint
-                                    (Installer.endpoint_of_rpc selected),
-                                  None ))
-                    in
-                    loop ()
-            else Ok (Dal_disabled, None)
-      in
-      let req : baker_request =
-        {
-          instance;
-          node_mode;
-          base_dir;
-          delegates;
-          dal_config;
-          dal_node;
-          liquidity_baking_vote;
-          extra_args;
-          service_user;
-          app_bin_dir;
-          logging_mode;
-          auto_enable = not no_enable;
-          preserve_data = false;
-        }
-      in
-      (* Installer.install_baker returns an Rresult-style error; convert it to a string-error Result *)
-      match Installer.install_baker req with
-      | Ok service ->
-          Format.printf "Installed %s (%s)\n" service.S.instance service.network ;
-          Ok ()
-      | Error (`Msg s) -> Error s
-    in
-    match res with Ok () -> `Ok () | Error msg -> Cli_helpers.cmdliner_error msg
-  in
-  let term =
-    Term.(
-      ret
-        (const make $ instance $ node_instance $ base_dir $ delegates
-       $ dal_endpoint $ liquidity_baking_vote $ extra_args $ service_user
-       $ app_bin_dir $ auto_enable $ Cli_helpers.logging_mode_term))
-  in
-  let info = Cmd.info "install-baker" ~doc:"Install an octez-baker service" in
   Cmd.v info term
 
 type instance_action =
@@ -801,7 +580,8 @@ let instance_term =
                   Cli_helpers.run_result
                     (Installer.start_service ~quiet:false ~instance:inst ()))
         | Stop ->
-            Cli_helpers.run_result (Installer.stop_service ~quiet:false ~instance:inst ())
+            Cli_helpers.run_result
+              (Installer.stop_service ~quiet:false ~instance:inst ())
         | Restart -> (
             (* Check for stopped dependencies *)
             let dep_check =
@@ -959,7 +739,8 @@ let instance_term =
             match Service_registry.find ~instance:inst with
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                Cli_helpers.cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let proceed =
                   if svc.S.dependents = [] then true
@@ -967,7 +748,9 @@ let instance_term =
                     Format.printf
                       "This will stop dependent instances: %s@."
                       (String.concat ", " svc.S.dependents) ;
-                    Cli_helpers.prompt_yes_no "Proceed with removal?" ~default:false)
+                    Cli_helpers.prompt_yes_no
+                      "Proceed with removal?"
+                      ~default:false)
                   else (
                     Format.printf
                       "Instance has dependents: %s. Use --yes to confirm.@."
@@ -987,7 +770,8 @@ let instance_term =
               (Installer.purge_service
                  ~quiet:false
                  ~prompt_yes_no:
-                   (if Cli_helpers.is_interactive () then Cli_helpers.prompt_yes_no
+                   (if Cli_helpers.is_interactive () then
+                      Cli_helpers.prompt_yes_no
                     else fun _ ~default:_ -> false)
                  ~instance:inst
                  ())
@@ -997,13 +781,15 @@ let instance_term =
                 Cli_output.print_service_details svc ;
                 `Ok ()
             | Ok None ->
-                Cli_helpers.cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
         | Show_service -> (
             match Service_registry.find ~instance:inst with
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                Cli_helpers.cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let role = svc.S.role in
                 let unit = Systemd.unit_name role inst in
@@ -1048,7 +834,8 @@ let instance_term =
             match Service_registry.find ~instance:inst with
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                Cli_helpers.cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let role = svc.S.role in
                 let user_flag = if Common.is_root () then "" else "--user " in
@@ -1068,7 +855,8 @@ let instance_term =
             match Service_registry.find ~instance:inst with
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                Cli_helpers.cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let role = svc.S.role in
                 (* List dependents that will be stopped *)
@@ -1084,7 +872,8 @@ let instance_term =
                 (* Confirm before proceeding in interactive mode *)
                 let proceed =
                   if not (Cli_helpers.is_interactive ()) then true
-                  else Cli_helpers.prompt_yes_no "Proceed with edit?" ~default:true
+                  else
+                    Cli_helpers.prompt_yes_no "Proceed with edit?" ~default:true
                 in
                 if not proceed then (
                   print_endline "Cancelled." ;
@@ -1184,7 +973,9 @@ let instance_term =
                     "@.Enter new values (press Enter to keep current):@." ;
                   (* Prompt for new instance name first *)
                   let new_instance =
-                    Cli_helpers.prompt_input ~default:(inst, inst) "Instance name"
+                    Cli_helpers.prompt_input
+                      ~default:(inst, inst)
+                      "Instance name"
                     |> Option.value ~default:inst
                   in
                   let is_rename = new_instance <> inst in
@@ -1296,7 +1087,9 @@ let instance_term =
                             if lb_vote = "" then "pass" else lb_vote
                           in
                           match
-                            Cli_helpers.prompt_with_completion "LB vote" completions
+                            Cli_helpers.prompt_with_completion
+                              "LB vote"
+                              completions
                           with
                           | Some "" | None -> default_val
                           | Some v -> String.trim v
@@ -1343,7 +1136,9 @@ let instance_term =
                               "  Available nodes: %s@."
                               (String.concat ", " node_names) ;
                             match
-                              Cli_helpers.prompt_with_completion "Node instance" node_names
+                              Cli_helpers.prompt_with_completion
+                                "Node instance"
+                                node_names
                             with
                             | Some "" | None -> current_node
                             | Some v -> String.trim v)
@@ -1488,7 +1283,9 @@ let instance_term =
                               "  Available nodes: %s@."
                               (String.concat ", " node_names) ;
                             match
-                              Cli_helpers.prompt_with_completion "Node instance" node_names
+                              Cli_helpers.prompt_with_completion
+                                "Node instance"
+                                node_names
                             with
                             | Some "" | None -> current_node
                             | Some v -> String.trim v)
@@ -1553,7 +1350,9 @@ let instance_term =
                               "  Available nodes: %s@."
                               (String.concat ", " node_names) ;
                             match
-                              Cli_helpers.prompt_with_completion "Node instance" node_names
+                              Cli_helpers.prompt_with_completion
+                                "Node instance"
+                                node_names
                             with
                             | Some "" | None -> current_node
                             | Some v -> String.trim v)
@@ -1689,19 +1488,22 @@ let instance_term =
                             msg ;
                           `Ok ())
                   | Error msg ->
-                      Cli_helpers.cmdliner_error (Printf.sprintf "Edit failed: %s" msg)))
+                      Cli_helpers.cmdliner_error
+                        (Printf.sprintf "Edit failed: %s" msg)))
         | Export_logs -> (
             match Service_registry.find ~instance:inst with
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok None ->
-                Cli_helpers.cmdliner_error (Printf.sprintf "Unknown instance '%s'" inst)
+                Cli_helpers.cmdliner_error
+                  (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) -> (
                 match Log_export.export_logs ~instance:inst ~svc with
                 | Ok archive_path ->
                     Format.printf "Logs exported to: %s@." archive_path ;
                     `Ok ()
                 | Error (`Msg msg) ->
-                    Cli_helpers.cmdliner_error (Printf.sprintf "Export failed: %s" msg))))
+                    Cli_helpers.cmdliner_error
+                      (Printf.sprintf "Export failed: %s" msg))))
   in
   Term.(ret (const run $ instance $ action $ delete_data_dir))
 
@@ -1724,7 +1526,8 @@ let list_cmd =
               Cli_output.print_services services ;
               `Ok ()
           | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
-      | None -> Cli_helpers.cmdliner_error "Service manager capability not available"
+      | None ->
+          Cli_helpers.cmdliner_error "Service manager capability not available"
     in
     Term.(ret (const run $ const ()))
   in
@@ -1759,7 +1562,8 @@ let purge_all_cmd =
                   Installer.purge_service
                     ~quiet:false
                     ~prompt_yes_no:
-                      (if Cli_helpers.is_interactive () then Cli_helpers.prompt_yes_no
+                      (if Cli_helpers.is_interactive () then
+                         Cli_helpers.prompt_yes_no
                        else fun _ ~default:_ -> false)
                     ~instance
                     ()
@@ -1945,7 +1749,9 @@ let list_snapshots_cmd =
           match Snapshots.list ~network_slug:slug with
           | Ok entries ->
               if output_json then
-                let json = `List (List.map Cli_output.snapshot_entry_to_json entries) in
+                let json =
+                  `List (List.map Cli_output.snapshot_entry_to_json entries)
+                in
                 Yojson.Safe.pretty_to_string json |> print_endline
               else List.iter Cli_output.print_snapshot_entry entries ;
               `Ok ()
@@ -2014,7 +1820,7 @@ let root_cmd =
     [
       instance_cmd;
       install_node_cmd;
-      install_baker_cmd;
+      Cmd_install_baker.install_baker_cmd;
       Cmd_install_accuser.install_accuser_cmd;
       Cmd_install_dal.install_dal_node_cmd;
       list_cmd;

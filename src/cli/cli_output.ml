@@ -25,10 +25,8 @@ let print_services services =
     List.iter (fun svc -> Format.printf "%a@." pp_service svc) services ;
     Format.print_flush ())
 
-
 let pp_logging fmt = function
   | Logging_mode.Journald -> Format.fprintf fmt "journald"
-
 
 let print_service_details svc =
   (* Read env file for this instance *)
@@ -187,7 +185,6 @@ let print_service_details svc =
           "Identity File"
           (Filename.concat dal_dir "identity.json"))
   | _ -> ()
-
 
 let print_snapshot_entry (entry : Snapshots.entry) =
   Format.printf "%s (%s)@." entry.Snapshots.label entry.slug ;

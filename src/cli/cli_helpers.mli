@@ -8,7 +8,6 @@
 (** CLI helper utilities for prompting, validation, and common operations *)
 
 open Octez_manager_lib
-
 module Term = Cmdliner.Term
 
 (** Return cmdliner error with message *)
@@ -24,7 +23,7 @@ val is_interactive : unit -> bool
 val normalize_opt_string : string option -> string option
 
 (** Prompt user for input with optional default value *)
-val prompt_input : ?default:(string * string) -> string -> string option
+val prompt_input : ?default:string * string -> string -> string option
 
 (** Prompt for required string, repeating until valid input *)
 val prompt_required_string : string -> string
@@ -70,10 +69,11 @@ val validate_port_addr :
 (** Resolve node instance or endpoint specification *)
 val resolve_node_instance_or_endpoint :
   node_instance:string option ->
-  ([> `Endpoint of string | `Instance of string ], [ `Msg of string ]) result
+  ([> `Endpoint of string | `Instance of string], [`Msg of string]) result
 
 (** Convert result to cmdliner result type *)
-val run_result : (unit, [< `Msg of string]) result -> [> `Ok of unit | `Error of bool * string]
+val run_result :
+  (unit, [< `Msg of string]) result -> [> `Ok of unit | `Error of bool * string]
 
 (** Cmdliner term for logging mode (always journald) *)
 val logging_mode_term : Logging_mode.t Term.t
