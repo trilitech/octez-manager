@@ -67,5 +67,12 @@ val table_lines_matrix :
 (** Main table rendering function *)
 val table_lines : ?cols:int -> ?visible_height:int -> state -> string list
 
+(** Render external service with fold/unfold *)
+val render_external_service :
+  folded:bool -> Octez_manager_lib.External_service.t -> string list
+
+(** Render external services section *)
+val render_external_services_section : state -> string list
+
 (** Render summary line showing total instances *)
 val summary_line : state -> string

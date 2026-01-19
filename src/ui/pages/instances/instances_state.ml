@@ -37,8 +37,10 @@ let services_start_idx = menu_item_count + 1
 
 type state = {
   services : Service_state.t list;
+  external_services : Octez_manager_lib.External_service.t list;
   selected : int;
   folded : StringSet.t; (* instance names that are folded *)
+  external_folded : bool; (* whether external services section is folded *)
   last_updated : float;
   (* Matrix layout state *)
   num_columns : int; (* number of columns based on terminal width *)

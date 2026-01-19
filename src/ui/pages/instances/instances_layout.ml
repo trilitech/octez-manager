@@ -49,6 +49,11 @@ let load_services () = Data.load_service_states () |> sort_services
 let load_services_fresh () =
   Data.load_service_states ~detail:false () |> sort_services
 
+let load_external_services () =
+  match External_service_detector.detect () with
+  | Ok services -> services
+  | Error _ -> []
+
 (** Calculate number of columns based on terminal width *)
 let calc_num_columns ~cols ~min_column_width ~column_separator =
   let separator_width = String.length column_separator in

@@ -526,6 +526,108 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
       in
       String.concat column_separator parts)
 
+(** Render external services section *)
+let render_external_service ~folded (ext : External_service.t) =
+  let open External_service in
+  let cfg = ext.config in
+  let role_str =
+    match cfg.role.value with Some r -> role_to_string r | None -> "unknown"
+  in
+  let network_str = match cfg.network.value with Some n -> n | None -> "?" in
+  let status_str = status_label (status_of_unit_state cfg.unit_state) in
+
+  (* First line: instance, role, network, status *)
+  let line1 =
+    Printf.sprintf
+      "  %s%-18s %-10s %-12s %s"
+      (if folded then "▸ " else "▾ ")
+      ext.suggested_instance_name
+      role_str
+      network_str
+      (match cfg.unit_state.active_state with
+      | "active" -> Widgets.green status_str
+      | "failed" -> Widgets.red status_str
+      | _ -> Widgets.yellow status_str)
+  in
+
+  if folded then [line1]
+  else
+    (* Unfold state: show more details *)
+    let line2 = Printf.sprintf "    Unit: %s" cfg.unit_name in
+
+    (* Role-specific details *)
+    let detail_lines =
+      match cfg.role.value with
+      | Some Node ->
+          let rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
+          let data =
+            match cfg.data_dir.value with Some d -> d | None -> "?"
+          in
+          [Printf.sprintf "    RPC: %s" rpc; Printf.sprintf "    Data: %s" data]
+      | Some Baker ->
+          let node_ep =
+            match cfg.node_endpoint.value with Some e -> e | None -> "?"
+          in
+          let base =
+            match cfg.base_dir.value with Some b -> b | None -> "?"
+          in
+          [
+            Printf.sprintf "    Node: %s" node_ep;
+            Printf.sprintf "    Base: %s" base;
+          ]
+      | Some Accuser ->
+          let node_ep =
+            match cfg.node_endpoint.value with Some e -> e | None -> "?"
+          in
+          let base =
+            match cfg.base_dir.value with Some b -> b | None -> "?"
+          in
+          [
+            Printf.sprintf "    Node: %s" node_ep;
+            Printf.sprintf "    Base: %s" base;
+          ]
+      | Some Dal_node ->
+          let node_ep =
+            match cfg.node_endpoint.value with Some e -> e | None -> "?"
+          in
+          let data =
+            match cfg.data_dir.value with Some d -> d | None -> "?"
+          in
+          [
+            Printf.sprintf "    Node: %s" node_ep;
+            Printf.sprintf "    Data: %s" data;
+          ]
+      | _ ->
+          let data =
+            match cfg.data_dir.value with Some d -> d | None -> "?"
+          in
+          [Printf.sprintf "    Data: %s" data]
+    in
+
+    line1 :: line2 :: detail_lines
+
+let render_external_services_section state =
+  if state.external_services = [] then []
+  else
+    let header_marker = if state.external_folded then "▸" else "▾" in
+    let header =
+      Printf.sprintf
+        "%s %s %s"
+        header_marker
+        (Widgets.bold "── External Services ──")
+        (Widgets.dim
+           (Printf.sprintf "(%d)" (List.length state.external_services)))
+    in
+
+    if state.external_folded then [header]
+    else
+      let service_lines =
+        List.concat_map
+          (fun ext -> render_external_service ~folded:false ext)
+          state.external_services
+      in
+      header :: service_lines
+
 (** Single-column layout (original) *)
 let table_lines_single state =
   let install_row =
@@ -556,7 +658,9 @@ let table_lines_single state =
       in
       build_rows 0 None [] state.services
   in
-  install_row :: "" :: instance_rows
+  let external_rows = render_external_services_section state in
+  let external_rows = if external_rows = [] then [] else "" :: external_rows in
+  (install_row :: "" :: instance_rows) @ external_rows
 
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
@@ -616,5 +720,7 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
       state
 
 let summary_line state =
-  let total = List.length state.services in
-  Printf.sprintf "Total instances: %d" total
+  let managed = List.length state.services in
+  let external_count = List.length state.external_services in
+  if external_count = 0 then Printf.sprintf "Total instances: %d" managed
+  else Printf.sprintf "Managed: %d | External: %d" managed external_count

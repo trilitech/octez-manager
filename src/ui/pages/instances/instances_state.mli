@@ -28,8 +28,10 @@ val services_start_idx : int
 (** Instances page state *)
 type state = {
   services : Service_state.t list;
+  external_services : Octez_manager_lib.External_service.t list;
   selected : int;
   folded : StringSet.t;
+  external_folded : bool;
   last_updated : float;
   num_columns : int;
   active_column : int;
