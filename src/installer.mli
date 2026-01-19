@@ -9,8 +9,6 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val invalid_instance_name_chars_msg : string
-
 val resolve_from_data_dir :
   string ->
   ([`Path of string | `Data_dir of resolved_data_dir_config], string) result
