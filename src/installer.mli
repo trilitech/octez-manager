@@ -7,8 +7,6 @@
 
 open Installer_types
 
-[@@@warning "-32"]
-
 module For_tests : sig
   type file_backup
 
