@@ -69,6 +69,55 @@ dune fmt            # Format code (MUST pass before commit)
 
 **Important:** The architecture database is a helpful tool but is NOT complete. It may be missing functions, have outdated information, or lack intent descriptions. Always verify by searching the actual code.
 
+### Module Inclusion: `open` vs `include`
+
+**Prefer `open` over `include` for internal modules.**
+
+When extracting code into submodules, use `open` to bring functions into scope without re-exporting them:
+
+```ocaml
+(* PREFERRED: Use 'open' *)
+open Rresult
+open Installer_types
+open Helpers  (* Functions available locally, not re-exported *)
+
+let my_function () =
+  backup_file_if_exists path  (* From Helpers, but not part of public API *)
+```
+
+**Avoid `include` unless explicitly needed for API design:**
+
+```ocaml
+(* DISCOURAGED: Using 'include' *)
+include Helpers  (* Re-exports ALL functions from Helpers *)
+(* Now all Helpers functions are part of this module's public API *)
+```
+
+**Why prefer `open`?**
+- **Explicit API boundaries**: Only intentionally exposed functions appear in `.mli`
+- **Clearer dependencies**: Obvious which modules provide functionality
+- **Easier refactoring**: Moving functions between modules doesn't change public API
+- **Better IDE support**: "Go to definition" can identify source modules
+
+**When `include` is appropriate:**
+- Delegation pattern: thin wrapper modules that intentionally re-export everything
+- Type sharing: when you need to expose types from another module as if they were local
+
+**For explicit module references:**
+
+When extracting multiple related submodules, consider using explicit module aliases for even greater clarity:
+
+```ocaml
+(* MOST EXPLICIT: Module aliases *)
+module State = My_module_state
+module Layout = My_module_layout
+
+let view state = Layout.render_view state
+let init = State.create ()
+```
+
+This makes the origin of every function crystal clear, though it's more verbose.
+
 ---
 
 ## TUI Architecture (CRITICAL)
