@@ -132,6 +132,42 @@ let get_unit_content ~unit_name =
         Error `Permission_denied
       else Error (`Error msg)
 
+(** {1 Process Inspection} *)
+
+(** Read /proc/PID/cmdline for a running process.
+    Returns the actual command line with all variables expanded. *)
+let read_proc_cmdline pid =
+  if pid <= 0 then None
+  else
+    let path = Printf.sprintf "/proc/%d/cmdline" pid in
+    try
+      let ic = open_in path in
+      Fun.protect
+        ~finally:(fun () -> close_in_noerr ic)
+        (fun () ->
+          let content = really_input_string ic (in_channel_length ic) in
+          (* cmdline is null-separated, convert to spaces *)
+          let cmdline =
+            String.map (fun c -> if c = '\000' then ' ' else c) content
+          in
+          Some (String.trim cmdline))
+    with Sys_error _ | End_of_file -> None
+
+(** Get the actual running command for a service if it's active.
+    Returns expanded command from /proc/PID/cmdline. *)
+let get_running_command ~unit_name =
+  (* Get MainPID from systemctl show *)
+  let cmd =
+    systemctl_cmd () @ ["show"; unit_name; "-p"; "MainPID"; "--value"]
+  in
+  match Common.run_out cmd with
+  | Ok output -> (
+      let trimmed = String.trim output in
+      match int_of_string_opt trimmed with
+      | Some pid when pid > 0 -> read_proc_cmdline pid
+      | _ -> None)
+  | Error _ -> None
+
 (** {1 Detection Logic} *)
 
 (** Check if ExecStart contains an octez binary *)
@@ -144,22 +180,8 @@ let contains_octez_binary exec_start =
   || string_contains ~needle:"tezos-baker" lower
   || string_contains ~needle:"tezos-accuser" lower
 
-(** Extract binary path from ExecStart command.
-    ExecStart can be complex (shell scripts, etc.), so we try to find
-    the first octez binary mentioned. *)
-let extract_binary_from_exec_start exec_start =
-  (* Split by spaces and quotes, look for octez binary paths *)
-  let words = String.split_on_char ' ' exec_start in
-  List.find_opt
-    (fun word ->
-      let word_lower = String.lowercase_ascii word in
-      string_contains ~needle:"octez-" word_lower
-      || string_contains ~needle:"tezos-baker" word_lower
-      || string_contains ~needle:"tezos-accuser" word_lower)
-    words
-
-(** Build a minimal External_service.t from a unit name and ExecStart.
-    Full configuration parsing will be implemented in later issues. *)
+(** Build External_service.t from a unit name, ExecStart, and systemd properties.
+    Parses ExecStart to extract configuration. *)
 let build_external_service ~unit_name ~exec_start ~properties =
   (* Get basic systemd properties *)
   let user = List.assoc_opt "User" properties in
@@ -195,19 +217,72 @@ let build_external_service ~unit_name ~exec_start ~properties =
     | None -> []
   in
 
-  (* Try to detect binary path and role *)
-  let binary_path_opt = extract_binary_from_exec_start exec_start in
+  (* Try to get actual running command for active services *)
+  let command_to_parse, command_source =
+    if active_state = "active" then
+      match get_running_command ~unit_name with
+      | Some running_cmd -> (running_cmd, "/proc/PID/cmdline")
+      | None -> (exec_start, "ExecStart")
+    else (exec_start, "ExecStart")
+  in
+
+  (* Parse command line *)
+  let parsed = Execstart_parser.parse command_to_parse in
+
+  (* Build fields from parsed data *)
   let role_field =
-    match binary_path_opt with
+    match parsed.binary_path with
     | Some binary ->
         let role = External_service.role_of_binary_name binary in
-        External_service.detected ~source:"ExecStart" role
+        External_service.detected ~source:command_source role
     | None -> External_service.unknown ()
   in
 
   let binary_field =
-    match binary_path_opt with
-    | Some binary -> External_service.detected ~source:"ExecStart" binary
+    match parsed.binary_path with
+    | Some binary -> External_service.detected ~source:command_source binary
+    | None -> External_service.unknown ()
+  in
+
+  let data_dir_field =
+    match parsed.data_dir with
+    | Some dir -> External_service.detected ~source:command_source dir
+    | None -> External_service.unknown ()
+  in
+
+  let base_dir_field =
+    match parsed.base_dir with
+    | Some dir -> External_service.detected ~source:command_source dir
+    | None -> External_service.unknown ()
+  in
+
+  let rpc_addr_field =
+    match parsed.rpc_addr with
+    | Some addr -> External_service.detected ~source:command_source addr
+    | None -> External_service.unknown ()
+  in
+
+  let net_addr_field =
+    match parsed.net_addr with
+    | Some addr -> External_service.detected ~source:command_source addr
+    | None -> External_service.unknown ()
+  in
+
+  let endpoint_field =
+    match parsed.endpoint with
+    | Some ep -> External_service.detected ~source:command_source ep
+    | None -> External_service.unknown ()
+  in
+
+  let history_mode_field =
+    match parsed.history_mode with
+    | Some mode -> External_service.detected ~source:command_source mode
+    | None -> External_service.unknown ()
+  in
+
+  let network_field =
+    match parsed.network with
+    | Some net -> External_service.detected ~source:command_source net
     | None -> External_service.unknown ()
   in
 
@@ -221,6 +296,15 @@ let build_external_service ~unit_name ~exec_start ~properties =
       environment_files;
       role = role_field;
       binary_path = binary_field;
+      data_dir = data_dir_field;
+      base_dir = base_dir_field;
+      rpc_addr = rpc_addr_field;
+      net_addr = net_addr_field;
+      node_endpoint = endpoint_field;
+      history_mode = history_mode_field;
+      network = network_field;
+      extra_args = parsed.extra_args;
+      parse_warnings = parsed.warnings;
     }
   in
 
