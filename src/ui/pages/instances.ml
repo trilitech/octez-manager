@@ -60,6 +60,8 @@ let init_state () =
     }
 
 let force_refresh state =
+  (* Trigger immediate refresh of external services *)
+  External_services_scheduler.refresh () ;
   let services = load_services_fresh () in
   let external_services = load_external_services () in
   let selected = clamp_selection services external_services state.selected in
