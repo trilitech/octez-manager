@@ -25,6 +25,66 @@ let print_services services =
     List.iter (fun svc -> Format.printf "%a@." pp_service svc) services ;
     Format.print_flush ())
 
+let pp_external_service fmt (ext : External_service.t) =
+  let open External_service in
+  let cfg = ext.config in
+  let role_str =
+    match cfg.role.value with Some r -> role_to_string r | None -> "unknown"
+  in
+  let network_str = match cfg.network.value with Some n -> n | None -> "?" in
+  let data_dir_str =
+    match cfg.data_dir.value with Some d -> d | None -> "?"
+  in
+  let status_str = status_label (status_of_unit_state cfg.unit_state) in
+  Format.fprintf
+    fmt
+    "%-16s %-8s %-10s %-8s %s"
+    ext.suggested_instance_name
+    role_str
+    network_str
+    status_str
+    data_dir_str
+
+let print_external_services services =
+  if services = [] then print_endline "No external services detected."
+  else (
+    Format.printf
+      "%-16s %-8s %-10s %-8s %s@."
+      "INSTANCE"
+      "ROLE"
+      "NETWORK"
+      "STATUS"
+      "DATA_DIR" ;
+    Format.printf "%s@." (String.make 70 '-') ;
+    List.iter (fun svc -> Format.printf "%a@." pp_external_service svc) services ;
+    Format.print_flush ())
+
+let print_all_services ~managed ~external_ =
+  if managed = [] && external_ = [] then print_endline "No services found."
+  else (
+    (* Print managed services *)
+    if managed <> [] then (
+      Format.printf "=== Managed Services ===@." ;
+      List.iter (fun svc -> Format.printf "%a@." pp_service svc) managed ;
+      if external_ <> [] then Format.printf "@.") ;
+
+    (* Print external services *)
+    if external_ <> [] then (
+      Format.printf "=== External Services ===@." ;
+      Format.printf
+        "%-16s %-8s %-10s %-8s %s@."
+        "INSTANCE"
+        "ROLE"
+        "NETWORK"
+        "STATUS"
+        "DATA_DIR" ;
+      Format.printf "%s@." (String.make 70 '-') ;
+      List.iter
+        (fun svc -> Format.printf "%a@." pp_external_service svc)
+        external_) ;
+
+    Format.print_flush ())
+
 let pp_logging fmt = function
   | Logging_mode.Journald -> Format.fprintf fmt "journald"
 
