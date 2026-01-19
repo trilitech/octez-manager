@@ -542,8 +542,8 @@ Press **Enter** to open instance menu.|}
     || lower = "^c" || String.equal key "\003"
 
   let move_selection s delta =
-    if s.services = [] then
-      (* Only Install button (0) when no services - ignore navigation *)
+    if s.services = [] && s.external_services = [] then
+      (* Only Install button (0) when no services at all - ignore navigation *)
       {s with selected = 0}
     else if s.num_columns <= 1 then
       (* Single column mode: simple linear navigation *)
