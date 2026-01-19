@@ -391,7 +391,7 @@ let instance_term =
                 in
                 if proceed then
                   Cli_helpers.run_result
-                    (Installer.remove_service
+                    (Removal.remove_service
                        ~quiet:false
                        ~delete_data_dir
                        ~instance:inst
@@ -399,7 +399,7 @@ let instance_term =
                 else `Ok ())
         | Purge ->
             Cli_helpers.run_result
-              (Installer.purge_service
+              (Removal.purge_service
                  ~quiet:false
                  ~prompt_yes_no:
                    (if Cli_helpers.is_interactive () then
@@ -1095,7 +1095,7 @@ let instance_term =
                             "@.Renaming instance from '%s' to '%s'...@."
                             inst
                             new_instance ;
-                          Installer.cleanup_renamed_instance
+                          Removal.cleanup_renamed_instance
                             ~quiet:false
                             ~old_instance:inst
                             ~new_instance

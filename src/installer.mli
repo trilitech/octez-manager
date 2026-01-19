@@ -9,50 +9,6 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val remove_service :
-  ?quiet:bool ->
-  delete_data_dir:bool ->
-  instance:string ->
-  unit ->
-  (unit, [`Msg of string]) result
-
-val purge_service :
-  ?quiet:bool ->
-  prompt_yes_no:(string -> default:bool -> bool) ->
-  instance:string ->
-  unit ->
-  (unit, [`Msg of string]) result
-
-val list_services : unit -> (Service.t list, [`Msg of string]) result
-
-(** Clean up old instance after rename.
-    Stops and disables old service, removes dropin and registry entry,
-    updates dependent env files to point to new instance name,
-    and transfers dependents list to the new service.
-    Does NOT delete data directory (data is preserved in the renamed instance). *)
-val cleanup_renamed_instance :
-  ?quiet:bool ->
-  old_instance:string ->
-  new_instance:string ->
-  unit ->
-  (unit, [`Msg of string]) result
-
-(** Clean up stale dependency entries.
-    Scans all services and removes dependents that no longer exist in the registry.
-    @return Number of stale entries removed *)
-val cleanup_dependencies : unit -> (int, [`Msg of string]) result
-
-(** Find directories and files not associated with registered services. *)
-val find_orphan_directories :
-  unit -> (string list * string list, [`Msg of string]) result
-
-(** Remove orphan directories and log files.
-    @param dry_run If true, only report what would be removed without deleting.
-    @return (removed_paths, errors) *)
-val cleanup_orphans :
-  dry_run:bool ->
-  (string list * (string * string) list, [`Msg of string]) result
-
 module For_tests : sig
   type file_backup
 
