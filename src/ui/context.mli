@@ -9,6 +9,12 @@ val set_pending_instance_detail : string -> unit
 
 val take_pending_instance_detail : unit -> string option
 
+(** Set pending external service unit name for details/logs viewing *)
+val set_pending_external_unit : string -> unit
+
+(** Take pending external service unit name (clears after retrieval) *)
+val take_pending_external_unit : unit -> string option
+
 (** Edit mode context *)
 type edit_context = {
   service : Octez_manager_lib.Service.t;

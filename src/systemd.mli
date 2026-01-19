@@ -94,3 +94,41 @@ module For_tests : sig
   (** Parse systemd show output string into unit_state (for testing) *)
   val parse_unit_state_output : string -> unit_state
 end
+
+(** {2 Service Lifecycle} *)
+
+(** Start a systemd unit by its full unit name (e.g., "octez-shadownet-baker.service").
+    Timeout: 30 seconds. *)
+val start_unit : unit_name:string -> (unit, [> `Msg of string]) result
+
+(** Stop a systemd unit by its full unit name.
+    Timeout: 30 seconds. *)
+val stop_unit : unit_name:string -> (unit, [> `Msg of string]) result
+
+(** Restart a systemd unit by its full unit name.
+    Timeout: 60 seconds. *)
+val restart_unit : unit_name:string -> (unit, [> `Msg of string]) result
+
+(** Start a managed service instance. *)
+val start :
+  ?quiet:bool ->
+  role:string ->
+  instance:string ->
+  unit ->
+  (unit, [> `Msg of string]) result
+
+(** Stop a managed service instance. *)
+val stop :
+  ?quiet:bool ->
+  role:string ->
+  instance:string ->
+  unit ->
+  (unit, [> `Msg of string]) result
+
+(** Restart a managed service instance. *)
+val restart :
+  ?quiet:bool ->
+  role:string ->
+  instance:string ->
+  unit ->
+  (unit, [> `Msg of string]) result
