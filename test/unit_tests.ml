@@ -345,9 +345,9 @@ let installer_normalize_data_dir_default () =
       Alcotest.(check string) "default data dir" expected actual)
 
 let installer_endpoint_of_rpc_formats () =
-  let trimmed = Installer.endpoint_of_rpc "  localhost:8732  " in
+  let trimmed = Config.endpoint_of_rpc "  localhost:8732  " in
   Alcotest.(check string) "adds scheme" "http://localhost:8732" trimmed ;
-  let passthrough = Installer.endpoint_of_rpc "https://node:8732" in
+  let passthrough = Config.endpoint_of_rpc "https://node:8732" in
   Alcotest.(check string) "keeps scheme" "https://node:8732" passthrough
 
 let installer_build_run_args_journald () =
