@@ -41,14 +41,26 @@ val empty : t
 
 (** {2 PID Discovery} *)
 
-(** Get the main PID for a systemd service.
+(** Get the main PID for a systemd unit by unit name.
+    Works for any systemd unit name (managed or external).
+    Returns [None] if the service is not running or PID cannot be determined. *)
+val get_main_pid_by_unit : unit_name:string -> int option
+
+(** Get the main PID for a managed systemd service.
+    Constructs unit name as [octez-{role}@{instance}].
     Returns [None] if the service is not running or PID cannot be determined. *)
 val get_service_main_pid : role:string -> instance:string -> int option
 
 (** Get child PIDs of a process (direct children only). *)
 val get_child_pids : parent_pid:int -> int list
 
-(** Get all PIDs for a service (main + all descendants).
+(** Get all PIDs for a systemd unit by unit name (main + all descendants).
+    Works for any systemd unit name (managed or external).
+    Returns empty list if service is not running. *)
+val get_pids_by_unit : unit_name:string -> int list
+
+(** Get all PIDs for a managed service (main + all descendants).
+    Constructs unit name as [octez-{role}@{instance}].
     Returns empty list if service is not running. *)
 val get_service_pids : role:string -> instance:string -> int list
 

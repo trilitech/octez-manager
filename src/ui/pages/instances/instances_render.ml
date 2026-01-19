@@ -582,6 +582,24 @@ let render_external_service ~selected_idx ~current_idx ~folded
       ~role:role_for_metrics
       ~instance:instance_for_metrics ;
 
+    (* Submit poll request with actual unit name for external services *)
+    let binary_path =
+      match cfg.binary_path.value with
+      | Some b -> b
+      | None ->
+          "octez-node" (* fallback, shouldn't happen for detected services *)
+    in
+    let data_dir_path =
+      match cfg.data_dir.value with Some d -> d | None -> ""
+    in
+    System_metrics_scheduler.submit_poll
+      ~role:role_for_metrics
+      ~instance:instance_for_metrics
+      ~binary:binary_path
+      ~data_dir:data_dir_path
+      ~unit_name:cfg.unit_name
+      () ;
+
     (* Second line: RPC/endpoint status *)
     let indent = "      " in
     let line2 =
