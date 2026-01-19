@@ -50,6 +50,7 @@
  (modules main)
  (libraries
   octez_manager_lib
+  octez_manager_cli
   octez-manager.ui
   cmdliner
   rresult
