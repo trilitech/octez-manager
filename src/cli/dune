@@ -6,7 +6,8 @@
   cli_helpers
   cmd_install_accuser
   cmd_install_baker
-  cmd_install_dal)
+  cmd_install_dal
+  cmd_install_node)
  (libraries octez_manager_lib cmdliner rresult yojson linenoise)
  (instrumentation
   (backend bisect_ppx)))
