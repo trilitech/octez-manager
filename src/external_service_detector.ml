@@ -95,6 +95,28 @@ let list_all_service_units () =
       Ok units
   | Error (`Msg msg) -> Error msg
 
+(** Extract command from systemd's structured ExecStart format.
+    Input: "{ path=/bin/foo ; argv[]=/bin/foo --arg val ; ... }"
+    Output: "/bin/foo --arg val" *)
+let extract_command_from_systemd_format str =
+  (* Look for argv[]= ... ; pattern *)
+  try
+    let argv_start = String.index str '[' in
+    (* Check if this is argv[...] by looking backwards from [ *)
+    if argv_start >= 4 && String.sub str (argv_start - 4) 4 = "argv" then
+      (* Find the content between argv[]= and the next ; *)
+      let content_start = String.index_from str argv_start '=' + 1 in
+      let content_end =
+        try String.index_from str content_start ';'
+        with Not_found -> String.length str
+      in
+      let command =
+        String.sub str content_start (content_end - content_start)
+      in
+      Some (String.trim command)
+    else None
+  with Not_found -> None
+
 let get_exec_start ~unit_name =
   let cmd =
     systemctl_cmd () @ ["show"; unit_name; "-p"; "ExecStart"; "--value"]
@@ -102,7 +124,13 @@ let get_exec_start ~unit_name =
   match Common.run_out cmd with
   | Ok output ->
       let trimmed = String.trim output in
-      if trimmed = "" || trimmed = "[not set]" then None else Some trimmed
+      if trimmed = "" || trimmed = "[not set]" then None
+      else if String.starts_with ~prefix:"{" trimmed then
+        (* Structured format from systemd - extract argv[]= part *)
+        extract_command_from_systemd_format trimmed
+      else
+        (* Plain format - use as-is *)
+        Some trimmed
   | Error _ -> None
 
 let get_unit_properties ~unit_name ~props =
