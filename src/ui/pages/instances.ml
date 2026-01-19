@@ -62,7 +62,7 @@ let init_state () =
 let force_refresh state =
   let services = load_services_fresh () in
   let external_services = load_external_services () in
-  let selected = clamp_selection services state.selected in
+  let selected = clamp_selection services external_services state.selected in
   let state =
     {
       state with
@@ -548,12 +548,12 @@ Press **Enter** to open instance menu.|}
     else if s.num_columns <= 1 then
       (* Single column mode: simple linear navigation *)
       let raw = s.selected + delta in
-      let selected = clamp_selection s.services raw in
+      let selected = clamp_selection s.services s.external_services raw in
       (* Skip separator during navigation *)
       let selected =
         if selected = menu_item_count then selected + delta else selected
       in
-      let selected = clamp_selection s.services selected in
+      let selected = clamp_selection s.services s.external_services selected in
       {s with selected}
     else if
       (* Multi-column mode: navigate within current column *)

@@ -52,8 +52,11 @@ type msg = unit
 
 type pstate = state Miaou.Core.Navigation.t
 
-let clamp_selection services idx =
-  let len = List.length services + services_start_idx in
+let clamp_selection services external_services idx =
+  (* Total selectable items: menu + managed services + external services *)
+  let len =
+    services_start_idx + List.length services + List.length external_services
+  in
   max 0 (min idx (len - 1))
 
 let current_service state =

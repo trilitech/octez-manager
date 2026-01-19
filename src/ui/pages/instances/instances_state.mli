@@ -43,7 +43,11 @@ type msg = unit
 type pstate = state Miaou.Core.Navigation.t
 
 (** Clamp selection index to valid range *)
-val clamp_selection : Service_state.t list -> int -> int
+val clamp_selection :
+  Service_state.t list ->
+  Octez_manager_lib.External_service.t list ->
+  int ->
+  int
 
 (** Get currently selected service, if any *)
 val current_service : state -> Service_state.t option
