@@ -211,12 +211,16 @@ let read_proc_cmdline pid =
       Fun.protect
         ~finally:(fun () -> close_in_noerr ic)
         (fun () ->
-          let length = in_channel_length ic in
-          Format.eprintf
-            "[DEBUG] /proc/%d/cmdline: file length = %d bytes@."
-            pid
-            length ;
-          let content = really_input_string ic length in
+          (* /proc files report size 0, so we must read until EOF *)
+          let buffer = Buffer.create 4096 in
+          let rec read_loop () =
+            try
+              Buffer.add_channel buffer ic 4096 ;
+              read_loop ()
+            with End_of_file -> ()
+          in
+          read_loop () ;
+          let content = Buffer.contents buffer in
           Format.eprintf
             "[DEBUG] /proc/%d/cmdline: read %d bytes@."
             pid
@@ -232,9 +236,9 @@ let read_proc_cmdline pid =
             (String.length trimmed) ;
           if String.length trimmed > 0 then
             Format.eprintf
-              "[DEBUG] /proc/%d/cmdline: first 80 chars = %s@."
+              "[DEBUG] /proc/%d/cmdline: content = %s@."
               pid
-              (String.sub trimmed 0 (min 80 (String.length trimmed)))
+              (String.sub trimmed 0 (min 120 (String.length trimmed)))
           else
             Format.eprintf "[DEBUG] /proc/%d/cmdline: EMPTY after trim!@." pid ;
           Some trimmed)
