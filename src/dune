@@ -36,7 +36,8 @@
   installer_types
   manager_interfaces
   capabilities
-  port_validation)
+  port_validation
+  external_service)
  (libraries
   rresult
   yojson

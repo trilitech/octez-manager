@@ -3765,6 +3765,104 @@ let service_get_bin_source () =
     (Binary_registry.Managed_version "24.0")
     bs
 
+(* External service tests *)
+
+let external_service_role_of_binary_name () =
+  Alcotest.(check string)
+    "octez-node"
+    "node"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-node")) ;
+  Alcotest.(check string)
+    "octez-baker-PsParisC"
+    "baker"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-baker-PsParisC")) ;
+  Alcotest.(check string)
+    "octez-accuser"
+    "accuser"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-accuser-PsQuebec")) ;
+  Alcotest.(check string)
+    "octez-dal-node"
+    "dal-node"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "octez-dal-node")) ;
+  Alcotest.(check string)
+    "unknown binary"
+    "random-binary"
+    (External_service.role_to_string
+       (External_service.role_of_binary_name "random-binary"))
+
+let external_service_confidence_to_string () =
+  Alcotest.(check string)
+    "detected"
+    "detected"
+    (External_service.confidence_to_string Detected) ;
+  Alcotest.(check string)
+    "inferred"
+    "inferred"
+    (External_service.confidence_to_string Inferred) ;
+  Alcotest.(check string)
+    "unknown"
+    "unknown"
+    (External_service.confidence_to_string Unknown) ;
+  Alcotest.(check string)
+    "permission denied"
+    "permission-denied"
+    (External_service.confidence_to_string Permission_denied)
+
+let external_service_suggest_instance_name () =
+  Alcotest.(check string)
+    "strip .service"
+    "my-node"
+    (External_service.suggest_instance_name ~unit_name:"my-node.service") ;
+  Alcotest.(check string)
+    "strip octez- prefix"
+    "node"
+    (External_service.suggest_instance_name ~unit_name:"octez-node.service") ;
+  Alcotest.(check string)
+    "strip tezos- prefix"
+    "node-mainnet"
+    (External_service.suggest_instance_name
+       ~unit_name:"tezos-node-mainnet.service")
+
+let external_service_status_of_unit_state () =
+  let open External_service in
+  Alcotest.(check string)
+    "running"
+    "running"
+    (status_label
+       (status_of_unit_state
+          {active_state = "active"; sub_state = "running"; enabled = Some true})) ;
+  Alcotest.(check string)
+    "stopped"
+    "stopped"
+    (status_label
+       (status_of_unit_state
+          {active_state = "inactive"; sub_state = "dead"; enabled = Some true})) ;
+  Alcotest.(check string)
+    "disabled"
+    "disabled"
+    (status_label
+       (status_of_unit_state
+          {active_state = "inactive"; sub_state = "dead"; enabled = Some false}))
+
+let external_service_field_helpers () =
+  let open External_service in
+  let unknown_field = unknown () in
+  Alcotest.(check bool) "unknown not known" false (is_known unknown_field) ;
+  let detected_field = detected ~source:"test" "value" in
+  Alcotest.(check bool) "detected is known" true (is_known detected_field) ;
+  Alcotest.(check string)
+    "detected value"
+    "value"
+    (value_or ~default:"default" detected_field) ;
+  Alcotest.(check string)
+    "unknown default"
+    "default"
+    (value_or ~default:"default" unknown_field)
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -4356,5 +4454,28 @@ let () =
             "service get_bin_source"
             `Quick
             service_get_bin_source;
+        ] );
+      ( "external_service",
+        [
+          Alcotest.test_case
+            "role_of_binary_name"
+            `Quick
+            external_service_role_of_binary_name;
+          Alcotest.test_case
+            "confidence_to_string"
+            `Quick
+            external_service_confidence_to_string;
+          Alcotest.test_case
+            "suggest_instance_name"
+            `Quick
+            external_service_suggest_instance_name;
+          Alcotest.test_case
+            "status_of_unit_state"
+            `Quick
+            external_service_status_of_unit_state;
+          Alcotest.test_case
+            "field_helpers"
+            `Quick
+            external_service_field_helpers;
         ] );
     ]
