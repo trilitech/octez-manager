@@ -953,7 +953,7 @@ let instance_term =
                         in
                         Result.map_error
                           (fun (`Msg s) -> s)
-                          (Installer.install_accuser req)
+                          (Accuser.install_accuser req)
                     | "dal-node" | "dal" ->
                         (* DAL node: edit node instance, RPC addr, P2P addr, extra args *)
                         (* Node instance selection with completion *)
