@@ -23,19 +23,23 @@ let role_of_string = function
   | "dal-node" | "dal" -> Dal_node
   | s -> Unknown s
 
-let role_of_binary_name binary_name =
+let role_of_binary_name ?subcommand binary_name =
   let name = Filename.basename binary_name |> String.lowercase_ascii in
-  if String.starts_with ~prefix:"octez-node" name then Node
-  else if
-    String.starts_with ~prefix:"octez-baker" name
-    || String.starts_with ~prefix:"tezos-baker" name
-  then Baker
-  else if
-    String.starts_with ~prefix:"octez-accuser" name
-    || String.starts_with ~prefix:"tezos-accuser" name
-  then Accuser
-  else if String.starts_with ~prefix:"octez-dal-node" name then Dal_node
-  else Unknown name
+  (* Check for DAL subcommand first - octez-baker can run DAL node *)
+  match subcommand with
+  | Some "dal" -> Dal_node
+  | _ ->
+      if String.starts_with ~prefix:"octez-node" name then Node
+      else if
+        String.starts_with ~prefix:"octez-baker" name
+        || String.starts_with ~prefix:"tezos-baker" name
+      then Baker
+      else if
+        String.starts_with ~prefix:"octez-accuser" name
+        || String.starts_with ~prefix:"tezos-accuser" name
+      then Accuser
+      else if String.starts_with ~prefix:"octez-dal-node" name then Dal_node
+      else Unknown name
 
 (** {1 Confidence Tracking} *)
 

@@ -407,7 +407,11 @@ let build_external_service ~unit_name ~exec_start ~properties =
   let role_field =
     match binary_field.value with
     | Some binary ->
-        let role = External_service.role_of_binary_name binary in
+        let role =
+          External_service.role_of_binary_name
+            ?subcommand:parsed.subcommand
+            binary
+        in
         {binary_field with value = Some role}
     | None -> External_service.unknown ()
   in
@@ -422,13 +426,22 @@ let build_external_service ~unit_name ~exec_start ~properties =
   (* Try to detect network via RPC probe if not already known *)
   let network_field =
     let parsed_network = build_field parsed.network in
-    match (parsed_network.value, rpc_addr_field.value, active_state) with
-    | None, Some rpc_addr, "active" -> (
-        (* No network but have RPC and service is active - try probe *)
-        match probe_rpc_chain_id rpc_addr with
-        | Some (_chain_id, Some network_name) ->
-            External_service.inferred ~source:"RPC probe" network_name
-        | _ -> parsed_network)
+    match (parsed_network.value, active_state) with
+    | None, "active" -> (
+        (* No network but service is active - try probe *)
+        (* Try rpc_addr first (for nodes), then endpoint (for bakers/accusers) *)
+        let probe_addr =
+          match rpc_addr_field.value with
+          | Some addr -> Some addr
+          | None -> endpoint_field.value
+        in
+        match probe_addr with
+        | Some addr -> (
+            match probe_rpc_chain_id addr with
+            | Some (_chain_id, Some network_name) ->
+                External_service.inferred ~source:"RPC probe" network_name
+            | _ -> parsed_network)
+        | None -> parsed_network)
     | _ -> parsed_network
   in
 

@@ -98,6 +98,7 @@ let extract_binary_path exec_start =
 
 type parsed_args = {
   binary_path : string option;
+  subcommand : string option; (* e.g., "run", "dal" for octez-baker *)
   data_dir : string option;
   base_dir : string option;
   rpc_addr : string option;
@@ -112,6 +113,7 @@ type parsed_args = {
 let empty_args =
   {
     binary_path = None;
+    subcommand = None;
     data_dir = None;
     base_dir = None;
     rpc_addr = None;
@@ -236,6 +238,12 @@ let rec parse_args_list words acc =
       else if is_octez_binary word then
         (* Found binary path *)
         parse_args_list rest {acc with binary_path = Some (unquote word)}
+      else if acc.binary_path <> None && acc.subcommand = None then
+        (* First non-flag word after binary is likely a subcommand *)
+        (* Common subcommands: run, config, snapshot, dal *)
+        if word = "run" || word = "dal" || word = "config" || word = "snapshot"
+        then parse_args_list rest {acc with subcommand = Some word}
+        else parse_args_list rest {acc with extra_args = word :: acc.extra_args}
       else
         (* Other argument *)
         parse_args_list rest {acc with extra_args = word :: acc.extra_args}
