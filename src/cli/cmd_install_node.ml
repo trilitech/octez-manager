@@ -300,7 +300,7 @@ let install_node_cmd =
                   | None -> (
                       (* Auto-select: resolve from tzinit to get URL *)
                       match
-                        Installer.resolve_snapshot_download
+                        Snapshot.resolve_snapshot_download
                           ~network
                           ~history_mode
                       with
