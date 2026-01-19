@@ -130,11 +130,16 @@ let get_state key =
           s)
 
 (** Update PIDs and version if changed *)
-let update_pids_and_version ~key ~role ~instance ~binary ~data_dir state now =
+let update_pids_and_version ~key ~role ~instance ~binary ~data_dir ?unit_name
+    state now =
   let interval = effective_interval ~key ~base_interval:pid_check_interval in
   if now -. state.last_pid_check < interval then ()
   else
-    let new_pids = System_metrics.get_service_pids ~role ~instance in
+    let new_pids =
+      match unit_name with
+      | Some unit -> System_metrics.get_pids_by_unit ~unit_name:unit
+      | None -> System_metrics.get_service_pids ~role ~instance
+    in
     let pids_changed =
       List.length new_pids <> List.length state.pids
       || List.exists2
@@ -214,11 +219,19 @@ let poll_disk ~key ~data_dir state now =
     state.last_disk_poll <- Unix.gettimeofday ())
 
 (** Poll all metrics for an instance *)
-let poll ~role ~instance ~binary ~data_dir =
+let poll ~role ~instance ~binary ~data_dir ?unit_name () =
   let key = Printf.sprintf "%s/%s" role instance in
   let state = get_state key in
   let now = Unix.gettimeofday () in
-  update_pids_and_version ~key ~role ~instance ~binary ~data_dir state now ;
+  update_pids_and_version
+    ~key
+    ~role
+    ~instance
+    ~binary
+    ~data_dir
+    ?unit_name
+    state
+    now ;
   poll_cpu ~key state now ;
   poll_mem ~key state now ;
   poll_disk ~key ~data_dir state now
@@ -311,10 +324,10 @@ let get_disk_size ~role ~instance =
 let worker : unit Worker_queue.t = Worker_queue.create ~name:"system_metrics" ()
 
 (** Submit a poll request to the worker queue *)
-let submit_poll ~role ~instance ~binary ~data_dir =
+let submit_poll ~role ~instance ~binary ~data_dir ?unit_name () =
   let key = Printf.sprintf "poll:%s/%s" role instance in
   Worker_queue.submit_unit worker ~key ~work:(fun () ->
-      try poll ~role ~instance ~binary ~data_dir with _ -> ())
+      try poll ~role ~instance ~binary ~data_dir ?unit_name () with _ -> ())
 
 (** Submit a DAL health check to the worker queue *)
 let submit_dal_health ~instance ~rpc_endpoint =
@@ -341,6 +354,7 @@ let tick () =
             ~instance:svc.Service.instance
             ~binary
             ~data_dir:svc.Service.data_dir
+            ()
       | "baker" ->
           let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
           submit_poll
@@ -348,13 +362,15 @@ let tick () =
             ~instance:svc.Service.instance
             ~binary
             ~data_dir:""
+            ()
       | "dal-node" ->
           let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
           submit_poll
             ~role:svc.Service.role
             ~instance:svc.Service.instance
             ~binary
-            ~data_dir:svc.Service.data_dir ;
+            ~data_dir:svc.Service.data_dir
+            () ;
           (* Also submit DAL health check *)
           let rpc_endpoint =
             if String.starts_with ~prefix:"http" svc.Service.rpc_addr then
@@ -370,6 +386,7 @@ let tick () =
             ~instance:svc.Service.instance
             ~binary
             ~data_dir:""
+            ()
       | _ -> ())
 
 let started = ref false

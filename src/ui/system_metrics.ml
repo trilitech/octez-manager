@@ -55,8 +55,7 @@ let page_size = 4096
 let clock_ticks_per_sec = 100
 
 (** Get the main PID for a systemd service *)
-let get_service_main_pid ~role ~instance =
-  let unit_name = Printf.sprintf "octez-%s@%s" role instance in
+let get_main_pid_by_unit ~unit_name =
   let cmd =
     if Common.is_root () then
       ["systemctl"; "show"; "--property=MainPID"; unit_name]
@@ -74,6 +73,10 @@ let get_service_main_pid ~role ~instance =
       | _ -> None)
   | Error _ -> None
 
+let get_service_main_pid ~role ~instance =
+  let unit_name = Printf.sprintf "octez-%s@%s" role instance in
+  get_main_pid_by_unit ~unit_name
+
 (** Get child PIDs of a process *)
 let get_child_pids ~parent_pid =
   let path = Printf.sprintf "/proc/%d/task/%d/children" parent_pid parent_pid in
@@ -86,6 +89,17 @@ let get_child_pids ~parent_pid =
         let s = String.trim s in
         if s = "" then None else int_of_string_opt s)
   with _ -> []
+
+(** Get all PIDs for a service by unit name (main + children, recursively) *)
+let get_pids_by_unit ~unit_name =
+  match get_main_pid_by_unit ~unit_name with
+  | None -> []
+  | Some main_pid ->
+      let rec collect_all pid =
+        let children = get_child_pids ~parent_pid:pid in
+        pid :: List.concat_map collect_all children
+      in
+      collect_all main_pid
 
 (** Get all PIDs for a service (main + children, recursively) *)
 let get_service_pids ~role ~instance =
