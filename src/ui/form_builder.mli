@@ -155,6 +155,7 @@ val node_data_dir :
   get:('model -> string) ->
   set:(string -> 'model -> 'model) ->
   ?validate:('model -> bool) ->
+  ?validate_msg:('model -> string option) ->
   unit ->
   'model field
 

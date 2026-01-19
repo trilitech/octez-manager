@@ -534,6 +534,29 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
                       (String.trim st.service.Service.data_dir)
                       (String.trim data_dir))
                   states))
+        ~validate_msg:(fun m ->
+          let states =
+            Form_builder_common.cached_service_states_nonblocking ()
+          in
+          let data_dir = String.trim (get_node m).data_dir in
+          if data_dir = "" then Some "Data directory is required"
+          else
+            (* Check if data_dir is already used by another instance *)
+            match
+              List.find_opt
+                (fun (st : Data.Service_state.t) ->
+                  String.equal
+                    (String.trim st.service.Service.data_dir)
+                    data_dir)
+                states
+            with
+            | Some st ->
+                Some
+                  (Printf.sprintf
+                     "Already used by instance '%s'. Choose a different \
+                      directory."
+                     st.service.Service.instance)
+            | None -> None)
         ()
   in
   let network_fields =
