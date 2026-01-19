@@ -514,6 +514,23 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
     if edit_mode then
       readonly ~label:"Data Dir" ~get:(fun m -> (get_node m).data_dir)
     else
+      (* Helper to check data_dir validation status *)
+      let check_data_dir_status m =
+        (* Use non-blocking cache to avoid syscalls during typing *)
+        let states = Form_builder_common.cached_service_states_nonblocking () in
+        let data_dir = String.trim (get_node m).data_dir in
+        if data_dir = "" then `Empty
+        else
+          (* Check if data_dir is already used by another instance *)
+          match
+            List.find_opt
+              (fun (st : Data.Service_state.t) ->
+                String.equal (String.trim st.service.Service.data_dir) data_dir)
+              states
+          with
+          | Some st -> `InUse st.service.Service.instance
+          | None -> `Valid
+      in
       node_data_dir
         ~label:"Data Dir"
         ~get:(fun m -> (get_node m).data_dir)
@@ -521,42 +538,17 @@ let node_fields ~get_node ~set_node ?(on_network_selected = fun _ -> ())
           let node = get_node m in
           set_node {node with data_dir} m)
         ~validate:(fun m ->
-          (* Use non-blocking cache to avoid syscalls during typing *)
-          let states =
-            Form_builder_common.cached_service_states_nonblocking ()
-          in
-          let data_dir = (get_node m).data_dir in
-          is_nonempty data_dir
-          && not
-               (List.exists
-                  (fun (st : Data.Service_state.t) ->
-                    String.equal
-                      (String.trim st.service.Service.data_dir)
-                      (String.trim data_dir))
-                  states))
+          match check_data_dir_status m with `Valid -> true | _ -> false)
         ~validate_msg:(fun m ->
-          let states =
-            Form_builder_common.cached_service_states_nonblocking ()
-          in
-          let data_dir = String.trim (get_node m).data_dir in
-          if data_dir = "" then Some "Data directory is required"
-          else
-            (* Check if data_dir is already used by another instance *)
-            match
-              List.find_opt
-                (fun (st : Data.Service_state.t) ->
-                  String.equal
-                    (String.trim st.service.Service.data_dir)
-                    data_dir)
-                states
-            with
-            | Some st ->
-                Some
-                  (Printf.sprintf
-                     "Already used by instance '%s'. Choose a different \
-                      directory."
-                     st.service.Service.instance)
-            | None -> None)
+          match check_data_dir_status m with
+          | `Empty -> Some "Data directory is required"
+          | `InUse instance ->
+              Some
+                (Printf.sprintf
+                   "Already used by instance '%s'. Choose a different \
+                    directory."
+                   instance)
+          | `Valid -> None)
         ()
   in
   let network_fields =
