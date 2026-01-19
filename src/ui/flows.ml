@@ -20,7 +20,7 @@ let instance_has_valid_chars name = String.for_all is_valid_instance_char name
 
 let invalid_instance_name_error_msg =
   "Instance name contains invalid characters. "
-  ^ Installer.invalid_instance_name_chars_msg
+  ^ Helpers.invalid_instance_name_chars_msg
 
 (** Strip "node-" prefix from instance name to create cleaner dependent names.
     E.g., "node-shadownet" -> "shadownet" so baker becomes "baker-shadownet" *)
