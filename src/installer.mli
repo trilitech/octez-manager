@@ -9,9 +9,6 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val install_baker :
-  ?quiet:bool -> baker_request -> (Service.t, [`Msg of string]) result
-
 val install_accuser :
   ?quiet:bool -> accuser_request -> (Service.t, [`Msg of string]) result
 

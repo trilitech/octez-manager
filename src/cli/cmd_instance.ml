@@ -886,7 +886,7 @@ let instance_term =
                         in
                         Result.map_error
                           (fun (`Msg s) -> s)
-                          (Installer.install_baker req)
+                          (Baker.install_baker req)
                     | "accuser" ->
                         (* Accuser: edit node instance, extra args *)
                         (* Node instance selection with completion *)
