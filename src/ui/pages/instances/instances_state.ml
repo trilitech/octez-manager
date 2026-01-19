@@ -1,9 +1,9 @@
-(*****************************************************************************)
-(*                                                                           *)
-(* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(*****************************************************************************)
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
 
 module Service_state = Data.Service_state
 module StringSet = Set.Make (String)

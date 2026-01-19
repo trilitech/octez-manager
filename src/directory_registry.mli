@@ -1,9 +1,9 @@
-(*****************************************************************************)
-(*                                                                           *)
-(* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(*****************************************************************************)
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
 
 (** Unified directory registry for tracking both node data directories and
     client base directories used by services. *)
