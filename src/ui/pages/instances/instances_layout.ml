@@ -9,6 +9,11 @@ open Octez_manager_lib
 module Service_state = Data.Service_state
 open Instances_state
 
+(** Layout configuration constants *)
+let min_column_width = 50
+
+let column_separator = "   "
+
 let role_order = function
   | "node" -> 0
   | "baker" -> 1
