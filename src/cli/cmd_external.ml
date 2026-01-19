@@ -10,13 +10,14 @@ open Octez_manager_lib
 
 type external_action = Start | Stop | Restart | Show | Logs
 
-let find_external_service ~unit_name =
+let find_external_service ~instance_name =
   match External_service_detector.detect () with
   | Error msg -> Error (`Msg (Printf.sprintf "Detection failed: %s" msg))
   | Ok services -> (
       match
         List.find_opt
-          (fun (ext : External_service.t) -> ext.config.unit_name = unit_name)
+          (fun (ext : External_service.t) ->
+            ext.suggested_instance_name = instance_name)
           services
       with
       | Some ext -> Ok ext
@@ -26,7 +27,7 @@ let find_external_service ~unit_name =
                (Printf.sprintf
                   "External service '%s' not found. Use 'octez-manager list \
                    --external' to see available services."
-                  unit_name)))
+                  instance_name)))
 
 let show_external_service ext =
   let cfg = ext.External_service.config in
@@ -52,7 +53,7 @@ let show_external_service ext =
   | Some r -> Printf.printf "Role: %s\n" (External_service.role_to_string r)
   | None -> ()
 
-let show_logs ~unit_name =
+let show_logs ~instance_name ~unit_name =
   let cmd =
     if Common.is_root () then
       Printf.sprintf "journalctl -u %s -f -n 100" (Filename.quote unit_name)
@@ -61,21 +62,23 @@ let show_logs ~unit_name =
         "journalctl --user -u %s -f -n 100"
         (Filename.quote unit_name)
   in
-  Printf.printf "Showing logs for %s (Ctrl+C to exit):\n" unit_name ;
+  Printf.printf "Showing logs for %s (Ctrl+C to exit):\n" instance_name ;
   flush stdout ;
   match Sys.command cmd with
   | 0 -> Ok ()
   | n -> Error (`Msg (Printf.sprintf "journalctl exited with code %d" n))
 
 let external_term =
-  let unit_name =
+  let instance_name =
     Arg.(
       value
       & pos 0 (some string) None
       & info
           []
-          ~docv:"UNIT_NAME"
-          ~doc:"Systemd unit name (e.g., octez-shadownet-baker.service)")
+          ~docv:"INSTANCE"
+          ~doc:
+            "Instance name (as shown in 'list --external', e.g., \
+             shadownet-baker)")
   in
   let action =
     let actions =
@@ -89,51 +92,62 @@ let external_term =
     in
     Arg.(value & pos 1 (some (enum actions)) None & info [] ~docv:"ACTION")
   in
-  let run unit_name action =
-    match (unit_name, action) with
+  let run instance_name action =
+    match (instance_name, action) with
     | None, _ -> `Help (`Pager, None)
     | Some _, None ->
         Cli_helpers.cmdliner_error
           "ACTION required (start|stop|restart|show|logs)"
-    | Some unit, Some action -> (
+    | Some instance, Some action -> (
         Capabilities.register () ;
         match action with
         | Show -> (
-            match find_external_service ~unit_name:unit with
+            match find_external_service ~instance_name:instance with
             | Ok ext ->
                 show_external_service ext ;
                 `Ok ()
             | Error (`Msg e) -> Cli_helpers.cmdliner_error e)
         | Logs -> (
-            match show_logs ~unit_name:unit with
-            | Ok () -> `Ok ()
+            match find_external_service ~instance_name:instance with
+            | Ok ext -> (
+                let unit_name = ext.External_service.config.unit_name in
+                match show_logs ~instance_name:instance ~unit_name with
+                | Ok () -> `Ok ()
+                | Error (`Msg e) -> Cli_helpers.cmdliner_error e)
             | Error (`Msg e) -> Cli_helpers.cmdliner_error e)
         | Start | Stop | Restart -> (
-            let verb =
-              match action with
-              | Start -> "start"
-              | Stop -> "stop"
-              | Restart -> "restart"
-              | _ -> assert false
-            in
-            let systemd_fn =
-              match action with
-              | Start -> Systemd.start_unit
-              | Stop -> Systemd.stop_unit
-              | Restart -> Systemd.restart_unit
-              | _ -> assert false
-            in
-            Printf.printf "%s %s...\n" (String.capitalize_ascii verb) unit ;
-            flush stdout ;
-            match systemd_fn ~unit_name:unit with
-            | Ok () ->
-                Printf.printf "Success: %s %s\n" unit verb ;
-                `Ok ()
-            | Error (`Msg e) ->
-                Printf.eprintf "Error: %s\n" e ;
-                `Error (false, e)))
+            match find_external_service ~instance_name:instance with
+            | Ok ext -> (
+                let unit_name = ext.External_service.config.unit_name in
+                let verb =
+                  match action with
+                  | Start -> "start"
+                  | Stop -> "stop"
+                  | Restart -> "restart"
+                  | _ -> assert false
+                in
+                let systemd_fn =
+                  match action with
+                  | Start -> Systemd.start_unit
+                  | Stop -> Systemd.stop_unit
+                  | Restart -> Systemd.restart_unit
+                  | _ -> assert false
+                in
+                Printf.printf
+                  "%s %s...\n"
+                  (String.capitalize_ascii verb)
+                  instance ;
+                flush stdout ;
+                match systemd_fn ~unit_name with
+                | Ok () ->
+                    Printf.printf "Success: %s %s\n" instance verb ;
+                    `Ok ()
+                | Error (`Msg e) ->
+                    Printf.eprintf "Error: %s\n" e ;
+                    `Error (false, e))
+            | Error (`Msg e) -> Cli_helpers.cmdliner_error e))
   in
-  Term.(ret (const run $ unit_name $ action))
+  Term.(ret (const run $ instance_name $ action))
 
 let external_info =
   Cmd.info
@@ -153,11 +167,11 @@ let external_info =
            services.";
         `S Manpage.s_examples;
         `P "Show details about an external service:";
-        `Pre "  octez-manager external octez-shadownet-baker.service show";
+        `Pre "  octez-manager external shadownet-baker show";
         `P "Start an external service:";
-        `Pre "  octez-manager external octez-shadownet-baker.service start";
+        `Pre "  octez-manager external shadownet-baker start";
         `P "View logs:";
-        `Pre "  octez-manager external octez-shadownet-baker.service logs";
+        `Pre "  octez-manager external shadownet-baker logs";
       ]
 
 let external_cmd = Cmd.v external_info external_term
