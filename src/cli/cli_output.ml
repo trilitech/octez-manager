@@ -52,7 +52,7 @@ let print_service_details svc =
             | s :: rest ->
                 if
                   List.exists (fun r -> String.equal s.role r) roles
-                  && String.equal (Installer.endpoint_of_rpc s.rpc_addr) ep
+                  && String.equal (Config.endpoint_of_rpc s.rpc_addr) ep
                 then Some s.instance
                 else find_match rest
           in

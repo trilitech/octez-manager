@@ -319,9 +319,9 @@ let spec =
                   let addr =
                     String.trim n.Data.Service_state.service.Service.rpc_addr
                   in
-                  Installer.endpoint_of_rpc addr
+                  Config.endpoint_of_rpc addr
               | None -> "http://127.0.0.1:8732")
-          | `Endpoint ep -> Installer.endpoint_of_rpc ep
+          | `Endpoint ep -> Config.endpoint_of_rpc ep
           | `None -> "http://127.0.0.1:8732"
         in
 
