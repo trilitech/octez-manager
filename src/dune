@@ -39,6 +39,7 @@
   port_validation
   external_service
   execstart_parser
+  env_file_parser
   external_service_detector)
  (libraries
   rresult

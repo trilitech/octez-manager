@@ -229,62 +229,63 @@ let build_external_service ~unit_name ~exec_start ~properties =
   (* Parse command line *)
   let parsed = Execstart_parser.parse command_to_parse in
 
+  (* Read environment files if parsing found unexpanded variables *)
+  let env_vars =
+    if List.length parsed.warnings > 0 && List.length environment_files > 0 then
+      (* Try to read env files to expand variables *)
+      List.fold_left
+        (fun acc file_path ->
+          (* Handle optional files (prefixed with -) *)
+          let actual_path =
+            if String.starts_with ~prefix:"-" file_path then
+              String.sub file_path 1 (String.length file_path - 1)
+            else file_path
+          in
+          match Env_file_parser.parse_file actual_path with
+          | Ok pairs -> acc @ pairs
+          | Error _ -> acc)
+        []
+        environment_files
+    else []
+  in
+
+  (* Helper to build a field, handling variable expansion *)
+  let build_field parsed_value =
+    match parsed_value with
+    | None -> External_service.unknown ()
+    | Some value ->
+        if env_vars = [] then
+          (* No env vars available, use value as-is *)
+          External_service.detected ~source:command_source value
+        else
+          (* Try to expand variables *)
+          let expanded = Env_file_parser.expand_vars ~env:env_vars value in
+          if expanded = value then
+            (* No expansion happened (no variables or not found) *)
+            External_service.detected ~source:command_source value
+          else
+            (* Expansion happened - mark as inferred from env file *)
+            External_service.inferred ~source:"EnvironmentFile" expanded
+  in
+
   (* Build fields from parsed data *)
+  let binary_field = build_field parsed.binary_path in
+
   let role_field =
-    match parsed.binary_path with
+    match binary_field.value with
     | Some binary ->
         let role = External_service.role_of_binary_name binary in
-        External_service.detected ~source:command_source role
+        {binary_field with value = Some role}
     | None -> External_service.unknown ()
   in
 
-  let binary_field =
-    match parsed.binary_path with
-    | Some binary -> External_service.detected ~source:command_source binary
-    | None -> External_service.unknown ()
-  in
-
-  let data_dir_field =
-    match parsed.data_dir with
-    | Some dir -> External_service.detected ~source:command_source dir
-    | None -> External_service.unknown ()
-  in
-
-  let base_dir_field =
-    match parsed.base_dir with
-    | Some dir -> External_service.detected ~source:command_source dir
-    | None -> External_service.unknown ()
-  in
-
-  let rpc_addr_field =
-    match parsed.rpc_addr with
-    | Some addr -> External_service.detected ~source:command_source addr
-    | None -> External_service.unknown ()
-  in
-
-  let net_addr_field =
-    match parsed.net_addr with
-    | Some addr -> External_service.detected ~source:command_source addr
-    | None -> External_service.unknown ()
-  in
-
-  let endpoint_field =
-    match parsed.endpoint with
-    | Some ep -> External_service.detected ~source:command_source ep
-    | None -> External_service.unknown ()
-  in
-
-  let history_mode_field =
-    match parsed.history_mode with
-    | Some mode -> External_service.detected ~source:command_source mode
-    | None -> External_service.unknown ()
-  in
-
-  let network_field =
-    match parsed.network with
-    | Some net -> External_service.detected ~source:command_source net
-    | None -> External_service.unknown ()
-  in
+  let data_dir_field = build_field parsed.data_dir in
+  let base_dir_field = build_field parsed.base_dir in
+  let rpc_addr_field = build_field parsed.rpc_addr in
+  let net_addr_field = build_field parsed.net_addr in
+  let endpoint_field = build_field parsed.endpoint in
+  let history_mode_field = build_field parsed.history_mode in
+  let network_field = build_field parsed.network in
 
   (* Build config *)
   let config =
