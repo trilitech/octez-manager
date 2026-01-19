@@ -1,3 +1,5 @@
+(include_subdirs unqualified)
+
 (library
  (name octez_manager_lib)
  (public_name octez-manager.lib)
