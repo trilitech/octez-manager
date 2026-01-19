@@ -15,6 +15,16 @@ val pp_service : Format.formatter -> Service.t -> unit
 (** Print a list of services *)
 val print_services : Service.t list -> unit
 
+(** Format an external service for list display *)
+val pp_external_service : Format.formatter -> External_service.t -> unit
+
+(** Print a list of external services *)
+val print_external_services : External_service.t list -> unit
+
+(** Print both managed and external services *)
+val print_all_services :
+  managed:Service.t list -> external_:External_service.t list -> unit
+
 (** Format logging mode *)
 val pp_logging : Format.formatter -> Logging_mode.t -> unit
 

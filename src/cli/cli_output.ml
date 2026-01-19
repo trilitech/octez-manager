@@ -25,6 +25,103 @@ let print_services services =
     List.iter (fun svc -> Format.printf "%a@." pp_service svc) services ;
     Format.print_flush ())
 
+let pp_external_service fmt (ext : External_service.t) =
+  let open External_service in
+  let cfg = ext.config in
+  let role_str =
+    match cfg.role.value with Some r -> role_to_string r | None -> "unknown"
+  in
+  let network_str = match cfg.network.value with Some n -> n | None -> "?" in
+  let status_str = status_label (status_of_unit_state cfg.unit_state) in
+
+  (* Line 1: Instance, role, network, status *)
+  Format.fprintf
+    fmt
+    "%-20s %-10s %-12s %s@."
+    ext.suggested_instance_name
+    role_str
+    network_str
+    status_str ;
+
+  (* Line 2: Unit name and binary path *)
+  let binary_str =
+    match cfg.binary_path.value with Some path -> path | None -> "?"
+  in
+  Format.fprintf fmt "  Unit: %-30s Binary: %s@." cfg.unit_name binary_str ;
+
+  (* Line 3: Role-specific info *)
+  (match cfg.role.value with
+  | Some Node ->
+      let rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
+      let p2p = match cfg.net_addr.value with Some n -> n | None -> "?" in
+      let data_dir =
+        match cfg.data_dir.value with Some d -> d | None -> "?"
+      in
+      Format.fprintf fmt "  RPC: %-25s P2P: %-25s Data: %s@." rpc p2p data_dir
+  | Some Baker ->
+      let node_ep =
+        match cfg.node_endpoint.value with Some e -> e | None -> "?"
+      in
+      let base_dir =
+        match cfg.base_dir.value with Some b -> b | None -> "?"
+      in
+      Format.fprintf fmt "  Node: %-24s Base: %s@." node_ep base_dir
+  | Some Accuser ->
+      let node_ep =
+        match cfg.node_endpoint.value with Some e -> e | None -> "?"
+      in
+      let base_dir =
+        match cfg.base_dir.value with Some b -> b | None -> "?"
+      in
+      Format.fprintf fmt "  Node: %-24s Base: %s@." node_ep base_dir
+  | Some Dal_node ->
+      let node_ep =
+        match cfg.node_endpoint.value with Some e -> e | None -> "?"
+      in
+      let dal_rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
+      let data_dir =
+        match cfg.data_dir.value with Some d -> d | None -> "?"
+      in
+      Format.fprintf
+        fmt
+        "  Node: %-24s DAL RPC: %-20s Data: %s@."
+        node_ep
+        dal_rpc
+        data_dir
+  | _ ->
+      let data_dir =
+        match cfg.data_dir.value with Some d -> d | None -> "?"
+      in
+      Format.fprintf fmt "  Data: %s@." data_dir) ;
+
+  (* Blank line between services *)
+  Format.fprintf fmt "@."
+
+let print_external_services services =
+  if services = [] then print_endline "No external services detected."
+  else (
+    Format.printf "External Octez Services Detected:@.@." ;
+    List.iter (fun svc -> Format.printf "%a" pp_external_service svc) services ;
+    Format.print_flush ())
+
+let print_all_services ~managed ~external_ =
+  if managed = [] && external_ = [] then print_endline "No services found."
+  else (
+    (* Print managed services *)
+    if managed <> [] then (
+      Format.printf "=== Managed Services ===@." ;
+      List.iter (fun svc -> Format.printf "%a@." pp_service svc) managed ;
+      if external_ <> [] then Format.printf "@.") ;
+
+    (* Print external services *)
+    if external_ <> [] then (
+      Format.printf "=== External Services ===@.@." ;
+      List.iter
+        (fun svc -> Format.printf "%a" pp_external_service svc)
+        external_) ;
+
+    Format.print_flush ())
+
 let pp_logging fmt = function
   | Logging_mode.Journald -> Format.fprintf fmt "journald"
 
