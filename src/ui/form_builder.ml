@@ -148,9 +148,9 @@ let custom ~label ~get ~edit ?(validate = fun _ -> true)
   let to_string v = v in
   Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 
-let node_data_dir ~label ~get ~set ?(validate = fun _ -> true) () =
+let node_data_dir ~label ~get ~set ?(validate = fun _ -> true)
+    ?(validate_msg = fun _ -> None) () =
   let to_string v = v in
-  let validate_msg _ = None in
   let edit model_ref =
     let on_select path = model_ref := set path !model_ref in
     Modal_helpers.select_node_data_dir_modal ~on_select ()
