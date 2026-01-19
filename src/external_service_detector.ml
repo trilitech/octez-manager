@@ -211,13 +211,40 @@ let read_proc_cmdline pid =
       Fun.protect
         ~finally:(fun () -> close_in_noerr ic)
         (fun () ->
-          let content = really_input_string ic (in_channel_length ic) in
+          let length = in_channel_length ic in
+          Format.eprintf
+            "[DEBUG] /proc/%d/cmdline: file length = %d bytes@."
+            pid
+            length ;
+          let content = really_input_string ic length in
+          Format.eprintf
+            "[DEBUG] /proc/%d/cmdline: read %d bytes@."
+            pid
+            (String.length content) ;
           (* cmdline is null-separated, convert to spaces *)
           let cmdline =
             String.map (fun c -> if c = '\000' then ' ' else c) content
           in
-          Some (String.trim cmdline))
-    with Sys_error _ | End_of_file -> None
+          let trimmed = String.trim cmdline in
+          Format.eprintf
+            "[DEBUG] /proc/%d/cmdline: after trim length = %d@."
+            pid
+            (String.length trimmed) ;
+          if String.length trimmed > 0 then
+            Format.eprintf
+              "[DEBUG] /proc/%d/cmdline: first 80 chars = %s@."
+              pid
+              (String.sub trimmed 0 (min 80 (String.length trimmed)))
+          else
+            Format.eprintf "[DEBUG] /proc/%d/cmdline: EMPTY after trim!@." pid ;
+          Some trimmed)
+    with
+    | Sys_error msg ->
+        Format.eprintf "[DEBUG] /proc/%d/cmdline: Sys_error: %s@." pid msg ;
+        None
+    | End_of_file ->
+        Format.eprintf "[DEBUG] /proc/%d/cmdline: End_of_file@." pid ;
+        None
 
 (** Get the actual running command for a service if it's active.
     Returns expanded command from /proc/PID/cmdline. *)
