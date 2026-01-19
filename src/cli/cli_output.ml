@@ -32,68 +32,84 @@ let pp_external_service fmt (ext : External_service.t) =
     match cfg.role.value with Some r -> role_to_string r | None -> "unknown"
   in
   let network_str = match cfg.network.value with Some n -> n | None -> "?" in
-  let data_dir_str =
-    match cfg.data_dir.value with Some d -> d | None -> "?"
-  in
   let status_str = status_label (status_of_unit_state cfg.unit_state) in
 
-  (* Build RPC/endpoint info *)
-  let endpoint_str =
-    match cfg.role.value with
-    | Some Node -> (
-        match cfg.rpc_addr.value with Some addr -> addr | None -> "?")
-    | Some (Baker | Accuser | Dal_node) -> (
-        match cfg.node_endpoint.value with Some ep -> ep | None -> "?")
-    | _ -> "?"
-  in
-
-  (* Build base_dir info for bakers/accusers *)
-  let base_dir_str =
-    match (cfg.role.value, cfg.base_dir.value) with
-    | Some (Baker | Accuser), Some bd -> bd
-    | _ -> ""
-  in
-
-  (* Build version from binary path *)
-  let version_str =
-    match cfg.binary_path.value with
-    | Some path -> (
-        (* Try to extract version from binary name like octez-baker-PsParisC *)
-        let basename = Filename.basename path in
-        let parts = String.split_on_char '-' basename in
-        match List.rev parts with
-        | proto :: _ when String.length proto > 2 && proto.[0] = 'P' -> proto
-        | _ -> "?")
-    | None -> "?"
-  in
-
+  (* Line 1: Instance, role, network, status *)
   Format.fprintf
     fmt
-    "%-16s %-8s %-10s %-8s %-20s %-15s %-30s %s"
+    "%-20s %-10s %-12s %s@."
     ext.suggested_instance_name
     role_str
     network_str
-    status_str
-    endpoint_str
-    version_str
-    base_dir_str
-    data_dir_str
+    status_str ;
+
+  (* Line 2: Unit name and binary path *)
+  let binary_str =
+    match cfg.binary_path.value with Some path -> path | None -> "?"
+  in
+  Format.fprintf fmt "  Unit: %-30s Binary: %s@." cfg.unit_name binary_str ;
+
+  (* Line 3: Role-specific info *)
+  (match cfg.role.value with
+  | Some Node ->
+      let rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
+      let p2p = match cfg.net_addr.value with Some n -> n | None -> "?" in
+      let data_dir =
+        match cfg.data_dir.value with Some d -> d | None -> "?"
+      in
+      Format.fprintf fmt "  RPC: %-25s P2P: %-25s Data: %s@." rpc p2p data_dir
+  | Some Baker ->
+      let node_ep =
+        match cfg.node_endpoint.value with Some e -> e | None -> "?"
+      in
+      let base_dir =
+        match cfg.base_dir.value with Some b -> b | None -> "?"
+      in
+      let data_dir =
+        match cfg.data_dir.value with Some d -> d | None -> "?"
+      in
+      Format.fprintf
+        fmt
+        "  Node: %-24s Base: %-24s Data: %s@."
+        node_ep
+        base_dir
+        data_dir
+  | Some Accuser ->
+      let node_ep =
+        match cfg.node_endpoint.value with Some e -> e | None -> "?"
+      in
+      let base_dir =
+        match cfg.base_dir.value with Some b -> b | None -> "?"
+      in
+      Format.fprintf fmt "  Node: %-24s Base: %s@." node_ep base_dir
+  | Some Dal_node ->
+      let node_ep =
+        match cfg.node_endpoint.value with Some e -> e | None -> "?"
+      in
+      let dal_rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
+      let data_dir =
+        match cfg.data_dir.value with Some d -> d | None -> "?"
+      in
+      Format.fprintf
+        fmt
+        "  Node: %-24s DAL RPC: %-20s Data: %s@."
+        node_ep
+        dal_rpc
+        data_dir
+  | _ ->
+      let data_dir =
+        match cfg.data_dir.value with Some d -> d | None -> "?"
+      in
+      Format.fprintf fmt "  Data: %s@." data_dir) ;
+
+  (* Blank line between services *)
+  Format.fprintf fmt "@."
 
 let print_external_services services =
   if services = [] then print_endline "No external services detected."
   else (
-    Format.printf
-      "%-16s %-8s %-10s %-8s %-20s %-15s %-30s %s@."
-      "INSTANCE"
-      "ROLE"
-      "NETWORK"
-      "STATUS"
-      "RPC/ENDPOINT"
-      "VERSION"
-      "BASE_DIR"
-      "DATA_DIR" ;
-    Format.printf "%s@." (String.make 140 '-') ;
-    List.iter (fun svc -> Format.printf "%a@." pp_external_service svc) services ;
+    Format.printf "External Octez Services Detected:@.@." ;
+    List.iter (fun svc -> Format.printf "%a" pp_external_service svc) services ;
     Format.print_flush ())
 
 let print_all_services ~managed ~external_ =
@@ -107,20 +123,9 @@ let print_all_services ~managed ~external_ =
 
     (* Print external services *)
     if external_ <> [] then (
-      Format.printf "=== External Services ===@." ;
-      Format.printf
-        "%-16s %-8s %-10s %-8s %-20s %-15s %-30s %s@."
-        "INSTANCE"
-        "ROLE"
-        "NETWORK"
-        "STATUS"
-        "RPC/ENDPOINT"
-        "VERSION"
-        "BASE_DIR"
-        "DATA_DIR" ;
-      Format.printf "%s@." (String.make 140 '-') ;
+      Format.printf "=== External Services ===@.@." ;
       List.iter
-        (fun svc -> Format.printf "%a@." pp_external_service svc)
+        (fun svc -> Format.printf "%a" pp_external_service svc)
         external_) ;
 
     Format.print_flush ())

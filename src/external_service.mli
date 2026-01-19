@@ -89,6 +89,7 @@ type detected_config = {
   (* Inferred from binary/args/env/config *)
   role : role field;
   binary_path : string field;
+  binary_version : string field;
   data_dir : string field;
   rpc_addr : string field;
   net_addr : string field;
