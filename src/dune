@@ -21,6 +21,7 @@
   keys_reader
   installer
   helpers
+  snapshot
   teztnets
   snapshots
   settings
