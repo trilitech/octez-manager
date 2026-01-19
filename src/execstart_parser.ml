@@ -202,7 +202,7 @@ let rec parse_args_list words acc =
             acc
         in
         parse_args_list new_rest new_acc
-      else if String.starts_with ~prefix:"--endpoint" word then
+      else if String.starts_with ~prefix:"--endpoint" word || word = "-E" then
         let new_rest, new_acc =
           parse_flag_value
             ~flag_name:"endpoint"
@@ -241,9 +241,15 @@ let rec parse_args_list words acc =
       else if acc.binary_path <> None && acc.subcommand = None then
         (* First non-flag word after binary is likely a subcommand *)
         (* Common subcommands: run, config, snapshot, dal *)
-        if word = "run" || word = "dal" || word = "config" || word = "snapshot"
-        then parse_args_list rest {acc with subcommand = Some word}
+        if word = "run" || word = "config" || word = "snapshot" then
+          parse_args_list rest {acc with subcommand = Some word}
+        else if word = "dal" then
+          (* DAL can be standalone or after 'run' *)
+          parse_args_list rest {acc with subcommand = Some "dal"}
         else parse_args_list rest {acc with extra_args = word :: acc.extra_args}
+      else if acc.subcommand = Some "run" && word = "dal" then
+        (* Special case: 'octez-baker run dal' -> change subcommand to 'dal' *)
+        parse_args_list rest {acc with subcommand = Some "dal"}
       else
         (* Other argument *)
         parse_args_list rest {acc with extra_args = word :: acc.extra_args}
