@@ -132,6 +132,41 @@ let get_unit_content ~unit_name =
         Error `Permission_denied
       else Error (`Error msg)
 
+(** {1 Network Detection} *)
+
+(** Known Tezos network chain IDs *)
+let chain_id_to_network = function
+  | "NetXdQprcVkpaWU" -> Some "mainnet"
+  | "NetXnHfVqm9iesp" -> Some "ghostnet"
+  | "NetXsqzbfFenSTS" -> Some "shadownet"
+  | _ -> None
+
+(** Probe RPC endpoint to get chain_id and detect network.
+    Returns (chain_id, network_name) if successful. *)
+let probe_rpc_chain_id rpc_addr =
+  let url =
+    if String.starts_with ~prefix:"http" rpc_addr then rpc_addr
+    else "http://" ^ rpc_addr
+  in
+  let full_url = url ^ "/chains/main/chain_id" in
+  (* Use curl with short timeout *)
+  let cmd = ["curl"; "-s"; "--max-time"; "2"; full_url] in
+  match Common.run_out cmd with
+  | Ok output -> (
+      try
+        let trimmed = String.trim output in
+        (* Response is JSON string like "NetXdQprcVkpaWU" *)
+        let chain_id =
+          if String.length trimmed > 2 && trimmed.[0] = '"' then
+            (* Remove surrounding quotes *)
+            String.sub trimmed 1 (String.length trimmed - 2)
+          else trimmed
+        in
+        let network = chain_id_to_network chain_id in
+        Some (chain_id, network)
+      with _ -> None)
+  | Error _ -> None
+
 (** {1 Process Inspection} *)
 
 (** Read /proc/PID/cmdline for a running process.
@@ -285,7 +320,19 @@ let build_external_service ~unit_name ~exec_start ~properties =
   let net_addr_field = build_field parsed.net_addr in
   let endpoint_field = build_field parsed.endpoint in
   let history_mode_field = build_field parsed.history_mode in
-  let network_field = build_field parsed.network in
+
+  (* Try to detect network via RPC probe if not already known *)
+  let network_field =
+    let parsed_network = build_field parsed.network in
+    match (parsed_network.value, rpc_addr_field.value, active_state) with
+    | None, Some rpc_addr, "active" -> (
+        (* No network but have RPC and service is active - try probe *)
+        match probe_rpc_chain_id rpc_addr with
+        | Some (_chain_id, Some network_name) ->
+            External_service.inferred ~source:"RPC probe" network_name
+        | _ -> parsed_network)
+    | _ -> parsed_network
+  in
 
   (* Build config *)
   let config =

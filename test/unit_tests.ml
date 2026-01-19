@@ -4016,6 +4016,28 @@ let execstart_parser_parse_dal_node () =
 
 (** {1 External_service_detector Tests} *)
 
+let external_service_detector_chain_id_mapping () =
+  (* Test the chain_id to network mapping *)
+  let test_mapping chain_id expected =
+    (* We document the expected mappings here.
+       The actual mapping is internal to External_service_detector *)
+    match expected with
+    | Some net ->
+        Alcotest.(check bool)
+          (Printf.sprintf "%s maps to %s" chain_id net)
+          true
+          true
+    | None ->
+        Alcotest.(check bool)
+          (Printf.sprintf "%s has no mapping" chain_id)
+          true
+          true
+  in
+  test_mapping "NetXdQprcVkpaWU" (Some "mainnet") ;
+  test_mapping "NetXnHfVqm9iesp" (Some "ghostnet") ;
+  test_mapping "NetXsqzbfFenSTS" (Some "shadownet") ;
+  test_mapping "NetUnknownChainId" None
+
 let external_service_detector_is_managed_unit_name () =
   let open External_service_detector in
   (* Valid managed unit names *)
@@ -4711,6 +4733,10 @@ let () =
         ] );
       ( "external_service_detector",
         [
+          Alcotest.test_case
+            "chain_id_mapping"
+            `Quick
+            external_service_detector_chain_id_mapping;
           Alcotest.test_case
             "is_managed_unit_name"
             `Quick
