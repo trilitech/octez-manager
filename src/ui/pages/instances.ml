@@ -623,13 +623,34 @@ Press **Enter** to open instance menu.|}
         (* External services: simple linear navigation (no multi-column support yet) *)
         Format.eprintf
           "[DEBUG NAV] In external services, using linear navigation@." ;
-        let raw = s.selected + delta in
-        let selected = clamp_selection s.services s.external_services raw in
-        Format.eprintf
-          "[DEBUG NAV] external nav: raw=%d selected=%d@."
-          raw
-          selected ;
-        {s with selected})
+        (* Check if moving up from first external service *)
+        let first_external = services_start_idx + List.length s.services in
+        if s.selected = first_external && delta < 0 then (
+          (* Move to last managed service, or menu if no managed services *)
+          Format.eprintf
+            "[DEBUG NAV] At first external, moving up to managed/menu@." ;
+          if List.length s.services > 0 then (
+            (* Jump to last managed service *)
+            let last_managed =
+              services_start_idx + List.length s.services - 1
+            in
+            Format.eprintf
+              "[DEBUG NAV] Jumping to last managed service: %d@."
+              last_managed ;
+            {s with selected = last_managed})
+          else (
+            (* No managed services, jump to menu *)
+            Format.eprintf "[DEBUG NAV] No managed services, jumping to menu@." ;
+            {s with selected = 0}))
+        else
+          (* Normal external service navigation *)
+          let raw = s.selected + delta in
+          let selected = clamp_selection s.services s.external_services raw in
+          Format.eprintf
+            "[DEBUG NAV] external nav: raw=%d selected=%d@."
+            raw
+            selected ;
+          {s with selected})
       else
         (* Managed services: column-based navigation *)
         let col_indices =
