@@ -426,6 +426,14 @@ let build_external_service ~unit_name ~exec_start ~properties =
   (* Try to detect network via RPC probe if not already known *)
   let network_field =
     let parsed_network = build_field parsed.network in
+    Format.eprintf
+      "[DEBUG] %s: parsed_network.value=%s rpc_addr=%s endpoint=%s \
+       active_state=%s@."
+      unit_name
+      (match parsed_network.value with Some n -> n | None -> "NONE")
+      (match rpc_addr_field.value with Some a -> a | None -> "NONE")
+      (match endpoint_field.value with Some e -> e | None -> "NONE")
+      active_state ;
     match (parsed_network.value, active_state) with
     | None, "active" -> (
         (* No network but service is active - try probe *)
@@ -435,13 +443,32 @@ let build_external_service ~unit_name ~exec_start ~properties =
           | Some addr -> Some addr
           | None -> endpoint_field.value
         in
+        Format.eprintf
+          "[DEBUG] %s: Attempting RPC probe with addr=%s@."
+          unit_name
+          (match probe_addr with Some a -> a | None -> "NONE") ;
         match probe_addr with
         | Some addr -> (
             match probe_rpc_chain_id addr with
             | Some (_chain_id, Some network_name) ->
+                Format.eprintf
+                  "[DEBUG] %s: RPC probe success, network=%s@."
+                  unit_name
+                  network_name ;
                 External_service.inferred ~source:"RPC probe" network_name
-            | _ -> parsed_network)
-        | None -> parsed_network)
+            | result ->
+                Format.eprintf
+                  "[DEBUG] %s: RPC probe failed: %s@."
+                  unit_name
+                  (match result with
+                  | Some (cid, None) ->
+                      "got chain_id=" ^ cid ^ " but no network match"
+                  | None -> "probe returned None"
+                  | _ -> "unknown") ;
+                parsed_network)
+        | None ->
+            Format.eprintf "[DEBUG] %s: No probe_addr available@." unit_name ;
+            parsed_network)
     | _ -> parsed_network
   in
 
