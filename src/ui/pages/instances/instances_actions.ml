@@ -265,7 +265,7 @@ let do_start_service ~instance ~role =
 
 (* Offer to start stopped dependents after starting a service *)
 let offer_start_dependents ~instance =
-  match Installer.get_stopped_dependents ~instance () with
+  match Lifecycle.get_stopped_dependents ~instance () with
   | Ok [] -> ()
   | Ok stopped ->
       let dep_names = List.map (fun s -> s.Service.instance) stopped in
@@ -301,7 +301,7 @@ let offer_start_dependents ~instance =
 
 (* Start with cascade: check dependencies first, then offer to start dependents *)
 let start_with_cascade ~instance ~role =
-  match Installer.get_stopped_dependencies ~instance () with
+  match Lifecycle.get_stopped_dependencies ~instance () with
   | Error (`Msg e) ->
       Context.toast_error (Printf.sprintf "Error checking dependencies: %s" e)
   | Ok [] ->
@@ -445,7 +445,7 @@ let offer_restart_dependents ~instance =
 
 (* Restart with cascade: check dependencies first, then offer to restart dependents *)
 let restart_with_cascade ~instance ~role =
-  match Installer.get_stopped_dependencies ~instance () with
+  match Lifecycle.get_stopped_dependencies ~instance () with
   | Error (`Msg e) ->
       Context.toast_error (Printf.sprintf "Error checking dependencies: %s" e)
   | Ok [] ->

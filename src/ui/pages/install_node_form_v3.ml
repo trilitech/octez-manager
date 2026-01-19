@@ -1088,7 +1088,7 @@ let spec =
                      stop_instance) ;
                 let stop_result =
                   try
-                    Installer.stop_service
+                    Lifecycle.stop_service
                       ~quiet:true
                       ~instance:stop_instance
                       ()
