@@ -9,10 +9,6 @@ open Installer_types
 
 [@@@warning "-32"]
 
-val resolve_from_data_dir :
-  string ->
-  ([`Path of string | `Data_dir of resolved_data_dir_config], string) result
-
 val install_node :
   ?quiet:bool ->
   ?on_log:(string -> unit) ->
@@ -89,8 +85,6 @@ val find_orphan_directories :
 val cleanup_orphans :
   dry_run:bool ->
   (string list * (string * string) list, [`Msg of string]) result
-
-val endpoint_of_rpc : string -> string
 
 module For_tests : sig
   type file_backup
