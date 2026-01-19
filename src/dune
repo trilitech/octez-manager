@@ -27,6 +27,7 @@
   dal_node
   baker
   accuser
+  lifecycle
   teztnets
   snapshots
   settings

@@ -60,8 +60,8 @@ module Service_lifecycle_impl = struct
     |> Result.map_error (function `Msg m -> m)
 
   let stop ~role:_ ~service =
-    (* Use Installer.stop_service to cascade stop dependents first *)
-    Installer.stop_service ~quiet:true ~instance:service ()
+    (* Use Lifecycle.stop_service to cascade stop dependents first *)
+    Lifecycle.stop_service ~quiet:true ~instance:service ()
     |> Result.map_error (function `Msg m -> m)
 
   let restart ~role ~service =
@@ -124,11 +124,11 @@ module Installer : Installer = struct
 
   let remove_service = Installer.remove_service
 
-  let start_service = Installer.start_service
+  let start_service = Lifecycle.start_service
 
-  let stop_service = Installer.stop_service
+  let stop_service = Lifecycle.stop_service
 
-  let restart_service = Installer.restart_service
+  let restart_service = Lifecycle.restart_service
 
   let purge_service = Installer.purge_service
 end
