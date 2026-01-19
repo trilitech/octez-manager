@@ -37,7 +37,8 @@
   manager_interfaces
   capabilities
   port_validation
-  external_service)
+  external_service
+  external_service_detector)
  (libraries
   rresult
   yojson

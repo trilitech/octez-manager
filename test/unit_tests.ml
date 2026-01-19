@@ -3863,6 +3863,58 @@ let external_service_field_helpers () =
     "default"
     (value_or ~default:"default" unknown_field)
 
+(** {1 External_service_detector Tests} *)
+
+let external_service_detector_is_managed_unit_name () =
+  let open External_service_detector in
+  (* Valid managed unit names *)
+  Alcotest.(check bool)
+    "octez-node@mainnet.service"
+    true
+    (is_managed_unit_name "octez-node@mainnet.service") ;
+  Alcotest.(check bool)
+    "octez-baker@my-baker.service"
+    true
+    (is_managed_unit_name "octez-baker@my-baker.service") ;
+  Alcotest.(check bool)
+    "octez-accuser@acc1.service"
+    true
+    (is_managed_unit_name "octez-accuser@acc1.service") ;
+  Alcotest.(check bool)
+    "octez-dal-node@dal.service"
+    true
+    (is_managed_unit_name "octez-dal-node@dal.service") ;
+  (* Invalid - no @ symbol *)
+  Alcotest.(check bool)
+    "octez-node.service"
+    false
+    (is_managed_unit_name "octez-node.service") ;
+  (* Invalid - wrong prefix *)
+  Alcotest.(check bool)
+    "my-tezos-node@instance.service"
+    false
+    (is_managed_unit_name "my-tezos-node@instance.service") ;
+  (* Invalid - no octez- prefix *)
+  Alcotest.(check bool)
+    "tezos-node@mainnet.service"
+    false
+    (is_managed_unit_name "tezos-node@mainnet.service") ;
+  (* Invalid - multiple @ *)
+  Alcotest.(check bool)
+    "octez-node@foo@bar.service"
+    false
+    (is_managed_unit_name "octez-node@foo@bar.service") ;
+  (* Invalid - no .service suffix *)
+  Alcotest.(check bool)
+    "octez-node@mainnet"
+    false
+    (is_managed_unit_name "octez-node@mainnet") ;
+  (* Invalid - random service *)
+  Alcotest.(check bool)
+    "nginx.service"
+    false
+    (is_managed_unit_name "nginx.service")
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -4477,5 +4529,12 @@ let () =
             "field_helpers"
             `Quick
             external_service_field_helpers;
+        ] );
+      ( "external_service_detector",
+        [
+          Alcotest.test_case
+            "is_managed_unit_name"
+            `Quick
+            external_service_detector_is_managed_unit_name;
         ] );
     ]
