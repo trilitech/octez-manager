@@ -28,6 +28,7 @@
   baker
   accuser
   lifecycle
+  removal
   teztnets
   snapshots
   settings

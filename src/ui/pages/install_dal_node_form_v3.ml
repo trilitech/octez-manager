@@ -433,7 +433,7 @@ let spec =
         let* () =
           match (model.edit_mode, model.original_instance) with
           | true, Some old_name when old_name <> model.core.instance_name ->
-              Installer.cleanup_renamed_instance
+              Removal.cleanup_renamed_instance
                 ~quiet:true
                 ~old_instance:old_name
                 ~new_instance:model.core.instance_name

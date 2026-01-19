@@ -57,7 +57,7 @@ let purge_all_cmd =
                 let role = svc.S.role in
                 Format.printf "Purging instance '%s' (%s)...@." instance role ;
                 match
-                  Installer.purge_service
+                  Removal.purge_service
                     ~quiet:false
                     ~prompt_yes_no:
                       (if Cli_helpers.is_interactive () then
@@ -113,7 +113,7 @@ let cleanup_orphans_cmd =
   let term =
     let run dry_run =
       Capabilities.register () ;
-      match Installer.find_orphan_directories () with
+      match Removal.find_orphan_directories () with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok (orphan_dirs, orphan_logs) -> (
           if orphan_dirs = [] && orphan_logs = [] then (
@@ -125,7 +125,7 @@ let cleanup_orphans_cmd =
             List.iter (fun f -> Format.printf "  [file] %s@." f) orphan_logs ;
             `Ok ())
           else
-            match Installer.cleanup_orphans ~dry_run:false with
+            match Removal.cleanup_orphans ~dry_run:false with
             | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
             | Ok (removed, errors) ->
                 List.iter (fun p -> Format.printf "  ✓ Removed: %s@." p) removed ;
@@ -159,7 +159,7 @@ let cleanup_dependencies_cmd =
   let term =
     let run () =
       Capabilities.register () ;
-      match Installer.cleanup_dependencies () with
+      match Removal.cleanup_dependencies () with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok 0 ->
           print_endline "No stale dependency entries found." ;

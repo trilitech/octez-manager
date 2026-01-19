@@ -100,7 +100,7 @@ module Service_lifecycle_impl = struct
     |> Result.map_error (function `Msg m -> m)
 
   let remove_instance_files ~inst ~remove_data =
-    Installer.remove_service ~delete_data_dir:remove_data ~instance:inst ()
+    Removal.remove_service ~delete_data_dir:remove_data ~instance:inst ()
     |> Result.map_error (function `Msg m -> m)
 end
 
@@ -122,7 +122,7 @@ module Installer : Installer = struct
   include Tezos_node_manager
   include Tezos_client_manager
 
-  let remove_service = Installer.remove_service
+  let remove_service = Removal.remove_service
 
   let start_service = Lifecycle.start_service
 
@@ -130,7 +130,7 @@ module Installer : Installer = struct
 
   let restart_service = Lifecycle.restart_service
 
-  let purge_service = Installer.purge_service
+  let purge_service = Removal.purge_service
 end
 
 let register () =
