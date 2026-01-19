@@ -231,9 +231,12 @@ let find_non_empty_column ~num_columns ~services =
 (** Ensure active_column points to a non-empty column, adjusting selection if needed.
     If all columns are empty (no services), move selection to menu. *)
 let ensure_valid_column state =
-  if state.services = [] then
-    (* No services, go to "Install new instance" *)
+  if state.services = [] && state.external_services = [] then
+    (* No services at all, go to "Install new instance" *)
     {state with selected = 0; active_column = 0}
+  else if state.services = [] then
+    (* Only external services, keep selection as-is *)
+    state
   else if state.num_columns <= 1 then state
   else
     let current_indices =

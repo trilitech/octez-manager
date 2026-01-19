@@ -563,7 +563,13 @@ let render_external_service ~selected_idx ~current_idx ~folded
 
   if folded then [first_line]
   else
-    (* Mark as visible for system metrics *)
+    (* For external services, use the unit name without .service suffix as the instance *)
+    let instance_for_metrics =
+      let unit = cfg.unit_name in
+      if String.ends_with ~suffix:".service" unit then
+        String.sub unit 0 (String.length unit - 8)
+      else unit
+    in
     let role_for_metrics =
       match cfg.role.value with
       | Some Node -> "node"
@@ -574,7 +580,7 @@ let render_external_service ~selected_idx ~current_idx ~folded
     in
     System_metrics_scheduler.mark_visible
       ~role:role_for_metrics
-      ~instance:ext.suggested_instance_name ;
+      ~instance:instance_for_metrics ;
 
     (* Second line: RPC/endpoint status *)
     let indent = "      " in
@@ -597,7 +603,7 @@ let render_external_service ~selected_idx ~current_idx ~folded
       match
         System_metrics_scheduler.get_version
           ~role:role_for_metrics
-          ~instance:ext.suggested_instance_name
+          ~instance:instance_for_metrics
       with
       | Some v -> System_metrics_scheduler.format_version_colored v
       | None -> Widgets.dim "v?"
@@ -605,7 +611,7 @@ let render_external_service ~selected_idx ~current_idx ~folded
     let mem =
       System_metrics_scheduler.render_mem_sparkline
         ~role:role_for_metrics
-        ~instance:ext.suggested_instance_name
+        ~instance:instance_for_metrics
         ~focus
     in
     let metrics_parts = [version] @ if mem = "" then [] else ["MEM " ^ mem] in
@@ -616,12 +622,11 @@ let render_external_service ~selected_idx ~current_idx ~folded
       match
         System_metrics_scheduler.render_cpu_chart
           ~role:role_for_metrics
-          ~instance:ext.suggested_instance_name
+          ~instance:instance_for_metrics
           ~focus
       with
       | None -> []
       | Some (chart, _avg_cpu) ->
-          (* Chart is multi-line, split and indent *)
           String.split_on_char '\n' chart
           |> List.map (fun line -> indent ^ line)
     in
