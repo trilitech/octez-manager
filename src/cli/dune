@@ -1,7 +1,7 @@
 (library
  (name octez_manager_cli)
  (wrapped false)
- (modules cli_output cli_helpers cmd_install_accuser)
+ (modules cli_output cli_helpers cmd_install_accuser cmd_install_dal)
  (libraries octez_manager_lib cmdliner rresult yojson linenoise)
  (instrumentation
   (backend bisect_ppx)))
