@@ -50,7 +50,7 @@ clean:
 coverage: clean
 	@echo "[coverage] running instrumented test suite"
 	@rm -rf _coverage && mkdir -p _coverage
-	@BISECT_FILE=$(CURDIR)/_coverage/bisect $(DUNE) runtest --instrument-with bisect_ppx
+	@BISECT_FILE=$(CURDIR)/_coverage/bisect $(DUNE) exec test/unit_tests.exe --instrument-with bisect_ppx
 	@COVERAGE_FILES=$$(find _coverage -name '*.coverage' -print); \
 		$(BISECT) summary --per-file $$COVERAGE_FILES | tee _coverage/summary.txt; \
 		$(BISECT) html -o _coverage/html $$COVERAGE_FILES
