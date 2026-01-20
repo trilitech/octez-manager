@@ -115,7 +115,7 @@ let print_all_services ~managed ~external_ =
 
     (* Print external services *)
     if external_ <> [] then (
-      Format.printf "=== External Services ===@.@." ;
+      Format.printf "=== Unmanaged Instances ===@.@." ;
       List.iter
         (fun svc -> Format.printf "%a" pp_external_service svc)
         external_) ;

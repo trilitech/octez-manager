@@ -684,7 +684,7 @@ let render_external_service ~selected_idx ~current_idx ~folded
 let render_external_services_section state =
   if state.external_services = [] then []
   else
-    let header = Widgets.bold "── External Services ──" in
+    let header = Widgets.bold "── Unmanaged Instances ──" in
     (* Calculate base index for external services (after menu and managed services) *)
     let external_start_idx = services_start_idx + List.length state.services in
     let service_lines =
