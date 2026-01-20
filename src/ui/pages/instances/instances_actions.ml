@@ -642,38 +642,71 @@ let external_service_actions_modal state ext =
   let display_name = ext.External_service.suggested_instance_name in
   (* Check if this is a standalone process (not a systemd service) *)
   let is_standalone_process = String.starts_with ~prefix:"process-" unit_name in
-  (* For standalone processes, only show Details (no start/stop/restart/logs) *)
+  (* For standalone processes, only show Details and Import *)
+  (* For systemd services, show all actions including Import *)
   let items =
-    if is_standalone_process then [`Details]
-    else [`Details; `Start; `Stop; `Restart; `Logs]
+    if is_standalone_process then [`Details; `Import]
+    else [`Details; `Import; `Start; `Stop; `Restart; `Logs]
   in
-  (* If only one item (Details for standalone), show it directly instead of modal *)
+  (* For standalone processes, show modal with Details and Import *)
   if is_standalone_process then (
-    (* Show details directly *)
-    let cfg = ext.External_service.config in
-    let lines =
-      [
-        Printf.sprintf "Unit: %s" cfg.unit_name;
-        Printf.sprintf "State: %s" cfg.unit_state.active_state;
-        (match cfg.binary_path.value with
-        | Some b -> Printf.sprintf "Binary: %s" b
-        | None -> "Binary: (not detected)");
-        (match cfg.data_dir.value with
-        | Some d -> Printf.sprintf "Data dir: %s" d
-        | None -> "Data dir: (not detected)");
-        (match cfg.rpc_addr.value with
-        | Some r -> Printf.sprintf "RPC: %s" r
-        | None -> "");
-        (match cfg.node_endpoint.value with
-        | Some e -> Printf.sprintf "Node endpoint: %s" e
-        | None -> "");
-        (match cfg.network.value with
-        | Some n -> Printf.sprintf "Network: %s" n
-        | None -> "");
-      ]
-      |> List.filter (fun s -> s <> "")
-    in
-    Modal_helpers.open_text_modal ~title:("Details · " ^ display_name) ~lines ;
+    Modal_helpers.open_choice_modal
+      ~title:("Standalone Process · " ^ display_name)
+      ~items
+      ~to_string:(function
+        | `Details -> "Details" | `Import -> "Import to Managed" | _ -> "")
+      ~on_select:(fun choice ->
+        match choice with
+        | `Import ->
+            (* Standalone processes cannot be imported (systemd only) *)
+            let lines =
+              [
+                "⚠ Cannot import standalone processes";
+                "";
+                "Only systemd-managed services can be imported.";
+                "";
+                "This is a standalone process (not managed by systemd).";
+                "To manage it, you'll need to:";
+                "  1. Stop the process manually";
+                "  2. Install a managed service with octez-manager";
+                "  3. Migrate any configuration/data if needed";
+              ]
+            in
+            Modal_helpers.open_text_modal
+              ~title:("Cannot Import · " ^ display_name)
+              ~lines
+        | `Details ->
+            let cfg = ext.External_service.config in
+            let lines =
+              [
+                Printf.sprintf
+                  "PID: %s"
+                  (String.sub unit_name 8 (String.length unit_name - 8));
+                (* extract PID from "process-12345" *)
+                Printf.sprintf "State: running";
+                (match cfg.binary_path.value with
+                | Some b -> Printf.sprintf "Binary: %s" b
+                | None -> "Binary: (not detected)");
+                (match cfg.data_dir.value with
+                | Some d -> Printf.sprintf "Data dir: %s" d
+                | None -> "Data dir: (not detected)");
+                (match cfg.rpc_addr.value with
+                | Some r -> Printf.sprintf "RPC: %s" r
+                | None -> "");
+                (match cfg.node_endpoint.value with
+                | Some e -> Printf.sprintf "Node endpoint: %s" e
+                | None -> "");
+                (match cfg.network.value with
+                | Some n -> Printf.sprintf "Network: %s" n
+                | None -> "");
+              ]
+              |> List.filter (fun s -> s <> "")
+            in
+            Modal_helpers.open_text_modal
+              ~title:("Details · " ^ display_name)
+              ~lines
+        | _ -> ())
+      () ;
     state)
   else (
     (* Systemd service: show action modal *)
@@ -682,12 +715,48 @@ let external_service_actions_modal state ext =
       ~items
       ~to_string:(function
         | `Details -> "Details"
+        | `Import -> "Import to Managed"
         | `Start -> "Start"
         | `Stop -> "Stop"
         | `Restart -> "Restart"
         | `Logs -> "View Logs")
       ~on_select:(fun choice ->
         match choice with
+        | `Import ->
+            (* Show import instructions *)
+            let missing = Import.missing_required_fields ext in
+            let lines =
+              [
+                "Import this service using the CLI:";
+                "";
+                Printf.sprintf "  octez-manager import '%s'" display_name;
+                "";
+              ]
+              @ (if missing <> [] then
+                   [
+                     "⚠ Missing configuration fields:";
+                     Printf.sprintf "  %s" (String.concat ", " missing);
+                     "";
+                     "You may need to provide overrides:";
+                     "  --network <network>  Override network";
+                     "  --as <name>          Custom instance name";
+                     "";
+                   ]
+                 else [])
+              @ [
+                  "Import strategies:";
+                  "  --strategy takeover  Disable original (default)";
+                  "  --strategy clone     Keep original running";
+                  "";
+                  "Preview first:";
+                  Printf.sprintf
+                    "  octez-manager import '%s' --dry-run"
+                    display_name;
+                ]
+            in
+            Modal_helpers.open_text_modal
+              ~title:("Import · " ^ display_name)
+              ~lines
         | `Details ->
             (* Show a simple info modal with detected configuration *)
             let cfg = ext.External_service.config in
