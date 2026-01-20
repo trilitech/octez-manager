@@ -652,10 +652,11 @@ let render_external_service ~selected_idx ~current_idx ~folded
     [first_line; line2; metrics_line] @ cpu_lines
 
 let render_external_services_section state =
-  Format.eprintf
-    "[DEBUG RENDER] external_services count: %d, selected: %d@."
-    (List.length state.external_services)
-    state.selected ;
+  if false then
+    Format.eprintf
+      "[DEBUG RENDER] external_services count: %d, selected: %d@."
+      (List.length state.external_services)
+      state.selected ;
   if state.external_services = [] then []
   else
     let header = Widgets.bold "── External Services ──" in
@@ -671,12 +672,13 @@ let render_external_services_section state =
               ext.External_service.suggested_instance_name
               state.external_folded
           in
-          Format.eprintf
-            "[DEBUG RENDER] Rendering %s at idx %d (folded=%b, selected=%d)@."
-            ext.External_service.suggested_instance_name
-            current_idx
-            is_folded
-            state.selected ;
+          if false then
+            Format.eprintf
+              "[DEBUG RENDER] Rendering %s at idx %d (folded=%b, selected=%d)@."
+              ext.External_service.suggested_instance_name
+              current_idx
+              is_folded
+              state.selected ;
           let lines =
             render_external_service
               ~selected_idx:state.selected
@@ -689,9 +691,10 @@ let render_external_services_section state =
         state.external_services
       |> List.concat
     in
-    Format.eprintf
-      "[DEBUG RENDER] Total service_lines: %d@."
-      (List.length service_lines) ;
+    if false then
+      Format.eprintf
+        "[DEBUG RENDER] Total service_lines: %d@."
+        (List.length service_lines) ;
     header :: service_lines
 
 (** Single-column layout (original) *)
