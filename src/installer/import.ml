@@ -1039,6 +1039,21 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
 
     (* Track imported services for dependency linking during dry-run *)
     let imported_map = Hashtbl.create 17 in
+    (* Pre-populate map with all services that will be imported (for dry-run) *)
+    List.iter
+      (fun svc_name ->
+        match
+          List.find_opt
+            (fun s -> s.External_service.config.unit_name = svc_name)
+            chain
+        with
+        | Some svc ->
+            Hashtbl.add
+              imported_map
+              svc.External_service.config.unit_name
+              svc.External_service.suggested_instance_name
+        | None -> ())
+      analysis.import_order ;
 
     (* Show each service in import order *)
     List.iteri
@@ -1066,11 +1081,6 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
                 ~external_svc:svc
                 ()
             in
-            (* Track this "mock import" for next service's dependency resolution *)
-            Hashtbl.add
-              imported_map
-              svc.External_service.config.unit_name
-              svc.External_service.suggested_instance_name ;
             ()
         | None -> ())
       analysis.import_order ;
