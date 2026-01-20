@@ -229,7 +229,8 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
               (match e with `Msg m -> m)))
 
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
-    ~node_endpoint ~bin_dir ~depends_on =
+    ~node_endpoint ~bin_dir ~depends_on ~imported_services
+    ~all_external_services =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
   (* Extract delegates if detected *)
@@ -242,14 +243,40 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
     | Some instance -> Local_instance instance
     | None -> Remote_endpoint node_endpoint
   in
+  (* Check for DAL node dependency *)
+  let dal_config, dal_node =
+    match config.dal_endpoint.value with
+    | Some dal_endpoint -> (
+        if
+          (* Baker has --dal-node, check if we imported that DAL node *)
+          Hashtbl.length imported_services = 0 || all_external_services = []
+        then (Dal_endpoint dal_endpoint, None)
+        else
+          let deps =
+            External_service.get_dependencies external_svc all_external_services
+          in
+          let dal_dep =
+            List.find_opt
+              (fun (dep_name, dep_role) ->
+                dep_role = "dal-node" && Hashtbl.mem imported_services dep_name)
+              deps
+          in
+          match dal_dep with
+          | Some (dep_name, _) -> (
+              match Hashtbl.find_opt imported_services dep_name with
+              | Some dal_instance -> (Dal_auto, Some dal_instance)
+              | None -> (Dal_endpoint dal_endpoint, None))
+          | None -> (Dal_endpoint dal_endpoint, None))
+    | None -> (Dal_disabled, None)
+  in
   let request : baker_request =
     {
       instance;
       node_mode;
       base_dir = Some base_dir;
       delegates;
-      dal_config = Dal_disabled;
-      dal_node = None;
+      dal_config;
+      dal_node;
       liquidity_baking_vote = None;
       extra_args = [];
       service_user;
@@ -821,6 +848,8 @@ let import_service ?(on_log = fun _ -> ())
               ~node_endpoint
               ~bin_dir
               ~depends_on:depends_on_instance
+              ~imported_services
+              ~all_external_services
         | Some External_service.Accuser ->
             create_accuser_from_external
               ~instance:instance_name
@@ -1008,6 +1037,9 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
          | Clone -> "Clone")) ;
     log (Printf.sprintf "Services to import: %d" (List.length chain)) ;
 
+    (* Track imported services for dependency linking during dry-run *)
+    let imported_map = Hashtbl.create 17 in
+
     (* Show each service in import order *)
     List.iteri
       (fun i svc_name ->
@@ -1024,8 +1056,21 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
                   --------------------------------------------------------------"
                  (i + 1)
                  (List.length chain)) ;
-            (* Call import_service in dry-run for each to show details *)
-            let _ = import_service ~on_log ~options ~external_svc:svc () in
+            (* Call import_service in dry-run with tracking for dependency linking *)
+            let _ =
+              import_service
+                ~on_log
+                ~imported_services:imported_map
+                ~all_external_services:all_services
+                ~options
+                ~external_svc:svc
+                ()
+            in
+            (* Track this "mock import" for next service's dependency resolution *)
+            Hashtbl.add
+              imported_map
+              svc.External_service.config.unit_name
+              svc.External_service.suggested_instance_name ;
             ()
         | None -> ())
       analysis.import_order ;
