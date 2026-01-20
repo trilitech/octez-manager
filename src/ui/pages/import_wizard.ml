@@ -385,11 +385,14 @@ let view ps ~focus:_ ~size =
             @ [""; "Enter: Confirm  Esc: Back"])
     | Importing -> (
         (* Show live progress from Job_manager *)
+        let all_jobs = Job_manager.list () in
+        let num_jobs = List.length all_jobs in
         match Job_manager.get_running_job () with
         | Some job ->
             let phase =
               if job.phase <> "" then Printf.sprintf " - %s" job.phase else ""
             in
+            let num_logs = List.length job.log in
             let log_lines =
               List.rev job.log
               |> (fun lines ->
@@ -400,15 +403,36 @@ let view ps ~focus:_ ~size =
             in
             [""; Printf.sprintf "⏳  Importing...%s" phase; ""]
             @ log_lines
-            @ [""; Widgets.dim "  Please wait..."]
+            @ [
+                "";
+                Widgets.dim
+                  (Printf.sprintf
+                     "  (job #%d, %d log lines, %d jobs total)"
+                     job.id
+                     num_logs
+                     num_jobs);
+              ]
         | None ->
-            (* Fallback if job already finished *)
+            (* Fallback if job already finished or not found *)
+            let latest = Job_manager.get_latest_job () in
+            let status_info =
+              match latest with
+              | None -> "No jobs found"
+              | Some j -> (
+                  match j.status with
+                  | Job_manager.Running -> "Latest: Running"
+                  | Job_manager.Pending -> "Latest: Pending"
+                  | Job_manager.Succeeded -> "Latest: Succeeded"
+                  | Job_manager.Failed msg ->
+                      Printf.sprintf "Latest: Failed - %s" msg)
+            in
             [
               "";
               "";
               "  ⏳  Importing...";
               "";
-              "  This may take a few moments.";
+              Widgets.dim
+                (Printf.sprintf "  Debug: %s (%d jobs)" status_info num_jobs);
               "";
             ])
   in
