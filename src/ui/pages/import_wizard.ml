@@ -412,29 +412,50 @@ let view ps ~focus:_ ~size =
                      num_logs
                      num_jobs);
               ]
-        | None ->
+        | None -> (
             (* Fallback if job already finished or not found *)
             let latest = Job_manager.get_latest_job () in
-            let status_info =
-              match latest with
-              | None -> "No jobs found"
-              | Some j -> (
-                  match j.status with
-                  | Job_manager.Running -> "Latest: Running"
-                  | Job_manager.Pending -> "Latest: Pending"
-                  | Job_manager.Succeeded -> "Latest: Succeeded"
-                  | Job_manager.Failed msg ->
-                      Printf.sprintf "Latest: Failed - %s" msg)
-            in
-            [
-              "";
-              "";
-              "  ⏳  Importing...";
-              "";
-              Widgets.dim
-                (Printf.sprintf "  Debug: %s (%d jobs)" status_info num_jobs);
-              "";
-            ])
+            match latest with
+            | None ->
+                [
+                  "";
+                  "";
+                  "  ⏳  Importing...";
+                  "";
+                  Widgets.dim
+                    (Printf.sprintf "  Debug: No jobs (%d total)" num_jobs);
+                  "";
+                ]
+            | Some j -> (
+                match j.status with
+                | Job_manager.Running ->
+                    [""; "  ⏳  Importing..."; ""; "  Status: Running"; ""]
+                | Job_manager.Pending ->
+                    [""; "  ⏳  Importing..."; ""; "  Status: Pending"; ""]
+                | Job_manager.Succeeded ->
+                    [
+                      "";
+                      Widgets.fg 10 "  ✓ Import succeeded!";
+                      "";
+                      "  Navigating to instances...";
+                      "";
+                    ]
+                | Job_manager.Failed msg ->
+                    let log_lines =
+                      List.rev j.log
+                      |> (fun lines ->
+                      let len = List.length lines in
+                      if len > 15 then
+                        List.filteri (fun i _ -> i >= len - 15) lines
+                      else lines)
+                      |> List.map (fun line -> "  " ^ line)
+                    in
+                    [""; Widgets.fg 9 "  ✗ Import failed"; ""]
+                    @ (if msg <> "" then ["  Error: " ^ msg; ""] else [])
+                    @ (if log_lines <> [] then
+                         ["  Log output:"; ""] @ log_lines @ [""]
+                       else ["  (no log output)"; ""])
+                    @ [""; "Press Esc to go back"])))
   in
   Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
       String.concat "\n" body_lines)
