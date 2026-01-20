@@ -13,6 +13,15 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/trilitech/octez-manager/actions/workflows/ci.yml">
+    <img src="https://github.com/trilitech/octez-manager/actions/workflows/ci.yml/badge.svg" alt="CI Status">
+  </a>
+  <a href="https://github.com/trilitech/octez-manager/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/badge/coverage-62%25-yellow" alt="Code Coverage">
+  </a>
+</p>
+
+<p align="center">
   <img src="assets/octez-manager.gif" alt="Octez Manager UI">
 </p>
 
