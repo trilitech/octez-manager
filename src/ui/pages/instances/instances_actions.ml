@@ -630,6 +630,10 @@ let go_to_diagnostics state =
   Context.navigate Diagnostics.name ;
   state
 
+let go_to_binaries state =
+  Context.navigate Binaries.name ;
+  state
+
 let current_external_service s =
   let external_start_idx = services_start_idx + List.length s.services in
   if s.selected >= external_start_idx then

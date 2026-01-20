@@ -86,6 +86,9 @@ val create_menu_modal : state -> state
 (** Navigate to diagnostics page *)
 val go_to_diagnostics : state -> state
 
+(** Navigate to binaries management page *)
+val go_to_binaries : state -> state
+
 (** Activate the current selection (enter key) *)
 val activate_selection : state -> state
 
