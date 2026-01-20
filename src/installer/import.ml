@@ -229,17 +229,23 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
               (match e with `Msg m -> m)))
 
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
-    ~node_endpoint ~bin_dir =
+    ~node_endpoint ~bin_dir ~depends_on =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
   (* Extract delegates if detected *)
   let delegates =
     match config.delegates.value with Some d -> d | None -> []
   in
+  (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
+  let node_mode =
+    match depends_on with
+    | Some instance -> Local_instance instance
+    | None -> Remote_endpoint node_endpoint
+  in
   let request : baker_request =
     {
       instance;
-      node_mode = Remote_endpoint node_endpoint;
+      node_mode;
       base_dir = Some base_dir;
       delegates;
       dal_config = Dal_disabled;
@@ -263,12 +269,18 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
-    ~node_endpoint ~bin_dir =
+    ~node_endpoint ~bin_dir ~depends_on =
   let service_user = get_service_user external_svc in
+  (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
+  let node_mode =
+    match depends_on with
+    | Some instance -> Local_instance instance
+    | None -> Remote_endpoint node_endpoint
+  in
   let request : accuser_request =
     {
       instance;
-      node_mode = Remote_endpoint node_endpoint;
+      node_mode;
       base_dir = Some base_dir;
       extra_args = [];
       service_user;
@@ -288,7 +300,7 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_dal_from_external ~instance ~external_svc ~network ~data_dir
-    ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy =
+    ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy ~depends_on =
   let service_user = get_service_user external_svc in
   (* For Clone strategy, increment ports to avoid conflicts *)
   let rpc_addr, net_addr =
@@ -321,7 +333,7 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       extra_env = [("OCTEZ_NODE_ENDPOINT", node_endpoint)];
       extra_paths = [];
       auto_enable = true;
-      depends_on = None;
+      depends_on;
       preserve_data = true;
     }
   in
@@ -429,7 +441,8 @@ let format_comparison ~log ~label ~original ~generated =
 
 (** Show dry-run details for a single service *)
 let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
-    ~base_dir:_ ~rpc_addr ~net_addr:_ ~node_endpoint:_ ~bin_dir:_ ~options =
+    ~base_dir:_ ~rpc_addr ~net_addr:_ ~node_endpoint ~bin_dir:_ ~options
+    ~depends_on =
   let config = external_svc.External_service.config in
   let role_str =
     match config.role.value with
@@ -617,11 +630,23 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
       log (Printf.sprintf "  \"data_dir\": \"%s\"," data_dir) ;
       log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr) ;
       log "  \"depends_on\": null  ⚠️ Should link to managed node instance!"
-  | Some External_service.Baker | Some External_service.Accuser ->
+  | Some External_service.Baker | Some External_service.Accuser -> (
       (match config.base_dir.value with
       | Some bd -> log (Printf.sprintf "  \"base_dir\": \"%s\"," bd)
       | None -> ()) ;
-      log "  \"depends_on\": null  ⚠️ Should link to managed node instance!"
+      match depends_on with
+      | Some inst ->
+          log
+            (Printf.sprintf
+               "  \"node_mode\": \"Local_instance(%s)\"  ✓ Linked to managed \
+                node!"
+               inst)
+      | None ->
+          log
+            (Printf.sprintf
+               "  \"node_mode\": \"Remote_endpoint(%s)\"  ℹ️ Using remote \
+                endpoint"
+               node_endpoint))
   | _ -> ()) ;
   log "  ..." ;
   log "}" ;
@@ -631,7 +656,13 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
 
 (** {1 Main Import Function} *)
 
-let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
+(** Map external unit name -> managed instance name for dependency resolution *)
+type _imported_map = (string, string) Hashtbl.t
+
+let import_service ?(on_log = fun _ -> ())
+    ?(imported_services = Hashtbl.create 0)
+    ?(all_external_services : External_service.t list = []) ~options
+    ~external_svc () =
   let log msg = on_log msg in
   let config = external_svc.External_service.config in
   (* 1. Validate *)
@@ -662,11 +693,63 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
   let* base_dir = resolve_base_dir ~overrides:options.overrides ~external_svc in
   let rpc_addr = resolve_rpc_addr ~overrides:options.overrides ~external_svc in
   let net_addr = resolve_net_addr ~overrides:options.overrides ~external_svc in
-  (* 5. Get node endpoint for baker/accuser/dal *)
+  (* 5. Get node endpoint for baker/accuser/dal and resolve depends_on *)
   let node_endpoint =
     match config.node_endpoint.value with
     | Some ep -> ep
     | None -> "http://127.0.0.1:8732"
+  in
+  (* 5b. Resolve dependency to managed instance if in cascade import *)
+  (* For baker: check run_mode to decide if we should link to local instance *)
+  (* For accuser: always use remote endpoint (no local mode) *)
+  (* For DAL: link to node if available *)
+  let depends_on_instance =
+    if Hashtbl.length imported_services = 0 || all_external_services = [] then
+      None
+    else
+      match config.role.value with
+      | Some External_service.Baker -> (
+          (* Baker: only use Local_instance if original was "with local node" *)
+          let parsed = Execstart_parser.parse config.exec_start in
+          match parsed.run_mode with
+          | Some "with local node" -> (
+              (* Find node dependency that was imported *)
+              let deps =
+                External_service.get_dependencies
+                  external_svc
+                  all_external_services
+              in
+              let node_dep =
+                List.find_opt
+                  (fun (dep_name, dep_role) ->
+                    dep_role = "node" && Hashtbl.mem imported_services dep_name)
+                  deps
+              in
+              match node_dep with
+              | Some (dep_name, _) ->
+                  Hashtbl.find_opt imported_services dep_name
+              | None -> None)
+          | Some "remotely" | Some _ | None ->
+              (* Keep remote endpoint for "remotely" or unknown modes *)
+              None)
+      | Some External_service.Accuser ->
+          (* Accuser always runs remotely, never link *)
+          None
+      | Some External_service.Dal_node -> (
+          (* DAL: link to node if available *)
+          let deps =
+            External_service.get_dependencies external_svc all_external_services
+          in
+          let node_dep =
+            List.find_opt
+              (fun (dep_name, dep_role) ->
+                dep_role = "node" && Hashtbl.mem imported_services dep_name)
+              deps
+          in
+          match node_dep with
+          | Some (dep_name, _) -> Hashtbl.find_opt imported_services dep_name
+          | None -> None)
+      | _ -> None
   in
   (* 6. Get bin_dir - extract directory from binary path *)
   let bin_dir =
@@ -687,7 +770,8 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
       ~net_addr
       ~node_endpoint
       ~bin_dir
-      ~options ;
+      ~options
+      ~depends_on:depends_on_instance ;
     Ok
       {
         original_unit = config.unit_name;
@@ -736,6 +820,7 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
               ~base_dir
               ~node_endpoint
               ~bin_dir
+              ~depends_on:depends_on_instance
         | Some External_service.Accuser ->
             create_accuser_from_external
               ~instance:instance_name
@@ -744,6 +829,7 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
               ~base_dir
               ~node_endpoint
               ~bin_dir
+              ~depends_on:depends_on_instance
         | Some External_service.Dal_node ->
             create_dal_from_external
               ~instance:instance_name
@@ -755,6 +841,7 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
               ~node_endpoint
               ~bin_dir
               ~strategy:options.strategy
+              ~depends_on:depends_on_instance
         | Some (External_service.Unknown role_str) ->
             Error (`Msg (Printf.sprintf "Unknown role: %s" role_str))
         | None -> Error (`Msg "Role not detected for external service")
@@ -973,6 +1060,7 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
     (* 4. Import each service in order *)
     let results = ref [] in
     let imported_instances = ref [] in
+    let imported_map = Hashtbl.create 17 in
 
     try
       List.iter
@@ -990,10 +1078,20 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
               log "" ;
               log (Printf.sprintf "Importing %s..." svc_name) ;
               let result =
-                match import_service ~on_log ~options ~external_svc:svc () with
+                match
+                  import_service
+                    ~on_log
+                    ~imported_services:imported_map
+                    ~all_external_services:all_services
+                    ~options
+                    ~external_svc:svc
+                    ()
+                with
                 | Ok r ->
                     results := r :: !results ;
                     imported_instances := r.new_instance :: !imported_instances ;
+                    (* Track this import for dependency resolution *)
+                    Hashtbl.add imported_map r.original_unit r.new_instance ;
                     r
                 | Error (`Msg msg) -> raise (Failure msg)
               in

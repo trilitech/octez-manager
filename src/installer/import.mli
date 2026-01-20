@@ -112,6 +112,8 @@ val missing_required_fields : External_service.t -> string list
     @raise any exception triggers rollback *)
 val import_service :
   ?on_log:(string -> unit) ->
+  ?imported_services:(string, string) Hashtbl.t ->
+  ?all_external_services:External_service.t list ->
   options:import_options ->
   external_svc:External_service.t ->
   unit ->
