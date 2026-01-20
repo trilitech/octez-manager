@@ -98,6 +98,17 @@ jobs:
           echo '(-ccopt -static)' > static_flags.sexp
           dune build --release
 
+      - name: Debug environment before test
+        run: |
+          echo "=== Testing write permissions ==="
+          mkdir -p _coverage/unit
+          chown -R opam:opam _coverage
+          su -s /bin/sh opam -c "touch _coverage/unit/test.txt && ls -la _coverage/unit/ && rm _coverage/unit/test.txt"
+          echo "=== Checking BISECT_FILE env var ==="
+          su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && echo \"BISECT_FILE=\$BISECT_FILE\""
+          echo "=== Checking if bisect_ppx runtime is available ==="
+          su -s /bin/sh opam -c "ocamlfind query bisect_ppx"
+
       - name: Test
         run: |
           chown -R opam:opam /home/opam/.opam
@@ -105,6 +116,15 @@ jobs:
           mkdir -p _coverage/unit
           chown -R opam:opam _coverage
           su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx --force"
+          
+      - name: Debug coverage files after test
+        if: always()
+        run: |
+          echo "=== Checking for coverage files ==="
+          find _coverage -type f -name '*.coverage' || echo "No .coverage files found"
+          ls -laR _coverage || echo "_coverage directory not found"
+          echo "=== Checking _build for bisect references ==="
+          find _build/default/test -name "unit_tests.exe" -exec strings {} \; | grep -i bisect | head -20 || echo "No bisect references in test binary"
 
       - name: Prepare binary artifact
         run: |
