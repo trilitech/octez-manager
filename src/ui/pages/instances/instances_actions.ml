@@ -728,6 +728,13 @@ let external_service_actions_modal state ext =
         | `Details ->
             (* Show a simple info modal with detected configuration *)
             let cfg = ext.External_service.config in
+            (* Get dependencies and dependents *)
+            let dependencies =
+              External_service.get_dependencies ext state.external_services
+            in
+            let dependents =
+              External_service.get_dependents ext state.external_services
+            in
             let lines =
               [
                 Printf.sprintf "Unit: %s" cfg.unit_name;
@@ -744,15 +751,39 @@ let external_service_actions_modal state ext =
                 (match cfg.node_endpoint.value with
                 | Some e -> Printf.sprintf "Node endpoint: %s" e
                 | None -> "");
+                (match cfg.dal_endpoint.value with
+                | Some e -> Printf.sprintf "DAL endpoint: %s" e
+                | None -> "");
                 (match cfg.network.value with
                 | Some n -> Printf.sprintf "Network: %s" n
                 | None -> "");
               ]
               |> List.filter (fun s -> s <> "")
             in
+            (* Add dependencies section *)
+            let dep_lines =
+              if dependencies = [] then []
+              else
+                "" :: "Dependencies (via endpoints):"
+                :: List.map
+                     (fun (unit_name, role) ->
+                       Printf.sprintf "  → %s (%s)" unit_name role)
+                     dependencies
+            in
+            (* Add dependents section *)
+            let dependent_lines =
+              if dependents = [] then []
+              else
+                "" :: "Dependents (services that use this):"
+                :: List.map
+                     (fun (unit_name, role) ->
+                       Printf.sprintf "  ← %s (%s)" unit_name role)
+                     dependents
+            in
+            let all_lines = lines @ dep_lines @ dependent_lines in
             Modal_helpers.open_text_modal
               ~title:("Details · " ^ display_name)
-              ~lines
+              ~lines:all_lines
         | `Start ->
             run_unit_action ~verb:"start" ~instance:display_name (fun () ->
                 Systemd.start_unit ~unit_name)
