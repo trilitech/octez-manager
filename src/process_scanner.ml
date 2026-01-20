@@ -125,16 +125,16 @@ let read_binary_realpath pid =
         with End_of_file -> None)
   with _ -> None
 
-(** Check if command line's first token is an Octez binary *)
+(** Check if command line's first token is an Octez service binary we want to track *)
 let is_octez_binary cmdline =
+  (* Only track main service binaries (node, baker, accuser, dal-node) *)
   let octez_binaries =
     [
       "octez-node";
       "octez-baker";
       "octez-accuser";
       "octez-dal-node";
-      "octez-signer";
-      "octez-client";
+      (* Legacy names *)
       "tezos-node";
       "tezos-baker";
       "tezos-accuser";
@@ -144,7 +144,7 @@ let is_octez_binary cmdline =
   match extract_binary_path cmdline with
   | None -> false
   | Some binary_path ->
-      (* Check if the binary path ends with one of the Octez binary names *)
+      (* Check if the binary path ends with one of the Octez service binary names *)
       List.exists
         (fun binary ->
           String.ends_with ~suffix:binary binary_path
