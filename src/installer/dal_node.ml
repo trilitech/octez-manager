@@ -51,10 +51,13 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
     let args_entry =
       if service_args = "" then [] else [("OCTEZ_SERVICE_ARGS", service_args)]
     in
-    ("OCTEZ_DATA_DIR", request.data_dir)
-    :: ("OCTEZ_NETWORK", request.network)
-    :: args_entry
-    @ request.extra_env
+    [
+      ("OCTEZ_DAL_DATA_DIR", request.data_dir);
+      ("OCTEZ_DAL_RPC_ADDR", request.rpc_addr);
+      ("OCTEZ_DAL_NET_ADDR", request.net_addr);
+      ("OCTEZ_NETWORK", request.network);
+    ]
+    @ args_entry @ request.extra_env
   in
   let* () = Node_env.write_pairs ~inst:request.instance extra_env in
   let* () =
