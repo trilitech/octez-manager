@@ -57,6 +57,14 @@ let build_graph_nodes ~all_services ~target_services =
 
 (** {1 Topological Sort} *)
 
+(** Helper to drop first n elements from list *)
+let rec list_drop n lst =
+  match (n, lst) with
+  | 0, _ -> lst
+  | _, [] -> []
+  | n, _ :: tl when n > 0 -> list_drop (n - 1) tl
+  | _, lst -> lst
+
 (** Topological sort using DFS. Returns (sorted_list, cycles). *)
 let topological_sort nodes =
   (* Create adjacency map: unit_name -> dependencies *)
@@ -77,7 +85,7 @@ let topological_sort nodes =
         try List.find_index (fun n -> n = node_name) path |> Option.get
         with _ -> 0
       in
-      let cycle = List.drop cycle_start path @ [node_name] in
+      let cycle = list_drop cycle_start path @ [node_name] in
       cycles := cycle :: !cycles
     else if not (Hashtbl.mem visited node_name) then (
       Hashtbl.add rec_stack node_name true ;
