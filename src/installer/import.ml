@@ -233,13 +233,9 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
               "Failed to create node: %s"
               (match e with `Msg m -> m)))
 
-let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
-    ~node_endpoint ~bin_dir ~depends_on ~imported_services
-    ~all_external_services =
-  let config = external_svc.External_service.config in
-  let service_user = get_service_user external_svc in
-  (* Parse ExecStart to extract extra arguments *)
-  let parsed = Execstart_parser.parse config.exec_start in
+(** Extract baker-specific fields from extra_args.
+    Returns (delegates, liquidity_baking_vote, remaining_extra_args) *)
+let extract_baker_fields extra_args =
   (* Extract delegates from extra_args using heuristics:
      - Tezos addresses: tz1/tz2/tz3/tz4/KT1 prefixes
      - Delegate aliases: alphanumeric+underscore, no paths
@@ -274,7 +270,7 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
     | args -> (List.rev acc, args)
   in
   let delegates, remaining_args_rev =
-    extract_trailing_delegates [] (List.rev parsed.extra_args)
+    extract_trailing_delegates [] (List.rev extra_args)
   in
   let remaining_args = List.rev remaining_args_rev in
   (* Extract liquidity baking vote if present *)
@@ -286,6 +282,19 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       | arg :: rest -> extract_lb (arg :: acc) rest
     in
     extract_lb [] remaining_args
+  in
+  (delegates, liquidity_baking_vote, remaining_args)
+
+let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
+    ~node_endpoint ~bin_dir ~depends_on ~imported_services
+    ~all_external_services =
+  let config = external_svc.External_service.config in
+  let service_user = get_service_user external_svc in
+  (* Parse ExecStart to extract extra arguments *)
+  let parsed = Execstart_parser.parse config.exec_start in
+  (* Extract baker-specific fields *)
+  let delegates, liquidity_baking_vote, remaining_args =
+    extract_baker_fields parsed.extra_args
   in
   (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
   let node_mode =
@@ -762,7 +771,53 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
                 ", "
                 (List.map (Printf.sprintf "\"%s\"") parsed.extra_args)))
       else log "  \"service_args\": [],"
-  | Some External_service.Baker | Some External_service.Accuser ->
+  | Some External_service.Baker ->
+      (* Extract baker fields to show processed values *)
+      let delegates, liquidity_baking_vote, processed_extra_args =
+        extract_baker_fields parsed.extra_args
+      in
+      (match config.base_dir.value with
+      | Some bd -> log (Printf.sprintf "  \"base_dir\": \"%s\"," bd)
+      | None -> ()) ;
+      log
+        (Printf.sprintf
+           "  \"service_user\": \"%s\","
+           (get_service_user external_svc)) ;
+      log (Printf.sprintf "  \"app_bin_dir\": \"%s\"," bin_dir) ;
+      (match depends_on with
+      | Some inst ->
+          log
+            (Printf.sprintf
+               "  \"node_mode\": \"Local_instance(%s)\",  ✓ Linked to managed \
+                node!"
+               inst)
+      | None ->
+          log
+            (Printf.sprintf
+               "  \"node_mode\": \"Remote_endpoint(%s)\",  ℹ️ Using remote \
+                endpoint"
+               node_endpoint)) ;
+      (* Show extracted delegates *)
+      if List.length delegates > 0 then
+        log
+          (Printf.sprintf
+             "  \"delegates\": [%s],"
+             (String.concat ", " (List.map (Printf.sprintf "\"%s\"") delegates))) ;
+      (* Show extracted LB vote *)
+      (match liquidity_baking_vote with
+      | Some vote ->
+          log (Printf.sprintf "  \"liquidity_baking_vote\": \"%s\"," vote)
+      | None -> ()) ;
+      (* Show remaining extra args after extraction *)
+      if List.length processed_extra_args > 0 then
+        log
+          (Printf.sprintf
+             "  \"extra_args\": [%s]"
+             (String.concat
+                ", "
+                (List.map (Printf.sprintf "\"%s\"") processed_extra_args)))
+      else log "  \"extra_args\": []"
+  | Some External_service.Accuser ->
       (match config.base_dir.value with
       | Some bd -> log (Printf.sprintf "  \"base_dir\": \"%s\"," bd)
       | None -> ()) ;
