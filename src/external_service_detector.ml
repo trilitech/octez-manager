@@ -221,34 +221,15 @@ let read_proc_cmdline pid =
           in
           read_loop () ;
           let content = Buffer.contents buffer in
-          Format.eprintf
-            "[DEBUG] /proc/%d/cmdline: read %d bytes@."
-            pid
-            (String.length content) ;
           (* cmdline is null-separated, convert to spaces *)
           let cmdline =
             String.map (fun c -> if c = '\000' then ' ' else c) content
           in
           let trimmed = String.trim cmdline in
-          Format.eprintf
-            "[DEBUG] /proc/%d/cmdline: after trim length = %d@."
-            pid
-            (String.length trimmed) ;
-          if String.length trimmed > 0 then
-            Format.eprintf
-              "[DEBUG] /proc/%d/cmdline: content = %s@."
-              pid
-              (String.sub trimmed 0 (min 120 (String.length trimmed)))
-          else
-            Format.eprintf "[DEBUG] /proc/%d/cmdline: EMPTY after trim!@." pid ;
-          Some trimmed)
+          if String.length trimmed > 0 then Some trimmed else None)
     with
-    | Sys_error msg ->
-        Format.eprintf "[DEBUG] /proc/%d/cmdline: Sys_error: %s@." pid msg ;
-        None
-    | End_of_file ->
-        Format.eprintf "[DEBUG] /proc/%d/cmdline: End_of_file@." pid ;
-        None
+    | Sys_error _ -> None
+    | End_of_file -> None
 
 (** Get the actual running command for a service if it's active.
     Returns expanded command from /proc/PID/cmdline. *)
@@ -260,20 +241,10 @@ let get_running_command ~unit_name =
   match Common.run_out cmd with
   | Ok output -> (
       let trimmed = String.trim output in
-      Format.eprintf
-        "[DEBUG] %s: MainPID query returned: '%s'@."
-        unit_name
-        trimmed ;
       match int_of_string_opt trimmed with
-      | Some pid when pid > 0 ->
-          Format.eprintf "[DEBUG] %s: Reading /proc/%d/cmdline@." unit_name pid ;
-          read_proc_cmdline pid
-      | _ ->
-          Format.eprintf "[DEBUG] %s: Invalid PID: %s@." unit_name trimmed ;
-          None)
-  | Error _ ->
-      Format.eprintf "[DEBUG] %s: MainPID query failed@." unit_name ;
-      None
+      | Some pid when pid > 0 -> read_proc_cmdline pid
+      | _ -> None)
+  | Error _ -> None
 
 (** {1 Detection Logic} *)
 
@@ -352,41 +323,15 @@ let build_external_service ~unit_name ~exec_start ~properties =
 
   (* Try to get actual running command for active services *)
   let command_to_parse, command_source =
-    if active_state = "active" then (
-      Format.eprintf
-        "[DEBUG] %s: ActiveState=active, trying /proc/PID/cmdline@."
-        unit_name ;
+    if active_state = "active" then
       match get_running_command ~unit_name with
-      | Some running_cmd ->
-          Format.eprintf
-            "[DEBUG] %s: Got running command: %s@."
-            unit_name
-            (String.sub running_cmd 0 (min 80 (String.length running_cmd))) ;
-          (running_cmd, "/proc/PID/cmdline")
-      | None ->
-          Format.eprintf
-            "[DEBUG] %s: Failed to get running command, using ExecStart@."
-            unit_name ;
-          (exec_start, "ExecStart"))
-    else (
-      Format.eprintf
-        "[DEBUG] %s: ActiveState=%s, using ExecStart@."
-        unit_name
-        active_state ;
-      (exec_start, "ExecStart"))
+      | Some running_cmd -> (running_cmd, "/proc/PID/cmdline")
+      | None -> (exec_start, "ExecStart")
+    else (exec_start, "ExecStart")
   in
 
   (* Parse command line *)
-  Format.eprintf
-    "[DEBUG] %s: Parsing command from %s@."
-    unit_name
-    command_source ;
   let parsed = Execstart_parser.parse command_to_parse in
-  Format.eprintf
-    "[DEBUG] %s: Parsed binary_path=%s data_dir=%s@."
-    unit_name
-    (match parsed.binary_path with Some b -> b | None -> "NONE")
-    (match parsed.data_dir with Some d -> d | None -> "NONE") ;
 
   (* Read environment files if parsing found unexpanded variables *)
   let env_vars =
@@ -452,14 +397,6 @@ let build_external_service ~unit_name ~exec_start ~properties =
   (* Try to detect network via RPC probe if not already known *)
   let network_field =
     let parsed_network = build_field parsed.network in
-    Format.eprintf
-      "[DEBUG] %s: parsed_network.value=%s rpc_addr=%s endpoint=%s \
-       active_state=%s@."
-      unit_name
-      (match parsed_network.value with Some n -> n | None -> "NONE")
-      (match rpc_addr_field.value with Some a -> a | None -> "NONE")
-      (match endpoint_field.value with Some e -> e | None -> "NONE")
-      active_state ;
     match (parsed_network.value, active_state) with
     | None, "active" -> (
         (* No network but service is active - try probe *)
@@ -469,32 +406,13 @@ let build_external_service ~unit_name ~exec_start ~properties =
           | Some addr -> Some addr
           | None -> endpoint_field.value
         in
-        Format.eprintf
-          "[DEBUG] %s: Attempting RPC probe with addr=%s@."
-          unit_name
-          (match probe_addr with Some a -> a | None -> "NONE") ;
         match probe_addr with
         | Some addr -> (
             match probe_rpc_chain_id addr with
             | Some (_chain_id, Some network_name) ->
-                Format.eprintf
-                  "[DEBUG] %s: RPC probe success, network=%s@."
-                  unit_name
-                  network_name ;
                 External_service.inferred ~source:"RPC probe" network_name
-            | result ->
-                Format.eprintf
-                  "[DEBUG] %s: RPC probe failed: %s@."
-                  unit_name
-                  (match result with
-                  | Some (cid, None) ->
-                      "got chain_id=" ^ cid ^ " but no network match"
-                  | None -> "probe returned None"
-                  | _ -> "unknown") ;
-                parsed_network)
-        | None ->
-            Format.eprintf "[DEBUG] %s: No probe_addr available@." unit_name ;
-            parsed_network)
+            | _result -> parsed_network)
+        | None -> parsed_network)
     | _ -> parsed_network
   in
 
@@ -553,10 +471,6 @@ let infer_network_from_endpoint services =
               String.sub rpc_addr 7 (String.length rpc_addr - 7)
             else rpc_addr
           in
-          Format.eprintf
-            "[DEBUG] Registering node network mapping: %s -> %s@."
-            normalized_addr
-            network ;
           Hashtbl.replace node_networks normalized_addr network
       | _ -> ())
     services ;
@@ -580,26 +494,13 @@ let infer_network_from_endpoint services =
               String.sub endpoint 7 (String.length endpoint - 7)
             else endpoint
           in
-          Format.eprintf
-            "[DEBUG] %s: Looking up network for endpoint %s@."
-            svc.config.unit_name
-            normalized_endpoint ;
           match Hashtbl.find_opt node_networks normalized_endpoint with
           | Some network ->
-              Format.eprintf
-                "[DEBUG] %s: Found network %s from connected node@."
-                svc.config.unit_name
-                network ;
               let new_network =
                 External_service.inferred ~source:"connected node" network
               in
               {svc with config = {svc.config with network = new_network}}
-          | None ->
-              Format.eprintf
-                "[DEBUG] %s: No node found for endpoint %s@."
-                svc.config.unit_name
-                normalized_endpoint ;
-              svc)
+          | None -> svc)
       | _ -> svc)
     services
 
@@ -714,11 +615,7 @@ let detect_standalone_processes () =
   try
     let standalone_procs = Process_scanner.get_standalone_processes () in
     List.map process_to_external_service standalone_procs
-  with e ->
-    Format.eprintf
-      "[WARN] Failed to scan standalone processes: %s@."
-      (Printexc.to_string e) ;
-    []
+  with _e -> []
 
 let detect () =
   try
