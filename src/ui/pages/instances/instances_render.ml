@@ -759,6 +759,15 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
       (fun column_groups -> render_column ~col_width ~state ~column_groups)
       columns
   in
+  (* Calculate space needed for external services *)
+  let external_lines = render_external_services_section state in
+  let external_line_count = List.length external_lines in
+  (* Reserve space for external services if present *)
+  let reserved_for_external =
+    if external_line_count > 0 then external_line_count + 1 else 0
+  in
+  (* Reduce available height for columns to make room for external services *)
+  let columns_visible_height = max 5 (visible_height - reserved_for_external) in
   (* Header row (install) spans full width in single line *)
   let install_row =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
@@ -771,12 +780,26 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   let instance_rows =
     merge_columns
       ~col_width
-      ~visible_height
+      ~visible_height:columns_visible_height
       ~column_scroll
       ~active_column:effective_active_column
       ~columns_content
   in
-  install_row :: "" :: instance_rows
+  (* Trim trailing empty lines from column grid to place external services directly below *)
+  let instance_rows_trimmed =
+    let rec trim_end = function
+      | [] -> []
+      | rows ->
+          let last = List.nth rows (List.length rows - 1) in
+          if String.trim last = "" then
+            trim_end (List.filteri (fun i _ -> i < List.length rows - 1) rows)
+          else rows
+    in
+    trim_end instance_rows
+  in
+  (* Append external services below the columnar grid *)
+  let result = install_row :: "" :: instance_rows_trimmed in
+  if external_line_count > 0 then result @ ("" :: external_lines) else result
 
 let table_lines ?(cols = 80) ?(visible_height = 20) state =
   (* Clear visibility markers at start of render pass *)
