@@ -234,12 +234,18 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
               (match e with `Msg m -> m)))
 
 (** Extract baker-specific fields from extra_args.
-    Returns (delegates, liquidity_baking_vote, remaining_extra_args) *)
+    Returns (delegates, liquidity_baking_vote, remaining_extra_args) 
+    
+    Note: This uses heuristics to identify delegates as trailing positional arguments.
+    According to Octez baker syntax, delegates are always the final arguments on the
+    command line, appearing after all flags. We identify them as:
+    - Tezos addresses (tz1/tz2/tz3/tz4/KT1 prefixes), or
+    - Alphanumeric aliases (letters, numbers, underscores only)
+    
+    This approach works for standard baker configurations. If users have unusual
+    setups (e.g., custom flags after delegates), they may need to manually adjust
+    the delegates field after import via the TUI. *)
 let extract_baker_fields extra_args =
-  (* Extract delegates from extra_args using heuristics:
-     - Tezos addresses: tz1/tz2/tz3/tz4/KT1 prefixes
-     - Delegate aliases: alphanumeric+underscore, no paths
-     - Must be trailing (after last flag) *)
   let is_likely_delegate arg =
     if String.length arg < 3 then false
     else
