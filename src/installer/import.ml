@@ -240,12 +240,43 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
   let service_user = get_service_user external_svc in
   (* Parse ExecStart to extract extra arguments *)
   let parsed = Execstart_parser.parse config.exec_start in
-  (* Extract delegates from extra_args: positional args that don't start with - *)
-  let delegates, remaining_args =
-    List.partition
-      (fun arg -> String.length arg > 0 && arg.[0] <> '-' && arg.[0] <> '/')
-      parsed.extra_args
+  (* Extract delegates from extra_args using heuristics:
+     - Tezos addresses: tz1/tz2/tz3/tz4/KT1 prefixes
+     - Delegate aliases: alphanumeric+underscore, no paths
+     - Must be trailing (after last flag) *)
+  let is_likely_delegate arg =
+    if String.length arg < 3 then false
+    else
+      let prefix = String.sub arg 0 3 in
+      (* Tezos address prefixes *)
+      if
+        prefix = "tz1" || prefix = "tz2" || prefix = "tz3" || prefix = "tz4"
+        || prefix = "KT1"
+      then true
+      else
+        (* Alias: only alphanumeric and underscore, no slashes or special chars *)
+        String.length arg > 0
+        && arg.[0] <> '/'
+        && arg.[0] <> '-'
+        && String.for_all
+             (fun c ->
+               (c >= 'a' && c <= 'z')
+               || (c >= 'A' && c <= 'Z')
+               || (c >= '0' && c <= '9')
+               || c = '_')
+             arg
   in
+  (* Extract trailing delegates (reverse list, take while delegate-like, reverse back) *)
+  let rec extract_trailing_delegates acc = function
+    | [] -> (List.rev acc, [])
+    | arg :: rest when is_likely_delegate arg ->
+        extract_trailing_delegates (arg :: acc) rest
+    | args -> (List.rev acc, args)
+  in
+  let delegates, remaining_args_rev =
+    extract_trailing_delegates [] (List.rev parsed.extra_args)
+  in
+  let remaining_args = List.rev remaining_args_rev in
   (* Extract liquidity baking vote if present *)
   let liquidity_baking_vote, remaining_args =
     let rec extract_lb acc = function
