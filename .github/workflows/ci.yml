@@ -106,9 +106,16 @@ jobs:
           chown -R opam:opam _coverage
           # Clean test artifacts and rebuild with coverage enabled
           # Use 'dune exec' instead of 'dune runtest' because dune runtest doesn't pass BISECT_FILE through
-          # Use runuser with -w to preserve BISECT_FILE environment variable
+          # Create a script to ensure BISECT_FILE is properly set for the opam user
+          cat > /tmp/run_tests_with_coverage.sh << 'EOF'
+          #!/bin/sh
           export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect
-          runuser -u opam -w BISECT_FILE -- sh -c "rm -rf _build/default/test && git checkout -- static_flags.sexp && dune exec test/unit_tests.exe --instrument-with bisect_ppx"
+          rm -rf _build/default/test
+          git checkout -- static_flags.sexp
+          dune exec test/unit_tests.exe --instrument-with bisect_ppx
+          EOF
+          chmod +x /tmp/run_tests_with_coverage.sh
+          su -s /bin/sh opam -c "/tmp/run_tests_with_coverage.sh"
           
       - name: Debug coverage files after test
         if: always()
