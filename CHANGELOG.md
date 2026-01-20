@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Unmanaged Instances Detection**: Automatically detect and manage Octez services not installed by octez-manager
+  - Detects systemd services and standalone processes (Docker, tmux, manual launches)
+  - Shows real-time metrics (CPU, memory, sync status, head level) for all detected services
+  - Supports Start/Stop/Restart for systemd services, view-only for standalone processes
+  - Network detection via RPC probing
+  - Appears in dedicated "Unmanaged Instances" section in TUI (below managed services)
+  - CLI commands: `octez-manager list --external`, `octez-manager external <instance> <action>`
+  - Efficient process scanning with pgrep and PID caching for minimal system impact
+
+### Fixed
+
+- Suppress `du` command stderr output to prevent error messages in TUI
+
 ## [0.1.1] - 2026-01-15
 
 ### Added
