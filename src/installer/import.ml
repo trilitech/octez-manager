@@ -795,13 +795,26 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
   (* 1. Build dependency chain *)
   log "Analyzing dependency chain..." ;
   let chain =
-    Import_cascade.get_dependency_chain ~service:external_svc ~all_services
+    match options.strategy with
+    | Takeover ->
+        (* For Takeover: must import ALL affected services (dependencies + dependents) *)
+        log
+          "Takeover strategy: computing full cascade (dependencies + \
+           dependents)..." ;
+        Import_cascade.get_full_cascade ~service:external_svc ~all_services
+    | Clone ->
+        (* For Clone: only need dependencies *)
+        log "Clone strategy: computing dependency chain..." ;
+        Import_cascade.get_dependency_chain ~service:external_svc ~all_services
   in
 
   log
     (Printf.sprintf
-       "Found %d services to import (including dependencies)"
-       (List.length chain)) ;
+       "Found %d services to import%s"
+       (List.length chain)
+       (match options.strategy with
+       | Takeover -> " (including dependencies and dependents)"
+       | Clone -> " (including dependencies)")) ;
 
   (* 2. Validate cascade *)
   log "Validating import cascade..." ;

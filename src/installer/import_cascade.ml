@@ -134,7 +134,7 @@ let analyze_dependencies ~services ~target_services =
 (** {1 Dependency Chain} *)
 
 let get_dependency_chain ~service ~all_services =
-  (* BFS to find all transitive dependencies *)
+  (* BFS to find all transitive dependencies (things this service needs) *)
   let visited = Hashtbl.create 17 in
   let queue = Queue.create () in
   Queue.add service queue ;
@@ -162,6 +162,69 @@ let get_dependency_chain ~service ~all_services =
   let nodes =
     build_graph_nodes ~all_services ~target_services:all_services_in_chain
   in
+  let sorted, _cycles = topological_sort nodes in
+  (* Map back to services *)
+  List.filter_map (fun name -> find_service ~unit_name:name all_services) sorted
+
+(** Get complete cascade: service + dependencies + dependents (full transitive closure).
+    
+    Algorithm:
+    1. Start with target service
+    2. BFS to collect all dependencies (things it needs)
+    3. For each service in the chain, BFS to collect all dependents (things that need it)
+    4. Repeat step 2 for newly added dependents (they may have their own dependencies)
+    5. Continue until no new services are added (fixed point)
+*)
+let get_full_cascade ~service ~all_services =
+  let visited = Hashtbl.create 17 in
+  let chain = ref [] in
+
+  let add_service svc =
+    let name = unit_name svc in
+    if not (Hashtbl.mem visited name) then (
+      Hashtbl.add visited name true ;
+      chain := svc :: !chain)
+  in
+
+  (* Add initial service *)
+  add_service service ;
+
+  (* Fixed-point iteration: keep expanding until no new services are added *)
+  let changed = ref true in
+  while !changed do
+    changed := false ;
+    let current_chain = !chain in
+
+    List.iter
+      (fun svc ->
+        (* Add all dependencies (things this service needs) *)
+        let deps = get_dependency_names svc all_services in
+        List.iter
+          (fun dep_name ->
+            match find_service ~unit_name:dep_name all_services with
+            | Some dep_svc ->
+                let was_new = not (Hashtbl.mem visited dep_name) in
+                add_service dep_svc ;
+                if was_new then changed := true
+            | None -> ())
+          deps ;
+
+        (* Add all dependents (things that depend on this service) *)
+        let dependents = get_dependent_names svc all_services in
+        List.iter
+          (fun dep_name ->
+            match find_service ~unit_name:dep_name all_services with
+            | Some dep_svc ->
+                let was_new = not (Hashtbl.mem visited dep_name) in
+                add_service dep_svc ;
+                if was_new then changed := true
+            | None -> ())
+          dependents)
+      current_chain
+  done ;
+
+  (* Do topological sort on the complete chain *)
+  let nodes = build_graph_nodes ~all_services ~target_services:!chain in
   let sorted, _cycles = topological_sort nodes in
   (* Map back to services *)
   List.filter_map (fun name -> find_service ~unit_name:name all_services) sorted

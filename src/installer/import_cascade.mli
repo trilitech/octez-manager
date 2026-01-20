@@ -64,6 +64,22 @@ val get_dependency_chain :
   all_services:External_service.t list ->
   External_service.t list
 
+(** Get full cascade: service + all dependencies + all dependents.
+    
+    This computes the complete transitive closure including both:
+    - Dependencies (services this one needs)
+    - Dependents (services that need this one or its dependencies)
+    
+    Used for Takeover strategy to import everything that would be affected.
+    
+    @param service The service to analyze
+    @param all_services All available services for lookup
+    @return List of services in dependency order (dependencies first, dependents last) *)
+val get_full_cascade :
+  service:External_service.t ->
+  all_services:External_service.t list ->
+  External_service.t list
+
 (** {1 Validation} *)
 
 (** Validate a set of services can be imported together.
