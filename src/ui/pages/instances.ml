@@ -24,10 +24,6 @@ include Instances_layout
 let init_state () =
   let services = load_services () in
   let external_services = load_external_services () in
-  if false then
-    Format.eprintf
-      "[DEBUG] Loaded %d external services@."
-      (List.length external_services) ;
   (* Start with all managed instances folded by default *)
   let all_folded =
     List.fold_left
@@ -545,15 +541,14 @@ Press **Enter** to open instance menu.|}
     || lower = "^c" || String.equal key "\003"
 
   let move_selection s delta =
-    if false then
-      Format.eprintf
-        "[DEBUG NAV] move_selection: selected=%d delta=%d services=%d \
-         external=%d num_columns=%d@."
-        s.selected
-        delta
-        (List.length s.services)
-        (List.length s.external_services)
-        s.num_columns ;
+    Format.eprintf
+      "[DEBUG NAV] move_selection: selected=%d delta=%d services=%d \
+       external=%d num_columns=%d@."
+      s.selected
+      delta
+      (List.length s.services)
+      (List.length s.external_services)
+      s.num_columns ;
 
     if s.services = [] && s.external_services = [] then (
       (* Only Install button (0) when no services at all - ignore navigation *)
@@ -569,11 +564,10 @@ Press **Enter** to open instance menu.|}
       (* Skip separator during navigation *)
       let selected =
         if selected = menu_item_count then (
-          if false then
-            Format.eprintf
-              "[DEBUG NAV] Hit separator, skipping: %d + %d@."
-              selected
-              delta ;
+          Format.eprintf
+            "[DEBUG NAV] Hit separator, skipping: %d + %d@."
+            selected
+            delta ;
           selected + delta)
         else selected
       in
@@ -597,11 +591,10 @@ Press **Enter** to open instance menu.|}
             ~services:s.services
             s.active_column
         in
-        if false then
-          Format.eprintf
-            "[DEBUG NAV] first_svc=%d, final=%d@."
-            first_svc
-            (first_svc + services_start_idx) ;
+        Format.eprintf
+          "[DEBUG NAV] first_svc=%d, final=%d@."
+          first_svc
+          (first_svc + services_start_idx) ;
         {s with selected = first_svc + services_start_idx})
       else (
         Format.eprintf "[DEBUG NAV] Staying in menu, selected=%d@." selected ;
@@ -610,42 +603,37 @@ Press **Enter** to open instance menu.|}
       (* In services area: stay within column *)
       Format.eprintf "[DEBUG NAV] Multi-column: in services area@." ;
       let current_idx = s.selected - services_start_idx in
-      if false then
-        Format.eprintf
-          "[DEBUG NAV] current_idx=%d active_column=%d@."
-          current_idx
-          s.active_column ;
+      Format.eprintf
+        "[DEBUG NAV] current_idx=%d active_column=%d@."
+        current_idx
+        s.active_column ;
 
       (* Check if we're in external services area *)
       let external_start_idx = List.length s.services in
       let in_external = current_idx >= external_start_idx in
-      if false then
-        Format.eprintf
-          "[DEBUG NAV] external_start_idx=%d in_external=%b@."
-          external_start_idx
-          in_external ;
+      Format.eprintf
+        "[DEBUG NAV] external_start_idx=%d in_external=%b@."
+        external_start_idx
+        in_external ;
 
       if in_external then (
         (* External services: simple linear navigation (no multi-column support yet) *)
-        if false then
-          Format.eprintf
-            "[DEBUG NAV] In external services, using linear navigation@." ;
+        Format.eprintf
+          "[DEBUG NAV] In external services, using linear navigation@." ;
         (* Check if moving up from first external service *)
         let first_external = services_start_idx + List.length s.services in
         if s.selected = first_external && delta < 0 then (
           (* Move to last managed service, or menu if no managed services *)
-          if false then
-            Format.eprintf
-              "[DEBUG NAV] At first external, moving up to managed/menu@." ;
+          Format.eprintf
+            "[DEBUG NAV] At first external, moving up to managed/menu@." ;
           if List.length s.services > 0 then (
             (* Jump to last managed service *)
             let last_managed =
               services_start_idx + List.length s.services - 1
             in
-            if false then
-              Format.eprintf
-                "[DEBUG NAV] Jumping to last managed service: %d@."
-                last_managed ;
+            Format.eprintf
+              "[DEBUG NAV] Jumping to last managed service: %d@."
+              last_managed ;
             {s with selected = last_managed})
           else (
             (* No managed services, jump to menu *)
@@ -655,11 +643,10 @@ Press **Enter** to open instance menu.|}
           (* Normal external service navigation *)
           let raw = s.selected + delta in
           let selected = clamp_selection s.services s.external_services raw in
-          if false then
-            Format.eprintf
-              "[DEBUG NAV] external nav: raw=%d selected=%d@."
-              raw
-              selected ;
+          Format.eprintf
+            "[DEBUG NAV] external nav: raw=%d selected=%d@."
+            raw
+            selected ;
           {s with selected})
       else
         (* Managed services: column-based navigation *)
@@ -669,11 +656,10 @@ Press **Enter** to open instance menu.|}
             ~services:s.services
             s.active_column
         in
-        if false then
-          Format.eprintf
-            "[DEBUG NAV] col_indices=[%s] (length=%d)@."
-            (String.concat "," (List.map string_of_int col_indices))
-            (List.length col_indices) ;
+        Format.eprintf
+          "[DEBUG NAV] col_indices=[%s] (length=%d)@."
+          (String.concat "," (List.map string_of_int col_indices))
+          (List.length col_indices) ;
         let current_pos =
           List.find_mapi
             (fun i idx -> if idx = current_idx then Some i else None)
@@ -695,9 +681,8 @@ Press **Enter** to open instance menu.|}
             List.length s.external_services > 0
           then (
             (* Jump to first external service *)
-            if false then
-              Format.eprintf
-                "[DEBUG NAV] At bottom of managed, jumping to first external@." ;
+            Format.eprintf
+              "[DEBUG NAV] At bottom of managed, jumping to first external@." ;
             let first_external = services_start_idx + List.length s.services in
             {s with selected = first_external})
           else (
@@ -706,11 +691,10 @@ Press **Enter** to open instance menu.|}
             s)
         else
           let new_idx = List.nth col_indices new_pos in
-          if false then
-            Format.eprintf
-              "[DEBUG NAV] new_idx=%d, final selected=%d@."
-              new_idx
-              (new_idx + services_start_idx) ;
+          Format.eprintf
+            "[DEBUG NAV] new_idx=%d, final selected=%d@."
+            new_idx
+            (new_idx + services_start_idx) ;
           (* Adjust scroll to keep selection visible *)
           let line_start, line_count =
             service_line_position

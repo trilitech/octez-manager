@@ -652,17 +652,11 @@ let render_external_service ~selected_idx ~current_idx ~folded
     [first_line; line2; metrics_line] @ cpu_lines
 
 let render_external_services_section state =
-  if false then
-    Format.eprintf
-      "[DEBUG RENDER] external_services count: %d, selected: %d@."
-      (List.length state.external_services)
-      state.selected ;
   if state.external_services = [] then []
   else
     let header = Widgets.bold "── External Services ──" in
     (* Calculate base index for external services (after menu and managed services) *)
     let external_start_idx = services_start_idx + List.length state.services in
-    Format.eprintf "[DEBUG RENDER] external_start_idx: %d@." external_start_idx ;
     let service_lines =
       List.mapi
         (fun idx ext ->
@@ -672,13 +666,6 @@ let render_external_services_section state =
               ext.External_service.suggested_instance_name
               state.external_folded
           in
-          if false then
-            Format.eprintf
-              "[DEBUG RENDER] Rendering %s at idx %d (folded=%b, selected=%d)@."
-              ext.External_service.suggested_instance_name
-              current_idx
-              is_folded
-              state.selected ;
           let lines =
             render_external_service
               ~selected_idx:state.selected
@@ -686,15 +673,10 @@ let render_external_services_section state =
               ~folded:is_folded
               ext
           in
-          Format.eprintf "[DEBUG RENDER] -> %d lines@." (List.length lines) ;
           lines)
         state.external_services
       |> List.concat
     in
-    if false then
-      Format.eprintf
-        "[DEBUG RENDER] Total service_lines: %d@."
-        (List.length service_lines) ;
     header :: service_lines
 
 (** Single-column layout (original) *)

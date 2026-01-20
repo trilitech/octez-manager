@@ -35,7 +35,7 @@ let refresh () =
     last_poll := now ;
     match External_service_detector.detect () with
     | Ok services -> Mutex.protect cache_lock (fun () -> cache := services)
-    | Error _msg ->
+    | Error _ ->
         (* Keep previous cache on error *)
         ())
 
