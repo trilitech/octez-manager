@@ -304,7 +304,7 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
       service_args = [];
-      extra_env = [("OCTEZ_NODE", node_endpoint)];
+      extra_env = [("OCTEZ_NODE_ENDPOINT", node_endpoint)];
       extra_paths = [];
       auto_enable = true;
       depends_on = None;
