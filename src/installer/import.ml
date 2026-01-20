@@ -219,7 +219,14 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
       keep_snapshot = false;
     }
   in
-  Node.install_node ~quiet:true request
+  match Node.install_node ~quiet:true request with
+  | Ok svc -> Ok svc
+  | Error e ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "Failed to create node: %s"
+              (match e with `Msg m -> m)))
 
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~node_endpoint ~bin_dir =
@@ -246,7 +253,14 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       preserve_data = true;
     }
   in
-  Baker.install_baker ~quiet:true request
+  match Baker.install_baker ~quiet:true request with
+  | Ok svc -> Ok svc
+  | Error e ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "Failed to create baker: %s"
+              (match e with `Msg m -> m)))
 
 let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~node_endpoint ~bin_dir =
@@ -264,7 +278,14 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
       preserve_data = true;
     }
   in
-  Accuser.install_accuser ~quiet:true request
+  match Accuser.install_accuser ~quiet:true request with
+  | Ok svc -> Ok svc
+  | Error e ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "Failed to create accuser: %s"
+              (match e with `Msg m -> m)))
 
 let create_dal_from_external ~instance ~external_svc ~network ~data_dir
     ~rpc_addr ~node_endpoint ~bin_dir =
@@ -290,7 +311,14 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       preserve_data = true;
     }
   in
-  Dal_node.install_daemon ~quiet:true request
+  match Dal_node.install_daemon ~quiet:true request with
+  | Ok svc -> Ok svc
+  | Error e ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "Failed to create DAL node: %s"
+              (match e with `Msg m -> m)))
 
 (** {1 Rollback} *)
 
