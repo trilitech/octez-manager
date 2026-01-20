@@ -106,6 +106,13 @@ jobs:
           chown -R opam:opam _coverage
           su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx"
 
+      - name: Debug coverage files
+        run: |
+          echo "=== Coverage directory contents ==="
+          ls -laR _coverage/ || echo "No _coverage directory"
+          echo "=== Looking for .coverage files ==="
+          find . -name "*.coverage" -ls || echo "No .coverage files found"
+
       - name: Prepare binary artifact
         run: |
           mkdir -p artifacts
@@ -123,7 +130,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-unit
-          path: _coverage/unit/*.coverage
+          path: _coverage/unit/bisect*.coverage
           retention-days: 1
           if-no-files-found: warn
 
