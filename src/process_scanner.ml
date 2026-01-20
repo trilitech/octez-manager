@@ -125,7 +125,9 @@ let read_binary_realpath pid =
         with End_of_file -> None)
   with _ -> None
 
-(** Check if command line's first token is an Octez service binary we want to track *)
+(** Check if command line's first token is an Octez service binary we want to track.
+    This checks the cmdline (argv[0]) to filter out child processes like
+    octez-validator and octez-validator-hypervisor which share the same binary. *)
 let is_octez_binary cmdline =
   (* Only track main service binaries (node, baker, accuser, dal-node) *)
   let octez_binaries =
@@ -140,11 +142,13 @@ let is_octez_binary cmdline =
       "tezos-accuser";
     ]
   in
-  (* Extract first token (the executable) *)
+  (* Extract first token (the executable name as shown in cmdline/argv[0]) *)
   match extract_binary_path cmdline with
   | None -> false
   | Some binary_path ->
-      (* Check if the binary path ends with one of the Octez service binary names *)
+      (* Check if the binary path ends with one of the Octez service binary names.
+         This will exclude child processes like "octez-validator" which have a
+         different argv[0] even though they share the same /proc/PID/exe. *)
       List.exists
         (fun binary ->
           String.ends_with ~suffix:binary binary_path
@@ -159,13 +163,10 @@ let scan_octez_processes () =
       | None -> None
       | Some cmdline ->
           let binary_realpath = read_binary_realpath pid in
-          (* Verify using realpath from /proc/PID/exe - most reliable *)
-          let is_octez =
-            match binary_realpath with
-            | Some realpath -> is_octez_binary realpath
-            | None -> is_octez_binary cmdline
-          in
-          if not is_octez then None
+          (* Use cmdline (argv[0]) for binary check to filter out child processes.
+             Child processes like octez-validator have a different argv[0] even though
+             they share the same /proc/PID/exe as their parent. *)
+          if not (is_octez_binary cmdline) then None
           else
             let ppid, uid = read_status pid in
             let user = Option.bind uid get_username in
