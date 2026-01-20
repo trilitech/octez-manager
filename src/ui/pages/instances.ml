@@ -156,12 +156,14 @@ struct
     ps
 
   let handled_keys () =
-    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
+    Miaou.Core.Keys.
+      [Enter; Char "b"; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
 
   let keymap _ps =
     let activate ps = Navigation.update activate_selection ps in
     let create ps = Navigation.update create_menu_modal ps in
     let diag ps = Navigation.update go_to_diagnostics ps in
+    let binaries ps = Navigation.update go_to_binaries ps in
     let dismiss ps = Navigation.update dismiss_failure ps in
     let noop ps = ps in
     let kb key action help =
@@ -171,6 +173,7 @@ struct
       kb "Enter" activate "Open";
       kb "c" create "Create";
       kb "d" diag "Diagnostics";
+      kb "b" binaries "Binaries";
       kb "x" dismiss "Clear failure";
       {
         Miaou.Core.Tui_page.key = "?";
