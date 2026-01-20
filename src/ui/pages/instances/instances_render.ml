@@ -627,8 +627,8 @@ let render_external_service ~selected_idx ~current_idx ~folded
         ~instance:instance_for_metrics
         ~focus
     in
-    (* For nodes, add head level and time since last block *)
-    let head_info =
+    (* For nodes, add head level, sync status, and staleness (matching managed instances) *)
+    let node_info =
       match cfg.role.value with
       | Some Node -> (
           match Rpc_metrics.get ~instance:instance_for_metrics with
@@ -638,23 +638,30 @@ let render_external_service ~selected_idx ~current_idx ~folded
                 | Some l -> Printf.sprintf "L%d" l
                 | None -> "L?"
               in
-              let time_str =
-                match metrics.Rpc_metrics.last_block_time with
-                | Some t ->
-                    let now = Unix.gettimeofday () in
-                    let elapsed = now -. t in
-                    if elapsed < 60.0 then Printf.sprintf "%.0fs ago" elapsed
-                    else if elapsed < 3600.0 then
-                      Printf.sprintf "%.0fm ago" (elapsed /. 60.0)
-                    else Printf.sprintf "%.1fh ago" (elapsed /. 3600.0)
-                | None -> ""
+              let sync_badge =
+                match metrics.Rpc_metrics.bootstrapped with
+                | Some true -> Widgets.green "synced"
+                | Some false -> Widgets.yellow "syncing"
+                | None -> Widgets.dim (Context.render_spinner "")
               in
-              if time_str = "" then [head_str] else [head_str; time_str]
+              let staleness =
+                match metrics.Rpc_metrics.last_block_time with
+                | None -> ""
+                | Some ts ->
+                    let age = Unix.gettimeofday () -. ts in
+                    if age >= 120. then
+                      Widgets.red (Printf.sprintf "Δ %.0fs" age)
+                    else if age >= 30. then
+                      Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
+                    else Widgets.green (Printf.sprintf "Δ %.0fs" age)
+              in
+              [head_str; sync_badge]
+              @ if staleness = "" then [] else [staleness]
           | None -> [])
       | _ -> []
     in
     let metrics_parts =
-      [version] @ (if mem = "" then [] else ["MEM " ^ mem]) @ head_info
+      [version] @ (if mem = "" then [] else ["MEM " ^ mem]) @ node_info
     in
     let metrics_line = indent ^ String.concat " · " metrics_parts in
 
