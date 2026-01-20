@@ -642,65 +642,95 @@ let external_service_actions_modal state ext =
   let display_name = ext.External_service.suggested_instance_name in
   (* Check if this is a standalone process (not a systemd service) *)
   let is_standalone_process = String.starts_with ~prefix:"process-" unit_name in
-  (* For standalone processes, only show Details and Logs (no start/stop/restart) *)
+  (* For standalone processes, only show Details (no start/stop/restart/logs) *)
   let items =
-    if is_standalone_process then [`Details; `Logs]
+    if is_standalone_process then [`Details]
     else [`Details; `Start; `Stop; `Restart; `Logs]
   in
-  Modal_helpers.open_choice_modal
-    ~title:("External Service · " ^ display_name)
-    ~items
-    ~to_string:(function
-      | `Details -> "Details"
-      | `Start -> "Start"
-      | `Stop -> "Stop"
-      | `Restart -> "Restart"
-      | `Logs -> "View Logs")
-    ~on_select:(fun choice ->
-      match choice with
-      | `Details ->
-          (* Show a simple info modal with detected configuration *)
-          let cfg = ext.External_service.config in
-          let lines =
-            [
-              Printf.sprintf "Unit: %s" cfg.unit_name;
-              Printf.sprintf "State: %s" cfg.unit_state.active_state;
-              (match cfg.binary_path.value with
-              | Some b -> Printf.sprintf "Binary: %s" b
-              | None -> "Binary: (not detected)");
-              (match cfg.data_dir.value with
-              | Some d -> Printf.sprintf "Data dir: %s" d
-              | None -> "Data dir: (not detected)");
-              (match cfg.rpc_addr.value with
-              | Some r -> Printf.sprintf "RPC: %s" r
-              | None -> "");
-              (match cfg.node_endpoint.value with
-              | Some e -> Printf.sprintf "Node endpoint: %s" e
-              | None -> "");
-              (match cfg.network.value with
-              | Some n -> Printf.sprintf "Network: %s" n
-              | None -> "");
-            ]
-            |> List.filter (fun s -> s <> "")
-          in
-          Modal_helpers.open_text_modal
-            ~title:("Details · " ^ display_name)
-            ~lines
-      | `Start ->
-          run_unit_action ~verb:"start" ~instance:display_name (fun () ->
-              Systemd.start_unit ~unit_name)
-      | `Stop ->
-          run_unit_action ~verb:"stop" ~instance:display_name (fun () ->
-              Systemd.stop_unit ~unit_name)
-      | `Restart ->
-          run_unit_action ~verb:"restart" ~instance:display_name (fun () ->
-              Systemd.restart_unit ~unit_name)
-      | `Logs ->
-          (* Set up log viewing for external service *)
-          Context.set_pending_external_service ext ;
-          Context.navigate Log_viewer_page.name)
-    () ;
-  state
+  (* If only one item (Details for standalone), show it directly instead of modal *)
+  if is_standalone_process then (
+    (* Show details directly *)
+    let cfg = ext.External_service.config in
+    let lines =
+      [
+        Printf.sprintf "Unit: %s" cfg.unit_name;
+        Printf.sprintf "State: %s" cfg.unit_state.active_state;
+        (match cfg.binary_path.value with
+        | Some b -> Printf.sprintf "Binary: %s" b
+        | None -> "Binary: (not detected)");
+        (match cfg.data_dir.value with
+        | Some d -> Printf.sprintf "Data dir: %s" d
+        | None -> "Data dir: (not detected)");
+        (match cfg.rpc_addr.value with
+        | Some r -> Printf.sprintf "RPC: %s" r
+        | None -> "");
+        (match cfg.node_endpoint.value with
+        | Some e -> Printf.sprintf "Node endpoint: %s" e
+        | None -> "");
+        (match cfg.network.value with
+        | Some n -> Printf.sprintf "Network: %s" n
+        | None -> "");
+      ]
+      |> List.filter (fun s -> s <> "")
+    in
+    Modal_helpers.open_text_modal ~title:("Details · " ^ display_name) ~lines ;
+    state)
+  else (
+    (* Systemd service: show action modal *)
+    Modal_helpers.open_choice_modal
+      ~title:("Unmanaged Service · " ^ display_name)
+      ~items
+      ~to_string:(function
+        | `Details -> "Details"
+        | `Start -> "Start"
+        | `Stop -> "Stop"
+        | `Restart -> "Restart"
+        | `Logs -> "View Logs")
+      ~on_select:(fun choice ->
+        match choice with
+        | `Details ->
+            (* Show a simple info modal with detected configuration *)
+            let cfg = ext.External_service.config in
+            let lines =
+              [
+                Printf.sprintf "Unit: %s" cfg.unit_name;
+                Printf.sprintf "State: %s" cfg.unit_state.active_state;
+                (match cfg.binary_path.value with
+                | Some b -> Printf.sprintf "Binary: %s" b
+                | None -> "Binary: (not detected)");
+                (match cfg.data_dir.value with
+                | Some d -> Printf.sprintf "Data dir: %s" d
+                | None -> "Data dir: (not detected)");
+                (match cfg.rpc_addr.value with
+                | Some r -> Printf.sprintf "RPC: %s" r
+                | None -> "");
+                (match cfg.node_endpoint.value with
+                | Some e -> Printf.sprintf "Node endpoint: %s" e
+                | None -> "");
+                (match cfg.network.value with
+                | Some n -> Printf.sprintf "Network: %s" n
+                | None -> "");
+              ]
+              |> List.filter (fun s -> s <> "")
+            in
+            Modal_helpers.open_text_modal
+              ~title:("Details · " ^ display_name)
+              ~lines
+        | `Start ->
+            run_unit_action ~verb:"start" ~instance:display_name (fun () ->
+                Systemd.start_unit ~unit_name)
+        | `Stop ->
+            run_unit_action ~verb:"stop" ~instance:display_name (fun () ->
+                Systemd.stop_unit ~unit_name)
+        | `Restart ->
+            run_unit_action ~verb:"restart" ~instance:display_name (fun () ->
+                Systemd.restart_unit ~unit_name)
+        | `Logs ->
+            (* Set up log viewing for external service *)
+            Context.set_pending_external_service ext ;
+            Context.navigate Log_viewer_page.name)
+      () ;
+    state)
 
 let activate_selection s =
   if s.selected = 0 then create_menu_modal s
