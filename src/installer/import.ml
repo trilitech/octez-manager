@@ -396,12 +396,12 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
     (* ACTUAL IMPORT *)
     try
       (* 5. Stop external service (for Takeover) *)
-      (if options.strategy = Takeover then (
-         log "Stopping external service..." ;
-         let* () = Systemd.stop_unit ~unit_name:config.unit_name in
-         Ok ())
-       else Ok ())
-      |> ignore ;
+      let* () =
+        if options.strategy = Takeover then (
+          log "Stopping external service..." ;
+          Systemd.stop_unit ~unit_name:config.unit_name)
+        else Ok ()
+      in
       (* 6. Create managed service based on role *)
       log "Creating managed service..." ;
       let* created_svc =
@@ -445,20 +445,18 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
         | None -> Error (`Msg "Role not detected for external service")
       in
       (* 7. Disable original unit (for Takeover) *)
-      (if options.strategy = Takeover then (
-         log "Disabling original systemd unit..." ;
-         let* () = Systemd.disable_unit config.unit_name in
-         Ok ())
-       else Ok ())
-      |> ignore ;
+      let* () =
+        if options.strategy = Takeover then (
+          log "Disabling original systemd unit..." ;
+          Systemd.disable_unit config.unit_name)
+        else Ok ()
+      in
       (* 8. Start managed service *)
       log "Starting managed service..." ;
       let* () =
         Lifecycle.start_service ~quiet:true ~instance:instance_name ()
       in
-      (* 9. Verify running *)
-      log "Verifying service started..." ;
-      Unix.sleep 2 ;
+      (* 9. Verify running - systemd start is synchronous, no sleep needed *)
       let* unit_state =
         Systemd.get_unit_state
           ~role:created_svc.Service.role
