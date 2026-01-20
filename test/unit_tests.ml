@@ -3796,13 +3796,11 @@ let binary_downloader_url_construction () =
 
 let binary_downloader_parse_version_json () =
   let json_str =
-    {|{
-      "versions": [
-        {"version": "24.0", "release_date": "2024-01-01"},
-        {"version": "23.1", "release_date": "2023-12-01"},
-        {"version": "24.0-rc1", "release_date": "2023-11-15"}
-      ]
-    }|}
+    {|[
+      {"major": 24, "minor": 0, "pubDate": 1704067200},
+      {"major": 23, "minor": 1, "pubDate": 1701388800},
+      {"major": 24, "minor": 0, "rc": 1, "pubDate": 0}
+    ]|}
   in
   let json = Yojson.Safe.from_string json_str in
   match Binary_downloader.For_tests.parse_version_json json with
@@ -3812,6 +3810,7 @@ let binary_downloader_parse_version_json () =
       Alcotest.(check string) "first version" "24.0" first.version ;
       Alcotest.(check bool) "not rc" false first.is_rc ;
       let last = List.nth versions 2 in
+      Alcotest.(check string) "rc version" "24.0-rc1" last.version ;
       Alcotest.(check bool) "is rc" true last.is_rc
   | Error (`Msg e) -> Alcotest.fail e
 

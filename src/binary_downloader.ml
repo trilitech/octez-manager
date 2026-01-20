@@ -126,18 +126,40 @@ let save_cache_timestamp () =
 let parse_version_json json =
   try
     let open Yojson.Safe.Util in
-    let versions_array = member "versions" json |> to_list in
+    let versions_array =
+      match json with
+      | `List lst -> lst
+      | `Assoc _ ->
+          (* Try to find a versions array inside *)
+          member "versions" json |> to_list
+      | _ -> failwith "Expected JSON array or object"
+    in
     let parse_version v =
-      let version = member "version" v |> to_string in
+      (* Parse major.minor format with optional rc *)
+      let major = member "major" v |> to_int in
+      let minor = member "minor" v |> to_int in
+      let rc = member "rc" v |> to_int_option in
+      let version =
+        match rc with
+        | Some rc_num -> Printf.sprintf "%d.%d-rc%d" major minor rc_num
+        | None -> Printf.sprintf "%d.%d" major minor
+      in
       let release_date =
-        member "release_date" v |> to_string_option |> Option.map String.trim
+        member "pubDate" v |> to_int_option
+        |> Option.map (fun ts ->
+            if ts > 0 then
+              (* Convert Unix timestamp to ISO date *)
+              let open Unix in
+              let tm = gmtime (float_of_int ts) in
+              Printf.sprintf
+                "%04d-%02d-%02d"
+                (tm.tm_year + 1900)
+                (tm.tm_mon + 1)
+                tm.tm_mday
+            else "")
         |> fun opt -> match opt with Some s when s <> "" -> Some s | _ -> None
       in
-      let is_rc =
-        String.contains version '-'
-        && (String.contains (String.lowercase_ascii version) 'r'
-           || String.contains (String.lowercase_ascii version) 'b')
-      in
+      let is_rc = rc <> None in
       {version; release_date; is_rc}
     in
     Ok (List.map parse_version versions_array)
