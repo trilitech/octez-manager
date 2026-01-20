@@ -13,7 +13,7 @@
 (** {1 Import Strategy} *)
 
 (** Strategy for handling the original external service *)
-type import_strategy =
+type import_strategy = Installer_types.import_strategy =
   | Takeover
       (** Stop external service, create managed service, disable original unit.
           Gives octez-manager full control. Original can be restored later. *)
@@ -116,6 +116,34 @@ val import_service :
   external_svc:External_service.t ->
   unit ->
   (import_result, Rresult.R.msg) result
+
+(** {1 Cascade Import} *)
+
+(** Import a service and all its dependencies in the correct order.
+
+    This function analyzes the dependency graph, validates it can be imported,
+    and imports services in topological order (dependencies first).
+
+    Process:
+    1. Build dependency chain (transitive closure)
+    2. Validate cascade (check for cycles, external dependents, etc.)
+    3. Sort services in dependency order
+    4. Import each service in order (dependencies → dependents)
+    5. Start services in order after all are imported
+
+    @param on_log Optional callback for progress messages
+    @param options Import options (applied to all services in the chain)
+    @param external_svc The target service to import (along with its dependencies)
+    @param all_services All available external services for dependency resolution
+    @return List of import results (one per service) or error
+    @raise any exception during import of any service triggers rollback of all *)
+val import_cascade :
+  ?on_log:(string -> unit) ->
+  options:import_options ->
+  external_svc:External_service.t ->
+  all_services:External_service.t list ->
+  unit ->
+  (import_result list, Rresult.R.msg) result
 
 (** {1 Rollback} *)
 

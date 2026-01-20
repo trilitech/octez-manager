@@ -11,7 +11,8 @@ open Import
 
 let import_cmd =
   let term =
-    let run external_name instance_override network_override strategy dry_run =
+    let run external_name instance_override network_override strategy cascade
+        dry_run =
       Capabilities.register () ;
 
       (* 1. Find the external service by name *)
@@ -87,37 +88,68 @@ let import_cmd =
 
                       (* 5. Perform import *)
                       let log_fn msg = Format.printf "%s@." msg in
-                      match
-                        Import.import_service
-                          ~on_log:log_fn
-                          ~options
-                          ~external_svc
-                          ()
-                      with
-                      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-                      | Ok result ->
-                          if dry_run then (
-                            Format.printf
-                              "@.Dry run complete. No changes made.@." ;
-                            `Ok ())
-                          else (
-                            Format.printf "@.Import successful!@." ;
-                            Format.printf
-                              "  Original unit: %s@."
-                              result.original_unit ;
-                            Format.printf
-                              "  New instance: %s@."
-                              result.new_instance ;
-                            if result.warnings <> [] then (
-                              Format.printf "@.Warnings:@." ;
+                      if cascade then
+                        (* Cascade import: import entire dependency chain *)
+                        match
+                          Import.import_cascade
+                            ~on_log:log_fn
+                            ~options
+                            ~external_svc
+                            ~all_services:services
+                            ()
+                        with
+                        | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+                        | Ok results ->
+                            if dry_run then (
+                              Format.printf
+                                "@.Dry run complete. No changes made.@." ;
+                              `Ok ())
+                            else (
+                              Format.printf "@.Cascade import successful!@." ;
+                              Format.printf
+                                "  Imported %d services:@."
+                                (List.length results) ;
                               List.iter
-                                (fun w -> Format.printf "  - %s@." w)
-                                result.warnings) ;
-                            Format.printf
-                              "@.Use 'octez-manager %s start' to start the \
-                               service.@."
-                              result.new_instance ;
-                            `Ok ())))))
+                                (fun (r : Import.import_result) ->
+                                  Format.printf
+                                    "    %s → %s@."
+                                    r.original_unit
+                                    r.new_instance)
+                                results ;
+                              `Ok ())
+                      else
+                        (* Single service import *)
+                        match
+                          Import.import_service
+                            ~on_log:log_fn
+                            ~options
+                            ~external_svc
+                            ()
+                        with
+                        | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+                        | Ok result ->
+                            if dry_run then (
+                              Format.printf
+                                "@.Dry run complete. No changes made.@." ;
+                              `Ok ())
+                            else (
+                              Format.printf "@.Import successful!@." ;
+                              Format.printf
+                                "  Original unit: %s@."
+                                result.original_unit ;
+                              Format.printf
+                                "  New instance: %s@."
+                                result.new_instance ;
+                              if result.warnings <> [] then (
+                                Format.printf "@.Warnings:@." ;
+                                List.iter
+                                  (fun w -> Format.printf "  - %s@." w)
+                                  result.warnings) ;
+                              Format.printf
+                                "@.Use 'octez-manager %s start' to start the \
+                                 service.@."
+                                result.new_instance ;
+                              `Ok ())))))
     in
     let external_name_arg =
       Arg.(
@@ -152,6 +184,13 @@ let import_cmd =
         & opt (some string) None
         & info ["strategy"; "s"] ~docv:"STRATEGY" ~doc)
     in
+    let cascade_flag =
+      let doc =
+        "Import service and all its dependencies (cascade import). Analyzes \
+         dependency graph and imports in correct order (dependencies first)."
+      in
+      Arg.(value & flag & info ["cascade"; "c"] ~doc)
+    in
     let dry_run_flag =
       let doc = "Show import plan without executing" in
       Arg.(value & flag & info ["dry-run"; "d"] ~doc)
@@ -159,7 +198,7 @@ let import_cmd =
     Term.(
       ret
         (const run $ external_name_arg $ instance_arg $ network_arg
-       $ strategy_arg $ dry_run_flag))
+       $ strategy_arg $ cascade_flag $ dry_run_flag))
   in
   let info =
     Cmd.info
@@ -178,6 +217,9 @@ let import_cmd =
             "Use 'clone' strategy to keep the original service intact while \
              creating a managed copy (useful for testing).";
           `P "Use --dry-run to preview the import plan without making changes.";
+          `P
+            "Use --cascade to import a service along with all its dependencies \
+             in the correct order.";
           `S Manpage.s_examples;
           `P "Import an external node:";
           `Pre "  octez-manager import tezos-node-mainnet";
@@ -187,6 +229,8 @@ let import_cmd =
           `Pre "  octez-manager import tezos-baker-ghostnet --dry-run";
           `P "Clone instead of takeover:";
           `Pre "  octez-manager import my-baker --strategy clone";
+          `P "Import baker with all dependencies (node + DAL):";
+          `Pre "  octez-manager import my-baker --cascade";
         ]
   in
   Cmd.v info term

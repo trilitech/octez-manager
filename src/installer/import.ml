@@ -12,7 +12,7 @@ let ( let* ) = Result.bind
 
 (** {1 Types} *)
 
-type import_strategy = Takeover | Clone
+type import_strategy = Installer_types.import_strategy = Takeover | Clone
 
 type field_overrides = {
   network : string option;
@@ -635,3 +635,109 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
           ~new_instance:(Some instance_name)
       in
       Error (`Msg (Printf.sprintf "Import failed: %s" (Printexc.to_string e)))
+
+(** {1 Cascade Import} *)
+
+let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
+    () =
+  let log msg = on_log msg in
+
+  (* 1. Build dependency chain *)
+  log "Analyzing dependency chain..." ;
+  let chain =
+    Import_cascade.get_dependency_chain ~service:external_svc ~all_services
+  in
+
+  log
+    (Printf.sprintf
+       "Found %d services to import (including dependencies)"
+       (List.length chain)) ;
+
+  (* 2. Validate cascade *)
+  log "Validating import cascade..." ;
+  let* () =
+    match
+      Import_cascade.validate_cascade
+        ~services:all_services
+        ~target_services:chain
+        ~strategy:options.strategy
+    with
+    | Ok () -> Ok ()
+    | Error err ->
+        let msg = Format.asprintf "%a" Import_cascade.pp_validation_error err in
+        Error (`Msg msg)
+  in
+
+  (* 3. Get import order *)
+  let analysis =
+    Import_cascade.analyze_dependencies
+      ~services:all_services
+      ~target_services:chain
+  in
+
+  log "Import order:" ;
+  List.iteri
+    (fun i name ->
+      let svc_opt =
+        List.find_opt
+          (fun s -> s.External_service.config.unit_name = name)
+          chain
+      in
+      match svc_opt with
+      | Some svc ->
+          let role_str =
+            match svc.External_service.config.role.value with
+            | Some r -> External_service.role_to_string r
+            | None -> "unknown"
+          in
+          log (Printf.sprintf "  %d. %s (%s)" (i + 1) name role_str)
+      | None -> ())
+    analysis.import_order ;
+
+  (* 4. Import each service in order *)
+  let results = ref [] in
+  let imported_instances = ref [] in
+
+  try
+    List.iter
+      (fun svc_name ->
+        match
+          List.find_opt
+            (fun s -> s.External_service.config.unit_name = svc_name)
+            chain
+        with
+        | None ->
+            raise
+              (Failure (Printf.sprintf "Service %s not found in chain" svc_name))
+        | Some svc ->
+            log "" ;
+            log (Printf.sprintf "Importing %s..." svc_name) ;
+            let result =
+              match import_service ~on_log ~options ~external_svc:svc () with
+              | Ok r ->
+                  results := r :: !results ;
+                  imported_instances := r.new_instance :: !imported_instances ;
+                  r
+              | Error (`Msg msg) -> raise (Failure msg)
+            in
+            log
+              (Printf.sprintf
+                 "✓ %s imported as %s"
+                 svc_name
+                 result.new_instance))
+      analysis.import_order ;
+    Ok (List.rev !results)
+  with e ->
+    (* Rollback all imported services in reverse order *)
+    log "" ;
+    log "Cascade import failed, rolling back..." ;
+    List.iter
+      (fun instance ->
+        log (Printf.sprintf "  Rolling back %s..." instance) ;
+        match Removal.remove_service ~delete_data_dir:false ~instance () with
+        | Ok () -> log (Printf.sprintf "  ✓ %s removed" instance)
+        | Error (`Msg msg) ->
+            log (Printf.sprintf "  ⚠ Failed to remove %s: %s" instance msg))
+      !imported_instances ;
+    Error
+      (`Msg (Printf.sprintf "Cascade import failed: %s" (Printexc.to_string e)))
