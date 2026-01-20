@@ -19,6 +19,8 @@ type parsed_args = {
   binary_path : string option;
   subcommand : string option;
       (** Subcommand after binary, e.g., "run", "dal" *)
+  run_mode : string option;
+      (** For baker: "with local node" or "remotely". Accuser always runs remotely. *)
   data_dir : string option;
   base_dir : string option;
   rpc_addr : string option;
