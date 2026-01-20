@@ -99,7 +99,7 @@ let topological_sort nodes =
   in
 
   List.iter (fun node -> visit (unit_name node.service) []) nodes ;
-  (!result, !cycles)
+  (List.rev !result, !cycles)
 
 (** {1 Dependency Analysis} *)
 
