@@ -113,7 +113,12 @@ let get_current_user_info () =
   with Unix.Unix_error (err, _, _) -> Error (Unix.error_message err)
 
 let get_disk_usage path =
-  match run_command ["du"; "-sb"; path] None with
+  (* Redirect stderr to suppress permission errors and other noise *)
+  match
+    run_command
+      ["sh"; "-c"; "du -sb " ^ Filename.quote path ^ " 2>/dev/null"]
+      None
+  with
   | Ok {Miaou_interfaces.System.exit_code = 0; stdout; _} -> (
       match String.split_on_char '\t' stdout with
       | size :: _ -> (

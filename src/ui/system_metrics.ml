@@ -242,7 +242,11 @@ let get_version ~binary =
 let get_dir_size ~path =
   if not (Sys.file_exists path) then None
   else
-    match Common.run_out ["du"; "-sb"; path] with
+    (* Redirect stderr to suppress permission errors and other noise *)
+    match
+      Common.run_out
+        ["sh"; "-c"; "du -sb " ^ Filename.quote path ^ " 2>/dev/null"]
+    with
     | Ok output -> (
         (* Output is "12345\t/path" *)
         match String.split_on_char '\t' output with
