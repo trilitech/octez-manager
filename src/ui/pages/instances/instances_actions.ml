@@ -723,40 +723,8 @@ let external_service_actions_modal state ext =
       ~on_select:(fun choice ->
         match choice with
         | `Import ->
-            (* Show import instructions *)
-            let missing = Import.missing_required_fields ext in
-            let lines =
-              [
-                "Import this service using the CLI:";
-                "";
-                Printf.sprintf "  octez-manager import '%s'" display_name;
-                "";
-              ]
-              @ (if missing <> [] then
-                   [
-                     "⚠ Missing configuration fields:";
-                     Printf.sprintf "  %s" (String.concat ", " missing);
-                     "";
-                     "You may need to provide overrides:";
-                     "  --network <network>  Override network";
-                     "  --as <name>          Custom instance name";
-                     "";
-                   ]
-                 else [])
-              @ [
-                  "Import strategies:";
-                  "  --strategy takeover  Disable original (default)";
-                  "  --strategy clone     Keep original running";
-                  "";
-                  "Preview first:";
-                  Printf.sprintf
-                    "  octez-manager import '%s' --dry-run"
-                    display_name;
-                ]
-            in
-            Modal_helpers.open_text_modal
-              ~title:("Import · " ^ display_name)
-              ~lines
+            (* Navigate to import wizard *)
+            Context.navigate Import_wizard.name
         | `Details ->
             (* Show a simple info modal with detected configuration *)
             let cfg = ext.External_service.config in
