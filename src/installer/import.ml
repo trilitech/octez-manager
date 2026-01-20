@@ -368,6 +368,130 @@ let rollback_import ~original_unit ~new_instance =
   in
   Ok ()
 
+(** {1 Dry-Run Helpers} *)
+
+(** Format side-by-side comparison for dry-run *)
+let format_comparison ~log ~label ~original ~generated =
+  let max_len = 40 in
+  let pad s =
+    let len = String.length s in
+    if len >= max_len then s else s ^ String.make (max_len - len) ' '
+  in
+  log (Printf.sprintf "%s:" label) ;
+  log
+    (Printf.sprintf
+       "  %-40s │ %-40s"
+       (pad "ORIGINAL")
+       (pad "GENERATED (managed)")) ;
+  log (Printf.sprintf "  %s-+-%s" (String.make 40 '-') (String.make 40 '-')) ;
+  List.iter2
+    (fun (k1, v1) (k2, v2) ->
+      log
+        (Printf.sprintf
+           "  %-40s | %-40s"
+           (pad (k1 ^ ": " ^ v1))
+           (pad (k2 ^ ": " ^ v2))))
+    original
+    generated
+
+(** Show dry-run details for a single service *)
+let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
+    ~base_dir:_ ~rpc_addr ~net_addr:_ ~node_endpoint:_ ~bin_dir:_ ~options =
+  let config = external_svc.External_service.config in
+  let role_str =
+    match config.role.value with
+    | Some r -> External_service.role_to_string r
+    | None -> "unknown"
+  in
+
+  log "" ;
+  log
+    "================================================================================" ;
+  log (Printf.sprintf "Service: %s -> %s" config.unit_name instance_name) ;
+  log
+    (Printf.sprintf
+       "Role: %s | Strategy: %s"
+       role_str
+       (match options.strategy with Takeover -> "Takeover" | Clone -> "Clone")) ;
+  log
+    "================================================================================" ;
+
+  (* Side-by-side configuration *)
+  let original_config =
+    [
+      ("Unit name", config.unit_name);
+      ("User", Option.value config.user ~default:"(unset)");
+      ("ExecStart", config.exec_start);
+    ]
+  in
+  let generated_config =
+    [
+      ("Instance", instance_name);
+      ("User", get_service_user external_svc);
+      ("Managed", "via octez-manager systemd templates");
+    ]
+  in
+  format_comparison
+    ~log
+    ~label:"Service Identity"
+    ~original:original_config
+    ~generated:generated_config ;
+
+  log "" ;
+
+  (* Configuration comparison *)
+  let original_fields =
+    [
+      ( "Network",
+        match config.network.value with Some n -> n | None -> "(unknown)" );
+      ( "Data dir",
+        match config.data_dir.value with Some d -> d | None -> "(unknown)" );
+      ( "RPC addr",
+        match config.rpc_addr.value with Some r -> r | None -> "(unknown)" );
+    ]
+  in
+  let generated_fields =
+    [
+      ("Network", network);
+      ("Data dir", if data_dir = "" then "(not applicable)" else data_dir);
+      ("RPC addr", rpc_addr);
+    ]
+  in
+  format_comparison
+    ~log
+    ~label:"Configuration"
+    ~original:original_fields
+    ~generated:generated_fields ;
+
+  log "" ;
+  log "Generated files:" ;
+  log
+    (Printf.sprintf
+       "  • Environment: /etc/octez/instances/%s/node.env"
+       instance_name) ;
+  log
+    (Printf.sprintf
+       "  • Systemd drop-in: \
+        /etc/systemd/system/octez-%s@%s.service.d/override.conf"
+       (match config.role.value with
+       | Some External_service.Dal_node -> "dal-node"
+       | Some External_service.Node -> "node"
+       | Some External_service.Baker -> "baker"
+       | Some External_service.Accuser -> "accuser"
+       | _ -> "unknown")
+       instance_name) ;
+
+  log "" ;
+  log "Actions (not executed):" ;
+  if options.strategy = Takeover then (
+    log "  1. Stop and disable original service" ;
+    log "  2. Create managed service configuration" ;
+    log "  3. Start managed service")
+  else (
+    log "  1. Create managed service configuration (clone)" ;
+    log "  2. Keep original service running" ;
+    log "  3. Start managed service (will conflict if using same ports)")
+
 (** {1 Main Import Function} *)
 
 let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
@@ -415,89 +539,18 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
   in
   (* DRY RUN: Stop here and show what would happen *)
   if options.dry_run then (
-    log "DRY RUN - Would import:" ;
-    log (Printf.sprintf "  Original: %s" config.unit_name) ;
-    log (Printf.sprintf "  New name: %s" instance_name) ;
-    log
-      (Printf.sprintf
-         "  Strategy: %s"
-         (match options.strategy with
-         | Takeover -> "takeover"
-         | Clone -> "clone")) ;
-    log "" ;
-    log "Configuration:" ;
-    log (Printf.sprintf "  Network: %s (detected)" network) ;
-    let role_str =
-      match config.role.value with
-      | Some r -> External_service.role_to_string r
-      | None -> "unknown"
-    in
-    log (Printf.sprintf "  Role: %s" role_str) ;
-    if data_dir <> "" then log (Printf.sprintf "  Data dir: %s" data_dir) ;
-    if base_dir <> "" then log (Printf.sprintf "  Base dir: %s" base_dir) ;
-    log (Printf.sprintf "  RPC addr: %s" rpc_addr) ;
-    if net_addr <> "" then log (Printf.sprintf "  Net addr: %s" net_addr) ;
-    log (Printf.sprintf "  Service user: %s" (get_service_user external_svc)) ;
-    log (Printf.sprintf "  Bin dir: %s" bin_dir) ;
-    log "" ;
-    log "Actions (not executed):" ;
-    if options.strategy = Takeover then (
-      log (Printf.sprintf "  1. Stop %s" config.unit_name) ;
-      log (Printf.sprintf "  2. Create managed service: %s" instance_name) ;
-      log (Printf.sprintf "  3. Disable %s" config.unit_name) ;
-      log (Printf.sprintf "  4. Start %s" instance_name))
-    else (
-      log "  1. Create managed service (clone)" ;
-      log "  2. Keep original service running" ;
-      log (Printf.sprintf "  3. Start %s" instance_name)) ;
-    log "" ;
-    log "Generated files preview:" ;
-    log "------------------------" ;
-    log "" ;
-    log
-      (Printf.sprintf
-         "Environment file: /etc/octez/instances/%s/node.env"
-         instance_name) ;
-    log "---" ;
-    (match config.role.value with
-    | Some External_service.Dal_node ->
-        log (Printf.sprintf "OCTEZ_DAL_DATA_DIR=%s" data_dir) ;
-        log (Printf.sprintf "OCTEZ_DAL_RPC_ADDR=%s" rpc_addr) ;
-        log (Printf.sprintf "OCTEZ_DAL_NET_ADDR=%s" net_addr) ;
-        log (Printf.sprintf "OCTEZ_NETWORK=%s" network) ;
-        log (Printf.sprintf "OCTEZ_NODE_ENDPOINT=%s" node_endpoint)
-    | Some External_service.Node ->
-        log (Printf.sprintf "OCTEZ_DATA_DIR=%s" data_dir) ;
-        log (Printf.sprintf "OCTEZ_RPC_ADDR=%s" rpc_addr) ;
-        log (Printf.sprintf "OCTEZ_NET_ADDR=%s" net_addr) ;
-        log (Printf.sprintf "OCTEZ_NETWORK=%s" network)
-    | Some External_service.Baker | Some External_service.Accuser ->
-        log (Printf.sprintf "OCTEZ_CLIENT_BASE_DIR=%s" base_dir) ;
-        log (Printf.sprintf "OCTEZ_NODE_ENDPOINT=%s" node_endpoint) ;
-        log (Printf.sprintf "OCTEZ_NETWORK=%s" network)
-    | _ -> log "(role-specific variables)") ;
-    log (Printf.sprintf "APP_BIN_DIR=%s" bin_dir) ;
-    log "---" ;
-    log "" ;
-    log
-      (Printf.sprintf
-         "Systemd drop-in: \
-          /etc/systemd/system/octez-%s@%s.service.d/override.conf"
-         (match config.role.value with
-         | Some External_service.Dal_node -> "dal-node"
-         | Some External_service.Node -> "node"
-         | Some External_service.Baker -> "baker"
-         | Some External_service.Accuser -> "accuser"
-         | _ -> "unknown")
-         instance_name) ;
-    log "---" ;
-    log
-      (Printf.sprintf
-         "[Service]\nEnvironmentFile=/etc/octez/instances/%s/node.env"
-         instance_name) ;
-    log "---" ;
-    log "" ;
-    log "Dry run complete. No changes made." ;
+    show_dry_run_details
+      ~log
+      ~external_svc
+      ~instance_name
+      ~network
+      ~data_dir
+      ~base_dir
+      ~rpc_addr
+      ~net_addr
+      ~node_endpoint
+      ~bin_dir
+      ~options ;
     Ok
       {
         original_unit = config.unit_name;
@@ -675,69 +728,144 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
       ~target_services:chain
   in
 
-  log "Import order:" ;
-  List.iteri
-    (fun i name ->
-      let svc_opt =
-        List.find_opt
-          (fun s -> s.External_service.config.unit_name = name)
-          chain
-      in
-      match svc_opt with
-      | Some svc ->
-          let role_str =
-            match svc.External_service.config.role.value with
-            | Some r -> External_service.role_to_string r
-            | None -> "unknown"
-          in
-          log (Printf.sprintf "  %d. %s (%s)" (i + 1) name role_str)
-      | None -> ())
-    analysis.import_order ;
+  log "" ;
+  log
+    (Printf.sprintf
+       "Import order: %s"
+       (String.concat
+          " → "
+          (List.map
+             (fun name ->
+               match
+                 List.find_opt
+                   (fun s -> s.External_service.config.unit_name = name)
+                   chain
+               with
+               | Some svc -> (
+                   match svc.External_service.config.role.value with
+                   | Some r ->
+                       Printf.sprintf
+                         "%s (%s)"
+                         name
+                         (External_service.role_to_string r)
+                   | None -> name)
+               | None -> name)
+             analysis.import_order))) ;
 
-  (* 4. Import each service in order *)
-  let results = ref [] in
-  let imported_instances = ref [] in
+  (* DRY RUN: Show plan for all services *)
+  if options.dry_run then (
+    log "" ;
+    log
+      "===================================================================================" ;
+    log
+      "                          CASCADE IMPORT \
+       DRY-RUN                                   " ;
+    log
+      "===================================================================================" ;
+    log "" ;
+    log
+      (Printf.sprintf
+         "Strategy: %s"
+         (match options.strategy with
+         | Takeover -> "Takeover"
+         | Clone -> "Clone")) ;
+    log (Printf.sprintf "Services to import: %d" (List.length chain)) ;
 
-  try
-    List.iter
-      (fun svc_name ->
+    (* Show each service in import order *)
+    List.iteri
+      (fun i svc_name ->
         match
           List.find_opt
             (fun s -> s.External_service.config.unit_name = svc_name)
             chain
         with
-        | None ->
-            raise
-              (Failure (Printf.sprintf "Service %s not found in chain" svc_name))
         | Some svc ->
             log "" ;
-            log (Printf.sprintf "Importing %s..." svc_name) ;
-            let result =
-              match import_service ~on_log ~options ~external_svc:svc () with
-              | Ok r ->
-                  results := r :: !results ;
-                  imported_instances := r.new_instance :: !imported_instances ;
-                  r
-              | Error (`Msg msg) -> raise (Failure msg)
-            in
             log
               (Printf.sprintf
-                 "✓ %s imported as %s"
-                 svc_name
-                 result.new_instance))
+                 "--- Service %d of %d \
+                  --------------------------------------------------------------"
+                 (i + 1)
+                 (List.length chain)) ;
+            (* Call import_service in dry-run for each to show details *)
+            let _ = import_service ~on_log ~options ~external_svc:svc () in
+            ()
+        | None -> ())
       analysis.import_order ;
-    Ok (List.rev !results)
-  with e ->
-    (* Rollback all imported services in reverse order *)
+
     log "" ;
-    log "Cascade import failed, rolling back..." ;
-    List.iter
-      (fun instance ->
-        log (Printf.sprintf "  Rolling back %s..." instance) ;
-        match Removal.remove_service ~delete_data_dir:false ~instance () with
-        | Ok () -> log (Printf.sprintf "  ✓ %s removed" instance)
-        | Error (`Msg msg) ->
-            log (Printf.sprintf "  ⚠ Failed to remove %s: %s" instance msg))
-      !imported_instances ;
-    Error
-      (`Msg (Printf.sprintf "Cascade import failed: %s" (Printexc.to_string e)))
+    log
+      "===================================================================================" ;
+    log
+      "                        END CASCADE IMPORT \
+       DRY-RUN                                 " ;
+    log
+      "===================================================================================" ;
+    log "" ;
+    log "Summary:" ;
+    log (Printf.sprintf "  • Total services: %d" (List.length chain)) ;
+    log "  • No changes have been made" ;
+    log "" ;
+    log "To execute this import, run the same command without --dry-run" ;
+
+    (* Return mock results *)
+    Ok
+      (List.map
+         (fun svc ->
+           {
+             original_unit = svc.External_service.config.unit_name;
+             new_instance = svc.External_service.suggested_instance_name;
+             preserved_paths = [];
+             warnings = [];
+           })
+         chain))
+  else
+    (* 4. Import each service in order *)
+    let results = ref [] in
+    let imported_instances = ref [] in
+
+    try
+      List.iter
+        (fun svc_name ->
+          match
+            List.find_opt
+              (fun s -> s.External_service.config.unit_name = svc_name)
+              chain
+          with
+          | None ->
+              raise
+                (Failure
+                   (Printf.sprintf "Service %s not found in chain" svc_name))
+          | Some svc ->
+              log "" ;
+              log (Printf.sprintf "Importing %s..." svc_name) ;
+              let result =
+                match import_service ~on_log ~options ~external_svc:svc () with
+                | Ok r ->
+                    results := r :: !results ;
+                    imported_instances := r.new_instance :: !imported_instances ;
+                    r
+                | Error (`Msg msg) -> raise (Failure msg)
+              in
+              log
+                (Printf.sprintf
+                   "✓ %s imported as %s"
+                   svc_name
+                   result.new_instance))
+        analysis.import_order ;
+      Ok (List.rev !results)
+    with e ->
+      (* Rollback all imported services in reverse order *)
+      log "" ;
+      log "Cascade import failed, rolling back..." ;
+      List.iter
+        (fun instance ->
+          log (Printf.sprintf "  Rolling back %s..." instance) ;
+          match Removal.remove_service ~delete_data_dir:false ~instance () with
+          | Ok () -> log (Printf.sprintf "  ✓ %s removed" instance)
+          | Error (`Msg msg) ->
+              log (Printf.sprintf "  ⚠ Failed to remove %s: %s" instance msg))
+        !imported_instances ;
+      Error
+        (`Msg
+           (Printf.sprintf "Cascade import failed: %s" (Printexc.to_string e)))
