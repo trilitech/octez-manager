@@ -54,24 +54,30 @@ let page_size = 4096
 (** Clock ticks per second (standard on Linux) *)
 let clock_ticks_per_sec = 100
 
-(** Get the main PID for a systemd service *)
+(** Get the main PID for a systemd service or standalone process *)
 let get_main_pid_by_unit ~unit_name =
-  let cmd =
-    if Common.is_root () then
-      ["systemctl"; "show"; "--property=MainPID"; unit_name]
-    else ["systemctl"; "--user"; "show"; "--property=MainPID"; unit_name]
-  in
-  match Common.run_out cmd with
-  | Ok output -> (
-      (* Output is "MainPID=12345" *)
-      match String.split_on_char '=' output with
-      | [_; pid_str] -> (
-          let pid_str = String.trim pid_str in
-          match int_of_string_opt pid_str with
-          | Some pid when pid > 0 -> Some pid
-          | _ -> None)
-      | _ -> None)
-  | Error _ -> None
+  (* Check if this is a standalone process (format: process-PID) *)
+  if String.starts_with ~prefix:"process-" unit_name then
+    let pid_str = String.sub unit_name 8 (String.length unit_name - 8) in
+    int_of_string_opt pid_str
+  else
+    (* Regular systemd unit - query MainPID *)
+    let cmd =
+      if Common.is_root () then
+        ["systemctl"; "show"; "--property=MainPID"; unit_name]
+      else ["systemctl"; "--user"; "show"; "--property=MainPID"; unit_name]
+    in
+    match Common.run_out cmd with
+    | Ok output -> (
+        (* Output is "MainPID=12345" *)
+        match String.split_on_char '=' output with
+        | [_; pid_str] -> (
+            let pid_str = String.trim pid_str in
+            match int_of_string_opt pid_str with
+            | Some pid when pid > 0 -> Some pid
+            | _ -> None)
+        | _ -> None)
+    | Error _ -> None
 
 let get_service_main_pid ~role ~instance =
   let unit_name = Printf.sprintf "octez-%s@%s" role instance in

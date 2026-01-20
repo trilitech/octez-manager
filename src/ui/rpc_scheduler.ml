@@ -189,7 +189,7 @@ let poll_external_node (ext : External_service.t) now =
         if String.starts_with ~prefix:"http" rpc_addr then rpc_addr
         else "http://" ^ rpc_addr
       in
-      (* Fetch head level using curl *)
+      (* Fetch head level and bootstrap status using curl *)
       let head_level =
         try
           let url = endpoint ^ "/chains/main/blocks/head/header" in
@@ -207,8 +207,39 @@ let poll_external_node (ext : External_service.t) now =
           | Error _ -> None
         with _ -> None
       in
-      (* Update metrics *)
-      let _existing = Rpc_m.get ~instance in
+      let bootstrapped =
+        try
+          let url = endpoint ^ "/monitor/bootstrapped" in
+          match
+            Common.run_out
+              ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
+          with
+          | Ok json_str -> (
+              try
+                let json = Yojson.Safe.from_string json_str in
+                match Yojson.Safe.Util.member "bootstrapped" json with
+                | `Bool b -> Some b
+                | _ -> None
+              with _ -> None)
+          | Error _ -> None
+        with _ -> None
+      in
+      (* Update metrics - only update last_block_time if head changed *)
+      let existing = Rpc_m.get ~instance in
+      let previous_head =
+        match existing with Some m -> m.Rpc_metrics.head_level | None -> None
+      in
+      let last_block_time =
+        match (previous_head, head_level) with
+        | Some old_level, Some new_level when old_level <> new_level ->
+            Some now (* Head changed, update time *)
+        | None, Some _ -> Some now (* First head detected *)
+        | _ -> (
+            (* Head unchanged or no head - preserve previous time *)
+            match existing with
+            | Some m -> m.Rpc_metrics.last_block_time
+            | None -> None)
+      in
       Rpc_m.set
         ~instance
         {
@@ -217,10 +248,10 @@ let poll_external_node (ext : External_service.t) now =
           head_level;
           proto = None;
           last_error = None;
-          bootstrapped = None;
+          bootstrapped;
           last_rpc_refresh = Some now;
           data_size = None;
-          last_block_time = Some now;
+          last_block_time;
         }
 
 (** Submit external node poll *)

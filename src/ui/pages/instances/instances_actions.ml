@@ -640,9 +640,16 @@ let current_external_service s =
 let external_service_actions_modal state ext =
   let unit_name = ext.External_service.config.unit_name in
   let display_name = ext.External_service.suggested_instance_name in
+  (* Check if this is a standalone process (not a systemd service) *)
+  let is_standalone_process = String.starts_with ~prefix:"process-" unit_name in
+  (* For standalone processes, only show Details and Logs (no start/stop/restart) *)
+  let items =
+    if is_standalone_process then [`Details; `Logs]
+    else [`Details; `Start; `Stop; `Restart; `Logs]
+  in
   Modal_helpers.open_choice_modal
     ~title:("External Service · " ^ display_name)
-    ~items:[`Details; `Start; `Stop; `Restart; `Logs]
+    ~items
     ~to_string:(function
       | `Details -> "Details"
       | `Start -> "Start"
