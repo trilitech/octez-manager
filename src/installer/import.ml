@@ -587,6 +587,46 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
        instance_name) ;
   log "" ;
   log
+    "────────────────────────────────────────────────────────────────────────────────" ;
+
+  log "" ;
+  log
+    "────────────────────────────────────────────────────────────────────────────────" ;
+  log
+    (Printf.sprintf
+       "Preview: Service Registry Entry (/var/lib/octez-manager/services.json)") ;
+  log
+    "────────────────────────────────────────────────────────────────────────────────" ;
+  log "{" ;
+  log (Printf.sprintf "  \"instance\": \"%s\"," instance_name) ;
+  log
+    (Printf.sprintf
+       "  \"role\": \"%s\","
+       (match config.role.value with
+       | Some External_service.Node -> "node"
+       | Some External_service.Dal_node -> "dal-node"
+       | Some External_service.Baker -> "baker"
+       | Some External_service.Accuser -> "accuser"
+       | _ -> "unknown")) ;
+  log (Printf.sprintf "  \"network\": \"%s\"," network) ;
+  (match config.role.value with
+  | Some External_service.Node ->
+      log (Printf.sprintf "  \"data_dir\": \"%s\"," data_dir) ;
+      log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr)
+  | Some External_service.Dal_node ->
+      log (Printf.sprintf "  \"data_dir\": \"%s\"," data_dir) ;
+      log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr) ;
+      log "  \"depends_on\": null  ⚠️ Should link to managed node instance!"
+  | Some External_service.Baker | Some External_service.Accuser ->
+      (match config.base_dir.value with
+      | Some bd -> log (Printf.sprintf "  \"base_dir\": \"%s\"," bd)
+      | None -> ()) ;
+      log "  \"depends_on\": null  ⚠️ Should link to managed node instance!"
+  | _ -> ()) ;
+  log "  ..." ;
+  log "}" ;
+  log "" ;
+  log
     "────────────────────────────────────────────────────────────────────────────────"
 
 (** {1 Main Import Function} *)
