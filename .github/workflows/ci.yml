@@ -104,14 +104,7 @@ jobs:
           chown -R opam:opam .
           mkdir -p _coverage/unit
           chown -R opam:opam _coverage
-          su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx"
-
-      - name: Debug coverage files
-        run: |
-          echo "=== Coverage directory contents ==="
-          ls -laR _coverage/ || echo "No _coverage directory"
-          echo "=== Looking for .coverage files ==="
-          find . -name "*.coverage" -ls || echo "No .coverage files found"
+          su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx --force"
 
       - name: Prepare binary artifact
         run: |
