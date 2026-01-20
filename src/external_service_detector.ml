@@ -561,6 +561,21 @@ let process_to_external_service (proc : Process_scanner.process_info) =
       {active_state = "active"; sub_state = "running"; enabled = None}
   in
 
+  (* Try to detect network via RPC probe for active processes *)
+  let network_field =
+    match (network.value, role.value) with
+    | None, Some External_service.Node -> (
+        (* Node with unknown network - try RPC probe *)
+        match rpc_addr.value with
+        | Some addr -> (
+            match probe_rpc_chain_id addr with
+            | Some (_chain_id, Some network_name) ->
+                External_service.inferred ~source:"RPC probe" network_name
+            | _ -> network)
+        | None -> network)
+    | _ -> network
+  in
+
   (* Detect daily_logs directory if we have role and data_dir *)
   let daily_logs_dir =
     match (role.value, data_dir.value, base_dir.value) with
@@ -591,7 +606,7 @@ let process_to_external_service (proc : Process_scanner.process_info) =
         data_dir;
         rpc_addr;
         net_addr = unknown ();
-        network;
+        network = network_field;
         history_mode = unknown ();
         node_endpoint;
         base_dir;
