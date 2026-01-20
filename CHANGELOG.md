@@ -22,12 +22,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     - `--as <name>`: Custom instance name (default: auto-generated from detected name)
     - `--network <network>`: Override network if not detected
     - `--strategy takeover|clone`: Takeover disables original (default), clone keeps it running
-    - `--dry-run`: Preview import plan without executing
+    - `--dry-run`: Preview import plan with generated file contents
+  - Interactive TUI wizard with live progress and error display
   - Validates service before import (checks for required fields, conflicts)
   - Automatic rollback if import fails (re-enables and restarts original service)
   - Preserves existing data directories (no re-sync required)
+  - Preserves original service user and file ownership
   - Smart field resolution with confidence tracking
-  - TUI wizard deferred to future release (use CLI for now)
+  - Auto-increments ports for Clone strategy to avoid conflicts
+  - **Known limitation**: Dependency chains not tracked yet (see #360)
+    - Clone strategy: safe, preserves original dependency chain
+    - Takeover strategy: may break services that depend on the imported service
+    - Manual verification recommended before using Takeover on services with dependents
 
 ### Fixed
 
