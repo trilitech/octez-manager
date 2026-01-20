@@ -99,13 +99,11 @@ jobs:
           dune build --release
 
       - name: Test
-        env:
-          BISECT_FILE: ${{ github.workspace }}/_coverage/unit/bisect
         run: |
           chown -R opam:opam /home/opam/.opam
           chown -R opam:opam .
           mkdir -p _coverage/unit
-          su -s /bin/sh opam -c "git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx"
+          su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx"
 
       - name: Prepare binary artifact
         run: |
