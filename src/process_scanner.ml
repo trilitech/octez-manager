@@ -11,6 +11,7 @@ type process_info = {
   pid : int;
   cmdline : string;
   binary_path : string option;
+  binary_realpath : string option;  (** Resolved from /proc/PID/exe *)
   parent_pid : int option;
   user : string option;
 }
@@ -107,6 +108,23 @@ let extract_binary_path cmdline =
         Some first
       else None
 
+(** Resolve absolute path to binary from /proc/<pid>/exe symlink *)
+let read_binary_realpath pid =
+  let path = Printf.sprintf "/proc/%d/exe" pid in
+  try
+    (* readlink on /proc/PID/exe gives the actual binary path *)
+    let ic =
+      Unix.open_process_in (Printf.sprintf "readlink %s 2>/dev/null" path)
+    in
+    Fun.protect
+      ~finally:(fun () -> ignore (Unix.close_process_in ic))
+      (fun () ->
+        try
+          let line = input_line ic in
+          Some (String.trim line)
+        with End_of_file -> None)
+  with _ -> None
+
 (** Check if command line's first token is an Octez binary *)
 let is_octez_binary cmdline =
   let octez_binaries =
@@ -144,7 +162,16 @@ let scan_octez_processes () =
           let ppid, uid = read_status pid in
           let user = Option.bind uid get_username in
           let binary_path = extract_binary_path cmdline in
-          Some {pid; cmdline; binary_path; parent_pid = ppid; user})
+          let binary_realpath = read_binary_realpath pid in
+          Some
+            {
+              pid;
+              cmdline;
+              binary_path;
+              binary_realpath;
+              parent_pid = ppid;
+              user;
+            })
 
 (** Check if PID is managed by a systemd service unit (not just in user.slice) *)
 let is_systemd_managed pid =
