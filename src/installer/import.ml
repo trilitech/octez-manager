@@ -523,7 +523,71 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
   else (
     log "  1. Create managed service configuration (clone)" ;
     log "  2. Keep original service running" ;
-    log "  3. Start managed service (will conflict if using same ports)")
+    log "  3. Start managed service (will conflict if using same ports)") ;
+
+  (* Show file contents preview *)
+  log "" ;
+  log
+    "────────────────────────────────────────────────────────────────────────────────" ;
+  log (Printf.sprintf "Preview: /etc/octez/instances/%s/node.env" instance_name) ;
+  log
+    "────────────────────────────────────────────────────────────────────────────────" ;
+  (match config.role.value with
+  | Some External_service.Dal_node -> (
+      log (Printf.sprintf "OCTEZ_DAL_DATA_DIR=%s" data_dir) ;
+      log (Printf.sprintf "OCTEZ_DAL_RPC_ADDR=%s" rpc_addr) ;
+      (match config.net_addr.value with
+      | Some addr -> log (Printf.sprintf "OCTEZ_DAL_NET_ADDR=%s" addr)
+      | None -> ()) ;
+      log (Printf.sprintf "OCTEZ_NETWORK=%s" network) ;
+      match config.node_endpoint.value with
+      | Some ep -> log (Printf.sprintf "OCTEZ_NODE_ENDPOINT=%s" ep)
+      | None -> ())
+  | Some External_service.Node ->
+      log (Printf.sprintf "OCTEZ_DATA_DIR=%s" data_dir) ;
+      log (Printf.sprintf "OCTEZ_RPC_ADDR=%s" rpc_addr) ;
+      (match config.net_addr.value with
+      | Some addr -> log (Printf.sprintf "OCTEZ_NET_ADDR=%s" addr)
+      | None -> ()) ;
+      log (Printf.sprintf "OCTEZ_NETWORK=%s" network)
+  | Some External_service.Baker | Some External_service.Accuser ->
+      (match config.base_dir.value with
+      | Some bd -> log (Printf.sprintf "OCTEZ_CLIENT_BASE_DIR=%s" bd)
+      | None -> ()) ;
+      (match config.node_endpoint.value with
+      | Some ep -> log (Printf.sprintf "OCTEZ_NODE_ENDPOINT=%s" ep)
+      | None -> ()) ;
+      log (Printf.sprintf "OCTEZ_NETWORK=%s" network)
+  | _ -> log "(role-specific environment variables)") ;
+  (match config.binary_path.value with
+  | Some bp ->
+      let bin_dir = Filename.dirname bp in
+      log (Printf.sprintf "APP_BIN_DIR=%s" bin_dir)
+  | None -> ()) ;
+
+  log "" ;
+  log
+    "────────────────────────────────────────────────────────────────────────────────" ;
+  log
+    (Printf.sprintf
+       "Preview: /etc/systemd/system/octez-%s@%s.service.d/override.conf"
+       (match config.role.value with
+       | Some External_service.Dal_node -> "dal-node"
+       | Some External_service.Node -> "node"
+       | Some External_service.Baker -> "baker"
+       | Some External_service.Accuser -> "accuser"
+       | _ -> "unknown")
+       instance_name) ;
+  log
+    "────────────────────────────────────────────────────────────────────────────────" ;
+  log "[Service]" ;
+  log
+    (Printf.sprintf
+       "EnvironmentFile=/etc/octez/instances/%s/node.env"
+       instance_name) ;
+  log "" ;
+  log
+    "────────────────────────────────────────────────────────────────────────────────"
 
 (** {1 Main Import Function} *)
 
