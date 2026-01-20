@@ -103,6 +103,7 @@ jobs:
           chown -R opam:opam /home/opam/.opam
           chown -R opam:opam .
           mkdir -p _coverage/unit
+          chown -R opam:opam _coverage
           su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx"
 
       - name: Prepare binary artifact
