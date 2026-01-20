@@ -277,6 +277,32 @@ let get_running_command ~unit_name =
 
 (** {1 Detection Logic} *)
 
+(** Detect daily_logs directory based on role and data_dir/base_dir.
+    Returns Some path if the directory exists. *)
+let detect_daily_logs_dir ~role ~data_dir ~base_dir =
+  let check_dir dir =
+    if dir <> "" && Sys.file_exists dir && Sys.is_directory dir then Some dir
+    else None
+  in
+  match role with
+  | External_service.Node ->
+      (* Node: <data_dir>/daily_logs/ *)
+      check_dir (Filename.concat data_dir "daily_logs")
+  | External_service.Baker ->
+      (* Baker: <base_dir>/logs/octez-baker/ *)
+      let base = if base_dir <> "" then base_dir else data_dir in
+      check_dir (Filename.concat (Filename.concat base "logs") "octez-baker")
+  | External_service.Accuser ->
+      (* Accuser: <base_dir>/logs/octez-accuser/ *)
+      let base = if base_dir <> "" then base_dir else data_dir in
+      check_dir (Filename.concat (Filename.concat base "logs") "octez-accuser")
+  | External_service.Dal_node ->
+      (* DAL node: <data_dir>/daily_logs/ *)
+      check_dir (Filename.concat data_dir "daily_logs")
+  | External_service.Unknown _ ->
+      (* Unknown role: try generic daily_logs *)
+      check_dir (Filename.concat data_dir "daily_logs")
+
 (** Check if ExecStart contains an octez binary *)
 let contains_octez_binary exec_start =
   let lower = String.lowercase_ascii exec_start in
@@ -472,6 +498,15 @@ let build_external_service ~unit_name ~exec_start ~properties =
     | _ -> parsed_network
   in
 
+  (* Detect daily_logs directory if we have role and data_dir *)
+  let daily_logs_dir =
+    match (role_field.value, data_dir_field.value, base_dir_field.value) with
+    | Some role, Some data_dir, base_dir_opt ->
+        let base_dir = Option.value ~default:"" base_dir_opt in
+        detect_daily_logs_dir ~role ~data_dir ~base_dir
+    | _ -> None
+  in
+
   (* Build config *)
   let config =
     {
@@ -489,6 +524,7 @@ let build_external_service ~unit_name ~exec_start ~properties =
       node_endpoint = endpoint_field;
       history_mode = history_mode_field;
       network = network_field;
+      daily_logs_dir;
       extra_args = parsed.extra_args;
       parse_warnings = parsed.warnings;
     }
@@ -624,6 +660,18 @@ let process_to_external_service (proc : Process_scanner.process_info) =
       {active_state = "active"; sub_state = "running"; enabled = None}
   in
 
+  (* Detect daily_logs directory if we have role and data_dir *)
+  let daily_logs_dir =
+    match (role.value, data_dir.value, base_dir.value) with
+    | Some detected_role, Some detected_data_dir, base_dir_opt ->
+        let detected_base_dir = Option.value ~default:"" base_dir_opt in
+        detect_daily_logs_dir
+          ~role:detected_role
+          ~data_dir:detected_data_dir
+          ~base_dir:detected_base_dir
+    | _ -> None
+  in
+
   (* Build detected config *)
   let config =
     External_service.
@@ -648,6 +696,7 @@ let process_to_external_service (proc : Process_scanner.process_info) =
         base_dir;
         delegates = unknown ();
         dal_endpoint = unknown ();
+        daily_logs_dir;
         extra_args = [];
         parse_warnings = [];
       }

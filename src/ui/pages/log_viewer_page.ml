@@ -70,9 +70,11 @@ let init () =
     Navigation.make {instance; role; source; pager; cleanup_files}
   in
   (* Check for external service first *)
-  match Context.take_pending_external_unit () with
-  | Some unit_name ->
-      (* External service - use journalctl with unit name directly *)
+  match Context.take_pending_external_service () with
+  | Some ext ->
+      let unit_name = ext.External_service.config.unit_name in
+      let display_name = ext.External_service.suggested_instance_name in
+      (* Try journalctl first, fall back to daily logs if available *)
       let cmd =
         if Common.is_root () then
           Printf.sprintf
@@ -86,11 +88,44 @@ let init () =
       let source, pager, cleanup =
         match open_stream_via_file ~title:"journalctl" cmd with
         | Ok (fp, tmp) -> (Log_viewer.Journald, FileTail fp, [tmp])
-        | Error (`Msg e) ->
-            let p = Pager.open_text ~title:"Error" e in
-            (Log_viewer.Journald, Static p, [])
+        | Error _ -> (
+            (* Fall back to daily logs if available *)
+            match ext.External_service.config.daily_logs_dir with
+            | Some logs_dir when Sys.file_exists logs_dir ->
+                let today = Unix.time () |> Unix.localtime in
+                let filename =
+                  Printf.sprintf
+                    "daily-%04d%02d%02d.log"
+                    (1900 + today.tm_year)
+                    (today.tm_mon + 1)
+                    today.tm_mday
+                in
+                let log_file = Filename.concat logs_dir filename in
+                if Sys.file_exists log_file then
+                  match open_file_with_tail log_file with
+                  | Ok fp -> (Log_viewer.DailyLogs, FileTail fp, [])
+                  | Error e ->
+                      let p = Pager.open_text ~title:"Error" e in
+                      (Log_viewer.DailyLogs, Static p, [])
+                else
+                  let msg =
+                    Printf.sprintf
+                      "No logs found.\n\
+                       Journalctl unavailable and daily log file does not exist:\n\
+                       %s"
+                      log_file
+                  in
+                  let p = Pager.open_text ~title:"Error" msg in
+                  (Log_viewer.DailyLogs, Static p, [])
+            | _ ->
+                let msg =
+                  "No logs available.\n\
+                   Journalctl unavailable and no daily_logs directory found."
+                in
+                let p = Pager.open_text ~title:"Error" msg in
+                (Log_viewer.Journald, Static p, []))
       in
-      make_state unit_name "external" source pager cleanup
+      make_state display_name "external" source pager cleanup
   | None -> (
       (* Managed service - use instance detail *)
       match Context.take_pending_instance_detail () with
