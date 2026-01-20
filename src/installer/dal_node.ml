@@ -59,7 +59,9 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
     ]
     @ args_entry @ request.extra_env
   in
-  let* () = Node_env.write_pairs ~inst:request.instance extra_env in
+  let* () =
+    Node_env.write_pairs ~with_comments:true ~inst:request.instance extra_env
+  in
   let* () =
     Systemd.install_unit
       ~quiet

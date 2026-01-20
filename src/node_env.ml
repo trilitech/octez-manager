@@ -7,16 +7,68 @@
 
 let ( let* ) = Rresult.R.bind
 
-let write_pairs ~inst pairs =
+(** Documentation for common environment variables *)
+let get_var_doc = function
+  | "OCTEZ_DATA_DIR" ->
+      Some
+        "Path to the Octez data directory containing blockchain data and \
+         configuration"
+  | "OCTEZ_RPC_ADDR" ->
+      Some
+        "RPC server listen address in format 'host:port' (e.g., \
+         'localhost:8732')\n\
+         # Use '0.0.0.0:PORT' to listen on all interfaces, or 'localhost:PORT' \
+         for local only"
+  | "OCTEZ_NET_ADDR" ->
+      Some
+        "P2P network listen address in format 'host:port' (e.g., ':9732')\n\
+         # Use ':PORT' to listen on all interfaces on the specified port"
+  | "OCTEZ_NETWORK" ->
+      Some "Network name (e.g., 'mainnet', 'ghostnet', 'nairobinet')"
+  | "APP_BIN_DIR" ->
+      Some "Directory containing Octez binaries (octez-node, octez-baker, etc.)"
+  | "OCTEZ_NODE_ENDPOINT" ->
+      Some
+        "Node RPC endpoint for baker/accuser/DAL (e.g., \
+         'http://localhost:8732')"
+  | "OCTEZ_CLIENT_BASE_DIR" ->
+      Some
+        "Octez client base directory containing keys and configuration\n\
+         # This is where your baker keys are stored"
+  | "OCTEZ_DAL_DATA_DIR" -> Some "Path to the DAL node data directory"
+  | "OCTEZ_DAL_RPC_ADDR" ->
+      Some "DAL node RPC listen address (e.g., '127.0.0.1:10732')"
+  | "OCTEZ_DAL_NET_ADDR" ->
+      Some "DAL node P2P listen address (e.g., '127.0.0.1:11732')"
+  | _ -> None
+
+let write_pairs ?(with_comments = false) ~inst pairs =
   let base = Common.env_instances_base_dir () in
   let path = Filename.concat (Filename.concat base inst) "node.env" in
   let env_lines =
     pairs
     |> List.filter (fun (_, v) -> String.trim v <> "")
-    |> List.map (fun (k, v) -> Format.sprintf "%s=%s\n" k v)
+    |> List.map (fun (k, v) ->
+        if with_comments then
+          match get_var_doc k with
+          | Some doc -> Format.sprintf "\n# %s\n%s=%s\n" doc k v
+          | None -> Format.sprintf "%s=%s\n" k v
+        else Format.sprintf "%s=%s\n" k v)
     |> String.concat ""
   in
-  let body = "VERSION=v1\n" ^ env_lines in
+  let header =
+    if with_comments then
+      "# Octez Service Environment Configuration\n\
+       # This file is sourced by the systemd service unit.\n\
+       # Edit carefully - incorrect values may prevent the service from \
+       starting.\n\
+       #\n\
+       # After editing, reload with: systemctl daemon-reload && systemctl \
+       restart SERVICE\n\n\
+       VERSION=v1\n"
+    else "VERSION=v1\n"
+  in
+  let body = header ^ env_lines in
   let owner, group =
     if Common.is_root () then ("root", "root")
     else Common.current_user_group_names ()
@@ -52,8 +104,8 @@ let read ~inst =
       Ok (loop [])
     with Sys_error msg -> Error (`Msg msg)
 
-let write ~inst ~data_dir ~run_args ~extra_env =
+let write ~inst ~data_dir ~run_args ~extra_env ?(with_comments = false) () =
   let env_pairs =
     ("OCTEZ_DATA_DIR", data_dir) :: ("OCTEZ_NODE_ARGS", run_args) :: extra_env
   in
-  write_pairs ~inst env_pairs
+  write_pairs ~with_comments ~inst env_pairs
