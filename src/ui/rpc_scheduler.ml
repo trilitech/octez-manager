@@ -179,6 +179,60 @@ let submit_poll (svc : Service.t) =
         Hashtbl.replace last_boot_at svc.Service.instance (!now_ref ())
       with _ -> ())
 
+(** Poll an external node for head/bootstrap status via direct RPC calls *)
+let poll_external_node (ext : External_service.t) now =
+  let instance = ext.suggested_instance_name in
+  match ext.config.rpc_addr.value with
+  | None -> ()
+  | Some rpc_addr ->
+      let endpoint =
+        if String.starts_with ~prefix:"http" rpc_addr then rpc_addr
+        else "http://" ^ rpc_addr
+      in
+      (* Fetch head level using curl *)
+      let head_level =
+        try
+          let url = endpoint ^ "/chains/main/blocks/head/header" in
+          match
+            Common.run_out
+              ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
+          with
+          | Ok json_str -> (
+              try
+                let json = Yojson.Safe.from_string json_str in
+                match Yojson.Safe.Util.member "level" json with
+                | `Int level -> Some level
+                | _ -> None
+              with _ -> None)
+          | Error _ -> None
+        with _ -> None
+      in
+      (* Update metrics *)
+      let _existing = Rpc_m.get ~instance in
+      Rpc_m.set
+        ~instance
+        {
+          Rpc_metrics.chain_id = None;
+          node_version = None;
+          head_level;
+          proto = None;
+          last_error = None;
+          bootstrapped = None;
+          last_rpc_refresh = Some now;
+          data_size = None;
+          last_block_time = Some now;
+        }
+
+(** Submit external node poll *)
+let submit_poll_external (ext : External_service.t) now =
+  let key =
+    Printf.sprintf
+      "rpc-poll-ext:%s"
+      ext.External_service.suggested_instance_name
+  in
+  Worker_queue.submit_unit worker ~key ~work:(fun () ->
+      try poll_external_node ext now with _ -> ())
+
 let tick () =
   let nodes =
     match
@@ -196,11 +250,21 @@ let tick () =
         |> List.map (fun st -> st.Data.Service_state.service)
         |> List.filter (fun (svc : Service.t) -> String.equal svc.role "node")
   in
+  (* Also get external nodes *)
+  let external_nodes =
+    External_services_scheduler.get ()
+    |> List.filter (fun (ext : External_service.t) ->
+        match ext.config.role.value with
+        | Some External_service.Node -> true
+        | _ -> false)
+  in
   let now = !now_ref () in
   (* Start head monitors for all nodes *)
   List.iter (fun (svc : Service.t) -> start_head_monitor svc) nodes ;
   (* Submit poll requests for nodes that are due *)
-  List.iter (fun svc -> if is_due_for_poll now svc then submit_poll svc) nodes
+  List.iter (fun svc -> if is_due_for_poll now svc then submit_poll svc) nodes ;
+  (* Poll external nodes too *)
+  List.iter (fun ext -> submit_poll_external ext now) external_nodes
 
 let started = ref false
 
