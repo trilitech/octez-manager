@@ -233,6 +233,8 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~all_external_services =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
+  (* Parse ExecStart to extract extra arguments *)
+  let parsed = Execstart_parser.parse config.exec_start in
   (* Extract delegates if detected *)
   let delegates =
     match config.delegates.value with Some d -> d | None -> []
@@ -269,6 +271,8 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
           | None -> (Dal_endpoint dal_endpoint, None))
     | None -> (Dal_disabled, None)
   in
+  (* Preserve extra arguments from original ExecStart (includes -f, --liquidity-baking-toggle-vote, etc.) *)
+  let extra_args = parsed.extra_args in
   let request : baker_request =
     {
       instance;
@@ -278,7 +282,7 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       dal_config;
       dal_node;
       liquidity_baking_vote = None;
-      extra_args = [];
+      extra_args;
       service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
@@ -297,19 +301,24 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
 
 let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~node_endpoint ~bin_dir ~depends_on =
+  let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
+  (* Parse ExecStart to extract extra arguments *)
+  let parsed = Execstart_parser.parse config.exec_start in
   (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
   let node_mode =
     match depends_on with
     | Some instance -> Local_instance instance
     | None -> Remote_endpoint node_endpoint
   in
+  (* Preserve extra arguments from original ExecStart *)
+  let extra_args = parsed.extra_args in
   let request : accuser_request =
     {
       instance;
       node_mode;
       base_dir = Some base_dir;
-      extra_args = [];
+      extra_args;
       service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
