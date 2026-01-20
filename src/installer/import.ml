@@ -240,9 +240,21 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
   let service_user = get_service_user external_svc in
   (* Parse ExecStart to extract extra arguments *)
   let parsed = Execstart_parser.parse config.exec_start in
-  (* Extract delegates if detected *)
-  let delegates =
-    match config.delegates.value with Some d -> d | None -> []
+  (* Extract delegates from extra_args: positional args that don't start with - *)
+  let delegates, remaining_args =
+    List.partition
+      (fun arg -> String.length arg > 0 && arg.[0] <> '-' && arg.[0] <> '/')
+      parsed.extra_args
+  in
+  (* Extract liquidity baking vote if present *)
+  let liquidity_baking_vote, remaining_args =
+    let rec extract_lb acc = function
+      | [] -> (None, List.rev acc)
+      | "--liquidity-baking-toggle-vote" :: value :: rest ->
+          (Some value, List.rev_append acc rest)
+      | arg :: rest -> extract_lb (arg :: acc) rest
+    in
+    extract_lb [] remaining_args
   in
   (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
   let node_mode =
@@ -276,8 +288,8 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
           | None -> (Dal_endpoint dal_endpoint, None))
     | None -> (Dal_disabled, None)
   in
-  (* Preserve extra arguments from original ExecStart (includes -f, --liquidity-baking-toggle-vote, etc.) *)
-  let extra_args = parsed.extra_args in
+  (* Use remaining args after extracting delegates and LB vote *)
+  let extra_args = remaining_args in
   let request : baker_request =
     {
       instance;
@@ -286,7 +298,7 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       delegates;
       dal_config;
       dal_node;
-      liquidity_baking_vote = None;
+      liquidity_baking_vote;
       extra_args;
       service_user;
       app_bin_dir = bin_dir;
