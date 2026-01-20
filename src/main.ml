@@ -67,6 +67,7 @@ let root_cmd =
       Cmd_install_accuser.install_accuser_cmd;
       Cmd_install_dal.install_dal_node_cmd;
       Cmd_import.import_cmd;
+      Cmd_binaries.binaries_cmd;
       Cmd_utils.list_cmd;
       Cmd_utils.purge_all_cmd;
       Cmd_utils.cleanup_orphans_cmd;
