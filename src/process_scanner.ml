@@ -157,21 +157,28 @@ let scan_octez_processes () =
   |> List.filter_map (fun pid ->
       match read_cmdline pid with
       | None -> None
-      | Some cmdline when not (is_octez_binary cmdline) -> None
       | Some cmdline ->
-          let ppid, uid = read_status pid in
-          let user = Option.bind uid get_username in
-          let binary_path = extract_binary_path cmdline in
           let binary_realpath = read_binary_realpath pid in
-          Some
-            {
-              pid;
-              cmdline;
-              binary_path;
-              binary_realpath;
-              parent_pid = ppid;
-              user;
-            })
+          (* Verify using realpath from /proc/PID/exe - most reliable *)
+          let is_octez =
+            match binary_realpath with
+            | Some realpath -> is_octez_binary realpath
+            | None -> is_octez_binary cmdline
+          in
+          if not is_octez then None
+          else
+            let ppid, uid = read_status pid in
+            let user = Option.bind uid get_username in
+            let binary_path = extract_binary_path cmdline in
+            Some
+              {
+                pid;
+                cmdline;
+                binary_path;
+                binary_realpath;
+                parent_pid = ppid;
+                user;
+              })
 
 (** Check if PID is managed by a systemd service unit (not just in user.slice) *)
 let is_systemd_managed pid =
