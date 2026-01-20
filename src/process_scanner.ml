@@ -137,9 +137,14 @@ let scan_octez_processes () =
           let binary_path = extract_binary_path cmdline in
           Some {pid; cmdline; binary_path; parent_pid = ppid; user})
 
-(** Check if PID is managed by a systemd unit *)
+(** Check if PID is managed by a systemd service unit (not just in user.slice) *)
 let is_systemd_managed pid =
-  (* Check if process has a systemd cgroup *)
+  (* Check if process has a systemd service cgroup.
+     We need to distinguish between:
+     - Actual systemd services: /system.slice/octez-node@mainnet.service/...
+     - User session processes: /user.slice/user-1000.slice/session-123.scope/...
+     
+     Only the former should be filtered out (as they're already detected via systemd). *)
   let path = Printf.sprintf "/proc/%d/cgroup" pid in
   try
     let ic = open_in path in
@@ -149,11 +154,20 @@ let is_systemd_managed pid =
         let rec check_lines () =
           match input_line ic with
           | line ->
-              (* Look for systemd service in cgroup *)
+              (* Look for actual systemd SERVICE units in cgroup path.
+                 Examples that SHOULD be filtered (systemd-managed):
+                   0::/system.slice/octez-node@mainnet.service
+                   0::/system.slice/system-octez\x2dnode.slice/octez-node@mainnet.service
+                 Examples that should NOT be filtered (standalone):
+                   0::/user.slice/user-1000.slice/session-3.scope
+                   0::/user.slice/user-1000.slice/user@1000.service/app.slice/vte-spawn-xxx.scope
+              *)
               if
-                contains_substring line ".service"
-                || contains_substring line "system.slice"
-                || contains_substring line "user.slice"
+                (* Check for octez/tezos service units specifically *)
+                contains_substring line "octez-"
+                && contains_substring line ".service"
+                || contains_substring line "tezos-"
+                   && contains_substring line ".service"
               then true
               else check_lines ()
           | exception End_of_file -> false
