@@ -370,12 +370,38 @@ let rollback_import ~original_unit ~new_instance =
 
 (** {1 Dry-Run Helpers} *)
 
+(** Wrap long string to fit within width *)
+let wrap_string s max_width =
+  if String.length s <= max_width then [s]
+  else
+    let rec split_at_spaces str acc =
+      if String.length str <= max_width then List.rev (str :: acc)
+      else
+        (* Try to find last space before max_width *)
+        let rec find_break pos =
+          if pos < 0 then max_width (* No space found, hard break *)
+          else if str.[pos] = ' ' then pos
+          else find_break (pos - 1)
+        in
+        let break_pos =
+          find_break (min (max_width - 1) (String.length str - 1))
+        in
+        let line = String.sub str 0 break_pos |> String.trim in
+        let rest =
+          String.sub str break_pos (String.length str - break_pos)
+          |> String.trim
+        in
+        split_at_spaces rest (line :: acc)
+    in
+    split_at_spaces s []
+
 (** Format side-by-side comparison for dry-run *)
 let format_comparison ~log ~label ~original ~generated =
   let max_len = 40 in
   let pad s =
     let len = String.length s in
-    if len >= max_len then s else s ^ String.make (max_len - len) ' '
+    if len >= max_len then String.sub s 0 max_len
+    else s ^ String.make (max_len - len) ' '
   in
   log (Printf.sprintf "%s:" label) ;
   log
@@ -386,11 +412,18 @@ let format_comparison ~log ~label ~original ~generated =
   log (Printf.sprintf "  %s-+-%s" (String.make 40 '-') (String.make 40 '-')) ;
   List.iter2
     (fun (k1, v1) (k2, v2) ->
-      log
-        (Printf.sprintf
-           "  %-40s | %-40s"
-           (pad (k1 ^ ": " ^ v1))
-           (pad (k2 ^ ": " ^ v2))))
+      let left_lines = wrap_string (k1 ^ ": " ^ v1) max_len in
+      let right_lines = wrap_string (k2 ^ ": " ^ v2) max_len in
+      let max_lines = max (List.length left_lines) (List.length right_lines) in
+      for i = 0 to max_lines - 1 do
+        let left =
+          if i < List.length left_lines then List.nth left_lines i else ""
+        in
+        let right =
+          if i < List.length right_lines then List.nth right_lines i else ""
+        in
+        log (Printf.sprintf "  %-40s | %-40s" (pad left) (pad right))
+      done)
     original
     generated
 
