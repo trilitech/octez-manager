@@ -653,10 +653,16 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
   | Some External_service.Node ->
       log (Printf.sprintf "  \"data_dir\": \"%s\"," data_dir) ;
       log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr)
-  | Some External_service.Dal_node ->
+  | Some External_service.Dal_node -> (
       log (Printf.sprintf "  \"data_dir\": \"%s\"," data_dir) ;
       log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr) ;
-      log "  \"depends_on\": null  ⚠️ Should link to managed node instance!"
+      match depends_on with
+      | Some inst ->
+          log
+            (Printf.sprintf
+               "  \"depends_on\": \"%s\"  ✓ Linked to managed node!"
+               inst)
+      | None -> log "  \"depends_on\": null  ℹ️ Using remote node endpoint")
   | Some External_service.Baker | Some External_service.Accuser -> (
       (match config.base_dir.value with
       | Some bd -> log (Printf.sprintf "  \"base_dir\": \"%s\"," bd)
