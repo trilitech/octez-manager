@@ -690,7 +690,7 @@ let external_service_actions_modal state ext =
               Systemd.restart_unit ~unit_name)
       | `Logs ->
           (* Set up log viewing for external service *)
-          Context.set_pending_external_unit unit_name ;
+          Context.set_pending_external_service ext ;
           Context.navigate Log_viewer_page.name)
     () ;
   state

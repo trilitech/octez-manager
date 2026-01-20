@@ -7,7 +7,8 @@
 
 let pending_instance_detail : string option ref = ref None
 
-let pending_external_unit : string option ref = ref None
+let pending_external_service : Octez_manager_lib.External_service.t option ref =
+  ref None
 
 (* Use Atomic for cross-domain visibility - mark_instances_dirty can be called
    from background worker domains via Job_manager.on_complete *)
@@ -20,12 +21,11 @@ let take_pending_instance_detail () =
   pending_instance_detail := None ;
   value
 
-let set_pending_external_unit unit_name =
-  pending_external_unit := Some unit_name
+let set_pending_external_service svc = pending_external_service := Some svc
 
-let take_pending_external_unit () =
-  let value = !pending_external_unit in
-  pending_external_unit := None ;
+let take_pending_external_service () =
+  let value = !pending_external_service in
+  pending_external_service := None ;
   value
 
 (* Edit mode: service being edited and list of stopped dependents *)

@@ -101,6 +101,9 @@ type detected_config = {
   delegates : string list field;
   (* DAL specific *)
   dal_endpoint : string field;
+  (* Logging *)
+  daily_logs_dir : string option;
+      (** Path to daily_logs directory if it exists *)
   (* Unparsed *)
   extra_args : string list;
   parse_warnings : string list;
