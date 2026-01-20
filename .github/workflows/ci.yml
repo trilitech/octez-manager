@@ -89,6 +89,10 @@ jobs:
           echo "Checking copyright headers..."
           ./scripts/check-copyright.sh
 
+      - name: Install bisect_ppx for coverage
+        run: |
+          opam install -y bisect_ppx
+
       - name: Build
         run: |
           echo '(-ccopt -static)' > static_flags.sexp
@@ -140,6 +144,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install bisect_ppx
+        run: |
+          opam install -y bisect_ppx
 
       - name: Download unit test coverage
         uses: actions/download-artifact@v4
