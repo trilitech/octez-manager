@@ -34,15 +34,8 @@ let refresh () =
   else (
     last_poll := now ;
     match External_service_detector.detect () with
-    | Ok services ->
-        Mutex.protect cache_lock (fun () -> cache := services) ;
-        Format.eprintf
-          "[External Services Scheduler] Detected %d services@."
-          (List.length services)
-    | Error msg ->
-        Format.eprintf
-          "[External Services Scheduler] Detection failed: %s@."
-          msg ;
+    | Ok services -> Mutex.protect cache_lock (fun () -> cache := services)
+    | Error _msg ->
         (* Keep previous cache on error *)
         ())
 
