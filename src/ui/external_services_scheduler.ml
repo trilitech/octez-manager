@@ -18,8 +18,8 @@ let cache : External_service.t list ref = ref []
 
 let cache_lock = Mutex.create ()
 
-(** Poll interval: 5 seconds *)
-let poll_interval = 5.0
+(** Poll interval: 30 seconds - external services don't change frequently *)
+let poll_interval = 30.0
 
 (** Last poll timestamp *)
 let last_poll = ref 0.0
