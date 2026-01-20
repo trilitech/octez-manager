@@ -563,13 +563,8 @@ let render_external_service ~selected_idx ~current_idx ~folded
 
   if folded then [first_line]
   else
-    (* For external services, use the unit name without .service suffix as the instance *)
-    let instance_for_metrics =
-      let unit = cfg.unit_name in
-      if String.ends_with ~suffix:".service" unit then
-        String.sub unit 0 (String.length unit - 8)
-      else unit
-    in
+    (* For external services, use the suggested instance name consistently *)
+    let instance_for_metrics = ext.suggested_instance_name in
     let role_for_metrics =
       match cfg.role.value with
       | Some Node -> "node"
@@ -632,7 +627,35 @@ let render_external_service ~selected_idx ~current_idx ~folded
         ~instance:instance_for_metrics
         ~focus
     in
-    let metrics_parts = [version] @ if mem = "" then [] else ["MEM " ^ mem] in
+    (* For nodes, add head level and time since last block *)
+    let head_info =
+      match cfg.role.value with
+      | Some Node -> (
+          match Rpc_metrics.get ~instance:instance_for_metrics with
+          | Some metrics ->
+              let head_str =
+                match metrics.Rpc_metrics.head_level with
+                | Some l -> Printf.sprintf "L%d" l
+                | None -> "L?"
+              in
+              let time_str =
+                match metrics.Rpc_metrics.last_block_time with
+                | Some t ->
+                    let now = Unix.gettimeofday () in
+                    let elapsed = now -. t in
+                    if elapsed < 60.0 then Printf.sprintf "%.0fs ago" elapsed
+                    else if elapsed < 3600.0 then
+                      Printf.sprintf "%.0fm ago" (elapsed /. 60.0)
+                    else Printf.sprintf "%.1fh ago" (elapsed /. 3600.0)
+                | None -> ""
+              in
+              if time_str = "" then [head_str] else [head_str; time_str]
+          | None -> [])
+      | _ -> []
+    in
+    let metrics_parts =
+      [version] @ (if mem = "" then [] else ["MEM " ^ mem]) @ head_info
+    in
     let metrics_line = indent ^ String.concat " · " metrics_parts in
 
     (* CPU chart *)
