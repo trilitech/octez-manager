@@ -393,9 +393,11 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
     | Some ep -> ep
     | None -> "http://127.0.0.1:8732"
   in
-  (* 6. Get bin_dir *)
+  (* 6. Get bin_dir - extract directory from binary path *)
   let bin_dir =
-    match config.binary_path.value with Some p -> p | None -> "/usr/bin"
+    match config.binary_path.value with
+    | Some binary_path -> Filename.dirname binary_path
+    | None -> "/usr/bin"
   in
   (* DRY RUN: Stop here and show what would happen *)
   if options.dry_run then (
