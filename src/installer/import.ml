@@ -410,14 +410,24 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
     (* ACTUAL IMPORT *)
     try
       (* 5. Stop external service (for Takeover) *)
+      log
+        (Printf.sprintf
+           "[1/6] Strategy: %s"
+           (match options.strategy with
+           | Takeover -> "Takeover"
+           | Clone -> "Clone")) ;
       let* () =
         if options.strategy = Takeover then (
-          log "Stopping external service..." ;
-          Systemd.stop_unit ~unit_name:config.unit_name)
-        else Ok ()
+          log (Printf.sprintf "Stopping external service: %s" config.unit_name) ;
+          let result = Systemd.stop_unit ~unit_name:config.unit_name in
+          log "Stop completed." ;
+          result)
+        else (
+          log "Clone strategy - keeping original running" ;
+          Ok ())
       in
       (* 6. Create managed service based on role *)
-      log "Creating managed service..." ;
+      log "[2/6] Creating managed service configuration..." ;
       let* created_svc =
         match config.role.value with
         | Some External_service.Node ->
@@ -458,19 +468,34 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
             Error (`Msg (Printf.sprintf "Unknown role: %s" role_str))
         | None -> Error (`Msg "Role not detected for external service")
       in
+      log
+        (Printf.sprintf
+           "[3/6] Service created: %s (role: %s, user: %s)"
+           instance_name
+           created_svc.Service.role
+           created_svc.Service.service_user) ;
       (* 7. Disable original unit (for Takeover) *)
       let* () =
         if options.strategy = Takeover then (
-          log "Disabling original systemd unit..." ;
-          Systemd.disable_unit config.unit_name)
-        else Ok ()
+          log
+            (Printf.sprintf
+               "[4/6] Disabling original systemd unit: %s"
+               config.unit_name) ;
+          let result = Systemd.disable_unit config.unit_name in
+          log "Disable completed." ;
+          result)
+        else (
+          log "[4/6] Skipping disable (Clone strategy)" ;
+          Ok ())
       in
       (* 8. Start managed service *)
-      log "Starting managed service..." ;
+      log (Printf.sprintf "[5/6] Starting managed service: %s" instance_name) ;
       let* () =
         Lifecycle.start_service ~quiet:true ~instance:instance_name ()
       in
+      log "Start completed." ;
       (* 9. Verify running - systemd start is synchronous, no sleep needed *)
+      log "[6/6] Verifying service is active..." ;
       let* unit_state =
         Systemd.get_unit_state
           ~role:created_svc.Service.role
