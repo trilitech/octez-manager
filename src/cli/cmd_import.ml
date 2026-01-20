@@ -12,7 +12,7 @@ open Import
 let import_cmd =
   let term =
     let run external_name instance_override network_override strategy cascade
-        dry_run =
+        dry_run interactive =
       Capabilities.register () ;
 
       (* 1. Find the external service by name *)
@@ -81,6 +81,7 @@ let import_cmd =
                           new_instance_name = instance_override;
                           overrides;
                           dry_run;
+                          interactive;
                           preserve_data = true;
                           quiet = false;
                         }
@@ -195,10 +196,17 @@ let import_cmd =
       let doc = "Show import plan without executing" in
       Arg.(value & flag & info ["dry-run"; "d"] ~doc)
     in
+    let interactive_flag =
+      let doc =
+        "Interactive mode: review and edit each configuration file before \
+         import"
+      in
+      Arg.(value & flag & info ["interactive"; "i"] ~doc)
+    in
     Term.(
       ret
         (const run $ external_name_arg $ instance_arg $ network_arg
-       $ strategy_arg $ cascade_flag $ dry_run_flag))
+       $ strategy_arg $ cascade_flag $ dry_run_flag $ interactive_flag))
   in
   let info =
     Cmd.info

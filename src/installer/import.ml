@@ -38,6 +38,7 @@ type import_options = {
   new_instance_name : string option;
   overrides : field_overrides;
   dry_run : bool;
+  interactive : bool;
   preserve_data : bool;
   quiet : bool;
 }
