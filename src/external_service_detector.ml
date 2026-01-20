@@ -571,6 +571,12 @@ let infer_network_from_endpoint services =
 let process_to_external_service (proc : Process_scanner.process_info) =
   let cmdline = proc.cmdline in
   let binary_path = Option.value ~default:"octez" proc.binary_path in
+  (* Prefer realpath for version detection (absolute path resolved from /proc/PID/exe) *)
+  let binary_for_version =
+    match proc.binary_realpath with
+    | Some realpath -> realpath
+    | None -> binary_path
+  in
 
   (* Parse role from command line *)
   let role =
@@ -631,7 +637,7 @@ let process_to_external_service (proc : Process_scanner.process_info) =
         working_dir = None;
         environment_files = [];
         role;
-        binary_path = detected ~source:"cmdline" binary_path;
+        binary_path = detected ~source:"cmdline" binary_for_version;
         binary_version = unknown ();
         data_dir;
         rpc_addr;

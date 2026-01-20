@@ -11,6 +11,8 @@ type process_info = {
   pid : int;
   cmdline : string;
   binary_path : string option;
+  binary_realpath : string option;
+      (** Resolved absolute path from /proc/PID/exe *)
   parent_pid : int option;
   user : string option;
 }
