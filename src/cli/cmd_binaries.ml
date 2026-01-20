@@ -174,6 +174,7 @@ let list_cmd =
 let download_cmd =
   let term =
     let run version verify_checksums =
+<<<<<<< HEAD
       (* Cleanup stale temporary download directories *)
       Binary_downloader.cleanup_stale_temp_dirs () ;
 
@@ -205,15 +206,34 @@ let download_cmd =
       in
 
       (* Perform download *)
+=======
+      Printf.printf "Downloading Octez v%s...\n" version ;
+      let progress ~downloaded ~total =
+        match total with
+        | Some t ->
+            let pct = Int64.(to_float downloaded /. to_float t *. 100.0) in
+            Printf.printf
+              "\rProgress: %.1f%% (%s / %s)%!"
+              pct
+              (format_size downloaded)
+              (format_size t)
+        | None -> Printf.printf "\rDownloaded: %s%!" (format_size downloaded)
+      in
+>>>>>>> 5c8989ec (feat(binaries): implement CLI commands for binary management)
       match
         Binary_downloader.download_version
           ~version
           ~verify_checksums
+<<<<<<< HEAD
           ~multi_progress
+=======
+          ~progress
+>>>>>>> 5c8989ec (feat(binaries): implement CLI commands for binary management)
           ()
       with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok result ->
+<<<<<<< HEAD
           (* Mark all binaries complete with their final sizes *)
           List.iter
             (fun binary ->
@@ -260,6 +280,18 @@ let download_cmd =
 
           (* Final newline *)
           Printf.printf "\n" ;
+=======
+          Printf.printf
+            "\n✓ Downloaded %d binaries to %s\n"
+            (List.length result.binaries)
+            result.installed_path ;
+          (match result.checksum_status with
+          | Binary_downloader.Verified -> Printf.printf "✓ Checksums verified\n"
+          | Binary_downloader.Skipped ->
+              Printf.printf "⚠ Checksum verification skipped\n"
+          | Binary_downloader.Failed reason ->
+              Printf.printf "⚠ Checksum verification failed: %s\n" reason) ;
+>>>>>>> 5c8989ec (feat(binaries): implement CLI commands for binary management)
           `Ok ()
     in
     let version_arg =
