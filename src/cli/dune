@@ -12,6 +12,7 @@
   cmd_install_node
   cmd_instance
   cmd_import
+  cmd_binaries
   cmd_utils)
  (libraries octez_manager_lib cmdliner rresult yojson linenoise)
  (instrumentation
