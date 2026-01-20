@@ -195,7 +195,12 @@ let get_service_user external_svc =
 
 let create_node_from_external ~instance ~external_svc ~network ~data_dir
     ~rpc_addr ~net_addr ~bin_dir =
+  let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
+  (* Parse ExecStart to extract extra arguments *)
+  let parsed = Execstart_parser.parse config.exec_start in
+  (* Preserve extra arguments from original ExecStart (e.g., --metrics-addr, --cors-origin) *)
+  let extra_args = parsed.extra_args in
   let request : node_request =
     {
       instance;
@@ -208,7 +213,7 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
       service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
-      extra_args = [];
+      extra_args;
       auto_enable = true;
       bootstrap = Genesis;
       (* No bootstrap - data already exists *)
@@ -337,7 +342,10 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
 
 let create_dal_from_external ~instance ~external_svc ~network ~data_dir
     ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy ~depends_on =
+  let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
+  (* Parse ExecStart to extract extra arguments *)
+  let parsed = Execstart_parser.parse config.exec_start in
   (* For Clone strategy, increment ports to avoid conflicts *)
   let rpc_addr, net_addr =
     if strategy = Clone then
@@ -353,6 +361,8 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       (increment_port rpc_addr, increment_port net_addr)
     else (rpc_addr, net_addr)
   in
+  (* Preserve extra arguments from original ExecStart (e.g., --attester-profiles) *)
+  let service_args = parsed.extra_args in
   let request : daemon_request =
     {
       role = "dal-node";
@@ -365,7 +375,7 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
-      service_args = [];
+      service_args;
       extra_env = [("OCTEZ_NODE_ENDPOINT", node_endpoint)];
       extra_paths = [];
       auto_enable = true;
