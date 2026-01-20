@@ -24,6 +24,7 @@ type parsed_args = {
   rpc_addr : string option;
   net_addr : string option;
   endpoint : string option;
+  dal_endpoint : string option;
   history_mode : string option;
   network : string option;
   extra_args : string list;

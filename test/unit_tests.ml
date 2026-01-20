@@ -4014,6 +4014,31 @@ let execstart_parser_parse_dal_node () =
     (Some "0.0.0.0:11732")
     parsed.net_addr
 
+let execstart_parser_parse_baker_with_dal () =
+  let open Execstart_parser in
+  (* Anonymized example based on real baker service *)
+  let parsed =
+    parse
+      "/usr/bin/octez-baker -E http://localhost:8736 --base-dir /data/wallet \
+       run with local node /data/node --dal-node http://127.0.0.1:10736"
+  in
+  Alcotest.(check (option string))
+    "baker binary"
+    (Some "/usr/bin/octez-baker")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "node endpoint"
+    (Some "http://localhost:8736")
+    parsed.endpoint ;
+  Alcotest.(check (option string))
+    "dal endpoint"
+    (Some "http://127.0.0.1:10736")
+    parsed.dal_endpoint ;
+  Alcotest.(check (option string))
+    "base dir"
+    (Some "/data/wallet")
+    parsed.base_dir
+
 (** {1 External_service_detector Tests} *)
 
 let external_service_detector_chain_id_mapping () =
@@ -4730,6 +4755,10 @@ let () =
             "parse_dal_node"
             `Quick
             execstart_parser_parse_dal_node;
+          Alcotest.test_case
+            "parse_baker_with_dal"
+            `Quick
+            execstart_parser_parse_baker_with_dal;
         ] );
       ( "external_service_detector",
         [

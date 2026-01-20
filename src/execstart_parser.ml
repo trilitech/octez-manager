@@ -104,6 +104,7 @@ type parsed_args = {
   rpc_addr : string option;
   net_addr : string option;
   endpoint : string option;
+  dal_endpoint : string option;
   history_mode : string option;
   network : string option;
   extra_args : string list;
@@ -119,6 +120,7 @@ let empty_args =
     rpc_addr = None;
     net_addr = None;
     endpoint = None;
+    dal_endpoint = None;
     history_mode = None;
     network = None;
     extra_args = [];
@@ -207,6 +209,16 @@ let rec parse_args_list words acc =
           parse_flag_value
             ~flag_name:"endpoint"
             ~setter:(fun a v -> {a with endpoint = Some v})
+            word
+            rest
+            acc
+        in
+        parse_args_list new_rest new_acc
+      else if String.starts_with ~prefix:"--dal-node" word then
+        let new_rest, new_acc =
+          parse_flag_value
+            ~flag_name:"dal-node"
+            ~setter:(fun a v -> {a with dal_endpoint = Some v})
             word
             rest
             acc
