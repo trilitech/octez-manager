@@ -119,7 +119,12 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
         ()
   in
   log "Reowning runtime paths...\n" ;
-  let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
+  let* () =
+    if request.preserve_data then (
+      log "Skipping reown (preserve_data=true)\n" ;
+      Ok ())
+    else reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode
+  in
   log "Creating service record...\n" ;
   (* In edit mode, preserve existing dependents list *)
   let existing_dependents =

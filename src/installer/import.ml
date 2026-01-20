@@ -182,8 +182,20 @@ let resolve_net_addr ~overrides ~external_svc =
 
 (** {1 Service Creation from External} *)
 
-let create_node_from_external ~instance ~external_svc:_ ~network ~data_dir
+(** Get service user from external service, with fallback to current user.
+    CRITICAL: We must preserve the original service user to avoid breaking
+    permissions on existing data directories. *)
+let get_service_user external_svc =
+  match external_svc.External_service.config.user with
+  | Some user -> user
+  | None ->
+      (* Fallback to current user if not detected *)
+      let current_user, _ = Common.current_user_group_names () in
+      current_user
+
+let create_node_from_external ~instance ~external_svc ~network ~data_dir
     ~rpc_addr ~net_addr ~bin_dir =
+  let service_user = get_service_user external_svc in
   let request : node_request =
     {
       instance;
@@ -193,8 +205,7 @@ let create_node_from_external ~instance ~external_svc:_ ~network ~data_dir
       data_dir = Some data_dir;
       rpc_addr;
       net_addr;
-      service_user = "octez";
-      (* Default service user *)
+      service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
       extra_args = [];
@@ -213,6 +224,7 @@ let create_node_from_external ~instance ~external_svc:_ ~network ~data_dir
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~node_endpoint ~bin_dir =
   let config = external_svc.External_service.config in
+  let service_user = get_service_user external_svc in
   (* Extract delegates if detected *)
   let delegates =
     match config.delegates.value with Some d -> d | None -> []
@@ -227,7 +239,7 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       dal_node = None;
       liquidity_baking_vote = None;
       extra_args = [];
-      service_user = "octez";
+      service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
       auto_enable = true;
@@ -236,15 +248,16 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
   in
   Baker.install_baker ~quiet:true request
 
-let create_accuser_from_external ~instance ~external_svc:_ ~network:_ ~base_dir
+let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~node_endpoint ~bin_dir =
+  let service_user = get_service_user external_svc in
   let request : accuser_request =
     {
       instance;
       node_mode = Remote_endpoint node_endpoint;
       base_dir = Some base_dir;
       extra_args = [];
-      service_user = "octez";
+      service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
       auto_enable = true;
@@ -253,8 +266,9 @@ let create_accuser_from_external ~instance ~external_svc:_ ~network:_ ~base_dir
   in
   Accuser.install_accuser ~quiet:true request
 
-let create_dal_from_external ~instance ~external_svc:_ ~network ~data_dir
+let create_dal_from_external ~instance ~external_svc ~network ~data_dir
     ~rpc_addr ~node_endpoint ~bin_dir =
+  let service_user = get_service_user external_svc in
   let request : daemon_request =
     {
       role = "dal-node";
@@ -265,7 +279,7 @@ let create_dal_from_external ~instance ~external_svc:_ ~network ~data_dir
       rpc_addr;
       net_addr = "0.0.0.0:10732";
       (* Default DAL net addr *)
-      service_user = "octez";
+      service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
       service_args = [];

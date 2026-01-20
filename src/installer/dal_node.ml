@@ -85,7 +85,8 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ()
   in
   let* () =
-    reown_runtime_paths ~owner ~group ~paths:directories ~logging_mode
+    if request.preserve_data then Ok ()
+    else reown_runtime_paths ~owner ~group ~paths:directories ~logging_mode
   in
   (* In edit mode, preserve existing dependents list *)
   let existing_dependents =
