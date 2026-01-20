@@ -119,7 +119,7 @@ and start_import ps =
         (fun s -> {s with error = Some "No service selected"})
         ps
   | Some external_svc ->
-      let import_task ~append_log:_ () =
+      let import_task ~append_log () =
         let overrides : Import.field_overrides =
           {
             network = s.network_override;
@@ -141,7 +141,7 @@ and start_import ps =
           }
         in
         match
-          Import.import_service ~on_log:(fun _ -> ()) ~options ~external_svc ()
+          Import.import_service ~on_log:append_log ~options ~external_svc ()
         with
         | Ok _result -> Ok ()
         | Error e -> Error e
@@ -383,8 +383,34 @@ let view ps ~focus:_ ~size =
                     "  3. Start managed service";
                   ])
             @ [""; "Enter: Confirm  Esc: Back"])
-    | Importing ->
-        [""; ""; "  ⏳  Importing..."; ""; "  This may take a few moments."; ""]
+    | Importing -> (
+        (* Show live progress from Job_manager *)
+        match Job_manager.get_running_job () with
+        | Some job ->
+            let phase =
+              if job.phase <> "" then Printf.sprintf " - %s" job.phase else ""
+            in
+            let log_lines =
+              List.rev job.log
+              |> (fun lines ->
+              if List.length lines > 10 then
+                List.filteri (fun i _ -> i < 10) lines
+              else lines)
+              |> List.map (fun line -> "  " ^ line)
+            in
+            [""; Printf.sprintf "⏳  Importing...%s" phase; ""]
+            @ log_lines
+            @ [""; Widgets.dim "  Please wait..."]
+        | None ->
+            (* Fallback if job already finished *)
+            [
+              "";
+              "";
+              "  ⏳  Importing...";
+              "";
+              "  This may take a few moments.";
+              "";
+            ])
   in
   Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
       String.concat "\n" body_lines)
