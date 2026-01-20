@@ -18,6 +18,7 @@ let register_pages () =
   Install_accuser_form_v3.register () ;
   Install_dal_node_form_v3.register () ;
   Import_wizard.register () ;
+  Binaries.register () ;
   Diagnostics.register () ;
   Log_viewer_page.register ()
 
