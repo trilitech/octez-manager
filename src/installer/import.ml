@@ -487,7 +487,7 @@ let format_comparison ~log ~label ~original ~generated =
 
 (** Show dry-run details for a single service *)
 let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
-    ~base_dir:_ ~rpc_addr ~net_addr:_ ~node_endpoint ~bin_dir:_ ~options
+    ~base_dir:_ ~rpc_addr ~net_addr:_ ~node_endpoint ~bin_dir ~options
     ~depends_on =
   let config = external_svc.External_service.config in
   let role_str =
@@ -668,39 +668,88 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
        | Some External_service.Accuser -> "accuser"
        | _ -> "unknown")) ;
   log (Printf.sprintf "  \"network\": \"%s\"," network) ;
+  (* Parse ExecStart to show extra_args *)
+  let parsed = Execstart_parser.parse config.exec_start in
   (match config.role.value with
   | Some External_service.Node ->
       log (Printf.sprintf "  \"data_dir\": \"%s\"," data_dir) ;
-      log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr)
-  | Some External_service.Dal_node -> (
+      log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr) ;
+      log
+        (Printf.sprintf
+           "  \"net_addr\": \"%s\","
+           (Option.value config.net_addr.value ~default:"")) ;
+      log "  \"history_mode\": \"rolling\"," ;
+      log
+        (Printf.sprintf
+           "  \"service_user\": \"%s\","
+           (get_service_user external_svc)) ;
+      log (Printf.sprintf "  \"app_bin_dir\": \"%s\"," bin_dir) ;
+      if List.length parsed.extra_args > 0 then
+        log
+          (Printf.sprintf
+             "  \"extra_args\": [%s],"
+             (String.concat
+                ", "
+                (List.map (Printf.sprintf "\"%s\"") parsed.extra_args)))
+      else log "  \"extra_args\": [],"
+  | Some External_service.Dal_node ->
       log (Printf.sprintf "  \"data_dir\": \"%s\"," data_dir) ;
       log (Printf.sprintf "  \"rpc_addr\": \"%s\"," rpc_addr) ;
-      match depends_on with
+      log
+        (Printf.sprintf
+           "  \"net_addr\": \"%s\","
+           (Option.value config.net_addr.value ~default:"")) ;
+      log
+        (Printf.sprintf
+           "  \"service_user\": \"%s\","
+           (get_service_user external_svc)) ;
+      log (Printf.sprintf "  \"app_bin_dir\": \"%s\"," bin_dir) ;
+      (match depends_on with
       | Some inst ->
           log
             (Printf.sprintf
-               "  \"depends_on\": \"%s\"  ✓ Linked to managed node!"
+               "  \"depends_on\": \"%s\",  ✓ Linked to managed node!"
                inst)
-      | None -> log "  \"depends_on\": null  ℹ️ Using remote node endpoint")
-  | Some External_service.Baker | Some External_service.Accuser -> (
+      | None -> log "  \"depends_on\": null,  ℹ️ Using remote node endpoint") ;
+      if List.length parsed.extra_args > 0 then
+        log
+          (Printf.sprintf
+             "  \"service_args\": [%s],"
+             (String.concat
+                ", "
+                (List.map (Printf.sprintf "\"%s\"") parsed.extra_args)))
+      else log "  \"service_args\": [],"
+  | Some External_service.Baker | Some External_service.Accuser ->
       (match config.base_dir.value with
       | Some bd -> log (Printf.sprintf "  \"base_dir\": \"%s\"," bd)
       | None -> ()) ;
-      match depends_on with
+      log
+        (Printf.sprintf
+           "  \"service_user\": \"%s\","
+           (get_service_user external_svc)) ;
+      log (Printf.sprintf "  \"app_bin_dir\": \"%s\"," bin_dir) ;
+      (match depends_on with
       | Some inst ->
           log
             (Printf.sprintf
-               "  \"node_mode\": \"Local_instance(%s)\"  ✓ Linked to managed \
+               "  \"node_mode\": \"Local_instance(%s)\",  ✓ Linked to managed \
                 node!"
                inst)
       | None ->
           log
             (Printf.sprintf
-               "  \"node_mode\": \"Remote_endpoint(%s)\"  ℹ️ Using remote \
+               "  \"node_mode\": \"Remote_endpoint(%s)\",  ℹ️ Using remote \
                 endpoint"
-               node_endpoint))
+               node_endpoint)) ;
+      if List.length parsed.extra_args > 0 then
+        log
+          (Printf.sprintf
+             "  \"extra_args\": [%s]"
+             (String.concat
+                ", "
+                (List.map (Printf.sprintf "\"%s\"") parsed.extra_args)))
+      else log "  \"extra_args\": []"
   | _ -> ()) ;
-  log "  ..." ;
   log "}" ;
   log "" ;
   log
