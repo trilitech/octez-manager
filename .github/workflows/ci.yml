@@ -95,10 +95,13 @@ jobs:
           dune build --release
 
       - name: Test
+        env:
+          BISECT_FILE: ${{ github.workspace }}/_coverage/unit/bisect
         run: |
           chown -R opam:opam /home/opam/.opam
           chown -R opam:opam .
-          su -s /bin/sh opam -c "git checkout -- static_flags.sexp && make test"
+          mkdir -p _coverage/unit
+          su -s /bin/sh opam -c "git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx"
 
       - name: Prepare binary artifact
         run: |
@@ -106,16 +109,24 @@ jobs:
           cp _build/default/src/main.exe artifacts/octez-manager
           chmod +x artifacts/octez-manager
 
-      - name: Upload artifact
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: octez-manager-static
           path: artifacts/octez-manager
           retention-days: 1
 
+      - name: Upload unit test coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: _coverage/unit/*.coverage
+          retention-days: 1
+          if-no-files-found: warn
+
   coverage:
-    name: Code Coverage
-    needs: changes
+    name: Code Coverage Report
+    needs: [build-and-test]
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}-ci:latest
@@ -125,45 +136,31 @@ jobs:
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
-      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache opam packages
-        id: cache-opam
-        uses: actions/cache@v4
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v4
         with:
-          path: /home/opam/.opam
-          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          name: coverage-unit
+          path: _coverage/merged/
 
-      - name: Pin miaou packages
-        if: steps.cache-opam.outputs.cache-hit != 'true'
+      - name: Generate merged coverage report
         run: |
-          if [ -z "$MIAOU_GIT_URL" ]; then
-            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
+          mkdir -p _coverage/html
+          # Find all coverage files
+          COVERAGE_FILES=$(find _coverage/merged -name '*.coverage' -print)
+          if [ -z "$COVERAGE_FILES" ]; then
+            echo "ERROR: No coverage files found!"
             exit 1
           fi
-          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
-
-      - name: Cache dune build
-        uses: actions/cache@v4
-        with:
-          path: _build
-          key: dune-coverage-${{ runner.os }}-${{ hashFiles('src/**', 'dune-project') }}
-          restore-keys: |
-            dune-coverage-${{ runner.os }}-
-
-      - name: Run tests with coverage
-        run: |
-          chown -R opam:opam /home/opam/.opam
-          chown -R opam:opam .
-          su -s /bin/sh opam -c "make coverage"
+          echo "Found coverage files:"
+          echo "$COVERAGE_FILES"
+          # Generate reports
+          bisect-ppx-report summary --per-file $COVERAGE_FILES | tee _coverage/summary.txt
+          bisect-ppx-report html -o _coverage/html $COVERAGE_FILES
 
       - name: Generate coverage summary
         id: coverage
