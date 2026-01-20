@@ -740,7 +740,13 @@ let table_lines_single state =
       build_rows 0 None [] state.services
   in
   let external_rows = render_external_services_section state in
-  let external_rows = if external_rows = [] then [] else "" :: external_rows in
+  let external_rows =
+    if external_rows = [] then []
+    else
+      (* Add separator above external services *)
+      let separator = Widgets.dim (String.make 80 '-') in
+      "" :: separator :: external_rows
+  in
   (install_row :: "" :: instance_rows) @ external_rows
 
 (** Multi-column matrix layout *)
@@ -800,7 +806,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   (* Append external services below the columnar grid *)
   let result = install_row :: "" :: instance_rows_trimmed in
   if external_line_count > 0 then
-    let separator = String.make (min cols 120) '-' in
+    let separator = Widgets.dim (String.make (min cols 120) '-') in
     result @ [""; separator] @ external_lines
   else result
 

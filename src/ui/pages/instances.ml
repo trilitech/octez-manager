@@ -560,15 +560,15 @@ Press **Enter** to open instance menu.|}
     then
       (* In menu area, simple navigation *)
       let selected = max 0 (min menu_item_count (s.selected + delta)) in
-      (* Jump from menu to first service in active column *)
+      (* Jump from menu to first service in first column (column 0) *)
       if selected >= menu_item_count && delta > 0 then
         let first_svc =
           first_service_in_column
             ~num_columns:s.num_columns
             ~services:s.services
-            s.active_column
+            0
         in
-        {s with selected = first_svc + services_start_idx}
+        {s with selected = first_svc + services_start_idx; active_column = 0}
       else {s with selected}
     else
       (* In services area: stay within column *)
