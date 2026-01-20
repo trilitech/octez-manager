@@ -288,8 +288,23 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_dal_from_external ~instance ~external_svc ~network ~data_dir
-    ~rpc_addr ~node_endpoint ~bin_dir =
+    ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy =
   let service_user = get_service_user external_svc in
+  (* For Clone strategy, increment ports to avoid conflicts *)
+  let rpc_addr, net_addr =
+    if strategy = Clone then
+      let increment_port addr =
+        match String.split_on_char ':' addr with
+        | [host; port] -> (
+            try
+              let port_num = int_of_string port in
+              Printf.sprintf "%s:%d" host (port_num + 1)
+            with _ -> addr)
+        | _ -> addr
+      in
+      (increment_port rpc_addr, increment_port net_addr)
+    else (rpc_addr, net_addr)
+  in
   let request : daemon_request =
     {
       role = "dal-node";
@@ -298,8 +313,7 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       history_mode = Rolling;
       data_dir;
       rpc_addr;
-      net_addr = "0.0.0.0:10732";
-      (* Default DAL net addr *)
+      net_addr;
       service_user;
       app_bin_dir = bin_dir;
       logging_mode = Logging_mode.Journald;
@@ -492,8 +506,10 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
               ~network
               ~data_dir
               ~rpc_addr
+              ~net_addr
               ~node_endpoint
               ~bin_dir
+              ~strategy:options.strategy
         | Some (External_service.Unknown role_str) ->
             Error (`Msg (Printf.sprintf "Unknown role: %s" role_str))
         | None -> Error (`Msg "Role not detected for external service")
