@@ -97,7 +97,17 @@ let contains_substring str sub =
     true
   with Not_found -> false
 
-(** Check if command line contains an Octez binary *)
+(** Extract binary path from command line (first token) *)
+let extract_binary_path cmdline =
+  match String.split_on_char ' ' cmdline with
+  | [] -> None
+  | first :: _ ->
+      let first = String.trim first in
+      if first <> "" && not (String.starts_with ~prefix:"-" first) then
+        Some first
+      else None
+
+(** Check if command line's first token is an Octez binary *)
 let is_octez_binary cmdline =
   let octez_binaries =
     [
@@ -112,17 +122,16 @@ let is_octez_binary cmdline =
       "tezos-accuser";
     ]
   in
-  List.exists (fun binary -> contains_substring cmdline binary) octez_binaries
-
-(** Extract binary path from command line (first token) *)
-let extract_binary_path cmdline =
-  match String.split_on_char ' ' cmdline with
-  | [] -> None
-  | first :: _ ->
-      let first = String.trim first in
-      if first <> "" && not (String.starts_with ~prefix:"-" first) then
-        Some first
-      else None
+  (* Extract first token (the executable) *)
+  match extract_binary_path cmdline with
+  | None -> false
+  | Some binary_path ->
+      (* Check if the binary path ends with one of the Octez binary names *)
+      List.exists
+        (fun binary ->
+          String.ends_with ~suffix:binary binary_path
+          || String.ends_with ~suffix:("/" ^ binary) binary_path)
+        octez_binaries
 
 (** Scan all processes for Octez binaries *)
 let scan_octez_processes () =

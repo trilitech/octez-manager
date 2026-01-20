@@ -15,7 +15,8 @@ type process_info = {
   user : string option;
 }
 
-(** Scan all running processes and return those running Octez binaries *)
+(** Scan all running processes and return those running Octez binaries.
+    Only processes where the executable (first token) is an Octez binary are included. *)
 val scan_octez_processes : unit -> process_info list
 
 (** Check if a PID is managed by systemd (via cgroup) *)
