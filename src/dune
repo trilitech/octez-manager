@@ -37,25 +37,28 @@
   manager_interfaces
   capabilities
   port_validation
-  external_service
-  execstart_parser
-  env_file_parser
-  external_service_detector)
- (libraries
-  rresult
-  yojson
-  bos
-  cohttp-eio
-  tls-eio
-  tls
-  ca-certs
-  domain-name
-  mirage-crypto-rng.unix
-  uri
-  eio_main
-  eio_posix
-  eio
-  miaou-core.lib)
+   external_service
+   execstart_parser
+   env_file_parser
+   process_scanner
+   external_service_detector)
+  (libraries
+   rresult
+   yojson
+   bos
+   str
+   unix
+   cohttp-eio
+   tls-eio
+   tls
+   ca-certs
+   domain-name
+   mirage-crypto-rng.unix
+   uri
+   eio_main
+   eio_posix
+   eio
+   miaou-core.lib)
  (instrumentation
   (backend bisect_ppx)))
 
