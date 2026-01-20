@@ -567,6 +567,104 @@ let infer_network_from_endpoint services =
       | _ -> svc)
     services
 
+(** Convert a standalone process to an External_service.t *)
+let process_to_external_service (proc : Process_scanner.process_info) =
+  let cmdline = proc.cmdline in
+  let binary_path = Option.value ~default:"octez" proc.binary_path in
+
+  (* Parse role from command line *)
+  let role =
+    let subcommand =
+      if Str.string_match (Str.regexp ".* run dal\\b") cmdline 0 then Some "dal"
+      else None
+    in
+    let detected_role =
+      External_service.role_of_binary_name ?subcommand binary_path
+    in
+    External_service.detected ~source:"cmdline" detected_role
+  in
+
+  (* Parse configuration from command line *)
+  let parsed = Execstart_parser.parse cmdline in
+  let data_dir =
+    match parsed.data_dir with
+    | Some d -> External_service.detected ~source:"cmdline" d
+    | None -> External_service.unknown ()
+  in
+  let rpc_addr =
+    match parsed.rpc_addr with
+    | Some r -> External_service.detected ~source:"cmdline" r
+    | None -> External_service.unknown ()
+  in
+  let node_endpoint =
+    match parsed.endpoint with
+    | Some e -> External_service.detected ~source:"cmdline" e
+    | None -> External_service.unknown ()
+  in
+  let base_dir =
+    match parsed.base_dir with
+    | Some b -> External_service.detected ~source:"cmdline" b
+    | None -> External_service.unknown ()
+  in
+  let network =
+    match parsed.network with
+    | Some n -> External_service.detected ~source:"cmdline" n
+    | None -> External_service.unknown ()
+  in
+
+  (* Create minimal unit_state (always active for running processes) *)
+  let unit_state =
+    External_service.
+      {active_state = "active"; sub_state = "running"; enabled = None}
+  in
+
+  (* Build detected config *)
+  let config =
+    External_service.
+      {
+        unit_name = Printf.sprintf "process-%d" proc.pid;
+        unit_file_path = None;
+        exec_start = cmdline;
+        unit_state;
+        user = proc.user;
+        group = None;
+        working_dir = None;
+        environment_files = [];
+        role;
+        binary_path = detected ~source:"cmdline" binary_path;
+        binary_version = unknown ();
+        data_dir;
+        rpc_addr;
+        net_addr = unknown ();
+        network;
+        history_mode = unknown ();
+        node_endpoint;
+        base_dir;
+        delegates = unknown ();
+        dal_endpoint = unknown ();
+        extra_args = [];
+        parse_warnings = [];
+      }
+  in
+
+  (* Generate instance name *)
+  let suggested_instance_name =
+    External_service.suggest_instance_name ~unit_name:config.unit_name
+  in
+
+  External_service.{config; suggested_instance_name}
+
+(** Detect Octez processes running outside systemd *)
+let detect_standalone_processes () =
+  try
+    let standalone_procs = Process_scanner.get_standalone_processes () in
+    List.map process_to_external_service standalone_procs
+  with e ->
+    Format.eprintf
+      "[WARN] Failed to scan standalone processes: %s@."
+      (Printexc.to_string e) ;
+    []
+
 let detect () =
   try
     (* List all service units *)
@@ -606,10 +704,16 @@ let detect () =
     (* Infer networks from connected nodes *)
     let enriched_services = infer_network_from_endpoint external_services in
 
-    (* Update cache *)
-    Mutex.protect cache_lock (fun () -> cache := enriched_services) ;
+    (* Detect standalone processes (not managed by systemd) *)
+    let standalone_services = detect_standalone_processes () in
 
-    Ok enriched_services
+    (* Combine systemd services and standalone processes *)
+    let all_services = enriched_services @ standalone_services in
+
+    (* Update cache *)
+    Mutex.protect cache_lock (fun () -> cache := all_services) ;
+
+    Ok all_services
   with e ->
     let msg = Printf.sprintf "Detection failed: %s" (Printexc.to_string e) in
     Error msg
