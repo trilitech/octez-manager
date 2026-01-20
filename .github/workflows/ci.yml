@@ -113,6 +113,141 @@ jobs:
           path: artifacts/octez-manager
           retention-days: 1
 
+  coverage:
+    name: Code Coverage
+    needs: changes
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      OPAMYES: "true"
+      OPAMROOT: /home/opam/.opam
+      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache opam packages
+        id: cache-opam
+        uses: actions/cache@v4
+        with:
+          path: /home/opam/.opam
+          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+
+      - name: Pin miaou packages
+        if: steps.cache-opam.outputs.cache-hit != 'true'
+        run: |
+          if [ -z "$MIAOU_GIT_URL" ]; then
+            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
+            exit 1
+          fi
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
+
+      - name: Cache dune build
+        uses: actions/cache@v4
+        with:
+          path: _build
+          key: dune-coverage-${{ runner.os }}-${{ hashFiles('src/**', 'dune-project') }}
+          restore-keys: |
+            dune-coverage-${{ runner.os }}-
+
+      - name: Run tests with coverage
+        run: |
+          chown -R opam:opam /home/opam/.opam
+          chown -R opam:opam .
+          su -s /bin/sh opam -c "make coverage"
+
+      - name: Generate coverage summary
+        id: coverage
+        run: |
+          # Extract overall coverage percentage
+          COVERAGE=$(grep "Project coverage" _coverage/summary.txt | awk '{print $1}')
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Coverage: $COVERAGE**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Per-file Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat _coverage/summary.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            _coverage/summary.txt
+            _coverage/html/
+          retention-days: 30
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('_coverage/summary.txt', 'utf8');
+            const lines = summary.split('\n');
+            const projectLine = lines.find(l => l.includes('Project coverage'));
+            const coverage = projectLine ? projectLine.trim().split(/\s+/)[0] : 'Unknown';
+            
+            // Get per-file coverage
+            const fileLines = lines.filter(l => l.trim() && !l.includes('Project coverage'));
+            const lowCoverage = fileLines.filter(l => {
+              const percent = parseFloat(l.trim().split(/\s+/)[0]);
+              return !isNaN(percent) && percent < 50;
+            }).slice(0, 10); // Top 10 files with low coverage
+            
+            let body = `## 📊 Coverage Report\n\n`;
+            body += `**Overall Coverage: ${coverage}**\n\n`;
+            
+            if (lowCoverage.length > 0) {
+              body += `### ⚠️ Files with Low Coverage (<50%)\n\n`;
+              body += '```\n';
+              body += lowCoverage.join('\n');
+              body += '\n```\n\n';
+            }
+            
+            body += `<details>\n<summary>📋 Full Coverage Report</summary>\n\n\`\`\`\n${summary}\n\`\`\`\n</details>\n\n`;
+            body += `[View detailed HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            // Find existing coverage comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('📊 Coverage Report')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
   integration-tests:
     name: Integration Tests (${{ matrix.category }})
     runs-on: ubuntu-latest
