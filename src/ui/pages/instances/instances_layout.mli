@@ -29,6 +29,9 @@ val load_services : unit -> Service_state.t list
 
 val load_services_fresh : unit -> Service_state.t list
 
+(** Load external (unmanaged) services *)
+val load_external_services : unit -> Octez_manager_lib.External_service.t list
+
 (** Calculate number of columns based on terminal width *)
 val calc_num_columns :
   cols:int -> min_column_width:int -> column_separator:string -> int

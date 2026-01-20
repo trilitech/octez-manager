@@ -36,11 +36,18 @@
   installer_types
   manager_interfaces
   capabilities
-  port_validation)
+  port_validation
+  external_service
+  execstart_parser
+  env_file_parser
+  process_scanner
+  external_service_detector)
  (libraries
   rresult
   yojson
   bos
+  str
+  unix
   cohttp-eio
   tls-eio
   tls

@@ -54,25 +54,34 @@ let page_size = 4096
 (** Clock ticks per second (standard on Linux) *)
 let clock_ticks_per_sec = 100
 
-(** Get the main PID for a systemd service *)
+(** Get the main PID for a systemd service or standalone process *)
+let get_main_pid_by_unit ~unit_name =
+  (* Check if this is a standalone process (format: process-PID) *)
+  if String.starts_with ~prefix:"process-" unit_name then
+    let pid_str = String.sub unit_name 8 (String.length unit_name - 8) in
+    int_of_string_opt pid_str
+  else
+    (* Regular systemd unit - query MainPID *)
+    let cmd =
+      if Common.is_root () then
+        ["systemctl"; "show"; "--property=MainPID"; unit_name]
+      else ["systemctl"; "--user"; "show"; "--property=MainPID"; unit_name]
+    in
+    match Common.run_out cmd with
+    | Ok output -> (
+        (* Output is "MainPID=12345" *)
+        match String.split_on_char '=' output with
+        | [_; pid_str] -> (
+            let pid_str = String.trim pid_str in
+            match int_of_string_opt pid_str with
+            | Some pid when pid > 0 -> Some pid
+            | _ -> None)
+        | _ -> None)
+    | Error _ -> None
+
 let get_service_main_pid ~role ~instance =
   let unit_name = Printf.sprintf "octez-%s@%s" role instance in
-  let cmd =
-    if Common.is_root () then
-      ["systemctl"; "show"; "--property=MainPID"; unit_name]
-    else ["systemctl"; "--user"; "show"; "--property=MainPID"; unit_name]
-  in
-  match Common.run_out cmd with
-  | Ok output -> (
-      (* Output is "MainPID=12345" *)
-      match String.split_on_char '=' output with
-      | [_; pid_str] -> (
-          let pid_str = String.trim pid_str in
-          match int_of_string_opt pid_str with
-          | Some pid when pid > 0 -> Some pid
-          | _ -> None)
-      | _ -> None)
-  | Error _ -> None
+  get_main_pid_by_unit ~unit_name
 
 (** Get child PIDs of a process *)
 let get_child_pids ~parent_pid =
@@ -86,6 +95,17 @@ let get_child_pids ~parent_pid =
         let s = String.trim s in
         if s = "" then None else int_of_string_opt s)
   with _ -> []
+
+(** Get all PIDs for a service by unit name (main + children, recursively) *)
+let get_pids_by_unit ~unit_name =
+  match get_main_pid_by_unit ~unit_name with
+  | None -> []
+  | Some main_pid ->
+      let rec collect_all pid =
+        let children = get_child_pids ~parent_pid:pid in
+        pid :: List.concat_map collect_all children
+      in
+      collect_all main_pid
 
 (** Get all PIDs for a service (main + children, recursively) *)
 let get_service_pids ~role ~instance =
@@ -222,7 +242,11 @@ let get_version ~binary =
 let get_dir_size ~path =
   if not (Sys.file_exists path) then None
   else
-    match Common.run_out ["du"; "-sb"; path] with
+    (* Redirect stderr to suppress permission errors and other noise *)
+    match
+      Common.run_out
+        ["sh"; "-c"; "du -sb " ^ Filename.quote path ^ " 2>/dev/null"]
+    with
     | Ok output -> (
         (* Output is "12345\t/path" *)
         match String.split_on_char '\t' output with

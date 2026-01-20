@@ -526,6 +526,189 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
       in
       String.concat column_separator parts)
 
+(** Render external services section *)
+let render_external_service ~selected_idx ~current_idx ~folded
+    (ext : External_service.t) =
+  let open External_service in
+  let cfg = ext.config in
+  let role_str =
+    match cfg.role.value with Some r -> role_to_string r | None -> "unknown"
+  in
+  let network_str = match cfg.network.value with Some n -> n | None -> "?" in
+  let status_str = status_label (status_of_unit_state cfg.unit_state) in
+
+  let marker = if current_idx = selected_idx then Widgets.bold "➤" else " " in
+  let fold_indicator = if folded then "+" else "−" in
+  let status =
+    match cfg.unit_state.active_state with
+    | "active" -> Widgets.green "●"
+    | "failed" -> Widgets.red "●"
+    | _ -> Widgets.yellow "●"
+  in
+
+  (* First line: like managed services *)
+  let instance_str = Printf.sprintf "%-16s" ext.suggested_instance_name in
+  let role_str = Printf.sprintf "%-10s" role_str in
+  let network = Printf.sprintf "%-12s" network_str in
+  let first_line =
+    Printf.sprintf
+      "%s %s %s %s %s %s [external]"
+      marker
+      fold_indicator
+      status
+      instance_str
+      role_str
+      network
+  in
+
+  if folded then [first_line]
+  else
+    (* For external services, use the suggested instance name consistently *)
+    let instance_for_metrics = ext.suggested_instance_name in
+    let role_for_metrics =
+      match cfg.role.value with
+      | Some Node -> "node"
+      | Some Baker -> "baker"
+      | Some Accuser -> "accuser"
+      | Some Dal_node -> "dal-node"
+      | _ -> "unknown"
+    in
+    System_metrics_scheduler.mark_visible
+      ~role:role_for_metrics
+      ~instance:instance_for_metrics ;
+
+    (* Submit poll request with actual unit name for external services *)
+    let binary_path =
+      match cfg.binary_path.value with
+      | Some b -> b
+      | None ->
+          "octez-node" (* fallback, shouldn't happen for detected services *)
+    in
+    let data_dir_path =
+      match cfg.data_dir.value with Some d -> d | None -> ""
+    in
+    System_metrics_scheduler.submit_poll
+      ~role:role_for_metrics
+      ~instance:instance_for_metrics
+      ~binary:binary_path
+      ~data_dir:data_dir_path
+      ~unit_name:cfg.unit_name
+      () ;
+
+    (* Second line: RPC/endpoint status *)
+    let indent = "      " in
+    let line2 =
+      match cfg.role.value with
+      | Some Node ->
+          let rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
+          indent ^ "RPC: " ^ rpc
+      | Some (Baker | Accuser | Dal_node) ->
+          let ep =
+            match cfg.node_endpoint.value with Some e -> e | None -> "?"
+          in
+          indent ^ "Node: " ^ ep
+      | _ -> indent ^ "Status: " ^ status_str
+    in
+
+    (* System metrics *)
+    let focus = current_idx = selected_idx in
+    let version =
+      match
+        System_metrics_scheduler.get_version
+          ~role:role_for_metrics
+          ~instance:instance_for_metrics
+      with
+      | Some v -> System_metrics_scheduler.format_version_colored v
+      | None -> Widgets.dim "v?"
+    in
+    let mem =
+      System_metrics_scheduler.render_mem_sparkline
+        ~role:role_for_metrics
+        ~instance:instance_for_metrics
+        ~focus
+    in
+    (* For nodes, add head level, sync status, and staleness (matching managed instances) *)
+    let node_info =
+      match cfg.role.value with
+      | Some Node -> (
+          match Rpc_metrics.get ~instance:instance_for_metrics with
+          | Some metrics ->
+              let head_str =
+                match metrics.Rpc_metrics.head_level with
+                | Some l -> Printf.sprintf "L%d" l
+                | None -> "L?"
+              in
+              let sync_badge =
+                match metrics.Rpc_metrics.bootstrapped with
+                | Some true -> Widgets.green "synced"
+                | Some false -> Widgets.yellow "syncing"
+                | None -> Widgets.dim (Context.render_spinner "")
+              in
+              let staleness =
+                match metrics.Rpc_metrics.last_block_time with
+                | None -> ""
+                | Some ts ->
+                    let age = Unix.gettimeofday () -. ts in
+                    if age >= 120. then
+                      Widgets.red (Printf.sprintf "Δ %.0fs" age)
+                    else if age >= 30. then
+                      Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
+                    else Widgets.green (Printf.sprintf "Δ %.0fs" age)
+              in
+              [head_str; sync_badge]
+              @ if staleness = "" then [] else [staleness]
+          | None -> [])
+      | _ -> []
+    in
+    let metrics_parts =
+      [version] @ (if mem = "" then [] else ["MEM " ^ mem]) @ node_info
+    in
+    let metrics_line = indent ^ String.concat " · " metrics_parts in
+
+    (* CPU chart *)
+    let cpu_lines =
+      match
+        System_metrics_scheduler.render_cpu_chart
+          ~role:role_for_metrics
+          ~instance:instance_for_metrics
+          ~focus
+      with
+      | None -> []
+      | Some (chart, _avg_cpu) ->
+          String.split_on_char '\n' chart
+          |> List.map (fun line -> indent ^ line)
+    in
+
+    [first_line; line2; metrics_line] @ cpu_lines
+
+let render_external_services_section state =
+  if state.external_services = [] then []
+  else
+    let header = Widgets.bold "── Unmanaged Instances ──" in
+    (* Calculate base index for external services (after menu and managed services) *)
+    let external_start_idx = services_start_idx + List.length state.services in
+    let service_lines =
+      List.mapi
+        (fun idx ext ->
+          let current_idx = external_start_idx + idx in
+          let is_folded =
+            StringSet.mem
+              ext.External_service.suggested_instance_name
+              state.external_folded
+          in
+          let lines =
+            render_external_service
+              ~selected_idx:state.selected
+              ~current_idx
+              ~folded:is_folded
+              ext
+          in
+          lines)
+        state.external_services
+      |> List.concat
+    in
+    header :: service_lines
+
 (** Single-column layout (original) *)
 let table_lines_single state =
   let install_row =
@@ -556,7 +739,15 @@ let table_lines_single state =
       in
       build_rows 0 None [] state.services
   in
-  install_row :: "" :: instance_rows
+  let external_rows = render_external_services_section state in
+  let external_rows =
+    if external_rows = [] then []
+    else
+      (* Add separator above external services *)
+      let separator = Widgets.dim (String.make 80 '-') in
+      "" :: separator :: external_rows
+  in
+  (install_row :: "" :: instance_rows) @ external_rows
 
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
@@ -574,6 +765,15 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
       (fun column_groups -> render_column ~col_width ~state ~column_groups)
       columns
   in
+  (* Calculate space needed for external services *)
+  let external_lines = render_external_services_section state in
+  let external_line_count = List.length external_lines in
+  (* Reserve space for external services if present *)
+  let reserved_for_external =
+    if external_line_count > 0 then external_line_count + 1 else 0
+  in
+  (* Reduce available height for columns to make room for external services *)
+  let columns_visible_height = max 5 (visible_height - reserved_for_external) in
   (* Header row (install) spans full width in single line *)
   let install_row =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
@@ -586,12 +786,29 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   let instance_rows =
     merge_columns
       ~col_width
-      ~visible_height
+      ~visible_height:columns_visible_height
       ~column_scroll
       ~active_column:effective_active_column
       ~columns_content
   in
-  install_row :: "" :: instance_rows
+  (* Trim trailing empty lines from column grid to place external services directly below *)
+  let instance_rows_trimmed =
+    let rec trim_end = function
+      | [] -> []
+      | rows ->
+          let last = List.nth rows (List.length rows - 1) in
+          if String.trim last = "" then
+            trim_end (List.filteri (fun i _ -> i < List.length rows - 1) rows)
+          else rows
+    in
+    trim_end instance_rows
+  in
+  (* Append external services below the columnar grid *)
+  let result = install_row :: "" :: instance_rows_trimmed in
+  if external_line_count > 0 then
+    let separator = Widgets.dim (String.make (min cols 120) '-') in
+    result @ [""; separator] @ external_lines
+  else result
 
 let table_lines ?(cols = 80) ?(visible_height = 20) state =
   (* Clear visibility markers at start of render pass *)
@@ -604,7 +821,11 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
       let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
       Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
     in
-    [install_row; ""; "  No managed instances."]
+    let external_rows = render_external_services_section state in
+    let external_rows =
+      if external_rows = [] then [] else "" :: external_rows
+    in
+    install_row :: "" :: "  No managed instances." :: external_rows
   else if num_columns <= 1 then table_lines_single state
   else
     (* For matrix layout, subtract for menu rows (install + separator) *)
@@ -616,5 +837,7 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
       state
 
 let summary_line state =
-  let total = List.length state.services in
-  Printf.sprintf "Total instances: %d" total
+  let managed = List.length state.services in
+  let external_count = List.length state.external_services in
+  if external_count = 0 then Printf.sprintf "Total instances: %d" managed
+  else Printf.sprintf "Managed: %d | External: %d" managed external_count

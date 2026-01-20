@@ -23,7 +23,8 @@ include Instances_layout
 
 let init_state () =
   let services = load_services () in
-  (* Start with all instances folded by default *)
+  let external_services = load_external_services () in
+  (* Start with all managed instances folded by default *)
   let all_folded =
     List.fold_left
       (fun acc (st : Service_state.t) ->
@@ -31,13 +32,23 @@ let init_state () =
       StringSet.empty
       services
   in
+  (* Start with all external instances folded by default *)
+  let all_external_folded =
+    List.fold_left
+      (fun acc (ext : External_service.t) ->
+        StringSet.add ext.suggested_instance_name acc)
+      StringSet.empty
+      external_services
+  in
   (* Default to 1 column, will be updated on first render with actual cols *)
   let num_columns = 1 in
   Navigation.make
     {
       services;
+      external_services;
       selected = 0;
       folded = all_folded;
+      external_folded = all_external_folded;
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
@@ -46,10 +57,19 @@ let init_state () =
     }
 
 let force_refresh state =
+  (* Trigger immediate refresh of external services *)
+  External_services_scheduler.refresh () ;
   let services = load_services_fresh () in
-  let selected = clamp_selection services state.selected in
+  let external_services = load_external_services () in
+  let selected = clamp_selection services external_services state.selected in
   let state =
-    {state with services; selected; last_updated = Unix.gettimeofday ()}
+    {
+      state with
+      services;
+      external_services;
+      selected;
+      last_updated = Unix.gettimeofday ();
+    }
   in
   ensure_valid_column state
 
@@ -521,18 +541,18 @@ Press **Enter** to open instance menu.|}
     || lower = "^c" || String.equal key "\003"
 
   let move_selection s delta =
-    if s.services = [] then
-      (* Only Install button (0) when no services - ignore navigation *)
+    if s.services = [] && s.external_services = [] then
+      (* Only Install button (0) when no services at all - ignore navigation *)
       {s with selected = 0}
     else if s.num_columns <= 1 then
       (* Single column mode: simple linear navigation *)
       let raw = s.selected + delta in
-      let selected = clamp_selection s.services raw in
+      let selected = clamp_selection s.services s.external_services raw in
       (* Skip separator during navigation *)
       let selected =
         if selected = menu_item_count then selected + delta else selected
       in
-      let selected = clamp_selection s.services selected in
+      let selected = clamp_selection s.services s.external_services selected in
       {s with selected}
     else if
       (* Multi-column mode: navigate within current column *)
@@ -540,71 +560,139 @@ Press **Enter** to open instance menu.|}
     then
       (* In menu area, simple navigation *)
       let selected = max 0 (min menu_item_count (s.selected + delta)) in
-      (* Jump from menu to first service in active column *)
+      (* Jump from menu to first service in first column (column 0) *)
       if selected >= menu_item_count && delta > 0 then
         let first_svc =
           first_service_in_column
             ~num_columns:s.num_columns
             ~services:s.services
-            s.active_column
+            0
         in
-        {s with selected = first_svc + services_start_idx}
+        {s with selected = first_svc + services_start_idx; active_column = 0}
       else {s with selected}
     else
       (* In services area: stay within column *)
       let current_idx = s.selected - services_start_idx in
-      let col_indices =
-        services_in_column
-          ~num_columns:s.num_columns
-          ~services:s.services
-          s.active_column
-      in
-      let current_pos =
-        List.find_mapi
-          (fun i idx -> if idx = current_idx then Some i else None)
-          col_indices
-        |> Option.value ~default:0
-      in
-      let new_pos = current_pos + delta in
-      if new_pos < 0 then (
-        (* Moving up from first service goes to Install button *)
-        (* Scroll to top of column *)
-        s.column_scroll.(s.active_column) <- 0 ;
-        {s with selected = 0})
-      else if new_pos >= List.length col_indices then
-        (* At bottom of column, stay put *)
-        s
+      (* Check if we're in external services area *)
+      let external_start_idx = List.length s.services in
+      let in_external = current_idx >= external_start_idx in
+      if in_external then
+        (* External services: linear navigation below all columns *)
+        (* Check if moving up from first external service *)
+        let first_external = services_start_idx + List.length s.services in
+        if s.selected = first_external && delta < 0 then
+          (* Move to last service in first column (column 0), or menu if none *)
+          if List.length s.services > 0 && s.num_columns > 1 then
+            (* Multi-column: jump to last service in first column *)
+            let col_indices =
+              services_in_column
+                ~num_columns:s.num_columns
+                ~services:s.services
+                0
+            in
+            match List.rev col_indices with
+            | [] ->
+                (* First column is empty, go to menu *)
+                {s with selected = 0; active_column = 0}
+            | last_idx :: _ ->
+                {
+                  s with
+                  selected = last_idx + services_start_idx;
+                  active_column = 0;
+                }
+          else if List.length s.services > 0 then
+            (* Single-column: jump to last managed service *)
+            let last_managed =
+              services_start_idx + List.length s.services - 1
+            in
+            {s with selected = last_managed}
+          else
+            (* No managed services, jump to menu *)
+            {s with selected = 0}
+        else
+          (* Normal external service navigation *)
+          let raw = s.selected + delta in
+          let selected = clamp_selection s.services s.external_services raw in
+          {s with selected}
       else
-        let new_idx = List.nth col_indices new_pos in
-        (* Adjust scroll to keep selection visible *)
-        let line_start, line_count =
-          service_line_position
+        (* Managed services: column-based navigation *)
+        let col_indices =
+          services_in_column
             ~num_columns:s.num_columns
             ~services:s.services
-            ~folded:s.folded
-            new_idx
             s.active_column
         in
-        adjust_column_scroll
-          ~column_scroll:s.column_scroll
-          ~col:s.active_column
-          ~line_start
-          ~line_count
-          ~visible_height:!last_visible_height_ref ;
-        {s with selected = new_idx + services_start_idx}
+        let current_pos =
+          List.find_mapi
+            (fun i idx -> if idx = current_idx then Some i else None)
+            col_indices
+          |> Option.value ~default:0
+        in
+        let new_pos = current_pos + delta in
+        if new_pos < 0 then (
+          (* Moving up from first service goes to Install button *)
+          (* Scroll to top of column *)
+          s.column_scroll.(s.active_column) <- 0 ;
+          {s with selected = 0})
+        else if new_pos >= List.length col_indices then
+          if
+            (* At bottom of managed services column *)
+            List.length s.external_services > 0
+          then
+            (* Jump to first external service *)
+            let first_external = services_start_idx + List.length s.services in
+            {s with selected = first_external}
+          else
+            (* No external services, stay put *)
+            s
+        else
+          let new_idx = List.nth col_indices new_pos in
+          (* Adjust scroll to keep selection visible *)
+          let line_start, line_count =
+            service_line_position
+              ~num_columns:s.num_columns
+              ~services:s.services
+              ~folded:s.folded
+              new_idx
+              s.active_column
+          in
+          adjust_column_scroll
+            ~column_scroll:s.column_scroll
+            ~col:s.active_column
+            ~line_start
+            ~line_count
+            ~visible_height:!last_visible_height_ref ;
+          {s with selected = new_idx + services_start_idx}
 
   let force_refresh_cmd s = force_refresh s
 
   let toggle_fold s =
-    match current_service s with
-    | None -> s
-    | Some st ->
-        let inst = st.service.Service.instance in
-        let folded =
-          if StringSet.mem inst s.folded then StringSet.remove inst s.folded
-          else StringSet.add inst s.folded
-        in
-        {s with folded}
+    (* Check if we're on an external service *)
+    let external_start_idx = services_start_idx + List.length s.services in
+    if s.selected >= external_start_idx then
+      (* Toggle external service *)
+      let ext_idx = s.selected - external_start_idx in
+      match List.nth_opt s.external_services ext_idx with
+      | None -> s
+      | Some ext ->
+          let inst = ext.External_service.suggested_instance_name in
+          let external_folded =
+            if StringSet.mem inst s.external_folded then
+              StringSet.remove inst s.external_folded
+            else StringSet.add inst s.external_folded
+          in
+          {s with external_folded}
+    else
+      (* Toggle managed service *)
+      match current_service s with
+      | None -> s (* In menu area, Tab does nothing now *)
+      | Some st ->
+          let inst = st.service.Service.instance in
+          let folded =
+            if StringSet.mem inst s.folded then StringSet.remove inst s.folded
+            else StringSet.add inst s.folded
+          in
+          {s with folded}
 
   (** Move to a different column (for matrix layout) *)
   let move_column s delta =
