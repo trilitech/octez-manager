@@ -46,6 +46,8 @@ type import_options = {
       (** Override suggested instance name. If None, uses suggested name from external service. *)
   overrides : field_overrides;  (** Override detected values *)
   dry_run : bool;  (** Preview changes without executing *)
+  interactive : bool;
+      (** Interactive mode: review and edit configuration files before import *)
   preserve_data : bool;  (** Always true for import (no data copying) *)
   quiet : bool;  (** Non-interactive mode (fail if missing required fields) *)
 }

@@ -136,6 +136,7 @@ and start_import ps =
             new_instance_name = s.custom_name;
             overrides;
             dry_run = false;
+            interactive = false;
             preserve_data = true;
             quiet = false;
           }
