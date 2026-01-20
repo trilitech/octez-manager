@@ -3767,6 +3767,67 @@ let service_get_bin_source () =
     (Binary_registry.Managed_version "24.0")
     bs
 
+(* Binary downloader tests *)
+
+let binary_downloader_arch_detection () =
+  match Binary_downloader.detect_arch () with
+  | Ok arch ->
+      let arch_str = Binary_downloader.arch_to_string arch in
+      Alcotest.(check bool)
+        "valid arch"
+        true
+        (arch_str = "x86_64" || arch_str = "arm64")
+  | Error (`Msg e) -> Alcotest.fail e
+
+let binary_downloader_url_construction () =
+  let version = "24.0" in
+  let arch = Binary_downloader.X86_64 in
+  let binary = "octez-node" in
+  let url = Binary_downloader.binary_url ~version ~arch ~binary in
+  Alcotest.(check string)
+    "binary url"
+    "https://octez.tezos.com/releases/octez-v24.0/binaries/x86_64/octez-node"
+    url ;
+  let checksums_url = Binary_downloader.checksums_url ~version ~arch in
+  Alcotest.(check string)
+    "checksums url"
+    "https://octez.tezos.com/releases/octez-v24.0/binaries/x86_64/sha256sums.txt"
+    checksums_url
+
+let binary_downloader_parse_version_json () =
+  let json_str =
+    {|{
+      "versions": [
+        {"version": "24.0", "release_date": "2024-01-01"},
+        {"version": "23.1", "release_date": "2023-12-01"},
+        {"version": "24.0-rc1", "release_date": "2023-11-15"}
+      ]
+    }|}
+  in
+  let json = Yojson.Safe.from_string json_str in
+  match Binary_downloader.For_tests.parse_version_json json with
+  | Ok versions ->
+      Alcotest.(check int) "version count" 3 (List.length versions) ;
+      let first = List.hd versions in
+      Alcotest.(check string) "first version" "24.0" first.version ;
+      Alcotest.(check bool) "not rc" false first.is_rc ;
+      let last = List.nth versions 2 in
+      Alcotest.(check bool) "is rc" true last.is_rc
+  | Error (`Msg e) -> Alcotest.fail e
+
+let binary_downloader_binaries_list () =
+  match Binary_downloader.binaries_for_version "24.0" with
+  | Ok binaries ->
+      Alcotest.(check bool)
+        "has octez-node"
+        true
+        (List.mem "octez-node" binaries) ;
+      Alcotest.(check bool)
+        "has octez-client"
+        true
+        (List.mem "octez-client" binaries)
+  | Error (`Msg e) -> Alcotest.fail e
+
 (* External service tests *)
 
 let external_service_role_of_binary_name () =
@@ -5249,6 +5310,25 @@ let () =
             "service get_bin_source"
             `Quick
             service_get_bin_source;
+        ] );
+      ( "binary_downloader",
+        [
+          Alcotest.test_case
+            "arch detection"
+            `Quick
+            binary_downloader_arch_detection;
+          Alcotest.test_case
+            "url construction"
+            `Quick
+            binary_downloader_url_construction;
+          Alcotest.test_case
+            "parse version json"
+            `Quick
+            binary_downloader_parse_version_json;
+          Alcotest.test_case
+            "binaries list"
+            `Quick
+            binary_downloader_binaries_list;
         ] );
       ( "external_service",
         [
