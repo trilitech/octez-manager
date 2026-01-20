@@ -13,9 +13,28 @@
 (** {2 Metrics Polling} *)
 
 (** Poll metrics for a specific service instance.
-    Call this to update CPU, memory, disk, and version data. *)
+    Call this to update CPU, memory, disk, and version data.
+    For external services, pass [~unit_name] to use the actual systemd unit name
+    instead of constructing it from role and instance. *)
 val poll :
-  role:string -> instance:string -> binary:string -> data_dir:string -> unit
+  role:string ->
+  instance:string ->
+  binary:string ->
+  data_dir:string ->
+  ?unit_name:string ->
+  unit ->
+  unit
+
+(** Submit a poll request to the worker queue (non-blocking).
+    For external services, pass [~unit_name] to use the actual systemd unit name. *)
+val submit_poll :
+  role:string ->
+  instance:string ->
+  binary:string ->
+  data_dir:string ->
+  ?unit_name:string ->
+  unit ->
+  unit
 
 (** {2 Metrics Access} *)
 
