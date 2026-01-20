@@ -178,7 +178,13 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   in
   log "Writing node env...\n" ;
   let* () =
-    Node_env.write ~inst:request.instance ~data_dir ~run_args ~extra_env
+    Node_env.write
+      ~inst:request.instance
+      ~data_dir
+      ~run_args
+      ~extra_env
+      ~with_comments:true
+      ()
   in
   log "Writing systemd dropin...\n" ;
   let* () =

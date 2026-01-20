@@ -2332,7 +2332,7 @@ let node_env_write_file () =
       let data_dir = Filename.concat env.data "octez/alpha" in
       let run_args = "--network https://example" in
       let () =
-        expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[])
+        expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[] ( ()))
       in
       let env_file =
         Filename.concat env.config "octez/instances/alpha/node.env"
@@ -2353,11 +2353,11 @@ let node_env_overwrite_existing () =
       let first = "--network https://example" in
       let second = "--network https://example --history-mode archive" in
       let () =
-        expect_ok (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[])
+        expect_ok (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[] ())
       in
       let () =
         expect_ok
-          (Node_env.write ~inst ~data_dir ~run_args:second ~extra_env:[])
+          (Node_env.write ~inst ~data_dir ~run_args:second ~extra_env:[] ())
       in
       let env_file =
         Filename.concat env.config "octez/instances/beta/node.env"
