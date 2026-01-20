@@ -93,29 +93,20 @@ jobs:
         run: |
           opam install -y bisect_ppx
 
-      - name: Build
+      - name: Build (without instrumentation for production binary)
         run: |
           echo '(-ccopt -static)' > static_flags.sexp
           dune build --release
 
-      - name: Debug environment before test
-        run: |
-          echo "=== Testing write permissions ==="
-          mkdir -p _coverage/unit
-          chown -R opam:opam _coverage
-          su -s /bin/sh opam -c "touch _coverage/unit/test.txt && ls -la _coverage/unit/ && rm _coverage/unit/test.txt"
-          echo "=== Checking BISECT_FILE env var ==="
-          su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && echo \"BISECT_FILE=\$BISECT_FILE\""
-          echo "=== Checking if bisect_ppx runtime is available ==="
-          su -s /bin/sh opam -c "ocamlfind query bisect_ppx"
-
-      - name: Test
+      - name: Clean and rebuild with instrumentation for tests
         run: |
           chown -R opam:opam /home/opam/.opam
           chown -R opam:opam .
           mkdir -p _coverage/unit
           chown -R opam:opam _coverage
-          su -s /bin/sh opam -c "export BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect && git checkout -- static_flags.sexp && dune runtest --instrument-with bisect_ppx --force"
+          # Clean test artifacts and rebuild with coverage enabled
+          # BISECT_ENABLE=yes is needed to activate the bisect_ppx runtime
+          su -s /bin/sh opam -c "rm -rf _build/default/test && git checkout -- static_flags.sexp && BISECT_ENABLE=yes BISECT_FILE=${{ github.workspace }}/_coverage/unit/bisect dune runtest --instrument-with bisect_ppx"
           
       - name: Debug coverage files after test
         if: always()
