@@ -13,6 +13,7 @@
   node_env
   systemd
   binary_registry
+  binary_downloader
   service
   service_registry
   base_dir_registry
