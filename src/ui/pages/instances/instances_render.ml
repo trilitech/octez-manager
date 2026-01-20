@@ -799,7 +799,10 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Append external services below the columnar grid *)
   let result = install_row :: "" :: instance_rows_trimmed in
-  if external_line_count > 0 then result @ ("" :: external_lines) else result
+  if external_line_count > 0 then
+    let separator = String.make (min cols 120) '-' in
+    result @ [""; separator] @ external_lines
+  else result
 
 let table_lines ?(cols = 80) ?(visible_height = 20) state =
   (* Clear visibility markers at start of render pass *)

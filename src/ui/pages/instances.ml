@@ -577,13 +577,31 @@ Press **Enter** to open instance menu.|}
       let external_start_idx = List.length s.services in
       let in_external = current_idx >= external_start_idx in
       if in_external then
-        (* External services: simple linear navigation (no multi-column support yet) *)
+        (* External services: linear navigation below all columns *)
         (* Check if moving up from first external service *)
         let first_external = services_start_idx + List.length s.services in
         if s.selected = first_external && delta < 0 then
-          (* Move to last managed service, or menu if no managed services *)
-          if List.length s.services > 0 then
-            (* Jump to last managed service *)
+          (* Move to last service in first column (column 0), or menu if none *)
+          if List.length s.services > 0 && s.num_columns > 1 then
+            (* Multi-column: jump to last service in first column *)
+            let col_indices =
+              services_in_column
+                ~num_columns:s.num_columns
+                ~services:s.services
+                0
+            in
+            match List.rev col_indices with
+            | [] ->
+                (* First column is empty, go to menu *)
+                {s with selected = 0; active_column = 0}
+            | last_idx :: _ ->
+                {
+                  s with
+                  selected = last_idx + services_start_idx;
+                  active_column = 0;
+                }
+          else if List.length s.services > 0 then
+            (* Single-column: jump to last managed service *)
             let last_managed =
               services_start_idx + List.length s.services - 1
             in
