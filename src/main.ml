@@ -62,7 +62,6 @@ let root_cmd =
     ~default:ui_term
     [
       Cmd_instance.instance_cmd;
-      Cmd_external.external_cmd;
       Cmd_install_node.install_node_cmd;
       Cmd_install_baker.install_baker_cmd;
       Cmd_install_accuser.install_accuser_cmd;
