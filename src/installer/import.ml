@@ -436,13 +436,68 @@ let import_service ?(on_log = fun _ -> ()) ~options ~external_svc () =
     if data_dir <> "" then log (Printf.sprintf "  Data dir: %s" data_dir) ;
     if base_dir <> "" then log (Printf.sprintf "  Base dir: %s" base_dir) ;
     log (Printf.sprintf "  RPC addr: %s" rpc_addr) ;
+    if net_addr <> "" then log (Printf.sprintf "  Net addr: %s" net_addr) ;
+    log (Printf.sprintf "  Service user: %s" (get_service_user external_svc)) ;
+    log (Printf.sprintf "  Bin dir: %s" bin_dir) ;
     log "" ;
     log "Actions (not executed):" ;
-    log (Printf.sprintf "  1. Stop %s" config.unit_name) ;
-    log (Printf.sprintf "  2. Create managed service: %s" instance_name) ;
-    if options.strategy = Takeover then
+    if options.strategy = Takeover then (
+      log (Printf.sprintf "  1. Stop %s" config.unit_name) ;
+      log (Printf.sprintf "  2. Create managed service: %s" instance_name) ;
       log (Printf.sprintf "  3. Disable %s" config.unit_name) ;
-    log (Printf.sprintf "  4. Start %s" instance_name) ;
+      log (Printf.sprintf "  4. Start %s" instance_name))
+    else (
+      log "  1. Create managed service (clone)" ;
+      log "  2. Keep original service running" ;
+      log (Printf.sprintf "  3. Start %s" instance_name)) ;
+    log "" ;
+    log "Generated files preview:" ;
+    log "------------------------" ;
+    log "" ;
+    log
+      (Printf.sprintf
+         "Environment file: /etc/octez/instances/%s/node.env"
+         instance_name) ;
+    log "---" ;
+    (match config.role.value with
+    | Some External_service.Dal_node ->
+        log (Printf.sprintf "OCTEZ_DAL_DATA_DIR=%s" data_dir) ;
+        log (Printf.sprintf "OCTEZ_DAL_RPC_ADDR=%s" rpc_addr) ;
+        log (Printf.sprintf "OCTEZ_DAL_NET_ADDR=%s" net_addr) ;
+        log (Printf.sprintf "OCTEZ_NETWORK=%s" network) ;
+        log (Printf.sprintf "OCTEZ_NODE_ENDPOINT=%s" node_endpoint)
+    | Some External_service.Node ->
+        log (Printf.sprintf "OCTEZ_DATA_DIR=%s" data_dir) ;
+        log (Printf.sprintf "OCTEZ_RPC_ADDR=%s" rpc_addr) ;
+        log (Printf.sprintf "OCTEZ_NET_ADDR=%s" net_addr) ;
+        log (Printf.sprintf "OCTEZ_NETWORK=%s" network)
+    | Some External_service.Baker | Some External_service.Accuser ->
+        log (Printf.sprintf "OCTEZ_CLIENT_BASE_DIR=%s" base_dir) ;
+        log (Printf.sprintf "OCTEZ_NODE_ENDPOINT=%s" node_endpoint) ;
+        log (Printf.sprintf "OCTEZ_NETWORK=%s" network)
+    | _ -> log "(role-specific variables)") ;
+    log (Printf.sprintf "APP_BIN_DIR=%s" bin_dir) ;
+    log "---" ;
+    log "" ;
+    log
+      (Printf.sprintf
+         "Systemd drop-in: \
+          /etc/systemd/system/octez-%s@%s.service.d/override.conf"
+         (match config.role.value with
+         | Some External_service.Dal_node -> "dal-node"
+         | Some External_service.Node -> "node"
+         | Some External_service.Baker -> "baker"
+         | Some External_service.Accuser -> "accuser"
+         | _ -> "unknown")
+         instance_name) ;
+    log "---" ;
+    log
+      (Printf.sprintf
+         "[Service]\nEnvironmentFile=/etc/octez/instances/%s/node.env"
+         instance_name) ;
+    log "---" ;
+    log "" ;
+    log "Dry run complete. No changes made." ;
     Ok
       {
         original_unit = config.unit_name;
