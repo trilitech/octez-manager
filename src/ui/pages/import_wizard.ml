@@ -48,7 +48,11 @@ let init () =
       error = None;
     }
 
-let update ps _ = ps
+let update ps _ =
+  (* Check for pending navigation (e.g., from job completion callback) *)
+  match Context.consume_navigation () with
+  | Some page -> Navigation.goto page ps
+  | None -> ps
 
 let refresh ps =
   (* Check for pending navigation (e.g., from job completion callback) *)
