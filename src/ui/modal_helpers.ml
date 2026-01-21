@@ -174,7 +174,7 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
 
     let has_modal _ = true
   end in
-  let widget = Select_widget.open_centered ~title ~items ~to_string () in
+  let widget = Select_widget.open_centered ~title:"" ~items ~to_string () in
   let ui : Miaou.Core.Modal_manager.ui =
     {title; left = None; max_width = Some (Fixed 80); dim_background = true}
   in
@@ -314,7 +314,7 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
 
     let has_modal _ = true
   end in
-  let widget = Select_widget.open_centered ~title ~items ~to_string () in
+  let widget = Select_widget.open_centered ~title:"" ~items ~to_string () in
   (* Set initial Help_hint for the default selection *)
   update_help_hint widget ;
   let ui : Miaou.Core.Modal_manager.ui =
@@ -453,7 +453,7 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
                 Navigation.update
                   (fun _ ->
                     Select_widget.open_centered
-                      ~title
+                      ~title:""
                       ~items:updated_items
                       ~to_string
                       ())
@@ -473,7 +473,7 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
     let has_modal _ = true
   end in
   let widget =
-    Select_widget.open_centered ~title ~items:(items ()) ~to_string ()
+    Select_widget.open_centered ~title:"" ~items:(items ()) ~to_string ()
   in
   let ui : Miaou.Core.Modal_manager.ui =
     {title; left = None; max_width = Some (Fixed 80); dim_background = true}
