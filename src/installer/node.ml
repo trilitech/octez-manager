@@ -120,10 +120,11 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   in
   log "Reowning runtime paths...\n" ;
   let* () =
-    if request.preserve_data then (
-      log "Skipping reown (preserve_data=true)\n" ;
-      Ok ())
-    else reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode
+    (* Always reown to ensure correct permissions, even when preserving data.
+       This is important for imported services where data may be owned by root
+       but service runs as a different user. The reown operation is safe and
+       doesn't modify the actual data, only file ownership. *)
+    reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode
   in
   log "Creating service record...\n" ;
   (* In edit mode, preserve existing dependents list *)
