@@ -362,6 +362,11 @@ let download_version ~version ?(verify_checksums = true) ?progress () =
   let* arch = detect_arch () in
   let dest_dir = Binary_registry.managed_version_path version in
 
+  (* Ensure parent binaries directory exists *)
+  let binaries_dir = Binary_registry.binaries_dir () in
+  let owner, group = Common.current_user_group_names () in
+  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 binaries_dir in
+
   (* Check if already exists *)
   if Sys.file_exists dest_dir then
     R.error_msgf "Version v%s is already installed" version
