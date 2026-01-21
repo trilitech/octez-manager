@@ -465,8 +465,8 @@ let keymap _ =
       "Link directory";
     kb "p" (fun ps -> Navigation.update prune_unused ps) "Prune unused";
     kb "Enter" (fun ps -> Navigation.update handle_action ps) "Action";
-    kb "Up" (fun ps -> move ps `Up) "Move up";
-    kb "Down" (fun ps -> move ps `Down) "Move down";
+    kb "Up" (fun ps -> move_selection ps `Up) "Move up";
+    kb "Down" (fun ps -> move_selection ps `Down) "Move down";
     {
       Miaou.Core.Tui_page.key = "?";
       action = noop;
