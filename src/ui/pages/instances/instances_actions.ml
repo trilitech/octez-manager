@@ -631,19 +631,7 @@ let rec update_version_modal svc =
        or link a directory first." ;
     ())
   else
-    let current_text =
-      match current_bin_source with
-      | Binary_registry.Managed_version v ->
-          Printf.sprintf "Current: v%s (managed)" v
-      | Binary_registry.Linked_alias alias ->
-          Printf.sprintf "Current: %s (linked)" alias
-      | Binary_registry.Raw_path path ->
-          Printf.sprintf "Current: %s (path)" path
-    in
-
-    let modal_title =
-      Printf.sprintf "Update Version · %s\n%s" instance current_text
-    in
+    let modal_title = Printf.sprintf "Update Version · %s" instance in
 
     let to_string = function
       | ManagedVersion v -> Printf.sprintf "v%s (managed)" v
