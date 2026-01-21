@@ -69,6 +69,11 @@ val run_streaming :
 
 val run_out : string list -> (string, [> `Msg of string]) result
 
+(** Like run_out but captures stderr to prevent it from leaking to the terminal.
+    Returns only stdout. Useful for HTTP operations in the TUI where curl errors
+    would corrupt the display. *)
+val run_out_silent : string list -> (string, [> `Msg of string]) result
+
 val run_as :
   ?quiet:bool ->
   ?on_log:(string -> unit) ->

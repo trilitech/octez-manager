@@ -146,7 +146,7 @@ let parse_version_json json =
 
 let fetch_versions_json () =
   match
-    Common.run_out
+    Common.run_out_silent
       [
         "curl";
         "-fsL";
@@ -270,7 +270,7 @@ let estimate_download_size _version =
 let fetch_checksums ~version ~arch =
   let url = checksums_url ~version ~arch in
   match
-    Common.run_out
+    Common.run_out_silent
       ["curl"; "-fsL"; "--max-time"; "10"; "--connect-timeout"; "5"; url]
   with
   | Ok body when String.trim body <> "" ->
@@ -321,7 +321,7 @@ let download_file_curl ~url ~dest ?progress () =
   in
   let _ = progress in
   (* TODO: Implement progress reporting via curl progress *)
-  Common.run cmd
+  Common.run_silent cmd
 
 let download_binary ~version ~arch ~binary ~dest_dir ?progress () =
   let url = binary_url ~version ~arch ~binary in
