@@ -231,3 +231,92 @@ show_service_logs() {
     journalctl -u "octez-${role}@${instance}.service" -n "$lines" --no-pager 2>&1 || true
     echo "==="
 }
+
+# Import test helpers
+
+# Create an external systemd service (unmanaged by octez-manager)
+create_external_service() {
+    local role="$1"
+    local instance="$2"
+    local data_dir="$3"
+    local rpc_addr="${4:-127.0.0.1:8732}"
+    local network="${5:-shadownet}"
+    
+    local unit_name="octez-${role}@${instance}.service"
+    local unit_dir="/etc/systemd/user"
+    
+    mkdir -p "$unit_dir"
+    mkdir -p "$data_dir"
+    chown -R tezos:tezos "$data_dir"
+    
+    case "$role" in
+        node)
+            cat > "$unit_dir/$unit_name" <<SERVICE
+[Unit]
+Description=External Octez Node - $instance
+After=network.target
+
+[Service]
+Type=simple
+User=tezos
+ExecStart=$OCTEZ_BIN_DIR/octez-node run --data-dir $data_dir --network $network --rpc-addr $rpc_addr
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+SERVICE
+            ;;
+        baker)
+            local node_endpoint="${6:-http://localhost:8732}"
+            cat > "$unit_dir/$unit_name" <<SERVICE
+[Unit]
+Description=External Octez Baker - $instance
+After=network.target octez-node@${instance}.service
+Requires=octez-node@${instance}.service
+
+[Service]
+Type=simple
+User=tezos
+ExecStart=$OCTEZ_BIN_DIR/octez-baker-PsParisC run --endpoint $node_endpoint with local node $data_dir
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+SERVICE
+            ;;
+    esac
+    
+    systemctl --user daemon-reload
+}
+
+# Check if external service is detected
+external_service_detected() {
+    local service_name="$1"
+    om list 2>&1 | grep -i "external" | grep -q "$service_name"
+}
+
+# Verify service is now managed
+service_is_managed() {
+    local instance="$1"
+    om list 2>&1 | grep -v "external" | grep -q "$instance"
+}
+
+# Verify external service is disabled
+external_service_disabled() {
+    local role="$1"
+    local instance="$2"
+    ! systemctl --user is-enabled "octez-${role}@${instance}.service" 2>/dev/null
+}
+
+# Start process without systemd (unmanaged)
+start_unmanaged_process() {
+    local binary="$1"
+    shift
+    local args="$@"
+    
+    su -s /bin/sh tezos -c "$OCTEZ_BIN_DIR/$binary $args" &
+    echo $!
+}
+

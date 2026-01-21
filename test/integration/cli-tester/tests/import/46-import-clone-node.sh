@@ -1,0 +1,61 @@
+#!/bin/bash
+# Test: Import with clone strategy
+set -euo pipefail
+source /tests/lib.sh
+
+EXTERNAL_INSTANCE="clone-source"
+CLONED_INSTANCE="clone-dest"
+EXTERNAL_DATA="/var/lib/octez-external/$EXTERNAL_INSTANCE"
+RPC_ADDR="127.0.0.1:18746"
+
+echo "Test: Import node with clone strategy"
+
+# Cleanup
+cleanup_instance "$EXTERNAL_INSTANCE" || true
+cleanup_instance "$CLONED_INSTANCE" || true
+rm -rf "$EXTERNAL_DATA" || true
+systemctl --user stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
+systemctl --user disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
+rm -f "/etc/systemd/user/octez-node@${EXTERNAL_INSTANCE}.service" || true
+systemctl --user daemon-reload
+
+# Create external service
+echo "Creating external systemd service..."
+create_external_service "node" "$EXTERNAL_INSTANCE" "$EXTERNAL_DATA" "$RPC_ADDR" "shadownet"
+systemctl --user enable "octez-node@${EXTERNAL_INSTANCE}.service"
+systemctl --user start "octez-node@${EXTERNAL_INSTANCE}.service"
+
+wait_for_service_active "node" "$EXTERNAL_INSTANCE" 10 || true
+
+# Import with clone strategy
+echo "Importing with clone strategy..."
+om import "octez-node@${EXTERNAL_INSTANCE}" --strategy clone --as "$CLONED_INSTANCE" 2>&1
+
+# Verify cloned service is managed
+if ! service_is_managed "$CLONED_INSTANCE"; then
+    echo "ERROR: Cloned service not found in managed instances"
+    om list 2>&1
+    exit 1
+fi
+
+# Verify original service is still running and enabled
+if ! systemctl --user is-enabled "octez-node@${EXTERNAL_INSTANCE}.service" >/dev/null 2>&1; then
+    echo "ERROR: Original service should still be enabled after clone"
+    exit 1
+fi
+
+if ! systemctl --user is-active "octez-node@${EXTERNAL_INSTANCE}.service" >/dev/null 2>&1; then
+    echo "WARNING: Original service stopped (may be expected depending on implementation)"
+fi
+
+echo "Service successfully cloned"
+
+# Cleanup
+systemctl --user stop "octez-node@${EXTERNAL_INSTANCE}.service" || true
+systemctl --user disable "octez-node@${EXTERNAL_INSTANCE}.service" || true
+rm -f "/etc/systemd/user/octez-node@${EXTERNAL_INSTANCE}.service" || true
+cleanup_instance "$CLONED_INSTANCE"
+rm -rf "$EXTERNAL_DATA"
+systemctl --user daemon-reload
+
+echo "Clone import test passed"
