@@ -559,11 +559,38 @@ let rec update_version_modal svc =
   let instance = svc.Service.instance in
   let current_bin_source = Service.get_bin_source svc in
 
-  (* Get current version if managed, for filtering *)
+  (* Get current version for filtering - try to extract from binary *)
   let current_version_opt =
     match current_bin_source with
     | Binary_registry.Managed_version v -> Some v
-    | _ -> None
+    | Binary_registry.Linked_alias _ | Binary_registry.Raw_path _ ->
+        (* Try to get version from the actual binary *)
+        let binary_name =
+          match svc.Service.role with
+          | "node" -> "octez-node"
+          | "baker" -> "octez-baker"
+          | "accuser" -> "octez-accuser"
+          | "dal-node" | "dal" -> "octez-dal-node"
+          | _ -> "octez-node" (* fallback *)
+        in
+        let binary_path = Filename.concat svc.Service.app_bin_dir binary_name in
+        if Sys.file_exists binary_path then
+          match Common.run_out [binary_path; "--version"] with
+          | Ok version_output -> (
+              (* Parse "24.0 (hash)" or "Octez 24.0" to extract "24.0" *)
+              let version_str = String.trim version_output in
+              (* Try to extract X.Y or X.Y.Z pattern *)
+              try
+                let _ =
+                  Str.search_forward
+                    (Str.regexp "\\([0-9]+\\.[0-9]+\\(\\.[0-9]+\\)?\\)")
+                    version_str
+                    0
+                in
+                Some (Str.matched_group 1 version_str)
+              with Not_found -> None)
+          | Error _ -> None
+        else None
   in
 
   (* Load available versions - filter to only newer or equal versions *)
@@ -578,7 +605,7 @@ let rec update_version_modal svc =
                 (fun v -> Binary_registry.compare_versions v current_v >= 0)
                 versions
           | None ->
-              (* No current version (linked/raw path), show all *)
+              (* No current version detected, show all *)
               versions
         in
         List.map (fun v -> ManagedVersion v) filtered_versions
