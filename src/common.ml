@@ -347,6 +347,38 @@ let run_out argv =
   | Ok (out, _) -> Ok out
   | Error (`Msg m) -> Error (`Msg m)
 
+let run_out_silent argv =
+  append_debug_log ("RUN_OUT_SILENT " ^ cmd_to_string argv) ;
+  let cmd_str = cmd_to_string argv in
+  let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
+  close_out oc ;
+  let stdout_lines = ref [] in
+  let stderr_lines = ref [] in
+  (* Read all stdout *)
+  (try
+     while true do
+       stdout_lines := input_line ic :: !stdout_lines
+     done
+   with End_of_file -> ()) ;
+  (* Read all stderr (to prevent leakage) *)
+  (try
+     while true do
+       stderr_lines := input_line ec :: !stderr_lines
+     done
+   with End_of_file -> ()) ;
+  match Unix.close_process_full (ic, oc, ec) with
+  | Unix.WEXITED 0 -> Ok (String.concat "\n" (List.rev !stdout_lines))
+  | _status ->
+      let msg =
+        Printf.sprintf
+          "Command failed: %s\nStdout:\n%s\nStderr:\n%s"
+          cmd_str
+          (String.concat "\n" (List.rev !stdout_lines))
+          (String.concat "\n" (List.rev !stderr_lines))
+      in
+      append_debug_log ("RUN_OUT_SILENT ERROR: " ^ msg) ;
+      Error (`Msg msg)
+
 let run_as ?(quiet = false) ?on_log ~user argv =
   let trimmed = String.trim user in
   let current_user, _ = current_user_group_names () in
