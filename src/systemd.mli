@@ -132,3 +132,27 @@ val restart :
   instance:string ->
   unit ->
   (unit, [> `Msg of string]) result
+
+(** Enable a systemd unit by its full unit name (e.g., "octez-node.service"). *)
+val enable_unit : string -> (unit, [> `Msg of string]) result
+
+(** Disable a systemd unit by its full unit name. *)
+val disable_unit : string -> (unit, [> `Msg of string]) result
+
+(** Enable a managed service instance. *)
+val enable :
+  ?quiet:bool ->
+  role:string ->
+  instance:string ->
+  start_now:bool ->
+  unit ->
+  (unit, [> `Msg of string]) result
+
+(** Disable a managed service instance. *)
+val disable :
+  ?quiet:bool ->
+  role:string ->
+  instance:string ->
+  stop_now:bool ->
+  unit ->
+  (unit, [> `Msg of string]) result

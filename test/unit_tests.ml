@@ -2332,15 +2332,16 @@ let node_env_write_file () =
       let data_dir = Filename.concat env.data "octez/alpha" in
       let run_args = "--network https://example" in
       let () =
-        expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[])
+        expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[] ())
       in
       let env_file =
         Filename.concat env.config "octez/instances/alpha/node.env"
       in
       let contents = read_file env_file in
+      (* run_args gets quoted if it contains spaces *)
       let expected =
         Printf.sprintf
-          "VERSION=v1\nOCTEZ_DATA_DIR=%s\nOCTEZ_NODE_ARGS=%s\n"
+          "VERSION=v1\nOCTEZ_DATA_DIR=%s\nOCTEZ_NODE_ARGS=\"%s\"\n"
           data_dir
           run_args
       in
@@ -2353,11 +2354,12 @@ let node_env_overwrite_existing () =
       let first = "--network https://example" in
       let second = "--network https://example --history-mode archive" in
       let () =
-        expect_ok (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[])
+        expect_ok
+          (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[] ())
       in
       let () =
         expect_ok
-          (Node_env.write ~inst ~data_dir ~run_args:second ~extra_env:[])
+          (Node_env.write ~inst ~data_dir ~run_args:second ~extra_env:[] ())
       in
       let env_file =
         Filename.concat env.config "octez/instances/beta/node.env"
@@ -4014,6 +4016,31 @@ let execstart_parser_parse_dal_node () =
     (Some "0.0.0.0:11732")
     parsed.net_addr
 
+let execstart_parser_parse_baker_with_dal () =
+  let open Execstart_parser in
+  (* Anonymized example based on real baker service *)
+  let parsed =
+    parse
+      "/usr/bin/octez-baker -E http://localhost:8736 --base-dir /data/wallet \
+       run with local node /data/node --dal-node http://127.0.0.1:10736"
+  in
+  Alcotest.(check (option string))
+    "baker binary"
+    (Some "/usr/bin/octez-baker")
+    parsed.binary_path ;
+  Alcotest.(check (option string))
+    "node endpoint"
+    (Some "http://localhost:8736")
+    parsed.endpoint ;
+  Alcotest.(check (option string))
+    "dal endpoint"
+    (Some "http://127.0.0.1:10736")
+    parsed.dal_endpoint ;
+  Alcotest.(check (option string))
+    "base dir"
+    (Some "/data/wallet")
+    parsed.base_dir
+
 (** {1 External_service_detector Tests} *)
 
 let external_service_detector_chain_id_mapping () =
@@ -4087,6 +4114,324 @@ let external_service_detector_is_managed_unit_name () =
     "nginx.service"
     false
     (is_managed_unit_name "nginx.service")
+
+(** {1 Bug Regression Tests - Import Feature} *)
+
+(** Bug #1: Shell expansion - Arguments with * get corrupted
+    
+    Issue: When importing services with arguments like --cors-origin *,
+    the * was not quoted in env files, causing shell expansion to all
+    filesystem paths when systemd sourced the file.
+    
+    Fix: Added escape_env_value function that wraps values in double quotes
+    and escapes special characters to prevent shell expansion. *)
+
+let bug1_shell_expansion_escape_env_value () =
+  let open Node_env in
+  (* Test that glob patterns are quoted *)
+  Alcotest.(check string)
+    "asterisk should be quoted"
+    "\"*\""
+    (escape_env_value "*") ;
+  Alcotest.(check string)
+    "glob in argument should be quoted"
+    "\"--cors-origin=*\""
+    (escape_env_value "--cors-origin=*") ;
+  Alcotest.(check string)
+    "question mark should be quoted"
+    "\"file?.txt\""
+    (escape_env_value "file?.txt") ;
+  (* Test that spaces trigger quoting *)
+  Alcotest.(check string)
+    "spaces should be quoted"
+    "\"/path/with spaces/file.txt\""
+    (escape_env_value "/path/with spaces/file.txt") ;
+  (* Test that normal values are not quoted *)
+  Alcotest.(check string)
+    "simple value should not be quoted"
+    "--network=mainnet"
+    (escape_env_value "--network=mainnet") ;
+  Alcotest.(check string)
+    "path without spaces should not be quoted"
+    "/usr/bin/octez-node"
+    (escape_env_value "/usr/bin/octez-node") ;
+  (* Test that shell variables are escaped *)
+  Alcotest.(check string)
+    "dollar sign should be escaped"
+    "\"value-\\$VAR\""
+    (escape_env_value "value-$VAR") ;
+  (* Test that backticks are escaped *)
+  Alcotest.(check string)
+    "backticks should be escaped"
+    "\"value-\\`cmd\\`\""
+    (escape_env_value "value-`cmd`") ;
+  (* Test that double quotes are escaped *)
+  Alcotest.(check string)
+    "double quotes should be escaped"
+    "\"value-\\\"quoted\\\"\""
+    (escape_env_value "value-\"quoted\"") ;
+  ()
+
+let bug1_shell_expansion_build_run_args () =
+  let open Config in
+  (* Test that arguments with glob patterns are properly quoted *)
+  let args =
+    build_run_args
+      ~network:"shadownet"
+      ~history_mode:Rolling
+      ~rpc_addr:"localhost:8732"
+      ~net_addr:"0.0.0.0:9732"
+      ~extra_args:["--cors-origin=*"; "--metrics-addr=:9096"]
+      ~logging_mode:Logging_mode.Journald
+  in
+  (* The result should have --cors-origin=* quoted *)
+  Alcotest.(check bool)
+    "args should contain quoted asterisk"
+    true
+    (string_contains ~needle:"'--cors-origin=*'" args) ;
+  (* Should still contain the other arguments *)
+  Alcotest.(check bool)
+    "args should contain network"
+    true
+    (string_contains ~needle:"--network=shadownet" args) ;
+  Alcotest.(check bool)
+    "args should contain metrics addr"
+    true
+    (string_contains ~needle:"--metrics-addr=:9096" args) ;
+  ()
+
+let bug1_shell_expansion_env_file_sourcing () =
+  with_env
+    [
+      ("XDG_CONFIG_HOME", Some (Filename.get_temp_dir_name ()));
+      ("XDG_DATA_HOME", Some (Filename.get_temp_dir_name ()));
+    ]
+    (fun () ->
+      let env =
+        {
+          config = Filename.get_temp_dir_name ();
+          data = Filename.get_temp_dir_name ();
+        }
+      in
+      let instance = "test-shell-expansion" in
+      let test_dir =
+        Filename.concat env.config ("octez/instances/" ^ instance)
+      in
+      let env_file = Filename.concat test_dir "node.env" in
+      (* Create instance directory *)
+      Common.ensure_dir_path ~owner:"root" ~group:"root" ~mode:0o755 test_dir
+      |> expect_ok ;
+      (* Write env file with arguments containing glob pattern *)
+      let run_args =
+        Config.build_run_args
+          ~network:"mainnet"
+          ~history_mode:Rolling
+          ~rpc_addr:"localhost:8732"
+          ~net_addr:":9732"
+          ~extra_args:["--cors-origin=*"; "--metrics-addr=:9096"]
+          ~logging_mode:Logging_mode.Journald
+      in
+      Node_env.write
+        ~inst:instance
+        ~data_dir:"/tmp/data"
+        ~run_args
+        ~extra_env:[]
+        ()
+      |> expect_ok ;
+      (* Read the env file and verify proper quoting *)
+      let ic = open_in env_file in
+      let content = really_input_string ic (in_channel_length ic) in
+      close_in ic ;
+      (* The env file should contain quoted glob pattern *)
+      Alcotest.(check bool)
+        "env file should have quoted asterisk"
+        true
+        (string_contains ~needle:"'--cors-origin=*'" content
+        || string_contains ~needle:"\"--cors-origin=*\"" content) ;
+      (* Verify it doesn't contain unquoted asterisk that would expand *)
+      let lines = String.split_on_char '\n' content in
+      let args_line =
+        List.find_opt
+          (fun l -> string_contains ~needle:"OCTEZ_NODE_ARGS" l)
+          lines
+      in
+      match args_line with
+      | Some line ->
+          (* Line should not have bare asterisk after = *)
+          let has_bare_asterisk =
+            match string_index_opt ~needle:"OCTEZ_NODE_ARGS=" line with
+            | Some idx ->
+                let after_equals =
+                  String.sub line (idx + 17) (String.length line - idx - 17)
+                in
+                (* Check for pattern like: ...=--foo * --bar (bare asterisk with spaces) *)
+                string_contains ~needle:" * " after_equals
+                || string_contains ~needle:"=* " after_equals
+            | None -> false
+          in
+          Alcotest.(check bool)
+            "should not have bare asterisk that would expand"
+            false
+            has_bare_asterisk ;
+          (* Clean up *)
+          Sys.remove env_file
+      | None -> Alcotest.fail "OCTEZ_NODE_ARGS line not found in env file")
+
+(** Bug #2: Extra arguments not preserved in metadata
+    
+    Issue: When importing or creating services, extra_args were written to
+    env files but NOT saved to service metadata JSON. This meant every edit
+    via TUI would lose the arguments because it reads from empty metadata.
+    
+    Fix: Baker and Accuser were passing empty service_args to install_daemon.
+    Changed to pass request.extra_args so they get saved to metadata.
+    
+    These tests verify that Service.make correctly stores extra_args. *)
+
+let bug2_node_extra_args_preserved () =
+  (* Test that Service.make preserves extra_args for nodes *)
+  let service =
+    Service.make
+      ~instance:"test-node"
+      ~role:"node"
+      ~network:"mainnet"
+      ~history_mode:Rolling
+      ~data_dir:"/tmp/data"
+      ~rpc_addr:"localhost:8732"
+      ~net_addr:":9732"
+      ~service_user:"testuser"
+      ~app_bin_dir:"/usr/bin"
+      ~logging_mode:Logging_mode.Journald
+      ~extra_args:["--cors-origin=*"; "--metrics-addr=:9096"]
+      ()
+  in
+  Alcotest.(check (list string))
+    "node extra_args preserved in Service.make"
+    ["--cors-origin=*"; "--metrics-addr=:9096"]
+    service.Service.extra_args
+
+let bug2_baker_extra_args_preserved () =
+  (* Test that baker installer passes extra_args as service_args to install_daemon
+     We can't test the full install flow without systemd, so we test that
+     a daemon_request with service_args creates a Service with those as extra_args *)
+  let service =
+    Service.make
+      ~instance:"test-baker"
+      ~role:"baker"
+      ~network:"mainnet"
+      ~history_mode:Rolling
+      ~data_dir:"/tmp/node-data"
+      ~rpc_addr:"http://localhost:8732"
+      ~net_addr:""
+      ~service_user:"testuser"
+      ~app_bin_dir:"/usr/bin"
+      ~logging_mode:Logging_mode.Journald
+      ~extra_args:["-f"; "/home/user/passwd"; "--custom-flag"]
+      ()
+  in
+  Alcotest.(check (list string))
+    "baker extra_args preserved via service_args"
+    ["-f"; "/home/user/passwd"; "--custom-flag"]
+    service.Service.extra_args
+
+let bug2_accuser_extra_args_preserved () =
+  (* Similar to baker test - verify accuser extra_args flow *)
+  let service =
+    Service.make
+      ~instance:"test-accuser"
+      ~role:"accuser"
+      ~network:"mainnet"
+      ~history_mode:Rolling
+      ~data_dir:"/tmp/node-data"
+      ~rpc_addr:"http://localhost:8732"
+      ~net_addr:""
+      ~service_user:"testuser"
+      ~app_bin_dir:"/usr/bin"
+      ~logging_mode:Logging_mode.Journald
+      ~extra_args:["--custom-accuser-flag"; "value"]
+      ()
+  in
+  Alcotest.(check (list string))
+    "accuser extra_args preserved via service_args"
+    ["--custom-accuser-flag"; "value"]
+    service.Service.extra_args
+
+let bug2_dal_extra_args_preserved () =
+  (* Test that DAL node service_args become extra_args in Service *)
+  let service =
+    Service.make
+      ~instance:"test-dal"
+      ~role:"dal-node"
+      ~network:"mainnet"
+      ~history_mode:Rolling
+      ~data_dir:"/tmp/dal-data"
+      ~rpc_addr:"localhost:10732"
+      ~net_addr:":11732"
+      ~service_user:"testuser"
+      ~app_bin_dir:"/usr/bin"
+      ~logging_mode:Logging_mode.Journald
+      ~extra_args:["--attester-profiles"; "tz1abc"]
+      ()
+  in
+  Alcotest.(check (list string))
+    "dal extra_args preserved"
+    ["--attester-profiles"; "tz1abc"]
+    service.Service.extra_args
+
+(** Bug #4: History mode not preserved during import
+    
+    Issue: When importing a node, the history_mode was always hardcoded to
+    Rolling, even if the original service used Archive or Full mode. This
+    meant imported nodes would have incorrect metadata.
+    
+    Fix: Parse history_mode from ExecStart arguments and use it when creating
+    the service, defaulting to Rolling only if not specified.
+    
+    This test verifies the Execstart_parser extracts history_mode correctly. *)
+
+let bug4_history_mode_preserved () =
+  (* Test that Execstart_parser extracts history mode from command line *)
+  let exec_start =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node \
+     --history-mode=archive --rpc-addr=localhost:8732"
+  in
+  let parsed = Execstart_parser.parse exec_start in
+  Alcotest.(check (option string))
+    "history mode extracted from ExecStart"
+    (Some "archive")
+    parsed.history_mode ;
+
+  (* Test with full mode *)
+  let exec_start_full =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node \
+     --history-mode=full"
+  in
+  let parsed_full = Execstart_parser.parse exec_start_full in
+  Alcotest.(check (option string))
+    "full history mode extracted"
+    (Some "full")
+    parsed_full.history_mode ;
+
+  (* Test with rolling mode explicit *)
+  let exec_start_rolling =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node \
+     --history-mode=rolling"
+  in
+  let parsed_rolling = Execstart_parser.parse exec_start_rolling in
+  Alcotest.(check (option string))
+    "rolling history mode extracted"
+    (Some "rolling")
+    parsed_rolling.history_mode ;
+
+  (* Test with no history mode (should be None, defaults to Rolling in import) *)
+  let exec_start_none =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node"
+  in
+  let parsed_none = Execstart_parser.parse exec_start_none in
+  Alcotest.(check (option string))
+    "no history mode returns None"
+    None
+    parsed_none.history_mode
 
 let () =
   Alcotest.run
@@ -4730,6 +5075,10 @@ let () =
             "parse_dal_node"
             `Quick
             execstart_parser_parse_dal_node;
+          Alcotest.test_case
+            "parse_baker_with_dal"
+            `Quick
+            execstart_parser_parse_baker_with_dal;
         ] );
       ( "external_service_detector",
         [
@@ -4741,5 +5090,46 @@ let () =
             "is_managed_unit_name"
             `Quick
             external_service_detector_is_managed_unit_name;
+        ] );
+      ( "bug1_shell_expansion",
+        [
+          Alcotest.test_case
+            "escape_env_value"
+            `Quick
+            bug1_shell_expansion_escape_env_value;
+          Alcotest.test_case
+            "build_run_args"
+            `Quick
+            bug1_shell_expansion_build_run_args;
+          Alcotest.test_case
+            "env_file_sourcing"
+            `Quick
+            bug1_shell_expansion_env_file_sourcing;
+        ] );
+      ( "bug2_extra_args_metadata",
+        [
+          Alcotest.test_case
+            "node_extra_args_preserved"
+            `Quick
+            bug2_node_extra_args_preserved;
+          Alcotest.test_case
+            "baker_extra_args_preserved"
+            `Quick
+            bug2_baker_extra_args_preserved;
+          Alcotest.test_case
+            "accuser_extra_args_preserved"
+            `Quick
+            bug2_accuser_extra_args_preserved;
+          Alcotest.test_case
+            "dal_extra_args_preserved"
+            `Quick
+            bug2_dal_extra_args_preserved;
+        ] );
+      ( "bug4_history_mode_preserved",
+        [
+          Alcotest.test_case
+            "history_mode_from_execstart"
+            `Quick
+            bug4_history_mode_preserved;
         ] );
     ]

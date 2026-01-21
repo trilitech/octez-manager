@@ -117,3 +117,18 @@ val same_filesystem : string -> string -> bool option
 
 (** Map Octez exit codes to human-readable descriptions. *)
 val octez_exit_code_description : int -> string
+
+(** {1 Editor Integration} *)
+
+(** Get the user's preferred editor from environment variables.
+    Tries $VISUAL, $EDITOR, then falls back to sensible-editor or vi.
+    
+    @return Editor command/path *)
+val get_editor : unit -> string
+
+(** Open a file in the user's preferred editor.
+    Blocks until the editor exits.
+    
+    @param file_path Path to the file to edit
+    @return Ok () if editor exited successfully, Error otherwise *)
+val open_in_editor : string -> (unit, Rresult.R.msg) result
