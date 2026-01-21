@@ -294,7 +294,7 @@ SERVICE
 # Check if external service is detected
 external_service_detected() {
 	local service_name="$1"
-	om list 2>&1 | grep -i "external" | grep -q "$service_name"
+	om list --external 2>&1 | grep -q "$service_name"
 }
 
 # Verify service is now managed
