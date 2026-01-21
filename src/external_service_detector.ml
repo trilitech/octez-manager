@@ -124,8 +124,7 @@ let list_all_service_units () =
   (* Deduplicate by converting to a set-like structure *)
   let unique_units =
     List.fold_left
-      (fun acc unit ->
-        if List.mem unit acc then acc else unit :: acc)
+      (fun acc unit -> if List.mem unit acc then acc else unit :: acc)
       []
       all_units
   in
