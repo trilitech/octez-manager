@@ -301,7 +301,8 @@ external_service_detected() {
 # Verify service is now managed
 service_is_managed() {
 	local instance="$1"
-	om list 2>&1 | grep -v "external" | grep -q "$instance"
+	# Check that instance appears in list but NOT in external services section
+	om list 2>&1 | grep -v "External Octez Services" | grep -q "$instance"
 }
 
 # Verify external service is disabled
