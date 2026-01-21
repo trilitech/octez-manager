@@ -198,16 +198,28 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
     ~rpc_addr ~net_addr ~bin_dir =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
-  (* Parse ExecStart to extract extra arguments *)
+  (* Parse ExecStart to extract extra arguments and history mode *)
   let parsed = Execstart_parser.parse config.exec_start in
   (* Preserve extra arguments from original ExecStart (e.g., --metrics-addr, --cors-origin) *)
   let extra_args = parsed.extra_args in
+  (* Detect history mode from ExecStart, default to Rolling if not found *)
+  let history_mode =
+    match parsed.history_mode with
+    | Some mode_str -> (
+        match History_mode.of_string mode_str with
+        | Ok mode -> mode
+        | Error _ ->
+            (* Invalid history mode string, default to Rolling *)
+            Rolling)
+    | None ->
+        (* No history mode specified, default to Rolling *)
+        Rolling
+  in
   let request : node_request =
     {
       instance;
       network;
-      history_mode = Rolling;
-      (* Default, can't detect from external *)
+      history_mode;
       data_dir = Some data_dir;
       rpc_addr;
       net_addr;
