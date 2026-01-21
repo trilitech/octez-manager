@@ -31,7 +31,7 @@ After=network.target
 [Service]
 Type=simple
 User=tezos
-ExecStart=$OCTEZ_BIN_DIR/octez-node run \
+ExecStart=/usr/local/bin/octez-node run \
   --data-dir $DATA_DIR \
   --network shadownet \
   --rpc-addr $RPC_ADDR \
@@ -41,7 +41,7 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 SERVICE
 
 systemctl daemon-reload
