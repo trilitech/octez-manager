@@ -48,15 +48,6 @@ RUN opam update && opam install -y \
     ppx_deriving \
     alcotest
 
-# Pre-install Miaou from public repo
-# CI can override with custom version by bumping .github/miaou-version
-ARG MIAOU_VERSION=main
-RUN opam pin add miaou-core https://github.com/trilitech/miaou.git#${MIAOU_VERSION} --no-action && \
-    opam pin add miaou-driver-term https://github.com/trilitech/miaou.git#${MIAOU_VERSION} --no-action && \
-    opam pin add miaou-driver-matrix https://github.com/trilitech/miaou.git#${MIAOU_VERSION} --no-action && \
-    opam pin add miaou-runner https://github.com/trilitech/miaou.git#${MIAOU_VERSION} --no-action && \
-    opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-runner
-
 # Clean up opam cache to reduce image size
 RUN opam clean -a -c -s --logs
 
