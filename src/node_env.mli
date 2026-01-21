@@ -5,6 +5,17 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Escape a value for safe use in shell environment files.
+    Wraps values containing special characters in double quotes and escapes
+    characters that could cause shell expansion or command substitution.
+    
+    This prevents issues like glob expansion (asterisk, question, brackets),
+    variable expansion (dollar sign), and command substitution (backticks).
+    
+    @param v The value to escape
+    @return Escaped value, quoted if necessary *)
+val escape_env_value : string -> string
+
 (** Write environment variable pairs to the instance's node.env file.
     If [with_comments] is true, includes documentation comments for each variable. *)
 val write_pairs :

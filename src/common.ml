@@ -185,7 +185,9 @@ let sh_quote s =
       if i = n then false
       else
         match s.[i] with
-        | ' ' | '\t' | '\n' | '"' | '\'' | '$' | '`' | '\\' -> true
+        | ' ' | '\t' | '\n' | '"' | '\'' | '$' | '`' | '\\' | '*' | '?' | '['
+        | ']' | ';' | '&' | '|' | '<' | '>' | '(' | ')' | '{' | '}' ->
+            true
         | _ -> loop (i + 1)
     in
     loop 0
@@ -645,3 +647,44 @@ let octez_exit_code_description code =
   | n when n >= 1 && n <= 125 -> "configuration or startup error"
   | n when n >= 129 && n <= 253 -> "error with shutdown failure"
   | _ -> Printf.sprintf "exit code %d" code
+
+(** {1 Editor Integration} *)
+
+(** Get the user's preferred editor from environment variables.
+    Tries $VISUAL, $EDITOR, then falls back to sensible-editor or vi. *)
+let get_editor () =
+  match Sys.getenv_opt "VISUAL" with
+  | Some e when e <> "" -> e
+  | Some _ | None -> (
+      match Sys.getenv_opt "EDITOR" with
+      | Some e when e <> "" -> e
+      | Some _ | None -> (
+          match which "sensible-editor" with
+          | Some path -> path
+          | None -> (
+              match which "vi" with Some path -> path | None -> "/usr/bin/vi")))
+
+(** Open a file in the user's preferred editor.
+    Blocks until the editor exits.
+    
+    @param file_path Path to the file to edit
+    @return Ok () if editor exited successfully, Error otherwise *)
+let open_in_editor file_path =
+  let editor = get_editor () in
+  (* Use Unix.create_process directly for interactive editor *)
+  let pid =
+    Unix.create_process
+      editor
+      [|editor; file_path|]
+      Unix.stdin
+      Unix.stdout
+      Unix.stderr
+  in
+  match Unix.waitpid [] pid with
+  | _, Unix.WEXITED 0 -> Ok ()
+  | _, Unix.WEXITED code ->
+      Error (`Msg (Printf.sprintf "Editor exited with code %d" code))
+  | _, Unix.WSIGNALED signal ->
+      Error (`Msg (Printf.sprintf "Editor terminated by signal %d" signal))
+  | _, Unix.WSTOPPED signal ->
+      Error (`Msg (Printf.sprintf "Editor stopped by signal %d" signal))

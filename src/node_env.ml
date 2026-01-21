@@ -42,6 +42,31 @@ let get_var_doc = function
       Some "DAL node P2P listen address (e.g., '127.0.0.1:11732')"
   | _ -> None
 
+(** Escape a value for safe use in shell environment files.
+    Wraps the value in double quotes and escapes special characters.
+    This prevents shell expansion of glob patterns (asterisk, question mark, brackets),
+    variables (dollar sign), and command substitution (backticks). *)
+let escape_env_value v =
+  (* Check if value needs quoting *)
+  let needs_quotes =
+    String.length v > 0
+    && (String.contains v ' ' || String.contains v '*' || String.contains v '?'
+      || String.contains v '$' || String.contains v '`' || String.contains v '"'
+      || String.contains v '\'' || String.contains v '\\'
+      || String.contains v ';' || String.contains v '&' || String.contains v '|'
+       )
+  in
+  if not needs_quotes then v
+  else
+    (* Escape backslashes and double quotes, then wrap in double quotes *)
+    let escaped =
+      v |> String.split_on_char '\\' |> String.concat "\\\\"
+      |> String.split_on_char '"' |> String.concat "\\\""
+      |> String.split_on_char '$' |> String.concat "\\$"
+      |> String.split_on_char '`' |> String.concat "\\`"
+    in
+    "\"" ^ escaped ^ "\""
+
 let write_pairs ?(with_comments = false) ~inst pairs =
   let base = Common.env_instances_base_dir () in
   let path = Filename.concat (Filename.concat base inst) "node.env" in
@@ -49,11 +74,12 @@ let write_pairs ?(with_comments = false) ~inst pairs =
     pairs
     |> List.filter (fun (_, v) -> String.trim v <> "")
     |> List.map (fun (k, v) ->
+        let escaped_value = escape_env_value v in
         if with_comments then
           match get_var_doc k with
-          | Some doc -> Format.sprintf "\n# %s\n%s=%s\n" doc k v
-          | None -> Format.sprintf "%s=%s\n" k v
-        else Format.sprintf "%s=%s\n" k v)
+          | Some doc -> Format.sprintf "\n# %s\n%s=%s\n" doc k escaped_value
+          | None -> Format.sprintf "%s=%s\n" k escaped_value
+        else Format.sprintf "%s=%s\n" k escaped_value)
     |> String.concat ""
   in
   let header =
