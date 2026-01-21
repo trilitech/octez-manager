@@ -406,9 +406,10 @@ let test_node_form_network_field () =
       let text = strip_ansi screen in
       check
         bool
-        "shows mainnet"
+        "shows shadownet"
         true
-        (contains_substring text "mainnet" || contains_substring text "Mainnet"))
+        (contains_substring text "shadownet"
+        || contains_substring text "Shadownet"))
 
 (* ============================================================ *)
 (* Install Baker Form Tests *)
@@ -861,9 +862,13 @@ let test_node_form_change_network () =
   TH.with_test_env (fun () ->
       Headless.Stateful.init (module Install_node_form.Page) ;
 
-      (* Default network should be mainnet *)
+      (* Default network should be shadownet *)
       let screen1 = TH.get_screen_text () in
-      check bool "shows mainnet" true (TH.contains_substring screen1 "mainnet") ;
+      check
+        bool
+        "shows shadownet"
+        true
+        (TH.contains_substring screen1 "shadownet") ;
 
       (* Navigate to network field (second field) *)
       ignore (TH.send_key_and_wait "Down") ;
@@ -893,12 +898,12 @@ let test_node_form_change_network () =
 
       (* The form should now show the selected network *)
       let screen2 = TH.get_screen_text () in
-      (* Either ghostnet is shown or we stayed on mainnet - both are valid *)
+      (* Either ghostnet is shown or we stayed on shadownet - both are valid *)
       check
         bool
         "network field has value"
         true
-        (TH.contains_substring screen2 "mainnet"
+        (TH.contains_substring screen2 "shadownet"
         || TH.contains_substring screen2 "ghostnet"))
 
 (** Test: Navigate through entire node form without errors.
