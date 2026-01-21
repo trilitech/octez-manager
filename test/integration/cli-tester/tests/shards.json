@@ -38,7 +38,7 @@
       "node/25-binary-access-validation.sh",
       "node/01-install.sh",
       "import/52-import-name-conflict.sh",
-      "dal/29-baker-dal-config.sh",
+      "baker/29-baker-dal-config.sh",
       "node/13-reinstall-same-instance.sh",
       "node/11-remove-vs-purge.sh",
       "node/10-purge-with-data.sh",
@@ -86,10 +86,10 @@
   "shard-5": {
     "tests": [
       "node/20-tmp-dir-option.sh",
-      "dal/41-baker-with-dal-node.sh",
+      "baker/41-baker-with-dal-node.sh",
       "dal/22-dal-start-stop.sh",
       "import/46-import-clone-node.sh",
-      "baker/47-import-cascade-baker.sh",
+      "import/47-import-cascade-baker.sh",
       "node/02-show.sh",
       "node/08-install-preserve-data.sh",
       "baker/34-baker-multiple-instances.sh",
