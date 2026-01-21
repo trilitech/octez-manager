@@ -30,7 +30,7 @@ let load_snapshots network =
   | Error (`Msg _e) -> []
 
 let init () =
-  let network = "mainnet" in
+  let network = "shadownet" in
   let entries = load_snapshots network in
   Navigation.make {network; entries; selected = 0; error = None}
 
