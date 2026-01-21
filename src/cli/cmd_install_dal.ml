@@ -66,13 +66,34 @@ let install_dal_node_cmd =
           ~doc:"Directory containing Octez binaries"
           ~docv:"DIR")
   in
+  let octez_version =
+    let doc =
+      "Use a managed Octez version. Overrides --app-bin-dir. Download versions \
+       with: octez-manager binaries download VERSION"
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["octez-version"] ~doc ~docv:"VERSION")
+  in
+  let bin_dir_alias =
+    let doc =
+      "Use a linked directory by alias. Overrides --app-bin-dir. Create \
+       aliases with: octez-manager binaries link"
+    in
+    Arg.(
+      value & opt (some string) None & info ["bin-dir-alias"] ~doc ~docv:"ALIAS")
+  in
   let auto_enable =
     Arg.(
       value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
   in
   let make instance_opt data_dir_opt rpc_addr net_addr node_instance extra_args
-      service_user app_bin_dir no_enable logging_mode =
-    match Cli_helpers.resolve_app_bin_dir app_bin_dir with
+      service_user app_bin_dir octez_version bin_dir_alias no_enable
+      logging_mode =
+    match
+      Cli_helpers.resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir
+    with
     | Error msg -> Cli_helpers.cmdliner_error msg
     | Ok app_bin_dir -> (
         let instance_result =
@@ -183,8 +204,8 @@ let install_dal_node_cmd =
     Term.(
       ret
         (const make $ instance $ data_dir_opt $ rpc_addr $ net_addr
-       $ node_instance $ extra_args $ service_user $ app_bin_dir $ auto_enable
-       $ Cli_helpers.logging_mode_term))
+       $ node_instance $ extra_args $ service_user $ app_bin_dir $ octez_version
+       $ bin_dir_alias $ auto_enable $ Cli_helpers.logging_mode_term))
   in
   let info =
     Cmd.info
