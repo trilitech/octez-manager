@@ -26,8 +26,13 @@ systemctl daemon-reload
 
 # Create external node service
 echo "Creating external node service..."
+mkdir -p "$NODE_DATA"
+inject_identity "$NODE_INSTANCE" "$NODE_DATA"
+chown -R tezos:tezos "$NODE_DATA"
 create_external_service "node" "$NODE_INSTANCE" "$NODE_DATA" "$NODE_RPC" "shadownet"
 systemctl enable "octez-node@${NODE_INSTANCE}.service"
+systemctl start "octez-node@${NODE_INSTANCE}.service"
+sleep 2
 systemctl start "octez-node@${NODE_INSTANCE}.service"
 
 # Create external baker service that depends on node
@@ -40,6 +45,9 @@ systemctl enable "octez-baker@${BAKER_INSTANCE}.service"
 # Import baker with cascade
 echo "Importing baker with cascade (should also import node)..."
 om import "octez-baker@${BAKER_INSTANCE}" --cascade 2>&1 || {
+n# Stop services to avoid long sync
+systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
+systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
     echo "Import command failed, checking what was imported..."
     om list 2>&1
 }

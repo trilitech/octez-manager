@@ -21,13 +21,20 @@ systemctl daemon-reload
 
 # Create external service on ghostnet
 echo "Creating external service..."
+mkdir -p "$DATA_DIR"
+inject_identity "$EXTERNAL_INSTANCE" "$DATA_DIR"
+chown -R tezos:tezos "$DATA_DIR"
 create_external_service "node" "$EXTERNAL_INSTANCE" "$DATA_DIR" "$RPC_ADDR" "ghostnet"
 systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
+systemctl start "octez-node@${EXTERNAL_INSTANCE}.service"
+sleep 2
 
 
 # Import with custom name override
 echo "Importing with custom instance name..."
 om import "octez-node@${EXTERNAL_INSTANCE}" --as "$CUSTOM_INSTANCE" 2>&1 || {
+n# Stop service
+systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
     echo "Import failed, showing current state..."
     om list 2>&1
 }

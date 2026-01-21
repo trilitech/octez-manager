@@ -21,13 +21,20 @@ systemctl daemon-reload
 
 # Create external service
 echo "Creating external systemd service..."
+mkdir -p "$EXTERNAL_DATA"
+inject_identity "$EXTERNAL_INSTANCE" "$EXTERNAL_DATA"
+chown -R tezos:tezos "$EXTERNAL_DATA"
 create_external_service "node" "$EXTERNAL_INSTANCE" "$EXTERNAL_DATA" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
+systemctl start "octez-node@${EXTERNAL_INSTANCE}.service"
+sleep 2
 
 
 # Import with clone strategy
 echo "Importing with clone strategy..."
 om import "octez-node@${EXTERNAL_INSTANCE}" --strategy clone --as "$CLONED_INSTANCE" 2>&1
+n# Stop service to avoid long sync
+systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
 
 # Verify cloned service is managed
 if ! service_is_managed "$CLONED_INSTANCE"; then

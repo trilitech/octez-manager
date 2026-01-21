@@ -16,6 +16,8 @@ systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
 systemctl disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
 rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
 systemctl daemon-reload
+systemctl start "octez-node@${INSTANCE}.service"
+sleep 2
 
 # Create external service with custom flags
 echo "Creating external service with extra args..."
@@ -44,12 +46,16 @@ WantedBy=default.target
 SERVICE
 
 systemctl daemon-reload
+systemctl start "octez-node@${INSTANCE}.service"
+sleep 2
 systemctl enable "octez-node@${INSTANCE}.service"
 
 
 # Import the service
 echo "Importing service with extra args..."
 om import "octez-node@${INSTANCE}" --strategy takeover 2>&1 || {
+n# Stop service
+systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
     echo "Import failed, showing current state..."
     om list 2>&1
 }

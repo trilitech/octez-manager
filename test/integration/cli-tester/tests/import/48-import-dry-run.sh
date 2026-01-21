@@ -19,12 +19,19 @@ systemctl daemon-reload
 
 # Create external service
 echo "Creating external systemd service..."
+mkdir -p "$DATA_DIR"
+inject_identity "$INSTANCE" "$DATA_DIR"
+chown -R tezos:tezos "$DATA_DIR"
 create_external_service "node" "$INSTANCE" "$DATA_DIR" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${INSTANCE}.service"
+systemctl start "octez-node@${INSTANCE}.service"
+sleep 2
 
 # Run dry-run
 echo "Running dry-run import..."
 om import "octez-node@${INSTANCE}" --dry-run 2>&1 >/tmp/dryrun_output.txt || true
+n# Stop service
+systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
 
 cat /tmp/dryrun_output.txt
 

@@ -17,35 +17,43 @@ systemctl disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
 rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
 systemctl daemon-reload
 
-# Create external service
+# Create external service with pre-generated identity
 echo "Creating external systemd service..."
+mkdir -p "$DATA_DIR"
+inject_identity "$INSTANCE" "$DATA_DIR"
+chown -R tezos:tezos "$DATA_DIR"
 create_external_service "node" "$INSTANCE" "$DATA_DIR" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${INSTANCE}.service"
 
-# Wait for it to be running
+# Start service briefly so it can be detected
+systemctl start "octez-node@${INSTANCE}.service"
+sleep 2
 
 # Import with takeover strategy
 echo "Importing with takeover strategy..."
 om import "octez-node@${INSTANCE}" --strategy takeover 2>&1
 
+# Stop the service immediately after import to avoid long sync
+systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
+
 # Verify service is now managed
 if ! service_is_managed "$INSTANCE"; then
-    echo "ERROR: Service is not managed after import"
-    om list 2>&1
-    exit 1
+	echo "ERROR: Service is not managed after import"
+	om list 2>&1
+	exit 1
 fi
 
 # Verify original external service is disabled
 if ! external_service_disabled "node" "$INSTANCE"; then
-    echo "ERROR: Original service should be disabled after takeover"
-    systemctl status "octez-node@${INSTANCE}.service" || true
-    exit 1
+	echo "ERROR: Original service should be disabled after takeover"
+	systemctl status "octez-node@${INSTANCE}.service" || true
+	exit 1
 fi
 
 # Verify data directory is preserved
 if [ ! -d "$DATA_DIR" ]; then
-    echo "ERROR: Data directory should be preserved"
-    exit 1
+	echo "ERROR: Data directory should be preserved"
+	exit 1
 fi
 
 echo "Service successfully imported with takeover"
