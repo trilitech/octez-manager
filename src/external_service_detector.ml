@@ -432,8 +432,10 @@ let build_external_service ~unit_name ~exec_start ~properties =
     match binary_field.value with
     | Some binary ->
         (* DEBUG: Log what we're passing to role detection *)
-        Printf.eprintf "DEBUG [%s]: calling role_of_binary_name with: %s\n%!"
-          unit_name binary ;
+        Printf.eprintf
+          "DEBUG [%s]: calling role_of_binary_name with: %s\n%!"
+          unit_name
+          binary ;
         let role =
           External_service.role_of_binary_name
             ?subcommand:parsed.subcommand
