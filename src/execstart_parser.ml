@@ -19,10 +19,12 @@ let string_contains ~needle haystack =
 
 (** Check if word looks like an octez/tezos binary *)
 let is_octez_binary word =
-  let word_lower = String.lowercase_ascii word in
-  string_contains ~needle:"octez-" word_lower
-  || string_contains ~needle:"tezos-baker" word_lower
-  || string_contains ~needle:"tezos-accuser" word_lower
+  (* Extract basename to avoid matching directory paths like /var/lib/octez-external *)
+  let basename = Filename.basename word in
+  let basename_lower = String.lowercase_ascii basename in
+  String.starts_with ~prefix:"octez-" basename_lower
+  || String.starts_with ~prefix:"tezos-baker" basename_lower
+  || String.starts_with ~prefix:"tezos-accuser" basename_lower
 
 (** {1 Shell Unwrapping} *)
 

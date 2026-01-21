@@ -69,15 +69,16 @@ let systemctl_cmd () =
   if Common.is_root () then ["systemctl"] else ["systemctl"; "--user"]
 
 let list_all_service_units () =
-  (* List all service units, including inactive and disabled ones *)
-  let cmd =
-    systemctl_cmd ()
-    @ ["list-units"; "--type=service"; "--all"; "--no-legend"; "--no-pager"]
-  in
-  match Common.run_out cmd with
-  | Ok output ->
-      let lines = String.split_on_char '\n' output in
-      let units =
+  (* List all service units from both loaded units and unit files.
+     This ensures we detect both running services and newly created ones. *)
+  let list_loaded_units () =
+    let cmd =
+      systemctl_cmd ()
+      @ ["list-units"; "--type=service"; "--all"; "--no-legend"; "--no-pager"]
+    in
+    match Common.run_out cmd with
+    | Ok output ->
+        let lines = String.split_on_char '\n' output in
         List.filter_map
           (fun line ->
             let trimmed = String.trim line in
@@ -91,9 +92,51 @@ let list_all_service_units () =
                   Some unit_name
               | _ -> None)
           lines
-      in
-      Ok units
-  | Error (`Msg msg) -> Error msg
+    | Error _ -> []
+  in
+  let list_unit_files () =
+    let cmd =
+      systemctl_cmd ()
+      @ [
+          "list-unit-files";
+          "--type=service";
+          "octez-*.service";
+          "--no-legend";
+          "--no-pager";
+        ]
+    in
+    match Common.run_out cmd with
+    | Ok output ->
+        let lines = String.split_on_char '\n' output in
+        List.filter_map
+          (fun line ->
+            let trimmed = String.trim line in
+            if trimmed = "" then None
+            else
+              (* Line format: "unit.service   enabled/disabled/static" *)
+              (* Extract first field (unit name) *)
+              match String.split_on_char ' ' trimmed with
+              | unit_name :: _
+                when String.ends_with ~suffix:".service" unit_name
+                     (* Skip template units (ending with @.service) *)
+                     && not (String.ends_with ~suffix:"@.service" unit_name) ->
+                  Some unit_name
+              | _ -> None)
+          lines
+    | Error _ -> []
+  in
+  (* Combine both lists and deduplicate *)
+  let loaded = list_loaded_units () in
+  let files = list_unit_files () in
+  let all_units = loaded @ files in
+  (* Deduplicate by converting to a set-like structure *)
+  let unique_units =
+    List.fold_left
+      (fun acc unit -> if List.mem unit acc then acc else unit :: acc)
+      []
+      all_units
+  in
+  Ok (List.rev unique_units)
 
 (** Extract command from systemd's structured ExecStart format.
     Input: "{ path=/bin/foo ; argv[]=/bin/foo --arg val ; ... }"
