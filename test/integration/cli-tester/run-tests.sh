@@ -45,8 +45,18 @@ run_test() {
 
 	log "Running test: $test_name"
 
+	# Record start time for duration tracking
+	local start_time=$(date +%s.%N 2>/dev/null || date +%s)
+
 	if bash -e "$test_file"; then
-		pass "$test_name"
+		# Calculate duration
+		local end_time=$(date +%s.%N 2>/dev/null || date +%s)
+		local duration=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+
+		# Log timing for manifest generation
+		echo "TIMING: $test_file $duration" >>/tmp/test-timings.log
+
+		pass "$test_name (${duration}s)"
 		return 0
 	else
 		fail "$test_name"
@@ -54,34 +64,60 @@ run_test() {
 	fi
 }
 
-# Run tests, optionally filtered by category
+# Run tests with shard support
 run_tests() {
-	local category_filter="${1:-}"
+	local mode="${1:-}"
+	local shard_id="${2:-}"
 	local failed=0
 	local passed=0
 	local tests=()
-	local categories
+	local shard_manifest="$TESTS_DIR/shards.json"
 
-	# Determine which categories to run
-	if [ -n "$category_filter" ]; then
-		categories=("$category_filter")
-		log "Running tests for category: $category_filter"
-	else
-		categories=(node dal baker accuser import)
+	# Determine which tests to run based on mode
+	if [ "$mode" == "--shard" ]; then
+		# Shard mode: load tests from manifest
+		if [ ! -f "$shard_manifest" ]; then
+			fail "Shard manifest not found: $shard_manifest"
+			return 1
+		fi
+
+		log "Running shard $shard_id"
+
+		# Extract test list from JSON manifest
+		# Convert JSON array to bash array
+		while IFS= read -r test_path; do
+			tests+=("$TESTS_DIR/$test_path")
+		done < <(jq -r ".\"shard-${shard_id}\".tests[]" "$shard_manifest" 2>/dev/null)
+
+		if [ ${#tests[@]} -eq 0 ]; then
+			fail "No tests found for shard $shard_id"
+			return 1
+		fi
+
+		log "Shard $shard_id contains ${#tests[@]} tests"
+	elif [ "$mode" == "all" ] || [ -z "$mode" ]; then
+		# All mode: run all tests (for local dev)
 		log "Running all test categories"
-	fi
-
-	# Collect tests in order
-	for category in "${categories[@]}"; do
-		if [ -d "$TESTS_DIR/$category" ]; then
-			for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
+		for category in node dal baker accuser import; do
+			if [ -d "$TESTS_DIR/$category" ]; then
+				for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
+					tests+=("$test")
+				done
+			fi
+		done
+		log "Found ${#tests[@]} tests to run"
+	else
+		# Legacy category mode: run specific category
+		log "Running tests for category: $mode"
+		if [ -d "$TESTS_DIR/$mode" ]; then
+			for test in $(ls "$TESTS_DIR/$mode"/*.sh 2>/dev/null | sort); do
 				tests+=("$test")
 			done
 		fi
-	done
+		log "Found ${#tests[@]} tests in category $mode"
+	fi
 
-	log "Found ${#tests[@]} tests to run"
-
+	# Run all collected tests
 	for test in "${tests[@]}"; do
 		if run_test "$test"; then
 			passed=$((passed + 1))
@@ -101,13 +137,19 @@ run_tests() {
 
 # Main
 main() {
-	local category="${1:-}"
+	local mode="${1:-}"
+	local shard_id="${2:-}"
 
 	log "Starting integration tests..."
 	log "SANDBOX_URL=$SANDBOX_URL"
 	log "NODE_RPC=$NODE_RPC"
-	if [ -n "$category" ]; then
-		log "Category filter: $category"
+
+	if [ "$mode" == "--shard" ]; then
+		log "Mode: Shard-based execution (shard $shard_id)"
+	elif [ -n "$mode" ]; then
+		log "Mode: Category filter ($mode)"
+	else
+		log "Mode: All tests"
 	fi
 
 	# Export for tests
@@ -117,7 +159,11 @@ main() {
 
 	wait_for_sandbox
 
-	run_tests "$category"
+	if [ "$mode" == "--shard" ]; then
+		run_tests --shard "$shard_id"
+	else
+		run_tests "$mode"
+	fi
 }
 
 main "$@"
