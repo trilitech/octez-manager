@@ -171,6 +171,13 @@ jobs:
         run: |
           docker compose exec -T cli-tester /run-tests.sh --shard ${{ matrix.shard }}
 
+      - name: Output timing data
+        if: always()
+        working-directory: test/integration
+        run: |
+          echo "=== Test Timing Data (shard ${{ matrix.shard }}) ==="
+          docker compose exec -T cli-tester cat /tmp/test-timings.log 2>/dev/null || echo "No timing data available"
+
       - name: Collect logs on failure
         if: failure()
         working-directory: test/integration
