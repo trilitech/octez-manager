@@ -4378,6 +4378,61 @@ let bug2_dal_extra_args_preserved () =
     ["--attester-profiles"; "tz1abc"]
     service.Service.extra_args
 
+(** Bug #4: History mode not preserved during import
+    
+    Issue: When importing a node, the history_mode was always hardcoded to
+    Rolling, even if the original service used Archive or Full mode. This
+    meant imported nodes would have incorrect metadata.
+    
+    Fix: Parse history_mode from ExecStart arguments and use it when creating
+    the service, defaulting to Rolling only if not specified.
+    
+    This test verifies the Execstart_parser extracts history_mode correctly. *)
+
+let bug4_history_mode_preserved () =
+  (* Test that Execstart_parser extracts history mode from command line *)
+  let exec_start =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node \
+     --history-mode=archive --rpc-addr=localhost:8732"
+  in
+  let parsed = Execstart_parser.parse exec_start in
+  Alcotest.(check (option string))
+    "history mode extracted from ExecStart"
+    (Some "archive")
+    parsed.history_mode ;
+
+  (* Test with full mode *)
+  let exec_start_full =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node \
+     --history-mode=full"
+  in
+  let parsed_full = Execstart_parser.parse exec_start_full in
+  Alcotest.(check (option string))
+    "full history mode extracted"
+    (Some "full")
+    parsed_full.history_mode ;
+
+  (* Test with rolling mode explicit *)
+  let exec_start_rolling =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node \
+     --history-mode=rolling"
+  in
+  let parsed_rolling = Execstart_parser.parse exec_start_rolling in
+  Alcotest.(check (option string))
+    "rolling history mode extracted"
+    (Some "rolling")
+    parsed_rolling.history_mode ;
+
+  (* Test with no history mode (should be None, defaults to Rolling in import) *)
+  let exec_start_none =
+    "ExecStart=/usr/bin/octez-node run --data-dir=/data/node"
+  in
+  let parsed_none = Execstart_parser.parse exec_start_none in
+  Alcotest.(check (option string))
+    "no history mode returns None"
+    None
+    parsed_none.history_mode
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -5069,5 +5124,12 @@ let () =
             "dal_extra_args_preserved"
             `Quick
             bug2_dal_extra_args_preserved;
+        ] );
+      ( "bug4_history_mode_preserved",
+        [
+          Alcotest.test_case
+            "history_mode_from_execstart"
+            `Quick
+            bug4_history_mode_preserved;
         ] );
     ]
