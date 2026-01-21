@@ -96,7 +96,7 @@ let install_baker ?(quiet = false) (request : baker_request) =
         service_user = request.service_user;
         app_bin_dir = request.app_bin_dir;
         logging_mode = request.logging_mode;
-        service_args = [];
+        service_args = request.extra_args;
         extra_env =
           [
             ("OCTEZ_BAKER_BASE_DIR", base_dir);
