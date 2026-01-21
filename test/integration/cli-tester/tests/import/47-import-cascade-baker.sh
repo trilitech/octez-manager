@@ -16,11 +16,11 @@ cleanup_instance "$NODE_INSTANCE" || true
 cleanup_instance "$BAKER_INSTANCE" || true
 rm -rf "$NODE_DATA" "$BAKER_DATA" || true
 for inst in "$NODE_INSTANCE" "$BAKER_INSTANCE"; do
-    for role in node baker; do
-        systemctl stop "octez-${role}@${inst}.service" 2>/dev/null || true
-        systemctl disable "octez-${role}@${inst}.service" 2>/dev/null || true
-        rm -f "/etc/systemd/system/octez-${role}@${inst}.service" || true
-    done
+	for role in node baker; do
+		systemctl stop "octez-${role}@${inst}.service" 2>/dev/null || true
+		systemctl disable "octez-${role}@${inst}.service" 2>/dev/null || true
+		rm -f "/etc/systemd/system/octez-${role}@${inst}.service" || true
+	done
 done
 systemctl daemon-reload
 
@@ -44,25 +44,25 @@ systemctl enable "octez-baker@${BAKER_INSTANCE}.service"
 
 # Import baker with cascade
 echo "Importing baker with cascade (should also import node)..."
-om import "octez-baker@${BAKER_INSTANCE}" --cascade 2>&1 || {
-# Stop services to avoid long sync
-systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
-systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
-    echo "Import command failed, checking what was imported..."
-    om list 2>&1
+om import "octez-baker@${BAKER_INSTANCE}" --cascade --network shadownet 2>&1 || {
+	# Stop services to avoid long sync
+	systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
+	systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
+	echo "Import command failed, checking what was imported..."
+	om list 2>&1
 }
 
 # Verify both node and baker are now managed
 if ! service_is_managed "$NODE_INSTANCE"; then
-    echo "ERROR: Node should be imported as part of cascade"
-    om list 2>&1
-    exit 1
+	echo "ERROR: Node should be imported as part of cascade"
+	om list 2>&1
+	exit 1
 fi
 
 if ! service_is_managed "$BAKER_INSTANCE"; then
-    echo "ERROR: Baker should be imported"
-    om list 2>&1
-    exit 1
+	echo "ERROR: Baker should be imported"
+	om list 2>&1
+	exit 1
 fi
 
 echo "Cascade import successful"
