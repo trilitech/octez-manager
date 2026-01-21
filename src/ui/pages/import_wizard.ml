@@ -431,14 +431,14 @@ let handle_key ps key ~size:_ =
     | SelectService, Some Keys.Up -> move_selection ps (-1)
     | SelectService, Some Keys.Down -> move_selection ps 1
     | SelectService, Some Keys.Enter -> next_step ps
-    | SelectService, Some (Keys.Char "Esc") -> Navigation.back ps
+    | SelectService, Some Keys.Escape -> Navigation.back ps
     | ConfigureImport, Some (Keys.Char " ") -> toggle_strategy ps
     | ConfigureImport, Some Keys.Tab -> next_step ps
     | ConfigureImport, Some Keys.Enter -> next_step ps
-    | ConfigureImport, Some (Keys.Char "Esc") -> back ps
+    | ConfigureImport, Some Keys.Escape -> back ps
     | ReviewImport, Some Keys.Enter -> next_step ps
-    | ReviewImport, Some (Keys.Char "Esc") -> back ps
-    | Importing, Some (Keys.Char "Esc") ->
+    | ReviewImport, Some Keys.Escape -> back ps
+    | Importing, Some Keys.Escape ->
         (* Allow exiting from Importing state *)
         Navigation.back ps
     | _ -> ps
