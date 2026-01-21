@@ -301,7 +301,7 @@ let view ps ~focus:_ ~size =
                    "";
                  ]
                else [])
-            @ [""; "Space: Toggle strategy  Tab: Next  Esc: Back"])
+            @ [""; "Space: Toggle strategy  Tab/Enter: Next  Esc: Back"])
     | ReviewImport -> (
         match s.selected_service with
         | None -> ["Error: No service selected"]
@@ -393,7 +393,7 @@ let view ps ~focus:_ ~size =
                       "";
                       Widgets.fg 10 "  ✓ Import succeeded!";
                       "";
-                      "  Navigating to instances...";
+                      "  Press Esc to return to instances";
                       "";
                     ]
                 | Job_manager.Failed msg ->
@@ -433,11 +433,14 @@ let handle_key ps key ~size:_ =
     | SelectService, Some Keys.Enter -> next_step ps
     | SelectService, Some (Keys.Char "Esc") -> Navigation.back ps
     | ConfigureImport, Some (Keys.Char " ") -> toggle_strategy ps
-    | ConfigureImport, Some (Keys.Char "Tab") -> next_step ps
+    | ConfigureImport, Some Keys.Tab -> next_step ps
+    | ConfigureImport, Some Keys.Enter -> next_step ps
     | ConfigureImport, Some (Keys.Char "Esc") -> back ps
     | ReviewImport, Some Keys.Enter -> next_step ps
     | ReviewImport, Some (Keys.Char "Esc") -> back ps
-    | Importing, Some (Keys.Char "Esc") -> Navigation.back ps
+    | Importing, Some (Keys.Char "Esc") ->
+        (* Allow exiting from Importing state *)
+        Navigation.back ps
     | _ -> ps
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
