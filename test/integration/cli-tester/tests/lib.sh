@@ -244,6 +244,7 @@ create_external_service() {
 
 	local unit_name="octez-${role}@${instance}.service"
 	local unit_dir="/etc/systemd/system"
+	local octez_bin_path="/usr/local/bin"
 
 	mkdir -p "$unit_dir"
 	mkdir -p "$data_dir"
@@ -259,7 +260,7 @@ After=network.target
 [Service]
 Type=simple
 User=tezos
-ExecStart=$OCTEZ_BIN_DIR/octez-node run --data-dir $data_dir --network $network --rpc-addr $rpc_addr
+ExecStart=$octez_bin_path/octez-node run --data-dir $data_dir --network $network --rpc-addr $rpc_addr
 Restart=on-failure
 RestartSec=5
 
@@ -278,7 +279,7 @@ Requires=octez-node@${instance}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=$OCTEZ_BIN_DIR/octez-baker-PsParisC run --endpoint $node_endpoint with local node $data_dir
+ExecStart=$octez_bin_path/octez-baker-PsParisC run --endpoint $node_endpoint with local node $data_dir
 Restart=on-failure
 RestartSec=5
 
@@ -315,7 +316,8 @@ start_unmanaged_process() {
 	local binary="$1"
 	shift
 	local args="$@"
+	local octez_bin_path="/usr/local/bin"
 
-	su -s /bin/sh tezos -c "$OCTEZ_BIN_DIR/$binary $args" &
+	su -s /bin/sh tezos -c "$octez_bin_path/$binary $args" &
 	echo $!
 }

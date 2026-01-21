@@ -38,10 +38,10 @@ fi
 
 echo "External service detected correctly"
 
-# Verify it shows up with 'external' marker
-if ! om list 2>&1 | grep -i "external" | grep -q "$INSTANCE"; then
+# Verify it shows up with 'external' marker when using --all or --external
+if ! om list --external 2>&1 | grep -q "$INSTANCE"; then
 	echo "ERROR: External service not marked as external"
-	om list 2>&1
+	om list --external 2>&1
 	exit 1
 fi
 
