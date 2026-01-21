@@ -50,7 +50,7 @@ jobs:
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
-      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
+      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL || 'https://github.com/trilitech/miaou.git' }}
 
     steps:
       - name: Checkout
@@ -63,18 +63,17 @@ jobs:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
 
-      - name: Pin miaou packages
+      - name: Update miaou packages if needed
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
-          if [ -z "$MIAOU_GIT_URL" ]; then
-            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
-            exit 1
-          fi
-          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
+          # Miaou is pre-installed in CI image
+          # Only re-pin if miaou-version changed (cache miss)
+          MIAOU_URL="${MIAOU_GIT_URL:-https://github.com/trilitech/miaou.git}"
+          opam pin add miaou-core "$MIAOU_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_URL" --no-action
+          opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-runner
 
       - name: Cache dune build
         uses: actions/cache@v4
@@ -100,11 +99,18 @@ jobs:
           cp _build/default/src/main.exe artifacts/octez-manager
           chmod +x artifacts/octez-manager
 
-      - name: Upload artifact
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: octez-manager-static
           path: artifacts/octez-manager
+          retention-days: 1
+
+      - name: Upload build directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: dune-build
+          path: _build
           retention-days: 1
 
   unit-tests:
@@ -119,23 +125,22 @@ jobs:
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
-      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dune-build
+          path: _build
 
       - name: Cache opam packages
         uses: actions/cache@v4
         with:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
-
-      - name: Cache dune build
-        uses: actions/cache@v4
-        with:
-          path: _build
-          key: dune-${{ runner.os }}-${{ hashFiles('src/**', 'dune-project') }}
 
       - name: Run unit tests
         run: |
@@ -173,13 +178,27 @@ jobs:
         with:
           driver: docker-container
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and start containers
         working-directory: test/integration
         env:
           DOCKER_BUILDKIT: 1
+          BUILDKIT_INLINE_CACHE: 1
         run: |
-          # Build with cache and start
-          docker compose up -d --build
+          # Pull base image (shared across all shards)
+          docker pull ghcr.io/${{ github.repository }}/test-base:latest || true
+          
+          # Build with aggressive caching
+          docker compose build --build-arg BUILDKIT_INLINE_CACHE=1
+          
+          # Start containers
+          docker compose up -d
 
           # Wait for sandbox to be healthy
           echo "Waiting for sandbox..."
@@ -238,7 +257,7 @@ jobs:
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
-      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
+      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL || 'https://github.com/trilitech/miaou.git' }}
 
     steps:
       - name: Checkout
@@ -251,14 +270,16 @@ jobs:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
 
-      - name: Pin miaou packages
+      - name: Update miaou packages if needed
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
+          # Miaou is pre-installed in CI image
+          # Only re-pin if miaou-version changed (cache miss)
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
+          opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-runner
 
       - name: Build static binary
         run: |
