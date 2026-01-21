@@ -15,6 +15,22 @@ let import_cmd =
         dry_run interactive =
       Capabilities.register () ;
 
+      (* Validate that editor is available if interactive mode is requested *)
+      (if interactive then
+         match Sys.getenv_opt "VISUAL" with
+         | Some v when v <> "" -> ()
+         | _ -> (
+             match Sys.getenv_opt "EDITOR" with
+             | Some e when e <> "" -> ()
+             | _ ->
+                 Format.eprintf
+                   "@[<v>Warning: Neither $VISUAL nor $EDITOR environment \
+                    variables are set.@,\
+                    The editor will fall back to 'sensible-editor', 'vi', or \
+                    '/usr/bin/vi'.@,\
+                    Set $EDITOR to your preferred editor to avoid this \
+                    message.@]@.")) ;
+
       (* 1. Find the external service by name *)
       match External_service_detector.detect () with
       | Error msg ->
