@@ -222,16 +222,34 @@ let unlink_directory ld =
 let download_version (version_info : Binary_downloader.version_info) =
   (* Start download in background *)
   Background_runner.enqueue (fun () ->
-      Context.toast_info
-        (Printf.sprintf
-           "Downloading v%s..."
-           version_info.Binary_downloader.version) ;
-      match
+      let version = version_info.Binary_downloader.version in
+      Context.toast_info (Printf.sprintf "Downloading v%s..." version) ;
+      Context.progress_start
+        ~label:(Printf.sprintf "Downloading Octez v%s" version)
+        ~estimate_secs:120.0
+        ~width:50 ;
+
+      let progress ~downloaded ~total =
+        match total with
+        | Some t ->
+            let pct = Int64.(to_float downloaded /. to_float t) in
+            Context.progress_set ~progress:pct ()
+        | None ->
+            (* Unknown total, just show spinner *)
+            ()
+      in
+
+      let result =
         Binary_downloader.download_version
-          ~version:version_info.version
+          ~version
           ~verify_checksums:true
+          ~progress
           ()
-      with
+      in
+
+      Context.progress_finish () ;
+
+      match result with
       | Ok result ->
           Context.toast_success
             (Printf.sprintf "Downloaded v%s" result.Binary_downloader.version) ;
@@ -405,6 +423,11 @@ let view ps ~focus:_ ~size:_ =
         in
         add (if is_selected then Widgets.bold line else line))
       s.available_versions ;
+
+  (* Add progress bar at the bottom if active *)
+  add "" ;
+  let progress_line = Context.render_progress ~cols:80 in
+  if String.trim progress_line <> "" then add progress_line ;
 
   String.concat "\n" (List.rev !lines)
 

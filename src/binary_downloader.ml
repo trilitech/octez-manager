@@ -331,23 +331,31 @@ let verify_checksum ~filepath ~expected_hash =
 (** Download utilities *)
 
 let download_file_curl ~url ~dest ?progress () =
-  let cmd =
-    [
-      "curl";
-      "-fsSL";
-      (* -s silent, -S show errors, -f fail on HTTP errors, -L follow redirects *)
-      "--max-time";
-      "300";
-      "--connect-timeout";
-      "10";
-      "-o";
-      dest;
-      url;
-    ]
-  in
-  let _ = progress in
-  (* TODO: Implement progress reporting via curl progress *)
-  Common.run_silent cmd
+  match progress with
+  | Some callback ->
+      (* Use progress-aware download *)
+      let on_progress current total =
+        let downloaded = Int64.of_int current in
+        let total_opt = Option.map Int64.of_int total in
+        callback ~downloaded ~total:total_opt
+      in
+      Common.download_file_with_progress ~url ~dest_path:dest ~on_progress
+  | None ->
+      (* Fallback to simple curl without progress *)
+      let cmd =
+        [
+          "curl";
+          "-fsSL";
+          "--max-time";
+          "300";
+          "--connect-timeout";
+          "10";
+          "-o";
+          dest;
+          url;
+        ]
+      in
+      Common.run cmd
 
 let download_binary ~version ~arch ~binary ~dest_dir ?progress () =
   let url = binary_url ~version ~arch ~binary in
