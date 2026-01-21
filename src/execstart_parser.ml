@@ -99,11 +99,14 @@ let extract_binary_path exec_start =
 type parsed_args = {
   binary_path : string option;
   subcommand : string option; (* e.g., "run", "dal" for octez-baker *)
+  run_mode : string option;
+      (* For baker/accuser: "with local node" or "remotely" *)
   data_dir : string option;
   base_dir : string option;
   rpc_addr : string option;
   net_addr : string option;
   endpoint : string option;
+  dal_endpoint : string option;
   history_mode : string option;
   network : string option;
   extra_args : string list;
@@ -114,11 +117,13 @@ let empty_args =
   {
     binary_path = None;
     subcommand = None;
+    run_mode = None;
     data_dir = None;
     base_dir = None;
     rpc_addr = None;
     net_addr = None;
     endpoint = None;
+    dal_endpoint = None;
     history_mode = None;
     network = None;
     extra_args = [];
@@ -212,6 +217,16 @@ let rec parse_args_list words acc =
             acc
         in
         parse_args_list new_rest new_acc
+      else if String.starts_with ~prefix:"--dal-node" word then
+        let new_rest, new_acc =
+          parse_flag_value
+            ~flag_name:"dal-node"
+            ~setter:(fun a v -> {a with dal_endpoint = Some v})
+            word
+            rest
+            acc
+        in
+        parse_args_list new_rest new_acc
       else if String.starts_with ~prefix:"--history-mode" word then
         let new_rest, new_acc =
           parse_flag_value
@@ -250,6 +265,16 @@ let rec parse_args_list words acc =
       else if acc.subcommand = Some "run" && word = "dal" then
         (* Special case: 'octez-baker run dal' -> change subcommand to 'dal' *)
         parse_args_list rest {acc with subcommand = Some "dal"}
+      else if acc.subcommand = Some "run" && word = "with" then
+        (* Baker: 'run with local node' *)
+        match rest with
+        | "local" :: "node" :: rest' ->
+            parse_args_list rest' {acc with run_mode = Some "with local node"}
+        | _ ->
+            parse_args_list rest {acc with extra_args = word :: acc.extra_args}
+      else if acc.subcommand = Some "run" && word = "remotely" then
+        (* Baker: 'run remotely' *)
+        parse_args_list rest {acc with run_mode = Some "remotely"}
       else
         (* Other argument *)
         parse_args_list rest {acc with extra_args = word :: acc.extra_args}

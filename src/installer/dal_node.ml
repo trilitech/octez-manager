@@ -51,12 +51,17 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
     let args_entry =
       if service_args = "" then [] else [("OCTEZ_SERVICE_ARGS", service_args)]
     in
-    ("OCTEZ_DATA_DIR", request.data_dir)
-    :: ("OCTEZ_NETWORK", request.network)
-    :: args_entry
-    @ request.extra_env
+    [
+      ("OCTEZ_DAL_DATA_DIR", request.data_dir);
+      ("OCTEZ_DAL_RPC_ADDR", request.rpc_addr);
+      ("OCTEZ_DAL_NET_ADDR", request.net_addr);
+      ("OCTEZ_NETWORK", request.network);
+    ]
+    @ args_entry @ request.extra_env
   in
-  let* () = Node_env.write_pairs ~inst:request.instance extra_env in
+  let* () =
+    Node_env.write_pairs ~with_comments:true ~inst:request.instance extra_env
+  in
   let* () =
     Systemd.install_unit
       ~quiet
@@ -85,7 +90,8 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ()
   in
   let* () =
-    reown_runtime_paths ~owner ~group ~paths:directories ~logging_mode
+    if request.preserve_data then Ok ()
+    else reown_runtime_paths ~owner ~group ~paths:directories ~logging_mode
   in
   (* In edit mode, preserve existing dependents list *)
   let existing_dependents =

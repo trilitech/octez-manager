@@ -151,3 +151,18 @@ val unknown_field_names : detected_config -> string list
 
 (** List names of fields with permission denied. *)
 val permission_denied_fields : detected_config -> string list
+
+(** {1 Dependency Resolution} *)
+
+(** Get list of services this one depends on via endpoint matching.
+    Matches node_endpoint and dal_endpoint against RPC addresses.
+    @param external_svc The service to analyze
+    @param all_services List of all external services to match against
+    @return List of (unit_name, role_str) tuples *)
+val get_dependencies : t -> t list -> (string * string) list
+
+(** Get list of services that depend on this one (reverse lookup).
+    @param external_svc The service to analyze
+    @param all_services List of all external services to check
+    @return List of (unit_name, role_str) tuples that depend on this *)
+val get_dependents : t -> t list -> (string * string) list
