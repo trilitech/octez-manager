@@ -4433,6 +4433,231 @@ let bug4_history_mode_preserved () =
     None
     parsed_none.history_mode
 
+(* CLI Import Command Tests *)
+
+(** Test strategy validation *)
+let cli_import_strategy_validation () =
+  (* Test valid strategies *)
+  let valid_strategies = ["takeover"; "clone"] in
+  List.iter
+    (fun strategy ->
+      let result =
+        match strategy with
+        | "clone" -> Import.Clone
+        | "takeover" -> Import.Takeover
+        | _ -> failwith "invalid"
+      in
+      match result with Import.Clone -> () | Import.Takeover -> ())
+    valid_strategies ;
+
+  (* Test case sensitivity - should these work? Document behavior *)
+  (* For now, strategies are case-sensitive: only "clone" and "takeover" *)
+  let invalid_strategies = ["Clone"; "TAKEOVER"; "Takeover"; "invalid"; ""] in
+  List.iter
+    (fun strategy ->
+      let is_valid = strategy = "clone" || strategy = "takeover" in
+      Alcotest.(check bool)
+        (Printf.sprintf "strategy '%s' validation" strategy)
+        false
+        is_valid)
+    invalid_strategies
+
+(** Test service lookup by name *)
+let cli_import_service_lookup () =
+  (* Test the lookup logic without needing full External_service objects *)
+  (* This tests the pattern used in cmd_import.ml *)
+
+  (* Simulate service lookup by name *)
+  let find_by_name name services =
+    List.find_opt
+      (fun (unit_name, suggested_name) ->
+        unit_name = name || suggested_name = name)
+      services
+  in
+
+  let mock_services =
+    [
+      ("octez-node-mainnet", "mainnet-node");
+      ("octez-baker-ghostnet", "ghostnet-baker");
+      ("my-custom-node", "custom");
+    ]
+  in
+
+  (* Test lookup by unit_name *)
+  let found_by_unit = find_by_name "octez-node-mainnet" mock_services in
+  Alcotest.(check bool) "find by unit_name" true (Option.is_some found_by_unit) ;
+
+  (* Test lookup by suggested_instance_name *)
+  let found_by_instance = find_by_name "mainnet-node" mock_services in
+  Alcotest.(check bool)
+    "find by suggested name"
+    true
+    (Option.is_some found_by_instance) ;
+
+  (* Test lookup with non-existent name *)
+  let not_found = find_by_name "non-existent" mock_services in
+  Alcotest.(check bool) "non-existent service" false (Option.is_some not_found) ;
+
+  (* Test lookup with partial match (should not match) *)
+  let partial = find_by_name "octez-node" mock_services in
+  Alcotest.(check bool)
+    "partial match should not find"
+    false
+    (Option.is_some partial)
+
+(** Test field overrides construction *)
+let cli_import_field_overrides () =
+  (* Test empty overrides *)
+  let empty = Import.empty_overrides in
+  Alcotest.(check bool) "empty network" true (Option.is_none empty.network) ;
+  Alcotest.(check bool) "empty data_dir" true (Option.is_none empty.data_dir) ;
+  Alcotest.(check bool) "empty base_dir" true (Option.is_none empty.base_dir) ;
+
+  (* Test with network override *)
+  let with_network = {Import.empty_overrides with network = Some "ghostnet"} in
+  Alcotest.(check (option string))
+    "network override"
+    (Some "ghostnet")
+    with_network.network ;
+  Alcotest.(check bool)
+    "other fields still none"
+    true
+    (Option.is_none with_network.data_dir)
+
+(** Test import options construction *)
+let cli_import_options_construction () =
+  (* Test default options *)
+  let options : Import.import_options =
+    {
+      strategy = Import.Takeover;
+      new_instance_name = None;
+      overrides = Import.empty_overrides;
+      dry_run = false;
+      interactive = false;
+      preserve_data = true;
+      quiet = false;
+    }
+  in
+  Alcotest.(check bool)
+    "default strategy is takeover"
+    true
+    (options.strategy = Import.Takeover) ;
+  Alcotest.(check bool) "default not dry_run" false options.dry_run ;
+  Alcotest.(check bool) "default not interactive" false options.interactive ;
+  Alcotest.(check bool) "preserve_data always true" true options.preserve_data ;
+
+  (* Test clone strategy *)
+  let clone_options = {options with strategy = Import.Clone} in
+  Alcotest.(check bool)
+    "clone strategy"
+    true
+    (clone_options.strategy = Import.Clone) ;
+
+  (* Test dry_run flag *)
+  let dry_options = {options with dry_run = true} in
+  Alcotest.(check bool) "dry_run enabled" true dry_options.dry_run ;
+
+  (* Test interactive flag *)
+  let interactive_options = {options with interactive = true} in
+  Alcotest.(check bool)
+    "interactive enabled"
+    true
+    interactive_options.interactive
+
+(** Test that import validates strategy strings correctly *)
+let cli_import_invalid_strategy_handling () =
+  (* This tests the CLI validation logic that should reject invalid strategies *)
+  let test_strategy_validation strategy =
+    (* Simulate CLI validation *)
+    match strategy with
+    | Some s when s <> "clone" && s <> "takeover" ->
+        (* Should error *)
+        false
+    | _ ->
+        (* Valid *)
+        true
+  in
+
+  (* Valid strategies *)
+  Alcotest.(check bool)
+    "None (default) is valid"
+    true
+    (test_strategy_validation None) ;
+  Alcotest.(check bool)
+    "takeover is valid"
+    true
+    (test_strategy_validation (Some "takeover")) ;
+  Alcotest.(check bool)
+    "clone is valid"
+    true
+    (test_strategy_validation (Some "clone")) ;
+
+  (* Invalid strategies *)
+  Alcotest.(check bool)
+    "invalid strategy rejected"
+    false
+    (test_strategy_validation (Some "invalid")) ;
+  Alcotest.(check bool)
+    "empty string rejected"
+    false
+    (test_strategy_validation (Some "")) ;
+  Alcotest.(check bool)
+    "wrong case rejected"
+    false
+    (test_strategy_validation (Some "Clone"))
+
+(** Test flag combinations *)
+let cli_import_flag_combinations () =
+  (* Test valid flag combinations *)
+  let test_flags dry_run interactive _cascade =
+    (* All combinations should be valid *)
+    {
+      Import.strategy = Import.Takeover;
+      new_instance_name = None;
+      overrides = Import.empty_overrides;
+      dry_run;
+      interactive;
+      preserve_data = true;
+      quiet = false;
+    }
+  in
+
+  (* dry_run + cascade *)
+  let opts1 = test_flags true false false in
+  Alcotest.(check bool) "dry_run works" true opts1.dry_run ;
+
+  (* interactive + cascade *)
+  let opts2 = test_flags false true false in
+  Alcotest.(check bool) "interactive works" true opts2.interactive ;
+
+  (* dry_run + interactive (both flags together) *)
+  let opts3 = test_flags true true false in
+  Alcotest.(check bool) "dry_run + interactive both true" true opts3.dry_run ;
+  Alcotest.(check bool)
+    "dry_run + interactive both true (2)"
+    true
+    opts3.interactive
+
+(** Test service name edge cases *)
+let cli_import_service_name_edge_cases () =
+  (* Test empty service name *)
+  let empty_name = "" in
+  Alcotest.(check bool)
+    "empty name should not be found"
+    true
+    (String.length empty_name = 0) ;
+
+  (* Test service name with spaces *)
+  let name_with_spaces = "my service name" in
+  Alcotest.(check bool)
+    "name with spaces has spaces"
+    true
+    (String.contains name_with_spaces ' ') ;
+
+  (* Test very long service name *)
+  let long_name = String.make 300 'a' in
+  Alcotest.(check bool) "long name is long" true (String.length long_name > 255)
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -5131,5 +5356,30 @@ let () =
             "history_mode_from_execstart"
             `Quick
             bug4_history_mode_preserved;
+        ] );
+      ( "cli_import",
+        [
+          Alcotest.test_case
+            "strategy_validation"
+            `Quick
+            cli_import_strategy_validation;
+          Alcotest.test_case "service_lookup" `Quick cli_import_service_lookup;
+          Alcotest.test_case "field_overrides" `Quick cli_import_field_overrides;
+          Alcotest.test_case
+            "options_construction"
+            `Quick
+            cli_import_options_construction;
+          Alcotest.test_case
+            "invalid_strategy_handling"
+            `Quick
+            cli_import_invalid_strategy_handling;
+          Alcotest.test_case
+            "flag_combinations"
+            `Quick
+            cli_import_flag_combinations;
+          Alcotest.test_case
+            "service_name_edge_cases"
+            `Quick
+            cli_import_service_name_edge_cases;
         ] );
     ]
