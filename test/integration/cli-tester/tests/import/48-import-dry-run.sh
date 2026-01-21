@@ -30,7 +30,8 @@ sleep 2
 # Run dry-run
 echo "Running dry-run import..."
 om import "octez-node@${INSTANCE}" --dry-run 2>&1 >/tmp/dryrun_output.txt || true
-n# Stop service
+
+# Stop service
 systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
 
 cat /tmp/dryrun_output.txt
