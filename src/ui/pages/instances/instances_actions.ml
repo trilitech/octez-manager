@@ -559,10 +559,29 @@ let rec update_version_modal svc =
   let instance = svc.Service.instance in
   let current_bin_source = Service.get_bin_source svc in
 
-  (* Load available versions *)
+  (* Get current version if managed, for filtering *)
+  let current_version_opt =
+    match current_bin_source with
+    | Binary_registry.Managed_version v -> Some v
+    | _ -> None
+  in
+
+  (* Load available versions - filter to only newer or equal versions *)
   let managed_versions =
     match Binary_registry.list_managed_versions () with
-    | Ok versions -> List.map (fun v -> ManagedVersion v) versions
+    | Ok versions ->
+        let filtered_versions =
+          match current_version_opt with
+          | Some current_v ->
+              (* Only include versions >= current version *)
+              List.filter
+                (fun v -> Binary_registry.compare_versions v current_v >= 0)
+                versions
+          | None ->
+              (* No current version (linked/raw path), show all *)
+              versions
+        in
+        List.map (fun v -> ManagedVersion v) filtered_versions
     | Error _ -> []
   in
 
