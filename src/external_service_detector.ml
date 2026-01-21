@@ -440,7 +440,9 @@ let build_external_service ~unit_name ~exec_start ~properties =
             binary
         in
         (* DEBUG: Log detected role *)
-        Printf.eprintf "DEBUG [%s]: detected role = %s\n%!" unit_name
+        Printf.eprintf
+          "DEBUG [%s]: detected role = %s\n%!"
+          unit_name
           (match role with
           | External_service.Node -> "Node"
           | External_service.Baker -> "Baker"
