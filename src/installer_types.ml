@@ -120,3 +120,8 @@ type snapshot_metadata = {
 }
 
 type file_backup = {tmp_path : string; original_path : string}
+
+(** Strategy for importing external services *)
+type import_strategy =
+  | Takeover  (** Take over the external service (stop and disable it) *)
+  | Clone  (** Create a clone, leave original running *)

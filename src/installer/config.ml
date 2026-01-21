@@ -66,7 +66,8 @@ let build_run_args ~network ~history_mode ~rpc_addr ~net_addr ~extra_args
     ]
   in
   (* Logging is via journald - octez binaries handle their own file logging *)
-  String.concat " " (base @ extra_args)
+  (* Shell-quote all arguments to prevent glob expansion when env file is sourced *)
+  Common.cmd_to_string (base @ extra_args)
 
 let prepare_logging ~instance:_ ~role:_ ~logging_mode:_ =
   (* Always use journald *)

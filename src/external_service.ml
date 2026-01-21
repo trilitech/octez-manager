@@ -213,3 +213,103 @@ let permission_denied_fields config =
   |> check "rpc_addr" config.rpc_addr
   |> check "network" config.network
   |> List.rev
+
+(** {1 Dependency Resolution} *)
+
+(** Extract host:port from an endpoint URL.
+    Examples:
+    - "http://localhost:8736" -> Some ("localhost", 8736)
+    - "http://127.0.0.1:10736" -> Some ("127.0.0.1", 10736) *)
+let parse_endpoint url =
+  try
+    let uri = Uri.of_string url in
+    match (Uri.host uri, Uri.port uri) with
+    | Some host, Some port -> Some (host, port)
+    | Some host, None ->
+        let port = if Uri.scheme uri = Some "https" then 443 else 80 in
+        Some (host, port)
+    | _ -> None
+  with _ -> None
+
+(** Check if an endpoint matches a service's RPC address. *)
+let endpoint_matches_rpc ~endpoint ~rpc_addr =
+  match (parse_endpoint endpoint, rpc_addr) with
+  | Some (ep_host, ep_port), addr -> (
+      match String.split_on_char ':' addr with
+      | [host; port] | [""; host; port] -> (
+          try
+            let rpc_port = int_of_string port in
+            let rpc_host = if host = "" then "0.0.0.0" else host in
+            let normalize h =
+              if h = "localhost" || h = "127.0.0.1" || h = "0.0.0.0" then
+                "localhost"
+              else h
+            in
+            ep_port = rpc_port && normalize ep_host = normalize rpc_host
+          with _ -> false)
+      | _ -> false)
+  | _ -> false
+
+(** Get services this one depends on via endpoint matching. *)
+let get_dependencies external_svc all_services =
+  let config = external_svc.config in
+  let deps = ref [] in
+  (* Check node_endpoint *)
+  (match config.node_endpoint.value with
+  | Some endpoint ->
+      List.iter
+        (fun (other : t) ->
+          if other.config.unit_name <> config.unit_name then
+            match other.config.rpc_addr.value with
+            | Some rpc ->
+                if endpoint_matches_rpc ~endpoint ~rpc_addr:rpc then
+                  let role_str =
+                    match other.config.role.value with
+                    | Some r -> role_to_string r
+                    | None -> "unknown"
+                  in
+                  deps := (other.config.unit_name, role_str) :: !deps
+            | None -> ())
+        all_services
+  | None -> ()) ;
+  (* Check dal_endpoint *)
+  (match config.dal_endpoint.value with
+  | Some endpoint ->
+      List.iter
+        (fun (other : t) ->
+          if other.config.unit_name <> config.unit_name then
+            match other.config.rpc_addr.value with
+            | Some rpc ->
+                if endpoint_matches_rpc ~endpoint ~rpc_addr:rpc then
+                  let role_str =
+                    match other.config.role.value with
+                    | Some r -> role_to_string r
+                    | None -> "unknown"
+                  in
+                  if not (List.mem (other.config.unit_name, role_str) !deps)
+                  then deps := (other.config.unit_name, role_str) :: !deps
+            | None -> ())
+        all_services
+  | None -> ()) ;
+  List.rev !deps
+
+(** Get services that depend on this one (reverse lookup). *)
+let get_dependents external_svc all_services =
+  List.filter_map
+    (fun (other : t) ->
+      if other.config.unit_name <> external_svc.config.unit_name then
+        let other_deps = get_dependencies other all_services in
+        if
+          List.exists
+            (fun (name, _) -> name = external_svc.config.unit_name)
+            other_deps
+        then
+          let role_str =
+            match other.config.role.value with
+            | Some r -> role_to_string r
+            | None -> "unknown"
+          in
+          Some (other.config.unit_name, role_str)
+        else None
+      else None)
+    all_services

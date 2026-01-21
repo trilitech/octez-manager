@@ -769,6 +769,12 @@ let restart_unit ~unit_name =
   (* Restart = stop + start. *)
   run_systemctl_timeout ~quiet:false ~duration:"60s" ["restart"; unit_name]
 
+let enable_unit unit_name =
+  run_systemctl_timeout ~quiet:false ~duration:"10s" ["enable"; unit_name]
+
+let disable_unit unit_name =
+  run_systemctl_timeout ~quiet:false ~duration:"10s" ["disable"; unit_name]
+
 let start ?quiet:_ ~role ~instance () =
   start_unit ~unit_name:(unit_name role instance)
 
