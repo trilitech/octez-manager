@@ -21,103 +21,103 @@ source "$TESTS_DIR/lib.sh"
 
 # Wait for sandbox to be ready
 wait_for_sandbox() {
-    log "Waiting for sandbox at $SANDBOX_URL..."
-    local max_attempts=60
-    local attempt=0
+	log "Waiting for sandbox at $SANDBOX_URL..."
+	local max_attempts=60
+	local attempt=0
 
-    while [ $attempt -lt $max_attempts ]; do
-        if curl -sf "$SANDBOX_URL/health" | jq -e '.status == "ready"' >/dev/null 2>&1; then
-            log "Sandbox is ready"
-            return 0
-        fi
-        attempt=$((attempt + 1))
-        sleep 2
-    done
+	while [ $attempt -lt $max_attempts ]; do
+		if curl -sf "$SANDBOX_URL/health" | jq -e '.status == "ready"' >/dev/null 2>&1; then
+			log "Sandbox is ready"
+			return 0
+		fi
+		attempt=$((attempt + 1))
+		sleep 2
+	done
 
-    fail "Sandbox did not become ready"
-    return 1
+	fail "Sandbox did not become ready"
+	return 1
 }
 
 # Run a single test
 run_test() {
-    local test_file="$1"
-    local test_name=$(basename "$test_file" .sh)
+	local test_file="$1"
+	local test_name=$(basename "$test_file" .sh)
 
-    log "Running test: $test_name"
+	log "Running test: $test_name"
 
-    if bash -e "$test_file"; then
-        pass "$test_name"
-        return 0
-    else
-        fail "$test_name"
-        return 1
-    fi
+	if bash -e "$test_file"; then
+		pass "$test_name"
+		return 0
+	else
+		fail "$test_name"
+		return 1
+	fi
 }
 
 # Run tests, optionally filtered by category
 run_tests() {
-    local category_filter="${1:-}"
-    local failed=0
-    local passed=0
-    local tests=()
-    local categories
+	local category_filter="${1:-}"
+	local failed=0
+	local passed=0
+	local tests=()
+	local categories
 
-    # Determine which categories to run
-    if [ -n "$category_filter" ]; then
-        categories=("$category_filter")
-        log "Running tests for category: $category_filter"
-    else
-        categories=(node dal baker accuser)
-        log "Running all test categories"
-    fi
+	# Determine which categories to run
+	if [ -n "$category_filter" ]; then
+		categories=("$category_filter")
+		log "Running tests for category: $category_filter"
+	else
+		categories=(node dal baker accuser import)
+		log "Running all test categories"
+	fi
 
-    # Collect tests in order
-    for category in "${categories[@]}"; do
-        if [ -d "$TESTS_DIR/$category" ]; then
-            for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
-                tests+=("$test")
-            done
-        fi
-    done
+	# Collect tests in order
+	for category in "${categories[@]}"; do
+		if [ -d "$TESTS_DIR/$category" ]; then
+			for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
+				tests+=("$test")
+			done
+		fi
+	done
 
-    log "Found ${#tests[@]} tests to run"
+	log "Found ${#tests[@]} tests to run"
 
-    for test in "${tests[@]}"; do
-        if run_test "$test"; then
-            passed=$((passed + 1))
-        else
-            failed=$((failed + 1))
-        fi
-    done
+	for test in "${tests[@]}"; do
+		if run_test "$test"; then
+			passed=$((passed + 1))
+		else
+			failed=$((failed + 1))
+		fi
+	done
 
-    echo ""
-    log "Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+	echo ""
+	log "Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
 
-    if [ $failed -gt 0 ]; then
-        return 1
-    fi
-    return 0
+	if [ $failed -gt 0 ]; then
+		return 1
+	fi
+	return 0
 }
 
 # Main
 main() {
-    local category="${1:-}"
+	local category="${1:-}"
 
-    log "Starting integration tests..."
-    log "SANDBOX_URL=$SANDBOX_URL"
-    log "NODE_RPC=$NODE_RPC"
-    if [ -n "$category" ]; then
-        log "Category filter: $category"
-    fi
+	log "Starting integration tests..."
+	log "SANDBOX_URL=$SANDBOX_URL"
+	log "NODE_RPC=$NODE_RPC"
+	if [ -n "$category" ]; then
+		log "Category filter: $category"
+	fi
 
-    # Export for tests
-    export SANDBOX_URL NODE_RPC
-    export OCTEZ_BIN_DIR="/opt/octez"
-    export TEST_INSTANCE="test-node"
+	# Export for tests
+	export SANDBOX_URL NODE_RPC
+	export OCTEZ_BIN_DIR="/opt/octez"
+	export TEST_INSTANCE="test-node"
 
-    wait_for_sandbox
+	wait_for_sandbox
 
-    run_tests "$category"
+	run_tests "$category"
 }
 
 main "$@"
