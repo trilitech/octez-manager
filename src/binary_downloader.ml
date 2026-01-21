@@ -262,6 +262,9 @@ let binaries_for_version _version =
 
 let check_disk_space () =
   let dir = Binary_registry.binaries_dir () in
+  (* Ensure directory exists before running df *)
+  let owner, group = Common.current_user_group_names () in
+  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
   match Common.run_out ["df"; "-B1"; dir] with
   | Ok output -> (
       (* Parse df output: lines like:
