@@ -2332,15 +2332,16 @@ let node_env_write_file () =
       let data_dir = Filename.concat env.data "octez/alpha" in
       let run_args = "--network https://example" in
       let () =
-        expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[] ( ()))
+        expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[] ())
       in
       let env_file =
         Filename.concat env.config "octez/instances/alpha/node.env"
       in
       let contents = read_file env_file in
+      (* run_args gets quoted if it contains spaces *)
       let expected =
         Printf.sprintf
-          "VERSION=v1\nOCTEZ_DATA_DIR=%s\nOCTEZ_NODE_ARGS=%s\n"
+          "VERSION=v1\nOCTEZ_DATA_DIR=%s\nOCTEZ_NODE_ARGS=\"%s\"\n"
           data_dir
           run_args
       in
@@ -2353,7 +2354,8 @@ let node_env_overwrite_existing () =
       let first = "--network https://example" in
       let second = "--network https://example --history-mode archive" in
       let () =
-        expect_ok (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[] ())
+        expect_ok
+          (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[] ())
       in
       let () =
         expect_ok
@@ -4113,6 +4115,168 @@ let external_service_detector_is_managed_unit_name () =
     false
     (is_managed_unit_name "nginx.service")
 
+(** {1 Bug Regression Tests - Import Feature} *)
+
+(** Bug #1: Shell expansion - Arguments with * get corrupted
+    
+    Issue: When importing services with arguments like --cors-origin *,
+    the * was not quoted in env files, causing shell expansion to all
+    filesystem paths when systemd sourced the file.
+    
+    Fix: Added escape_env_value function that wraps values in double quotes
+    and escapes special characters to prevent shell expansion. *)
+
+let bug1_shell_expansion_escape_env_value () =
+  let open Node_env in
+  (* Test that glob patterns are quoted *)
+  Alcotest.(check string)
+    "asterisk should be quoted"
+    "\"*\""
+    (escape_env_value "*") ;
+  Alcotest.(check string)
+    "glob in argument should be quoted"
+    "\"--cors-origin=*\""
+    (escape_env_value "--cors-origin=*") ;
+  Alcotest.(check string)
+    "question mark should be quoted"
+    "\"file?.txt\""
+    (escape_env_value "file?.txt") ;
+  (* Test that spaces trigger quoting *)
+  Alcotest.(check string)
+    "spaces should be quoted"
+    "\"/path/with spaces/file.txt\""
+    (escape_env_value "/path/with spaces/file.txt") ;
+  (* Test that normal values are not quoted *)
+  Alcotest.(check string)
+    "simple value should not be quoted"
+    "--network=mainnet"
+    (escape_env_value "--network=mainnet") ;
+  Alcotest.(check string)
+    "path without spaces should not be quoted"
+    "/usr/bin/octez-node"
+    (escape_env_value "/usr/bin/octez-node") ;
+  (* Test that shell variables are escaped *)
+  Alcotest.(check string)
+    "dollar sign should be escaped"
+    "\"value-\\$VAR\""
+    (escape_env_value "value-$VAR") ;
+  (* Test that backticks are escaped *)
+  Alcotest.(check string)
+    "backticks should be escaped"
+    "\"value-\\`cmd\\`\""
+    (escape_env_value "value-`cmd`") ;
+  (* Test that double quotes are escaped *)
+  Alcotest.(check string)
+    "double quotes should be escaped"
+    "\"value-\\\"quoted\\\"\""
+    (escape_env_value "value-\"quoted\"") ;
+  ()
+
+let bug1_shell_expansion_build_run_args () =
+  let open Config in
+  (* Test that arguments with glob patterns are properly quoted *)
+  let args =
+    build_run_args
+      ~network:"shadownet"
+      ~history_mode:Rolling
+      ~rpc_addr:"localhost:8732"
+      ~net_addr:"0.0.0.0:9732"
+      ~extra_args:["--cors-origin=*"; "--metrics-addr=:9096"]
+      ~logging_mode:Logging_mode.Journald
+  in
+  (* The result should have --cors-origin=* quoted *)
+  Alcotest.(check bool)
+    "args should contain quoted asterisk"
+    true
+    (string_contains ~needle:"'--cors-origin=*'" args) ;
+  (* Should still contain the other arguments *)
+  Alcotest.(check bool)
+    "args should contain network"
+    true
+    (string_contains ~needle:"--network=shadownet" args) ;
+  Alcotest.(check bool)
+    "args should contain metrics addr"
+    true
+    (string_contains ~needle:"--metrics-addr=:9096" args) ;
+  ()
+
+let bug1_shell_expansion_env_file_sourcing () =
+  with_env
+    [
+      ("XDG_CONFIG_HOME", Some (Filename.get_temp_dir_name ()));
+      ("XDG_DATA_HOME", Some (Filename.get_temp_dir_name ()));
+    ]
+    (fun () ->
+      let env =
+        {
+          config = Filename.get_temp_dir_name ();
+          data = Filename.get_temp_dir_name ();
+        }
+      in
+      let instance = "test-shell-expansion" in
+      let test_dir =
+        Filename.concat env.config ("octez/instances/" ^ instance)
+      in
+      let env_file = Filename.concat test_dir "node.env" in
+      (* Create instance directory *)
+      Common.ensure_dir_path ~owner:"root" ~group:"root" ~mode:0o755 test_dir
+      |> expect_ok ;
+      (* Write env file with arguments containing glob pattern *)
+      let run_args =
+        Config.build_run_args
+          ~network:"mainnet"
+          ~history_mode:Rolling
+          ~rpc_addr:"localhost:8732"
+          ~net_addr:":9732"
+          ~extra_args:["--cors-origin=*"; "--metrics-addr=:9096"]
+          ~logging_mode:Logging_mode.Journald
+      in
+      Node_env.write
+        ~inst:instance
+        ~data_dir:"/tmp/data"
+        ~run_args
+        ~extra_env:[]
+        ()
+      |> expect_ok ;
+      (* Read the env file and verify proper quoting *)
+      let ic = open_in env_file in
+      let content = really_input_string ic (in_channel_length ic) in
+      close_in ic ;
+      (* The env file should contain quoted glob pattern *)
+      Alcotest.(check bool)
+        "env file should have quoted asterisk"
+        true
+        (string_contains ~needle:"'--cors-origin=*'" content
+        || string_contains ~needle:"\"--cors-origin=*\"" content) ;
+      (* Verify it doesn't contain unquoted asterisk that would expand *)
+      let lines = String.split_on_char '\n' content in
+      let args_line =
+        List.find_opt
+          (fun l -> string_contains ~needle:"OCTEZ_NODE_ARGS" l)
+          lines
+      in
+      match args_line with
+      | Some line ->
+          (* Line should not have bare asterisk after = *)
+          let has_bare_asterisk =
+            match string_index_opt ~needle:"OCTEZ_NODE_ARGS=" line with
+            | Some idx ->
+                let after_equals =
+                  String.sub line (idx + 17) (String.length line - idx - 17)
+                in
+                (* Check for pattern like: ...=--foo * --bar (bare asterisk with spaces) *)
+                string_contains ~needle:" * " after_equals
+                || string_contains ~needle:"=* " after_equals
+            | None -> false
+          in
+          Alcotest.(check bool)
+            "should not have bare asterisk that would expand"
+            false
+            has_bare_asterisk ;
+          (* Clean up *)
+          Sys.remove env_file
+      | None -> Alcotest.fail "OCTEZ_NODE_ARGS line not found in env file")
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -4770,5 +4934,20 @@ let () =
             "is_managed_unit_name"
             `Quick
             external_service_detector_is_managed_unit_name;
+        ] );
+      ( "bug1_shell_expansion",
+        [
+          Alcotest.test_case
+            "escape_env_value"
+            `Quick
+            bug1_shell_expansion_escape_env_value;
+          Alcotest.test_case
+            "build_run_args"
+            `Quick
+            bug1_shell_expansion_build_run_args;
+          Alcotest.test_case
+            "env_file_sourcing"
+            `Quick
+            bug1_shell_expansion_env_file_sourcing;
         ] );
     ]
