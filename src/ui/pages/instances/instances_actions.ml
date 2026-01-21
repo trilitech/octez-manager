@@ -549,6 +549,131 @@ let confirm_edit_modal svc =
         match choice with `Confirm -> do_edit_instance svc | `Cancel -> ())
       ()
 
+(** Update Version modal and handler *)
+
+type version_choice =
+  | ManagedVersion of string
+  | LinkedDir of string * string (* alias, path *)
+
+let rec update_version_modal svc =
+  let instance = svc.Service.instance in
+  let current_bin_source = Service.get_bin_source svc in
+
+  (* Load available versions *)
+  let managed_versions =
+    match Binary_registry.list_managed_versions () with
+    | Ok versions -> List.map (fun v -> ManagedVersion v) versions
+    | Error _ -> []
+  in
+
+  let linked_dirs =
+    match Binary_registry.load_linked_dirs () with
+    | Ok dirs ->
+        List.map
+          (fun (ld : Binary_registry.linked_dir) ->
+            LinkedDir (ld.alias, ld.path))
+          dirs
+    | Error _ -> []
+  in
+
+  let all_choices = managed_versions @ linked_dirs in
+
+  if all_choices = [] then (
+    Modal_helpers.show_error
+      ~title:"No Versions Available"
+      "No managed versions or linked directories available. Download a version \
+       or link a directory first." ;
+    ())
+  else
+    let current_text =
+      match current_bin_source with
+      | Binary_registry.Managed_version v ->
+          Printf.sprintf "Current: v%s (managed)" v
+      | Binary_registry.Linked_alias alias ->
+          Printf.sprintf "Current: %s (linked)" alias
+      | Binary_registry.Raw_path path ->
+          Printf.sprintf "Current: %s (path)" path
+    in
+
+    let modal_title =
+      Printf.sprintf "Update Version · %s\n%s" instance current_text
+    in
+
+    let to_string = function
+      | ManagedVersion v -> Printf.sprintf "v%s (managed)" v
+      | LinkedDir (alias, path) -> Printf.sprintf "%s (%s)" alias path
+    in
+
+    Modal_helpers.open_choice_modal
+      ~title:modal_title
+      ~items:all_choices
+      ~to_string
+      ~on_select:(fun choice ->
+        let new_bin_source =
+          match choice with
+          | ManagedVersion v -> Binary_registry.Managed_version v
+          | LinkedDir (alias, _) -> Binary_registry.Linked_alias alias
+        in
+
+        (* Check if it's actually different *)
+        if new_bin_source = current_bin_source then (
+          Context.toast_info "Version unchanged" ;
+          ())
+        else
+          (* Confirm and perform update *)
+          let new_version_str =
+            match new_bin_source with
+            | Binary_registry.Managed_version v -> "v" ^ v
+            | Binary_registry.Linked_alias a -> a
+            | Binary_registry.Raw_path p -> p
+          in
+
+          Modal_helpers.confirm_modal
+            ~title:(Printf.sprintf "Update %s to %s?" instance new_version_str)
+            ~message:""
+            ~on_result:(fun confirmed ->
+              if confirmed then
+                (* Run update in background *)
+                Background_runner.enqueue (fun () ->
+                    match do_update_version ~svc ~new_bin_source () with
+                    | Ok () ->
+                        Context.toast_success
+                          (Printf.sprintf
+                             "Updated %s to %s"
+                             instance
+                             new_version_str) ;
+                        Context.mark_instances_dirty ()
+                    | Error (`Msg msg) ->
+                        Context.toast_error
+                          (Printf.sprintf "Update failed: %s" msg)))
+            ())
+      ()
+
+and do_update_version ~svc ~new_bin_source () =
+  let instance = svc.Service.instance in
+  let role = svc.Service.role in
+
+  (* Stop the service first *)
+  let* () =
+    let cap = Miaou_interfaces.Service_lifecycle.require () in
+    Miaou_interfaces.Service_lifecycle.stop cap ~role ~service:instance
+    |> Result.map_error (fun e -> `Msg e)
+  in
+
+  (* Resolve the new bin_source to get the actual path *)
+  let* new_path = Binary_registry.resolve_bin_source new_bin_source in
+
+  (* Update the service config *)
+  let updated_svc =
+    {svc with Service.app_bin_dir = new_path; bin_source = Some new_bin_source}
+  in
+  let* () = Service_registry.write updated_svc in
+
+  (* Restart the service *)
+  let cap = Miaou_interfaces.Service_lifecycle.require () in
+  Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
+  |> Result.map_error (fun e -> `Msg e)
+
 let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
@@ -561,6 +686,7 @@ let instance_actions_modal state =
             `Start;
             `Stop;
             `Restart;
+            `Update_version;
             `Logs;
             `Export_logs;
             `Remove;
@@ -571,6 +697,7 @@ let instance_actions_modal state =
           | `Start -> "Start"
           | `Stop -> "Stop"
           | `Restart -> "Restart"
+          | `Update_version -> "Update Version"
           | `Logs -> "View Logs"
           | `Export_logs -> "Export Logs"
           | `Remove -> "Remove")
@@ -594,6 +721,7 @@ let instance_actions_modal state =
                     ~service:instance
                   |> Result.map_error (fun e -> `Msg e))
           | `Restart -> restart_with_cascade ~instance ~role
+          | `Update_version -> update_version_modal svc
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
