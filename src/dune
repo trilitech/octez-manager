@@ -14,6 +14,7 @@
   systemd
   binary_registry
   binary_downloader
+  version_checker
   service
   service_registry
   base_dir_registry

@@ -3917,6 +3917,86 @@ let binaries_page_filter_latest_n_major_versions () =
     (List.length versions)
     (List.length filtered_many)
 
+(* Version checker tests *)
+
+let version_checker_compare_versions_basic () =
+  Alcotest.(check int)
+    "24.0 vs 24.1"
+    (-1)
+    (Version_checker.compare_versions "24.0" "24.1") ;
+  Alcotest.(check int)
+    "24.1 vs 24.0"
+    1
+    (Version_checker.compare_versions "24.1" "24.0") ;
+  Alcotest.(check int)
+    "24.0 vs 24.0"
+    0
+    (Version_checker.compare_versions "24.0" "24.0")
+
+let version_checker_compare_versions_multidigit () =
+  Alcotest.(check int)
+    "24.2 vs 24.10"
+    (-1)
+    (Version_checker.compare_versions "24.2" "24.10") ;
+  Alcotest.(check int)
+    "24.10 vs 24.9"
+    1
+    (Version_checker.compare_versions "24.10" "24.9") ;
+  Alcotest.(check int)
+    "25.0 vs 24.10"
+    1
+    (Version_checker.compare_versions "25.0" "24.10")
+
+let version_checker_compare_versions_rc () =
+  Alcotest.(check int)
+    "24.0-rc1 vs 24.0"
+    (-1)
+    (Version_checker.compare_versions "24.0-rc1" "24.0") ;
+  Alcotest.(check int)
+    "24.0-rc2 vs 24.0-rc1"
+    1
+    (Version_checker.compare_versions "24.0-rc2" "24.0-rc1") ;
+  Alcotest.(check int)
+    "24.0-rc1 vs 24.0-rc1"
+    0
+    (Version_checker.compare_versions "24.0-rc1" "24.0-rc1")
+
+let version_checker_compare_versions_three_parts () =
+  Alcotest.(check int)
+    "24.0.1 vs 24.0.2"
+    (-1)
+    (Version_checker.compare_versions "24.0.1" "24.0.2") ;
+  Alcotest.(check int)
+    "24.1.0 vs 24.0.9"
+    1
+    (Version_checker.compare_versions "24.1.0" "24.0.9") ;
+  Alcotest.(check int)
+    "24.0 vs 24.0.0"
+    0
+    (Version_checker.compare_versions "24.0" "24.0.0")
+
+let version_checker_parse_version () =
+  Alcotest.(check (list int))
+    "24.0"
+    [24; 0]
+    (Version_checker.For_tests.parse_version "24.0") ;
+  Alcotest.(check (list int))
+    "24.1"
+    [24; 1]
+    (Version_checker.For_tests.parse_version "24.1") ;
+  Alcotest.(check (list int))
+    "24.0-rc1"
+    [24; 0]
+    (Version_checker.For_tests.parse_version "24.0-rc1") ;
+  Alcotest.(check (list int))
+    "24.10.5"
+    [24; 10; 5]
+    (Version_checker.For_tests.parse_version "24.10.5") ;
+  Alcotest.(check (list int))
+    "v25.0"
+    [25; 0]
+    (Version_checker.For_tests.parse_version "v25.0")
+
 (* External service tests *)
 
 let external_service_role_of_binary_name () =
@@ -5537,6 +5617,29 @@ let () =
             "filter latest N major versions"
             `Quick
             binaries_page_filter_latest_n_major_versions;
+        ] );
+      ( "version_checker",
+        [
+          Alcotest.test_case
+            "compare versions basic"
+            `Quick
+            version_checker_compare_versions_basic;
+          Alcotest.test_case
+            "compare versions multidigit"
+            `Quick
+            version_checker_compare_versions_multidigit;
+          Alcotest.test_case
+            "compare versions rc"
+            `Quick
+            version_checker_compare_versions_rc;
+          Alcotest.test_case
+            "compare versions three parts"
+            `Quick
+            version_checker_compare_versions_three_parts;
+          Alcotest.test_case
+            "parse version"
+            `Quick
+            version_checker_parse_version;
         ] );
       ( "external_service",
         [
