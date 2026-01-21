@@ -51,6 +51,12 @@ let init () =
 let update ps _ = ps
 
 let refresh ps =
+  (* Check for pending navigation (e.g., from job completion callback) *)
+  let ps =
+    match Context.consume_navigation () with
+    | Some page -> Navigation.goto page ps
+    | None -> ps
+  in
   Navigation.update
     (fun s ->
       let external_services = load_external_services () in
