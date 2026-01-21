@@ -49,6 +49,24 @@ let install_node_cmd =
     in
     Arg.(value & opt (some string) None & info ["app-bin-dir"] ~doc ~docv:"DIR")
   in
+  let octez_version =
+    let doc =
+      "Use a managed Octez version. Overrides --app-bin-dir. Download versions \
+       with: octez-manager binaries download VERSION"
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["octez-version"] ~doc ~docv:"VERSION")
+  in
+  let bin_dir_alias =
+    let doc =
+      "Use a linked directory by alias. Overrides --app-bin-dir. Create \
+       aliases with: octez-manager binaries link"
+    in
+    Arg.(
+      value & opt (some string) None & info ["bin-dir-alias"] ~doc ~docv:"ALIAS")
+  in
   let extra_args =
     let doc = "Additional arguments appended to the node command." in
     Arg.(value & opt_all string [] & info ["extra-arg"] ~doc ~docv:"ARG")
@@ -98,12 +116,17 @@ let install_node_cmd =
     Arg.(value & flag & info ["keep-snapshot"] ~doc)
   in
   let make instance_opt network_opt history_mode_opt data_dir rpc_addr net_addr
-      service_user app_bin_dir extra_args snapshot_flag snapshot_uri
-      snapshot_no_check no_enable preserve_data tmp_dir keep_snapshot
-      logging_mode =
+      service_user app_bin_dir octez_version bin_dir_alias extra_args
+      snapshot_flag snapshot_uri snapshot_no_check no_enable preserve_data
+      tmp_dir keep_snapshot logging_mode =
     let res =
       let ( let* ) = Result.bind in
-      let* app_bin_dir = Cli_helpers.resolve_app_bin_dir app_bin_dir in
+      let* app_bin_dir =
+        Cli_helpers.resolve_app_bin_dir
+          ?octez_version
+          ?bin_dir_alias
+          app_bin_dir
+      in
       (* When preserve_data is set, require data_dir to be specified *)
       let* data_dir =
         match (preserve_data, data_dir) with
@@ -369,9 +392,9 @@ let install_node_cmd =
       ret
         (const make $ instance $ network $ Cli_helpers.history_mode_opt_term
        $ data_dir $ rpc_addr $ net_addr $ service_user $ app_bin_dir
-       $ extra_args $ snapshot_flag $ snapshot_uri $ snapshot_no_check
-       $ auto_enable $ preserve_data $ tmp_dir $ keep_snapshot
-       $ Cli_helpers.logging_mode_term))
+       $ octez_version $ bin_dir_alias $ extra_args $ snapshot_flag
+       $ snapshot_uri $ snapshot_no_check $ auto_enable $ preserve_data
+       $ tmp_dir $ keep_snapshot $ Cli_helpers.logging_mode_term))
   in
   let info =
     Cmd.info "install-node" ~doc:"Install an octez-node systemd instance"

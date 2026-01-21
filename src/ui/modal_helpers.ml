@@ -863,37 +863,47 @@ let select_client_base_dir_modal ~on_select () =
     ()
 
 let select_app_bin_dir_modal ~on_select () =
-  (* Load existing app bin directories from registry *)
-  let existing_dirs =
-    match
-      Octez_manager_lib.Directory_registry.list
-        ~dir_type:Octez_manager_lib.Directory_registry.App_bin_dir
-        ()
-    with
-    | Ok entries -> entries
+  (* Load managed versions *)
+  let managed_versions =
+    match Octez_manager_lib.Binary_registry.list_managed_versions () with
+    | Ok versions ->
+        List.map
+          (fun v -> `ManagedVersion v)
+          (List.sort String.compare versions)
     | Error _ -> []
   in
 
-  (* Build choice items: existing dirs + browse option *)
+  (* Load linked directories *)
+  let linked_dirs =
+    match Octez_manager_lib.Binary_registry.load_linked_dirs () with
+    | Ok dirs ->
+        List.map
+          (fun (ld : Octez_manager_lib.Binary_registry.linked_dir) ->
+            `LinkedDir (ld.alias, ld.path))
+          dirs
+    | Error _ -> []
+  in
+
+  (* Build sections with separators *)
   let items =
-    List.map (fun e -> Existing_dir e) existing_dirs @ [Browse_new_dir]
+    if managed_versions = [] && linked_dirs = [] then [`CustomPath]
+    else managed_versions @ linked_dirs @ [`CustomPath]
   in
 
   let to_string = function
-    | Existing_dir entry ->
-        let services_str =
-          match entry.Octez_manager_lib.Directory_registry.linked_services with
-          | [] -> ""
-          | svcs -> "  (" ^ String.concat ", " svcs ^ ")"
-        in
-        entry.Octez_manager_lib.Directory_registry.path ^ services_str
-    | Browse_new_dir -> "[ Browse for existing directory... ]"
+    | `ManagedVersion v -> Printf.sprintf "v%s (managed)" v
+    | `LinkedDir (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `CustomPath -> "[ Browse for custom directory... ]"
   in
 
   let on_choice_select = function
-    | Existing_dir entry ->
-        on_select entry.Octez_manager_lib.Directory_registry.path
-    | Browse_new_dir ->
+    | `ManagedVersion version ->
+        let path =
+          Octez_manager_lib.Binary_registry.managed_version_path version
+        in
+        on_select path
+    | `LinkedDir (_alias, path) -> on_select path
+    | `CustomPath ->
         (* Open read-only file browser - no write permissions required *)
         open_file_browser_modal
           ~dirs_only:true
@@ -912,23 +922,12 @@ let select_app_bin_dir_modal ~on_select () =
               show_error
                 ~title:"Invalid Path"
                 "Path exists but is not a directory"
-            else
-              (* Register in directory registry without creating *)
-              match
-                Octez_manager_lib.Directory_registry.add
-                  ~path:trimmed
-                  ~dir_type:Octez_manager_lib.Directory_registry.App_bin_dir
-                  ~linked_services:[]
-              with
-              | Ok () -> on_select trimmed
-              | Error (`Msg _) ->
-                  (* If registry update fails, still allow selection *)
-                  on_select trimmed)
+            else on_select trimmed)
           ()
   in
 
   open_choice_modal
-    ~title:"Select Application Binary Directory"
+    ~title:"Select Octez Binaries"
     ~items
     ~to_string
     ~on_select:on_choice_select
