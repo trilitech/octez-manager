@@ -111,7 +111,7 @@ let create_default_snapshot ~network ~history_mode =
       | None -> `None)
 
 let base_initial_model () =
-  let network = "mainnet" in
+  let network = "shadownet" in
   let history_mode = "rolling" in
   let instance_name = generate_instance_name ~network ~history_mode in
   {

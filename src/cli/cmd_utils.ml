@@ -287,7 +287,7 @@ let list_networks_cmd =
 let list_snapshots_cmd =
   let network =
     let doc = "Network alias or teztnets.json URL to inspect." in
-    Arg.(value & opt string "mainnet" & info ["network"] ~doc ~docv:"NET")
+    Arg.(value & opt string "shadownet" & info ["network"] ~doc ~docv:"NET")
   in
   let output_json =
     Arg.(value & flag & info ["json"] ~doc:"Emit JSON output instead of text.")

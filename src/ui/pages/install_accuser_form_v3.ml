@@ -431,7 +431,7 @@ let spec =
           {
             role = "accuser";
             instance = model.core.instance_name;
-            network = Option.value ~default:"mainnet" network;
+            network = Option.value ~default:"shadownet" network;
             history_mode = History_mode.default;
             data_dir =
               Common.default_role_dir "accuser" model.core.instance_name;

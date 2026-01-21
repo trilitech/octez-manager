@@ -16,7 +16,7 @@ let install_node_cmd =
     Arg.(value & opt (some string) None & info ["instance"] ~doc ~docv:"NAME")
   in
   let network =
-    let doc = "Chain network (default: mainnet)." in
+    let doc = "Chain network (default: shadownet)." in
     Arg.(value & opt (some string) None & info ["network"] ~doc ~docv:"NET")
   in
   let data_dir =
@@ -251,7 +251,7 @@ let install_node_cmd =
                       in
                       Ok (loop ())
                   | Error (`Msg err) -> Error err
-                else Ok "mainnet"
+                else Ok "shadownet"
           in
           let history_mode =
             match history_mode_opt with
