@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     netbase \
     procps \
+    bc \
     && rm -rf /var/lib/apt/lists/*
 
 # Remove unnecessary systemd units that cause issues in containers
