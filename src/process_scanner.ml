@@ -91,7 +91,7 @@ let cache_lock = Mutex.create ()
 let list_octez_candidate_pids () =
   try
     (* Use pgrep to find PIDs of processes with "octez" or "tezos" in their command *)
-    let ic = Unix.open_process_in "pgrep -f 'octez\\|tezos' 2>/dev/null" in
+    let ic = Unix.open_process_in "pgrep -f 'octez|tezos' 2>/dev/null" in
     let pids = ref [] in
     Fun.protect
       ~finally:(fun () -> ignore (Unix.close_process_in ic))

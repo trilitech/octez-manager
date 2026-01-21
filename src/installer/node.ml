@@ -119,7 +119,13 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
         ()
   in
   log "Reowning runtime paths...\n" ;
-  let* () = reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode in
+  let* () =
+    (* Always reown to ensure correct permissions, even when preserving data.
+       This is important for imported services where data may be owned by root
+       but service runs as a different user. The reown operation is safe and
+       doesn't modify the actual data, only file ownership. *)
+    reown_runtime_paths ~owner ~group ~paths:[data_dir] ~logging_mode
+  in
   log "Creating service record...\n" ;
   (* In edit mode, preserve existing dependents list *)
   let existing_dependents =
@@ -173,7 +179,13 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   in
   log "Writing node env...\n" ;
   let* () =
-    Node_env.write ~inst:request.instance ~data_dir ~run_args ~extra_env
+    Node_env.write
+      ~inst:request.instance
+      ~data_dir
+      ~run_args
+      ~extra_env
+      ~with_comments:true
+      ()
   in
   log "Writing systemd dropin...\n" ;
   let* () =
