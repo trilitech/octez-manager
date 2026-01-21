@@ -144,6 +144,10 @@ let refresh_data s =
 
 let refresh ps = Navigation.update refresh_data ps
 
+let auto_refresh ps =
+  (* Auto-refresh if data has been marked dirty (e.g., after remove/download) *)
+  if Context.consume_instances_dirty () then refresh ps else ps
+
 let move_up s =
   let selected = if s.selected > 0 then s.selected - 1 else s.selected in
   {s with selected}
@@ -185,12 +189,14 @@ let remove_version version =
       ~message:(Printf.sprintf "Remove managed version v%s?" version)
       ~on_result:(fun confirmed ->
         if confirmed then
-          match Binary_downloader.remove_version version with
-          | Ok () ->
-              Context.toast_success (Printf.sprintf "Removed v%s" version) ;
-              Context.mark_instances_dirty ()
-          | Error (`Msg msg) ->
-              Modal_helpers.show_error ~title:"Remove Failed" msg)
+          (* Run removal in background to avoid blocking UI *)
+          Background_runner.enqueue (fun () ->
+              match Binary_downloader.remove_version version with
+              | Ok () ->
+                  Context.toast_success (Printf.sprintf "Removed v%s" version) ;
+                  Context.mark_instances_dirty ()
+              | Error (`Msg msg) ->
+                  Context.toast_error (Printf.sprintf "Remove failed: %s" msg)))
       ()
 
 let unlink_directory ld =
@@ -211,12 +217,15 @@ let unlink_directory ld =
       ~message:(Printf.sprintf "Unlink directory '%s'?" ld.alias)
       ~on_result:(fun confirmed ->
         if confirmed then
-          match Binary_registry.remove_linked_dir ld.alias with
-          | Ok () ->
-              Context.toast_success (Printf.sprintf "Unlinked '%s'" ld.alias) ;
-              Context.mark_instances_dirty ()
-          | Error (`Msg msg) ->
-              Modal_helpers.show_error ~title:"Unlink Failed" msg)
+          (* Run unlink in background to avoid blocking UI *)
+          Background_runner.enqueue (fun () ->
+              match Binary_registry.remove_linked_dir ld.alias with
+              | Ok () ->
+                  Context.toast_success
+                    (Printf.sprintf "Unlinked '%s'" ld.alias) ;
+                  Context.mark_instances_dirty ()
+              | Error (`Msg msg) ->
+                  Context.toast_error (Printf.sprintf "Unlink failed: %s" msg)))
       ()
 
 let download_version (version_info : Binary_downloader.version_info) =
@@ -521,7 +530,7 @@ struct
 
   let update = update
 
-  let refresh = refresh
+  let refresh = auto_refresh
 
   let move = move
 
