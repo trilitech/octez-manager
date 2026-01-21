@@ -29,6 +29,14 @@ systemctl enable "octez-node@${INSTANCE}.service"
 systemctl start "octez-node@${INSTANCE}.service"
 sleep 2
 
+# Debug: Check what external services are detected
+echo "DEBUG: External services detected:"
+om list --external 2>&1 || true
+echo "DEBUG: Systemd unit status:"
+systemctl status "octez-node@${INSTANCE}.service" --no-pager || true
+echo "DEBUG: List of octez unit files:"
+systemctl list-unit-files "octez-*.service" --no-legend || true
+
 # Import with takeover strategy
 echo "Importing with takeover strategy..."
 om import "octez-node@${INSTANCE}" --strategy takeover 2>&1
