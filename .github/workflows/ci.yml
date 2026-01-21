@@ -122,7 +122,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        category: [node, dal, baker, accuser]
+        category: [node, dal, baker, accuser, import]
 
     steps:
       - name: Checkout
