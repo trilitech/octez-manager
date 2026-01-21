@@ -106,13 +106,6 @@ jobs:
           path: artifacts/octez-manager
           retention-days: 1
 
-      - name: Upload build directory
-        uses: actions/upload-artifact@v4
-        with:
-          name: dune-build
-          path: _build
-          retention-days: 1
-
   unit-tests:
     name: Unit Tests
     needs: build
@@ -130,17 +123,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dune-build
-          path: _build
-
       - name: Cache opam packages
         uses: actions/cache@v4
         with:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+
+      - name: Cache dune build
+        uses: actions/cache@v4
+        with:
+          path: _build
+          key: dune-${{ runner.os }}-${{ hashFiles('src/**', 'dune-project') }}
 
       - name: Run unit tests
         run: |
