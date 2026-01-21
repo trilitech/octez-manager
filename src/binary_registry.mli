@@ -65,6 +65,10 @@ val rename_linked_dir :
 
 (** {2 Managed versions} *)
 
+(** Compare version strings numerically (e.g., "24.0" > "9.0").
+    Returns: negative if a < b, 0 if a = b, positive if a > b *)
+val compare_versions : string -> string -> int
+
 (** List all installed managed versions *)
 val list_managed_versions : unit -> (string list, Rresult.R.msg) result
 
