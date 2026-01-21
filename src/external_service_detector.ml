@@ -418,16 +418,39 @@ let build_external_service ~unit_name ~exec_start ~properties =
   (* Build fields from parsed data *)
   let binary_field = build_field parsed.binary_path in
 
+  (* DEBUG: Log binary path *)
+  let () =
+    Printf.eprintf "DEBUG [%s]: parsed.binary_path = %s\n%!" unit_name
+      (match parsed.binary_path with Some b -> b | None -> "NONE")
+  in
+  let () =
+    Printf.eprintf "DEBUG [%s]: binary_field.value = %s\n%!" unit_name
+      (match binary_field.value with Some b -> b | None -> "NONE")
+  in
+
   let role_field =
     match binary_field.value with
     | Some binary ->
+        (* DEBUG: Log what we're passing to role detection *)
+        Printf.eprintf "DEBUG [%s]: calling role_of_binary_name with: %s\n%!"
+          unit_name binary ;
         let role =
           External_service.role_of_binary_name
             ?subcommand:parsed.subcommand
             binary
         in
+        (* DEBUG: Log detected role *)
+        Printf.eprintf "DEBUG [%s]: detected role = %s\n%!" unit_name
+          (match role with
+          | External_service.Node -> "Node"
+          | External_service.Baker -> "Baker"
+          | External_service.Accuser -> "Accuser"
+          | External_service.Dal_node -> "Dal_node"
+          | External_service.Unknown s -> "Unknown(" ^ s ^ ")") ;
         {binary_field with value = Some role}
-    | None -> External_service.unknown ()
+    | None ->
+        Printf.eprintf "DEBUG [%s]: binary_field.value is NONE!\n%!" unit_name ;
+        External_service.unknown ()
   in
 
   let data_dir_field = build_field parsed.data_dir in
