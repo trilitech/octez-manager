@@ -376,7 +376,7 @@ let spec =
           {
             role = "dal-node";
             instance = model.core.instance_name;
-            network = Option.value ~default:"mainnet" network;
+            network = Option.value ~default:"shadownet" network;
             history_mode = History_mode.default;
             data_dir = dal_data_dir;
             rpc_addr = model.rpc_addr;
