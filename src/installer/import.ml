@@ -860,12 +860,59 @@ let show_dry_run_details ~log ~external_svc ~instance_name ~network ~data_dir
   log
     "────────────────────────────────────────────────────────────────────────────────"
 
+(** {1 Interactive Mode Helpers} *)
+
+(** Interactively review and edit a configuration file.
+    
+    Writes content to a temporary file, opens it in the user's editor,
+    reads back the edited content, and asks for confirmation.
+    
+    @param log Logging function
+    @param prompt_yes_no Function to prompt for yes/no confirmation
+    @param file_label Description of the file (e.g., "environment file")
+    @param file_path Final destination path (for display)
+    @param content Initial file content
+    @return Ok edited_content if user confirms, Error if cancelled *)
+let interactive_review_file ~log ~prompt_yes_no ~file_label ~file_path ~content
+    =
+  log "" ;
+  log (Printf.sprintf "Reviewing %s: %s" file_label file_path) ;
+  log "Opening in editor..." ;
+
+  (* Create temporary file *)
+  let tmp_path = Filename.temp_file "octez-manager-import-" ".tmp" in
+  let oc = open_out tmp_path in
+  output_string oc content ;
+  close_out oc ;
+
+  (* Open in editor *)
+  match Common.open_in_editor tmp_path with
+  | Error (`Msg msg) ->
+      Sys.remove tmp_path ;
+      Error (`Msg (Printf.sprintf "Failed to open editor: %s" msg))
+  | Ok () ->
+      (* Read edited content *)
+      let ic = open_in tmp_path in
+      let edited_content = really_input_string ic (in_channel_length ic) in
+      close_in ic ;
+      Sys.remove tmp_path ;
+
+      (* Ask for confirmation *)
+      log "" ;
+      log (Printf.sprintf "Edited %s" file_label) ;
+      if prompt_yes_no "Accept these changes?" ~default:true then
+        Ok edited_content
+      else (
+        log "Changes rejected. Using original content." ;
+        Ok content)
+
 (** {1 Main Import Function} *)
 
 (** Map external unit name -> managed instance name for dependency resolution *)
 type _imported_map = (string, string) Hashtbl.t
 
 let import_service ?(on_log = fun _ -> ())
+    ?(prompt_yes_no = fun _ ~default -> default)
     ?(imported_services = Hashtbl.create 0)
     ?(all_external_services : External_service.t list = []) ~options
     ~external_svc () =
@@ -1060,6 +1107,125 @@ let import_service ?(on_log = fun _ -> ())
            instance_name
            created_svc.Service.role
            created_svc.Service.service_user) ;
+
+      (* INTERACTIVE MODE: Let user review and edit configuration files *)
+      let* () =
+        if options.interactive then (
+          log "" ;
+          log "=== Interactive Mode: Review Configuration ===" ;
+          log "" ;
+
+          (* Path to environment file *)
+          let env_file_path =
+            Filename.concat
+              (Filename.concat (Common.env_instances_base_dir ()) instance_name)
+              "node.env"
+          in
+
+          (* Review environment file *)
+          let* () =
+            if Sys.file_exists env_file_path then (
+              let ic = open_in env_file_path in
+              let env_content = really_input_string ic (in_channel_length ic) in
+              close_in ic ;
+
+              match
+                interactive_review_file
+                  ~log
+                  ~prompt_yes_no
+                  ~file_label:"environment file"
+                  ~file_path:env_file_path
+                  ~content:env_content
+              with
+              | Error e -> Error e
+              | Ok edited_content ->
+                  (* Write back edited content *)
+                  let oc = open_out env_file_path in
+                  output_string oc edited_content ;
+                  close_out oc ;
+                  log (Printf.sprintf "Updated: %s" env_file_path) ;
+                  Ok ())
+            else (
+              log
+                (Printf.sprintf
+                   "Warning: Environment file not found at %s"
+                   env_file_path) ;
+              Ok ())
+          in
+
+          (* Path to systemd drop-in override file *)
+          let systemd_override_path =
+            Printf.sprintf
+              "/etc/systemd/system/octez-%s@%s.service.d/override.conf"
+              created_svc.Service.role
+              instance_name
+          in
+
+          (* Review systemd override file *)
+          if Sys.file_exists systemd_override_path then (
+            let ic = open_in systemd_override_path in
+            let override_content =
+              really_input_string ic (in_channel_length ic)
+            in
+            close_in ic ;
+
+            match
+              interactive_review_file
+                ~log
+                ~prompt_yes_no
+                ~file_label:"systemd drop-in file"
+                ~file_path:systemd_override_path
+                ~content:override_content
+            with
+            | Error e -> Error e
+            | Ok edited_content ->
+                (* Write back edited content *)
+                let oc = open_out systemd_override_path in
+                output_string oc edited_content ;
+                close_out oc ;
+                log (Printf.sprintf "Updated: %s" systemd_override_path) ;
+
+                (* Reload systemd daemon after editing drop-in *)
+                log "Reloading systemd daemon..." ;
+                Common.run ["systemctl"; "daemon-reload"])
+          else (
+            log
+              (Printf.sprintf
+                 "Warning: Systemd override file not found at %s"
+                 systemd_override_path) ;
+            Ok ()))
+        else Ok ()
+      in
+
+      (* INTERACTIVE MODE: Final confirmation before proceeding *)
+      let* () =
+        if options.interactive then (
+          log "" ;
+          log "=== Ready to Complete Import ===" ;
+          log "" ;
+          log (Printf.sprintf "The following actions will be performed:") ;
+          if options.strategy = Takeover then (
+            log "  1. Disable and stop the original service" ;
+            log
+              (Printf.sprintf
+                 "  2. Start the managed service: %s"
+                 instance_name))
+          else (
+            log "  1. Keep the original service running (clone mode)" ;
+            log
+              (Printf.sprintf
+                 "  2. Start the managed service: %s"
+                 instance_name)) ;
+          log "" ;
+          if prompt_yes_no "Proceed with import?" ~default:true then Ok ()
+          else
+            Error
+              (`Msg
+                 "Import cancelled by user. Configuration files have been \
+                  created but service is not started."))
+        else Ok ()
+      in
+
       (* 7. Disable original unit (for Takeover) *)
       let* () =
         if options.strategy = Takeover then (
@@ -1123,8 +1289,9 @@ let import_service ?(on_log = fun _ -> ())
 
 (** {1 Cascade Import} *)
 
-let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
-    () =
+let import_cascade ?(on_log = fun _ -> ())
+    ?(prompt_yes_no = fun _ ~default -> default) ~options ~external_svc
+    ~all_services () =
   let log msg = on_log msg in
 
   (* 1. Build dependency chain *)
@@ -1254,6 +1421,7 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
             let _ =
               import_service
                 ~on_log
+                ~prompt_yes_no
                 ~imported_services:imported_map
                 ~all_external_services:all_services
                 ~options
@@ -1315,6 +1483,7 @@ let import_cascade ?(on_log = fun _ -> ()) ~options ~external_svc ~all_services
                 match
                   import_service
                     ~on_log
+                    ~prompt_yes_no
                     ~imported_services:imported_map
                     ~all_external_services:all_services
                     ~options
