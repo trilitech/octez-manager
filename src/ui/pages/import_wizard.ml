@@ -187,47 +187,6 @@ let toggle_strategy ps =
       {s with strategy})
     ps
 
-let edit_instance_name ps =
-  let s = ps.Navigation.s in
-  let suggested =
-    match s.selected_service with
-    | Some svc -> svc.External_service.suggested_instance_name
-    | None -> ""
-  in
-  let current = Option.value s.custom_name ~default:"" in
-  Modal_helpers.prompt_text_modal
-    ~title:"Instance Name"
-    ~placeholder:(Some (Printf.sprintf "Leave empty for: %s" suggested))
-    ~initial:current
-    ~on_submit:(fun name ->
-      let new_name =
-        if String.trim name = "" then None else Some (String.trim name)
-      in
-      (* Need to update state but we can't from callback... use Context *)
-      ignore new_name)
-    () ;
-  ps
-
-let edit_network ps =
-  let s = ps.Navigation.s in
-  let detected =
-    match s.selected_service with
-    | Some svc -> External_service.value_or ~default:"" svc.config.network
-    | None -> ""
-  in
-  let current = Option.value s.network_override ~default:"" in
-  Modal_helpers.prompt_text_modal
-    ~title:"Network Override"
-    ~placeholder:(Some (if detected = "" then "Not detected" else detected))
-    ~initial:current
-    ~on_submit:(fun net ->
-      let new_net =
-        if String.trim net = "" then None else Some (String.trim net)
-      in
-      ignore new_net)
-    () ;
-  ps
-
 let header s =
   let step_text =
     match s.step with
@@ -339,11 +298,7 @@ let view ps ~focus:_ ~size =
                    "";
                  ]
                else [])
-            @ [
-                "Space: Toggle strategy  Tab: Next  Esc: Back";
-                Widgets.dim
-                  "(Note: name/network editing via modal not fully integrated)";
-              ])
+            @ [""; "Space: Toggle strategy  Tab: Next  Esc: Back"])
     | ReviewImport -> (
         match s.selected_service with
         | None -> ["Error: No service selected"]
@@ -477,8 +432,6 @@ let handle_key ps key ~size:_ =
     | ConfigureImport, Some (Keys.Char " ") -> toggle_strategy ps
     | ConfigureImport, Some (Keys.Char "Tab") -> next_step ps
     | ConfigureImport, Some (Keys.Char "Esc") -> back ps
-    | ConfigureImport, Some (Keys.Char "n") -> edit_instance_name ps
-    | ConfigureImport, Some (Keys.Char "w") -> edit_network ps
     | ReviewImport, Some Keys.Enter -> next_step ps
     | ReviewImport, Some (Keys.Char "Esc") -> back ps
     | Importing, Some (Keys.Char "Esc") -> Navigation.back ps
