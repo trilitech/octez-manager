@@ -17,25 +17,25 @@ cleanup_instance "$BAKER_INSTANCE" || true
 rm -rf "$NODE_DATA" "$BAKER_DATA" || true
 for inst in "$NODE_INSTANCE" "$BAKER_INSTANCE"; do
     for role in node baker; do
-        systemctl --user stop "octez-${role}@${inst}.service" 2>/dev/null || true
-        systemctl --user disable "octez-${role}@${inst}.service" 2>/dev/null || true
-        rm -f "/etc/systemd/user/octez-${role}@${inst}.service" || true
+        systemctl stop "octez-${role}@${inst}.service" 2>/dev/null || true
+        systemctl disable "octez-${role}@${inst}.service" 2>/dev/null || true
+        rm -f "/etc/systemd/system/octez-${role}@${inst}.service" || true
     done
 done
-systemctl --user daemon-reload
+systemctl daemon-reload
 
 # Create external node service
 echo "Creating external node service..."
 create_external_service "node" "$NODE_INSTANCE" "$NODE_DATA" "$NODE_RPC" "shadownet"
-systemctl --user enable "octez-node@${NODE_INSTANCE}.service"
-systemctl --user start "octez-node@${NODE_INSTANCE}.service"
+systemctl enable "octez-node@${NODE_INSTANCE}.service"
+systemctl start "octez-node@${NODE_INSTANCE}.service"
 
 # Create external baker service that depends on node
 echo "Creating external baker service that depends on node..."
 create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "http://$NODE_RPC"
 
 # Note: Baker service should have After= and Requires= for node
-systemctl --user enable "octez-baker@${BAKER_INSTANCE}.service"
+systemctl enable "octez-baker@${BAKER_INSTANCE}.service"
 
 # Import baker with cascade
 echo "Importing baker with cascade (should also import node)..."

@@ -12,17 +12,17 @@ echo "Test: Import node with extra args"
 # Cleanup
 cleanup_instance "$INSTANCE" || true
 rm -rf "$DATA_DIR" || true
-systemctl --user stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
-systemctl --user disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/user/octez-node@${INSTANCE}.service" || true
-systemctl --user daemon-reload
+systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
+systemctl disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
+rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
+systemctl daemon-reload
 
 # Create external service with custom flags
 echo "Creating external service with extra args..."
 mkdir -p "$DATA_DIR"
 chown -R tezos:tezos "$DATA_DIR"
 
-cat > "/etc/systemd/user/octez-node@${INSTANCE}.service" <<SERVICE
+cat > "/etc/systemd/system/octez-node@${INSTANCE}.service" <<SERVICE
 [Unit]
 Description=External Octez Node with Extra Args
 After=network.target
@@ -43,9 +43,9 @@ RestartSec=5
 WantedBy=default.target
 SERVICE
 
-systemctl --user daemon-reload
-systemctl --user enable "octez-node@${INSTANCE}.service"
-systemctl --user start "octez-node@${INSTANCE}.service"
+systemctl daemon-reload
+systemctl enable "octez-node@${INSTANCE}.service"
+systemctl start "octez-node@${INSTANCE}.service"
 
 wait_for_service_active "node" "$INSTANCE" 10 || true
 

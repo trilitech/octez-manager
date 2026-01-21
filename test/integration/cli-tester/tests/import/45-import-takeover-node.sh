@@ -12,16 +12,16 @@ echo "Test: Import node with takeover strategy"
 # Cleanup
 cleanup_instance "$INSTANCE" || true
 rm -rf "$DATA_DIR" || true
-systemctl --user stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
-systemctl --user disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/user/octez-node@${INSTANCE}.service" || true
-systemctl --user daemon-reload
+systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
+systemctl disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
+rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
+systemctl daemon-reload
 
 # Create external service
 echo "Creating external systemd service..."
 create_external_service "node" "$INSTANCE" "$DATA_DIR" "$RPC_ADDR" "shadownet"
-systemctl --user enable "octez-node@${INSTANCE}.service"
-systemctl --user start "octez-node@${INSTANCE}.service"
+systemctl enable "octez-node@${INSTANCE}.service"
+systemctl start "octez-node@${INSTANCE}.service"
 
 # Wait for it to be running
 wait_for_service_active "node" "$INSTANCE" 10 || true
@@ -40,7 +40,7 @@ fi
 # Verify original external service is disabled
 if ! external_service_disabled "node" "$INSTANCE"; then
     echo "ERROR: Original service should be disabled after takeover"
-    systemctl --user status "octez-node@${INSTANCE}.service" || true
+    systemctl status "octez-node@${INSTANCE}.service" || true
     exit 1
 fi
 

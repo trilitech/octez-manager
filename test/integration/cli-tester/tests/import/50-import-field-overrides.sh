@@ -14,16 +14,16 @@ echo "Test: Import with field overrides"
 cleanup_instance "$EXTERNAL_INSTANCE" || true
 cleanup_instance "$CUSTOM_INSTANCE" || true
 rm -rf "$DATA_DIR" || true
-systemctl --user stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-systemctl --user disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/user/octez-node@${EXTERNAL_INSTANCE}.service" || true
-systemctl --user daemon-reload
+systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
+systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
+rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
+systemctl daemon-reload
 
 # Create external service on ghostnet
 echo "Creating external service..."
 create_external_service "node" "$EXTERNAL_INSTANCE" "$DATA_DIR" "$RPC_ADDR" "ghostnet"
-systemctl --user enable "octez-node@${EXTERNAL_INSTANCE}.service"
-systemctl --user start "octez-node@${EXTERNAL_INSTANCE}.service"
+systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
+systemctl start "octez-node@${EXTERNAL_INSTANCE}.service"
 
 wait_for_service_active "node" "$EXTERNAL_INSTANCE" 10 || true
 

@@ -14,10 +14,10 @@ echo "Test: Import with instance name conflict"
 cleanup_instance "$MANAGED_INSTANCE" || true
 cleanup_instance "$EXTERNAL_INSTANCE" || true
 rm -rf "$EXTERNAL_DATA" || true
-systemctl --user stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-systemctl --user disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/user/octez-node@${EXTERNAL_INSTANCE}.service" || true
-systemctl --user daemon-reload
+systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
+systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
+rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
+systemctl daemon-reload
 
 # Create a managed instance
 echo "Creating managed instance..."
@@ -31,7 +31,7 @@ om install-node \
 # Create external service
 echo "Creating external service..."
 create_external_service "node" "$EXTERNAL_INSTANCE" "$EXTERNAL_DATA" "$RPC_ADDR" "shadownet"
-systemctl --user enable "octez-node@${EXTERNAL_INSTANCE}.service"
+systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
 
 # Try to import with same name as managed instance
 echo "Attempting to import with conflicting name..."
@@ -51,9 +51,9 @@ echo "Name conflict handling passed"
 
 # Cleanup
 cleanup_instance "$MANAGED_INSTANCE"
-systemctl --user disable "octez-node@${EXTERNAL_INSTANCE}.service" || true
-rm -f "/etc/systemd/user/octez-node@${EXTERNAL_INSTANCE}.service" || true
-systemctl --user daemon-reload
+systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" || true
+rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
+systemctl daemon-reload
 rm -rf "$EXTERNAL_DATA"
 
 echo "Name conflict test passed"
