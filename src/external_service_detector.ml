@@ -111,7 +111,9 @@ let list_all_service_units () =
               (* Extract first field (unit name) *)
               match String.split_on_char ' ' trimmed with
               | unit_name :: _
-                when String.ends_with ~suffix:".service" unit_name ->
+                when String.ends_with ~suffix:".service" unit_name
+                     (* Skip template units (ending with @.service) *)
+                     && not (String.ends_with ~suffix:"@.service" unit_name) ->
                   Some unit_name
               | _ -> None)
           lines
