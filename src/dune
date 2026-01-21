@@ -29,6 +29,8 @@
   accuser
   lifecycle
   removal
+  import
+  import_cascade
   teztnets
   snapshots
   settings
