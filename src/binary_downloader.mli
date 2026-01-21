@@ -98,6 +98,14 @@ val download_version :
     @param version Version to remove (e.g., "24.0") *)
 val remove_version : string -> (unit, Rresult.R.msg) result
 
+(** Calculate directory size for a version
+    @param version Version to measure (e.g., "24.0")
+    @return Tuple of (bytes, formatted_string) *)
+val get_version_size : string -> (int64 * string, Rresult.R.msg) result
+
+(** Format byte count into human-readable string (e.g., "1.5 MB") *)
+val format_size_bytes : int64 -> string
+
 (** {2 Disk space} *)
 
 (** Estimate download size for a version in bytes *)

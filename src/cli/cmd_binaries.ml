@@ -472,7 +472,19 @@ let prune_cmd =
             Printf.printf
               "Found %d unused version(s):\n"
               (List.length unused_versions) ;
-            List.iter (fun v -> Printf.printf "  - v%s\n" v) unused_versions ;
+            let total_bytes = ref 0L in
+            List.iter
+              (fun v ->
+                match Binary_downloader.get_version_size v with
+                | Ok (bytes, formatted) ->
+                    Printf.printf "  - v%s (%s)\n" v formatted ;
+                    total_bytes := Int64.add !total_bytes bytes
+                | Error _ -> Printf.printf "  - v%s (size unknown)\n" v)
+              unused_versions ;
+            let total_formatted =
+              Binary_downloader.format_size_bytes !total_bytes
+            in
+            Printf.printf "\nTotal space to free: %s\n" total_formatted ;
             if dry_run then (
               Printf.printf "\n(Dry run - no changes made)\n" ;
               `Ok ())
@@ -492,8 +504,9 @@ let prune_cmd =
                 unused_versions ;
               if !failures = [] then (
                 Printf.printf
-                  "\n✓ Successfully pruned %d version(s)\n"
-                  (List.length unused_versions) ;
+                  "\n✓ Successfully pruned %d version(s), freed %s\n"
+                  (List.length unused_versions)
+                  total_formatted ;
                 `Ok ())
               else
                 Cli_helpers.cmdliner_error
