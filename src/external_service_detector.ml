@@ -392,6 +392,7 @@ let build_external_service ~unit_name ~exec_start ~properties =
   let rpc_addr_field = build_field parsed.rpc_addr in
   let net_addr_field = build_field parsed.net_addr in
   let endpoint_field = build_field parsed.endpoint in
+  let dal_endpoint_field = build_field parsed.dal_endpoint in
   let history_mode_field = build_field parsed.history_mode in
 
   (* Try to detect network via RPC probe if not already known *)
@@ -440,6 +441,7 @@ let build_external_service ~unit_name ~exec_start ~properties =
       rpc_addr = rpc_addr_field;
       net_addr = net_addr_field;
       node_endpoint = endpoint_field;
+      dal_endpoint = dal_endpoint_field;
       history_mode = history_mode_field;
       network = network_field;
       daily_logs_dir;
@@ -544,6 +546,11 @@ let process_to_external_service (proc : Process_scanner.process_info) =
     | Some e -> External_service.detected ~source:"cmdline" e
     | None -> External_service.unknown ()
   in
+  let dal_endpoint =
+    match parsed.dal_endpoint with
+    | Some d -> External_service.detected ~source:"cmdline" d
+    | None -> External_service.unknown ()
+  in
   let base_dir =
     match parsed.base_dir with
     | Some b -> External_service.detected ~source:"cmdline" b
@@ -611,7 +618,7 @@ let process_to_external_service (proc : Process_scanner.process_info) =
         node_endpoint;
         base_dir;
         delegates = unknown ();
-        dal_endpoint = unknown ();
+        dal_endpoint;
         daily_logs_dir;
         extra_args = [];
         parse_warnings = [];
