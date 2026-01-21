@@ -80,16 +80,19 @@ let back ps =
         ps
   | Importing -> ps
 
+let with_selected_service s on_error on_success =
+  match List.nth_opt s.external_services s.selected_idx with
+  | None -> on_error "No service selected"
+  | Some svc -> on_success svc
+
 let rec next_step ps =
   let s = ps.Navigation.s in
   match s.step with
-  | SelectService -> (
-      match List.nth_opt s.external_services s.selected_idx with
-      | None ->
-          Navigation.update
-            (fun s -> {s with error = Some "No service selected"})
-            ps
-      | Some svc -> (
+  | SelectService ->
+      with_selected_service
+        s
+        (fun msg -> Navigation.update (fun s -> {s with error = Some msg}) ps)
+        (fun svc ->
           match Import.validate_importable svc with
           | Error (`Msg msg) ->
               Navigation.update (fun s -> {s with error = Some msg}) ps
@@ -102,7 +105,7 @@ let rec next_step ps =
                     selected_service = Some svc;
                     error = None;
                   })
-                ps))
+                ps)
   | ConfigureImport ->
       Navigation.update (fun s -> {s with step = ReviewImport; error = None}) ps
   | ReviewImport -> start_import ps
