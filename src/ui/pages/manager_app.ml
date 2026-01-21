@@ -51,6 +51,24 @@ let run ?page ?(log = false) ?logfile () =
   Runtime.initialize ~log ?logfile () ;
   (* Cleanup stale temporary download directories from interrupted sessions *)
   Binary_downloader.cleanup_stale_temp_dirs () ;
+  (* Check for version updates in background *)
+  Background_runner.enqueue (fun () ->
+      match Version_checker.check_for_updates () with
+      | Version_checker.UpdateAvailable
+          {latest_version; current_version; should_notify}
+        when should_notify ->
+          let current_str =
+            match current_version with
+            | Some v -> Printf.sprintf "v%s" v
+            | None -> "none"
+          in
+          Context.toast_info
+            (Printf.sprintf
+               "Octez v%s is available (you have %s). Press B to manage \
+                binaries."
+               latest_version
+               current_str)
+      | _ -> ()) ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
     if !quit_requested then raise Exit
