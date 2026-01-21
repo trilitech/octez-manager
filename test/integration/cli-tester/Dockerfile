@@ -1,76 +1,23 @@
-# CLI tester container for integration testing
-# Uses real systemd as PID 1 for testing actual service management
-FROM debian:bookworm-slim
+# Runtime test container - builds on top of base image
+# This layer contains only the octez-manager binary and test scripts
+# which change frequently with each commit
+#
+# The base image contains:
+# - debian:bookworm-slim with systemd
+# - Octez binaries (node, client, baker, accuser, dal-node)
+# - Zcash/Sapling parameters
+# - Pre-generated identity file
+# - Test user and directories
+#
+# To build the base image first:
+#   docker build -f Dockerfile.base -t ghcr.io/trilitech/octez-manager/test-base:latest .
+FROM ghcr.io/trilitech/octez-manager/test-base:latest
 
-# Install systemd and dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    systemd \
-    systemd-sysv \
-    dbus \
-    curl \
-    jq \
-    ca-certificates \
-    gnupg \
-    netbase \
-    procps \
-    bc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Remove unnecessary systemd units that cause issues in containers
-RUN rm -rf /lib/systemd/system/multi-user.target.wants/* \
-    /etc/systemd/system/*.wants/* \
-    /lib/systemd/system/local-fs.target.wants/* \
-    /lib/systemd/system/sockets.target.wants/*udev* \
-    /lib/systemd/system/sockets.target.wants/*initctl* \
-    /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
-    /lib/systemd/system/systemd-update-utmp* \
-    /lib/systemd/system/getty* \
-    2>/dev/null || true
-
-# Download Octez binaries directly (more reliable than packages)
-ARG OCTEZ_VERSION=v24.0
-ARG OCTEZ_BASE_URL=https://octez.tezos.com/releases/octez-v24.0/binaries/x86_64
-RUN for binary in octez-node octez-client octez-baker octez-accuser octez-dal-node; do \
-        echo "Downloading $binary..." && \
-        curl -sfL "${OCTEZ_BASE_URL}/${binary}" -o /usr/local/bin/${binary} && \
-        chmod +x /usr/local/bin/${binary}; \
-    done
-
-# Download Zcash/Sapling parameters required for node operation
-ARG ZCASH_PARAMS_URL=https://download.z.cash/downloads
-RUN mkdir -p /usr/local/share/zcash-params && \
-    echo "Downloading sapling-output.params..." && \
-    curl -sfL "${ZCASH_PARAMS_URL}/sapling-output.params" -o /usr/local/share/zcash-params/sapling-output.params && \
-    echo "Downloading sapling-spend.params..." && \
-    curl -sfL "${ZCASH_PARAMS_URL}/sapling-spend.params" -o /usr/local/share/zcash-params/sapling-spend.params
-
-# Install octez-manager from build context
+# Install octez-manager binary (changes every commit)
 COPY cli-tester/octez-manager /usr/local/bin/octez-manager
 RUN chmod +x /usr/local/bin/octez-manager
 
-# Copy test scripts
+# Copy test scripts (changes frequently)
 COPY cli-tester/tests/ /tests/
 COPY cli-tester/run-tests.sh /run-tests.sh
 RUN chmod +x /run-tests.sh /tests/*.sh /tests/**/*.sh 2>/dev/null || true
-
-# Ensure test user exists
-RUN id tezos >/dev/null 2>&1 || useradd -m -s /bin/bash tezos
-
-# Create required directories
-RUN mkdir -p /var/lib/octez /etc/octez /var/log/octez \
-    && chown -R tezos:tezos /var/lib/octez /etc/octez /var/log/octez
-
-# Pre-generate identity file to avoid PoW during tests (saves ~2-3 min per node start)
-# Generate with minimum difficulty for speed
-RUN mkdir -p /etc/octez/pregenerated && \
-    octez-node identity generate 0 --data-dir /tmp/identity-gen && \
-    cp /tmp/identity-gen/identity.json /etc/octez/pregenerated/identity.json && \
-    rm -rf /tmp/identity-gen && \
-    chmod 644 /etc/octez/pregenerated/identity.json
-
-# Systemd needs these
-VOLUME ["/sys/fs/cgroup", "/run", "/run/lock"]
-STOPSIGNAL SIGRTMIN+3
-
-# Run systemd as PID 1
-CMD ["/lib/systemd/systemd"]
