@@ -176,11 +176,21 @@ let suggest_instance_name ~unit_name =
     else unit_name
   in
   (* Remove common prefixes to keep names short *)
-  if String.starts_with ~prefix:"octez-" name then
-    String.sub name 6 (String.length name - 6)
-  else if String.starts_with ~prefix:"tezos-" name then
-    String.sub name 6 (String.length name - 6)
-  else name
+  let without_prefix =
+    if String.starts_with ~prefix:"octez-" name then
+      String.sub name 6 (String.length name - 6)
+    else if String.starts_with ~prefix:"tezos-" name then
+      String.sub name 6 (String.length name - 6)
+    else name
+  in
+  (* Extract instance name from systemd template format (role@instance) *)
+  match String.index_opt without_prefix '@' with
+  | Some at_pos ->
+      String.sub
+        without_prefix
+        (at_pos + 1)
+        (String.length without_prefix - at_pos - 1)
+  | None -> without_prefix
 
 (** {1 Inspection} *)
 

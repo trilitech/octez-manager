@@ -21,10 +21,17 @@ let import_cmd =
           Cli_helpers.cmdliner_error
             (Printf.sprintf "Failed to detect external services: %s" msg)
       | Ok services -> (
+          (* Normalize external_name: add .service suffix if missing *)
+          let normalized_name =
+            if String.ends_with ~suffix:".service" external_name then
+              external_name
+            else external_name ^ ".service"
+          in
           match
             List.find_opt
               (fun (svc : External_service.t) ->
-                svc.config.unit_name = external_name
+                svc.config.unit_name = normalized_name
+                || svc.config.unit_name = external_name
                 || svc.suggested_instance_name = external_name)
               services
           with
