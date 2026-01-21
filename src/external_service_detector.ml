@@ -420,11 +420,15 @@ let build_external_service ~unit_name ~exec_start ~properties =
 
   (* DEBUG: Log binary path *)
   let () =
-    Printf.eprintf "DEBUG [%s]: parsed.binary_path = %s\n%!" unit_name
+    Printf.eprintf
+      "DEBUG [%s]: parsed.binary_path = %s\n%!"
+      unit_name
       (match parsed.binary_path with Some b -> b | None -> "NONE")
   in
   let () =
-    Printf.eprintf "DEBUG [%s]: binary_field.value = %s\n%!" unit_name
+    Printf.eprintf
+      "DEBUG [%s]: binary_field.value = %s\n%!"
+      unit_name
       (match binary_field.value with Some b -> b | None -> "NONE")
   in
 
