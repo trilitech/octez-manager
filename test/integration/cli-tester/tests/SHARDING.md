@@ -244,3 +244,113 @@ Potential improvements:
 - Dynamic shard count based on test count
 - Per-test historical timing database
 - Smart test ordering (flaky tests first for fast failure)
+
+## Regenerating the Manifest with Real Timing Data
+
+The manifest should be regenerated periodically to maintain optimal balance as tests change.
+
+### When to Regenerate
+
+- Test suite changes significantly (tests added/removed)
+- Test durations change by >20%
+- Shard balance degrades (>10% coefficient)
+- After major refactoring
+
+### Step-by-Step Process
+
+#### 1. Get CI Run ID
+
+Find a recent successful CI run on main:
+```bash
+gh run list --branch main --workflow CI --limit 5
+```
+
+#### 2. Download CI Logs
+
+```bash
+gh run view <run-id> --log > ci-logs.txt
+```
+
+#### 3. Extract Timing Data
+
+The CI workflow outputs timing data from each shard:
+```bash
+# Extract TIMING lines from all shards
+grep '^TIMING:' ci-logs.txt > test-timings.txt
+
+# Verify count (should be 60-61 tests)
+echo "Tests found: $(wc -l < test-timings.txt)"
+```
+
+Example timing data:
+```
+TIMING: /tests/node/17-preserve-data-resume.sh 18.643577024
+TIMING: /tests/accuser/37-accuser-extra-args.sh 18.531480509
+TIMING: /tests/baker/32-baker-node-dependency.sh 12.979262923
+```
+
+#### 4. Generate New Manifest
+
+```bash
+# Generate with 5 shards (or adjust as needed)
+python3 scripts/generate-shard-manifest.py test-timings.txt --shards 5 \
+  > test/integration/cli-tester/tests/shards.json
+```
+
+Review the balance output:
+```
+=== Shard Manifest Summary ===
+Total tests: 60
+Total duration: 392.6s
+Shards: 5
+
+Shard balance:
+  Mean: 78.5s
+  Range: 77.5s - 78.8s
+  Std dev: 0.5s
+  Balance coefficient: 0.6% (lower is better)
+
+✓ Excellent balance (variance <10%)
+```
+
+#### 5. Verify and Commit
+
+```bash
+# Verify all test paths exist
+cd test/integration/cli-tester/tests
+for test in $(jq -r '.[] | select(.test_count) | .tests[]' shards.json 2>/dev/null); do
+  [ -f "$test" ] || echo "MISSING: $test"
+done
+
+# Commit
+git add shards.json
+git commit -m "chore(ci): update shard manifest with timings from CI run <run-id>
+
+Balance coefficient: X.X%
+Mean shard duration: XXs"
+```
+
+### Troubleshooting
+
+**No TIMING lines in logs:**
+- Check that `bc` is installed in the test container (Dockerfile)
+- Verify the "Output timing data" CI step ran
+- Ensure tests completed successfully
+
+**Wrong test count:**
+- Some tests may have failed in the CI run
+- Use a fully successful run for timing data
+- Check if new tests were added since last update
+
+**Test paths don't exist:**
+- Manual path corrections may be needed
+- Test names containing "dal" or "baker" may be misclassified
+- Verify paths match actual file locations
+
+### Timing Data Quality
+
+With `bc` installed, timings have nanosecond precision:
+- ✅ `18.643577024s` - precise
+- ❌ `0s` - means `bc` is missing
+
+The test runner logs timing to `/tmp/test-timings.log` and the CI workflow outputs it in the "Output timing data" step.
