@@ -11,6 +11,13 @@ module Term = Cmdliner.Term
 
 let cmdliner_error msg = `Error (false, msg)
 
+let interactive_tty =
+  lazy
+    (let fd_isatty fd = try Unix.isatty fd with Unix.Unix_error _ -> false in
+     fd_isatty Unix.stdin && fd_isatty Unix.stdout)
+
+let is_interactive () = Lazy.force interactive_tty
+
 let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
   (* Priority: octez_version > bin_dir_alias > app_bin_dir > auto-detect *)
   match (octez_version, bin_dir_alias, app_bin_dir) with
@@ -19,6 +26,35 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
       let version = String.trim version in
       if Binary_registry.managed_version_exists version then
         Ok (Binary_registry.managed_version_path version)
+      else if is_interactive () then
+        (* Prompt to download *)
+        let msg =
+          Printf.sprintf
+            "Managed version v%s not found locally. Download now? [Y/n] "
+            version
+        in
+        match LNoise.linenoise msg with
+        | None | Some "" | Some "y" | Some "Y" | Some "yes" | Some "Yes" -> (
+            Printf.printf "Downloading Octez v%s...\n%!" version ;
+            match Binary_downloader.download_version ~version () with
+            | Ok _result ->
+                Printf.printf "Download complete!\n%!" ;
+                Ok (Binary_registry.managed_version_path version)
+            | Error (`Msg e) ->
+                Error
+                  (Printf.sprintf
+                     "Download failed: %s\n\n\
+                      You can download manually with:\n\
+                     \  octez-manager binaries download %s"
+                     e
+                     version))
+        | Some _ ->
+            Error
+              (Printf.sprintf
+                 "Version v%s not installed. Download it with:\n\
+                 \  octez-manager binaries download %s"
+                 version
+                 version)
       else
         Error
           (Printf.sprintf
@@ -52,13 +88,6 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
           Error
             "Unable to locate octez-node in PATH. Install Octez binaries or \
              use --octez-version, --bin-dir-alias, or --app-bin-dir")
-
-let interactive_tty =
-  lazy
-    (let fd_isatty fd = try Unix.isatty fd with Unix.Unix_error _ -> false in
-     fd_isatty Unix.stdin && fd_isatty Unix.stdout)
-
-let is_interactive () = Lazy.force interactive_tty
 
 let normalize_opt_string = function
   | Some s ->
