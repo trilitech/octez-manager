@@ -99,21 +99,27 @@ val missing_required_fields : External_service.t -> string list
     4. Resolve all required fields (detected + overrides + prompts)
     5. Stop external service (if Takeover strategy)
     6. Create managed service with preserve_data=true
-    7. Disable/remove original systemd unit (if Takeover)
-    8. Enable and start managed service
-    9. Verify service started successfully
-    10. Invalidate external services cache
+    7. Interactive review (if interactive mode enabled):
+       - Review and edit environment file
+       - Review and edit systemd drop-in file
+       - Final confirmation before proceeding
+    8. Disable/remove original systemd unit (if Takeover)
+    9. Enable and start managed service
+    10. Verify service started successfully
+    11. Invalidate external services cache
 
     If any step fails after stopping the external service, automatic rollback
     is triggered to restore the original service.
 
     @param on_log Optional callback for progress messages
+    @param prompt_yes_no Optional function for yes/no prompts (default always returns default value)
     @param options Import options
     @param external_svc External service to import
     @return Import result or error
     @raise any exception triggers rollback *)
 val import_service :
   ?on_log:(string -> unit) ->
+  ?prompt_yes_no:(string -> default:bool -> bool) ->
   ?imported_services:(string, string) Hashtbl.t ->
   ?all_external_services:External_service.t list ->
   options:import_options ->
@@ -136,6 +142,7 @@ val import_service :
     5. Start services in order after all are imported
 
     @param on_log Optional callback for progress messages
+    @param prompt_yes_no Optional function for yes/no prompts (default always returns default value)
     @param options Import options (applied to all services in the chain)
     @param external_svc The target service to import (along with its dependencies)
     @param all_services All available external services for dependency resolution
@@ -143,6 +150,7 @@ val import_service :
     @raise any exception during import of any service triggers rollback of all *)
 val import_cascade :
   ?on_log:(string -> unit) ->
+  ?prompt_yes_no:(string -> default:bool -> bool) ->
   options:import_options ->
   external_svc:External_service.t ->
   all_services:External_service.t list ->

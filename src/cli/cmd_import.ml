@@ -89,11 +89,13 @@ let import_cmd =
 
                       (* 5. Perform import *)
                       let log_fn msg = Format.printf "%s@." msg in
+                      let prompt_fn = Cli_helpers.prompt_yes_no in
                       if cascade then
                         (* Cascade import: import entire dependency chain *)
                         match
                           Import.import_cascade
                             ~on_log:log_fn
+                            ~prompt_yes_no:prompt_fn
                             ~options
                             ~external_svc
                             ~all_services:services
@@ -123,6 +125,7 @@ let import_cmd =
                         match
                           Import.import_service
                             ~on_log:log_fn
+                            ~prompt_yes_no:prompt_fn
                             ~options
                             ~external_svc
                             ()
