@@ -152,8 +152,8 @@ and start_import ps =
           match status with
           | Job_manager.Succeeded ->
               Cache.invalidate_all () ;
-              Context.toast_success "Service imported successfully!"
-              (* Don't auto-navigate - let user press Esc to exit *)
+              Context.toast_success "Service imported successfully!" ;
+              Context.navigate "instances"
           | Job_manager.Failed msg ->
               Context.toast_error (Printf.sprintf "Import failed: %s" msg)
           | Job_manager.Pending | Job_manager.Running -> ())
@@ -393,7 +393,7 @@ let view ps ~focus:_ ~size =
                       "";
                       Widgets.fg 10 "  ✓ Import succeeded!";
                       "";
-                      "  Press Esc to return to instances";
+                      "  Returning to instances page...";
                       "";
                     ]
                 | Job_manager.Failed msg ->
