@@ -334,7 +334,8 @@ let download_file_curl ~url ~dest ?progress () =
   let cmd =
     [
       "curl";
-      "-fL";
+      "-fsSL";
+      (* -s silent, -S show errors, -f fail on HTTP errors, -L follow redirects *)
       "--max-time";
       "300";
       "--connect-timeout";
