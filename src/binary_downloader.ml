@@ -615,6 +615,46 @@ let download_version ~version ?(verify_checksums = true) ?progress
         checksum_status;
       }
 
+(** Calculate directory size in bytes *)
+
+let calculate_directory_size path =
+  if not (Sys.file_exists path) then Ok 0L
+  else
+    try
+      (* Use du command to calculate directory size *)
+      let output = Common.run_out ["du"; "-sb"; path] in
+      match output with
+      | Ok out -> (
+          (* du -sb outputs: "SIZE\tPATH" *)
+          try
+            let size_str = List.hd (String.split_on_char '\t' out) in
+            Ok (Int64.of_string (String.trim size_str))
+          with _ -> R.error_msgf "Failed to parse du output: %s" out)
+      | Error _ as e -> e
+    with e ->
+      R.error_msgf
+        "Failed to calculate directory size: %s"
+        (Printexc.to_string e)
+
+(** Format bytes into human-readable string *)
+
+let format_size_bytes bytes =
+  let open Int64 in
+  if bytes < 1024L then Printf.sprintf "%Ld B" bytes
+  else if bytes < mul 1024L 1024L then
+    Printf.sprintf "%.1f KB" (to_float bytes /. 1024.0)
+  else if bytes < mul (mul 1024L 1024L) 1024L then
+    Printf.sprintf "%.1f MB" (to_float bytes /. 1024.0 /. 1024.0)
+  else Printf.sprintf "%.1f GB" (to_float bytes /. 1024.0 /. 1024.0 /. 1024.0)
+
+(** Get version size with formatted string *)
+
+let get_version_size version =
+  let path = Binary_registry.managed_version_path version in
+  match calculate_directory_size path with
+  | Ok bytes -> Ok (bytes, format_size_bytes bytes)
+  | Error _ as e -> e
+
 (** Remove version *)
 
 let remove_version version =

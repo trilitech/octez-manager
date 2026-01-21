@@ -338,26 +338,55 @@ let prune_unused s =
     Modal_helpers.show_error ~title:"Prune" "No unused versions to prune." ;
     s)
   else
-    let versions_str =
-      String.concat ", " (List.map (fun (v, _, _) -> "v" ^ v) unused)
+    (* Calculate total size and build detailed message *)
+    let version_details = ref [] in
+    let total_bytes = ref 0L in
+    List.iter
+      (fun (v, _, _) ->
+        match Binary_downloader.get_version_size v with
+        | Ok (bytes, formatted) ->
+            version_details := (v, formatted) :: !version_details ;
+            total_bytes := Int64.add !total_bytes bytes
+        | Error _ -> version_details := (v, "unknown size") :: !version_details)
+      unused ;
+    let details_lines =
+      List.map
+        (fun (v, size) -> Printf.sprintf "  • v%s (%s)" v size)
+        (List.rev !version_details)
+    in
+    let total_formatted = Binary_downloader.format_size_bytes !total_bytes in
+    let message =
+      String.concat
+        "\n"
+        (["The following versions will be removed:"; ""]
+        @ details_lines
+        @ [""; Printf.sprintf "Total space to free: %s" total_formatted])
     in
     Modal_helpers.confirm_modal
-      ~title:
-        (Printf.sprintf
-           "Remove %d unused version(s): %s?"
-           (List.length unused)
-           versions_str)
-      ~message:""
+      ~title:(Printf.sprintf "Prune %d unused version(s)?" (List.length unused))
+      ~message
       ~on_result:(fun confirmed ->
         if confirmed then (
+          let success_count = ref 0 in
+          let fail_count = ref 0 in
           List.iter
             (fun (v, _, _) ->
               match Binary_downloader.remove_version v with
-              | Ok () -> Context.toast_info (Printf.sprintf "Removed v%s" v)
-              | Error (`Msg msg) ->
-                  Context.toast_error
-                    (Printf.sprintf "Failed to remove v%s: %s" v msg))
+              | Ok () -> incr success_count
+              | Error _ -> incr fail_count)
             unused ;
+          if !fail_count = 0 then
+            Context.toast_info
+              (Printf.sprintf
+                 "Removed %d version(s), freed %s"
+                 !success_count
+                 total_formatted)
+          else
+            Context.toast_error
+              (Printf.sprintf
+                 "Removed %d version(s), %d failed"
+                 !success_count
+                 !fail_count) ;
           Context.mark_instances_dirty ()))
       () ;
     s
