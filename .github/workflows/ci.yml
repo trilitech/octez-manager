@@ -63,17 +63,18 @@ jobs:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
 
-      - name: Update miaou packages if needed
+      - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
-          # Miaou is pre-installed in CI image
-          # Only re-pin if miaou-version changed (cache miss)
-          MIAOU_URL="${MIAOU_GIT_URL:-https://github.com/trilitech/miaou.git}"
-          opam pin add miaou-core "$MIAOU_URL" --no-action
-          opam pin add miaou-driver-term "$MIAOU_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_URL" --no-action
-          opam pin add miaou-runner "$MIAOU_URL" --no-action
-          opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-runner
+          if [ -z "$MIAOU_GIT_URL" ]; then
+            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
+            exit 1
+          fi
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
 
       - name: Cache dune build
         uses: actions/cache@v4
@@ -250,7 +251,7 @@ jobs:
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
-      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL || 'https://github.com/trilitech/miaou.git' }}
+      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
 
     steps:
       - name: Checkout
@@ -263,16 +264,14 @@ jobs:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
 
-      - name: Update miaou packages if needed
+      - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
-          # Miaou is pre-installed in CI image
-          # Only re-pin if miaou-version changed (cache miss)
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-runner
+          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
 
       - name: Build static binary
         run: |
