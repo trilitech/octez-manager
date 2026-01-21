@@ -97,7 +97,13 @@ let list_all_service_units () =
   let list_unit_files () =
     let cmd =
       systemctl_cmd ()
-      @ ["list-unit-files"; "--type=service"; "--no-legend"; "--no-pager"]
+      @ [
+          "list-unit-files";
+          "--type=service";
+          "octez-*.service";
+          "--no-legend";
+          "--no-pager";
+        ]
     in
     match Common.run_out cmd with
     | Ok output ->

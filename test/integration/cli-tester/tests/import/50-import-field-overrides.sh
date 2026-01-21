@@ -33,7 +33,7 @@ sleep 2
 # Import with custom name override
 echo "Importing with custom instance name..."
 om import "octez-node@${EXTERNAL_INSTANCE}" --as "$CUSTOM_INSTANCE" 2>&1 || {
-n# Stop service
+# Stop service
 systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
     echo "Import failed, showing current state..."
     om list 2>&1

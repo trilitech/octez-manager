@@ -45,7 +45,7 @@ systemctl enable "octez-baker@${BAKER_INSTANCE}.service"
 # Import baker with cascade
 echo "Importing baker with cascade (should also import node)..."
 om import "octez-baker@${BAKER_INSTANCE}" --cascade 2>&1 || {
-n# Stop services to avoid long sync
+# Stop services to avoid long sync
 systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
 systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
     echo "Import command failed, checking what was imported..."

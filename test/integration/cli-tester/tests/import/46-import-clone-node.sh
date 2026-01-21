@@ -33,7 +33,7 @@ sleep 2
 # Import with clone strategy
 echo "Importing with clone strategy..."
 om import "octez-node@${EXTERNAL_INSTANCE}" --strategy clone --as "$CLONED_INSTANCE" 2>&1
-n# Stop service to avoid long sync
+# Stop service to avoid long sync
 systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
 
 # Verify cloned service is managed
