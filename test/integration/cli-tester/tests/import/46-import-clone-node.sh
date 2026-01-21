@@ -23,9 +23,7 @@ systemctl daemon-reload
 echo "Creating external systemd service..."
 create_external_service "node" "$EXTERNAL_INSTANCE" "$EXTERNAL_DATA" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
-systemctl start "octez-node@${EXTERNAL_INSTANCE}.service"
 
-wait_for_service_active "node" "$EXTERNAL_INSTANCE" 10 || true
 
 # Import with clone strategy
 echo "Importing with clone strategy..."

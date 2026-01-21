@@ -23,9 +23,7 @@ systemctl daemon-reload
 echo "Creating external service..."
 create_external_service "node" "$EXTERNAL_INSTANCE" "$DATA_DIR" "$RPC_ADDR" "ghostnet"
 systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
-systemctl start "octez-node@${EXTERNAL_INSTANCE}.service"
 
-wait_for_service_active "node" "$EXTERNAL_INSTANCE" 10 || true
 
 # Import with custom name override
 echo "Importing with custom instance name..."

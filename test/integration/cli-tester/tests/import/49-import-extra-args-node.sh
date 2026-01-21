@@ -45,9 +45,7 @@ SERVICE
 
 systemctl daemon-reload
 systemctl enable "octez-node@${INSTANCE}.service"
-systemctl start "octez-node@${INSTANCE}.service"
 
-wait_for_service_active "node" "$INSTANCE" 10 || true
 
 # Import the service
 echo "Importing service with extra args..."

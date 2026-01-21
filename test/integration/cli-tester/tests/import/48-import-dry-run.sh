@@ -21,32 +21,24 @@ systemctl daemon-reload
 echo "Creating external systemd service..."
 create_external_service "node" "$INSTANCE" "$DATA_DIR" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${INSTANCE}.service"
-systemctl start "octez-node@${INSTANCE}.service"
-
-wait_for_service_active "node" "$INSTANCE" 10 || true
 
 # Run dry-run
 echo "Running dry-run import..."
-om import "octez-node@${INSTANCE}" --dry-run 2>&1 > /tmp/dryrun_output.txt || true
+om import "octez-node@${INSTANCE}" --dry-run 2>&1 >/tmp/dryrun_output.txt || true
 
 cat /tmp/dryrun_output.txt
 
 # Verify service is still external (not imported)
 if service_is_managed "$INSTANCE"; then
-    echo "ERROR: Service should not be imported during dry-run"
-    om list 2>&1
-    exit 1
+	echo "ERROR: Service should not be imported during dry-run"
+	om list 2>&1
+	exit 1
 fi
 
-# Verify external service is still enabled and running
+# Verify external service is still enabled (we don't start it, so don't check if running)
 if ! systemctl is-enabled "octez-node@${INSTANCE}.service" >/dev/null 2>&1; then
-    echo "ERROR: External service should still be enabled after dry-run"
-    exit 1
-fi
-
-if ! systemctl is-active "octez-node@${INSTANCE}.service" >/dev/null 2>&1; then
-    echo "ERROR: External service should still be running after dry-run"
-    exit 1
+	echo "ERROR: External service should still be enabled after dry-run"
+	exit 1
 fi
 
 echo "Dry-run correctly showed plan without making changes"

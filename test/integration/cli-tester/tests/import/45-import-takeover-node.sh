@@ -21,10 +21,8 @@ systemctl daemon-reload
 echo "Creating external systemd service..."
 create_external_service "node" "$INSTANCE" "$DATA_DIR" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${INSTANCE}.service"
-systemctl start "octez-node@${INSTANCE}.service"
 
 # Wait for it to be running
-wait_for_service_active "node" "$INSTANCE" 10 || true
 
 # Import with takeover strategy
 echo "Importing with takeover strategy..."

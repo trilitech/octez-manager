@@ -13,30 +13,34 @@ echo "Test: Detect process-based instances"
 rm -rf "$DATA_DIR" || true
 pkill -f "octez-node.*$DATA_DIR" || true
 
-# Create data directory
+# Create data directory with pre-generated identity to avoid PoW
 mkdir -p "$DATA_DIR"
+inject_identity "unused" "$DATA_DIR"
 chown -R tezos:tezos "$DATA_DIR"
 
 # Start octez-node as direct process (no systemd)
 echo "Starting octez-node as direct process..."
 PID=$(start_unmanaged_process "octez-node" "run --data-dir $DATA_DIR --network shadownet --rpc-addr $RPC_ADDR")
 
-sleep 3
+sleep 2
 
 # Verify process is running
-if ! ps -p $PID > /dev/null 2>&1; then
-    echo "ERROR: Process did not start"
-    exit 1
+if ! ps -p $PID >/dev/null 2>&1; then
+	echo "ERROR: Process did not start"
+	exit 1
 fi
+
+echo "Process started successfully (PID: $PID)"
 
 # Check detection - process-based instances should be detected but not importable
 # NOTE: This test verifies the detection behavior. Current implementation may vary.
 echo "Checking detection behavior for process-based instance..."
-om list 2>&1 > /tmp/list_output.txt || true
+om list 2>&1 >/tmp/list_output.txt || true
 cat /tmp/list_output.txt
 
-# Cleanup
+# Cleanup immediately - we don't need the node to sync
 kill $PID 2>/dev/null || true
+pkill -f "octez-node.*$DATA_DIR" || true
 rm -rf "$DATA_DIR"
 
 echo "Process-based detection test completed"
