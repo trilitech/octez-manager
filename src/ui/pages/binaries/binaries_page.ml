@@ -185,8 +185,8 @@ let remove_version version =
          count)
   else
     Modal_helpers.confirm_modal
-      ~title:"Remove Version"
-      ~message:(Printf.sprintf "Remove managed version v%s?" version)
+      ~title:(Printf.sprintf "Remove managed version v%s?" version)
+      ~message:""
       ~on_result:(fun confirmed ->
         if confirmed then
           (* Run removal in background to avoid blocking UI *)
@@ -213,8 +213,8 @@ let unlink_directory ld =
          count)
   else
     Modal_helpers.confirm_modal
-      ~title:"Unlink Directory"
-      ~message:(Printf.sprintf "Unlink directory '%s'?" ld.alias)
+      ~title:(Printf.sprintf "Unlink directory '%s'?" ld.alias)
+      ~message:""
       ~on_result:(fun confirmed ->
         if confirmed then
           (* Run unlink in background to avoid blocking UI *)
@@ -293,12 +293,12 @@ let prune_unused s =
       String.concat ", " (List.map (fun (v, _, _) -> "v" ^ v) unused)
     in
     Modal_helpers.confirm_modal
-      ~title:"Prune Unused Versions"
-      ~message:
+      ~title:
         (Printf.sprintf
            "Remove %d unused version(s): %s?"
            (List.length unused)
            versions_str)
+      ~message:""
       ~on_result:(fun confirmed ->
         if confirmed then (
           List.iter
