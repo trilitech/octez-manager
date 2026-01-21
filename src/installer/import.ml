@@ -1475,10 +1475,14 @@ let import_cascade ?(on_log = fun _ -> ())
     let results = ref [] in
     let imported_instances = ref [] in
     let imported_map = Hashtbl.create 17 in
+    let current_service = ref None in
+    let current_index = ref 0 in
 
     try
-      List.iter
-        (fun svc_name ->
+      List.iteri
+        (fun idx svc_name ->
+          current_index := idx + 1 ;
+          current_service := Some svc_name ;
           match
             List.find_opt
               (fun s -> s.External_service.config.unit_name = svc_name)
@@ -1518,9 +1522,39 @@ let import_cascade ?(on_log = fun _ -> ())
         analysis.import_order ;
       Ok (List.rev !results)
     with e ->
+      (* Build detailed error message *)
+      let total_services = List.length chain in
+      let completed_count = List.length !imported_instances in
+      let failed_service =
+        match !current_service with Some s -> s | None -> "unknown"
+      in
+      let error_msg = Printexc.to_string e in
+
+      log "" ;
+      log
+        (Printf.sprintf
+           "Cascade import failed at service '%s' (%d of %d)"
+           failed_service
+           !current_index
+           total_services) ;
+
+      if completed_count > 0 then (
+        log "" ;
+        log "Successfully imported before failure:" ;
+        List.iter
+          (fun instance -> log (Printf.sprintf "  - %s" instance))
+          (List.rev !imported_instances)) ;
+
+      log "" ;
+      log (Printf.sprintf "Error: %s" error_msg) ;
+
       (* Rollback all imported services in reverse order *)
       log "" ;
-      log "Cascade import failed, rolling back..." ;
+      log
+        (Printf.sprintf
+           "Rollback: Removing %d imported service%s..."
+           completed_count
+           (if completed_count = 1 then "" else "s")) ;
       List.iter
         (fun instance ->
           log (Printf.sprintf "  Rolling back %s..." instance) ;
@@ -1529,6 +1563,19 @@ let import_cascade ?(on_log = fun _ -> ())
           | Error (`Msg msg) ->
               log (Printf.sprintf "  ⚠ Failed to remove %s: %s" instance msg))
         !imported_instances ;
-      Error
-        (`Msg
-           (Printf.sprintf "Cascade import failed: %s" (Printexc.to_string e)))
+
+      (* Construct detailed error message *)
+      let detailed_msg =
+        Printf.sprintf
+          "Cascade import failed at service '%s' (%d of %d).\n\
+           %s\n\n\
+           Rollback: %d service%s removed.\n\n\
+           Tip: Use --dry-run to preview the import plan before executing."
+          failed_service
+          !current_index
+          total_services
+          error_msg
+          completed_count
+          (if completed_count = 1 then "" else "s")
+      in
+      Error (`Msg detailed_msg)
