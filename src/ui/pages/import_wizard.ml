@@ -311,7 +311,7 @@ let view ps ~focus:_ ~size =
                    "";
                  ]
                else [])
-            @ [""; "Space: Toggle strategy  Tab/Enter: Next  Esc: Back"])
+            @ [""; "Space: Toggle strategy  Enter: Next  Esc: Back"])
     | ReviewImport -> (
         match s.selected_service with
         | None -> ["Error: No service selected"]
@@ -443,7 +443,6 @@ let handle_key ps key ~size:_ =
     | SelectService, Some Keys.Enter -> next_step ps
     | SelectService, Some Keys.Escape -> Navigation.back ps
     | ConfigureImport, Some (Keys.Char " ") -> toggle_strategy ps
-    | ConfigureImport, Some Keys.Tab -> next_step ps
     | ConfigureImport, Some Keys.Enter -> next_step ps
     | ConfigureImport, Some Keys.Escape -> back ps
     | ReviewImport, Some Keys.Enter -> next_step ps
