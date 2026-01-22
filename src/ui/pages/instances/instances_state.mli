@@ -20,10 +20,10 @@ val clear_failure : instance:string -> unit
 
 val get_recent_failure : instance:string -> string option
 
-(** Layout constants *)
-val menu_item_count : int
+(** Layout functions - counts depend on whether update is available *)
+val menu_item_count : unit -> int
 
-val services_start_idx : int
+val services_start_idx : unit -> int
 
 (** Instances page state *)
 type state = {
