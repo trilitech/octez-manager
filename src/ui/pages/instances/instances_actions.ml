@@ -555,20 +555,48 @@ type version_choice =
   | ManagedVersion of string
   | LinkedDir of string * string (* alias, path *)
 
-(** Get dependent services that should be offered for cascade update *)
+(** Get all dependent services transitively.
+    If A depends on B and B depends on C, updating C should include both A and B.
+    Returns services in dependency order (direct dependents first). *)
 let get_dependent_services instance =
   match Service_registry.list () with
   | Error _ -> []
   | Ok all_services ->
+      (* Find direct dependents of a given instance *)
+      let direct_dependents_of inst =
+        List.filter
+          (fun svc ->
+            match svc.Service.depends_on with
+            | Some dep when dep = inst -> true
+            | _ -> false)
+          all_services
+      in
+      (* BFS to find all transitive dependents *)
+      let rec collect_all visited queue acc =
+        match queue with
+        | [] -> List.rev acc
+        | inst :: rest ->
+            if List.mem inst visited then collect_all visited rest acc
+            else
+              let deps = direct_dependents_of inst in
+              let new_instances = List.map (fun s -> s.Service.instance) deps in
+              collect_all (inst :: visited) (rest @ new_instances) (deps @ acc)
+      in
+      (* Start from the target instance, collect all dependents *)
+      let all_deps = collect_all [] [instance] [] in
+      (* Remove duplicates while preserving order *)
+      let seen = Hashtbl.create 16 in
       List.filter
         (fun svc ->
-          match svc.Service.depends_on with
-          | Some dep when dep = instance -> true
-          | _ -> false)
-        all_services
+          let inst = svc.Service.instance in
+          if Hashtbl.mem seen inst then false
+          else (
+            Hashtbl.add seen inst () ;
+            true))
+        all_deps
 
 (** Show cascade selection modal with checkboxes for dependents *)
-let show_cascade_modal ~instance ~new_version_str ~dependents ~on_confirm =
+let rec show_cascade_modal ~instance ~new_version_str ~dependents ~on_confirm =
   let dependent_instances = List.map (fun s -> s.Service.instance) dependents in
 
   if dependents = [] then
@@ -599,8 +627,26 @@ let show_cascade_modal ~instance ~new_version_str ~dependents ~on_confirm =
         if confirmed then on_confirm ~cascade_instances:dependent_instances)
       ()
 
+(** Try to restart service with original config after a failure *)
+and try_restart_with_old_config ~svc ~old_bin_source:_ =
+  let instance = svc.Service.instance in
+  let role = svc.Service.role in
+  (* Best effort - try to restart with original config *)
+  let cap = Miaou_interfaces.Service_lifecycle.require () in
+  match
+    Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
+  with
+  | Ok () ->
+      Context.toast_info
+        (Printf.sprintf "%s restarted with previous version" instance)
+  | Error _ ->
+      Context.toast_error
+        (Printf.sprintf
+           "%s left stopped - manual intervention required"
+           instance)
+
 (** Update a single service with rollback support *)
-let rec do_update_single_service ~svc ~old_bin_source ~new_bin_source () =
+and do_update_single_service ~svc ~old_bin_source ~new_bin_source () =
   let instance = svc.Service.instance in
   let role = svc.Service.role in
 
@@ -612,31 +658,40 @@ let rec do_update_single_service ~svc ~old_bin_source ~new_bin_source () =
   in
 
   (* Resolve the new bin_source to get the actual path *)
-  let* new_path = Binary_registry.resolve_bin_source new_bin_source in
+  match Binary_registry.resolve_bin_source new_bin_source with
+  | Error (`Msg msg) ->
+      (* Resolution failed - try to restart with old config *)
+      try_restart_with_old_config ~svc ~old_bin_source ;
+      Error (`Msg (Printf.sprintf "Failed to resolve new version: %s" msg))
+  | Ok new_path -> (
+      (* Update the service config *)
+      let updated_svc =
+        {
+          svc with
+          Service.app_bin_dir = new_path;
+          bin_source = Some new_bin_source;
+        }
+      in
+      let* () = Service_registry.write updated_svc in
 
-  (* Update the service config *)
-  let updated_svc =
-    {svc with Service.app_bin_dir = new_path; bin_source = Some new_bin_source}
-  in
-  let* () = Service_registry.write updated_svc in
+      (* Try to start the service *)
+      let cap = Miaou_interfaces.Service_lifecycle.require () in
+      match
+        Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
+      with
+      | Ok () -> Ok ()
+      | Error start_error ->
+          (* Start failed - offer rollback *)
+          show_rollback_modal
+            ~instance
+            ~svc
+            ~old_bin_source
+            ~new_bin_source
+            ~error:start_error ;
+          Error (`Msg start_error))
 
-  (* Try to start the service *)
-  let cap = Miaou_interfaces.Service_lifecycle.require () in
-  match
-    Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
-  with
-  | Ok () -> Ok ()
-  | Error start_error ->
-      (* Start failed - offer rollback *)
-      show_rollback_modal
-        ~instance
-        ~svc
-        ~old_bin_source
-        ~new_bin_source
-        ~error:start_error ;
-      Error (`Msg start_error)
-
-and show_rollback_modal ~instance ~svc ~old_bin_source ~new_bin_source ~error =
+and show_rollback_modal ~instance ~svc ~old_bin_source ~new_bin_source ~error:_
+    =
   let old_version_str =
     match old_bin_source with
     | Binary_registry.Managed_version v -> "v" ^ v
@@ -651,14 +706,8 @@ and show_rollback_modal ~instance ~svc ~old_bin_source ~new_bin_source ~error =
     | Binary_registry.Raw_path p -> p
   in
 
-  let modal_title =
-    Printf.sprintf
-      "Update Failed: %s\n\nFailed to start %s with %s.\nError: %s"
-      instance
-      instance
-      new_version_str
-      error
-  in
+  (* Keep title concise - error details shown via View Logs *)
+  let modal_title = Printf.sprintf "Update to %s failed" new_version_str in
 
   Modal_helpers.open_choice_modal
     ~title:modal_title
@@ -705,8 +754,25 @@ and do_rollback ~svc ~old_bin_source () =
   Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
   |> Result.map_error (fun e -> `Msg e)
 
+(** Check if a service is currently running *)
+and is_service_running svc =
+  let instance = svc.Service.instance in
+  let services = Data.load_service_states () in
+  List.exists
+    (fun s ->
+      s.Data.Service_state.service.Service.instance = instance
+      && s.Data.Service_state.status = Data.Service_state.Running)
+    services
+
 (** Perform cascade update of multiple services *)
 and do_cascade_update ~services ~new_bin_source () =
+  (* First, record which services are currently running *)
+  let was_running =
+    List.filter_map
+      (fun svc ->
+        if is_service_running svc then Some svc.Service.instance else None)
+      services
+  in
   let rec update_all acc_updated = function
     | [] -> Ok acc_updated
     | svc :: rest -> (
@@ -719,15 +785,30 @@ and do_cascade_update ~services ~new_bin_source () =
             (* One update failed - rollback all successfully updated ones *)
             List.iter
               (fun (updated_svc, old_bs) ->
-                match
-                  do_rollback ~svc:updated_svc ~old_bin_source:old_bs ()
-                with
-                | Ok () ->
-                    Context.toast_info
-                      (Printf.sprintf
-                         "Rolled back %s"
-                         updated_svc.Service.instance)
-                | Error _ -> ())
+                (* Only rollback (restart) if service was running before *)
+                let inst = updated_svc.Service.instance in
+                if List.mem inst was_running then
+                  match
+                    do_rollback ~svc:updated_svc ~old_bin_source:old_bs ()
+                  with
+                  | Ok () ->
+                      Context.toast_info (Printf.sprintf "Rolled back %s" inst)
+                  | Error _ ->
+                      Context.toast_error
+                        (Printf.sprintf "Failed to rollback %s" inst)
+                else
+                  (* Service wasn't running before, just restore config *)
+                  match Binary_registry.resolve_bin_source old_bs with
+                  | Error _ -> ()
+                  | Ok old_path ->
+                      let restored =
+                        {
+                          updated_svc with
+                          Service.app_bin_dir = old_path;
+                          bin_source = Some old_bs;
+                        }
+                      in
+                      ignore (Service_registry.write restored))
               acc_updated ;
             e)
   in
