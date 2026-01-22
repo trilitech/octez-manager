@@ -142,6 +142,24 @@ jobs:
           eval $(opam env)
           dune build test/test_golden_path_tui_v2.exe
 
+      - name: Check completions are up to date
+        run: |
+          mkdir -p /tmp/completions-check
+          dune exec -- octez-manager-gen-completion --out-dir /tmp/completions-check
+          if ! diff -q completions/octez-manager.bash /tmp/completions-check/octez-manager.bash >/dev/null 2>&1 || \
+             ! diff -q completions/octez-manager.zsh /tmp/completions-check/octez-manager.zsh >/dev/null 2>&1; then
+            echo "ERROR: Shell completion files are out of date."
+            echo "Run: dune exec -- octez-manager-gen-completion --out-dir completions"
+            echo ""
+            echo "=== Bash diff ==="
+            diff completions/octez-manager.bash /tmp/completions-check/octez-manager.bash || true
+            echo ""
+            echo "=== Zsh diff ==="
+            diff completions/octez-manager.zsh /tmp/completions-check/octez-manager.zsh || true
+            exit 1
+          fi
+          echo "Completion files are up to date."
+
       - name: Prepare binary artifacts
         run: |
           mkdir -p artifacts
