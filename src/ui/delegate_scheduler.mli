@@ -32,3 +32,6 @@ val invalidate_config : instance:string -> unit
 
 (** Clear all state and cache. *)
 val clear : unit -> unit
+
+(** Shutdown the background scheduler. *)
+val shutdown : unit -> unit
