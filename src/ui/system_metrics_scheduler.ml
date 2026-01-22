@@ -366,7 +366,9 @@ let tick () =
             ~data_dir:""
             ()
       | "dal-node" ->
-          let binary = Filename.concat svc.Service.app_bin_dir "octez-baker" in
+          let binary =
+            Filename.concat svc.Service.app_bin_dir "octez-dal-node"
+          in
           submit_poll
             ~role:svc.Service.role
             ~instance:svc.Service.instance
