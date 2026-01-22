@@ -3824,7 +3824,15 @@ let binary_downloader_binaries_list () =
       Alcotest.(check bool)
         "has octez-client"
         true
-        (List.mem "octez-client" binaries)
+        (List.mem "octez-client" binaries) ;
+      Alcotest.(check bool)
+        "has octez-baker"
+        true
+        (List.mem "octez-baker" binaries) ;
+      Alcotest.(check bool)
+        "has octez-dal-node"
+        true
+        (List.mem "octez-dal-node" binaries)
   | Error (`Msg e) -> Alcotest.fail e
 
 (* External service tests *)
