@@ -6,38 +6,101 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-23
+
 ### Added
 
-- **Unmanaged Instances Detection**: Automatically detect and manage Octez services not installed by octez-manager
+- **Self-Update System**: Check for and install octez-manager updates
+  - `octez-manager self-update` CLI command with `--check` (check only) and `--force` options
+  - `octez-manager version` shows current version and checks for updates
+  - TUI displays "Upgrade octez-manager" button when updates are available
+  - Background version polling (every 10 minutes) for non-intrusive notifications
+  - SHA256 checksum verification for downloaded binaries
+  - Smart detection of install method (package, binary, manual) with appropriate upgrade path
+
+- **Binary Management**: Download and manage official Octez binary releases
+  - New TUI page accessible via `b` key from the instances screen
+  - CLI commands:
+    - `binaries list` - Show installed versions and linked directories
+    - `binaries download <version>` - Download from GitLab releases
+    - `binaries remove <version>` - Remove an installed version
+    - `binaries prune` - Remove all unused versions with disk space preview
+    - `binaries link <alias> <path>` - Create alias for custom build directory
+    - `binaries unlink <alias>` - Remove a linked directory alias
+    - `binaries list-remote` - Show available versions from GitLab
+  - Progress display during downloads with speed and ETA
+  - Disk space calculation and display when pruning
+  - Binaries stored in `~/.local/share/octez-manager/binaries/` (user mode) or `/var/lib/octez-manager/binaries/` (system mode)
+
+- **Installer Integration**: Use managed binaries when installing services
+  - New flags for all install commands: `--octez-version <version>` and `--bin-dir-alias <alias>`
+  - TUI binary selector shows managed versions and linked directories
+  - Inline download prompt when selecting an uninstalled version in interactive mode
+  - Priority: `--octez-version` > `--bin-dir-alias` > `--app-bin-dir` > auto-detect from PATH
+
+- **Version Notifications**: Get notified when new Octez versions are available
+  - Toast notification on TUI startup when newer versions exist
+  - Dismissible per-version (won't show again for dismissed versions)
+  - User preferences stored in `~/.config/octez-manager/version-check.json`
+  - Smart semantic version comparison (handles RC versions, multi-digit, padding)
+
+- **Update Version Action**: Change the binary version used by running services
+  - New "Update Version" option in instance action menu
+  - Select from managed versions or linked directories
+  - Version filtering prevents accidental downgrades
+  - Extracts version from non-managed binaries for comparison
+
+- **Cascade Update and Rollback**: Update services along with their dependents
+  - Automatically detects dependent services (bakers/accusers depending on a node)
+  - Offers cascade update to update all related services together
+  - Finds transitive dependencies (if A depends on B and B depends on C, updating C includes both)
+  - Automatic rollback if any service fails to start after update
+  - Rollback only restarts services that were running before the update
+  - Options on failure: Rollback, View Logs, or Keep Stopped
+
+- **Unmanaged Instances Detection**: Automatically detect Octez services not installed by octez-manager
   - Detects systemd services and standalone processes (Docker, tmux, manual launches)
   - Shows real-time metrics (CPU, memory, sync status, head level) for all detected services
   - Supports Start/Stop/Restart for systemd services, view-only for standalone processes
   - Network detection via RPC probing
   - Appears in dedicated "Unmanaged Instances" section in TUI (below managed services)
-  - CLI commands: `octez-manager list --external`, `octez-manager external <instance> <action>`
+  - CLI: `octez-manager list --external` to include unmanaged services
   - Efficient process scanning with pgrep and PID caching for minimal system impact
 
 - **Import External Services**: Convert detected external services into managed instances
   - `octez-manager import <service-name>` CLI command with options:
-    - `--as <name>`: Custom instance name (default: auto-generated from detected name)
+    - `--as <name>`: Custom instance name (default: auto-generated)
     - `--network <network>`: Override network if not detected
     - `--strategy takeover|clone`: Takeover disables original (default), clone keeps it running
-    - `--dry-run`: Preview import plan with generated file contents
-  - Interactive TUI wizard with live progress and error display
+    - `--dry-run`: Preview import plan without making changes
+    - `--cascade`: Import service and all its dependencies in correct order
+    - `--interactive`: Review and edit configuration before import
+  - TUI: Select unmanaged service → Enter → "Import to Managed"
   - Validates service before import (checks for required fields, conflicts)
   - Automatic rollback if import fails (re-enables and restarts original service)
   - Preserves existing data directories (no re-sync required)
   - Preserves original service user and file ownership
-  - Smart field resolution with confidence tracking
   - Auto-increments ports for Clone strategy to avoid conflicts
-  - **Known limitation**: Dependency chains not tracked yet (see #360)
-    - Clone strategy: safe, preserves original dependency chain
-    - Takeover strategy: may break services that depend on the imported service
-    - Manual verification recommended before using Takeover on services with dependents
+
+- **Graceful Shutdown**: Background schedulers now shut down cleanly on exit
+  - All background workers (RPC, delegate, system metrics, external services) stop properly
+  - Prevents orphaned threads and resource leaks
+
+### Changed
+
+- Default network changed from mainnet to shadownet for new installations
+- Modal titles are now single-line for better layout consistency
 
 ### Fixed
 
-- Suppress `du` command stderr output to prevent error messages in TUI
+- Warning displayed when `$EDITOR` is not set in interactive edit mode
+- Multiple import wizard navigation and state management issues
+- Binary downloader stderr output no longer pollutes TUI display
+- External services detection filters out child processes (validator, validator-hypervisor)
+- Process scanner uses `/proc/PID/exe` for reliable binary path detection
+- `du` command stderr output suppressed to prevent TUI error messages
+- File browser `h` key now properly toggles hidden files
+- Extra arguments use space-separated format instead of `=` syntax for compatibility
 
 ## [0.1.1] - 2026-01-15
 
