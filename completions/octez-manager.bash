@@ -27,7 +27,7 @@ _octez_manager() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="cleanup-dependencies cleanup-orphans install-accuser install-baker install-dal-node install-node instance list list-available-networks list-snapshots purge-all ui"
+  local commands="binaries cleanup-dependencies cleanup-orphans import install-accuser install-baker install-dal-node install-node instance list list-available-networks list-snapshots purge-all self-update ui version"
   local instance_actions="start stop restart remove purge show show-service logs edit export-logs"
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
@@ -104,6 +104,13 @@ _octez_manager() {
       fi
       return 0
       ;;
+    binaries)
+      if [[ $cur == -* ]]; then
+        opts="--help --version"
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      fi
+      return 0
+      ;;
     cleanup-dependencies)
       if [[ $cur == -* ]]; then
         opts="--help --version"
@@ -114,6 +121,13 @@ _octez_manager() {
     cleanup-orphans)
       if [[ $cur == -* ]]; then
         opts="-n --dry-run --help --version"
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      fi
+      return 0
+      ;;
+    import)
+      if [[ $cur == -* ]]; then
+        opts="-c --cascade -d --dry-run -i --interactive -n --network --name --as -s --strategy --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
@@ -148,7 +162,7 @@ _octez_manager() {
       ;;
     list)
       if [[ $cur == -* ]]; then
-        opts="--help --version"
+        opts="-a --all -e --external --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
@@ -174,9 +188,23 @@ _octez_manager() {
       fi
       return 0
       ;;
+    self-update)
+      if [[ $cur == -* ]]; then
+        opts="-c --check -f --force --help --version"
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      fi
+      return 0
+      ;;
     ui)
       if [[ $cur == -* ]]; then
         opts="--page --ui-log --ui-logfile --help --version"
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      fi
+      return 0
+      ;;
+    version)
+      if [[ $cur == -* ]]; then
+        opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
