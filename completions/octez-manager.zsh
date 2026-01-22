@@ -5,18 +5,22 @@
 _octez-manager() {
   local -a commands
   commands=(
+    'binaries:Manage Octez binaries'
     'cleanup-dependencies:Remove stale dependency entries from service configurations. This cleans up references to services that have been removed.'
     'cleanup-orphans:Remove orphan data directories and log files not associated with any registered service. Use --dry-run to preview what would be removed.'
+    'import:Import an external Octez service'
     'install-accuser:Install an octez-accuser service'
     'install-baker:Install an octez-baker service'
     'install-dal-node:Install a DAL node service (octez-dal-node)'
     'install-node:Install an octez-node systemd instance'
     'instance:Manage existing Octez services.'
-    'list:Show registered services'
+    'list:Show services'
     'list-available-networks:Show networks advertised on teztnets.com (with fallbacks).'
     'list-snapshots:List downloads published on snapshots.tzinit.org for a network.'
     'purge-all:Purge all registered instances. This removes each service, deletes data directories, log files, and (when run as root) drops service users that are no longer referenced by other services.'
+    'self-update:Check for and install octez-manager updates'
     'ui:Launch the interactive terminal UI (same as running without arguments)'
+    'version:Show version information and check for updates'
   )
 
   local -a instance_actions
@@ -55,6 +59,12 @@ _octez-manager() {
     'pass:Abstain from voting (default)'
   )
 
+  local -a opts_binaries
+  opts_binaries=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
   local -a opts_cleanup_dependencies
   opts_cleanup_dependencies=(
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
@@ -65,6 +75,24 @@ _octez-manager() {
   opts_cleanup_orphans=(
     '-n[Show what would be removed without actually deleting.]'
     '--dry-run[Show what would be removed without actually deleting.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_import
+  opts_import=(
+    '-c[Import service and all its dependencies (cascade import). Analyzes dependency graph and imports in correct order (dependencies first).]'
+    '--cascade[Import service and all its dependencies (cascade import). Analyzes dependency graph and imports in correct order (dependencies first).]'
+    '-d[Show import plan without executing]'
+    '--dry-run[Show import plan without executing]'
+    '-i[Interactive mode: review and edit each configuration file before import]'
+    '--interactive[Interactive mode: review and edit each configuration file before import]'
+    '-n[Override network (if not detected)]:NETWORK:'
+    '--network[Override network (if not detected)]:NETWORK:'
+    '--name[Instance name for the imported service (default: auto-generated)]:NAME:'
+    '--as[Instance name for the imported service (default: auto-generated)]:NAME:'
+    '-s[Import strategy: '\''takeover'\'' (default, disable original) or '\''clone'\'' (keep original)]:STRATEGY:'
+    '--strategy[Import strategy: '\''takeover'\'' (default, disable original) or '\''clone'\'' (keep original)]:STRATEGY:'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -122,7 +150,7 @@ _octez-manager() {
     '--instance[Instance name used for node.env and systemd units.]:NAME:'
     '--keep-snapshot[Keep the downloaded snapshot file after import instead of deleting it.]'
     '--net-addr[P2P address]:ADDR:'
-    '--network[Chain network (default: mainnet).]:NET:'
+    '--network[Chain network (default: shadownet).]:NET:'
     '--no-enable[Disable automatic systemctl enable --now.]'
     '--preserve-data[Preserve existing data in data-dir instead of clearing it. When set, no snapshot will be imported even if --snapshot is specified.]'
     '--rpc-addr[RPC address]:ADDR:'
@@ -144,6 +172,10 @@ _octez-manager() {
 
   local -a opts_list
   opts_list=(
+    '-a[Show both managed and external services]'
+    '--all[Show both managed and external services]'
+    '-e[Show only external (unmanaged) services]'
+    '--external[Show only external (unmanaged) services]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -169,11 +201,27 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
+  local -a opts_self_update
+  opts_self_update=(
+    '-c[Only check for updates, don'\''t install]'
+    '--check[Only check for updates, don'\''t install]'
+    '-f[Force check (bypass cache)]'
+    '--force[Force check (bypass cache)]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
   local -a opts_ui
   opts_ui=(
     '--page[Start on a registered page]:NAME:'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_version
+  opts_version=(
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -225,6 +273,10 @@ _octez-manager() {
               $opts_instance
           fi
           ;;
+        binaries)
+          _arguments \
+            $opts_binaries
+          ;;
         cleanup-dependencies)
           _arguments \
             $opts_cleanup_dependencies
@@ -232,6 +284,10 @@ _octez-manager() {
         cleanup-orphans)
           _arguments \
             $opts_cleanup_orphans
+          ;;
+        import)
+          _arguments \
+            $opts_import
           ;;
         install-accuser)
           _arguments \
@@ -265,9 +321,17 @@ _octez-manager() {
           _arguments \
             $opts_purge_all
           ;;
+        self-update)
+          _arguments \
+            $opts_self_update
+          ;;
         ui)
           _arguments \
             $opts_ui
+          ;;
+        version)
+          _arguments \
+            $opts_version
           ;;
       esac
       ;;
