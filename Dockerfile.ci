@@ -2,7 +2,9 @@
 # Contains OCaml, opam, and all public dependencies pre-installed
 # Miaou is pinned at CI runtime (private repo)
 
-FROM ocaml/opam:alpine-ocaml-5.1 AS base
+# Pin to known-good base image digest - updated images after 2026-01-18 produce
+# statically-linked binaries that segfault on Debian/glibc systems
+FROM ocaml/opam:alpine-ocaml-5.1@sha256:420811732203383aeb5926962d96aaf6f7752928c544ab3b74f3dff7709e2c6a AS base
 
 # Switch to root for system package installation
 USER root
