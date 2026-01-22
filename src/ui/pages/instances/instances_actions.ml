@@ -674,6 +674,16 @@ and do_update_single_service ~svc ~old_bin_source ~new_bin_source () =
       in
       let* () = Service_registry.write updated_svc in
 
+      (* Regenerate systemd unit file with new APP_BIN_DIR *)
+      let* () =
+        Systemd.install_unit
+          ~quiet:true
+          ~role
+          ~app_bin_dir:new_path
+          ~user:svc.Service.service_user
+          ()
+      in
+
       (* Try to start the service *)
       let cap = Miaou_interfaces.Service_lifecycle.require () in
       match
@@ -749,6 +759,16 @@ and do_rollback ~svc ~old_bin_source () =
   in
   let* () = Service_registry.write restored_svc in
 
+  (* Regenerate systemd unit file with old APP_BIN_DIR *)
+  let* () =
+    Systemd.install_unit
+      ~quiet:true
+      ~role
+      ~app_bin_dir:old_path
+      ~user:svc.Service.service_user
+      ()
+  in
+
   (* Try to start with old version *)
   let cap = Miaou_interfaces.Service_lifecycle.require () in
   Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
@@ -808,7 +828,15 @@ and do_cascade_update ~services ~new_bin_source () =
                           bin_source = Some old_bs;
                         }
                       in
-                      ignore (Service_registry.write restored))
+                      ignore (Service_registry.write restored) ;
+                      (* Regenerate systemd unit file with restored APP_BIN_DIR *)
+                      ignore
+                        (Systemd.install_unit
+                           ~quiet:true
+                           ~role:updated_svc.Service.role
+                           ~app_bin_dir:old_path
+                           ~user:updated_svc.Service.service_user
+                           ()))
               acc_updated ;
             e)
   in
