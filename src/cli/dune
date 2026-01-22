@@ -13,6 +13,7 @@
   cmd_instance
   cmd_import
   cmd_binaries
+  cmd_self_update
   cmd_utils)
  (libraries octez_manager_lib cmdliner rresult yojson linenoise)
  (instrumentation
