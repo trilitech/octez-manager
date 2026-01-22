@@ -256,8 +256,6 @@ let initialize ?(log = false) ?logfile () =
     Delegate_scheduler.start () ;
     External_services_scheduler.start () ;
     Self_update_scheduler.start () ;
-    (* Run initial update check immediately in background *)
-    ignore (Domain.spawn Self_update_scheduler.check_now) ;
     Metrics.maybe_start_from_env () ;
     initialized := true) ;
   register_logger ~log ~logfile_path:logfile

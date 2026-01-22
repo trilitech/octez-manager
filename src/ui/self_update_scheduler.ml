@@ -26,10 +26,10 @@ type cached_update = {
 
 let cache : cached_update option ref = ref None
 
-let cache_lock = Mutex.create ()
+let cache_lock = lazy (Mutex.create ())
 
 (** Get cached update info (fast, no I/O) *)
-let get () = Mutex.protect cache_lock (fun () -> !cache)
+let get () = Mutex.protect (Lazy.force cache_lock) (fun () -> !cache)
 
 (** Check if an update is available (fast, no I/O) *)
 let update_available () = Option.is_some (get ())
@@ -63,7 +63,7 @@ let refresh ?(force = false) () =
         (* Only cache if not dismissed *)
         if not (Self_update_checker.is_version_dismissed info.latest_version)
         then
-          Mutex.protect cache_lock (fun () ->
+          Mutex.protect (Lazy.force cache_lock) (fun () ->
               cache :=
                 Some
                   {
@@ -71,13 +71,14 @@ let refresh ?(force = false) () =
                     is_major = info.is_major_update;
                     install_method;
                   })
-        else Mutex.protect cache_lock (fun () -> cache := None)
+        else Mutex.protect (Lazy.force cache_lock) (fun () -> cache := None)
     | Self_update_checker.Up_to_date | Self_update_checker.Check_disabled
     | Self_update_checker.Check_failed _ ->
-        Mutex.protect cache_lock (fun () -> cache := None))
+        Mutex.protect (Lazy.force cache_lock) (fun () -> cache := None))
 
 (** Clear the cache (e.g., after dismissing a version) *)
-let clear_cache () = Mutex.protect cache_lock (fun () -> cache := None)
+let clear_cache () =
+  Mutex.protect (Lazy.force cache_lock) (fun () -> cache := None)
 
 (** {1 Background scheduler} *)
 
