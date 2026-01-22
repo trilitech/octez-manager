@@ -11,6 +11,8 @@ module Rpc = Rpc_client
 
 let now_ref = ref Unix.gettimeofday
 
+let shutdown_requested = Atomic.make false
+
 (* Polling cadence *)
 let boot_pending_interval = 6.0
 
@@ -310,7 +312,7 @@ let start () =
            (* Brief delay to let UI initialize *)
            Unix.sleepf 0.2 ;
            (* Submit poll requests periodically *)
-           while true do
+           while not (Atomic.get shutdown_requested) do
              Metrics.record_scheduler_tick ~scheduler:"rpc" tick ;
              Unix.sleepf 1.0
            done)))
@@ -319,6 +321,11 @@ let start () =
 let stop_all_monitors () =
   Hashtbl.iter (fun _ handle -> handle.Rpc_client.stop ()) head_monitors ;
   Hashtbl.clear head_monitors
+
+let shutdown () =
+  Atomic.set shutdown_requested true ;
+  stop_all_monitors () ;
+  Worker_queue.stop worker
 
 (** Get worker queue stats *)
 let get_worker_stats () = Worker_queue.get_stats worker

@@ -89,5 +89,8 @@ val tick : unit -> unit
 (** Clear all stored metrics. *)
 val clear : unit -> unit
 
+(** Shutdown the background scheduler. *)
+val shutdown : unit -> unit
+
 (** Get worker queue statistics. *)
 val get_worker_stats : unit -> Worker_queue.stats

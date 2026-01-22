@@ -69,3 +69,5 @@ let stop () =
   | Some d ->
       Domain.join d ;
       domain := None
+
+let shutdown = stop
