@@ -254,8 +254,9 @@ let binaries_for_version _version =
     [
       "octez-node";
       "octez-client";
+      "octez-baker";
       "octez-dal-node";
-      (* Baker and accuser variants will be added based on available protocols *)
+      (* Accuser is not included as it runs via octez-baker *)
     ]
 
 (** Disk space utilities *)
