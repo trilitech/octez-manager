@@ -798,6 +798,22 @@ and is_service_running svc =
       && s.Data.Service_state.status = Data.Service_state.Running)
     services
 
+(** Just restart a service that's already at the target version *)
+and restart_service_for_cascade ~svc () =
+  let instance = svc.Service.instance in
+  let role = svc.Service.role in
+  let cap = Miaou_interfaces.Service_lifecycle.require () in
+
+  (* Stop the service *)
+  let* () =
+    Miaou_interfaces.Service_lifecycle.stop cap ~role ~service:instance
+    |> Result.map_error (fun e -> `Msg e)
+  in
+
+  (* Start it back up *)
+  Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
+  |> Result.map_error (fun e -> `Msg e)
+
 (** Perform cascade update of multiple services *)
 and do_cascade_update ~services ~new_bin_source () =
   (* First, record which services are currently running *)
@@ -811,46 +827,77 @@ and do_cascade_update ~services ~new_bin_source () =
     | [] -> Ok acc_updated
     | svc :: rest -> (
         let old_bin_source = Service.get_bin_source svc in
-        match
-          do_update_single_service ~svc ~old_bin_source ~new_bin_source ()
-        with
+        (* Check if service is already at target version *)
+        let result =
+          if old_bin_source = new_bin_source then
+            (* Already at target version - just restart if it was running *)
+            if List.mem svc.Service.instance was_running then
+              restart_service_for_cascade ~svc ()
+            else
+              Ok () (* Not running, no action needed *)
+          else
+            (* Different version - do full update *)
+            do_update_single_service ~svc ~old_bin_source ~new_bin_source ()
+        in
+        match result with
         | Ok () -> update_all ((svc, old_bin_source) :: acc_updated) rest
         | Error _ as e ->
-            (* One update failed - rollback all successfully updated ones *)
+            (* One update/restart failed - rollback all successfully updated ones *)
             List.iter
               (fun (updated_svc, old_bs) ->
                 (* Only rollback (restart) if service was running before *)
                 let inst = updated_svc.Service.instance in
                 if List.mem inst was_running then
-                  match
-                    do_rollback ~svc:updated_svc ~old_bin_source:old_bs ()
-                  with
-                  | Ok () ->
-                      Context.toast_info (Printf.sprintf "Rolled back %s" inst)
-                  | Error _ ->
-                      Context.toast_error
-                        (Printf.sprintf "Failed to rollback %s" inst)
+                  let current_bs = Service.get_bin_source updated_svc in
+                  (* Check if this was an update or just a restart *)
+                  if old_bs = current_bs then
+                    (* Was a restart-only - just try to start it again *)
+                    let cap = Miaou_interfaces.Service_lifecycle.require () in
+                    match
+                      Miaou_interfaces.Service_lifecycle.start
+                        cap
+                        ~role:updated_svc.Service.role
+                        ~service:inst
+                    with
+                    | Ok () ->
+                        Context.toast_info
+                          (Printf.sprintf "Restarted %s after failure" inst)
+                    | Error _ ->
+                        Context.toast_error
+                          (Printf.sprintf "Failed to restart %s" inst)
+                  else
+                    (* Was a full update - do full rollback *)
+                    match
+                      do_rollback ~svc:updated_svc ~old_bin_source:old_bs ()
+                    with
+                    | Ok () ->
+                        Context.toast_info (Printf.sprintf "Rolled back %s" inst)
+                    | Error _ ->
+                        Context.toast_error
+                          (Printf.sprintf "Failed to rollback %s" inst)
                 else
-                  (* Service wasn't running before, just restore config *)
-                  match Binary_registry.resolve_bin_source old_bs with
-                  | Error _ -> ()
-                  | Ok old_path ->
-                      let restored =
-                        {
-                          updated_svc with
-                          Service.app_bin_dir = old_path;
-                          bin_source = Some old_bs;
-                        }
-                      in
-                      ignore (Service_registry.write restored) ;
-                      (* Regenerate systemd unit file with restored APP_BIN_DIR *)
-                      ignore
-                        (Systemd.install_unit
-                           ~quiet:true
-                           ~role:updated_svc.Service.role
-                           ~app_bin_dir:old_path
-                           ~user:updated_svc.Service.service_user
-                           ()))
+                  (* Service wasn't running before, just restore config if updated *)
+                  let current_bs = Service.get_bin_source updated_svc in
+                  if old_bs <> current_bs then
+                    match Binary_registry.resolve_bin_source old_bs with
+                    | Error _ -> ()
+                    | Ok old_path ->
+                        let restored =
+                          {
+                            updated_svc with
+                            Service.app_bin_dir = old_path;
+                            bin_source = Some old_bs;
+                          }
+                        in
+                        ignore (Service_registry.write restored) ;
+                        (* Regenerate systemd unit file with restored APP_BIN_DIR *)
+                        ignore
+                          (Systemd.install_unit
+                             ~quiet:true
+                             ~role:updated_svc.Service.role
+                             ~app_bin_dir:old_path
+                             ~user:updated_svc.Service.service_user
+                             ()))
               acc_updated ;
             e)
   in
