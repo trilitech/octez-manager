@@ -44,7 +44,8 @@
   execstart_parser
   env_file_parser
   process_scanner
-  external_service_detector)
+  external_service_detector
+  self_update_checker)
  (libraries
   rresult
   yojson
