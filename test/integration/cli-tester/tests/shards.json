@@ -2,14 +2,14 @@
   "metadata": {
     "generated_at": "2026-01-21T18:31:32.050597",
     "generated_by": "scripts/generate-shard-manifest.py",
-    "total_tests": 60,
-    "total_duration": 392.597,
+    "total_tests": 61,
+    "total_duration": 399.597,
     "shard_count": 5,
-    "mean_shard_duration": 78.52,
-    "max_shard_duration": 78.82,
-    "min_shard_duration": 77.54,
-    "duration_std_dev": 0.49,
-    "balance_coefficient": 0.63
+    "mean_shard_duration": 79.92,
+    "max_shard_duration": 84.54,
+    "min_shard_duration": 78.73,
+    "duration_std_dev": 2.16,
+    "balance_coefficient": 2.70
   },
   "shard-1": {
     "tests": [
@@ -60,10 +60,11 @@
       "dal/18-dal-basic-install.sh",
       "accuser/35-accuser-basic-install.sh",
       "node/06-install-custom-rpc-net.sh",
-      "import/51-import-nonexistent-service.sh"
+      "import/51-import-nonexistent-service.sh",
+      "binaries/01-download-and-verify.sh"
     ],
-    "test_count": 12,
-    "total_duration": 77.54
+    "test_count": 13,
+    "total_duration": 84.54
   },
   "shard-4": {
     "tests": [
