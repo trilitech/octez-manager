@@ -12,6 +12,8 @@
 
 open Octez_manager_lib
 
+let shutdown_requested = Atomic.make false
+
 (** Metrics storage per instance *)
 type instance_state = {
   mutable version : string option;
@@ -548,13 +550,17 @@ let start () =
            (* Fetch latest version first *)
            (try fetch_latest_version () with _ -> ()) ;
            (* Submit poll requests periodically *)
-           while true do
+           while not (Atomic.get shutdown_requested) do
              Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick ;
              Unix.sleepf 0.5
            done)))
 
 (** Clear all state *)
 let clear () = with_lock (fun () -> Hashtbl.clear table)
+
+let shutdown () =
+  Atomic.set shutdown_requested true ;
+  Worker_queue.stop worker
 
 (** Get worker queue stats *)
 let get_worker_stats () = Worker_queue.get_stats worker

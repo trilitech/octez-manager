@@ -31,3 +31,6 @@ val start : unit -> unit
 
 (** Stop the background scheduler. *)
 val stop : unit -> unit
+
+(** Shutdown the background scheduler (alias for stop). *)
+val shutdown : unit -> unit

@@ -18,6 +18,8 @@ open Octez_manager_lib
 (** Poll interval in seconds *)
 let poll_interval = 60.0
 
+let shutdown_requested = Atomic.make false
+
 (** {1 Baker config cache} *)
 
 type baker_config = {
@@ -176,7 +178,7 @@ let start () =
            (* Delay to let UI initialize first *)
            Unix.sleepf 2.0 ;
            (* Simple polling loop *)
-           while true do
+           while not (Atomic.get shutdown_requested) do
              let now = Unix.gettimeofday () in
              if now -. !last_poll >= poll_interval then (
                last_poll := now ;
@@ -201,3 +203,5 @@ let clear () =
   Delegate_data.clear () ;
   with_forbidden_lock (fun () -> Hashtbl.clear forbidden_status) ;
   Mutex.protect config_lock (fun () -> Hashtbl.clear config_cache)
+
+let shutdown () = Atomic.set shutdown_requested true
