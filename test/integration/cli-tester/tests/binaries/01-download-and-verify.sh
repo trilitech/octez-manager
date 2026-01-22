@@ -8,7 +8,9 @@ echo "Test: Download and verify managed binaries"
 
 # Get the latest available version
 echo "Fetching latest version..."
-VERSION=$(om binaries list-remote --json 2>/dev/null | jq -r '.[0].version' || echo "")
+# list-remote outputs: "Available versions:\n  v20.2\n  v20.1\n..."
+# Extract the first version (skip the header line)
+VERSION=$(om binaries list-remote 2>&1 | grep -E '^\s+v[0-9]+\.[0-9]+' | head -1 | sed 's/^\s*v//' | awk '{print $1}' || echo "")
 
 if [ -z "$VERSION" ]; then
 	echo "WARNING: Could not fetch available versions (no internet access)"
