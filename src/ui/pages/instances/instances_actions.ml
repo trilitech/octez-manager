@@ -564,12 +564,26 @@ let get_dependent_services instance =
   | Ok all_services ->
       (* Find direct dependents of a given instance *)
       let direct_dependents_of inst =
-        List.filter
-          (fun svc ->
-            match svc.Service.depends_on with
-            | Some dep when dep = inst -> true
-            | _ -> false)
-          all_services
+        (* First, check if the service has a dependents field populated *)
+        match
+          List.find_opt (fun s -> s.Service.instance = inst) all_services
+        with
+        | Some svc when svc.Service.dependents <> [] ->
+            (* Use the dependents field - this is more reliable *)
+            List.filter_map
+              (fun dep_inst ->
+                List.find_opt
+                  (fun s -> s.Service.instance = dep_inst)
+                  all_services)
+              svc.Service.dependents
+        | _ ->
+            (* Fall back to searching by depends_on field *)
+            List.filter
+              (fun svc ->
+                match svc.Service.depends_on with
+                | Some dep when dep = inst -> true
+                | _ -> false)
+              all_services
       in
       (* BFS to find all transitive dependents *)
       let rec collect_all visited queue acc =
