@@ -612,9 +612,9 @@ let rec show_cascade_modal ~instance ~new_version_str ~dependents ~on_confirm =
     let dep_list = String.concat ", " dependent_instances in
     let message =
       Printf.sprintf
-        "The following services depend on %s and will also be updated:\n\n\
-         %s\n\n\
-         All services will be stopped, updated to %s, and restarted.\n\n\
+        "The following services depend on %s and will also be updated:\n\
+         %s\n\
+         All services will be stopped, updated to %s, and restarted.\n\
          If any service fails to start, all will be rolled back."
         instance
         dep_list
