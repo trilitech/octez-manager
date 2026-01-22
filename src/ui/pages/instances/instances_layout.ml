@@ -263,5 +263,5 @@ let ensure_valid_column state =
           {
             state with
             active_column = new_col;
-            selected = first_svc + services_start_idx;
+            selected = first_svc + services_start_idx ();
           }
