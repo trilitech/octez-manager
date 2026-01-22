@@ -66,8 +66,12 @@ let run ?page ?(log = false) ?logfile () =
   in
   try loop [] start_name
   with Exit | Sys.Break ->
-    (* Cleanup: stop all head monitors to kill curl processes *)
-    Rpc_scheduler.stop_all_monitors () ;
+    (* Cleanup: shutdown all background schedulers and workers *)
+    Background_runner.shutdown () ;
+    Rpc_scheduler.shutdown () ;
+    Delegate_scheduler.shutdown () ;
+    System_metrics_scheduler.shutdown () ;
+    External_services_scheduler.shutdown () ;
     (* Cleanup: kill any active download process *)
     Common.kill_active_download () ;
     Ok ()
