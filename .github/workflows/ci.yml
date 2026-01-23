@@ -5,14 +5,8 @@ on:
     branches: [main]
     tags:
       - 'v*'
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
   workflow_dispatch:
 
 concurrency:
@@ -25,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       needs-integration: ${{ steps.filter.outputs.needs-integration }}
+      docs-only: ${{ steps.filter.outputs.docs-only }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -37,10 +32,26 @@ jobs:
               - 'test/integration/**'
               - '.github/workflows/ci.yml'
               - 'Makefile'
+            docs-only:
+              - 'docs/**'
+              - '**/*.md'
+
+  docs-check:
+    name: Build and Test
+    needs: changes
+    if: needs.changes.outputs.docs-only == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Documentation-only change
+        run: |
+          echo "This PR only modifies documentation files."
+          echo "Skipping full build and test pipeline."
+          echo "✓ Documentation check passed"
 
   build-and-test:
     name: Build and Test
     needs: changes
+    if: needs.changes.outputs.docs-only == 'false'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}-ci:latest
