@@ -886,13 +886,14 @@ let select_app_bin_dir_modal ~on_select () =
 
   (* Build sections with separators *)
   let items =
-    if managed_versions = [] && linked_dirs = [] then [`CustomPath]
-    else managed_versions @ linked_dirs @ [`CustomPath]
+    if managed_versions = [] && linked_dirs = [] then [`Download; `CustomPath]
+    else managed_versions @ linked_dirs @ [`Download; `CustomPath]
   in
 
   let to_string = function
     | `ManagedVersion v -> Printf.sprintf "v%s (managed)" v
     | `LinkedDir (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `Download -> "[ Download new version... ]"
     | `CustomPath -> "[ Browse for custom directory... ]"
   in
 
@@ -903,6 +904,58 @@ let select_app_bin_dir_modal ~on_select () =
         in
         on_select path
     | `LinkedDir (_alias, path) -> on_select path
+    | `Download -> (
+        (* Show available versions to download *)
+        match Versions_scheduler.get_cached () with
+        | None ->
+            show_error
+              ~title:"No Versions Available"
+              "Could not load available versions. Try again later."
+        | Some versions ->
+            let version_items =
+              List.map
+                (fun (vi : Octez_manager_lib.Binary_downloader.version_info) ->
+                  vi)
+                versions
+            in
+            open_choice_modal
+              ~title:"Select Version to Download"
+              ~items:version_items
+              ~to_string:(fun vi ->
+                Printf.sprintf
+                  "v%s%s"
+                  vi.Octez_manager_lib.Binary_downloader.version
+                  (match
+                     vi.Octez_manager_lib.Binary_downloader.release_date
+                   with
+                  | Some date -> Printf.sprintf "  (%s)" date
+                  | None -> ""))
+              ~on_select:(fun vi ->
+                let version = vi.Octez_manager_lib.Binary_downloader.version in
+                (* Start download in background *)
+                Job_manager.submit
+                  ~description:(Printf.sprintf "Download Octez v%s" version)
+                  (fun ~append_log () ->
+                    append_log
+                      (Printf.sprintf "Downloading Octez v%s...\n" version) ;
+                    match
+                      Octez_manager_lib.Binary_downloader.download_version
+                        ~version
+                        ()
+                    with
+                    | Ok _result ->
+                        append_log "Download complete!\n" ;
+                        (* Auto-select the downloaded version *)
+                        let path =
+                          Octez_manager_lib.Binary_registry.managed_version_path
+                            version
+                        in
+                        on_select path ;
+                        Ok ()
+                    | Error (`Msg msg) ->
+                        append_log (Printf.sprintf "Download failed: %s\n" msg) ;
+                        Error (`Msg msg)))
+              ())
     | `CustomPath ->
         (* Open read-only file browser - no write permissions required *)
         open_file_browser_modal
