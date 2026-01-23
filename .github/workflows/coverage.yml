@@ -64,20 +64,6 @@ jobs:
           dune runtest --instrument-with bisect_ppx --force
         continue-on-error: false
 
-      - name: Build instrumented binary for integration tests
-        run: |
-          dune clean
-          dune build --instrument-with bisect_ppx --release
-          cp _build/default/src/main.exe test/integration/cli-tester/octez-manager
-          chmod +x test/integration/cli-tester/octez-manager
-
-      - name: Upload instrumented binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: octez-manager-coverage
-          path: test/integration/cli-tester/octez-manager
-          retention-days: 1
-
       - name: Upload unit coverage data
         uses: actions/upload-artifact@v4
         with:
@@ -85,10 +71,91 @@ jobs:
           path: _coverage/
           retention-days: 1
 
+  build-instrumented-binary:
+    name: Build Instrumented Binary (Debian)
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            opam \
+            build-essential \
+            git \
+            ca-certificates \
+            libgmp-dev \
+            m4 \
+            pkg-config \
+            curl
+      
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Initialize opam
+        run: |
+          opam init --disable-sandboxing --bare -y
+          opam switch create . ocaml.5.1.1 -y
+          eval $(opam env)
+      
+      - name: Install OCaml dependencies
+        run: |
+          eval $(opam env)
+          opam install -y \
+            dune \
+            cmdliner \
+            rresult \
+            yojson \
+            bos \
+            eio \
+            eio_main \
+            eio_posix \
+            cohttp-eio \
+            tls-eio \
+            ca-certs \
+            uri \
+            lambda-term \
+            linenoise \
+            ppx_deriving \
+            alcotest \
+            bisect_ppx
+      
+      - name: Install Miaou
+        run: |
+          eval $(opam env)
+          if [ -z "${{ secrets.MIAOU_GIT_URL }}" ]; then
+            echo "ERROR: MIAOU_GIT_URL secret not configured" >&2
+            exit 1
+          fi
+          opam pin add miaou-core "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
+          opam pin add miaou-driver-term "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
+          opam pin add miaou-driver-matrix "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
+          opam pin add miaou-runner "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
+          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner -y
+      
+      - name: Build instrumented binary
+        run: |
+          eval $(opam env)
+          dune clean
+          dune build --instrument-with bisect_ppx --release
+          cp _build/default/src/main.exe octez-manager-instrumented
+          chmod +x octez-manager-instrumented
+      
+      - name: Upload instrumented binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: octez-manager-coverage
+          path: octez-manager-instrumented
+          retention-days: 1
+
   integration-coverage:
     name: Integration Tests Coverage
     runs-on: ubuntu-latest
-    needs: coverage
+    needs: [coverage, build-instrumented-binary]
     timeout-minutes: 30
 
     steps:
@@ -99,10 +166,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: octez-manager-coverage
-          path: test/integration/cli-tester/
+          path: .
 
-      - name: Make binary executable
-        run: chmod +x test/integration/cli-tester/octez-manager
+      - name: Copy binary to test location
+        run: |
+          mkdir -p test/integration/cli-tester
+          cp octez-manager-instrumented test/integration/cli-tester/octez-manager
+          chmod +x test/integration/cli-tester/octez-manager
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -161,7 +231,7 @@ jobs:
   report:
     name: Generate and Post Coverage Report
     runs-on: ubuntu-latest
-    needs: [coverage, integration-coverage]
+    needs: [coverage, build-instrumented-binary, integration-coverage]
     container:
       image: ghcr.io/${{ github.repository }}-ci:latest
       credentials:
