@@ -3835,6 +3835,66 @@ let binary_downloader_binaries_list () =
         (List.mem "octez-dal-node" binaries)
   | Error (`Msg e) -> Alcotest.fail e
 
+let binaries_page_filter_latest_n_major_versions () =
+  (* Create mock version_info records for testing *)
+  let make_version version =
+    {Binary_downloader.version; release_date = None; is_rc = false}
+  in
+  let versions =
+    [
+      make_version "24.2";
+      make_version "24.1";
+      make_version "24.0";
+      make_version "23.3";
+      make_version "23.2";
+      make_version "23.1";
+      make_version "22.0";
+      make_version "21.1";
+      make_version "21.0";
+    ]
+  in
+  (* Test filtering to 2 major versions *)
+  let filtered =
+    Octez_manager_ui.Binaries_page.For_tests.filter_latest_n_major_versions
+      2
+      versions
+  in
+  (* Should only keep v24 and v23 versions *)
+  let filtered_version_strs =
+    List.map (fun (v : Binary_downloader.version_info) -> v.version) filtered
+    |> List.sort String.compare
+  in
+  Alcotest.(check (list string))
+    "keeps only 2 latest major versions"
+    ["23.1"; "23.2"; "23.3"; "24.0"; "24.1"; "24.2"]
+    filtered_version_strs ;
+  (* Test filtering to 1 major version *)
+  let filtered_one =
+    Octez_manager_ui.Binaries_page.For_tests.filter_latest_n_major_versions
+      1
+      versions
+  in
+  let filtered_one_strs =
+    List.map
+      (fun (v : Binary_downloader.version_info) -> v.version)
+      filtered_one
+    |> List.sort String.compare
+  in
+  Alcotest.(check (list string))
+    "keeps only 1 latest major version"
+    ["24.0"; "24.1"; "24.2"]
+    filtered_one_strs ;
+  (* Test filtering with n > available major versions *)
+  let filtered_many =
+    Octez_manager_ui.Binaries_page.For_tests.filter_latest_n_major_versions
+      10
+      versions
+  in
+  Alcotest.(check int)
+    "keeps all versions when n is large"
+    (List.length versions)
+    (List.length filtered_many)
+
 (* External service tests *)
 
 let external_service_role_of_binary_name () =
@@ -5336,6 +5396,10 @@ let () =
             "binaries list"
             `Quick
             binary_downloader_binaries_list;
+          Alcotest.test_case
+            "filter latest N major versions"
+            `Quick
+            binaries_page_filter_latest_n_major_versions;
         ] );
       ( "external_service",
         [
