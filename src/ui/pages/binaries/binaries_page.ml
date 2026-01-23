@@ -566,7 +566,7 @@ let view ps ~focus:_ ~size:_ =
               | _ -> false
             in
             let is_expanded = List.mem major s.expanded_majors in
-            let expand_icon = if is_expanded then "▼" else "▶" in
+            let expand_icon = if is_expanded then "−" else "+" in
             let prefix = if is_group_selected then "➤ " else "  " in
             let version_count = List.length versions in
             let group_line =
