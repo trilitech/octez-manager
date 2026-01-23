@@ -19,6 +19,7 @@ type item_type =
       string * int64 option * int (* version, size, instance_count *)
   | LinkedDir of
       Binary_registry.linked_dir * int (* linked_dir, instance_count *)
+  | LinkAction (* Button to link a new directory *)
   | AvailableVersion of Binary_downloader.version_info
   | AvailableMajorGroup of int * Binary_downloader.version_info list
 (* major version, list of minor versions *)
@@ -145,6 +146,7 @@ let build_items managed linked available expanded_majors =
     (fun (v, s, c) -> items := ManagedVersion (v, s, c) :: !items)
     managed ;
   List.iter (fun (ld, c) -> items := LinkedDir (ld, c) :: !items) linked ;
+  items := LinkAction :: !items ;
 
   (* Group available versions by major version *)
   let major_groups = Hashtbl.create 10 in
@@ -454,6 +456,9 @@ let handle_action s =
     | LinkedDir (ld, _) ->
         unlink_directory ld ;
         s
+    | LinkAction ->
+        link_directory () ;
+        s
     | AvailableVersion vi ->
         download_version vi ;
         s
@@ -540,6 +545,9 @@ let view ps ~focus:_ ~size:_ =
 
   add "" ;
   add (Widgets.fg 13 (Widgets.bold "━━━ Linked Directories ━━━")) ;
+  add
+    (Widgets.dim
+       "Link to Octez binaries from development builds or custom locations") ;
   add "" ;
 
   if s.linked_dirs = [] then add (Widgets.dim "  No linked directories")
@@ -569,6 +577,18 @@ let view ps ~focus:_ ~size:_ =
         in
         add (if is_selected then Widgets.bold line else line))
       s.linked_dirs ;
+
+  (* Add link directory button *)
+  let link_action_selected =
+    match List.nth_opt s.items s.selected with
+    | Some LinkAction -> true
+    | _ -> false
+  in
+  let link_button =
+    let prefix = if link_action_selected then "➤ " else "  " in
+    Printf.sprintf "%s%s" prefix (Widgets.fg 10 "[+ Link a directory...]")
+  in
+  add (if link_action_selected then Widgets.bold link_button else link_button) ;
 
   add "" ;
   add (Widgets.fg 10 (Widgets.bold "━━━ Available for Download ━━━")) ;
