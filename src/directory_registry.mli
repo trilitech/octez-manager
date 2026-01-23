@@ -56,3 +56,11 @@ val clear_all : unit -> (unit, [`Msg of string]) result
 (** Migrate from old base_dirs.json format.
     Called automatically on first read. *)
 val migrate_from_base_dir_registry : unit -> (unit, [`Msg of string]) result
+
+(** Test-only functions *)
+module For_test : sig
+  val directory_entry_to_yojson : directory_entry -> Yojson.Safe.t
+  val directory_entry_of_yojson : Yojson.Safe.t -> (directory_entry, [`Msg of string]) result
+  val dir_type_to_yojson : dir_type -> Yojson.Safe.t
+  val dir_type_of_yojson : Yojson.Safe.t -> (dir_type, string) result
+end
