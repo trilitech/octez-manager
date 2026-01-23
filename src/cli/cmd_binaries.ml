@@ -186,12 +186,16 @@ let download_cmd =
              ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"])
       in
 
+      (* Mutex to protect display_state from concurrent access *)
+      let display_mutex = Mutex.create () in
+
       (* Render initial state *)
       let lines = Cli_progress.render_display !display_state in
       display_state := {!display_state with lines_printed = lines} ;
 
-      (* Multi-progress callback *)
+      (* Multi-progress callback (thread-safe for parallel downloads) *)
       let multi_progress (mp : Binary_downloader.multi_progress_state) =
+        Mutex.lock display_mutex ;
         (* Update state for current file *)
         display_state :=
           Cli_progress.set_in_progress
@@ -201,7 +205,8 @@ let download_cmd =
             ~total:mp.total ;
         (* Re-render *)
         let lines = Cli_progress.render_display !display_state in
-        display_state := {!display_state with lines_printed = lines}
+        display_state := {!display_state with lines_printed = lines} ;
+        Mutex.unlock display_mutex
       in
 
       (* Perform download *)
@@ -215,6 +220,7 @@ let download_cmd =
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok result ->
           (* Mark all binaries complete with their final sizes *)
+          Mutex.lock display_mutex ;
           List.iter
             (fun binary ->
               (* Get file size from disk *)
@@ -240,8 +246,10 @@ let download_cmd =
               "[\xe2\x86\x92] Verifying checksums..." ;
           let lines = Cli_progress.render_display !display_state in
           display_state := {!display_state with lines_printed = lines} ;
+          Mutex.unlock display_mutex ;
 
           (* Update checksum status based on result *)
+          Mutex.lock display_mutex ;
           let checksum_msg =
             match result.checksum_status with
             | Binary_downloader.Verified ->
@@ -257,6 +265,7 @@ let download_cmd =
             Cli_progress.set_checksum_status !display_state checksum_msg ;
           let lines = Cli_progress.render_display !display_state in
           display_state := {!display_state with lines_printed = lines} ;
+          Mutex.unlock display_mutex ;
 
           (* Final newline *)
           Printf.printf "\n" ;
