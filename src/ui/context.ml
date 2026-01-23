@@ -327,7 +327,7 @@ let multi_progress_start ~version ~binaries =
       (fun name ->
         {
           name;
-          widget = Progress_widget.open_inline ~width:30 ~label:name ();
+          widget = Progress_widget.open_inline ~width:30 ();
           downloaded = None;
           total = None;
           status = `Pending;
