@@ -90,6 +90,8 @@ Run `octez-manager --help` for all commands.
 
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Development guidelines
 - **[CHANGELOG.md](./CHANGELOG.md)** - Version history
+- **[docs/TUI_TESTING_GUIDE.md](./docs/TUI_TESTING_GUIDE.md)** - Writing TUI tests
+- **[COVERAGE_PRIORITIES.md](./COVERAGE_PRIORITIES.md)** - Test coverage roadmap
 
 ## License
 
