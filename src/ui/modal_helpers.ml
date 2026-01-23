@@ -1013,16 +1013,55 @@ let select_app_bin_dir_modal ~on_select () =
     | Error _ -> []
   in
 
-  (* Build sections with separators *)
-  let items =
-    if managed_versions = [] && linked_dirs = [] then [`Download; `CustomPath]
-    else managed_versions @ linked_dirs @ [`Download; `CustomPath]
+  (* Get latest uninstalled version to feature at the top *)
+  let latest_uninstalled :
+      Octez_manager_lib.Binary_downloader.version_info option =
+    match Versions_scheduler.get_cached () with
+    | None -> None
+    | Some all_versions ->
+        (* Get already installed versions *)
+        let installed =
+          match Octez_manager_lib.Binary_registry.list_managed_versions () with
+          | Ok vers -> vers
+          | Error _ -> []
+        in
+        (* Find first uninstalled version (versions are already sorted latest first) *)
+        List.find_opt
+          (fun (vi : Octez_manager_lib.Binary_downloader.version_info) ->
+            not (List.mem vi.version installed))
+          all_versions
   in
 
-  let to_string = function
+  (* Build sections with separators *)
+  let items =
+    if managed_versions = [] && linked_dirs = [] then
+      (* No installed versions - show latest uninstalled if available *)
+      match latest_uninstalled with
+      | Some vi -> [`LatestVersion vi; `DownloadOther; `CustomPath]
+      | None -> [`DownloadOther; `CustomPath]
+    else
+      (* Have installed versions - optionally show latest uninstalled at top *)
+      match latest_uninstalled with
+      | Some vi ->
+          `LatestVersion vi
+          :: (managed_versions @ linked_dirs @ [`DownloadOther; `CustomPath])
+      | None -> managed_versions @ linked_dirs @ [`DownloadOther; `CustomPath]
+  in
+
+  let to_string :
+      [ `ManagedVersion of string
+      | `LinkedDir of string * string
+      | `LatestVersion of Octez_manager_lib.Binary_downloader.version_info
+      | `DownloadOther
+      | `CustomPath ] ->
+      string = function
     | `ManagedVersion v -> Printf.sprintf "v%s (managed)" v
     | `LinkedDir (alias, path) -> Printf.sprintf "%s  →  %s" alias path
-    | `Download -> "[ Download new version... ]"
+    | `LatestVersion vi ->
+        Printf.sprintf
+          "Latest (v%s)  <download>"
+          vi.Octez_manager_lib.Binary_downloader.version
+    | `DownloadOther -> "[ Download other version... ]"
     | `CustomPath -> "[ Browse for custom directory... ]"
   in
 
@@ -1033,7 +1072,17 @@ let select_app_bin_dir_modal ~on_select () =
         in
         on_select path
     | `LinkedDir (_alias, path) -> on_select path
-    | `Download -> (
+    | `LatestVersion (vi : Octez_manager_lib.Binary_downloader.version_info) ->
+        (* Directly download the latest version *)
+        let version = vi.Octez_manager_lib.Binary_downloader.version in
+        open_download_progress_modal ~version ~on_complete:(fun success ->
+            if success then
+              (* Auto-select the downloaded version *)
+              let path =
+                Octez_manager_lib.Binary_registry.managed_version_path version
+              in
+              on_select path)
+    | `DownloadOther -> (
         (* Show available versions to download *)
         match Versions_scheduler.get_cached () with
         | None ->
