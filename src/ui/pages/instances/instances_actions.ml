@@ -833,8 +833,7 @@ and do_cascade_update ~services ~new_bin_source () =
             (* Already at target version - just restart if it was running *)
             if List.mem svc.Service.instance was_running then
               restart_service_for_cascade ~svc ()
-            else
-              Ok () (* Not running, no action needed *)
+            else Ok () (* Not running, no action needed *)
           else
             (* Different version - do full update *)
             do_update_single_service ~svc ~old_bin_source ~new_bin_source ()
@@ -871,7 +870,8 @@ and do_cascade_update ~services ~new_bin_source () =
                       do_rollback ~svc:updated_svc ~old_bin_source:old_bs ()
                     with
                     | Ok () ->
-                        Context.toast_info (Printf.sprintf "Rolled back %s" inst)
+                        Context.toast_info
+                          (Printf.sprintf "Rolled back %s" inst)
                     | Error _ ->
                         Context.toast_error
                           (Printf.sprintf "Failed to rollback %s" inst)
