@@ -31,11 +31,22 @@
 
 ### Installation
 
+**Quick install (default location):**
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
 ```
 
-Or build from source:
+- Root user: installs to `/usr/local/bin` (system-wide)
+- Regular user: installs to `~/.local/bin` (user-local)
+
+**Custom installation directory:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh -s -- --prefix=/custom/path
+```
+
+**Build from source:**
 
 ```sh
 git clone https://github.com/trilitech/octez-manager.git
