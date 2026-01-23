@@ -1,0 +1,57 @@
+# Debian-based CI image for coverage builds
+# Produces glibc binaries compatible with integration test containers
+
+FROM debian:bookworm-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    opam \
+    build-essential \
+    git \
+    ca-certificates \
+    libgmp-dev \
+    m4 \
+    pkg-config \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Initialize opam as root (GitHub Actions runs as root in containers)
+RUN opam init --disable-sandboxing --bare -y && \
+    opam switch create 5.1.1 ocaml.5.1.1 -y
+
+# Install OCaml dependencies
+RUN eval $(opam env) && \
+    opam install -y \
+    dune \
+    ocamlformat \
+    cmdliner \
+    rresult \
+    yojson \
+    bos \
+    eio \
+    eio_main \
+    eio_posix \
+    cohttp-eio \
+    tls-eio \
+    tls \
+    ca-certs \
+    domain-name \
+    mirage-crypto-rng \
+    uri \
+    lambda-term \
+    linenoise \
+    ppx_deriving \
+    alcotest \
+    bisect_ppx
+
+# Clean up opam cache
+RUN eval $(opam env) && opam clean -a -c -s --logs
+
+# Set working directory
+WORKDIR /workspace
+
+# Set environment variables for opam
+ENV OPAM_SWITCH_PREFIX=/root/.opam/5.1.1
+ENV CAML_LD_LIBRARY_PATH=/root/.opam/5.1.1/lib/stublibs:/root/.opam/5.1.1/lib/ocaml/stublibs:/root/.opam/5.1.1/lib/ocaml
+ENV OCAML_TOPLEVEL_PATH=/root/.opam/5.1.1/lib/toplevel
+ENV PATH=/root/.opam/5.1.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

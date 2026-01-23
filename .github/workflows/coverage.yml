@@ -78,16 +78,15 @@ jobs:
           retention-days: 1
 
   build-instrumented-binary:
-    name: Build Instrumented Binary
+    name: Build Instrumented Binary (Debian)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}-ci:latest
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
-      OPAMROOT: /home/opam/.opam
       MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
     
     steps:
@@ -98,10 +97,10 @@ jobs:
         id: cache-opam
         uses: actions/cache@v4
         with:
-          path: /home/opam/.opam
-          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          path: /root/.opam
+          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
           restore-keys: |
-            opam-miaou-
+            opam-debian-miaou-
       
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
