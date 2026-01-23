@@ -222,26 +222,52 @@ let prepare_extra_args s =
 (** Find the best default app_bin_dir for a given binary.
 
     Priority order:
-    1. Use `which <binary>` to find system-installed binary
-    2. Look in registered services for a directory containing the binary
-    3. Fall back to /usr/bin
+    1. Latest managed version if any exist
+    2. Use `which <binary>` to find system-installed binary
+    3. Look in registered services for a directory containing the binary
+    4. Fall back to /usr/bin
 
     @param binary_name The name of the binary to find (e.g., "octez-node")
     @return The directory containing the binary, or /usr/bin as fallback *)
 let default_app_bin_dir ~binary_name =
-  (* 1. Try `which` first *)
-  match Common.which binary_name with
-  | Some path ->
-      (* which returns full path, we need the directory *)
-      Filename.dirname path
-  | None -> (
-      (* 2. Look in registered services for a directory with this binary *)
-      match Service_registry.list () with
-      | Ok services -> (
-          let found =
-            List.find_opt
-              (fun (svc : Service.t) -> has_binary binary_name svc.app_bin_dir)
-              services
-          in
-          match found with Some svc -> svc.app_bin_dir | None -> "/usr/bin")
-      | Error _ -> "/usr/bin")
+  (* 1. Try latest managed version first *)
+  match Binary_registry.list_managed_versions () with
+  | Ok (latest :: _) -> (
+      (* Use latest managed version if available *)
+      let version_path = Binary_registry.managed_version_path latest in
+      if has_binary binary_name version_path then version_path
+      else
+        (* Managed version exists but doesn't have this binary, try other sources *)
+        match Common.which binary_name with
+        | Some path -> Filename.dirname path
+        | None -> (
+            match Service_registry.list () with
+            | Ok services -> (
+                let found =
+                  List.find_opt
+                    (fun (svc : Service.t) ->
+                      has_binary binary_name svc.app_bin_dir)
+                    services
+                in
+                match found with
+                | Some svc -> svc.app_bin_dir
+                | None -> "/usr/bin")
+            | Error _ -> "/usr/bin"))
+  | Ok [] | Error _ -> (
+      (* 2. No managed versions, try `which` *)
+      match Common.which binary_name with
+      | Some path -> Filename.dirname path
+      | None -> (
+          (* 3. Look in registered services for a directory with this binary *)
+          match Service_registry.list () with
+          | Ok services -> (
+              let found =
+                List.find_opt
+                  (fun (svc : Service.t) ->
+                    has_binary binary_name svc.app_bin_dir)
+                  services
+              in
+              match found with
+              | Some svc -> svc.app_bin_dir
+              | None -> "/usr/bin")
+          | Error _ -> "/usr/bin"))
