@@ -441,8 +441,18 @@ let kill_active_download () =
           try if Sys.file_exists dest_path then Sys.remove dest_path
           with _ -> ()))
 
-(* Streaming download progress using curl progress meter. We parse percent from
-   stderr lines; when parsing fails we still complete without progress ticks. *)
+(* Streaming download progress using curl progress meter. We parse byte counts from
+   stderr lines; when parsing fails we still complete without progress ticks.
+   
+   Curl --progress-meter format:
+     % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                    Dload  Upload   Total   Spent    Left  Speed
+    20 100M   20 20.0M    0     0  1024k      0  0:01:40  0:00:20  0:01:20 1024k
+   
+   We extract:
+   - Column 2: Total size in bytes (may have K/M/G suffix)
+   - Column 4: Bytes received (may have K/M/G suffix)
+*)
 let download_file_with_progress ~url ~dest_path ~on_progress =
   append_debug_log (Printf.sprintf "DOWNLOAD_PROGRESS %s -> %s" url dest_path) ;
   let cmd =
@@ -461,6 +471,28 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
       dest_path;
     ]
   in
+  (* Parse curl size format: "123", "1.5k", "20.0M", etc. *)
+  let parse_size_str s =
+    try
+      let len = String.length s in
+      if len = 0 then None
+      else
+        let suffix = s.[len - 1] in
+        let multiplier, num_str =
+          match suffix with
+          | 'k' | 'K' -> (1024L, String.sub s 0 (len - 1))
+          | 'm' | 'M' -> (Int64.mul 1024L 1024L, String.sub s 0 (len - 1))
+          | 'g' | 'G' ->
+              (Int64.mul (Int64.mul 1024L 1024L) 1024L, String.sub s 0 (len - 1))
+          | '0' .. '9' -> (1L, s)
+          | _ -> (1L, s)
+        in
+        (* Handle decimal numbers *)
+        match float_of_string_opt num_str with
+        | Some f -> Some (Int64.of_float (f *. Int64.to_float multiplier))
+        | None -> None
+    with _ -> None
+  in
   let ic, oc, ec =
     Unix.open_process_full (cmd_to_string cmd) (Unix.environment ())
   in
@@ -476,18 +508,33 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
         if c = '\r' || c = '\n' then (
           let line = Buffer.contents buffer in
           Buffer.clear buffer ;
-          (* curl progress lines often start with percent. *)
+          (* Parse curl progress lines:
+             Format: "pct_total total pct_recv bytes_recv pct_xfer bytes_xfer ..."
+             Example: "20 100M 20 20.0M 0 0 ..."
+             We extract tokens[1] (total) and tokens[3] (bytes_recv) *)
           (try
              let trimmed = String.trim line in
              if String.length trimmed > 0 then
                let tokens = String.split_on_char ' ' trimmed in
-               match tokens |> List.filter (fun s -> String.trim s <> "") with
-               | pct_str :: _ ->
-                   let pct =
-                     int_of_string_opt pct_str |> Option.value ~default:0
-                   in
-                   let pct = max 0 (min 100 pct) in
-                   on_progress pct (Some 100)
+               let non_empty =
+                 List.filter (fun s -> String.trim s <> "") tokens
+               in
+               match non_empty with
+               | _ :: total_str :: _ :: received_str :: _ -> (
+                   (* Try to parse as byte counts *)
+                   match
+                     (parse_size_str total_str, parse_size_str received_str)
+                   with
+                   | Some total_bytes, Some received_bytes ->
+                       (* Convert int64 to int (should be safe for reasonable file sizes) *)
+                       let total_int =
+                         Int64.to_int total_bytes |> max 0 |> min max_int
+                       in
+                       let received_int =
+                         Int64.to_int received_bytes |> max 0 |> min max_int
+                       in
+                       on_progress received_int (Some total_int)
+                   | _ -> ())
                | _ -> ()
            with _ -> ()) ;
           loop ())
