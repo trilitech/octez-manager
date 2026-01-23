@@ -78,15 +78,16 @@ jobs:
           retention-days: 1
 
   build-instrumented-binary:
-    name: Build Instrumented Binary (Debian)
+    name: Build Instrumented Binary
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:latest
+      image: ghcr.io/${{ github.repository }}-ci:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
+      OPAMROOT: /home/opam/.opam
       MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
     
     steps:
@@ -97,10 +98,10 @@ jobs:
         id: cache-opam
         uses: actions/cache@v4
         with:
-          path: /root/.opam
-          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
+          path: /home/opam/.opam
+          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
           restore-keys: |
-            opam-debian-miaou-
+            opam-miaou-
       
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
@@ -115,12 +116,18 @@ jobs:
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
       
-      - name: Build instrumented binary
+      - name: Build instrumented static binary
         run: |
+          # Build static binary for compatibility with Debian test container
+          echo '(-ccopt -static)' > static_flags.sexp
           dune clean
           dune build --instrument-with bisect_ppx --release
           cp _build/default/src/main.exe octez-manager-instrumented
           chmod +x octez-manager-instrumented
+          
+          # Verify it's static
+          file octez-manager-instrumented
+          ldd octez-manager-instrumented || echo "Static binary confirmed"
       
       - name: Upload instrumented binary
         uses: actions/upload-artifact@v4
