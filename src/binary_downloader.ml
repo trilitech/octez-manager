@@ -44,6 +44,17 @@ type version_info = {
 
 type progress_callback = downloaded:int64 -> total:int64 option -> unit
 
+(** Multi-file progress tracking for downloads *)
+type multi_progress_state = {
+  current_file : string;
+  file_index : int;
+  total_files : int;
+  downloaded : int64;
+  total : int64 option;
+}
+
+type multi_progress_callback = multi_progress_state -> unit
+
 type checksum_status = Verified | Skipped | Failed of string
 
 type download_result = {
@@ -331,6 +342,36 @@ let verify_checksum ~filepath ~expected_hash =
 
 (** Download utilities *)
 
+(** Get file size via HEAD request
+    
+    Returns the Content-Length if available, None otherwise.
+    Failures are logged but not treated as errors - download will proceed without size info. *)
+let get_file_size ~url =
+  match
+    Common.run_out_silent
+      ["curl"; "-sI"; "--max-time"; "5"; "--connect-timeout"; "3"; url]
+  with
+  | Ok headers ->
+      (* Parse Content-Length: header *)
+      let lines = String.split_on_char '\n' headers in
+      let rec find_content_length = function
+        | [] -> None
+        | line :: rest ->
+            let trimmed = String.trim line in
+            if
+              String.length trimmed > 15
+              && String.lowercase_ascii (String.sub trimmed 0 15)
+                 = "content-length:"
+            then
+              let size_str =
+                String.trim (String.sub trimmed 15 (String.length trimmed - 15))
+              in
+              try Some (Int64.of_string size_str) with _ -> None
+            else find_content_length rest
+      in
+      find_content_length lines
+  | Error _ -> None
+
 let download_file_curl ~url ~dest ?progress () =
   match progress with
   | Some callback ->
@@ -368,7 +409,8 @@ let download_binary ~version ~arch ~binary ~dest_dir ?progress () =
 
 (** Main download function *)
 
-let download_version ~version ?(verify_checksums = true) ?progress () =
+let download_version ~version ?(verify_checksums = true) ?progress
+    ?multi_progress () =
   let* arch = detect_arch () in
   let dest_dir = Binary_registry.managed_version_path version in
 
@@ -396,18 +438,57 @@ let download_version ~version ?(verify_checksums = true) ?progress () =
 
       (* Get list of binaries to download *)
       let* binary_list = binaries_for_version version in
+      let total_files = List.length binary_list in
+
+      (* Pre-fetch file sizes if using multi-progress *)
+      let file_sizes =
+        match multi_progress with
+        | Some _ ->
+            List.map
+              (fun binary ->
+                let url = binary_url ~version ~arch ~binary in
+                (binary, get_file_size ~url))
+              binary_list
+        | None -> []
+      in
 
       (* Download all binaries *)
-      let rec download_all acc = function
+      let rec download_all acc index = function
         | [] -> Ok (List.rev acc)
         | binary :: rest -> (
+            (* Create progress wrapper for multi-progress *)
+            let progress_for_file =
+              match multi_progress with
+              | Some mp_callback ->
+                  let file_size =
+                    List.assoc_opt binary file_sizes
+                    |> Option.value ~default:None
+                  in
+                  Some
+                    (fun ~downloaded ~total ->
+                      let total' =
+                        match total with Some t -> Some t | None -> file_size
+                      in
+                      mp_callback
+                        {
+                          current_file = binary;
+                          file_index = index;
+                          total_files;
+                          downloaded;
+                          total = total';
+                        })
+              | None -> progress
+            in
             match
-              download_binary ~version ~arch ~binary ~dest_dir ?progress ()
+              download_binary
+                ~version
+                ~arch
+                ~binary
+                ~dest_dir
+                ?progress:progress_for_file
+                ()
             with
-            | Ok _path ->
-                let _ = progress in
-                (* TODO: Update progress *)
-                download_all (binary :: acc) rest
+            | Ok _path -> download_all (binary :: acc) (index + 1) rest
             | Error _ as e ->
                 (* Cleanup on failure *)
                 (try Common.run_out ["rm"; "-rf"; dest_dir] |> ignore
@@ -415,7 +496,7 @@ let download_version ~version ?(verify_checksums = true) ?progress () =
                 e)
       in
 
-      let* downloaded_binaries = download_all [] binary_list in
+      let* downloaded_binaries = download_all [] 0 binary_list in
 
       (* Verify checksums if requested *)
       let checksum_status =
