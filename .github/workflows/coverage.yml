@@ -130,10 +130,14 @@ jobs:
           retention-days: 1
 
   integration-coverage:
-    name: Integration Tests Coverage
+    name: Integration Tests Coverage (Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     needs: [coverage, build-instrumented-binary]
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
 
     steps:
       - name: Checkout
@@ -180,10 +184,13 @@ jobs:
           done
           docker compose ps
 
-      - name: Run integration tests with coverage
+      - name: Run integration tests with coverage (Shard ${{ matrix.shard }})
         working-directory: test/integration
+        env:
+          SHARD: ${{ matrix.shard }}
+          TOTAL_SHARDS: 5
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.coverage.yml exec -T cli-tester /run-tests.sh
+          docker compose -f docker-compose.yml -f docker-compose.coverage.yml exec -T -e SHARD -e TOTAL_SHARDS cli-tester /run-tests.sh
 
       - name: Extract coverage data from container
         working-directory: test/integration
@@ -195,7 +202,7 @@ jobs:
       - name: Upload integration coverage data
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-integration
+          name: coverage-integration-shard-${{ matrix.shard }}
           path: _coverage-integration/
           retention-days: 1
 
@@ -233,11 +240,12 @@ jobs:
           name: coverage-unit
           path: _coverage/
 
-      - name: Download integration coverage data
+      - name: Download integration coverage data (all shards)
         uses: actions/download-artifact@v4
         with:
-          name: coverage-integration
+          pattern: coverage-integration-shard-*
           path: _coverage/
+          merge-multiple: true
         continue-on-error: true
 
       - name: List all coverage files
