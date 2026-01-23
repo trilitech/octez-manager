@@ -29,14 +29,11 @@ let get_recent_failure ~instance =
       None
   | None -> None
 
-(** Number of menu items before services.
-    1 = Install button only (no update available)
-    2 = Upgrade + Install buttons (update available) *)
-let menu_item_count () =
-  if Self_update_scheduler.update_available () then 2 else 1
+(** Number of menu items before services (just Install button) *)
+let menu_item_count = 1
 
 (** Index where services start (after menu items + separator line) *)
-let services_start_idx () = menu_item_count () + 1
+let services_start_idx = menu_item_count + 1
 
 type state = {
   services : Service_state.t list;
@@ -58,11 +55,10 @@ type pstate = state Miaou.Core.Navigation.t
 let clamp_selection services external_services idx =
   (* Total selectable items: menu + managed services + external services *)
   let len =
-    services_start_idx () + List.length services + List.length external_services
+    services_start_idx + List.length services + List.length external_services
   in
   max 0 (min idx (len - 1))
 
 let current_service state =
-  let start_idx = services_start_idx () in
-  if state.selected < start_idx then None
-  else List.nth_opt state.services (state.selected - start_idx)
+  if state.selected < services_start_idx then None
+  else List.nth_opt state.services (state.selected - services_start_idx)

@@ -382,7 +382,7 @@ Press **Enter** to open instance menu.|}
         in
         let avail_rows = max 5 avail_rows in
         (* Update visible height for scroll calculations - subtract menu rows *)
-        last_visible_height_ref := avail_rows - services_start_idx () ;
+        last_visible_height_ref := avail_rows - services_start_idx ;
         let num_columns =
           calc_num_columns ~cols ~min_column_width ~column_separator
         in
@@ -408,7 +408,7 @@ Press **Enter** to open instance menu.|}
              s.selected meanings:
                0 -> install menu
                1 -> separator (skipped in navigation)
-               2+ -> service at index (s.selected - services_start_idx ())
+               2+ -> service at index (s.selected - services_start_idx)
 
              Table structure from table_lines_single:
                [install; ""; ...instance_rows...]
@@ -417,7 +417,7 @@ Press **Enter** to open instance menu.|}
              We need to find where the selected item starts in all_lines.
           *)
           let selection_line_start, selection_line_count =
-            if s.selected < services_start_idx () then
+            if s.selected < services_start_idx then
               (* Menu items: count lines for entries 0..s.selected-1 *)
               let line_start =
                 let rec count idx acc =
@@ -438,14 +438,14 @@ Press **Enter** to open instance menu.|}
               in
               (line_start, line_count)
             else
-              (* Service selection: s.selected = services_start_idx () + service_index.
+              (* Service selection: s.selected = services_start_idx + service_index.
                  Count menu lines, then iterate through services
                  adding header lines when role changes. *)
-              let target_svc_idx = s.selected - services_start_idx () in
+              let target_svc_idx = s.selected - services_start_idx in
               (* Menu lines: install + "" *)
               let menu_lines =
                 let rec count idx acc =
-                  if idx >= services_start_idx () then acc
+                  if idx >= services_start_idx then acc
                   else if idx >= List.length table then acc
                   else
                     let entry = List.nth table idx in
@@ -553,36 +553,36 @@ Press **Enter** to open instance menu.|}
       let selected = clamp_selection s.services s.external_services raw in
       (* Skip separator during navigation *)
       let selected =
-        if selected = menu_item_count () then selected + delta else selected
+        if selected = menu_item_count then selected + delta else selected
       in
       let selected = clamp_selection s.services s.external_services selected in
       {s with selected}
     else if
       (* Multi-column mode: navigate within current column *)
-      s.selected < services_start_idx ()
+      s.selected < services_start_idx
     then
       (* In menu area, simple navigation *)
-      let selected = max 0 (min (menu_item_count ()) (s.selected + delta)) in
+      let selected = max 0 (min menu_item_count (s.selected + delta)) in
       (* Jump from menu to first service in first column (column 0) *)
-      if selected >= menu_item_count () && delta > 0 then
+      if selected >= menu_item_count && delta > 0 then
         let first_svc =
           first_service_in_column
             ~num_columns:s.num_columns
             ~services:s.services
             0
         in
-        {s with selected = first_svc + services_start_idx (); active_column = 0}
+        {s with selected = first_svc + services_start_idx; active_column = 0}
       else {s with selected}
     else
       (* In services area: stay within column *)
-      let current_idx = s.selected - services_start_idx () in
+      let current_idx = s.selected - services_start_idx in
       (* Check if we're in external services area *)
       let external_start_idx = List.length s.services in
       let in_external = current_idx >= external_start_idx in
       if in_external then
         (* External services: linear navigation below all columns *)
         (* Check if moving up from first external service *)
-        let first_external = services_start_idx () + List.length s.services in
+        let first_external = services_start_idx + List.length s.services in
         if s.selected = first_external && delta < 0 then
           (* Move to last service in first column (column 0), or menu if none *)
           if List.length s.services > 0 && s.num_columns > 1 then
@@ -600,13 +600,13 @@ Press **Enter** to open instance menu.|}
             | last_idx :: _ ->
                 {
                   s with
-                  selected = last_idx + services_start_idx ();
+                  selected = last_idx + services_start_idx;
                   active_column = 0;
                 }
           else if List.length s.services > 0 then
             (* Single-column: jump to last managed service *)
             let last_managed =
-              services_start_idx () + List.length s.services - 1
+              services_start_idx + List.length s.services - 1
             in
             {s with selected = last_managed}
           else
@@ -643,9 +643,7 @@ Press **Enter** to open instance menu.|}
             List.length s.external_services > 0
           then
             (* Jump to first external service *)
-            let first_external =
-              services_start_idx () + List.length s.services
-            in
+            let first_external = services_start_idx + List.length s.services in
             {s with selected = first_external}
           else
             (* No external services, stay put *)
@@ -667,13 +665,13 @@ Press **Enter** to open instance menu.|}
             ~line_start
             ~line_count
             ~visible_height:!last_visible_height_ref ;
-          {s with selected = new_idx + services_start_idx ()}
+          {s with selected = new_idx + services_start_idx}
 
   let force_refresh_cmd s = force_refresh s
 
   let toggle_fold s =
     (* Check if we're on an external service *)
-    let external_start_idx = services_start_idx () + List.length s.services in
+    let external_start_idx = services_start_idx + List.length s.services in
     if s.selected >= external_start_idx then
       (* Toggle external service *)
       let ext_idx = s.selected - external_start_idx in
@@ -703,12 +701,12 @@ Press **Enter** to open instance menu.|}
   let move_column s delta =
     let num_cols = s.num_columns in
     if num_cols <= 1 then s
-    else if s.selected < services_start_idx () then
+    else if s.selected < services_start_idx then
       (* In menu area, left/right should do nothing - menu spans all columns *)
       s
     else
       (* In services area: move to same position in target column *)
-      let current_idx = s.selected - services_start_idx () in
+      let current_idx = s.selected - services_start_idx in
       let current_col_indices =
         services_in_column
           ~num_columns:num_cols
@@ -735,7 +733,7 @@ Press **Enter** to open instance menu.|}
         {
           s with
           active_column = new_col;
-          selected = target_idx + services_start_idx ();
+          selected = target_idx + services_start_idx;
         }
 
   let handle_key ps key ~size =
@@ -781,8 +779,8 @@ Press **Enter** to open instance menu.|}
       (* Keep active_column in sync with selection *)
       let ps =
         let s = ps.Navigation.s in
-        if s.selected >= services_start_idx () && s.num_columns > 1 then
-          let svc_idx = s.selected - services_start_idx () in
+        if s.selected >= services_start_idx && s.num_columns > 1 then
+          let svc_idx = s.selected - services_start_idx in
           let col =
             column_for_service
               ~num_columns:s.num_columns

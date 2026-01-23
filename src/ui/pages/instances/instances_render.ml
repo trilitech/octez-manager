@@ -121,7 +121,7 @@ let network_short (n : string) =
 let line_for_service idx selected ~folded (st : Service_state.t) =
   let svc = st.Service_state.service in
   let marker =
-    if idx + services_start_idx () = selected then Widgets.bold "➤" else " "
+    if idx + services_start_idx = selected then Widgets.bold "➤" else " "
   in
   let status = status_icon st in
   let enabled = enabled_badge st in
@@ -327,7 +327,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     let extra_lines =
       match svc.Service.role with
       | "node" | "baker" | "accuser" | "dal-node" ->
-          let focus = idx + services_start_idx () = selected in
+          let focus = idx + services_start_idx = selected in
           let indent = String.make indent_start ' ' in
           (* For bakers: add delegate status line (line 3) *)
           let baker_delegate_line =
@@ -686,9 +686,7 @@ let render_external_services_section state =
   else
     let header = Widgets.bold "── Unmanaged Instances ──" in
     (* Calculate base index for external services (after menu and managed services) *)
-    let external_start_idx =
-      services_start_idx () + List.length state.services
-    in
+    let external_start_idx = services_start_idx + List.length state.services in
     let service_lines =
       List.mapi
         (fun idx ext ->
@@ -711,44 +709,12 @@ let render_external_services_section state =
     in
     header :: service_lines
 
-(** Render menu header items (upgrade if available, then install) *)
-let render_header_items ~selected =
-  let install_idx =
-    if Self_update_scheduler.update_available () then 1 else 0
-  in
-  let install_marker =
-    if selected = install_idx then Widgets.bold "➤" else " "
-  in
-  let install_row =
-    Printf.sprintf
-      "%s %s"
-      install_marker
-      (Widgets.bold "[ Install new instance ]")
-  in
-  match Self_update_scheduler.get () with
-  | None -> [install_row]
-  | Some update_info ->
-      let upgrade_marker = if selected = 0 then Widgets.bold "➤" else " " in
-      let label =
-        if update_info.is_major then
-          Widgets.fg
-            11 (* yellow *)
-            (Widgets.bold
-               (Printf.sprintf
-                  "[ UPGRADE octez-manager → v%s ]"
-                  update_info.latest_version))
-        else
-          Widgets.bold
-            (Printf.sprintf
-               "[ Upgrade octez-manager → v%s ]"
-               update_info.latest_version)
-      in
-      let upgrade_row = Printf.sprintf "%s %s" upgrade_marker label in
-      [upgrade_row; install_row]
-
 (** Single-column layout (original) *)
 let table_lines_single state =
-  let header_rows = render_header_items ~selected:state.selected in
+  let install_row =
+    let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+  in
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
     else
@@ -781,7 +747,7 @@ let table_lines_single state =
       let separator = Widgets.dim (String.make 80 '-') in
       "" :: separator :: external_rows
   in
-  header_rows @ ("" :: instance_rows) @ external_rows
+  (install_row :: "" :: instance_rows) @ external_rows
 
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
@@ -808,11 +774,14 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Reduce available height for columns to make room for external services *)
   let columns_visible_height = max 5 (visible_height - reserved_for_external) in
-  (* Header rows: upgrade (if available) and install *)
-  let header_rows = render_header_items ~selected:state.selected in
+  (* Header row (install) spans full width in single line *)
+  let install_row =
+    let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+  in
   (* When selection is in menu area, use -1 to dim all columns equally *)
   let effective_active_column =
-    if state.selected < services_start_idx () then -1 else state.active_column
+    if state.selected < services_start_idx then -1 else state.active_column
   in
   let instance_rows =
     merge_columns
@@ -835,7 +804,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     trim_end instance_rows
   in
   (* Append external services below the columnar grid *)
-  let result = header_rows @ ("" :: instance_rows_trimmed) in
+  let result = install_row :: "" :: instance_rows_trimmed in
   if external_line_count > 0 then
     let separator = Widgets.dim (String.make (min cols 120) '-') in
     result @ [""; separator] @ external_lines
@@ -860,7 +829,7 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
   else if num_columns <= 1 then table_lines_single state
   else
     (* For matrix layout, subtract for menu rows (install + separator) *)
-    let matrix_height = max 5 (visible_height - services_start_idx ()) in
+    let matrix_height = max 5 (visible_height - services_start_idx) in
     table_lines_matrix
       ~cols
       ~visible_height:matrix_height
