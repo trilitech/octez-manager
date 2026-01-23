@@ -20,6 +20,8 @@ type item_type =
   | LinkedDir of
       Binary_registry.linked_dir * int (* linked_dir, instance_count *)
   | AvailableVersion of Binary_downloader.version_info
+  | AvailableMajorGroup of int * Binary_downloader.version_info list
+(* major version, list of minor versions *)
 
 type state = {
   managed_versions : (string * int64 option * int) list;
@@ -28,6 +30,7 @@ type state = {
   items : item_type list;
   selected : int;
   loading_remote : bool;
+  expanded_majors : int list; (* list of expanded major versions *)
 }
 
 type msg = unit
@@ -136,20 +139,53 @@ let load_available_versions () =
           not (List.mem v.version managed))
         filtered_versions
 
-let build_items managed linked available =
+let build_items managed linked available expanded_majors =
   let items = ref [] in
   List.iter
     (fun (v, s, c) -> items := ManagedVersion (v, s, c) :: !items)
     managed ;
   List.iter (fun (ld, c) -> items := LinkedDir (ld, c) :: !items) linked ;
-  List.iter (fun v -> items := AvailableVersion v :: !items) available ;
+
+  (* Group available versions by major version *)
+  let major_groups = Hashtbl.create 10 in
+  List.iter
+    (fun (v : Binary_downloader.version_info) ->
+      (* Parse major version from "24.0" or "23.1-rc1" *)
+      match String.split_on_char '.' v.version with
+      | major_str :: _ -> (
+          try
+            let major = int_of_string major_str in
+            let existing =
+              Hashtbl.find_opt major_groups major |> Option.value ~default:[]
+            in
+            Hashtbl.replace major_groups major (v :: existing)
+          with _ -> ())
+      | _ -> ())
+    available ;
+
+  (* Add major groups in descending order, with sub-items if expanded *)
+  let majors =
+    Hashtbl.to_seq_keys major_groups
+    |> List.of_seq
+    |> List.sort (fun a b -> compare b a)
+  in
+  List.iter
+    (fun major ->
+      let versions = Hashtbl.find major_groups major |> List.rev in
+      items := AvailableMajorGroup (major, versions) :: !items ;
+      (* If expanded, add individual version items *)
+      if List.mem major expanded_majors then
+        List.iter (fun v -> items := AvailableVersion v :: !items) versions)
+    majors ;
+
   List.rev !items
 
 let init () =
   let managed = load_managed_versions () in
   let linked = load_linked_dirs () in
   let available = load_available_versions () in
-  let items = build_items managed linked available in
+  let expanded_majors = [] in
+  let items = build_items managed linked available expanded_majors in
   Navigation.make
     {
       managed_versions = managed;
@@ -158,6 +194,7 @@ let init () =
       items;
       selected = 0;
       loading_remote = false;
+      expanded_majors;
     }
 
 let update ps _ = ps
@@ -166,7 +203,7 @@ let refresh_data s =
   let managed = load_managed_versions () in
   let linked = load_linked_dirs () in
   let available = load_available_versions () in
-  let items = build_items managed linked available in
+  let items = build_items managed linked available s.expanded_majors in
   let selected = min s.selected (max 0 (List.length items - 1)) in
   {
     managed_versions = managed;
@@ -175,6 +212,7 @@ let refresh_data s =
     items;
     selected;
     loading_remote = false;
+    expanded_majors = s.expanded_majors;
   }
 
 let refresh ps = Navigation.update refresh_data ps
@@ -182,6 +220,22 @@ let refresh ps = Navigation.update refresh_data ps
 let auto_refresh ps =
   (* Auto-refresh if data has been marked dirty (e.g., after remove/download) *)
   if Context.consume_instances_dirty () then refresh ps else ps
+
+let toggle_major_expansion s major =
+  let expanded_majors =
+    if List.mem major s.expanded_majors then
+      List.filter (( <> ) major) s.expanded_majors
+    else major :: s.expanded_majors
+  in
+  (* Rebuild items with new expansion state *)
+  let items =
+    build_items
+      s.managed_versions
+      s.linked_dirs
+      s.available_versions
+      expanded_majors
+  in
+  {s with expanded_majors; items}
 
 let move_up s =
   let selected = if s.selected > 0 then s.selected - 1 else s.selected in
@@ -405,6 +459,9 @@ let handle_action s =
     | AvailableVersion vi ->
         download_version vi ;
         s
+    | AvailableMajorGroup (major, _) ->
+        (* Toggle expansion on Enter *)
+        toggle_major_expansion s major
 
 (** View *)
 
@@ -490,26 +547,62 @@ let view ps ~focus:_ ~size:_ =
   if s.available_versions = [] then
     add (Widgets.dim "  No versions available (or all installed)")
   else
+    (* Render major version groups *)
     List.iter
-      (fun (vi : Binary_downloader.version_info) ->
-        let is_selected =
-          match List.nth_opt s.items s.selected with
-          | Some (AvailableVersion vi2)
-            when vi.Binary_downloader.version = vi2.Binary_downloader.version ->
-              true
-          | _ -> false
-        in
-        let prefix = if is_selected then "➤ " else "  " in
-        let date_str =
-          match vi.Binary_downloader.release_date with
-          | Some d -> Printf.sprintf " - %s" d
-          | None -> ""
-        in
-        let line =
-          Printf.sprintf "%sv%s%s" prefix vi.Binary_downloader.version date_str
-        in
-        add (if is_selected then Widgets.bold line else line))
-      s.available_versions ;
+      (fun item ->
+        match item with
+        | AvailableMajorGroup (major, versions) ->
+            let is_group_selected =
+              match List.nth_opt s.items s.selected with
+              | Some (AvailableMajorGroup (m, _)) when m = major -> true
+              | _ -> false
+            in
+            let is_expanded = List.mem major s.expanded_majors in
+            let expand_icon = if is_expanded then "▼" else "▶" in
+            let prefix = if is_group_selected then "➤ " else "  " in
+            let version_count = List.length versions in
+            let group_line =
+              Printf.sprintf
+                "%s%s v%d  (%d version%s)"
+                prefix
+                expand_icon
+                major
+                version_count
+                (if version_count = 1 then "" else "s")
+            in
+            add
+              (if is_group_selected then Widgets.bold group_line else group_line) ;
+            (* If expanded, show all minor versions *)
+            if is_expanded then
+              List.iter
+                (fun (vi : Binary_downloader.version_info) ->
+                  let is_version_selected =
+                    match List.nth_opt s.items s.selected with
+                    | Some (AvailableVersion vi2)
+                      when vi.Binary_downloader.version
+                           = vi2.Binary_downloader.version ->
+                        true
+                    | _ -> false
+                  in
+                  let v_prefix =
+                    if is_version_selected then "  ➤ " else "    "
+                  in
+                  let date_str =
+                    match vi.Binary_downloader.release_date with
+                    | Some d -> Printf.sprintf " - %s" d
+                    | None -> ""
+                  in
+                  let line =
+                    Printf.sprintf
+                      "  %sv%s%s"
+                      v_prefix
+                      vi.Binary_downloader.version
+                      date_str
+                  in
+                  add (if is_version_selected then Widgets.bold line else line))
+                versions
+        | _ -> ())
+      s.items ;
 
   (* Add multi-progress display if active, fallback to single progress *)
   let multi_progress_lines = Context.render_multi_progress ~cols:80 in
