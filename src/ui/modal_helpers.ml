@@ -1025,11 +1025,50 @@ let select_app_bin_dir_modal ~on_select () =
           | Ok vers -> vers
           | Error _ -> []
         in
-        (* Find first uninstalled version (versions are already sorted latest first) *)
+        (* Find highest installed version *)
+        let highest_installed =
+          List.fold_left
+            (fun acc v ->
+              match acc with
+              | None -> Some v
+              | Some prev ->
+                  if
+                    Octez_manager_lib.Version_checker.compare_versions v prev
+                    > 0
+                  then Some v
+                  else Some prev)
+            None
+            installed
+        in
+        (* Sort available versions newest first *)
+        let sorted_versions =
+          List.sort
+            (fun (a : Octez_manager_lib.Binary_downloader.version_info)
+                 (b : Octez_manager_lib.Binary_downloader.version_info)
+               ->
+              (* Sort descending: newer versions first *)
+              -Octez_manager_lib.Version_checker.compare_versions
+                 a.version
+                 b.version)
+            all_versions
+        in
+        (* Find first version that is:
+           1. Not already installed
+           2. Newer than the highest installed version (if any) *)
         List.find_opt
           (fun (vi : Octez_manager_lib.Binary_downloader.version_info) ->
-            not (List.mem vi.version installed))
-          all_versions
+            let not_installed = not (List.mem vi.version installed) in
+            let newer_than_installed =
+              match highest_installed with
+              | None -> true (* No installed versions, all are candidates *)
+              | Some highest ->
+                  Octez_manager_lib.Version_checker.compare_versions
+                    vi.version
+                    highest
+                  > 0
+            in
+            not_installed && newer_than_installed)
+          sorted_versions
   in
 
   (* Build sections with separators *)
