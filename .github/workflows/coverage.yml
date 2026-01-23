@@ -296,6 +296,30 @@ jobs:
           bisect-ppx-report summary \
             --coverage-path _coverage \
             --per-file >> coverage-summary.md 2>&1 || true
+          
+          # Append files with no coverage (not instrumented or not executed)
+          echo "" >> coverage-summary.md
+          echo "### Files Not Covered (0%)" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+          
+          # Get list of all source files
+          find src -name "*.ml" -not -name "*_tests.ml" | sort > /tmp/all_files.txt
+          
+          # Get list of files in coverage report
+          grep -oE "src/[^[:space:]]+\.ml" coverage-summary.md | sort -u > /tmp/covered_files.txt || touch /tmp/covered_files.txt
+          
+          # Find files missing from coverage
+          MISSING_COUNT=$(comm -23 /tmp/all_files.txt /tmp/covered_files.txt | wc -l)
+          
+          if [ "$MISSING_COUNT" -gt 0 ]; then
+            echo "$MISSING_COUNT files with no coverage data:" >> coverage-summary.md
+            comm -23 /tmp/all_files.txt /tmp/covered_files.txt | while read file; do
+              echo "  0.00 %      0/0       $file" >> coverage-summary.md
+            done
+          else
+            echo "All source files have coverage data!" >> coverage-summary.md
+          fi
+          
           echo '```' >> coverage-summary.md
           
           # Extract overall percentage from format: "Coverage: 6688/11735 (56.99%)"
