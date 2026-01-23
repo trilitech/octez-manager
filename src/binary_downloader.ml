@@ -28,10 +28,6 @@ let base_url = "https://octez.tezos.com/releases"
 
 let versions_url = base_url ^ "/versions.json"
 
-let cache_ttl_seconds = 3600
-
-(* 1 hour *)
-
 (** Types *)
 
 type arch = X86_64 | Arm64
@@ -98,41 +94,7 @@ let checksums_url ~version ~arch =
     version
     (arch_to_string arch)
 
-(** Version fetching and caching *)
-
-let versions_cache_file () =
-  Filename.concat (Common.xdg_data_home ()) "octez-manager/versions-cache.json"
-
-let cache_timestamp_file () =
-  Filename.concat
-    (Common.xdg_data_home ())
-    "octez-manager/versions-cache.timestamp"
-
-let is_cache_fresh () =
-  let ts_file = cache_timestamp_file () in
-  if Sys.file_exists ts_file then
-    try
-      let ic = open_in ts_file in
-      let line = input_line ic in
-      close_in ic ;
-      let cache_time = float_of_string line in
-      let now = Unix.time () in
-      now -. cache_time < float_of_int cache_ttl_seconds
-    with _ -> false
-  else false
-
-let save_cache_timestamp () =
-  let ts_file = cache_timestamp_file () in
-  let dir = Filename.dirname ts_file in
-  let owner, group = Common.current_user_group_names () in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
-  try
-    let oc = open_out ts_file in
-    output_string oc (string_of_float (Unix.time ())) ;
-    close_out oc ;
-    Ok ()
-  with exn ->
-    R.error_msgf "Failed to save cache timestamp: %s" (Printexc.to_string exn)
+(** Version fetching *)
 
 let parse_version_json json =
   try
@@ -194,66 +156,14 @@ let fetch_versions_json () =
   | Ok _ -> R.error_msg "Empty versions.json response"
   | Error _ as e -> e
 
-let save_versions_cache json_str =
-  let cache_file = versions_cache_file () in
-  let dir = Filename.dirname cache_file in
-  let owner, group = Common.current_user_group_names () in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
-  try
-    let oc = open_out cache_file in
-    output_string oc json_str ;
-    close_out oc ;
-    save_cache_timestamp ()
-  with exn ->
-    R.error_msgf "Failed to save versions cache: %s" (Printexc.to_string exn)
-
-let load_versions_cache () =
-  let cache_file = versions_cache_file () in
-  if Sys.file_exists cache_file then
-    try
-      let ic = open_in cache_file in
-      let json_str = really_input_string ic (in_channel_length ic) in
-      close_in ic ;
-      Ok json_str
-    with exn ->
-      R.error_msgf "Failed to load versions cache: %s" (Printexc.to_string exn)
-  else R.error_msg "Cache file does not exist"
-
-let clear_cache () =
-  let cache_file = versions_cache_file () in
-  let ts_file = cache_timestamp_file () in
-  (try if Sys.file_exists cache_file then Sys.remove cache_file with _ -> ()) ;
-  try if Sys.file_exists ts_file then Sys.remove ts_file with _ -> ()
-
 let fetch_versions ?(include_rc = false) () =
   let* json_str = fetch_versions_json () in
-  let* () = save_versions_cache json_str in
   let json = Yojson.Safe.from_string json_str in
   let* versions = parse_version_json json in
   let filtered =
     if include_rc then versions else List.filter (fun v -> not v.is_rc) versions
   in
   Ok filtered
-
-let get_versions_cached ?(include_rc = false) () =
-  if is_cache_fresh () then
-    match load_versions_cache () with
-    | Ok json_str -> (
-        let json = Yojson.Safe.from_string json_str in
-        match parse_version_json json with
-        | Ok versions ->
-            let filtered =
-              if include_rc then versions
-              else List.filter (fun v -> not v.is_rc) versions
-            in
-            Ok filtered
-        | Error _ ->
-            (* Cache parse failed, fetch fresh *)
-            fetch_versions ~include_rc ())
-    | Error _ ->
-        (* Cache load failed, fetch fresh *)
-        fetch_versions ~include_rc ()
-  else fetch_versions ~include_rc ()
 
 (** Binary names *)
 
