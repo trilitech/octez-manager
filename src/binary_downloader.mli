@@ -58,18 +58,10 @@ val arch_to_string : arch -> string
 
 (** {2 Version fetching} *)
 
-(** Fetch available versions from remote
+(** Fetch available versions from remote repository
     @param include_rc Whether to include release candidates *)
 val fetch_versions :
   ?include_rc:bool -> unit -> (version_info list, Rresult.R.msg) result
-
-(** Get cached versions list, or fetch if cache is stale/missing
-    @param include_rc Whether to include release candidates *)
-val get_versions_cached :
-  ?include_rc:bool -> unit -> (version_info list, Rresult.R.msg) result
-
-(** Clear versions cache (forces re-fetch on next request) *)
-val clear_cache : unit -> unit
 
 (** {2 Binary download} *)
 
