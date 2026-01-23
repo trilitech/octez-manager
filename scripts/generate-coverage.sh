@@ -27,12 +27,25 @@ fi
 COVERAGE_FILES=$(find "$COVERAGE_DIR" -name "*.coverage" | wc -l)
 echo "Found $COVERAGE_FILES coverage file(s)"
 
+# Find all source files to include in coverage report
+echo "Discovering source files..."
+SRC_FILES=$(find src -name "*.ml" -not -name "*_tests.ml" | sort)
+SRC_COUNT=$(echo "$SRC_FILES" | wc -l)
+echo "Found $SRC_COUNT source files to track"
+
+# Build --expect arguments for all source files
+EXPECT_ARGS=""
+for file in $SRC_FILES; do
+	EXPECT_ARGS="$EXPECT_ARGS --expect $file"
+done
+
 # Generate HTML report
 echo "Generating HTML report..."
 mkdir -p "$OUTPUT_DIR"
 bisect-ppx-report html \
 	--coverage-path "$COVERAGE_DIR" \
 	--title "Octez Manager Coverage Report" \
+	$EXPECT_ARGS \
 	-o "$OUTPUT_DIR"
 
 echo "HTML report generated at: $OUTPUT_DIR/index.html"
@@ -41,20 +54,23 @@ echo "HTML report generated at: $OUTPUT_DIR/index.html"
 echo ""
 echo "Generating summary..."
 bisect-ppx-report summary \
-	--coverage-path "$COVERAGE_DIR"
+	--coverage-path "$COVERAGE_DIR" \
+	$EXPECT_ARGS
 
 # Generate detailed text summary for CI
 echo ""
 echo "Coverage by file:"
 bisect-ppx-report summary \
 	--coverage-path "$COVERAGE_DIR" \
-	--per-file
+	--per-file \
+	$EXPECT_ARGS
 
 # Generate Cobertura XML for tools like codecov
 echo ""
 echo "Generating Cobertura XML..."
 bisect-ppx-report cobertura \
 	--coverage-path "$COVERAGE_DIR" \
+	$EXPECT_ARGS \
 	"$OUTPUT_DIR/coverage.xml"
 
 echo ""

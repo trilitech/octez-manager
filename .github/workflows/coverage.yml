@@ -3,6 +3,7 @@ name: Coverage Report
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
 
@@ -18,6 +19,11 @@ jobs:
   coverage:
     name: Generate Coverage Report
     runs-on: ubuntu-latest
+    # Only run if: pushing to main, OR PR has 'coverage' label, OR PR just opened
+    if: |
+      github.event_name == 'push' || 
+      contains(github.event.pull_request.labels.*.name, 'coverage') ||
+      github.event.action == 'opened'
     container:
       image: ghcr.io/${{ github.repository }}-ci:latest
       credentials:
@@ -72,74 +78,46 @@ jobs:
           retention-days: 1
 
   build-instrumented-binary:
-    name: Build Instrumented Binary (Debian)
+    name: Build Instrumented Binary
     runs-on: ubuntu-latest
     container:
-      image: debian:bookworm
+      image: ghcr.io/${{ github.repository }}-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     env:
-      DEBIAN_FRONTEND: noninteractive
+      OPAMYES: "true"
+      OPAMROOT: /home/opam/.opam
+      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
     
     steps:
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            opam \
-            build-essential \
-            git \
-            ca-certificates \
-            libgmp-dev \
-            m4 \
-            pkg-config \
-            curl
-      
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Initialize opam
-        run: |
-          opam init --disable-sandboxing --bare -y
-          opam switch create coverage ocaml.5.1.1 -y
-          eval $(opam env --switch=coverage)
+      - name: Cache opam packages
+        id: cache-opam
+        uses: actions/cache@v4
+        with:
+          path: /home/opam/.opam
+          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          restore-keys: |
+            opam-miaou-
       
-      - name: Install OCaml dependencies
+      - name: Pin miaou packages
+        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
-          eval $(opam env --switch=coverage)
-          opam install -y \
-            dune \
-            cmdliner \
-            rresult \
-            yojson \
-            bos \
-            eio \
-            eio_main \
-            eio_posix \
-            cohttp-eio \
-            tls-eio \
-            ca-certs \
-            uri \
-            lambda-term \
-            linenoise \
-            ppx_deriving \
-            alcotest \
-            bisect_ppx
-      
-      - name: Install Miaou
-        run: |
-          eval $(opam env --switch=coverage)
-          if [ -z "${{ secrets.MIAOU_GIT_URL }}" ]; then
-            echo "ERROR: MIAOU_GIT_URL secret not configured" >&2
+          if [ -z "$MIAOU_GIT_URL" ]; then
+            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
             exit 1
           fi
-          opam pin add miaou-core "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
-          opam pin add miaou-driver-term "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
-          opam pin add miaou-driver-matrix "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
-          opam pin add miaou-runner "${{ secrets.MIAOU_GIT_URL }}" --no-action -y
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner -y
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
       
       - name: Build instrumented binary
         run: |
-          eval $(opam env --switch=coverage)
           dune clean
           dune build --instrument-with bisect_ppx --release
           cp _build/default/src/main.exe octez-manager-instrumented
@@ -272,12 +250,21 @@ jobs:
         run: |
           mkdir -p coverage-report
           
+          # Find all source files to track (including 0% coverage files)
+          echo "Discovering all source files..."
+          EXPECT_ARGS=""
+          for file in $(find src -name "*.ml" -not -name "*_tests.ml" | sort); do
+            EXPECT_ARGS="$EXPECT_ARGS --expect $file"
+          done
+          echo "Tracking $(find src -name "*.ml" -not -name "*_tests.ml" | wc -l) source files"
+          
           # Generate summary
           echo "## Coverage Report" > coverage-summary.md
           echo "" >> coverage-summary.md
           
           bisect-ppx-report summary \
-            --coverage-path _coverage > coverage-summary.txt || echo "Summary generation failed"
+            --coverage-path _coverage \
+            $EXPECT_ARGS > coverage-summary.txt || echo "Summary generation failed"
           
           cat coverage-summary.txt >> coverage-summary.md
           
@@ -285,6 +272,7 @@ jobs:
           bisect-ppx-report html \
             --coverage-path _coverage \
             --title "Octez Manager Coverage" \
+            $EXPECT_ARGS \
             -o coverage-report || echo "HTML generation failed"
           
           # Generate per-file summary
@@ -294,7 +282,8 @@ jobs:
           echo '```' >> coverage-summary.md
           bisect-ppx-report summary \
             --coverage-path _coverage \
-            --per-file >> coverage-summary.md || echo "Per-file summary failed"
+            --per-file \
+            $EXPECT_ARGS >> coverage-summary.md || echo "Per-file summary failed"
           echo '```' >> coverage-summary.md
           
           # Extract overall percentage
