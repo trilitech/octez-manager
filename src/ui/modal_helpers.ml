@@ -863,67 +863,129 @@ let select_client_base_dir_modal ~on_select () =
     ()
 
 let open_download_progress_modal ~version ~on_complete =
-  (* Start download in background *)
-  Background_runner.enqueue (fun () ->
-      (* Initialize multi-progress with list of binaries *)
-      Context.multi_progress_start
-        ~version
-        ~binaries:
-          ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
+  let module Modal = struct
+    type state = unit
 
-      (* Multi-progress callback *)
-      let multi_progress
-          (mp : Octez_manager_lib.Binary_downloader.multi_progress_state) =
-        Context.multi_progress_update
-          ~binary:mp.current_file
-          ~downloaded:mp.downloaded
-          ~total:mp.total
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      (* Start download in background *)
+      Background_runner.enqueue (fun () ->
+          (* Initialize multi-progress with list of binaries *)
+          Context.multi_progress_start
+            ~version
+            ~binaries:
+              ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
+
+          (* Multi-progress callback *)
+          let multi_progress
+              (mp : Octez_manager_lib.Binary_downloader.multi_progress_state) =
+            Context.multi_progress_update
+              ~binary:mp.current_file
+              ~downloaded:mp.downloaded
+              ~total:mp.total
+          in
+
+          let result =
+            Octez_manager_lib.Binary_downloader.download_version
+              ~version
+              ~verify_checksums:true
+              ~multi_progress
+              ()
+          in
+
+          (* Handle checksums *)
+          match result with
+          | Ok res ->
+              Context.multi_progress_checksum "Verifying checksums..." ;
+              Unix.sleepf 0.5 ;
+              (match
+                 res.Octez_manager_lib.Binary_downloader.checksum_status
+               with
+              | Octez_manager_lib.Binary_downloader.Verified ->
+                  Context.multi_progress_checksum
+                    "\xe2\x9c\x93 All checksums verified"
+              | Octez_manager_lib.Binary_downloader.Skipped ->
+                  Context.multi_progress_checksum
+                    "\xe2\x9a\xa0 Checksum verification skipped"
+              | Octez_manager_lib.Binary_downloader.Failed reason ->
+                  Context.multi_progress_checksum
+                    (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
+              Unix.sleepf 2.0 ;
+              (* Linger to show final status *)
+              Context.multi_progress_finish () ;
+              on_complete true
+          | Error (`Msg msg) ->
+              Context.multi_progress_finish () ;
+              Context.toast_error (Printf.sprintf "Download failed: %s" msg) ;
+              on_complete false) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      (* Render multi-progress display (same as binaries page) *)
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+
+      add (Printf.sprintf "Downloading Octez v%s..." version) ;
+      add "" ;
+
+      (* Add multi-progress display if active *)
+      let multi_progress_lines =
+        Context.render_multi_progress ~cols:(size.LTerm_geom.cols - 4)
       in
+      if String.trim multi_progress_lines <> "" then add multi_progress_lines
+      else add "Initializing download..." ;
 
-      let result =
-        Octez_manager_lib.Binary_downloader.download_version
-          ~version
-          ~verify_checksums:true
-          ~multi_progress
-          ()
-      in
+      add "" ;
+      add "Modal will close automatically when download completes." ;
 
-      (* Handle checksums *)
-      match result with
-      | Ok res ->
-          Context.multi_progress_checksum "Verifying checksums..." ;
-          Unix.sleepf 0.5 ;
-          (match res.Octez_manager_lib.Binary_downloader.checksum_status with
-          | Octez_manager_lib.Binary_downloader.Verified ->
-              Context.multi_progress_checksum
-                "\xe2\x9c\x93 All checksums verified"
-          | Octez_manager_lib.Binary_downloader.Skipped ->
-              Context.multi_progress_checksum
-                "\xe2\x9a\xa0 Checksum verification skipped"
-          | Octez_manager_lib.Binary_downloader.Failed reason ->
-              Context.multi_progress_checksum
-                (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
-          Unix.sleepf 2.0 ;
-          (* Linger to show final status *)
-          Context.multi_progress_finish () ;
-          on_complete true
-      | Error (`Msg msg) ->
-          Context.multi_progress_finish () ;
-          Context.toast_error (Printf.sprintf "Download failed: %s" msg) ;
-          on_complete false) ;
+      let content = String.concat "\n" (List.rev !lines) in
+      let lines_list = String.split_on_char '\n' content in
+      Pager.render
+        ~win:(max 1 (size.LTerm_geom.rows - 4))
+        ~cols:(max 1 (size.LTerm_geom.cols - 2))
+        (Pager.open_lines ~title:"" lines_list)
+        ~focus:false
 
-  (* Show simple info modal *)
-  let lines =
-    [
-      Printf.sprintf "Download of Octez v%s started." version;
-      "";
-      "Progress is shown below the form.";
-      "The version will be auto-selected when download completes.";
-      "";
-      "Press Esc to close this message.";
-    ]
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Downloading v%s" version;
+      left = None;
+      max_width = Some (Fixed 76);
+      dim_background = true;
+    }
   in
-  open_text_modal ~title:(Printf.sprintf "Downloading v%s" version) ~lines
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
 
 let select_app_bin_dir_modal ~on_select () =
   (* Load managed versions *)
