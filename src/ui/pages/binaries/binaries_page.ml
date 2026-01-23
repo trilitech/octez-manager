@@ -90,6 +90,38 @@ let load_available_versions () =
   match Binary_downloader.get_versions_cached ~include_rc:false () with
   | Error _ -> []
   | Ok versions ->
+      (* Filter to only the 2 latest major versions *)
+      let extract_major version_str =
+        try
+          match String.split_on_char '.' version_str with
+          | major :: _ -> int_of_string major
+          | [] -> 0
+        with _ -> 0
+      in
+      (* Group versions by major version *)
+      let major_versions = Hashtbl.create 5 in
+      List.iter
+        (fun (v : Binary_downloader.version_info) ->
+          let major = extract_major v.version in
+          let existing = Hashtbl.find_opt major_versions major in
+          Hashtbl.replace
+            major_versions
+            major
+            (v :: Option.value ~default:[] existing))
+        versions ;
+      (* Get the 2 latest major versions *)
+      let all_majors =
+        Hashtbl.to_seq_keys major_versions |> List.of_seq |> List.sort compare
+      in
+      let latest_two_majors =
+        List.rev all_majors |> fun l -> List.filteri (fun i _ -> i < 2) l
+      in
+      let filtered_versions =
+        List.concat_map
+          (fun major ->
+            Option.value ~default:[] (Hashtbl.find_opt major_versions major))
+          latest_two_majors
+      in
       (* Filter out already installed versions *)
       let managed =
         match Binary_registry.list_managed_versions () with
@@ -99,7 +131,7 @@ let load_available_versions () =
       List.filter
         (fun (v : Binary_downloader.version_info) ->
           not (List.mem v.version managed))
-        versions
+        filtered_versions
 
 let build_items managed linked available =
   let items = ref [] in
