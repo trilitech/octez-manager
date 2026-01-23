@@ -70,3 +70,18 @@ val clear_checksum_status : display_state -> display_state
 
 (** Format file size in human-readable format *)
 val format_size : int64 -> string
+
+(** Test-only functions *)
+module For_test : sig
+  val render_progress_bar :
+    width:int -> percentage:float -> style:style -> string
+
+  val render_binary_line :
+    name:string ->
+    status:binary_status ->
+    bar_width:int ->
+    style:style ->
+    string
+
+  val detect_style : unit -> style
+end
