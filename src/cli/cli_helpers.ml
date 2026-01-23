@@ -35,12 +35,85 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
         in
         match LNoise.linenoise msg with
         | None | Some "" | Some "y" | Some "Y" | Some "yes" | Some "Yes" -> (
-            Printf.printf "Downloading Octez v%s...\n%!" version ;
-            match Binary_downloader.download_version ~version () with
-            | Ok _result ->
-                Printf.printf "Download complete!\n%!" ;
+            Printf.printf "Downloading Octez v%s...\n\n%!" version ;
+
+            (* Initialize multi-line progress display *)
+            let display_state =
+              ref
+                (Cli_progress.init_display
+                   [
+                     "octez-node";
+                     "octez-client";
+                     "octez-baker";
+                     "octez-dal-node";
+                   ])
+            in
+            let display_mutex = Mutex.create () in
+
+            (* Render initial state *)
+            let lines = Cli_progress.render_display !display_state in
+            display_state := {!display_state with lines_printed = lines} ;
+
+            (* Multi-progress callback *)
+            let multi_progress (mp : Binary_downloader.multi_progress_state) =
+              Mutex.lock display_mutex ;
+              display_state :=
+                Cli_progress.set_in_progress
+                  !display_state
+                  ~binary:mp.current_file
+                  ~downloaded:mp.downloaded
+                  ~total:mp.total ;
+              let lines = Cli_progress.render_display !display_state in
+              display_state := {!display_state with lines_printed = lines} ;
+              Mutex.unlock display_mutex
+            in
+
+            (* Perform download with progress *)
+            match
+              Binary_downloader.download_version ~version ~multi_progress ()
+            with
+            | Ok result ->
+                (* Mark all binaries complete *)
+                Mutex.lock display_mutex ;
+                List.iter
+                  (fun binary ->
+                    let path =
+                      Filename.concat
+                        (Binary_registry.managed_version_path version)
+                        binary
+                    in
+                    let size =
+                      try
+                        let stats = Unix.stat path in
+                        Int64.of_int stats.Unix.st_size
+                      with _ -> 0L
+                    in
+                    display_state :=
+                      Cli_progress.set_complete !display_state ~binary ~size)
+                  result.binaries ;
+
+                (* Show checksum status *)
+                let checksum_msg =
+                  match result.checksum_status with
+                  | Binary_downloader.Verified ->
+                      "[\xe2\x9c\x93] All checksums verified"
+                  | Binary_downloader.Skipped ->
+                      "[\xe2\x9a\xa0] Checksum verification skipped"
+                  | Binary_downloader.Failed reason ->
+                      Printf.sprintf
+                        "[\xe2\x9c\x97] Checksum verification failed: %s"
+                        reason
+                in
+                display_state :=
+                  Cli_progress.set_checksum_status !display_state checksum_msg ;
+                let lines = Cli_progress.render_display !display_state in
+                display_state := {!display_state with lines_printed = lines} ;
+                Mutex.unlock display_mutex ;
+
+                Printf.printf "\n" ;
                 Ok (Binary_registry.managed_version_path version)
             | Error (`Msg e) ->
+                Printf.printf "\n" ;
                 Error
                   (Printf.sprintf
                      "Download failed: %s\n\n\
