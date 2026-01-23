@@ -68,7 +68,31 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
 let get_bin_source t =
   match t.bin_source with
   | Some bs -> bs
-  | None -> Binary_registry.Raw_path t.app_bin_dir
+  | None -> (
+      (* For backward compatibility with services created before bin_source field:
+         Detect if app_bin_dir matches a managed version or linked directory *)
+      let binaries_dir = Binary_registry.binaries_dir () in
+      (* Check if this is a managed version path *)
+      if String.starts_with ~prefix:binaries_dir t.app_bin_dir then
+        let basename = Filename.basename t.app_bin_dir in
+        (* Managed versions are stored as "vX.Y" *)
+        if String.starts_with ~prefix:"v" basename then
+          let version = String.sub basename 1 (String.length basename - 1) in
+          Binary_registry.Managed_version version
+        else Binary_registry.Raw_path t.app_bin_dir
+      else
+        (* Check if this matches a linked directory *)
+        match Binary_registry.load_linked_dirs () with
+        | Ok dirs -> (
+            match
+              List.find_opt
+                (fun (ld : Binary_registry.linked_dir) ->
+                  ld.path = t.app_bin_dir)
+                dirs
+            with
+            | Some ld -> Binary_registry.Linked_alias ld.alias
+            | None -> Binary_registry.Raw_path t.app_bin_dir)
+        | Error _ -> Binary_registry.Raw_path t.app_bin_dir)
 
 let logging_mode_to_yojson = Logging_mode.to_yojson
 
