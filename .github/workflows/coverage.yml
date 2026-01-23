@@ -56,9 +56,6 @@ jobs:
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
 
-      - name: Install bisect_ppx
-        run: opam install bisect_ppx
-
       - name: Run unit tests with coverage
         run: |
           mkdir -p _coverage
