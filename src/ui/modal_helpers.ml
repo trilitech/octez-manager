@@ -862,6 +862,69 @@ let select_client_base_dir_modal ~on_select () =
     ~on_select
     ()
 
+let open_download_progress_modal ~version ~on_complete =
+  (* Start download in background *)
+  Background_runner.enqueue (fun () ->
+      (* Initialize multi-progress with list of binaries *)
+      Context.multi_progress_start
+        ~version
+        ~binaries:
+          ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
+
+      (* Multi-progress callback *)
+      let multi_progress
+          (mp : Octez_manager_lib.Binary_downloader.multi_progress_state) =
+        Context.multi_progress_update
+          ~binary:mp.current_file
+          ~downloaded:mp.downloaded
+          ~total:mp.total
+      in
+
+      let result =
+        Octez_manager_lib.Binary_downloader.download_version
+          ~version
+          ~verify_checksums:true
+          ~multi_progress
+          ()
+      in
+
+      (* Handle checksums *)
+      match result with
+      | Ok res ->
+          Context.multi_progress_checksum "Verifying checksums..." ;
+          Unix.sleepf 0.5 ;
+          (match res.Octez_manager_lib.Binary_downloader.checksum_status with
+          | Octez_manager_lib.Binary_downloader.Verified ->
+              Context.multi_progress_checksum
+                "\xe2\x9c\x93 All checksums verified"
+          | Octez_manager_lib.Binary_downloader.Skipped ->
+              Context.multi_progress_checksum
+                "\xe2\x9a\xa0 Checksum verification skipped"
+          | Octez_manager_lib.Binary_downloader.Failed reason ->
+              Context.multi_progress_checksum
+                (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
+          Unix.sleepf 2.0 ;
+          (* Linger to show final status *)
+          Context.multi_progress_finish () ;
+          on_complete true
+      | Error (`Msg msg) ->
+          Context.multi_progress_finish () ;
+          Context.toast_error (Printf.sprintf "Download failed: %s" msg) ;
+          on_complete false) ;
+
+  (* Show simple info modal *)
+  let lines =
+    [
+      Printf.sprintf "Download of Octez v%s started." version;
+      "";
+      "Progress is shown below the form.";
+      "The version will be auto-selected when download completes.";
+      "";
+      "Press Esc to close this message.";
+    ]
+  in
+  open_text_modal ~title:(Printf.sprintf "Downloading v%s" version) ~lines
+
 let select_app_bin_dir_modal ~on_select () =
   (* Load managed versions *)
   let managed_versions =
@@ -932,75 +995,17 @@ let select_app_bin_dir_modal ~on_select () =
                   | None -> ""))
               ~on_select:(fun vi ->
                 let version = vi.Octez_manager_lib.Binary_downloader.version in
-                (* Start download in background *)
-                Background_runner.enqueue (fun () ->
-                    Context.toast_info
-                      (Printf.sprintf "Downloading v%s..." version) ;
-
-                    (* Initialize multi-progress with list of binaries *)
-                    Context.multi_progress_start
-                      ~version
-                      ~binaries:
-                        [
-                          "octez-node";
-                          "octez-client";
-                          "octez-baker";
-                          "octez-dal-node";
-                        ] ;
-
-                    (* Multi-progress callback *)
-                    let multi_progress
-                        (mp :
-                          Octez_manager_lib.Binary_downloader
-                          .multi_progress_state) =
-                      Context.multi_progress_update
-                        ~binary:mp.current_file
-                        ~downloaded:mp.downloaded
-                        ~total:mp.total
-                    in
-
-                    let result =
-                      Octez_manager_lib.Binary_downloader.download_version
-                        ~version
-                        ~verify_checksums:true
-                        ~multi_progress
-                        ()
-                    in
-
-                    (* Handle checksums *)
-                    match result with
-                    | Ok res ->
-                        Context.multi_progress_checksum "Verifying checksums..." ;
-                        Unix.sleepf 0.5 ;
-                        (match
-                           res
-                             .Octez_manager_lib.Binary_downloader
-                              .checksum_status
-                         with
-                        | Octez_manager_lib.Binary_downloader.Verified ->
-                            Context.multi_progress_checksum
-                              "\xe2\x9c\x93 All checksums verified"
-                        | Octez_manager_lib.Binary_downloader.Skipped ->
-                            Context.multi_progress_checksum
-                              "\xe2\x9a\xa0 Checksum verification skipped"
-                        | Octez_manager_lib.Binary_downloader.Failed reason ->
-                            Context.multi_progress_checksum
-                              (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
-                        Unix.sleepf 2.0 ;
-                        (* Linger to show final status *)
-                        Context.multi_progress_finish () ;
-                        Context.toast_success
-                          (Printf.sprintf "Downloaded v%s" version) ;
-                        (* Auto-select the downloaded version *)
-                        let path =
-                          Octez_manager_lib.Binary_registry.managed_version_path
-                            version
-                        in
-                        on_select path
-                    | Error (`Msg msg) ->
-                        Context.multi_progress_finish () ;
-                        Context.toast_error
-                          (Printf.sprintf "Download failed: %s" msg)))
+                (* Open download progress modal *)
+                open_download_progress_modal
+                  ~version
+                  ~on_complete:(fun success ->
+                    if success then
+                      (* Auto-select the downloaded version *)
+                      let path =
+                        Octez_manager_lib.Binary_registry.managed_version_path
+                          version
+                      in
+                      on_select path))
               ())
     | `CustomPath ->
         (* Open read-only file browser - no write permissions required *)
