@@ -1,15 +1,15 @@
 {
   "metadata": {
-    "generated_at": "2026-01-21T18:31:32.050597",
-    "generated_by": "scripts/generate-shard-manifest.py",
-    "total_tests": 61,
-    "total_duration": 399.597,
+    "generated_at": "2026-01-23T11:00:00.000000",
+    "generated_by": "manual update - added binaries/02-list-remote-major-versions.sh",
+    "total_tests": 62,
+    "total_duration": 401.597,
     "shard_count": 5,
-    "mean_shard_duration": 79.92,
-    "max_shard_duration": 84.54,
+    "mean_shard_duration": 80.32,
+    "max_shard_duration": 86.54,
     "min_shard_duration": 78.73,
-    "duration_std_dev": 2.16,
-    "balance_coefficient": 2.70
+    "duration_std_dev": 2.93,
+    "balance_coefficient": 3.65
   },
   "shard-1": {
     "tests": [
@@ -61,10 +61,11 @@
       "accuser/35-accuser-basic-install.sh",
       "node/06-install-custom-rpc-net.sh",
       "import/51-import-nonexistent-service.sh",
-      "binaries/01-download-and-verify.sh"
+      "binaries/01-download-and-verify.sh",
+      "binaries/02-list-remote-major-versions.sh"
     ],
-    "test_count": 13,
-    "total_duration": 84.54
+    "test_count": 14,
+    "total_duration": 86.54
   },
   "shard-4": {
     "tests": [
