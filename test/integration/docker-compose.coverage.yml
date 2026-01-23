@@ -1,0 +1,19 @@
+# Docker compose override for coverage builds
+# Usage: docker compose -f docker-compose.yml -f docker-compose.coverage.yml up
+
+services:
+  cli-tester:
+    build:
+      context: .
+      dockerfile: cli-tester/Dockerfile.coverage
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - coverage-data:/coverage  # Mount volume for coverage data
+    environment:
+      - SANDBOX_URL=http://sandbox:8080
+      - NODE_RPC=http://sandbox:8732
+      - TEST_INSTANCE=test-node
+      - BISECT_FILE=/coverage/bisect  # Enable coverage collection
+
+volumes:
+  coverage-data:
