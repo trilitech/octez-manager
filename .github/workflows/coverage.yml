@@ -264,21 +264,15 @@ jobs:
         run: |
           mkdir -p coverage-report
           
-          # Find all source files to track (including 0% coverage files)
-          echo "Discovering all source files..."
-          EXPECT_ARGS=""
-          for file in $(find src -name "*.ml" -not -name "*_tests.ml" | sort); do
-            EXPECT_ARGS="$EXPECT_ARGS --expect $file"
-          done
-          echo "Tracking $(find src -name "*.ml" -not -name "*_tests.ml" | wc -l) source files"
+          echo "Generating coverage report..."
+          echo "Total source files: $(find src -name "*.ml" -not -name "*_tests.ml" | wc -l)"
           
           # Generate summary
           echo "## Coverage Report" > coverage-summary.md
           echo "" >> coverage-summary.md
           
           bisect-ppx-report summary \
-            --coverage-path _coverage \
-            $EXPECT_ARGS > coverage-summary.txt || echo "Summary generation failed"
+            --coverage-path _coverage > coverage-summary.txt 2>&1 || echo "Summary generation failed"
           
           cat coverage-summary.txt >> coverage-summary.md
           
@@ -286,7 +280,6 @@ jobs:
           bisect-ppx-report html \
             --coverage-path _coverage \
             --title "Octez Manager Coverage" \
-            $EXPECT_ARGS \
             -o coverage-report || echo "HTML generation failed"
           
           # Generate per-file summary
@@ -296,12 +289,11 @@ jobs:
           echo '```' >> coverage-summary.md
           bisect-ppx-report summary \
             --coverage-path _coverage \
-            --per-file \
-            $EXPECT_ARGS >> coverage-summary.md || echo "Per-file summary failed"
+            --per-file >> coverage-summary.md 2>&1 || echo "Per-file summary failed"
           echo '```' >> coverage-summary.md
           
-          # Extract overall percentage
-          COVERAGE_PCT=$(grep -oP 'Coverage: \K[0-9.]+' coverage-summary.txt || echo "0")
+          # Extract overall percentage (use basic grep syntax for Alpine)
+          COVERAGE_PCT=$(grep 'Coverage:' coverage-summary.txt | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0")
           echo "COVERAGE_PCT=$COVERAGE_PCT" >> $GITHUB_ENV
           echo "Overall coverage: $COVERAGE_PCT%"
 
