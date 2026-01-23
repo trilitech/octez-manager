@@ -51,8 +51,9 @@ let install_node_cmd =
   in
   let octez_version =
     let doc =
-      "Use a managed Octez version. Overrides --app-bin-dir. Download versions \
-       with: octez-manager binaries download VERSION"
+      "Use a managed Octez version (e.g., '24.1' or 'latest'). Overrides \
+       --app-bin-dir. Download versions with: octez-manager binaries download \
+       VERSION"
     in
     Arg.(
       value

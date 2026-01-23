@@ -173,9 +173,38 @@ let list_cmd =
 (** download command *)
 let download_cmd =
   let term =
-    let run version verify_checksums =
+    let run version_input verify_checksums =
       (* Cleanup stale temporary download directories *)
       Binary_downloader.cleanup_stale_temp_dirs () ;
+
+      (* Resolve "latest" to actual version *)
+      let version =
+        if String.trim version_input = "latest" then
+          match Binary_downloader.fetch_versions ~include_rc:false () with
+          | Error (`Msg e) ->
+              Printf.eprintf "Error: Failed to fetch latest version: %s\n" e ;
+              exit 1
+          | Ok [] ->
+              Printf.eprintf "Error: No versions available\n" ;
+              exit 1
+          | Ok versions -> (
+              (* Sort versions to get the latest *)
+              let sorted =
+                List.sort
+                  (fun (a : Binary_downloader.version_info)
+                       (b : Binary_downloader.version_info)
+                     -> -Version_checker.compare_versions a.version b.version)
+                  versions
+              in
+              match sorted with
+              | latest :: _ ->
+                  Printf.printf "Latest version is v%s\n" latest.version ;
+                  latest.version
+              | [] ->
+                  Printf.eprintf "Error: No versions available\n" ;
+                  exit 1)
+        else String.trim version_input
+      in
 
       Printf.printf "Downloading Octez v%s...\n\n" version ;
 
@@ -272,7 +301,7 @@ let download_cmd =
           `Ok ()
     in
     let version_arg =
-      let doc = "Version to download (e.g., 24.0)" in
+      let doc = "Version to download (e.g., 24.0 or 'latest')" in
       Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
     in
     let no_verify_flag =
@@ -292,6 +321,7 @@ let download_cmd =
           `P
             "Downloads the specified Octez version from the official \
              distribution.";
+          `P "Use 'latest' to automatically download the newest stable version.";
           `P
             "Checksums are verified by default. Use --no-verify to skip \
              verification.";
