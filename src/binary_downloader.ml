@@ -407,150 +407,213 @@ let download_binary ~version ~arch ~binary ~dest_dir ?progress () =
   let* () = Common.run ["chmod"; "+x"; dest] in
   Ok dest
 
+(** Atomic installation helpers *)
+
+let temp_version_dir version =
+  let pid = Unix.getpid () in
+  Filename.concat
+    (Binary_registry.binaries_dir ())
+    (Printf.sprintf ".tmp.v%s.%d" version pid)
+
+let cleanup_stale_temp_dirs ?(max_age_seconds = 3600) () =
+  let dir = Binary_registry.binaries_dir () in
+  if Sys.file_exists dir && Sys.is_directory dir then
+    try
+      let now = Unix.time () in
+      let entries = Sys.readdir dir |> Array.to_list in
+      let temp_dirs =
+        entries
+        |> List.filter (fun e ->
+            String.length e > 5
+            && String.sub e 0 5 = ".tmp."
+            && Sys.is_directory (Filename.concat dir e))
+      in
+      List.iter
+        (fun temp_dir ->
+          let full_path = Filename.concat dir temp_dir in
+          try
+            let stat = Unix.stat full_path in
+            let age = now -. stat.Unix.st_mtime in
+            if age > float_of_int max_age_seconds then
+              (* Stale temp directory, remove it *)
+              ignore (Common.run_out ["rm"; "-rf"; full_path])
+          with _ -> ())
+        temp_dirs
+    with _ -> ()
+
 (** Main download function *)
 
 let download_version ~version ?(verify_checksums = true) ?progress
     ?multi_progress () =
   let* arch = detect_arch () in
-  let dest_dir = Binary_registry.managed_version_path version in
+  let final_dir = Binary_registry.managed_version_path version in
+  let temp_dir = temp_version_dir version in
 
   (* Ensure parent binaries directory exists *)
   let binaries_dir = Binary_registry.binaries_dir () in
   let owner, group = Common.current_user_group_names () in
   let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 binaries_dir in
 
-  (* Check if already exists *)
-  if Sys.file_exists dest_dir then
-    R.error_msgf "Version v%s is already installed" version
+  (* Check if already exists and is complete *)
+  let* () =
+    if Sys.file_exists final_dir then
+      if Binary_registry.is_complete_installation version then
+        R.error_msgf "Version v%s is already installed" version
+      else (
+        (* Incomplete installation - remove it *)
+        (try ignore (Common.run_out ["rm"; "-rf"; final_dir]) with _ -> ()) ;
+        Ok ())
+    else Ok ()
+  in
+
+  (* Clean up any stale temp directories *)
+  cleanup_stale_temp_dirs () ;
+
+  (* Remove temp directory if it exists from a previous failed attempt *)
+  (try
+     if Sys.file_exists temp_dir then
+       ignore (Common.run_out ["rm"; "-rf"; temp_dir])
+   with _ -> ()) ;
+
+  (* Use temp_dir for download, rename to final_dir on success *)
+  let dest_dir = temp_dir in
+  (* Check disk space *)
+  let* available = check_disk_space () in
+  let* required = estimate_download_size version in
+  if available < required then
+    R.error_msgf
+      "Insufficient disk space: need %Ld bytes, have %Ld bytes"
+      required
+      available
   else
-    (* Check disk space *)
-    let* available = check_disk_space () in
-    let* required = estimate_download_size version in
-    if available < required then
-      R.error_msgf
-        "Insufficient disk space: need %Ld bytes, have %Ld bytes"
-        required
-        available
-    else
-      (* Create version directory *)
-      let owner, group = Common.current_user_group_names () in
-      let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dest_dir in
+    (* Create version directory *)
+    let owner, group = Common.current_user_group_names () in
+    let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dest_dir in
 
-      (* Get list of binaries to download *)
-      let* binary_list = binaries_for_version version in
-      let total_files = List.length binary_list in
+    (* Get list of binaries to download *)
+    let* binary_list = binaries_for_version version in
+    let total_files = List.length binary_list in
 
-      (* Pre-fetch file sizes if using multi-progress *)
-      let file_sizes =
-        match multi_progress with
-        | Some _ ->
-            List.map
-              (fun binary ->
-                let url = binary_url ~version ~arch ~binary in
-                (binary, get_file_size ~url))
-              binary_list
-        | None -> []
-      in
+    (* Pre-fetch file sizes if using multi-progress *)
+    let file_sizes =
+      match multi_progress with
+      | Some _ ->
+          List.map
+            (fun binary ->
+              let url = binary_url ~version ~arch ~binary in
+              (binary, get_file_size ~url))
+            binary_list
+      | None -> []
+    in
 
-      (* Download all binaries *)
-      let rec download_all acc index = function
-        | [] -> Ok (List.rev acc)
-        | binary :: rest -> (
-            (* Create progress wrapper for multi-progress *)
-            let progress_for_file =
-              match multi_progress with
-              | Some mp_callback ->
-                  let file_size =
-                    List.assoc_opt binary file_sizes
-                    |> Option.value ~default:None
-                  in
-                  Some
-                    (fun ~downloaded ~total ->
-                      let total' =
-                        match total with Some t -> Some t | None -> file_size
-                      in
-                      mp_callback
-                        {
-                          current_file = binary;
-                          file_index = index;
-                          total_files;
-                          downloaded;
-                          total = total';
-                        })
-              | None -> progress
-            in
-            match
-              download_binary
-                ~version
-                ~arch
-                ~binary
-                ~dest_dir
-                ?progress:progress_for_file
-                ()
-            with
-            | Ok _path -> download_all (binary :: acc) (index + 1) rest
-            | Error _ as e ->
-                (* Cleanup on failure *)
-                (try Common.run_out ["rm"; "-rf"; dest_dir] |> ignore
-                 with _ -> ()) ;
-                e)
-      in
-
-      let* downloaded_binaries = download_all [] 0 binary_list in
-
-      (* Verify checksums if requested *)
-      let checksum_status =
-        if verify_checksums then
-          match fetch_checksums ~version ~arch with
-          | Ok checksums -> (
-              let verify_all () =
-                let rec check = function
-                  | [] -> Ok ()
-                  | binary :: rest -> (
-                      let filepath = Filename.concat dest_dir binary in
-                      match List.assoc_opt binary checksums with
-                      | Some expected_hash -> (
-                          match verify_checksum ~filepath ~expected_hash with
-                          | Ok () -> check rest
-                          | Error _ as e -> e)
-                      | None ->
-                          (* Binary not in checksums file - skip *)
-                          check rest)
+    (* Download all binaries *)
+    let rec download_all acc index = function
+      | [] -> Ok (List.rev acc)
+      | binary :: rest -> (
+          (* Create progress wrapper for multi-progress *)
+          let progress_for_file =
+            match multi_progress with
+            | Some mp_callback ->
+                let file_size =
+                  List.assoc_opt binary file_sizes |> Option.value ~default:None
                 in
-                check downloaded_binaries
+                Some
+                  (fun ~downloaded ~total ->
+                    let total' =
+                      match total with Some t -> Some t | None -> file_size
+                    in
+                    mp_callback
+                      {
+                        current_file = binary;
+                        file_index = index;
+                        total_files;
+                        downloaded;
+                        total = total';
+                      })
+            | None -> progress
+          in
+          match
+            download_binary
+              ~version
+              ~arch
+              ~binary
+              ~dest_dir
+              ?progress:progress_for_file
+              ()
+          with
+          | Ok _path -> download_all (binary :: acc) (index + 1) rest
+          | Error _ as e ->
+              (* Cleanup on failure *)
+              (try Common.run_out ["rm"; "-rf"; dest_dir] |> ignore
+               with _ -> ()) ;
+              e)
+    in
+
+    let* downloaded_binaries = download_all [] 0 binary_list in
+
+    (* Verify checksums if requested *)
+    let checksum_status =
+      if verify_checksums then
+        match fetch_checksums ~version ~arch with
+        | Ok checksums -> (
+            let verify_all () =
+              let rec check = function
+                | [] -> Ok ()
+                | binary :: rest -> (
+                    let filepath = Filename.concat dest_dir binary in
+                    match List.assoc_opt binary checksums with
+                    | Some expected_hash -> (
+                        match verify_checksum ~filepath ~expected_hash with
+                        | Ok () -> check rest
+                        | Error _ as e -> e)
+                    | None ->
+                        (* Binary not in checksums file - skip *)
+                        check rest)
               in
-              match verify_all () with
-              | Ok () -> Verified
-              | Error (`Msg reason) -> Failed reason)
-          | Error (`Msg reason) -> Failed reason
-        else Skipped
-      in
+              check downloaded_binaries
+            in
+            match verify_all () with
+            | Ok () -> Verified
+            | Error (`Msg reason) -> Failed reason)
+        | Error (`Msg reason) -> Failed reason
+      else Skipped
+    in
 
-      (* Save metadata *)
-      let metadata =
-        `Assoc
-          [
-            ("version", `String version);
-            ("architecture", `String (arch_to_string arch));
-            ("download_date", `String (iso8601_now ()));
-            ( "checksum_status",
-              `String
-                (match checksum_status with
-                | Verified -> "verified"
-                | Skipped -> "skipped"
-                | Failed _ -> "failed") );
-          ]
-      in
-      let metadata_file = Filename.concat dest_dir ".metadata.json" in
-      (try Yojson.Safe.to_file metadata_file metadata with _ -> ()) ;
+    (* Save metadata *)
+    let metadata =
+      `Assoc
+        [
+          ("version", `String version);
+          ("architecture", `String (arch_to_string arch));
+          ("download_date", `String (iso8601_now ()));
+          ( "checksum_status",
+            `String
+              (match checksum_status with
+              | Verified -> "verified"
+              | Skipped -> "skipped"
+              | Failed _ -> "failed") );
+        ]
+    in
+    let metadata_file = Filename.concat dest_dir ".metadata.json" in
+    (try Yojson.Safe.to_file metadata_file metadata with _ -> ()) ;
 
-      Ok
-        {
-          version;
-          installed_path = dest_dir;
-          binaries = downloaded_binaries;
-          checksum_status;
-        }
+    (* Atomic rename: move from temp to final location *)
+    let* () =
+      match Common.run ["mv"; temp_dir; final_dir] with
+      | Ok () -> Ok ()
+      | Error _ as e ->
+          (* Cleanup temp on rename failure *)
+          (try ignore (Common.run_out ["rm"; "-rf"; temp_dir]) with _ -> ()) ;
+          e
+    in
+
+    Ok
+      {
+        version;
+        installed_path = final_dir;
+        binaries = downloaded_binaries;
+        checksum_status;
+      }
 
 (** Remove version *)
 

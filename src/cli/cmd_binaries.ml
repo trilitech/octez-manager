@@ -174,6 +174,9 @@ let list_cmd =
 let download_cmd =
   let term =
     let run version verify_checksums =
+      (* Cleanup stale temporary download directories *)
+      Binary_downloader.cleanup_stale_temp_dirs () ;
+
       Printf.printf "Downloading Octez v%s...\n\n" version ;
 
       (* Initialize multi-line progress display *)
