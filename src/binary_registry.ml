@@ -170,6 +170,25 @@ let rename_linked_dir ~old_alias ~new_alias =
 
 (* Managed versions *)
 
+(* Check if a version installation is complete *)
+let is_complete_installation version =
+  let dest_dir = managed_version_path version in
+  if not (Sys.file_exists dest_dir && Sys.is_directory dest_dir) then false
+  else
+    (* Check for metadata file *)
+    let metadata_file = Filename.concat dest_dir ".metadata.json" in
+    if not (Sys.file_exists metadata_file) then false
+    else
+      (* Check that all expected binaries exist *)
+      let binaries =
+        ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"]
+      in
+      List.for_all
+        (fun binary ->
+          let path = Filename.concat dest_dir binary in
+          Sys.file_exists path)
+        binaries
+
 (* Compare version strings numerically (e.g., "24.0" > "9.0") *)
 let compare_versions a b =
   let parse_version v =
@@ -199,6 +218,8 @@ let list_managed_versions () =
             && e.[0] = 'v'
             && Sys.is_directory (Filename.concat dir e))
         |> List.map (fun e -> String.sub e 1 (String.length e - 1))
+        |> List.filter is_complete_installation
+        (* Filter out incomplete installations *)
         |> List.sort (fun a b -> compare_versions b a)
         (* newest first *)
       in

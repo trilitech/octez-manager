@@ -74,3 +74,7 @@ val list_managed_versions : unit -> (string list, Rresult.R.msg) result
 
 (** Check if a managed version is installed *)
 val managed_version_exists : string -> bool
+
+(** Check if a version installation is complete (has all binaries and metadata)
+    @param version Version to check (e.g., "24.0") *)
+val is_complete_installation : string -> bool
