@@ -59,7 +59,7 @@ let get_dir_size path =
 let list_remote_cmd =
   let term =
     let run include_rc =
-      match Binary_downloader.get_versions_cached ~include_rc () with
+      match Binary_downloader.fetch_versions ~include_rc () with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok versions ->
           if versions = [] then (
