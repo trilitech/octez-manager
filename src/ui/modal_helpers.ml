@@ -998,7 +998,11 @@ let select_app_bin_dir_modal ~on_select () =
     | Ok versions ->
         List.map
           (fun v -> `ManagedVersion v)
-          (List.sort String.compare versions)
+          (List.sort
+             (fun a b ->
+               (* Sort descending: newest first *)
+               -Octez_manager_lib.Version_checker.compare_versions a b)
+             versions)
     | Error _ -> []
   in
 
