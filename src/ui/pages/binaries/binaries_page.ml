@@ -502,6 +502,11 @@ let view ps ~focus:_ ~size:_ =
   | Some (AvailableVersion _) ->
       Miaou.Core.Help_hint.set
         (Some "Press Enter to download this version. Press ? for help.")
+  | Some (AvailableMajorGroup _) ->
+      Miaou.Core.Help_hint.set
+        (Some
+           "Press Enter or Tab to expand/collapse version group. Press ? for \
+            help.")
   | None -> Miaou.Core.Help_hint.clear ()) ;
 
   (* Header *)
