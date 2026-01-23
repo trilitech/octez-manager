@@ -237,3 +237,221 @@ let render_progress ~cols =
           progress := None ;
           ""
       | _ -> Progress_widget.render ~cols p.widget)
+
+(** Multi-file progress for binary downloads *)
+
+type speed_sample = {timestamp : float; bytes : int64}
+
+type speed_tracker = {
+  samples : speed_sample list; (* Keep last 5 samples *)
+  current_speed : float option; (* MB/s *)
+}
+
+type binary_progress = {
+  name : string;
+  widget : Progress_widget.t;
+  downloaded : int64 option;
+  total : int64 option;
+  status : [`Pending | `InProgress | `Complete];
+  speed_tracker : speed_tracker;
+}
+
+type multi_progress_state = {
+  version : string;
+  binaries : binary_progress list;
+  finished_at : float option;
+  checksum_message : string option;
+}
+
+let multi_progress : multi_progress_state option ref = ref None
+
+let multi_progress_linger_secs = 3.0
+
+(* Helper: calculate download speed from samples *)
+let calculate_speed tracker =
+  match tracker.samples with
+  | [] | [_] -> None
+  | samples ->
+      let first = List.hd samples in
+      let last = List.hd (List.rev samples) in
+      let time_diff = last.timestamp -. first.timestamp in
+      let bytes_diff = Int64.sub last.bytes first.bytes in
+      if time_diff > 0.1 then
+        (* MB/s = bytes/sec / 1024 / 1024 *)
+        Some (Int64.to_float bytes_diff /. time_diff /. 1024. /. 1024.)
+      else None
+
+(* Helper: add sample and update speed *)
+let update_speed_tracker tracker ~downloaded =
+  let now = Unix.gettimeofday () in
+  let new_sample = {timestamp = now; bytes = downloaded} in
+  (* Keep last 5 samples for smoothing *)
+  let new_samples =
+    new_sample :: tracker.samples |> fun l -> List.filteri (fun i _ -> i < 5) l
+  in
+  let new_speed =
+    calculate_speed {samples = new_samples; current_speed = None}
+  in
+  {samples = new_samples; current_speed = new_speed}
+
+(* Helper: format file size *)
+let format_size bytes =
+  let open Int64 in
+  let kb = div bytes 1024L in
+  let mb = div kb 1024L in
+  let gb = div mb 1024L in
+  if gb > 0L then Printf.sprintf "%Ld GB" gb
+  else if mb > 0L then Printf.sprintf "%Ld MB" mb
+  else if kb > 0L then Printf.sprintf "%Ld KB" kb
+  else Printf.sprintf "%Ld bytes" bytes
+
+(* Helper: format binary name (15 chars, truncate with ellipsis if longer) *)
+let format_binary_name name =
+  let max_len = 15 in
+  if String.length name <= max_len then Printf.sprintf "%-15s" name
+  else
+    let truncated = String.sub name 0 (max_len - 3) in
+    Printf.sprintf "%s..." truncated
+
+(* Helper: format status icon *)
+let format_status_icon status =
+  match status with
+  | `Complete -> "[\xe2\x9c\x93]" (* [✓] *)
+  | `InProgress -> "[\xe2\x86\x92]" (* [→] *)
+  | `Pending -> "[ ]"
+
+(* Start multi-progress *)
+let multi_progress_start ~version ~binaries =
+  let widgets =
+    List.map
+      (fun name ->
+        {
+          name;
+          widget = Progress_widget.open_inline ~width:30 ~label:name ();
+          downloaded = None;
+          total = None;
+          status = `Pending;
+          speed_tracker = {samples = []; current_speed = None};
+        })
+      binaries
+  in
+  multi_progress :=
+    Some
+      {version; binaries = widgets; finished_at = None; checksum_message = None}
+
+(* Update progress for a specific binary *)
+let multi_progress_update ~binary ~downloaded ~total =
+  multi_progress :=
+    Option.map
+      (fun mp ->
+        let binaries =
+          List.map
+            (fun bp ->
+              if bp.name = binary then
+                let pct =
+                  match total with
+                  | Some t when t > 0L ->
+                      Int64.(to_float downloaded /. to_float t)
+                  | _ -> 0.0
+                in
+                let new_tracker =
+                  update_speed_tracker bp.speed_tracker ~downloaded
+                in
+                {
+                  bp with
+                  widget = Progress_widget.set_progress bp.widget pct;
+                  downloaded = Some downloaded;
+                  total;
+                  status = `InProgress;
+                  speed_tracker = new_tracker;
+                }
+              else bp)
+            mp.binaries
+        in
+        {mp with binaries})
+      !multi_progress
+
+(* Mark a binary as complete *)
+let multi_progress_complete ~binary ~size =
+  multi_progress :=
+    Option.map
+      (fun mp ->
+        let binaries =
+          List.map
+            (fun bp ->
+              if bp.name = binary then
+                {
+                  bp with
+                  widget = Progress_widget.set_progress bp.widget 1.0;
+                  downloaded = Some size;
+                  total = Some size;
+                  status = `Complete;
+                }
+              else bp)
+            mp.binaries
+        in
+        {mp with binaries})
+      !multi_progress
+
+(* Set checksum message *)
+let multi_progress_checksum msg =
+  multi_progress :=
+    Option.map (fun mp -> {mp with checksum_message = Some msg}) !multi_progress
+
+(* Finish multi-progress *)
+let multi_progress_finish () =
+  multi_progress :=
+    Option.map
+      (fun mp -> {mp with finished_at = Some (Unix.gettimeofday ())})
+      !multi_progress
+
+(* Render multi-progress display *)
+let render_multi_progress ~cols:_ =
+  match !multi_progress with
+  | None -> ""
+  | Some mp -> (
+      let now = Unix.gettimeofday () in
+      match mp.finished_at with
+      | Some finished when now -. finished > multi_progress_linger_secs ->
+          multi_progress := None ;
+          ""
+      | _ ->
+          let lines = ref [] in
+          (* Header *)
+          lines :=
+            Printf.sprintf "Downloading Octez v%s..." mp.version :: !lines ;
+          lines := "" :: !lines ;
+          (* Render each binary *)
+          List.iter
+            (fun bp ->
+              let icon = format_status_icon bp.status in
+              let name = format_binary_name bp.name in
+              let bar = Progress_widget.render ~cols:80 bp.widget in
+              (* Build size info *)
+              let size_info =
+                match
+                  (bp.downloaded, bp.total, bp.speed_tracker.current_speed)
+                with
+                | Some dl, Some t, Some speed ->
+                    Printf.sprintf
+                      " (%s / %s) @ %.1f MB/s"
+                      (format_size dl)
+                      (format_size t)
+                      speed
+                | Some dl, Some t, None ->
+                    Printf.sprintf " (%s / %s)" (format_size dl) (format_size t)
+                | Some dl, None, Some speed ->
+                    Printf.sprintf " (%s) @ %.1f MB/s" (format_size dl) speed
+                | Some dl, None, None -> Printf.sprintf " (%s)" (format_size dl)
+                | _ -> ""
+              in
+              let line = Printf.sprintf "%s %s %s%s" icon name bar size_info in
+              lines := line :: !lines)
+            mp.binaries ;
+          (* Checksum message if present *)
+          (match mp.checksum_message with
+          | Some msg ->
+              lines := "" :: !lines ;
+              lines := msg :: !lines
+          | None -> ()) ;
+          String.concat "\n" (List.rev !lines))

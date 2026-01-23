@@ -73,3 +73,31 @@ val progress_finish : unit -> unit
 val progress_set : ?label:string -> progress:float -> unit -> unit
 
 val render_progress : cols:int -> string
+
+(** Multi-file progress for binary downloads *)
+
+(** Start multi-file progress display
+    @param version Version being downloaded
+    @param binaries List of binary names to track *)
+val multi_progress_start : version:string -> binaries:string list -> unit
+
+(** Update progress for a specific binary
+    @param binary Binary name
+    @param downloaded Bytes downloaded
+    @param total Total file size (if known) *)
+val multi_progress_update :
+  binary:string -> downloaded:int64 -> total:int64 option -> unit
+
+(** Mark a binary as complete
+    @param binary Binary name
+    @param size Final file size *)
+val multi_progress_complete : binary:string -> size:int64 -> unit
+
+(** Set checksum verification message *)
+val multi_progress_checksum : string -> unit
+
+(** Finish multi-progress (will linger for a few seconds before clearing) *)
+val multi_progress_finish : unit -> unit
+
+(** Render multi-progress display (returns multi-line string) *)
+val render_multi_progress : cols:int -> string
