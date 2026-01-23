@@ -99,12 +99,12 @@ jobs:
       - name: Initialize opam
         run: |
           opam init --disable-sandboxing --bare -y
-          opam switch create . ocaml.5.1.1 -y
-          eval $(opam env)
+          opam switch create coverage ocaml.5.1.1 -y
+          eval $(opam env --switch=coverage)
       
       - name: Install OCaml dependencies
         run: |
-          eval $(opam env)
+          eval $(opam env --switch=coverage)
           opam install -y \
             dune \
             cmdliner \
@@ -126,7 +126,7 @@ jobs:
       
       - name: Install Miaou
         run: |
-          eval $(opam env)
+          eval $(opam env --switch=coverage)
           if [ -z "${{ secrets.MIAOU_GIT_URL }}" ]; then
             echo "ERROR: MIAOU_GIT_URL secret not configured" >&2
             exit 1
@@ -139,7 +139,7 @@ jobs:
       
       - name: Build instrumented binary
         run: |
-          eval $(opam env)
+          eval $(opam env --switch=coverage)
           dune clean
           dune build --instrument-with bisect_ppx --release
           cp _build/default/src/main.exe octez-manager-instrumented
