@@ -22,6 +22,18 @@ type version_info = {
     @param total Total size in bytes (None if unknown) *)
 type progress_callback = downloaded:int64 -> total:int64 option -> unit
 
+(** Multi-file progress tracking state *)
+type multi_progress_state = {
+  current_file : string;  (** Name of file currently being downloaded *)
+  file_index : int;  (** 0-based index of current file *)
+  total_files : int;  (** Total number of files to download *)
+  downloaded : int64;  (** Bytes downloaded for current file *)
+  total : int64 option;  (** Total size of current file (if known) *)
+}
+
+(** Multi-file progress callback for tracking overall download progress *)
+type multi_progress_callback = multi_progress_state -> unit
+
 (** Checksum verification status *)
 type checksum_status =
   | Verified  (** Checksum matched *)
@@ -67,12 +79,14 @@ val binaries_for_version : string -> (string list, Rresult.R.msg) result
 (** Download a version to the managed binaries directory
     @param version Version to download (e.g., "24.0")
     @param verify_checksums Whether to verify checksums (can be cancelled by user)
-    @param progress Optional progress callback
+    @param progress Optional single-file progress callback (legacy)
+    @param multi_progress Optional multi-file progress callback (recommended for CLI)
     @return Download result with installed path and status *)
 val download_version :
   version:string ->
   ?verify_checksums:bool ->
   ?progress:progress_callback ->
+  ?multi_progress:multi_progress_callback ->
   unit ->
   (download_result, Rresult.R.msg) result
 

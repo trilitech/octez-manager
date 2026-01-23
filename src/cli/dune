@@ -6,6 +6,7 @@
  (modules
   cli_output
   cli_helpers
+  cli_progress
   cmd_install_accuser
   cmd_install_baker
   cmd_install_dal
