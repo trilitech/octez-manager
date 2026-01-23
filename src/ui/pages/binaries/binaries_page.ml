@@ -86,42 +86,45 @@ let load_linked_dirs () =
           (ld, count))
         dirs
 
+(** Filter versions to only keep the N latest major versions.
+    Returns versions from the N most recent major version families. *)
+let filter_latest_n_major_versions n versions =
+  let extract_major version_str =
+    try
+      match String.split_on_char '.' version_str with
+      | major :: _ -> int_of_string major
+      | [] -> 0
+    with _ -> 0
+  in
+  (* Group versions by major version *)
+  let major_versions = Hashtbl.create 5 in
+  List.iter
+    (fun (v : Binary_downloader.version_info) ->
+      let major = extract_major v.version in
+      let existing = Hashtbl.find_opt major_versions major in
+      Hashtbl.replace
+        major_versions
+        major
+        (v :: Option.value ~default:[] existing))
+    versions ;
+  (* Get the N latest major versions *)
+  let all_majors =
+    Hashtbl.to_seq_keys major_versions |> List.of_seq |> List.sort compare
+  in
+  let latest_n_majors =
+    List.rev all_majors |> fun l -> List.filteri (fun i _ -> i < n) l
+  in
+  List.concat_map
+    (fun major ->
+      Option.value ~default:[] (Hashtbl.find_opt major_versions major))
+    latest_n_majors
+
 let load_available_versions () =
   match Binary_downloader.get_versions_cached ~include_rc:false () with
   | Error _ -> []
   | Ok versions ->
       (* Filter to only the 2 latest major versions *)
-      let extract_major version_str =
-        try
-          match String.split_on_char '.' version_str with
-          | major :: _ -> int_of_string major
-          | [] -> 0
-        with _ -> 0
-      in
-      (* Group versions by major version *)
-      let major_versions = Hashtbl.create 5 in
-      List.iter
-        (fun (v : Binary_downloader.version_info) ->
-          let major = extract_major v.version in
-          let existing = Hashtbl.find_opt major_versions major in
-          Hashtbl.replace
-            major_versions
-            major
-            (v :: Option.value ~default:[] existing))
-        versions ;
-      (* Get the 2 latest major versions *)
-      let all_majors =
-        Hashtbl.to_seq_keys major_versions |> List.of_seq |> List.sort compare
-      in
-      let latest_two_majors =
-        List.rev all_majors |> fun l -> List.filteri (fun i _ -> i < 2) l
-      in
-      let filtered_versions =
-        List.concat_map
-          (fun major ->
-            Option.value ~default:[] (Hashtbl.find_opt major_versions major))
-          latest_two_majors
-      in
+      let filtered_versions = filter_latest_n_major_versions 2 versions in
       (* Filter out already installed versions *)
       let managed =
         match Binary_registry.list_managed_versions () with
@@ -590,3 +593,8 @@ let page = (module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG)
 let register () =
   if not (Miaou.Core.Registry.exists name) then
     Miaou.Core.Registry.register name page
+
+(** For testing *)
+module For_tests = struct
+  let filter_latest_n_major_versions = filter_latest_n_major_versions
+end
