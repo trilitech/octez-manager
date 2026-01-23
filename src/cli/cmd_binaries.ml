@@ -179,12 +179,14 @@ let download_cmd =
         match total with
         | Some t ->
             let pct = Int64.(to_float downloaded /. to_float t *. 100.0) in
+            (* \r moves cursor to start, \x1b[K clears from cursor to end of line *)
             Printf.printf
-              "\rProgress: %.1f%% (%s / %s)%!"
+              "\r\x1b[KProgress: %.1f%% (%s / %s)%!"
               pct
               (format_size downloaded)
               (format_size t)
-        | None -> Printf.printf "\rDownloaded: %s%!" (format_size downloaded)
+        | None ->
+            Printf.printf "\r\x1b[KDownloaded: %s%!" (format_size downloaded)
       in
       match
         Binary_downloader.download_version

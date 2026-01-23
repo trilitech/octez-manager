@@ -102,16 +102,29 @@ let download_snapshot ?(quiet = false) ?on_log ?progress ?tmp_dir src =
         Common.download_file_with_progress
           ~url:src
           ~dest_path:tmp
-          ~on_progress:(fun pct _ ->
+          ~on_progress:(fun downloaded total ->
             match on_download_progress with
-            | Some f -> f pct (Some 100)
+            | Some f ->
+                (* Convert byte counts to percentage for the callback *)
+                let pct =
+                  match total with
+                  | Some t when t > 0 -> downloaded * 100 / t
+                  | _ -> 0
+                in
+                f pct (Some 100)
             | None -> ())
     | None, Some log ->
         (* Use progress download and convert to log messages *)
         Common.download_file_with_progress
           ~url:src
           ~dest_path:tmp
-          ~on_progress:(fun pct _ ->
+          ~on_progress:(fun downloaded total ->
+            (* Convert byte counts to percentage *)
+            let pct =
+              match total with
+              | Some t when t > 0 -> downloaded * 100 / t
+              | _ -> 0
+            in
             (* Log every 5 seconds to avoid flooding *)
             let now = Unix.gettimeofday () in
             if now -. !last_log_time >= 5. then (
