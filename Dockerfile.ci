@@ -48,7 +48,8 @@ RUN opam update && opam install -y \
     lambda-term \
     linenoise \
     ppx_deriving \
-    alcotest
+    alcotest \
+    bisect_ppx
 
 # Clean up opam cache to reduce image size
 RUN opam clean -a -c -s --logs
