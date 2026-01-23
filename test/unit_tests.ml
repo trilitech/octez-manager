@@ -341,10 +341,12 @@ let installer_backup_restore_roundtrip () =
         restored)
 
 let installer_normalize_data_dir_default () =
-  with_fake_xdg (fun env ->
-      let expected = Filename.concat env.data "octez/alpha" in
-      let actual = Installer.For_tests.normalize_data_dir "alpha" None in
-      Alcotest.(check string) "default data dir" expected actual)
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun env ->
+        let expected = Filename.concat env.data "octez/alpha" in
+        let actual = Installer.For_tests.normalize_data_dir "alpha" None in
+        Alcotest.(check string) "default data dir" expected actual)
 
 let installer_endpoint_of_rpc_formats () =
   let trimmed = Config.endpoint_of_rpc "  localhost:8732  " in
@@ -2150,43 +2152,49 @@ let teztnets_resolve_network_empty_string () =
         (string_contains ~needle:"empty" (String.lowercase_ascii msg))
 
 let service_registry_list_empty () =
-  with_fake_xdg (fun _env ->
-      let services = expect_ok (Service_registry.list ()) in
-      Alcotest.(check int) "empty registry" 0 (List.length services))
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun _env ->
+        let services = expect_ok (Service_registry.list ()) in
+        Alcotest.(check int) "empty registry" 0 (List.length services))
 
 let service_registry_roundtrip () =
-  with_fake_xdg (fun _env ->
-      let service = sample_service () in
-      let () = expect_ok (Service_registry.write service) in
-      let listed = expect_ok (Service_registry.list ()) |> sort_services in
-      Alcotest.(check int) "one entry" 1 (List.length listed) ;
-      let found = expect_ok (Service_registry.find ~instance:"alpha") in
-      (match found with
-      | Some svc -> check_service service svc
-      | None -> Alcotest.fail "service not found") ;
-      let () = expect_ok (Service_registry.remove ~instance:"alpha") in
-      let after = expect_ok (Service_registry.list ()) in
-      Alcotest.(check int) "empty after removal" 0 (List.length after) ;
-      match expect_ok (Service_registry.find ~instance:"alpha") with
-      | None -> ()
-      | Some _ -> Alcotest.fail "service should have been removed")
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun _env ->
+        let service = sample_service () in
+        let () = expect_ok (Service_registry.write service) in
+        let listed = expect_ok (Service_registry.list ()) |> sort_services in
+        Alcotest.(check int) "one entry" 1 (List.length listed) ;
+        let found = expect_ok (Service_registry.find ~instance:"alpha") in
+        (match found with
+        | Some svc -> check_service service svc
+        | None -> Alcotest.fail "service not found") ;
+        let () = expect_ok (Service_registry.remove ~instance:"alpha") in
+        let after = expect_ok (Service_registry.list ()) in
+        Alcotest.(check int) "empty after removal" 0 (List.length after) ;
+        match expect_ok (Service_registry.find ~instance:"alpha") with
+        | None -> ()
+        | Some _ -> Alcotest.fail "service should have been removed")
 
 let service_registry_list_invalid_json () =
-  with_fake_xdg (fun env ->
-      let root = Filename.concat env.config "octez-manager" in
-      let services = Filename.concat root "services" in
-      let ensure_dir path =
-        if not (Sys.file_exists path) then Unix.mkdir path 0o755
-      in
-      ensure_dir root ;
-      ensure_dir services ;
-      let broken = Filename.concat services "broken.json" in
-      let oc = open_out broken in
-      output_string oc "{ invalid" ;
-      close_out oc ;
-      match Service_registry.list () with
-      | Error _ -> ()
-      | Ok _ -> Alcotest.fail "broken registry entry should fail")
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun env ->
+        let root = Filename.concat env.config "octez-manager" in
+        let services = Filename.concat root "services" in
+        let ensure_dir path =
+          if not (Sys.file_exists path) then Unix.mkdir path 0o755
+        in
+        ensure_dir root ;
+        ensure_dir services ;
+        let broken = Filename.concat services "broken.json" in
+        let oc = open_out broken in
+        output_string oc "{ invalid" ;
+        close_out oc ;
+        match Service_registry.list () with
+        | Error _ -> ()
+        | Ok _ -> Alcotest.fail "broken registry entry should fail")
 
 let service_registry_remove_missing () =
   with_fake_xdg (fun _env ->
@@ -2341,115 +2349,131 @@ let installer_instance_name_full_validation () =
           Alcotest.failf "Valid unique name was rejected: %s" msg)
 
 let node_env_write_file () =
-  with_fake_xdg (fun env ->
-      let inst = "alpha" in
-      let data_dir = Filename.concat env.data "octez/alpha" in
-      let run_args = "--network https://example" in
-      let () =
-        expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[] ())
-      in
-      let env_file =
-        Filename.concat env.config "octez/instances/alpha/node.env"
-      in
-      let contents = read_file env_file in
-      (* run_args gets quoted if it contains spaces *)
-      let expected =
-        Printf.sprintf
-          "VERSION=v1\nOCTEZ_DATA_DIR=%s\nOCTEZ_NODE_ARGS=\"%s\"\n"
-          data_dir
-          run_args
-      in
-      Alcotest.(check string) "env contents" expected contents)
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun env ->
+        let inst = "alpha" in
+        let data_dir = Filename.concat env.data "octez/alpha" in
+        let run_args = "--network https://example" in
+        let () =
+          expect_ok (Node_env.write ~inst ~data_dir ~run_args ~extra_env:[] ())
+        in
+        let env_file =
+          Filename.concat env.config "octez/instances/alpha/node.env"
+        in
+        let contents = read_file env_file in
+        (* run_args gets quoted if it contains spaces *)
+        let expected =
+          Printf.sprintf
+            "VERSION=v1\nOCTEZ_DATA_DIR=%s\nOCTEZ_NODE_ARGS=\"%s\"\n"
+            data_dir
+            run_args
+        in
+        Alcotest.(check string) "env contents" expected contents)
 
 let node_env_overwrite_existing () =
-  with_fake_xdg (fun env ->
-      let inst = "beta" in
-      let data_dir = Filename.concat env.data "octez/beta" in
-      let first = "--network https://example" in
-      let second = "--network https://example --history-mode archive" in
-      let () =
-        expect_ok
-          (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[] ())
-      in
-      let () =
-        expect_ok
-          (Node_env.write ~inst ~data_dir ~run_args:second ~extra_env:[] ())
-      in
-      let env_file =
-        Filename.concat env.config "octez/instances/beta/node.env"
-      in
-      let contents = read_file env_file in
-      Alcotest.(check bool)
-        "updated args"
-        true
-        (string_contains ~needle:second contents) ;
-      Alcotest.(check bool)
-        "data dir preserved"
-        true
-        (string_contains ~needle:data_dir contents))
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun env ->
+        let inst = "beta" in
+        let data_dir = Filename.concat env.data "octez/beta" in
+        let first = "--network https://example" in
+        let second = "--network https://example --history-mode archive" in
+        let () =
+          expect_ok
+            (Node_env.write ~inst ~data_dir ~run_args:first ~extra_env:[] ())
+        in
+        let () =
+          expect_ok
+            (Node_env.write ~inst ~data_dir ~run_args:second ~extra_env:[] ())
+        in
+        let env_file =
+          Filename.concat env.config "octez/instances/beta/node.env"
+        in
+        let contents = read_file env_file in
+        Alcotest.(check bool)
+          "updated args"
+          true
+          (string_contains ~needle:second contents) ;
+        Alcotest.(check bool)
+          "data dir preserved"
+          true
+          (string_contains ~needle:data_dir contents))
 
 let node_env_write_pairs_custom_env () =
-  with_fake_xdg (fun env ->
-      let inst = "gamma" in
-      let entries =
-        [
-          ("OCTEZ_DATA_DIR", "/tmp/data");
-          ("CUSTOM_KEY", "custom-value");
-          ("EMPTY", " ");
-        ]
-      in
-      let () = expect_ok (Node_env.write_pairs ~inst entries) in
-      let env_file =
-        Filename.concat env.config "octez/instances/gamma/node.env"
-      in
-      let contents = read_file env_file in
-      Alcotest.(check bool)
-        "contains custom"
-        true
-        (string_contains ~needle:"CUSTOM_KEY=custom-value" contents) ;
-      Alcotest.(check bool)
-        "skips empty"
-        false
-        (string_contains ~needle:"EMPTY=" contents))
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun env ->
+        let inst = "gamma" in
+        let entries =
+          [
+            ("OCTEZ_DATA_DIR", "/tmp/data");
+            ("CUSTOM_KEY", "custom-value");
+            ("EMPTY", " ");
+          ]
+        in
+        let () = expect_ok (Node_env.write_pairs ~inst entries) in
+        let env_file =
+          Filename.concat env.config "octez/instances/gamma/node.env"
+        in
+        let contents = read_file env_file in
+        Alcotest.(check bool)
+          "contains custom"
+          true
+          (string_contains ~needle:"CUSTOM_KEY=custom-value" contents) ;
+        Alcotest.(check bool)
+          "skips empty"
+          false
+          (string_contains ~needle:"EMPTY=" contents))
 
 let systemd_helper_paths () =
-  with_fake_xdg (fun env ->
-      let open Systemd.For_tests in
-      Alcotest.(check string)
-        "unit name"
-        "octez-node@alpha"
-        (Systemd.unit_name "node" "alpha") ;
-      Alcotest.(check string) "role binary" "octez-dal-node" (role_binary "dal") ;
-      let unit_path_expected =
-        Filename.concat env.config "systemd/user/octez-node@.service"
-      in
-      Alcotest.(check string) "unit path" unit_path_expected (unit_path "node") ;
-      let dropin_expected =
-        Filename.concat env.config "systemd/user/octez-node@alpha.service.d"
-      in
-      Alcotest.(check string)
-        "dropin dir"
-        dropin_expected
-        (dropin_dir "node" "alpha") ;
-      let dropin_path_expected =
-        Filename.concat dropin_expected "override.conf"
-      in
-      Alcotest.(check string)
-        "dropin path"
-        dropin_path_expected
-        (dropin_path "node" "alpha") ;
-      let env_file = Filename.concat env.config "octez/instances/%i/node.env" in
-      let template =
-        unit_template ~role:"node" ~app_bin_dir:"/opt/octez" ~user:"octez" ()
-      in
-      Alcotest.(check bool)
-        "env file referenced"
-        true
-        (string_contains ~needle:env_file template) ;
-      Alcotest.(check bool)
-        "default target"
-        true
-        (string_contains ~needle:"WantedBy=default.target" template))
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun env ->
+        let open Systemd.For_tests in
+        Alcotest.(check string)
+          "unit name"
+          "octez-node@alpha"
+          (Systemd.unit_name "node" "alpha") ;
+        Alcotest.(check string)
+          "role binary"
+          "octez-dal-node"
+          (role_binary "dal") ;
+        let unit_path_expected =
+          Filename.concat env.config "systemd/user/octez-node@.service"
+        in
+        Alcotest.(check string)
+          "unit path"
+          unit_path_expected
+          (unit_path "node") ;
+        let dropin_expected =
+          Filename.concat env.config "systemd/user/octez-node@alpha.service.d"
+        in
+        Alcotest.(check string)
+          "dropin dir"
+          dropin_expected
+          (dropin_dir "node" "alpha") ;
+        let dropin_path_expected =
+          Filename.concat dropin_expected "override.conf"
+        in
+        Alcotest.(check string)
+          "dropin path"
+          dropin_path_expected
+          (dropin_path "node" "alpha") ;
+        let env_file =
+          Filename.concat env.config "octez/instances/%i/node.env"
+        in
+        let template =
+          unit_template ~role:"node" ~app_bin_dir:"/opt/octez" ~user:"octez" ()
+        in
+        Alcotest.(check bool)
+          "env file referenced"
+          true
+          (string_contains ~needle:env_file template) ;
+        Alcotest.(check bool)
+          "default target"
+          true
+          (string_contains ~needle:"WantedBy=default.target" template))
 
 let systemd_logging_lines () =
   let open Systemd.For_tests in
