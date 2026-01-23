@@ -3,6 +3,7 @@
 FROM debian:bookworm-slim
 
 # Install systemd, dependencies, and libraries for instrumented binary
+# The binary is built in Alpine with musl but needs glibc runtime libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd \
     systemd-sysv \
@@ -15,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     bc \
     libgmp10 \
+    libc6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Remove unnecessary systemd units that cause issues in containers
