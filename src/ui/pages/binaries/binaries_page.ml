@@ -370,18 +370,16 @@ let download_version (version_info : Binary_downloader.version_info) =
           Context.toast_error (Printf.sprintf "Download failed: %s" msg))
 
 let link_directory () =
-  Modal_helpers.prompt_text_modal
-    ~title:"Link Local Directory"
-    ~initial:""
-    ~on_submit:(fun path ->
-      if path = "" then ()
-      else
-        let alias = Filename.basename path in
-        match Binary_registry.add_linked_dir ~alias ~path with
-        | Ok () ->
-            Context.toast_success (Printf.sprintf "Linked '%s'" alias) ;
-            Context.mark_instances_dirty ()
-        | Error (`Msg msg) -> Modal_helpers.show_error ~title:"Link Failed" msg)
+  Modal_helpers.open_file_browser_modal
+    ~dirs_only:true
+    ~require_writable:false
+    ~on_select:(fun path ->
+      let alias = Filename.basename path in
+      match Binary_registry.add_linked_dir ~alias ~path with
+      | Ok () ->
+          Context.toast_success (Printf.sprintf "Linked '%s'" alias) ;
+          Context.mark_instances_dirty ()
+      | Error (`Msg msg) -> Modal_helpers.show_error ~title:"Link Failed" msg)
     ()
 
 let prune_unused s =
@@ -486,6 +484,25 @@ let view ps ~focus:_ ~size:_ =
   let s = ps.Navigation.s in
   let lines = ref [] in
   let add line = lines := line :: !lines in
+
+  (* Set help hint based on selected item *)
+  (match List.nth_opt s.items s.selected with
+  | Some LinkAction ->
+      Miaou.Core.Help_hint.set
+        (Some
+           "Linked directories let you use Octez binaries from other locations \
+            (dev builds, system installs, custom versions). Press Enter to \
+            browse for a directory.")
+  | Some (LinkedDir _) ->
+      Miaou.Core.Help_hint.set
+        (Some "Press Enter to unlink this directory. Press ? for help.")
+  | Some (ManagedVersion _) ->
+      Miaou.Core.Help_hint.set
+        (Some "Press Enter to remove this version. Press ? for help.")
+  | Some (AvailableVersion _) ->
+      Miaou.Core.Help_hint.set
+        (Some "Press Enter to download this version. Press ? for help.")
+  | None -> Miaou.Core.Help_hint.clear ()) ;
 
   (* Header *)
   add (Widgets.fg 14 (Widgets.bold "━━━ Managed Versions ━━━")) ;
