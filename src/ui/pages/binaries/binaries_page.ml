@@ -516,6 +516,11 @@ let toggle_current_group s =
     let item = List.nth s.items s.selected in
     match item with
     | AvailableMajorGroup (major, _) -> toggle_major_expansion s major
+    | ManagedVersion (version, _, count) ->
+        if count > 0 then toggle_managed_expansion s version else s
+    | LinkedDir (ld, count) ->
+        if count > 0 then toggle_linked_expansion s ld.Binary_registry.alias
+        else s
     | _ -> s
 
 (** View *)
