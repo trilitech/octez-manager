@@ -268,37 +268,51 @@ let download_version (version_info : Binary_downloader.version_info) =
   Background_runner.enqueue (fun () ->
       let version = version_info.Binary_downloader.version in
       Context.toast_info (Printf.sprintf "Downloading v%s..." version) ;
-      Context.progress_start
-        ~label:(Printf.sprintf "Downloading Octez v%s" version)
-        ~estimate_secs:120.0
-        ~width:50 ;
 
-      let progress ~downloaded ~total =
-        match total with
-        | Some t ->
-            let pct = Int64.(to_float downloaded /. to_float t) in
-            Context.progress_set ~progress:pct ()
-        | None ->
-            (* Unknown total, just show spinner *)
-            ()
+      (* Initialize multi-progress with list of binaries *)
+      Context.multi_progress_start
+        ~version
+        ~binaries:
+          ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
+
+      (* Multi-progress callback *)
+      let multi_progress (mp : Binary_downloader.multi_progress_state) =
+        Context.multi_progress_update
+          ~binary:mp.current_file
+          ~downloaded:mp.downloaded
+          ~total:mp.total
       in
 
       let result =
         Binary_downloader.download_version
           ~version
           ~verify_checksums:true
-          ~progress
+          ~multi_progress
           ()
       in
 
-      Context.progress_finish () ;
-
+      (* Handle checksums *)
       match result with
-      | Ok result ->
-          Context.toast_success
-            (Printf.sprintf "Downloaded v%s" result.Binary_downloader.version) ;
+      | Ok res ->
+          Context.multi_progress_checksum "Verifying checksums..." ;
+          Unix.sleepf 0.5 ;
+          (match res.Binary_downloader.checksum_status with
+          | Binary_downloader.Verified ->
+              Context.multi_progress_checksum
+                "\xe2\x9c\x93 All checksums verified"
+          | Binary_downloader.Skipped ->
+              Context.multi_progress_checksum
+                "\xe2\x9a\xa0 Checksum verification skipped"
+          | Binary_downloader.Failed reason ->
+              Context.multi_progress_checksum
+                (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
+          Unix.sleepf 2.0 ;
+          (* Linger to show final status *)
+          Context.multi_progress_finish () ;
+          Context.toast_success (Printf.sprintf "Downloaded v%s" version) ;
           Context.mark_instances_dirty ()
       | Error (`Msg msg) ->
+          Context.multi_progress_finish () ;
           Context.toast_error (Printf.sprintf "Download failed: %s" msg))
 
 let link_directory () =
@@ -468,10 +482,15 @@ let view ps ~focus:_ ~size:_ =
         add (if is_selected then Widgets.bold line else line))
       s.available_versions ;
 
-  (* Add progress bar at the bottom if active *)
-  add "" ;
-  let progress_line = Context.render_progress ~cols:80 in
-  if String.trim progress_line <> "" then add progress_line ;
+  (* Add multi-progress display if active, fallback to single progress *)
+  let multi_progress_lines = Context.render_multi_progress ~cols:80 in
+  if String.trim multi_progress_lines <> "" then (
+    add "" ;
+    add multi_progress_lines)
+  else (
+    add "" ;
+    let progress_line = Context.render_progress ~cols:80 in
+    if String.trim progress_line <> "" then add progress_line) ;
 
   String.concat "\n" (List.rev !lines)
 
