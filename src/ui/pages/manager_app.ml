@@ -92,6 +92,7 @@ let run ?page ?(log = false) ?logfile () =
     Delegate_scheduler.shutdown () ;
     System_metrics_scheduler.shutdown () ;
     External_services_scheduler.shutdown () ;
+    Versions_scheduler.shutdown () ;
     (* Cleanup: kill any active download process *)
     Common.kill_active_download () ;
     Ok ()
