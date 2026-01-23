@@ -174,39 +174,89 @@ let list_cmd =
 let download_cmd =
   let term =
     let run version verify_checksums =
-      Printf.printf "Downloading Octez v%s...\n" version ;
-      let progress ~downloaded ~total =
-        match total with
-        | Some t ->
-            let pct = Int64.(to_float downloaded /. to_float t *. 100.0) in
-            (* \r moves cursor to start, \x1b[K clears from cursor to end of line *)
-            Printf.printf
-              "\r\x1b[KProgress: %.1f%% (%s / %s)%!"
-              pct
-              (format_size downloaded)
-              (format_size t)
-        | None ->
-            Printf.printf "\r\x1b[KDownloaded: %s%!" (format_size downloaded)
+      Printf.printf "Downloading Octez v%s...\n\n" version ;
+
+      (* Initialize multi-line progress display *)
+      let display_state =
+        ref
+          (Cli_progress.init_display
+             ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"])
       in
+
+      (* Render initial state *)
+      let lines = Cli_progress.render_display !display_state in
+      display_state := {!display_state with lines_printed = lines} ;
+
+      (* Multi-progress callback *)
+      let multi_progress (mp : Binary_downloader.multi_progress_state) =
+        (* Update state for current file *)
+        display_state :=
+          Cli_progress.set_in_progress
+            !display_state
+            ~binary:mp.current_file
+            ~downloaded:mp.downloaded
+            ~total:mp.total ;
+        (* Re-render *)
+        let lines = Cli_progress.render_display !display_state in
+        display_state := {!display_state with lines_printed = lines}
+      in
+
+      (* Perform download *)
       match
         Binary_downloader.download_version
           ~version
           ~verify_checksums
-          ~progress
+          ~multi_progress
           ()
       with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok result ->
-          Printf.printf
-            "\n✓ Downloaded %d binaries to %s\n"
-            (List.length result.binaries)
-            result.installed_path ;
-          (match result.checksum_status with
-          | Binary_downloader.Verified -> Printf.printf "✓ Checksums verified\n"
-          | Binary_downloader.Skipped ->
-              Printf.printf "⚠ Checksum verification skipped\n"
-          | Binary_downloader.Failed reason ->
-              Printf.printf "⚠ Checksum verification failed: %s\n" reason) ;
+          (* Mark all binaries complete with their final sizes *)
+          List.iter
+            (fun binary ->
+              (* Get file size from disk *)
+              let path =
+                Filename.concat
+                  (Binary_registry.managed_version_path version)
+                  binary
+              in
+              let size =
+                try
+                  let stats = Unix.stat path in
+                  Int64.of_int stats.Unix.st_size
+                with _ -> 0L
+              in
+              display_state :=
+                Cli_progress.set_complete !display_state ~binary ~size)
+            result.binaries ;
+
+          (* Show checksum verification *)
+          display_state :=
+            Cli_progress.set_checksum_status
+              !display_state
+              "[\xe2\x86\x92] Verifying checksums..." ;
+          let lines = Cli_progress.render_display !display_state in
+          display_state := {!display_state with lines_printed = lines} ;
+
+          (* Update checksum status based on result *)
+          let checksum_msg =
+            match result.checksum_status with
+            | Binary_downloader.Verified ->
+                "[\xe2\x9c\x93] All checksums verified"
+            | Binary_downloader.Skipped ->
+                "[\xe2\x9a\xa0] Checksum verification skipped"
+            | Binary_downloader.Failed reason ->
+                Printf.sprintf
+                  "[\xe2\x9c\x97] Checksum verification failed: %s"
+                  reason
+          in
+          display_state :=
+            Cli_progress.set_checksum_status !display_state checksum_msg ;
+          let lines = Cli_progress.render_display !display_state in
+          display_state := {!display_state with lines_printed = lines} ;
+
+          (* Final newline *)
+          Printf.printf "\n" ;
           `Ok ()
     in
     let version_arg =
