@@ -2,7 +2,7 @@
 # Uses real systemd as PID 1 for testing actual service management
 FROM debian:bookworm-slim
 
-# Install systemd, dependencies, and OCaml runtime for instrumented binary
+# Install systemd, dependencies, and libraries for instrumented binary
 RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd \
     systemd-sysv \
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     netbase \
     procps \
     bc \
-    ocaml-base \
+    libgmp10 \
     && rm -rf /var/lib/apt/lists/*
 
 # Remove unnecessary systemd units that cause issues in containers
