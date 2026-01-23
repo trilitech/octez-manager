@@ -32,6 +32,8 @@ type state = {
   selected : int;
   loading_remote : bool;
   expanded_majors : int list; (* list of expanded major versions *)
+  expanded_managed : string list; (* list of expanded managed versions *)
+  expanded_linked : string list; (* list of expanded linked directory aliases *)
 }
 
 type msg = unit
@@ -62,6 +64,17 @@ let count_instances_using bin_source =
           | _ -> false)
         services
       |> List.length
+
+let get_instances_using bin_source =
+  match Service_registry.list () with
+  | Error _ -> []
+  | Ok services ->
+      List.filter_map
+        (fun svc ->
+          match Service.get_bin_source svc with
+          | bs when bs = bin_source -> Some svc.Service.instance
+          | _ -> None)
+        services
 
 let load_managed_versions () =
   match Binary_registry.list_managed_versions () with
@@ -187,6 +200,8 @@ let init () =
   let linked = load_linked_dirs () in
   let available = load_available_versions () in
   let expanded_majors = [] in
+  let expanded_managed = [] in
+  let expanded_linked = [] in
   let items = build_items managed linked available expanded_majors in
   Navigation.make
     {
@@ -197,6 +212,8 @@ let init () =
       selected = 0;
       loading_remote = false;
       expanded_majors;
+      expanded_managed;
+      expanded_linked;
     }
 
 let update ps _ = ps
@@ -215,6 +232,8 @@ let refresh_data s =
     selected;
     loading_remote = false;
     expanded_majors = s.expanded_majors;
+    expanded_managed = s.expanded_managed;
+    expanded_linked = s.expanded_linked;
   }
 
 let refresh ps = Navigation.update refresh_data ps
@@ -238,6 +257,22 @@ let toggle_major_expansion s major =
       expanded_majors
   in
   {s with expanded_majors; items}
+
+let toggle_managed_expansion s version =
+  let expanded_managed =
+    if List.mem version s.expanded_managed then
+      List.filter (( <> ) version) s.expanded_managed
+    else version :: s.expanded_managed
+  in
+  {s with expanded_managed}
+
+let toggle_linked_expansion s alias =
+  let expanded_linked =
+    if List.mem alias s.expanded_linked then
+      List.filter (( <> ) alias) s.expanded_linked
+    else alias :: s.expanded_linked
+  in
+  {s with expanded_linked}
 
 let move_up s =
   let selected = if s.selected > 0 then s.selected - 1 else s.selected in
@@ -450,12 +485,22 @@ let handle_action s =
   else
     let item = List.nth s.items s.selected in
     match item with
-    | ManagedVersion (version, _, _) ->
-        remove_version version ;
-        s
-    | LinkedDir (ld, _) ->
-        unlink_directory ld ;
-        s
+    | ManagedVersion (version, _, count) ->
+        if count > 0 then
+          (* If has instances, toggle expansion *)
+          toggle_managed_expansion s version
+        else (
+          (* If unused, allow removal *)
+          remove_version version ;
+          s)
+    | LinkedDir (ld, count) ->
+        if count > 0 then
+          (* If has instances, toggle expansion *)
+          toggle_linked_expansion s ld.Binary_registry.alias
+        else (
+          (* If unused, allow unlinking *)
+          unlink_directory ld ;
+          s)
     | LinkAction ->
         link_directory () ;
         s
@@ -498,12 +543,24 @@ let view ps ~focus:_ ~size:_ =
            "Linked directories let you use Octez binaries from other locations \
             (dev builds, system installs, custom versions). Press Enter to \
             browse for a directory.")
-  | Some (LinkedDir _) ->
-      Miaou.Core.Help_hint.set
-        (Some "Press Enter to unlink this directory. Press ? for help.")
-  | Some (ManagedVersion _) ->
-      Miaou.Core.Help_hint.set
-        (Some "Press Enter to remove this version. Press ? for help.")
+  | Some (LinkedDir (_, count)) ->
+      if count > 0 then
+        Miaou.Core.Help_hint.set
+          (Some
+             "Press Enter to expand/collapse instances using this directory. \
+              Press ? for help.")
+      else
+        Miaou.Core.Help_hint.set
+          (Some "Press Enter to unlink this directory. Press ? for help.")
+  | Some (ManagedVersion (_, _, count)) ->
+      if count > 0 then
+        Miaou.Core.Help_hint.set
+          (Some
+             "Press Enter to expand/collapse instances using this version. \
+              Press ? for help.")
+      else
+        Miaou.Core.Help_hint.set
+          (Some "Press Enter to remove this version. Press ? for help.")
   | Some (AvailableVersion _) ->
       Miaou.Core.Help_hint.set
         (Some "Press Enter to download this version. Press ? for help.")
@@ -537,10 +594,30 @@ let view ps ~focus:_ ~size:_ =
           else if count = 1 then "1 instance"
           else Printf.sprintf "%d instances" count
         in
-        let line =
-          Printf.sprintf "%sv%-15s  %10s  %s" prefix version size_str usage
+        (* Add expansion indicator *)
+        let expansion_indicator =
+          if count > 0 then
+            if List.mem version s.expanded_managed then " ▼" else " ▶"
+          else ""
         in
-        add (if is_selected then Widgets.bold line else line))
+        let line =
+          Printf.sprintf
+            "%sv%-15s  %10s  %s%s"
+            prefix
+            version
+            size_str
+            usage
+            expansion_indicator
+        in
+        add (if is_selected then Widgets.bold line else line) ;
+        (* Render sub-items if expanded *)
+        if List.mem version s.expanded_managed then
+          let instances =
+            get_instances_using (Binary_registry.Managed_version version)
+          in
+          List.iter
+            (fun inst -> add (Widgets.dim (Printf.sprintf "      → %s" inst)))
+            instances)
       s.managed_versions ;
 
   add "" ;
@@ -567,15 +644,32 @@ let view ps ~focus:_ ~size:_ =
           else if count = 1 then "1 instance"
           else Printf.sprintf "%d instances" count
         in
+        (* Add expansion indicator *)
+        let expansion_indicator =
+          if count > 0 then
+            if List.mem ld.Binary_registry.alias s.expanded_linked then " ▼"
+            else " ▶"
+          else ""
+        in
         let line =
           Printf.sprintf
-            "%s%-20s  %s  %s"
+            "%s%-20s  %s  %s%s"
             prefix
             ld.alias
             (Widgets.dim ld.path)
             usage
+            expansion_indicator
         in
-        add (if is_selected then Widgets.bold line else line))
+        add (if is_selected then Widgets.bold line else line) ;
+        (* Render sub-items if expanded *)
+        if List.mem ld.Binary_registry.alias s.expanded_linked then
+          let instances =
+            get_instances_using
+              (Binary_registry.Linked_alias ld.Binary_registry.alias)
+          in
+          List.iter
+            (fun inst -> add (Widgets.dim (Printf.sprintf "      → %s" inst)))
+            instances)
       s.linked_dirs ;
 
   (* Add link directory button *)
