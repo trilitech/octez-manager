@@ -49,6 +49,8 @@ let run ?page ?(log = false) ?logfile () =
   Capabilities.register () ;
   register_pages () ;
   Runtime.initialize ~log ?logfile () ;
+  (* Cleanup stale temporary download directories from interrupted sessions *)
+  Binary_downloader.cleanup_stale_temp_dirs () ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
     if !quit_requested then raise Exit
