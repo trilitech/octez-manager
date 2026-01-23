@@ -703,7 +703,10 @@ and do_update_single_service ~svc ~old_bin_source ~new_bin_source () =
       match
         Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
       with
-      | Ok () -> Ok ()
+      | Ok () ->
+          (* Success - invalidate version cache to force immediate refresh *)
+          System_metrics_scheduler.invalidate_version ~role ~instance ;
+          Ok ()
       | Error start_error ->
           (* Start failed - offer rollback *)
           show_rollback_modal
@@ -785,8 +788,15 @@ and do_rollback ~svc ~old_bin_source () =
 
   (* Try to start with old version *)
   let cap = Miaou_interfaces.Service_lifecycle.require () in
-  Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
-  |> Result.map_error (fun e -> `Msg e)
+  let result =
+    Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
+    |> Result.map_error (fun e -> `Msg e)
+  in
+  (* Invalidate cache on successful rollback *)
+  (match result with
+  | Ok () -> System_metrics_scheduler.invalidate_version ~role ~instance
+  | Error _ -> ()) ;
+  result
 
 (** Check if a service is currently running *)
 and is_service_running svc =
@@ -811,8 +821,15 @@ and restart_service_for_cascade ~svc () =
   in
 
   (* Start it back up *)
-  Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
-  |> Result.map_error (fun e -> `Msg e)
+  let result =
+    Miaou_interfaces.Service_lifecycle.start cap ~role ~service:instance
+    |> Result.map_error (fun e -> `Msg e)
+  in
+  (* Invalidate cache on successful restart *)
+  (match result with
+  | Ok () -> System_metrics_scheduler.invalidate_version ~role ~instance
+  | Error _ -> ()) ;
+  result
 
 (** Perform cascade update of multiple services *)
 and do_cascade_update ~services ~new_bin_source () =

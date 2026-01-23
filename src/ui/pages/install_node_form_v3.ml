@@ -1166,6 +1166,9 @@ let spec =
                      "Node %s installed successfully"
                      model.core.instance_name) ;
                 (* Invalidate caches and mark instances dirty to refresh UI *)
+                System_metrics_scheduler.invalidate_version
+                  ~role:"node"
+                  ~instance:model.core.instance_name ;
                 Context.mark_instances_dirty ()
             | Job_manager.Failed msg ->
                 (* Log to debug file for troubleshooting *)

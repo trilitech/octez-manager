@@ -493,6 +493,9 @@ let spec =
           | _ -> Ok ()
         in
         (* Invalidate caches and mark instances dirty to refresh UI *)
+        System_metrics_scheduler.invalidate_version
+          ~role:"accuser"
+          ~instance:model.core.instance_name ;
         Context.mark_instances_dirty () ;
         (* Queue restart dependents for modal on instances page *)
         if model.edit_mode && model.stopped_dependents <> [] then
