@@ -918,11 +918,15 @@ let open_download_progress_modal ~version ~on_complete =
               Unix.sleepf 2.0 ;
               (* Linger to show final status *)
               Context.multi_progress_finish () ;
-              on_complete true
+              on_complete true ;
+              (* Close modal after successful download *)
+              Miaou.Core.Modal_manager.close_top `Commit
           | Error (`Msg msg) ->
               Context.multi_progress_finish () ;
               Context.toast_error (Printf.sprintf "Download failed: %s" msg) ;
-              on_complete false) ;
+              on_complete false ;
+              (* Close modal after failed download *)
+              Miaou.Core.Modal_manager.close_top `Cancel) ;
       Navigation.make ()
 
     let update ps _ = ps
@@ -1037,38 +1041,92 @@ let select_app_bin_dir_modal ~on_select () =
               ~title:"No Versions Available"
               "Could not load available versions. Try again later."
         | Some versions ->
-            let version_items =
-              List.map
-                (fun (vi : Octez_manager_lib.Binary_downloader.version_info) ->
-                  vi)
-                versions
+            (* Filter to only show 2 latest major versions *)
+            let extract_major version_str =
+              try
+                match String.split_on_char '.' version_str with
+                | major :: _ -> int_of_string major
+                | [] -> 0
+              with _ -> 0
             in
-            open_choice_modal
-              ~title:"Select Version to Download"
-              ~items:version_items
-              ~to_string:(fun vi ->
-                Printf.sprintf
-                  "v%s%s"
-                  vi.Octez_manager_lib.Binary_downloader.version
-                  (match
-                     vi.Octez_manager_lib.Binary_downloader.release_date
-                   with
-                  | Some date -> Printf.sprintf "  (%s)" date
-                  | None -> ""))
-              ~on_select:(fun vi ->
-                let version = vi.Octez_manager_lib.Binary_downloader.version in
-                (* Open download progress modal *)
-                open_download_progress_modal
-                  ~version
-                  ~on_complete:(fun success ->
-                    if success then
-                      (* Auto-select the downloaded version *)
-                      let path =
-                        Octez_manager_lib.Binary_registry.managed_version_path
-                          version
-                      in
-                      on_select path))
-              ())
+            (* Group versions by major version *)
+            let major_versions = Hashtbl.create 5 in
+            List.iter
+              (fun (v : Octez_manager_lib.Binary_downloader.version_info) ->
+                let major = extract_major v.version in
+                let existing = Hashtbl.find_opt major_versions major in
+                Hashtbl.replace
+                  major_versions
+                  major
+                  (v :: Option.value ~default:[] existing))
+              versions ;
+            (* Get the 2 latest major versions *)
+            let all_majors =
+              Hashtbl.to_seq_keys major_versions
+              |> List.of_seq |> List.sort compare
+            in
+            let latest_2_majors =
+              List.rev all_majors |> fun l -> List.filteri (fun i _ -> i < 2) l
+            in
+            let filtered_versions =
+              List.concat_map
+                (fun major ->
+                  Option.value
+                    ~default:[]
+                    (Hashtbl.find_opt major_versions major))
+                latest_2_majors
+            in
+            (* Get already installed versions *)
+            let installed =
+              match
+                Octez_manager_lib.Binary_registry.list_managed_versions ()
+              with
+              | Ok vers -> vers
+              | Error _ -> []
+            in
+            (* Filter out already installed versions *)
+            let version_items =
+              List.filter
+                (fun (vi : Octez_manager_lib.Binary_downloader.version_info) ->
+                  not
+                    (List.mem
+                       vi.Octez_manager_lib.Binary_downloader.version
+                       installed))
+                filtered_versions
+            in
+            if version_items = [] then
+              show_error
+                ~title:"No Versions to Download"
+                "All recent versions are already installed."
+            else
+              open_choice_modal
+                ~title:"Select Version to Download"
+                ~items:version_items
+                ~to_string:(fun vi ->
+                  Printf.sprintf
+                    "v%s%s"
+                    vi.Octez_manager_lib.Binary_downloader.version
+                    (match
+                       vi.Octez_manager_lib.Binary_downloader.release_date
+                     with
+                    | Some date -> Printf.sprintf "  (%s)" date
+                    | None -> ""))
+                ~on_select:(fun vi ->
+                  let version =
+                    vi.Octez_manager_lib.Binary_downloader.version
+                  in
+                  (* Open download progress modal *)
+                  open_download_progress_modal
+                    ~version
+                    ~on_complete:(fun success ->
+                      if success then
+                        (* Auto-select the downloaded version *)
+                        let path =
+                          Octez_manager_lib.Binary_registry.managed_version_path
+                            version
+                        in
+                        on_select path))
+                ())
     | `CustomPath ->
         (* Open read-only file browser - no write permissions required *)
         open_file_browser_modal
