@@ -88,6 +88,13 @@ val download_file :
   unit ->
   (unit, [> `Msg of string]) result
 
+(** Download a file with progress reporting.
+    
+    The [on_progress] callback receives:
+    - First parameter: bytes downloaded so far
+    - Second parameter: total file size in bytes (if known)
+    
+    Both values are reported as [int] (byte counts). *)
 val download_file_with_progress :
   url:string ->
   dest_path:string ->
