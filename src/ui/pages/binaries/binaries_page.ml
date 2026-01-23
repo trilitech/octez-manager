@@ -463,6 +463,14 @@ let handle_action s =
         (* Toggle expansion on Enter *)
         toggle_major_expansion s major
 
+let toggle_current_group s =
+  if s.items = [] then s
+  else
+    let item = List.nth s.items s.selected in
+    match item with
+    | AvailableMajorGroup (major, _) -> toggle_major_expansion s major
+    | _ -> s
+
 (** View *)
 
 let format_size bytes =
@@ -640,6 +648,7 @@ let handle_key ps key ~size:_ =
         ps
     | Some (Keys.Char "p") -> Navigation.update prune_unused ps
     | Some Keys.Enter -> Navigation.update handle_action ps
+    | Some Keys.Tab -> Navigation.update toggle_current_group ps
     | Some Keys.Up -> move_selection ps `Up
     | Some Keys.Down -> move_selection ps `Down
     | _ -> ps
@@ -673,6 +682,10 @@ let keymap _ =
       "Link directory";
     kb "p" (fun ps -> Navigation.update prune_unused ps) "Prune unused";
     kb "Enter" (fun ps -> Navigation.update handle_action ps) "Action";
+    kb
+      "Tab"
+      (fun ps -> Navigation.update toggle_current_group ps)
+      "Expand/Collapse";
     kb "Up" (fun ps -> move_selection ps `Up) "Move up";
     kb "Down" (fun ps -> move_selection ps `Down) "Move down";
     {
