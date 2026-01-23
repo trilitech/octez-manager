@@ -223,6 +223,7 @@ jobs:
     name: Generate and Post Coverage Report
     runs-on: ubuntu-latest
     needs: [coverage, build-instrumented-binary, integration-coverage]
+    if: always() && needs.coverage.result == 'success'
     container:
       image: ghcr.io/${{ github.repository }}-ci:latest
       credentials:
@@ -271,8 +272,13 @@ jobs:
           echo "## Coverage Report" > coverage-summary.md
           echo "" >> coverage-summary.md
           
+          echo "Running bisect-ppx-report summary..."
           bisect-ppx-report summary \
-            --coverage-path _coverage > coverage-summary.txt 2>&1 || echo "Summary generation failed"
+            --coverage-path _coverage > coverage-summary.txt 2>&1 || true
+          
+          echo "=== Coverage summary output ==="
+          cat coverage-summary.txt
+          echo "=== End coverage summary ==="
           
           cat coverage-summary.txt >> coverage-summary.md
           
@@ -289,11 +295,24 @@ jobs:
           echo '```' >> coverage-summary.md
           bisect-ppx-report summary \
             --coverage-path _coverage \
-            --per-file >> coverage-summary.md 2>&1 || echo "Per-file summary failed"
+            --per-file >> coverage-summary.md 2>&1 || true
           echo '```' >> coverage-summary.md
           
-          # Extract overall percentage (use basic grep syntax for Alpine)
-          COVERAGE_PCT=$(grep 'Coverage:' coverage-summary.txt | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0")
+          # Extract overall percentage - try multiple patterns for robustness
+          echo "Extracting coverage percentage..."
+          if grep -q 'Coverage:' coverage-summary.txt; then
+            # Try to extract percentage after "Coverage:"
+            COVERAGE_PCT=$(grep 'Coverage:' coverage-summary.txt | sed 's/.*Coverage: *\([0-9.]*\)%.*/\1/' | head -1)
+          else
+            # Fallback: look for percentage pattern
+            COVERAGE_PCT=$(grep -o '[0-9]\+\.[0-9]\+%' coverage-summary.txt | head -1 | tr -d '%')
+          fi
+          
+          # If still empty, default to 0
+          if [ -z "$COVERAGE_PCT" ]; then
+            COVERAGE_PCT="0"
+          fi
+          
           echo "COVERAGE_PCT=$COVERAGE_PCT" >> $GITHUB_ENV
           echo "Overall coverage: $COVERAGE_PCT%"
 
