@@ -76,6 +76,10 @@ val clear_cache : unit -> unit
 (** List of binaries to download for a version *)
 val binaries_for_version : string -> (string list, Rresult.R.msg) result
 
+(** Cleanup stale temporary download directories
+    @param max_age_seconds Maximum age in seconds (default: 3600 = 1 hour) *)
+val cleanup_stale_temp_dirs : ?max_age_seconds:int -> unit -> unit
+
 (** Download a version to the managed binaries directory
     @param version Version to download (e.g., "24.0")
     @param verify_checksums Whether to verify checksums (can be cancelled by user)

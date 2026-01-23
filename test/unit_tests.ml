@@ -3656,11 +3656,33 @@ let binary_registry_managed_versions () =
       (* Initially no versions *)
       let versions = expect_ok (Binary_registry.list_managed_versions ()) in
       Alcotest.(check int) "initial empty" 0 (List.length versions) ;
-      (* Create some version directories *)
+      (* Create some version directories with complete installations *)
       let bin_dir = Filename.concat xdg.data "octez-manager/binaries" in
       expect_ok (Common.ensure_dir_path ~owner:"" ~group:"" ~mode:0o755 bin_dir) ;
-      Unix.mkdir (Filename.concat bin_dir "v24.0") 0o755 ;
-      Unix.mkdir (Filename.concat bin_dir "v23.1") 0o755 ;
+      let create_complete_version version_str =
+        let version_dir = Filename.concat bin_dir ("v" ^ version_str) in
+        Unix.mkdir version_dir 0o755 ;
+        (* Create metadata file *)
+        let metadata =
+          `Assoc
+            [
+              ("version", `String version_str);
+              ("architecture", `String "x86_64");
+              ("download_date", `String "2026-01-23T12:00:00Z");
+              ("checksum_status", `String "verified");
+            ]
+        in
+        let metadata_file = Filename.concat version_dir ".metadata.json" in
+        Yojson.Safe.to_file metadata_file metadata ;
+        (* Create all binaries *)
+        List.iter
+          (fun bin ->
+            let path = Filename.concat version_dir bin in
+            write_exec_file path "#!/bin/sh\necho stub\n")
+          ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"]
+      in
+      create_complete_version "24.0" ;
+      create_complete_version "23.1" ;
       (* List should find them, sorted newest first *)
       let versions = expect_ok (Binary_registry.list_managed_versions ()) in
       Alcotest.(check int) "count" 2 (List.length versions) ;
@@ -4786,6 +4808,121 @@ let cli_import_service_name_edge_cases () =
   let long_name = String.make 300 'a' in
   Alcotest.(check bool) "long name is long" true (String.length long_name > 255)
 
+(** Tests for atomic download functionality (Issue #405) *)
+
+let atomic_downloads_is_complete_no_dir () =
+  with_fake_xdg (fun _xdg ->
+      (* Directory doesn't exist *)
+      Alcotest.(check bool)
+        "non-existent directory is incomplete"
+        false
+        (Binary_registry.is_complete_installation "99.99"))
+
+let atomic_downloads_is_complete_no_metadata () =
+  with_fake_xdg (fun xdg ->
+      let binaries_dir =
+        Filename.concat xdg.data "octez-manager/binaries/v99.99"
+      in
+      Unix.mkdir (Filename.concat xdg.data "octez-manager") 0o755 ;
+      Unix.mkdir (Filename.concat xdg.data "octez-manager/binaries") 0o755 ;
+      Unix.mkdir binaries_dir 0o755 ;
+      (* Create binaries but no metadata *)
+      List.iter
+        (fun bin ->
+          let path = Filename.concat binaries_dir bin in
+          write_exec_file path "#!/bin/sh\necho stub\n")
+        ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
+      Alcotest.(check bool)
+        "directory without metadata is incomplete"
+        false
+        (Binary_registry.is_complete_installation "99.99"))
+
+let atomic_downloads_is_complete_missing_binary () =
+  with_fake_xdg (fun xdg ->
+      let binaries_dir =
+        Filename.concat xdg.data "octez-manager/binaries/v99.99"
+      in
+      Unix.mkdir (Filename.concat xdg.data "octez-manager") 0o755 ;
+      Unix.mkdir (Filename.concat xdg.data "octez-manager/binaries") 0o755 ;
+      Unix.mkdir binaries_dir 0o755 ;
+      (* Create metadata *)
+      let metadata =
+        `Assoc
+          [
+            ("version", `String "99.99");
+            ("architecture", `String "x86_64");
+            ("download_date", `String "2026-01-23T12:00:00Z");
+            ("checksum_status", `String "verified");
+          ]
+      in
+      let metadata_file = Filename.concat binaries_dir ".metadata.json" in
+      Yojson.Safe.to_file metadata_file metadata ;
+      (* Create only 3 of 4 binaries *)
+      List.iter
+        (fun bin ->
+          let path = Filename.concat binaries_dir bin in
+          write_exec_file path "#!/bin/sh\necho stub\n")
+        ["octez-node"; "octez-client"; "octez-baker"] ;
+      (* octez-dal-node is missing *)
+      Alcotest.(check bool)
+        "directory with missing binary is incomplete"
+        false
+        (Binary_registry.is_complete_installation "99.99"))
+
+let atomic_downloads_is_complete_complete () =
+  with_fake_xdg (fun xdg ->
+      let binaries_dir =
+        Filename.concat xdg.data "octez-manager/binaries/v99.99"
+      in
+      Unix.mkdir (Filename.concat xdg.data "octez-manager") 0o755 ;
+      Unix.mkdir (Filename.concat xdg.data "octez-manager/binaries") 0o755 ;
+      Unix.mkdir binaries_dir 0o755 ;
+      (* Create metadata *)
+      let metadata =
+        `Assoc
+          [
+            ("version", `String "99.99");
+            ("architecture", `String "x86_64");
+            ("download_date", `String "2026-01-23T12:00:00Z");
+            ("checksum_status", `String "verified");
+          ]
+      in
+      let metadata_file = Filename.concat binaries_dir ".metadata.json" in
+      Yojson.Safe.to_file metadata_file metadata ;
+      (* Create all 4 binaries *)
+      List.iter
+        (fun bin ->
+          let path = Filename.concat binaries_dir bin in
+          write_exec_file path "#!/bin/sh\necho stub\n")
+        ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
+      Alcotest.(check bool)
+        "complete installation with all files"
+        true
+        (Binary_registry.is_complete_installation "99.99"))
+
+let atomic_downloads_cleanup_stale_temps () =
+  with_fake_xdg (fun xdg ->
+      let binaries_dir = Filename.concat xdg.data "octez-manager/binaries" in
+      Unix.mkdir (Filename.concat xdg.data "octez-manager") 0o755 ;
+      Unix.mkdir binaries_dir 0o755 ;
+      (* Create a stale temp directory (old timestamp) *)
+      let old_temp = Filename.concat binaries_dir ".tmp.v99.99.12345" in
+      Unix.mkdir old_temp 0o755 ;
+      (* Set modification time to 2 hours ago *)
+      let now = Unix.time () in
+      Unix.utimes old_temp (now -. 7200.0) (now -. 7200.0) ;
+      (* Create a fresh temp directory (recent timestamp) *)
+      let fresh_temp = Filename.concat binaries_dir ".tmp.v99.98.12346" in
+      Unix.mkdir fresh_temp 0o755 ;
+      (* Cleanup with 1 hour threshold *)
+      Binary_downloader.cleanup_stale_temp_dirs ~max_age_seconds:3600 () ;
+      (* Old temp should be removed, fresh should remain *)
+      Alcotest.(check bool) "old temp removed" false (Sys.file_exists old_temp) ;
+      Alcotest.(check bool)
+        "fresh temp preserved"
+        true
+        (Sys.file_exists fresh_temp))
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -5532,5 +5669,28 @@ let () =
             "service_name_edge_cases"
             `Quick
             cli_import_service_name_edge_cases;
+        ] );
+      ( "atomic_downloads",
+        [
+          Alcotest.test_case
+            "is_complete_installation_no_dir"
+            `Quick
+            atomic_downloads_is_complete_no_dir;
+          Alcotest.test_case
+            "is_complete_installation_no_metadata"
+            `Quick
+            atomic_downloads_is_complete_no_metadata;
+          Alcotest.test_case
+            "is_complete_installation_missing_binary"
+            `Quick
+            atomic_downloads_is_complete_missing_binary;
+          Alcotest.test_case
+            "is_complete_installation_complete"
+            `Quick
+            atomic_downloads_is_complete_complete;
+          Alcotest.test_case
+            "cleanup_stale_temp_dirs"
+            `Quick
+            atomic_downloads_cleanup_stale_temps;
         ] );
     ]
