@@ -59,9 +59,8 @@ let count_instances_using bin_source =
   | Ok services ->
       List.filter
         (fun svc ->
-          match Service.get_bin_source svc with
-          | bs when bs = bin_source -> true
-          | _ -> false)
+          let svc_bin_source = Service.get_bin_source svc in
+          svc_bin_source = bin_source)
         services
       |> List.length
 
@@ -71,9 +70,9 @@ let get_instances_using bin_source =
   | Ok services ->
       List.filter_map
         (fun svc ->
-          match Service.get_bin_source svc with
-          | bs when bs = bin_source -> Some svc.Service.instance
-          | _ -> None)
+          let svc_bin_source = Service.get_bin_source svc in
+          if svc_bin_source = bin_source then Some svc.Service.instance
+          else None)
         services
 
 let load_managed_versions () =
