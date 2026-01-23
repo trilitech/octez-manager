@@ -99,7 +99,12 @@ let open_text_modal ~title ~lines =
   end in
   let ui : Miaou.Core.Modal_manager.ui =
     (* Limit modal width so header/separator stay on a single line *)
-    {title; left = None; max_width = Some (Fixed 76); dim_background = true}
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 76; max = 100});
+      dim_background = true;
+    }
   in
   Miaou.Core.Modal_manager.push_default
     (module Modal)
@@ -176,7 +181,12 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
   end in
   let widget = Select_widget.open_centered ~title:"" ~items ~to_string () in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some (Fixed 80); dim_background = true}
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 80; max = 100});
+      dim_background = true;
+    }
   in
   Miaou.Core.Modal_manager.push_default
     (module Modal)
@@ -318,7 +328,12 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
   (* Set initial Help_hint for the default selection *)
   update_help_hint widget ;
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some (Fixed 80); dim_background = true}
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 80; max = 100});
+      dim_background = true;
+    }
   in
   (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
      in handle_modal_key. This prevents double-close when used as nested modal. *)
@@ -476,7 +491,12 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
     Select_widget.open_centered ~title:"" ~items:(items ()) ~to_string ()
   in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some (Fixed 80); dim_background = true}
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 80; max = 100});
+      dim_background = true;
+    }
   in
   (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
      in handle_modal_key. This prevents the modal from auto-closing on Enter. *)
@@ -732,7 +752,7 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
         "Browse Directory (Space selects, Enter opens/Selects leaf, Esc to \
          cancel)";
       left = None;
-      max_width = Some (Fixed 100);
+      max_width = Some (Clamped {ratio = 0.85; min = 100; max = 140});
       dim_background = true;
     }
   in
@@ -981,7 +1001,7 @@ let open_download_progress_modal ~version ~on_complete =
     {
       title = Printf.sprintf "Downloading v%s" version;
       left = None;
-      max_width = Some (Fixed 76);
+      max_width = Some (Clamped {ratio = 0.8; min = 76; max = 120});
       dim_background = true;
     }
   in
