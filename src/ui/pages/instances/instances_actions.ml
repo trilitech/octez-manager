@@ -1137,7 +1137,7 @@ let go_to_binaries state =
   state
 
 let current_external_service s =
-  let external_start_idx = services_start_idx () + List.length s.services in
+  let external_start_idx = services_start_idx + List.length s.services in
   if s.selected >= external_start_idx then
     let ext_idx = s.selected - external_start_idx in
     List.nth_opt s.external_services ext_idx
@@ -1306,45 +1306,8 @@ let external_service_actions_modal state ext =
       () ;
     state)
 
-let do_upgrade () =
-  match Self_update_scheduler.get () with
-  | None ->
-      Context.toast_info "No update available" ;
-      ()
-  | Some update_info ->
-      (* Confirm before updating *)
-      Modal_helpers.confirm_modal
-        ~title:(Printf.sprintf "Upgrade to v%s?" update_info.latest_version)
-        ~message:"octez-manager will download and install the new version."
-        ~on_result:(fun confirmed ->
-          if confirmed then
-            Background_runner.enqueue (fun () ->
-                Context.toast_info "Downloading update..." ;
-                match
-                  Self_update_checker.perform_upgrade
-                    ~version:update_info.latest_version
-                    ()
-                with
-                | Self_update_checker.Upgrade_success {new_version; _} ->
-                    Context.toast_success
-                      (Printf.sprintf
-                         "Updated to v%s. Please restart octez-manager."
-                         new_version)
-                | Self_update_checker.Upgrade_needs_elevation cmd ->
-                    Context.toast_error (Printf.sprintf "Run with sudo: %s" cmd)
-                | Self_update_checker.Upgrade_failed msg ->
-                    Context.toast_error (Printf.sprintf "Update failed: %s" msg)))
-        ()
-
 let activate_selection s =
-  let install_idx =
-    if Self_update_scheduler.update_available () then 1 else 0
-  in
-  if s.selected = 0 && Self_update_scheduler.update_available () then (
-    (* Upgrade item selected *)
-    do_upgrade () ;
-    s)
-  else if s.selected = install_idx then create_menu_modal s
+  if s.selected = 0 then create_menu_modal s
   else
     match current_service s with
     | Some _ -> instance_actions_modal s
