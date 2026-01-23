@@ -416,50 +416,76 @@ let download_version ~version ?(verify_checksums = true) ?progress
       | None -> []
     in
 
-    (* Download all binaries *)
-    let rec download_all acc index = function
-      | [] -> Ok (List.rev acc)
-      | binary :: rest -> (
-          (* Create progress wrapper for multi-progress *)
-          let progress_for_file =
-            match multi_progress with
-            | Some mp_callback ->
-                let file_size =
-                  List.assoc_opt binary file_sizes |> Option.value ~default:None
+    (* Download all binaries in parallel *)
+    let download_all_parallel () =
+      (* Create a download task for each binary *)
+      let download_tasks =
+        List.mapi
+          (fun index binary ->
+            let progress_for_file =
+              match multi_progress with
+              | Some mp_callback ->
+                  let file_size =
+                    List.assoc_opt binary file_sizes
+                    |> Option.value ~default:None
+                  in
+                  Some
+                    (fun ~downloaded ~total ->
+                      let total' =
+                        match total with Some t -> Some t | None -> file_size
+                      in
+                      mp_callback
+                        {
+                          current_file = binary;
+                          file_index = index;
+                          total_files;
+                          downloaded;
+                          total = total';
+                        })
+              | None -> progress
+            in
+            (binary, index, progress_for_file))
+          binary_list
+      in
+
+      (* Spawn parallel download domains *)
+      let domains =
+        List.map
+          (fun (binary, _index, progress_for_file) ->
+            Domain.spawn (fun () ->
+                download_binary
+                  ~version
+                  ~arch
+                  ~binary
+                  ~dest_dir
+                  ?progress:progress_for_file
+                  ()))
+          download_tasks
+      in
+
+      (* Collect results from all domains *)
+      let rec collect_results acc = function
+        | [] -> Ok (List.rev acc)
+        | domain :: rest -> (
+            match Domain.join domain with
+            | Ok _path ->
+                let binary, _, _ =
+                  List.nth
+                    download_tasks
+                    (List.length domains - List.length acc - 1)
                 in
-                Some
-                  (fun ~downloaded ~total ->
-                    let total' =
-                      match total with Some t -> Some t | None -> file_size
-                    in
-                    mp_callback
-                      {
-                        current_file = binary;
-                        file_index = index;
-                        total_files;
-                        downloaded;
-                        total = total';
-                      })
-            | None -> progress
-          in
-          match
-            download_binary
-              ~version
-              ~arch
-              ~binary
-              ~dest_dir
-              ?progress:progress_for_file
-              ()
-          with
-          | Ok _path -> download_all (binary :: acc) (index + 1) rest
-          | Error _ as e ->
-              (* Cleanup on failure *)
-              (try Common.run_out ["rm"; "-rf"; dest_dir] |> ignore
-               with _ -> ()) ;
-              e)
+                collect_results (binary :: acc) rest
+            | Error _ as e ->
+                (* Cleanup on failure *)
+                (try Common.run_out ["rm"; "-rf"; dest_dir] |> ignore
+                 with _ -> ()) ;
+                e)
+      in
+
+      collect_results [] domains
     in
 
-    let* downloaded_binaries = download_all [] 0 binary_list in
+    let* downloaded_binaries = download_all_parallel () in
 
     (* Verify checksums if requested *)
     let checksum_status =
