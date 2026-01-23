@@ -52,10 +52,9 @@ let load_prefs () =
 
 let save_prefs prefs =
   let file = prefs_file () in
-  (* Ensure config directory exists *)
   let dir = Filename.dirname file in
-  (if not (Sys.file_exists dir) then
-     try Unix.mkdir dir 0o755 with Unix.Unix_error _ -> ()) ;
+  let owner, group = Common.current_user_group_names () in
+  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
   try
     let json =
       `Assoc
@@ -149,13 +148,13 @@ let get_current_version () =
   match Binary_registry.list_managed_versions () with
   | Error _ -> None
   | Ok [] -> None
-  | Ok versions ->
+  | Ok (first :: rest) ->
       (* Find highest version *)
       Some
         (List.fold_left
            (fun acc v -> if compare_versions v acc > 0 then v else acc)
-           (List.hd versions)
-           (List.tl versions))
+           first
+           rest)
 
 let check_for_updates ?(force = false) () =
   (* Check if enabled *)
@@ -171,14 +170,14 @@ let check_for_updates ?(force = false) () =
       match fetch_fn ~include_rc:false () with
       | Error (`Msg e) -> CheckFailed e
       | Ok [] -> CheckFailed "No versions available"
-      | Ok versions ->
+      | Ok (first :: rest) ->
           (* Get latest version (should already be sorted, but ensure) *)
           let latest =
             List.fold_left
               (fun acc (vi : Binary_downloader.version_info) ->
                 if compare_versions vi.version acc > 0 then vi.version else acc)
-              (List.hd versions).version
-              (List.tl versions)
+              first.version
+              rest
           in
           let current = get_current_version () in
           (* Check if update is needed *)
