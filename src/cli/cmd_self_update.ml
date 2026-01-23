@@ -81,13 +81,16 @@ let self_update_cmd =
                       let pct =
                         Int64.(to_float downloaded /. to_float t *. 100.0)
                       in
+                      (* \r moves cursor to start, \x1b[K clears from cursor to end of line *)
                       Printf.printf
-                        "\rDownloading... %.0f%% (%Ld / %Ld bytes)%!"
+                        "\r\x1b[KDownloading... %.0f%% (%Ld / %Ld bytes)%!"
                         pct
                         downloaded
                         t
                   | None ->
-                      Printf.printf "\rDownloading... %Ld bytes%!" downloaded
+                      Printf.printf
+                        "\r\x1b[KDownloading... %Ld bytes%!"
+                        downloaded
                 in
                 match
                   Self_update_checker.perform_upgrade
