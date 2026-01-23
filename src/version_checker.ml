@@ -157,17 +157,15 @@ let get_current_version () =
            rest)
 
 let check_for_updates ?(force = false) () =
+  let _ = force in
+  (* force parameter kept for API compatibility but no longer used *)
   (* Check if enabled *)
   match load_prefs () with
   | Error _ -> CheckFailed "Failed to load preferences"
   | Ok prefs when not prefs.check_enabled -> CheckDisabled
   | Ok prefs -> (
       (* Get latest remote version *)
-      let fetch_fn =
-        if force then Binary_downloader.fetch_versions
-        else Binary_downloader.get_versions_cached
-      in
-      match fetch_fn ~include_rc:false () with
+      match Binary_downloader.fetch_versions ~include_rc:false () with
       | Error (`Msg e) -> CheckFailed e
       | Ok [] -> CheckFailed "No versions available"
       | Ok (first :: rest) ->
