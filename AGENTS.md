@@ -392,6 +392,7 @@ Keep the first line under 72 characters.
 - Don't opportunistically fix unrelated issues
 - Never commit secrets or credentials
 - Use `git mv` for renames to preserve history
+- **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
 
 ## Questions or Uncertainty
 
