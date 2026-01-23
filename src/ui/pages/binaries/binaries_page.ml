@@ -120,9 +120,9 @@ let filter_latest_n_major_versions n versions =
     latest_n_majors
 
 let load_available_versions () =
-  match Binary_downloader.fetch_versions ~include_rc:false () with
-  | Error _ -> []
-  | Ok versions ->
+  match Versions_scheduler.get_cached () with
+  | None -> []
+  | Some versions ->
       (* Filter to only the 2 latest major versions *)
       let filtered_versions = filter_latest_n_major_versions 2 versions in
       (* Filter out already installed versions *)
