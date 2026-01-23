@@ -298,13 +298,13 @@ jobs:
             --per-file >> coverage-summary.md 2>&1 || true
           echo '```' >> coverage-summary.md
           
-          # Extract overall percentage - try multiple patterns for robustness
+          # Extract overall percentage from format: "Coverage: 6688/11735 (56.99%)"
           echo "Extracting coverage percentage..."
           if grep -q 'Coverage:' coverage-summary.txt; then
-            # Try to extract percentage after "Coverage:"
-            COVERAGE_PCT=$(grep 'Coverage:' coverage-summary.txt | sed 's/.*Coverage: *\([0-9.]*\)%.*/\1/' | head -1)
+            # Extract percentage from parentheses: (XX.XX%)
+            COVERAGE_PCT=$(grep 'Coverage:' coverage-summary.txt | sed 's/.*(\([0-9.]*\)%).*/\1/' | head -1)
           else
-            # Fallback: look for percentage pattern
+            # Fallback: look for any percentage pattern
             COVERAGE_PCT=$(grep -o '[0-9]\+\.[0-9]\+%' coverage-summary.txt | head -1 | tr -d '%')
           fi
           
