@@ -17,6 +17,8 @@ let shutdown_requested = Atomic.make false
 (** Metrics storage per instance *)
 type instance_state = {
   mutable version : string option;
+  mutable last_version_check : float option;
+      (** Last version check timestamp *)
   mutable pids : int list;
   mutable last_pid_check : float;
   cpu_samples : (int, System_metrics.cpu_sample) Hashtbl.t;
@@ -44,6 +46,7 @@ let mem_max_points = 20
 let make_instance_state () =
   {
     version = None;
+    last_version_check = None;
     pids = [];
     last_pid_check = 0.0;
     cpu_samples = Hashtbl.create 17;
@@ -150,10 +153,21 @@ let update_pids_and_version ~key ~role ~instance ~binary ~data_dir ?unit_name
            (List.sort compare state.pids)
     in
     state.pids <- new_pids ;
-    (* Refresh version when PIDs change (service restarted) *)
+    (* Refresh version when PIDs change (service restarted) OR periodically *)
     let old_version = state.version in
-    if pids_changed || Option.is_none state.version then
+    let time_since_version_check =
+      match state.last_version_check with
+      | None -> Float.infinity
+      | Some t -> now -. t
+    in
+    let should_refresh_version =
+      pids_changed
+      || Option.is_none state.version
+      || time_since_version_check > 300.0 (* Re-check every 5 minutes *)
+    in
+    if should_refresh_version then (
       state.version <- System_metrics.get_version ~binary ;
+      state.last_version_check <- Some now) ;
     (* Check version and show toast if outdated (on first detection or change) *)
     (match (old_version, state.version) with
     | _, None -> ()
@@ -313,6 +327,16 @@ let get_version ~role ~instance =
       match Hashtbl.find_opt table key with
       | None -> None
       | Some state -> state.version)
+
+(** Invalidate version cache - forces refresh on next poll *)
+let invalidate_version ~role ~instance =
+  let key = Printf.sprintf "%s/%s" role instance in
+  with_lock (fun () ->
+      match Hashtbl.find_opt table key with
+      | None ->
+          (* Not in cache yet, nothing to do *)
+          ()
+      | Some state -> state.version <- None)
 
 (** Get disk size *)
 let get_disk_size ~role ~instance =

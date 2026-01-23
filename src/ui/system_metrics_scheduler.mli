@@ -41,6 +41,10 @@ val submit_poll :
 (** Get version string for an instance. *)
 val get_version : role:string -> instance:string -> string option
 
+(** Invalidate cached version for an instance.
+    Forces version refresh on next poll. Call after upgrading a service. *)
+val invalidate_version : role:string -> instance:string -> unit
+
 (** Format version with color based on comparison with latest stable.
     - Green: running latest stable
     - Yellow: same major, older minor
