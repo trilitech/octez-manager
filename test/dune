@@ -162,3 +162,10 @@
  (modules test_port_validation)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_execstart_parser)
+ (libraries alcotest octez_manager_lib)
+ (modules test_execstart_parser)
+ (instrumentation
+  (backend bisect_ppx)))
