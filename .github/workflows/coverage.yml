@@ -110,8 +110,11 @@ jobs:
             echo "Initializing opam..."
             opam init --disable-sandboxing --bare -y
             opam switch create 5.1.1 ocaml.5.1.1 -y
+            eval $(opam env)
+          else
+            echo "Opam already initialized, setting environment..."
+            eval $(opam env)
           fi
-          eval $(opam env)
       
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
