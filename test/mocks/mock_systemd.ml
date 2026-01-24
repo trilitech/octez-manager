@@ -314,7 +314,7 @@ let generate_status_json name =
         match service.state with
         | Running -> "running"
         | Stopped -> "dead"
-        | Failed msg -> "failed"
+        | Failed _ -> "failed"
         | Unknown -> "unknown"
       in
       `Assoc
