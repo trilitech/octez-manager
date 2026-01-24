@@ -99,7 +99,6 @@ jobs:
           key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
       
       - name: Ensure opam is initialized
-        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           # Check if opam actually works, not just if directory exists
           if opam switch list 2>&1 | grep -q "5.1.1"; then
@@ -113,7 +112,6 @@ jobs:
           fi
       
       - name: Pin miaou packages
-        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           if [ -z "$MIAOU_GIT_URL" ]; then
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
@@ -127,7 +125,6 @@ jobs:
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
       
       - name: Install project dependencies
-        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           eval $(opam env)
           git config --global --add safe.directory "$PWD"
