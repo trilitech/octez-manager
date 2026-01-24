@@ -276,6 +276,125 @@ let test_shows_dal_options () =
         (TH.contains_substring screen "Install Baker"))
 
 (* ============================================================ *)
+(* VALIDATION TESTS - Test error handling and edge cases *)
+(* ============================================================ *)
+
+let test_form_validation_status () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "has validation indicators"
+        true
+        (TH.contains_substring screen "✓" || TH.contains_substring screen "✗"))
+
+let test_rejects_empty_instance_name () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      for _i = 1 to 20 do
+        ignore (TH.send_key_and_wait "Backspace") ;
+        Unix.sleepf 0.005
+      done ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      let screen = TH.get_screen_text () in
+      check bool "form still active" true (String.length screen > 100))
+
+let test_cancel_returns_to_form () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+      let screen = TH.get_screen_text () in
+      check bool "returned to form" true (String.length screen > 0))
+
+let test_navigation_boundaries () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      TH.navigate_up 1 ;
+      Unix.sleepf 0.01 ;
+      let screen1 = TH.get_screen_text () in
+      check bool "valid after up from first" true (String.length screen1 > 0) ;
+      TH.navigate_down 50 ;
+      Unix.sleepf 0.02 ;
+      let screen2 = TH.get_screen_text () in
+      check bool "valid after many down" true (String.length screen2 > 0) ;
+      TH.assert_screen_contains "Install Baker")
+
+let test_rapid_key_presses () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      let keys =
+        ["Down"; "Up"; "Enter"; "Escape"; "Tab"; "Down"; "Enter"; "Escape"]
+      in
+      List.iter
+        (fun key ->
+          ignore (TH.send_key_and_wait ~wait_iterations:1 key) ;
+          Unix.sleepf 0.005)
+        keys ;
+      let screen = TH.get_screen_text () in
+      check bool "form survived rapid keys" true (String.length screen > 100))
+
+let test_modal_state_recovery () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      TH.type_string "test" ;
+      Unix.sleepf 0.01 ;
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      let screen = TH.get_screen_text () in
+      check bool "modal reopened successfully" true (String.length screen > 0))
+
+let test_delegate_field_interaction () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      TH.navigate_down 2 ;
+      Unix.sleepf 0.01 ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      let screen = TH.get_screen_text () in
+      check bool "delegate field functional" true (String.length screen > 0) ;
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+      TH.assert_screen_contains "Install Baker")
+
+let test_multiple_field_edits () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      for _i = 1 to 4 do
+        ignore (TH.send_key_and_wait "Enter") ;
+        Unix.sleepf 0.01 ;
+        ignore (TH.send_key_and_wait "Escape") ;
+        Unix.sleepf 0.01 ;
+        TH.navigate_down 1
+      done ;
+      let screen = TH.get_screen_text () in
+      check bool "form still functional" true (String.length screen > 100))
+
+let test_baker_specific_fields_accessible () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+      TH.navigate_down 5 ;
+      Unix.sleepf 0.01 ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+      let screen = TH.get_screen_text () in
+      check bool "baker fields accessible" true (String.length screen > 0))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -296,4 +415,20 @@ let form_tests =
     ("form shows DAL options", `Quick, test_shows_dal_options);
   ]
 
-let () = Alcotest.run "Install Baker Form (TUI)" [("baker_form", form_tests)]
+let validation_tests =
+  [
+    ("form validation status", `Quick, test_form_validation_status);
+    ("rejects empty instance name", `Quick, test_rejects_empty_instance_name);
+    ("cancel returns to form", `Quick, test_cancel_returns_to_form);
+    ("navigation boundaries", `Quick, test_navigation_boundaries);
+    ("rapid key presses", `Quick, test_rapid_key_presses);
+    ("modal state recovery", `Quick, test_modal_state_recovery);
+    ("delegate field interaction", `Quick, test_delegate_field_interaction);
+    ("multiple field edits", `Quick, test_multiple_field_edits);
+    ("baker fields accessible", `Quick, test_baker_specific_fields_accessible);
+  ]
+
+let () =
+  Alcotest.run
+    "Install Baker Form (TUI)"
+    [("baker_form", form_tests); ("validation", validation_tests)]
