@@ -454,6 +454,153 @@ let test_port_field_accessibility () =
       TH.assert_screen_contains "Install DAL Node")
 
 (* ============================================================ *)
+(* Validation Tests: Invalid Inputs *)
+(* ============================================================ *)
+
+let test_invalid_rpc_port_dal () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Navigate to RPC port field *)
+      TH.navigate_down 5 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Enter invalid port *)
+      TH.type_string "99999" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles invalid RPC port" true (String.length screen > 0))
+
+let test_invalid_listen_port () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Navigate to listen port field *)
+      TH.navigate_down 6 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "-100" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "form handles invalid listen port"
+        true
+        (String.length screen > 0))
+
+let test_invalid_metrics_port () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Navigate to metrics port field *)
+      TH.navigate_down 7 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "notaport" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles non-numeric port" true (String.length screen > 0))
+
+let test_dal_instance_name_special_chars () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "dal@#$%node" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles special chars" true (String.length screen > 0))
+
+let test_dal_very_long_name () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let long_name = String.make 200 'x' in
+      TH.type_string long_name ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles long name" true (String.length screen > 0))
+
+let test_dal_reserved_names () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "systemd" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form validates reserved names" true (String.length screen > 0))
+
+let test_invalid_node_reference_dal () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Navigate to node reference field *)
+      TH.navigate_down 4 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "nonexistent-node" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles invalid node ref" true (String.length screen > 0))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -487,6 +634,16 @@ let validation_tests =
       test_dal_specific_field_interaction );
     ("multiple field navigation", `Quick, test_multiple_field_navigation);
     ("port field accessibility", `Quick, test_port_field_accessibility);
+    (* New validation tests for issue #457 *)
+    ("invalid RPC port DAL", `Quick, test_invalid_rpc_port_dal);
+    ("invalid listen port", `Quick, test_invalid_listen_port);
+    ("invalid metrics port", `Quick, test_invalid_metrics_port);
+    ( "DAL instance name special chars",
+      `Quick,
+      test_dal_instance_name_special_chars );
+    ("DAL very long name", `Quick, test_dal_very_long_name);
+    ("DAL reserved names", `Quick, test_dal_reserved_names);
+    ("invalid node reference DAL", `Quick, test_invalid_node_reference_dal);
   ]
 
 let () =

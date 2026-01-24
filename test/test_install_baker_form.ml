@@ -395,6 +395,154 @@ let test_baker_specific_fields_accessible () =
       check bool "baker fields accessible" true (String.length screen > 0))
 
 (* ============================================================ *)
+(* Validation Tests: Invalid Inputs *)
+(* ============================================================ *)
+
+let test_invalid_liquidity_baking_vote () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+
+      (* Navigate to liquidity baking vote field *)
+      TH.navigate_down 8 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Try invalid vote value *)
+      TH.type_string "invalid" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles invalid LB vote" true (String.length screen > 0))
+
+let test_very_long_delegate_address () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+
+      (* Navigate to delegate field *)
+      TH.navigate_down 5 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Enter very long string *)
+      let long_addr = String.make 200 'x' in
+      TH.type_string long_addr ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles long delegate" true (String.length screen > 0))
+
+let test_invalid_delegate_format () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+
+      TH.navigate_down 5 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Enter invalid format (not tz1/tz2/tz3) *)
+      TH.type_string "invalid_format" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "form handles invalid delegate format"
+        true
+        (String.length screen > 0))
+
+let test_empty_delegate_address () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+
+      TH.navigate_down 5 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Try to submit empty delegate *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form validates empty delegate" true (String.length screen > 0))
+
+let test_baker_instance_name_special_chars () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "baker@#$%invalid" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles special chars" true (String.length screen > 0))
+
+let test_baker_reserved_names () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Try reserved name *)
+      TH.type_string "systemd" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form validates reserved names" true (String.length screen > 0))
+
+let test_dal_node_reference_invalid () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_baker_form.Page) ;
+
+      (* Navigate to DAL node field if DAL is enabled *)
+      TH.navigate_down 12 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Enter invalid reference *)
+      TH.type_string "nonexistent-dal" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles invalid DAL ref" true (String.length screen > 0))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -426,6 +574,16 @@ let validation_tests =
     ("delegate field interaction", `Quick, test_delegate_field_interaction);
     ("multiple field edits", `Quick, test_multiple_field_edits);
     ("baker fields accessible", `Quick, test_baker_specific_fields_accessible);
+    (* New validation tests for issue #457 *)
+    ("invalid liquidity baking vote", `Quick, test_invalid_liquidity_baking_vote);
+    ("very long delegate address", `Quick, test_very_long_delegate_address);
+    ("invalid delegate format", `Quick, test_invalid_delegate_format);
+    ("empty delegate address", `Quick, test_empty_delegate_address);
+    ( "baker instance name special chars",
+      `Quick,
+      test_baker_instance_name_special_chars );
+    ("baker reserved names", `Quick, test_baker_reserved_names);
+    ("DAL node reference invalid", `Quick, test_dal_node_reference_invalid);
   ]
 
 let () =

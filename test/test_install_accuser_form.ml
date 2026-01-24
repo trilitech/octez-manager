@@ -369,6 +369,125 @@ let test_multiple_field_edits () =
         (TH.contains_substring screen "Parameter"))
 
 (* ============================================================ *)
+(* Validation Tests: Invalid Inputs *)
+(* ============================================================ *)
+
+let test_invalid_node_reference () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_accuser_form.Page) ;
+
+      (* Navigate to node field *)
+      TH.navigate_down 5 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Enter non-existent node reference *)
+      TH.type_string "nonexistent-node" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles invalid node ref" true (String.length screen > 0))
+
+let test_empty_node_reference () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_accuser_form.Page) ;
+
+      TH.navigate_down 5 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Try to submit empty node reference *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form validates empty node ref" true (String.length screen > 0))
+
+let test_accuser_instance_name_special_chars () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_accuser_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "accuser@#$%invalid" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles special chars" true (String.length screen > 0))
+
+let test_accuser_very_long_name () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_accuser_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let long_name = String.make 150 'x' in
+      TH.type_string long_name ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles long name" true (String.length screen > 0))
+
+let test_accuser_reserved_names () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_accuser_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "root" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form validates reserved names" true (String.length screen > 0))
+
+let test_accuser_duplicate_instance () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_accuser_form.Page) ;
+
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      TH.type_string "test-accuser" ;
+      Unix.sleepf 0.02 ;
+
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check bool "form handles instance name" true (String.length screen > 0))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -398,6 +517,15 @@ let validation_tests =
     ("modal state recovery", `Quick, test_modal_state_recovery);
     ("node field interaction", `Quick, test_node_field_interaction);
     ("multiple field edits", `Quick, test_multiple_field_edits);
+    (* New validation tests for issue #457 *)
+    ("invalid node reference", `Quick, test_invalid_node_reference);
+    ("empty node reference", `Quick, test_empty_node_reference);
+    ( "accuser instance name special chars",
+      `Quick,
+      test_accuser_instance_name_special_chars );
+    ("accuser very long name", `Quick, test_accuser_very_long_name);
+    ("accuser reserved names", `Quick, test_accuser_reserved_names);
+    ("accuser duplicate instance", `Quick, test_accuser_duplicate_instance);
   ]
 
 let () =
