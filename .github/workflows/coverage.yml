@@ -102,6 +102,17 @@ jobs:
           restore-keys: |
             opam-debian-miaou-
       
+      - name: Ensure opam is initialized
+        if: steps.cache-opam.outputs.cache-hit != 'true'
+        run: |
+          # Check if opam root exists, if not initialize it
+          if [ ! -d "/root/.opam/5.1.1" ]; then
+            echo "Initializing opam..."
+            opam init --disable-sandboxing --bare -y
+            opam switch create 5.1.1 ocaml.5.1.1 -y
+          fi
+          eval $(opam env)
+      
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
@@ -109,6 +120,7 @@ jobs:
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
             exit 1
           fi
+          eval $(opam env)
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
