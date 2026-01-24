@@ -175,6 +175,9 @@ let test_update_linked_services () =
 let test_list_by_type () =
   with_fake_xdg (fun () ->
       let open Directory_registry in
+      (* Clear any existing entries first *)
+      let _ = clear_all () in
+
       (* Add different types *)
       let _ =
         add ~path:"/data/node1" ~dir_type:Node_data_dir ~linked_services:[]
