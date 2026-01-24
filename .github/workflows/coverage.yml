@@ -105,14 +105,14 @@ jobs:
       - name: Ensure opam is initialized
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
-          # Check if opam root exists, if not initialize it
-          if [ ! -d "/root/.opam/5.1.1" ]; then
-            echo "Initializing opam..."
-            opam init --disable-sandboxing --bare -y
-            opam switch create 5.1.1 ocaml.5.1.1 -y
+          # Check if opam actually works, not just if directory exists
+          if opam switch list 2>&1 | grep -q "5.1.1"; then
+            echo "Opam switch 5.1.1 exists, using it..."
             eval $(opam env)
           else
-            echo "Opam already initialized, setting environment..."
+            echo "Initializing opam and creating switch 5.1.1..."
+            opam init --disable-sandboxing --bare -y || true
+            opam switch create 5.1.1 ocaml.5.1.1 -y
             eval $(opam env)
           fi
       
