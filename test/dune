@@ -169,3 +169,10 @@
  (modules test_execstart_parser)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_system_user)
+ (libraries alcotest octez_manager_lib)
+ (modules test_system_user)
+ (instrumentation
+  (backend bisect_ppx)))
