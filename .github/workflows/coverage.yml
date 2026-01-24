@@ -46,8 +46,6 @@ jobs:
         with:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
-          restore-keys: |
-            opam-miaou-
 
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
@@ -99,8 +97,6 @@ jobs:
         with:
           path: /root/.opam
           key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
-          restore-keys: |
-            opam-debian-miaou-
       
       - name: Ensure opam is initialized
         if: steps.cache-opam.outputs.cache-hit != 'true'
@@ -130,9 +126,17 @@ jobs:
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
       
+      - name: Install project dependencies
+        if: steps.cache-opam.outputs.cache-hit != 'true'
+        run: |
+          eval $(opam env)
+          git config --global --add safe.directory "$PWD"
+          opam install . --deps-only --with-test
+      
       - name: Build instrumented static binary
         run: |
           # Build static binary for compatibility with Debian test container
+          eval $(opam env)
           echo '(-ccopt -static)' > static_flags.sexp
           dune clean
           dune build --instrument-with bisect_ppx --release
@@ -140,8 +144,7 @@ jobs:
           chmod +x octez-manager-instrumented
           
           # Verify it's static
-          file octez-manager-instrumented
-          ldd octez-manager-instrumented || echo "Static binary confirmed"
+          ldd octez-manager-instrumented 2>&1 | head -10 || echo "Static binary confirmed"
       
       - name: Upload instrumented binary
         uses: actions/upload-artifact@v4
