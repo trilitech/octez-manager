@@ -662,7 +662,7 @@ let test_dal_form_navigation_bounds () =
 (* Wizard-Style Integration Tests (using test helpers) *)
 (* ============================================================ *)
 
-module TH = Tui_test_helpers
+module TH = Tui_test_helpers_lib.Tui_test_helpers
 
 (** Test: Drive through create menu and select Node *)
 let test_instances_create_node_flow () =
