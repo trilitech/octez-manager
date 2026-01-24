@@ -30,6 +30,7 @@
 ; Run locally with: dune exec test/tui_flow_tests.exe
 
 ; Shared TUI test helpers library
+
 (library
  (name tui_test_helpers_lib)
  (libraries
