@@ -17,7 +17,7 @@
 open Alcotest
 module HD = Lib_miaou_internal.Headless_driver
 module Install_node_form = Octez_manager_ui.Install_node_form_v3
-module TH = Tui_test_helpers
+module TH = Tui_test_helpers_lib.Tui_test_helpers
 
 (* ============================================================ *)
 (* Test: Form Initialization *)

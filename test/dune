@@ -29,6 +29,20 @@
 ; TUI tests are skipped in CI (headless driver hangs in container)
 ; Run locally with: dune exec test/tui_flow_tests.exe
 
+; Shared TUI test helpers library
+(library
+ (name tui_test_helpers_lib)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term)
+ (modules tui_test_helpers)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (executable
  (name tui_flow_tests)
  (libraries
@@ -37,8 +51,9 @@
   octez-manager.ui
   miaou-core.lib
   miaou-core.lib_miaou_internal
-  lambda-term)
- (modules tui_flow_tests tui_test_helpers)
+  lambda-term
+  tui_test_helpers_lib)
+ (modules tui_flow_tests)
  (instrumentation
   (backend bisect_ppx)))
 
@@ -50,7 +65,8 @@
   octez-manager.ui
   miaou-core.lib
   miaou-core.lib_miaou_internal
-  lambda-term)
- (modules test_install_node_form tui_test_helpers)
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_install_node_form)
  (instrumentation
   (backend bisect_ppx)))
