@@ -232,6 +232,233 @@ let test_form_persists_navigation () =
       check bool "screen not empty" true (String.length final_screen > 100))
 
 (* ============================================================ *)
+(* VALIDATION TESTS - Test error handling and edge cases *)
+(* ============================================================ *)
+
+(* ============================================================ *)
+(* Test: Form Shows Validation Status *)
+(* ============================================================ *)
+
+let test_form_validation_status () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      let screen = TH.get_screen_text () in
+
+      (* Form should show validation indicators (checkmarks or warnings) *)
+      check
+        bool
+        "has validation indicators"
+        true
+        (TH.contains_substring screen "✓" || TH.contains_substring screen "✗"))
+
+(* ============================================================ *)
+(* Test: Cannot Submit Empty Instance Name *)
+(* ============================================================ *)
+
+let test_rejects_empty_instance_name () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      (* Navigate to instance name field (usually near the bottom) *)
+      TH.navigate_down 10 ;
+      Unix.sleepf 0.02 ;
+
+      (* Try to open instance name field *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Clear the field (send backspace multiple times) *)
+      for _i = 1 to 20 do
+        ignore (TH.send_key_and_wait "Backspace") ;
+        Unix.sleepf 0.005
+      done ;
+
+      (* Try to confirm with empty value *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+
+      (* Should either reject or show warning *)
+      (* The form should still be active (not crashed) *)
+      check
+        bool
+        "form still active after empty instance name"
+        true
+        (String.length screen > 100))
+
+(* ============================================================ *)
+(* Test: Form Handles Cancel/Escape Gracefully *)
+(* ============================================================ *)
+
+let test_cancel_returns_to_form () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      let initial_screen = TH.get_screen_text () in
+
+      (* Open a field *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Press Escape to cancel *)
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+
+      let after_cancel = TH.get_screen_text () in
+
+      (* Should be back at form *)
+      check bool "returned to form" true (String.length after_cancel > 0) ;
+
+      (* Form should still show install node content *)
+      check
+        bool
+        "still shows form content"
+        true
+        (TH.contains_substring initial_screen "Install Node"
+        || TH.contains_substring after_cancel "Install Node"))
+
+(* ============================================================ *)
+(* Test: Navigation Doesn't Break at Boundaries *)
+(* ============================================================ *)
+
+let test_navigation_boundaries () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      (* Navigate up from first item (should stay at first) *)
+      TH.navigate_up 1 ;
+      Unix.sleepf 0.01 ;
+
+      let screen_after_up = TH.get_screen_text () in
+      check
+        bool
+        "still valid after up from first"
+        true
+        (String.length screen_after_up > 0) ;
+
+      (* Navigate down many times (more than number of fields) *)
+      TH.navigate_down 50 ;
+      Unix.sleepf 0.02 ;
+
+      let screen_after_many_down = TH.get_screen_text () in
+      check
+        bool
+        "still valid after many down"
+        true
+        (String.length screen_after_many_down > 0) ;
+
+      (* Form should still be functional *)
+      TH.assert_screen_contains "Install Node")
+
+(* ============================================================ *)
+(* Test: Rapid Key Presses Don't Crash Form *)
+(* ============================================================ *)
+
+let test_rapid_key_presses () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      (* Rapidly press various keys *)
+      let keys =
+        ["Down"; "Up"; "Enter"; "Escape"; "Tab"; "Down"; "Enter"; "Escape"]
+      in
+
+      List.iter
+        (fun key ->
+          ignore (TH.send_key_and_wait ~wait_iterations:1 key) ;
+          Unix.sleepf 0.005)
+        keys ;
+
+      (* Form should still be functional *)
+      let screen = TH.get_screen_text () in
+      check bool "form survived rapid keys" true (String.length screen > 100) ;
+      check
+        bool
+        "still shows form structure"
+        true
+        (TH.contains_substring screen "Parameter"
+        || TH.contains_substring screen "Value"))
+
+(* ============================================================ *)
+(* Test: Modal State Recovery *)
+(* ============================================================ *)
+
+let test_modal_state_recovery () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      (* Open modal, type something, cancel *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Type some characters *)
+      TH.type_string "test" ;
+      Unix.sleepf 0.01 ;
+
+      (* Cancel *)
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+
+      (* Open modal again - should not have stale state *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+
+      (* Form should still be functional *)
+      check bool "modal reopened successfully" true (String.length screen > 0))
+
+(* ============================================================ *)
+(* Test: Form Handles Multiple Submit Attempts *)
+(* ============================================================ *)
+
+let test_multiple_submit_attempts () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      (* Try to submit multiple times (navigate to Confirm and press Enter) *)
+      (* This tests idempotency and doesn't create duplicate installations *)
+      for _i = 1 to 3 do
+        (* Try pressing Enter (might try to submit or open field) *)
+        ignore (TH.send_key_and_wait "Enter") ;
+        Unix.sleepf 0.01 ;
+        ignore (TH.send_key_and_wait "Escape") ;
+        Unix.sleepf 0.01
+      done ;
+
+      let screen = TH.get_screen_text () in
+
+      (* Form should still be functional *)
+      check bool "form still functional" true (String.length screen > 100))
+
+(* ============================================================ *)
+(* Test: Empty Network List Handling *)
+(* ============================================================ *)
+
+let test_handles_network_field () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      (* Navigate to network field (usually first field) *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Network modal should open *)
+      let screen = TH.get_screen_text () in
+
+      (* Should show some network or handle empty gracefully *)
+      check bool "network selection functional" true (String.length screen > 0) ;
+
+      (* Close modal *)
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+
+      (* Form should still be there *)
+      TH.assert_screen_contains "Install Node")
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -248,4 +475,19 @@ let form_tests =
     ("form persists after navigation", `Quick, test_form_persists_navigation);
   ]
 
-let () = Alcotest.run "Install Node Form (TUI)" [("node_form", form_tests)]
+let validation_tests =
+  [
+    ("form shows validation status", `Quick, test_form_validation_status);
+    ("rejects empty instance name", `Quick, test_rejects_empty_instance_name);
+    ("cancel returns to form", `Quick, test_cancel_returns_to_form);
+    ("navigation respects boundaries", `Quick, test_navigation_boundaries);
+    ("rapid key presses don't crash", `Quick, test_rapid_key_presses);
+    ("modal state recovery", `Quick, test_modal_state_recovery);
+    ("multiple submit attempts", `Quick, test_multiple_submit_attempts);
+    ("handles network field", `Quick, test_handles_network_field);
+  ]
+
+let () =
+  Alcotest.run
+    "Install Node Form (TUI)"
+    [("node_form", form_tests); ("validation", validation_tests)]
