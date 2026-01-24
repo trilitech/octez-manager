@@ -113,3 +113,17 @@
  (modules test_install_dal_node_form)
  (instrumentation
   (backend bisect_ppx)))
+
+(executable
+ (name test_modal_interactions)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_modal_interactions)
+ (instrumentation
+  (backend bisect_ppx)))
