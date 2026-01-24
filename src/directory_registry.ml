@@ -295,7 +295,10 @@ let clear_all () = write_all []
 (** Expose internal functions for testing *)
 module For_test = struct
   let directory_entry_to_yojson = directory_entry_to_yojson
+
   let directory_entry_of_yojson = directory_entry_of_yojson
+
   let dir_type_to_yojson = dir_type_to_yojson
+
   let dir_type_of_yojson = dir_type_of_yojson
 end
