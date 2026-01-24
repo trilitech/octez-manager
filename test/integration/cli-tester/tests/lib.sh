@@ -73,8 +73,31 @@ inject_identity() {
 service_exists() {
 	local role="$1"
 	local instance="$2"
-	# Template units are listed as role@.service, not role@instance.service
-	systemctl list-unit-files "octez-${role}@.service" 2>/dev/null | grep -q "octez-${role}@"
+	local max_retries="${3:-20}" # 10 seconds max (20 × 0.5s)
+	local retry=0
+
+	# Force systemd to reload its configuration to ensure new services are visible
+	systemctl daemon-reload 2>/dev/null || true
+
+	# Retry loop to handle systemd cache propagation delay
+	# After install, there can be a brief window where daemon-reload hasn't
+	# fully propagated through systemd's internal state
+	while [ $retry -lt $max_retries ]; do
+		# Template units are listed as role@.service, not role@instance.service
+		if systemctl list-unit-files "octez-${role}@.service" 2>/dev/null | grep -q "octez-${role}@"; then
+			return 0
+		fi
+
+		# Short sleep and retry
+		sleep 0.5
+		retry=$((retry + 1))
+	done
+
+	# Failed after retries - provide diagnostics
+	echo "WARNING: Service template octez-${role}@ not found after $((max_retries / 2)) seconds" >&2
+	echo "Available octez services:" >&2
+	systemctl list-unit-files "octez-*" 2>&1 | head -10 >&2 || true
+	return 1
 }
 
 service_is_active() {
