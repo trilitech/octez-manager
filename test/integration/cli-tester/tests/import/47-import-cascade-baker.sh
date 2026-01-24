@@ -32,15 +32,17 @@ chown -R tezos:tezos "$NODE_DATA"
 create_external_service "node" "$NODE_INSTANCE" "$NODE_DATA" "$NODE_RPC" "shadownet"
 systemctl enable "octez-node@${NODE_INSTANCE}.service"
 systemctl start "octez-node@${NODE_INSTANCE}.service"
-sleep 2
-systemctl start "octez-node@${NODE_INSTANCE}.service"
+
+# Wait for node to be actually ready before creating baker
+wait_for_node_ready "$NODE_RPC" 30
 
 # Create external baker service that depends on node
 echo "Creating external baker service that depends on node..."
 create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "http://$NODE_RPC"
 
 # Note: Baker service should have After= and Requires= for node
-systemctl enable "octez-baker@${BAKER_INSTANCE}.service"
+# Don't enable the baker yet - let the import command handle that
+# (enabling now would create a race condition with import's enable --now)
 
 # Import baker with cascade
 echo "Importing baker with cascade (should also import node)..."
