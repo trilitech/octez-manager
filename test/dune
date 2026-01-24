@@ -230,3 +230,10 @@
  (modules test_ui_regressions_forms_comprehensive)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_help_parser)
+ (libraries alcotest octez_manager_lib)
+ (modules test_help_parser)
+ (instrumentation
+  (backend bisect_ppx)))
