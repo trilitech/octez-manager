@@ -14,4 +14,6 @@
   eio_main
   eio_posix)
  (preprocess
-  (pps ppx_deriving.show)))
+  (pps ppx_deriving.show))
+ (instrumentation
+  (backend bisect_ppx)))
