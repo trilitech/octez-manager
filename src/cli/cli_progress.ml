@@ -199,6 +199,8 @@ let clear_checksum_status state = {state with checksum_status = None}
 (** Expose internal functions for testing *)
 module For_test = struct
   let render_progress_bar = render_progress_bar
+
   let render_binary_line = render_binary_line
+
   let detect_style = detect_style
 end
