@@ -127,3 +127,17 @@
  (modules test_modal_interactions)
  (instrumentation
   (backend bisect_ppx)))
+
+(executable
+ (name test_instances_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_instances_page)
+ (instrumentation
+  (backend bisect_ppx)))
