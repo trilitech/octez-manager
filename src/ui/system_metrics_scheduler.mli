@@ -94,3 +94,42 @@ val shutdown : unit -> unit
 
 (** Get worker queue statistics. *)
 val get_worker_stats : unit -> Worker_queue.stats
+
+(** {2 Testing Interface} *)
+
+module For_test : sig
+  (** Version status for comparison with latest stable *)
+  type version_status_t =
+    | Latest  (** Running latest stable *)
+    | MinorBehind  (** Same major, older minor *)
+    | MajorBehind  (** Older major version *)
+    | DevOrRC  (** Running dev or RC version *)
+    | Unknown  (** Can't determine *)
+
+  (** Parse version string like "23.3" or "v23.3" into (major, minor) *)
+  val parse_version : string -> (int * int) option
+
+  (** Check if version string contains RC or dev markers *)
+  val is_rc_or_dev : string -> bool
+
+  (** Compare running version against latest stable *)
+  val check_version_status : running:string -> version_status_t
+
+  (** Get ANSI color code for version status *)
+  val version_color : version_status_t -> string
+
+  (** Set the latest stable version for testing *)
+  val set_latest_version : (int * int) option -> unit
+
+  (** Get the current latest stable version *)
+  val get_latest_version : unit -> (int * int) option
+
+  (** Clear all state (instances, visibility, warnings) for test isolation *)
+  val clear_all : unit -> unit
+
+  (** Check if an instance is marked as visible *)
+  val is_visible : string -> bool
+
+  (** Calculate effective polling interval based on visibility *)
+  val effective_interval : key:string -> base_interval:float -> float
+end

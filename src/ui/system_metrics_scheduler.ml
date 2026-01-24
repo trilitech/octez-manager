@@ -566,3 +566,44 @@ let shutdown () =
 
 (** Get worker queue stats *)
 let get_worker_stats () = Worker_queue.get_stats worker
+
+(** {2 Testing Interface} *)
+
+module For_test = struct
+  type version_status_t = version_status =
+    | Latest
+    | MinorBehind
+    | MajorBehind
+    | DevOrRC
+    | Unknown
+
+  let parse_version = parse_version
+
+  let is_rc_or_dev = is_rc_or_dev
+
+  let check_version_status = check_version_status
+
+  let version_color = version_color
+
+  (** Set the latest stable version for testing *)
+  let set_latest_version version = latest_stable_version := version
+
+  (** Get the latest stable version *)
+  let get_latest_version () = !latest_stable_version
+
+  (** Clear all state for test isolation *)
+  let clear_all () =
+    with_lock (fun () -> Hashtbl.clear table) ;
+    Mutex.lock visible_lock ;
+    Fun.protect
+      ~finally:(fun () -> Mutex.unlock visible_lock)
+      (fun () -> Hashtbl.clear visible_instances) ;
+    Hashtbl.clear version_warned ;
+    latest_stable_version := None
+
+  (** Direct access to visibility check *)
+  let is_visible = is_visible
+
+  (** Direct access to interval calculation *)
+  let effective_interval = effective_interval
+end
