@@ -141,3 +141,10 @@
  (modules test_instances_page)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_instance_actions)
+ (libraries alcotest test_mocks unix)
+ (modules test_instance_actions)
+ (instrumentation
+  (backend bisect_ppx)))
