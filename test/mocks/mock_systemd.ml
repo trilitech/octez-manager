@@ -89,17 +89,31 @@ let set_failure_mode name mode =
 let clear_failure_mode name =
   Mutex.protect lock (fun () -> Hashtbl.remove failure_modes name)
 
-let get_failure_mode name =
-  Mutex.protect lock (fun () ->
-      Hashtbl.find_opt failure_modes name |> Option.value ~default:NoFailure)
+(* Internal: get failure mode without locking (for use within locked sections) *)
+let get_failure_mode_unsafe name =
+  Hashtbl.find_opt failure_modes name |> Option.value ~default:NoFailure
 
 (** {1 Service Operations} *)
 
 let start_service name =
   Mutex.protect lock (fun () ->
-      match get_failure_mode name with
+      match get_failure_mode_unsafe name with
       | PermissionDenied -> Error "Permission denied"
-      | StartFails msg -> Error msg
+      | StartFails msg -> (
+          (* Service starts but immediately fails *)
+          match Hashtbl.find_opt services name with
+          | None -> Error "Service not found"
+          | Some service ->
+              let updated =
+                {
+                  service with
+                  state = Failed msg;
+                  active_since = None;
+                  pid = None;
+                }
+              in
+              Hashtbl.replace services name updated ;
+              Ok ())
       | Timeout -> Error "Operation timed out"
       | ServiceNotFound -> Error "Service not found"
       | _ -> (
@@ -107,7 +121,7 @@ let start_service name =
           | None -> Error "Service not found"
           | Some service -> (
               match service.state with
-              | Running -> Error "Service already running"
+              | Running -> Ok () (* Idempotent - already running *)
               | Failed _ | Stopped | Unknown ->
                   let updated =
                     {
@@ -122,7 +136,7 @@ let start_service name =
 
 let stop_service name =
   Mutex.protect lock (fun () ->
-      match get_failure_mode name with
+      match get_failure_mode_unsafe name with
       | PermissionDenied -> Error "Permission denied"
       | StopFails msg -> Error msg
       | Timeout -> Error "Operation timed out"
@@ -132,7 +146,7 @@ let stop_service name =
           | None -> Error "Service not found"
           | Some service -> (
               match service.state with
-              | Stopped -> Error "Service already stopped"
+              | Stopped -> Ok () (* Idempotent - already stopped *)
               | Running | Failed _ | Unknown ->
                   let updated =
                     {
@@ -147,25 +161,30 @@ let stop_service name =
 
 let restart_service name =
   Mutex.protect lock (fun () ->
-      match stop_service name with
-      | Error e -> Error e
-      | Ok () -> (
-          match start_service name with
-          | Error e -> Error e
-          | Ok () ->
-              (* Increment restart count *)
-              (match Hashtbl.find_opt services name with
-              | Some service ->
-                  let updated =
-                    {service with restart_count = service.restart_count + 1}
-                  in
-                  Hashtbl.replace services name updated
-              | None -> ()) ;
+      match get_failure_mode_unsafe name with
+      | PermissionDenied -> Error "Permission denied"
+      | Timeout -> Error "Operation timed out"
+      | ServiceNotFound -> Error "Service not found"
+      | _ -> (
+          match Hashtbl.find_opt services name with
+          | None -> Error "Service not found"
+          | Some service ->
+              (* Stop then start *)
+              let updated =
+                {
+                  service with
+                  state = Running;
+                  active_since = Some (Unix.time ());
+                  pid = Some (Random.int 65535 + 1000);
+                  restart_count = service.restart_count + 1;
+                }
+              in
+              Hashtbl.replace services name updated ;
               Ok ()))
 
 let enable_service name =
   Mutex.protect lock (fun () ->
-      match get_failure_mode name with
+      match get_failure_mode_unsafe name with
       | PermissionDenied -> Error "Permission denied"
       | ServiceNotFound -> Error "Service not found"
       | _ -> (
@@ -178,7 +197,7 @@ let enable_service name =
 
 let disable_service name =
   Mutex.protect lock (fun () ->
-      match get_failure_mode name with
+      match get_failure_mode_unsafe name with
       | PermissionDenied -> Error "Permission denied"
       | ServiceNotFound -> Error "Service not found"
       | _ -> (
