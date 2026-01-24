@@ -20,6 +20,29 @@ module HD = Lib_miaou_internal.Headless_driver
 module Modal_manager = Miaou.Core.Modal_manager
 
 (* ============================================================ *)
+(* Mock System Capability for Tests *)
+(* ============================================================ *)
+
+(** Mock Miaou System capability that provides minimal functionality for TUI tests
+    without requiring actual system commands or file I/O *)
+let mock_miaou_system : Miaou_interfaces.System.t =
+  {
+    file_exists = (fun _path -> true);
+    is_directory = (fun _path -> true);
+    read_file = (fun _path -> Ok "mock file content");
+    write_file = (fun _path _content -> Ok ());
+    mkdir = (fun _path -> Ok ());
+    run_command =
+      (fun ~argv:_ ~cwd:_ ->
+        Ok {Miaou_interfaces.System.exit_code = 0; stdout = ""; stderr = ""});
+    get_current_user_info = (fun () -> Ok ("testuser", "testgroup"));
+    get_disk_usage = (fun ~path:_ -> Ok 1000000L);
+    list_dir = (fun _path -> Ok ["."; ".."; "test"]);
+    probe_writable = (fun ~path:_ -> Ok true);
+    get_env_var = Sys.getenv_opt;
+  }
+
+(* ============================================================ *)
 (* Environment Setup *)
 (* ============================================================ *)
 
@@ -53,8 +76,11 @@ let setup_test_env () =
   ignore (set_env "XDG_DATA_HOME" "data") ;
   ignore (set_env "XDG_STATE_HOME" "state") ;
   test_root := tmp_dir ;
-  (* Register capabilities *)
+  (* Register capabilities - this registers all octez-manager capabilities *)
   Octez_manager_lib.Capabilities.register () ;
+  (* Register mock Miaou System capability for file browser widget *)
+  (* This provides the System capability that Miaou's file browser needs *)
+  Miaou_interfaces.System.set mock_miaou_system ;
   (* Reset headless driver state *)
   HD.set_size 24 80 ;
   HD.set_limits ~iterations:500 ~seconds:10.0 () ;
