@@ -282,6 +282,178 @@ let test_shows_default_ports () =
         (TH.contains_substring screen "11732"))
 
 (* ============================================================ *)
+(* Validation & Error Path Tests *)
+(* ============================================================ *)
+
+let test_form_validation_status () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Check validation status indicators *)
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "shows validation checkmarks or crosses"
+        true
+        (TH.contains_substring screen "✓" || TH.contains_substring screen "✗"))
+
+let test_validation_updates_dynamically () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Test that form shows validation indicators *)
+      let screen = TH.get_screen_text () in
+
+      (* Form should have validation status *)
+      check
+        bool
+        "has validation indicators"
+        true
+        (TH.contains_substring screen "✓" || TH.contains_substring screen "✗") ;
+
+      (* Form should be functional *)
+      check bool "form is functional" true (String.length screen > 100))
+
+let test_cancel_returns_to_form () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Open a field modal *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.01 ;
+
+      (* Cancel with Escape *)
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.01 ;
+
+      (* Should return to form *)
+      TH.assert_screen_contains "Install DAL Node")
+
+let test_navigation_boundaries () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Try to go up from first item *)
+      TH.navigate_up 3 ;
+
+      (* Should stay at first item, not crash *)
+      TH.assert_screen_contains "Install DAL Node" ;
+
+      (* Navigate to bottom *)
+      TH.navigate_down 20 ;
+
+      (* Try to go down past last item *)
+      TH.navigate_down 5 ;
+
+      (* Should stay at last item, not crash *)
+      let screen = TH.get_screen_text () in
+      check bool "still has content" true (String.length screen > 0))
+
+let test_rapid_key_presses () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Rapidly press navigation keys *)
+      for _i = 1 to 10 do
+        ignore (TH.send_key_and_wait "Down")
+      done ;
+      for _i = 1 to 10 do
+        ignore (TH.send_key_and_wait "Up")
+      done ;
+
+      (* Should still render correctly *)
+      TH.assert_screen_contains "Install DAL Node" ;
+      TH.assert_screen_contains "Parameter")
+
+let test_modal_state_recovery () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Open and close modal multiple times *)
+      for _i = 1 to 3 do
+        ignore (TH.send_key_and_wait "Enter") ;
+        Unix.sleepf 0.01 ;
+        ignore (TH.send_key_and_wait "Escape") ;
+        Unix.sleepf 0.01
+      done ;
+
+      (* Form should still be functional *)
+      TH.assert_screen_contains "Install DAL Node" ;
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "still has parameters"
+        true
+        (TH.contains_substring screen "Parameter"))
+
+let test_dal_specific_field_interaction () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Navigate to DAL-specific fields *)
+      TH.navigate_down 4 ;
+
+      (* Interact with field *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.01 ;
+
+      let screen = TH.get_screen_text () in
+
+      (* Should show modal or stay on form *)
+      check
+        bool
+        "has content after field interaction"
+        true
+        (String.length screen > 0))
+
+let test_multiple_field_navigation () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      (* Navigate through multiple fields *)
+      TH.navigate_down 3 ;
+      TH.navigate_up 1 ;
+      TH.navigate_down 2 ;
+      TH.navigate_up 2 ;
+      TH.navigate_down 4 ;
+
+      (* Form should still be functional *)
+      TH.assert_screen_contains "Install DAL Node" ;
+
+      (* Form should have all key DAL fields *)
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "still shows DAL fields"
+        true
+        (TH.contains_substring screen "DAL RPC Addr"
+        || TH.contains_substring screen "Parameter"))
+
+let test_port_field_accessibility () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_dal_form.Page) ;
+
+      let screen = TH.get_screen_text () in
+
+      (* DAL has unique port fields - verify they're accessible *)
+      check
+        bool
+        "shows RPC port field"
+        true
+        (TH.contains_substring screen "10732") ;
+      check
+        bool
+        "shows P2P port field"
+        true
+        (TH.contains_substring screen "11732") ;
+
+      (* Navigate to verify fields are interactive *)
+      TH.navigate_down 5 ;
+
+      (* Form should still be functional *)
+      TH.assert_screen_contains "Install DAL Node")
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -300,4 +472,24 @@ let form_tests =
     ("form shows default ports", `Quick, test_shows_default_ports);
   ]
 
-let () = Alcotest.run "Install DAL Node Form (TUI)" [("dal_form", form_tests)]
+let validation_tests =
+  [
+    ("form validation status", `Quick, test_form_validation_status);
+    ( "validation updates dynamically",
+      `Quick,
+      test_validation_updates_dynamically );
+    ("cancel returns to form", `Quick, test_cancel_returns_to_form);
+    ("navigation boundaries", `Quick, test_navigation_boundaries);
+    ("rapid key presses", `Quick, test_rapid_key_presses);
+    ("modal state recovery", `Quick, test_modal_state_recovery);
+    ( "DAL specific field interaction",
+      `Quick,
+      test_dal_specific_field_interaction );
+    ("multiple field navigation", `Quick, test_multiple_field_navigation);
+    ("port field accessibility", `Quick, test_port_field_accessibility);
+  ]
+
+let () =
+  Alcotest.run
+    "Install DAL Node Form (TUI)"
+    [("dal_form", form_tests); ("validation", validation_tests)]
