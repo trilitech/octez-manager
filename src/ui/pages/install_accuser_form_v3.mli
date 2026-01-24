@@ -16,6 +16,9 @@ val page : Miaou.Core.Registry.page
 (** Register the accuser installation page in the Miaou registry *)
 val register : unit -> unit
 
+(** The page module for direct TUI initialization (used in tests) *)
+module Page : Miaou.Core.Tui_page.PAGE_SIG
+
 module For_tests : sig
   val initial_base_dir : string
 end

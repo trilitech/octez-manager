@@ -85,3 +85,17 @@
  (modules test_install_baker_form)
  (instrumentation
   (backend bisect_ppx)))
+
+(executable
+ (name test_install_accuser_form)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_install_accuser_form)
+ (instrumentation
+  (backend bisect_ppx)))
