@@ -155,3 +155,10 @@
  (modules test_node_env)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_port_validation)
+ (libraries alcotest octez_manager_lib)
+ (modules test_port_validation)
+ (instrumentation
+  (backend bisect_ppx)))
