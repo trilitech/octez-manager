@@ -73,11 +73,33 @@ val sync_logrotate : logrotate_spec list -> (unit, [`Msg of string]) result
 module For_tests : sig
   val role_binary : string -> string
 
+  val unit_name : string -> string -> string
+
+  val system_unit_path : string -> string
+
+  val user_unit_path : string -> string
+
   val unit_path : string -> string
 
   val dropin_dir : string -> string -> string
 
   val dropin_path : string -> string -> string
+
+  val systemctl_cmd : unit -> string list
+
+  val env_file_template : bool -> string
+
+  val system_logrotate_config_path : string -> string
+
+  val user_logrotate_root : unit -> string
+
+  val user_logrotate_include_dir : unit -> string
+
+  val user_logrotate_main_config : unit -> string
+
+  val prestart_hooks_dir : unit -> string
+
+  val prestart_script_path : string -> string
 
   val unit_template :
     role:string ->
