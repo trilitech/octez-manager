@@ -74,47 +74,52 @@ jobs:
           echo "Process limits:"
           ulimit -a
           
-          echo "=== Running tests with coverage on tmpfs ==="
+          echo "=== Building instrumented tests ==="
           dune clean
           
-          # Run tests with detailed progress monitoring
-          echo "Starting tests at $(date -u '+%H:%M:%S')"
+          # Build instrumented test executables (not run yet)
+          echo "Building at $(date -u '+%H:%M:%S')"
+          dune build @runtest --instrument-with bisect_ppx
+          echo "Build complete at $(date -u '+%H:%M:%S')"
           
-          # Start tests in background so we can monitor  
-          timeout 600 dune runtest --instrument-with bisect_ppx --force --display=short &
-          TEST_PID=$!
+          # Find all test executables
+          echo "=== Running tests individually to avoid dune hang ==="
+          TEST_EXES=$(find _build/default/test -name "*.exe" -type f | sort)
+          echo "Found $(echo "$TEST_EXES" | wc -l) test executables"
           
-          # Monitor progress
-          START_TIME=$(date +%s)
-          while kill -0 $TEST_PID 2>/dev/null; do
-            ELAPSED=$(($(date +%s) - START_TIME))
-            echo "[${ELAPSED}s] Still running... Coverage files: $(ls /dev/shm/coverage/ 2>/dev/null | wc -l)"
+          # Run each test individually with timeout
+          FAILED_TESTS=""
+          for test_exe in $TEST_EXES; do
+            test_name=$(basename "$test_exe" .exe)
+            echo ""
+            echo "Running: $test_name"
             
-            # Show recent coverage file activity
-            if [ -d /dev/shm/coverage ]; then
-              echo "  Latest files:"
-              ls -lth /dev/shm/coverage/ | head -3
+            # Run with timeout, capture exit code
+            if timeout 120 "$test_exe"; then
+              echo "  ✓ $test_name passed"
+            else
+              EXIT_CODE=$?
+              if [ $EXIT_CODE -eq 124 ]; then
+                echo "  ✗ $test_name TIMEOUT (>120s)"
+                FAILED_TESTS="$FAILED_TESTS\n  - $test_name (timeout)"
+              else
+                echo "  ✗ $test_name FAILED (exit $EXIT_CODE)"
+                FAILED_TESTS="$FAILED_TESTS\n  - $test_name (exit $EXIT_CODE)"
+              fi
             fi
             
-            # Check if we're past 5 minutes (unusual)
-            if [ $ELAPSED -gt 300 ]; then
-              echo "WARNING: Tests running longer than 5 minutes!"
-              echo "Process tree:"
-              ps auxf | grep -E "dune|alcotest|test_" | head -20
-            fi
-            
-            sleep 10
+            # Show coverage file count
+            echo "  Coverage files so far: $(ls /dev/shm/coverage/ 2>/dev/null | wc -l)"
           done
           
-          # Wait for test process and capture exit code
-          wait $TEST_PID
-          TEST_EXIT=$?
+          echo ""
+          echo "=== All tests completed at $(date -u '+%H:%M:%S') ==="
+          echo "Total coverage files: $(ls /dev/shm/coverage/ 2>/dev/null | wc -l)"
           
-          echo "Tests completed at $(date -u '+%H:%M:%S') with exit code $TEST_EXIT"
-          
-          if [ $TEST_EXIT -ne 0 ]; then
-            echo "ERROR: Tests failed with exit code $TEST_EXIT"
-            exit $TEST_EXIT
+          if [ -n "$FAILED_TESTS" ]; then
+            echo ""
+            echo "Failed tests:$FAILED_TESTS"
+            exit 1
           fi
           
           # Copy coverage files to artifact location
