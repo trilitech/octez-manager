@@ -2,9 +2,9 @@
 # Contains OCaml, opam, and all public dependencies pre-installed
 # Miaou is pinned at CI runtime (private repo)
 
-# Pin to known-good base image digest - updated images after 2026-01-18 produce
-# statically-linked binaries that segfault on Debian/glibc systems
-FROM ocaml/opam:alpine-ocaml-5.1@sha256:420811732203383aeb5926962d96aaf6f7752928c544ab3b74f3dff7709e2c6a AS base
+# Upgrade to OCaml 5.3 to fix bisect_ppx/dune compatibility issues in CI
+# Previous 5.1 image caused indefinite hangs during coverage instrumentation
+FROM ocaml/opam:alpine-ocaml-5.3 AS base
 
 # Switch to root for system package installation
 USER root
@@ -26,6 +26,9 @@ RUN apk add --no-cache \
 # Switch back to opam user
 USER opam
 WORKDIR /home/opam
+
+# Add alpha opam repository for latest package fixes
+RUN opam repository add alpha git+https://github.com/kit-ty-kate/opam-alpha-repository.git --rank=1
 
 # Update opam and install common dependencies that won't change often
 RUN opam update && opam install -y \
@@ -59,14 +62,14 @@ RUN opam clean -a -c -s --logs
 USER root
 RUN mkdir -p /root/.opam && \
     cp -r /home/opam/.opam/config /root/.opam/ && \
-    ln -s /home/opam/.opam/5.1 /root/.opam/5.1 && \
+    ln -s /home/opam/.opam/5.3 /root/.opam/5.3 && \
     ln -s /home/opam/.opam/repo /root/.opam/repo && \
     ln -s /home/opam/.opam/download-cache /root/.opam/download-cache && \
-    opam switch set 5.1
+    opam switch set 5.3
 
-ENV OPAM_SWITCH_PREFIX=/home/opam/.opam/5.1
-ENV CAML_LD_LIBRARY_PATH=/home/opam/.opam/5.1/lib/stublibs:/home/opam/.opam/5.1/lib/ocaml/stublibs:/home/opam/.opam/5.1/lib/ocaml
-ENV OCAML_TOPLEVEL_PATH=/home/opam/.opam/5.1/lib/toplevel
-ENV PATH=/home/opam/.opam/5.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV OPAM_SWITCH_PREFIX=/home/opam/.opam/5.3
+ENV CAML_LD_LIBRARY_PATH=/home/opam/.opam/5.3/lib/stublibs:/home/opam/.opam/5.3/lib/ocaml/stublibs:/home/opam/.opam/5.3/lib/ocaml
+ENV OCAML_TOPLEVEL_PATH=/home/opam/.opam/5.3/lib/toplevel
+ENV PATH=/home/opam/.opam/5.3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 WORKDIR /github/workspace
 # trigger rebuild

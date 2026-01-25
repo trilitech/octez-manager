@@ -17,7 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Initialize opam as root (GitHub Actions runs as root in containers)
 RUN opam init --disable-sandboxing --bare -y && \
-    opam switch create 5.1.1 ocaml.5.1.1 -y
+    opam switch create 5.3.0 ocaml.5.3.0 -y
+
+# Add alpha opam repository for latest package fixes
+RUN eval $(opam env) && \
+    opam repository add alpha git+https://github.com/kit-ty-kate/opam-alpha-repository.git --rank=1 && \
+    opam update
 
 # Install OCaml dependencies
 RUN eval $(opam env) && \
@@ -51,7 +56,7 @@ RUN eval $(opam env) && opam clean -a -c -s --logs
 WORKDIR /workspace
 
 # Set environment variables for opam
-ENV OPAM_SWITCH_PREFIX=/root/.opam/5.1.1
-ENV CAML_LD_LIBRARY_PATH=/root/.opam/5.1.1/lib/stublibs:/root/.opam/5.1.1/lib/ocaml/stublibs:/root/.opam/5.1.1/lib/ocaml
-ENV OCAML_TOPLEVEL_PATH=/root/.opam/5.1.1/lib/toplevel
-ENV PATH=/root/.opam/5.1.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV OPAM_SWITCH_PREFIX=/root/.opam/5.3.0
+ENV CAML_LD_LIBRARY_PATH=/root/.opam/5.3.0/lib/stublibs:/root/.opam/5.3.0/lib/ocaml/stublibs:/root/.opam/5.3.0/lib/ocaml
+ENV OCAML_TOPLEVEL_PATH=/root/.opam/5.3.0/lib/toplevel
+ENV PATH=/root/.opam/5.3.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
