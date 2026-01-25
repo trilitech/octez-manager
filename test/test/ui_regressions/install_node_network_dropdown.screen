@@ -1,0 +1,25 @@
+SIZE:234x24
+ Install Node 
+ ⚠ Form incomplete 
+--------------------------------------------------------------------------------
+┌───────────────────────┬─────────────────────────────────────────────┬──────┐
+│ Parameter             │ Value                                       │ S    │
+├───────────────────────┼─────────────────────────────────────────────┼──────┤
+│ Network               │ Shadownet                                   │ ✓    │
+┌────────────────────────────── Network ───────────────────────────────┐✓    │
+│▲/▼ move · PgUp/PgDn page · Home/End jump · Enter confirm · Esc cancel│✓    │
+│Ghostnet                                                              │✓    │
+│Mainnet                                                               │✓    │
+│Shadownet · https://teztnets.com/shadownet                            │✓    │
+│Tallinnnet · https://teztnets.com/tallinnnet                          │✗    │
+│Weeklynet · https://teztnets.com/weeklynet-2026-01-21                 │✓    │
+│Custom URL or slug...                                                 │✓    │
+└──────────────────────────────────────────────────────────────────────┘✓    │
+│ Extra Args            │ (none)                                      │ ✓    │
+│ Service User          │ mathias                                     │ ✓    │
+│ Enable on Boot        │ true                                        │ ✓    │
+│ Start Now             │ true                                        │ ✓    │
+│ Instance Name         │ node-shadownet                              │ ✓    │
+│ Confirm & Install     │ Incomplete                                  │ ✗    │
+└───────────────────────┴─────────────────────────────────────────────┴──────┘
+--------------------------------------------------------------------------------
