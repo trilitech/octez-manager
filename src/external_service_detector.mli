@@ -62,3 +62,17 @@ val get_unit_properties :
     @return Unit file content, or error if permission denied *)
 val get_unit_content :
   unit_name:string -> (string, [`Permission_denied | `Error of string]) result
+
+(** {1 Testing Utilities} *)
+
+module For_tests : sig
+  val string_contains : needle:string -> string -> bool
+
+  val is_managed_unit_name : string -> bool
+
+  val extract_command_from_systemd_format : string -> string option
+
+  val chain_id_to_network : string -> string option
+
+  val systemctl_cmd : unit -> string list
+end
