@@ -218,6 +218,13 @@
  (modules test_binary_downloader_extended)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_systemd_extended)
+ (libraries alcotest octez_manager_lib)
+ (modules test_systemd_extended)
+ (instrumentation
+  (backend bisect_ppx)))
 ; UI Regression Testing Framework
 
 (library

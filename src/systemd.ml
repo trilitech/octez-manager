@@ -792,11 +792,33 @@ let remove_dropin ~role ~instance =
 module For_tests = struct
   let role_binary = role_binary
 
+  let unit_name = unit_name
+
+  let system_unit_path = system_unit_path
+
+  let user_unit_path = user_unit_path
+
   let unit_path = unit_path
 
   let dropin_dir = dropin_dir
 
   let dropin_path = dropin_path
+
+  let systemctl_cmd = systemctl_cmd
+
+  let env_file_template = env_file_template
+
+  let system_logrotate_config_path = system_logrotate_config_path
+
+  let user_logrotate_root = user_logrotate_root
+
+  let user_logrotate_include_dir = user_logrotate_include_dir
+
+  let user_logrotate_main_config = user_logrotate_main_config
+
+  let prestart_hooks_dir = prestart_hooks_dir
+
+  let prestart_script_path = prestart_script_path
 
   let unit_template ~role ~app_bin_dir ~user ?prestart () =
     unit_template
