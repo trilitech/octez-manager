@@ -98,7 +98,7 @@ jobs:
           echo "TERM=$TERM"
           df -h /dev/shm
           echo "Available memory:"
-          free -h
+          free -h || echo "free command not available"
           echo "Process limits:"
           ulimit -a
           
