@@ -54,38 +54,62 @@ jobs:
     if: needs.changes.outputs.docs-only == 'false'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}-ci:latest
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
-      OPAMROOT: /home/opam/.opam
       MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for copyright check script to see git history
 
       - name: Cache opam packages
         id: cache-opam
         uses: actions/cache@v4
         with:
-          path: /home/opam/.opam
-          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          path: /root/.opam
+          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
+
+      - name: Ensure opam is initialized
+        id: opam-init
+        run: |
+          if opam switch list 2>&1 | grep -q "5.3.0"; then
+            echo "Opam switch 5.3.0 exists, using it..."
+            echo "needs_miaou=false" >> $GITHUB_OUTPUT
+            eval $(opam env)
+          else
+            echo "Initializing opam and creating switch 5.3.0..."
+            opam init --disable-sandboxing --bare -y || true
+            opam switch create 5.3.0 ocaml.5.3.0 -y
+            echo "needs_miaou=true" >> $GITHUB_OUTPUT
+            eval $(opam env)
+          fi
 
       - name: Pin miaou packages
-        if: steps.cache-opam.outputs.cache-hit != 'true'
+        if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.needs_miaou == 'true'
         run: |
           if [ -z "$MIAOU_GIT_URL" ]; then
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
             exit 1
           fi
+          eval $(opam env)
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
+
+      - name: Install project dependencies
+        run: |
+          eval $(opam env)
+          git config --global --add safe.directory "$PWD"
+          opam install . --deps-only --with-test
+          opam install ocamlformat
 
       - name: Cache dune build
         uses: actions/cache@v4
@@ -102,14 +126,15 @@ jobs:
 
       - name: Build
         run: |
+          eval $(opam env)
           echo '(-ccopt -static)' > static_flags.sexp
           dune build --release
 
       - name: Test
         run: |
-          chown -R opam:opam /home/opam/.opam
-          chown -R opam:opam .
-          su -s /bin/sh opam -c "git checkout -- static_flags.sexp && make test"
+          eval $(opam env)
+          git checkout -- static_flags.sexp
+          make test
 
       - name: Prepare binary artifact
         run: |
