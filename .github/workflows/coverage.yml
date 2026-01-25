@@ -80,43 +80,21 @@ jobs:
           echo "Process limits:"
           ulimit -a
           
-          echo "=== Running tests with coverage (excluding UI regression tests) ==="
+          echo "=== Temporarily disabling coverage collection ==="
+          echo "UI regression tests cause dune to hang in CI (even the build step)"
+          echo "Issue tracked separately. Running tests without coverage for now."
           dune clean
           
-          # Build all tests with instrumentation
-          echo "Building tests at $(date -u '+%H:%M:%S')"
-          dune build @runtest --instrument-with bisect_ppx
-          
-          # Run tests individually, skipping UI regression tests
-          # UI tests cause dune to hang in CI for unknown reasons (works locally)
-          # Tracked in separate issue for investigation
-          echo "Running tests individually..."
-          FAILED=0
-          
-          for test_exe in _build/default/test/*.exe; do
-            test_name=$(basename "$test_exe" .exe)
-            
-            # Skip UI regression tests - they hang in CI (works locally in 2s)
-            if echo "$test_name" | grep -q "ui_regressions"; then
-              echo "  ⊘ Skipping $test_name (hangs in CI, works locally)"
-              continue
-            fi
-            
-            echo "  → Running $test_name"
-            if timeout 120 "$test_exe"; then
-              echo "    ✓ passed"
-            else
-              echo "    ✗ FAILED"
-              FAILED=1
-            fi
-          done
-          
-          if [ $FAILED -eq 1 ]; then
-            echo "Some tests failed"
-            exit 1
-          fi
-          
+          # Just run tests normally without instrumentation
+          # This at least validates the tests pass
+          echo "Starting tests at $(date -u '+%H:%M:%S')"
+          dune runtest
           echo "Completed at $(date -u '+%H:%M:%S')"
+          
+          echo ""
+          echo "⚠️  Coverage collection disabled due to CI hang issue"
+          echo "Tests pass but coverage data not collected"
+          echo "Run locally with: dune runtest --instrument-with bisect_ppx"
           
           # Copy coverage files to artifact location
           echo "=== Copying coverage data from tmpfs ==="
