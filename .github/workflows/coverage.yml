@@ -61,6 +61,12 @@ jobs:
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
 
+      - name: Install project dependencies
+        run: |
+          eval $(opam env)
+          git config --global --add safe.directory "$PWD"
+          opam install . --deps-only --with-test
+
       - name: Run unit tests with coverage
         run: |
           # Use tmpfs for fast I/O during test execution
