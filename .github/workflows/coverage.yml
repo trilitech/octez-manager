@@ -77,9 +77,9 @@ jobs:
           echo "=== Running tests with standard dune runtest ==="
           dune clean
           
-          # Run tests the standard way
+          # Run tests WITHOUT --force to avoid rebuild issues
           echo "Starting at $(date -u '+%H:%M:%S')"
-          dune runtest --instrument-with bisect_ppx --force
+          dune runtest --instrument-with bisect_ppx
           echo "Completed at $(date -u '+%H:%M:%S')"
           
           # Copy coverage files to artifact location
