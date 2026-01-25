@@ -1,0 +1,25 @@
+SIZE:234x24
+ Install Node 
+ ⚠ Form incomplete 
+--------------------------------------------------------------------------------
+┌───────────────────────┬─────────────────────────────────────────────┬──────┐
+│ Parameter             │ Value                                       │ S    │
+├───────────────────────┼─────────────────────────────────────────────┼──────┤
+│ Network               │ Ghostnet                                    │ ✓    │
+│ History Mode          │ rolling                                     │ ✓    │
+│ Snapshot Import       │ tzinit · Auto (rolling) (rolling)           │ ✓    │
+│ Download Directory    │ /tmp (default)                              │ ✓    │
+│ Keep Snapshot         │ false                                       │ ✓    │
+│ Check Snapshot        │ true                                        │ ✓    │
+│ App Bin Dir           │ /usr/bin ⚠ Binary 'octez-node' not f…       │ ✗    │
+│ Data Dir              │ …ession/.local/share/octez/node-ghostnet    │ ✓    │
+│ RPC Address           │ 127.0.0.1:8733                              │ ✓    │
+│ P2P Address           │ 0.0.0.0:9733                                │ ✓    │
+│ Extra Args            │ (none)                                      │ ✓    │
+│ Service User          │ mathias                                     │ ✓    │
+│ Enable on Boot        │ true                                        │ ✓    │
+│ Start Now             │ true                                        │ ✓    │
+│ Instance Name         │ node-ghostnet                               │ ✓    │
+│ Confirm & Install     │ Incomplete                                  │ ✗    │
+└───────────────────────┴─────────────────────────────────────────────┴──────┘
+--------------------------------------------------------------------------------

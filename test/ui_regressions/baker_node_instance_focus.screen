@@ -1,0 +1,25 @@
+SIZE:234x24
+ Install Baker 
+ ⚠ Form incomplete 
+--------------------------------------------------------------------------------
+┌─────────────────────────┬────────────────────────────────────────────┬─────┐
+│ Parameter               │ Value                                      │ S   │
+├─────────────────────────┼────────────────────────────────────────────┼─────┤
+│ Parent Node             │ External                                   │ ✓   │
+│ DAL Node                │ None                                       │ ✓   │
+│ App Bin Dir             │ /usr/bin ⚠ Binary 'octez-baker' not …      │ ✗   │
+│ Baker Base Dir          │ …gression/.local/share/octez/baker-baker   │ ✓   │
+│ Delegates               │ (none)                                     │ ✓   │
+│ Liquidity Baking Vote   │ pass                                       │ ✓   │
+│ Node Endpoint           │ 127.0.0.1:8732                             │ ✓   │
+│ Node Data Dir           │                                            │ ✓   │
+│ Extra Args              │ (none)                                     │ ✓   │
+│ Service User            │ mathias                                    │ ✓   │
+│ Enable on Boot          │ true                                       │ ✓   │
+│ Start Now               │ true                                       │ ✓   │
+│ Instance Name           │ baker                                      │ ✓   │
+│ Confirm & Install       │ Incomplete                                 │ ✗   │
+└─────────────────────────┴────────────────────────────────────────────┴─────┘
+
+
+--------------------------------------------------------------------------------
