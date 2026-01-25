@@ -27,9 +27,6 @@ RUN apk add --no-cache \
 USER opam
 WORKDIR /home/opam
 
-# Add alpha opam repository for latest package fixes
-RUN opam repository add alpha git+https://github.com/kit-ty-kate/opam-alpha-repository.git --rank=1
-
 # Update opam and install common dependencies that won't change often
 RUN opam update && opam install -y \
     dune \
