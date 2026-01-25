@@ -78,3 +78,26 @@ val managed_version_exists : string -> bool
 (** Check if a version installation is complete (has all binaries and metadata)
     @param version Version to check (e.g., "24.0") *)
 val is_complete_installation : string -> bool
+
+(** {2 Testing interface} *)
+
+module For_tests : sig
+  val bin_source_to_string : bin_source -> string
+
+  val bin_source_to_yojson : bin_source -> Yojson.Safe.t
+
+  val bin_source_of_yojson : Yojson.Safe.t -> (bin_source, Rresult.R.msg) result
+
+  val bin_source_of_legacy : string -> bin_source
+
+  val linked_dir_to_yojson : linked_dir -> Yojson.Safe.t
+
+  val linked_dir_of_yojson : Yojson.Safe.t -> (linked_dir, Rresult.R.msg) result
+
+  val linked_dirs_to_yojson : linked_dir list -> Yojson.Safe.t
+
+  val linked_dirs_of_yojson :
+    Yojson.Safe.t -> (linked_dir list, Rresult.R.msg) result
+
+  val compare_versions : string -> string -> int
+end
