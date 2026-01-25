@@ -255,3 +255,24 @@ let resolve_bin_source = function
   | Raw_path path ->
       if Sys.file_exists path && Sys.is_directory path then Ok path
       else R.error_msgf "Binary path does not exist: %s" path
+
+(** Expose internal functions for testing *)
+module For_tests = struct
+  let bin_source_to_string = bin_source_to_string
+
+  let bin_source_to_yojson = bin_source_to_yojson
+
+  let bin_source_of_yojson = bin_source_of_yojson
+
+  let bin_source_of_legacy = bin_source_of_legacy
+
+  let linked_dir_to_yojson = linked_dir_to_yojson
+
+  let linked_dir_of_yojson = linked_dir_of_yojson
+
+  let linked_dirs_to_yojson = linked_dirs_to_yojson
+
+  let linked_dirs_of_yojson = linked_dirs_of_yojson
+
+  let compare_versions = compare_versions
+end
