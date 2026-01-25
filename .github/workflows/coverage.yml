@@ -47,6 +47,19 @@ jobs:
           path: /root/.opam
           key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
 
+      - name: Ensure opam is initialized
+        run: |
+          # Check if opam actually works, not just if directory exists
+          if opam switch list 2>&1 | grep -q "5.3.0"; then
+            echo "Opam switch 5.3.0 exists, using it..."
+            eval $(opam env)
+          else
+            echo "Initializing opam and creating switch 5.3.0..."
+            opam init --disable-sandboxing --bare -y || true
+            opam switch create 5.3.0 ocaml.5.3.0 -y
+            eval $(opam env)
+          fi
+
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
