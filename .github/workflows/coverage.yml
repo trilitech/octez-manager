@@ -25,14 +25,13 @@ jobs:
     #   contains(github.event.pull_request.labels.*.name, 'coverage') ||
     #   github.event.action == 'opened'
     container:
-      image: ghcr.io/${{ github.repository }}-ci:latest
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       options: --tty  # Allocate a pseudo-TTY for UI tests
     env:
       OPAMYES: "true"
-      OPAMROOT: /home/opam/.opam
       MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
 
     steps:
@@ -45,8 +44,8 @@ jobs:
         id: cache-opam
         uses: actions/cache@v4
         with:
-          path: /home/opam/.opam
-          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          path: /root/.opam
+          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
 
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
@@ -55,6 +54,7 @@ jobs:
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
             exit 1
           fi
+          eval $(opam env)
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
@@ -80,25 +80,26 @@ jobs:
           echo "Process limits:"
           ulimit -a
           
-          echo "=== Running tests with coverage (excluding UI regression tests) ==="
-          echo "Testing hypothesis: UI regression tests cause bisect_ppx hang"
+          echo "=== Running tests with coverage (Debian container) ==="
+          echo "Testing if Debian fixes UI regression test hang with bisect_ppx"
           dune clean
           
-          # Temporarily comment out UI regression test stanzas by line number
-          # test_ui_regressions_minimal: lines 189-202
-          # test_ui_regressions_forms: lines 204-217
-          # test_ui_regressions_forms_comprehensive: lines 219-232
-          sed -i '189,202s/^/; /' test/dune
-          sed -i '204,217s/^/; /' test/dune
-          sed -i '219,232s/^/; /' test/dune
-          
-          echo "Modified test/dune - UI regression tests commented out"
-          echo "Lines 189-232 should now be commented:"
-          sed -n '189,232p' test/dune | head -20
-          
-          # Run tests WITH instrumentation (UI tests won't be built)
+          # Run ALL tests WITH instrumentation, but with timeout protection
           echo "Starting tests at $(date -u '+%H:%M:%S')"
-          dune runtest --instrument-with bisect_ppx --force
+          
+          # Use timeout to prevent indefinite hangs (5 minutes should be more than enough)
+          timeout 300 dune runtest --instrument-with bisect_ppx --force || {
+            exit_code=$?
+            if [ $exit_code -eq 124 ]; then
+              echo "ERROR: Tests timed out after 5 minutes!"
+              echo "This suggests the hang still occurs even with Debian."
+              exit 1
+            else
+              echo "Tests failed with exit code $exit_code"
+              exit $exit_code
+            fi
+          }
+          
           echo "Completed at $(date -u '+%H:%M:%S')"
           
           echo ""
