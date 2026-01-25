@@ -82,6 +82,10 @@ jobs:
           
           echo "=== Running tests with coverage (Debian container) ==="
           echo "Testing if Debian fixes UI regression test hang with bisect_ppx"
+          
+          # Ensure opam environment is loaded
+          eval $(opam env)
+          
           dune clean
           
           # Run ALL tests WITH instrumentation, but with timeout protection
