@@ -233,6 +233,13 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_simple_modules)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_simple_modules)
+ (instrumentation
+  (backend bisect_ppx)))
+
 ; UI Regression Testing Framework
 
 (library
