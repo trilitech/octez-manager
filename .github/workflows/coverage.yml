@@ -71,10 +71,51 @@ jobs:
           df -h /dev/shm
           echo "Available memory:"
           free -h
+          echo "Process limits:"
+          ulimit -a
           
           echo "=== Running tests with coverage on tmpfs ==="
           dune clean
-          dune runtest --instrument-with bisect_ppx --force
+          
+          # Run tests with detailed progress monitoring
+          echo "Starting tests at $(date -u '+%H:%M:%S')"
+          
+          # Start tests in background so we can monitor
+          timeout 600 dune runtest --instrument-with bisect_ppx --force --display=short --verbose &
+          TEST_PID=$!
+          
+          # Monitor progress
+          START_TIME=$(date +%s)
+          while kill -0 $TEST_PID 2>/dev/null; do
+            ELAPSED=$(($(date +%s) - START_TIME))
+            echo "[${ELAPSED}s] Still running... Coverage files: $(ls /dev/shm/coverage/ 2>/dev/null | wc -l)"
+            
+            # Show recent coverage file activity
+            if [ -d /dev/shm/coverage ]; then
+              echo "  Latest files:"
+              ls -lth /dev/shm/coverage/ | head -3
+            fi
+            
+            # Check if we're past 5 minutes (unusual)
+            if [ $ELAPSED -gt 300 ]; then
+              echo "WARNING: Tests running longer than 5 minutes!"
+              echo "Process tree:"
+              ps auxf | grep -E "dune|alcotest|test_" | head -20
+            fi
+            
+            sleep 10
+          done
+          
+          # Wait for test process and capture exit code
+          wait $TEST_PID
+          TEST_EXIT=$?
+          
+          echo "Tests completed at $(date -u '+%H:%M:%S') with exit code $TEST_EXIT"
+          
+          if [ $TEST_EXIT -ne 0 ]; then
+            echo "ERROR: Tests failed with exit code $TEST_EXIT"
+            exit $TEST_EXIT
+          fi
           
           # Copy coverage files to artifact location
           echo "=== Copying coverage data from tmpfs ==="
