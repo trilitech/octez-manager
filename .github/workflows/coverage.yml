@@ -74,71 +74,13 @@ jobs:
           echo "Process limits:"
           ulimit -a
           
-          echo "=== Building instrumented tests ==="
+          echo "=== Running tests with standard dune runtest ==="
           dune clean
           
-          # Build instrumented test executables (not run yet)
-          echo "Building at $(date -u '+%H:%M:%S')"
-          dune build @runtest --instrument-with bisect_ppx
-          echo "Build complete at $(date -u '+%H:%M:%S')"
-          
-          # Find all test executables
-          echo "=== Running tests in parallel to avoid dune hang ==="
-          TEST_EXES=$(find _build/default/test -name "*.exe" -type f | sort)
-          TEST_COUNT=$(echo "$TEST_EXES" | wc -l)
-          echo "Found $TEST_COUNT test executables"
-          
-          # Create temporary directory for test results
-          mkdir -p /tmp/test-results
-          
-          # Run all tests in parallel with individual timeouts
-          echo "Starting parallel test execution at $(date -u '+%H:%M:%S')"
-          echo "$TEST_EXES" | xargs -P 4 -I {} sh -c '
-            test_name=$(basename "{}" .exe)
-            result_file="/tmp/test-results/${test_name}.result"
-            
-            echo "Starting: $test_name"
-            if timeout 120 "{}"; then
-              echo "PASS" > "$result_file"
-              echo "  ✓ $test_name passed"
-            else
-              EXIT_CODE=$?
-              if [ $EXIT_CODE -eq 124 ]; then
-                echo "TIMEOUT" > "$result_file"
-                echo "  ✗ $test_name TIMEOUT (>120s)"
-              else
-                echo "FAIL:$EXIT_CODE" > "$result_file"
-                echo "  ✗ $test_name FAILED (exit $EXIT_CODE)"
-              fi
-            fi
-          '
-          
-          echo ""
-          echo "=== All tests completed at $(date -u '+%H:%M:%S') ==="
-          echo "Total coverage files: $(ls /dev/shm/coverage/ 2>/dev/null | wc -l)"
-          
-          # Check for failures
-          FAILED_COUNT=0
-          FAILED_TESTS=""
-          for result_file in /tmp/test-results/*.result; do
-            if [ -f "$result_file" ]; then
-              test_name=$(basename "$result_file" .result)
-              result=$(cat "$result_file")
-              
-              if [ "$result" != "PASS" ]; then
-                FAILED_COUNT=$((FAILED_COUNT + 1))
-                FAILED_TESTS="$FAILED_TESTS\n  - $test_name: $result"
-              fi
-            fi
-          done
-          
-          echo "Test results: $((TEST_COUNT - FAILED_COUNT))/$TEST_COUNT passed"
-          
-          if [ $FAILED_COUNT -gt 0 ]; then
-            echo ""
-            echo "Failed tests:$FAILED_TESTS"
-            exit 1
-          fi
+          # Run tests the standard way
+          echo "Starting at $(date -u '+%H:%M:%S')"
+          dune runtest --instrument-with bisect_ppx --force
+          echo "Completed at $(date -u '+%H:%M:%S')"
           
           # Copy coverage files to artifact location
           echo "=== Copying coverage data from tmpfs ==="
