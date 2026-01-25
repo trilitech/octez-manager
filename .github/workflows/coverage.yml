@@ -62,10 +62,26 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          mkdir -p _coverage
-          export BISECT_FILE=$PWD/_coverage/bisect-unit
+          # Use tmpfs for fast I/O during test execution
+          mkdir -p /dev/shm/coverage
+          export BISECT_FILE=/dev/shm/coverage/bisect-unit
+          
+          echo "=== Environment Check ==="
+          echo "BISECT_FILE=$BISECT_FILE"
+          df -h /dev/shm
+          echo "Available memory:"
+          free -h
+          
+          echo "=== Running tests with coverage on tmpfs ==="
           dune clean
           dune runtest --instrument-with bisect_ppx --force
+          
+          # Copy coverage files to artifact location
+          echo "=== Copying coverage data from tmpfs ==="
+          mkdir -p _coverage
+          cp -v /dev/shm/coverage/* _coverage/ || echo "Warning: No coverage files generated"
+          ls -lah _coverage/
+          echo "=== Coverage data ready for upload ==="
         continue-on-error: false
 
       - name: Upload unit coverage data
