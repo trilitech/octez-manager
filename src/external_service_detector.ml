@@ -734,3 +734,17 @@ let detect () =
   with e ->
     let msg = Printf.sprintf "Detection failed: %s" (Printexc.to_string e) in
     Error msg
+
+(** {1 Testing Utilities} *)
+
+module For_tests = struct
+  let string_contains = string_contains
+
+  let is_managed_unit_name = is_managed_unit_name
+
+  let extract_command_from_systemd_format = extract_command_from_systemd_format
+
+  let chain_id_to_network = chain_id_to_network
+
+  let systemctl_cmd = systemctl_cmd
+end
