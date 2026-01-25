@@ -84,14 +84,17 @@ jobs:
           echo "Testing hypothesis: UI regression tests cause bisect_ppx hang"
           dune clean
           
-          # Temporarily comment out UI regression test stanzas in dune file
-          sed -i '/name test_ui_regressions_minimal/,/backend bisect_ppx)))/s/^/; /' test/dune
-          sed -i '/name test_ui_regressions_forms)/,/backend bisect_ppx)))/s/^/; /' test/dune
-          sed -i '/name test_ui_regressions_forms_comprehensive/,/backend bisect_ppx)))/s/^/; /' test/dune
+          # Temporarily comment out UI regression test stanzas by line number
+          # test_ui_regressions_minimal: lines 189-202
+          # test_ui_regressions_forms: lines 204-217
+          # test_ui_regressions_forms_comprehensive: lines 219-232
+          sed -i '189,202s/^/; /' test/dune
+          sed -i '204,217s/^/; /' test/dune
+          sed -i '219,232s/^/; /' test/dune
           
           echo "Modified test/dune - UI regression tests commented out"
-          echo "Checking modified file:"
-          grep -B 1 "test_ui_regressions" test/dune | head -10
+          echo "Lines 189-232 should now be commented:"
+          sed -n '189,232p' test/dune | head -20
           
           # Run tests WITH instrumentation (UI tests won't be built)
           echo "Starting tests at $(date -u '+%H:%M:%S')"
