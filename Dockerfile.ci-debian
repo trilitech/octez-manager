@@ -19,11 +19,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN opam init --disable-sandboxing --bare -y && \
     opam switch create 5.3.0 ocaml.5.3.0 -y
 
-# Add alpha opam repository for latest package fixes
-RUN eval $(opam env) && \
-    opam repository add alpha git+https://github.com/kit-ty-kate/opam-alpha-repository.git --rank=1 && \
-    opam update
-
 # Install OCaml dependencies
 RUN eval $(opam env) && \
     opam install -y \
