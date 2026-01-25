@@ -40,3 +40,7 @@ let read_public_key_hashes ~base_dir =
     with
     | Sys_error msg -> Error (`Msg msg)
     | Yojson.Json_error msg -> Error (`Msg msg)
+
+module For_tests = struct
+  let key_info_of_yojson = key_info_of_yojson
+end
