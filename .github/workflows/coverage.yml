@@ -84,15 +84,14 @@ jobs:
           echo "Testing hypothesis: UI regression tests cause bisect_ppx hang"
           dune clean
           
-          # Temporarily rename UI regression test files so dune doesn't build them
-          cd test
-          mv test_ui_regressions_minimal.ml test_ui_regressions_minimal.ml.skip || true
-          mv test_ui_regressions_forms.ml test_ui_regressions_forms.ml.skip || true
-          mv test_ui_regressions_forms_comprehensive.ml test_ui_regressions_forms_comprehensive.ml.skip || true
-          cd ..
+          # Temporarily comment out UI regression test stanzas in dune file
+          sed -i '/name test_ui_regressions_minimal/,/backend bisect_ppx)))/s/^/; /' test/dune
+          sed -i '/name test_ui_regressions_forms)/,/backend bisect_ppx)))/s/^/; /' test/dune
+          sed -i '/name test_ui_regressions_forms_comprehensive/,/backend bisect_ppx)))/s/^/; /' test/dune
           
-          echo "UI regression test files renamed (skipped)"
-          ls -la test/*.skip 2>/dev/null || echo "No .skip files (maybe already renamed)"
+          echo "Modified test/dune - UI regression tests commented out"
+          echo "Checking modified file:"
+          grep -B 1 "test_ui_regressions" test/dune | head -10
           
           # Run tests WITH instrumentation (UI tests won't be built)
           echo "Starting tests at $(date -u '+%H:%M:%S')"
