@@ -10,12 +10,12 @@ SIZE:234x24
 │▲/▼ move · PgUp/PgDn page · Home/End jump · Enter confirm · Esc cancel│✓    │
 │Ghostnet                                                              │✓    │
 │Mainnet                                                               │✓    │
-│Seoulnet · https://teztnets.com/seoulnet                              │✓    │
-│Shadownet · https://teztnets.com/shadownet                            │✗    │
-│Tallinnnet · https://teztnets.com/tallinnnet                          │✓    │
+│Shadownet · https://teztnets.com/shadownet                            │✓    │
+│Tallinnnet · https://teztnets.com/tallinnnet                          │✗    │
 │Weeklynet · https://teztnets.com/weeklynet-2026-01-21                 │✓    │
 │Custom URL or slug...                                                 │✓    │
 └──────────────────────────────────────────────────────────────────────┘✓    │
+│ Extra Args            │ (none)                                      │ ✓    │
 │ Service User          │ mathias                                     │ ✓    │
 │ Enable on Boot        │ true                                        │ ✓    │
 │ Start Now             │ true                                        │ ✓    │
