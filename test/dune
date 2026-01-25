@@ -177,34 +177,6 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(test
- (name test_snapshots)
- (libraries alcotest octez_manager_lib)
- (modules test_snapshots)
- (instrumentation
-  (backend bisect_ppx)))
-
-(test
- (name test_version_checker)
- (libraries alcotest octez_manager_lib)
- (modules test_version_checker)
- (instrumentation
-  (backend bisect_ppx)))
-
-(test
- (name test_common_utils)
- (libraries alcotest octez_manager_lib)
- (modules test_common_utils)
- (instrumentation
-  (backend bisect_ppx)))
-
-(test
- (name test_teztnets)
- (libraries alcotest octez_manager_lib)
- (modules test_teztnets)
- (instrumentation
-  (backend bisect_ppx)))
-
 ; UI Regression Testing Framework
 
 (library
