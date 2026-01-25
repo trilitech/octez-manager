@@ -83,8 +83,17 @@ jobs:
           echo "=== Running tests with coverage (Debian container) ==="
           echo "Testing if Debian fixes UI regression test hang with bisect_ppx"
           
+          # Debug: Check environment
+          echo "PATH: $PATH"
+          echo "OPAM_SWITCH_PREFIX: $OPAM_SWITCH_PREFIX"
+          which dune || echo "dune not in PATH"
+          which opam || echo "opam not in PATH"
+          
           # Ensure opam environment is loaded
           eval $(opam env)
+          echo "After eval opam env:"
+          echo "PATH: $PATH"
+          which dune || echo "dune STILL not in PATH"
           
           dune clean
           
