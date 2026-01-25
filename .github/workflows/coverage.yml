@@ -29,6 +29,7 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+      options: --tty  # Allocate a pseudo-TTY for UI tests
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
@@ -82,31 +83,10 @@ jobs:
           echo "=== Running tests with standard dune runtest ==="
           dune clean
           
-          # Run tests WITHOUT UI regression tests (they hang in container without PTY)
-          # The UI tests work locally but lambda-term needs /dev/tty in CI
+          # Run all tests including UI regression tests
+          # Container now has --tty option for lambda-term support
           echo "Starting at $(date -u '+%H:%M:%S')"
-          dune build @runtest --instrument-with bisect_ppx
-          
-          # Run all test executables EXCEPT UI regression tests
-          echo "Running tests individually..."
-          for test_exe in _build/default/test/*.exe; do
-            test_name=$(basename "$test_exe" .exe)
-            
-            # Skip UI regression tests in CI (they need PTY)
-            if echo "$test_name" | grep -q "ui_regressions"; then
-              echo "  ⊘ Skipping $test_name (requires PTY)"
-              continue
-            fi
-            
-            echo "  → Running $test_name"
-            if timeout 120 "$test_exe"; then
-              echo "    ✓ passed"
-            else
-              echo "    ✗ FAILED"
-              exit 1
-            fi
-          done
-          
+          dune runtest --instrument-with bisect_ppx
           echo "Completed at $(date -u '+%H:%M:%S')"
           
           # Copy coverage files to artifact location
