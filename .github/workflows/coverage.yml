@@ -80,8 +80,8 @@ jobs:
           # Run tests with detailed progress monitoring
           echo "Starting tests at $(date -u '+%H:%M:%S')"
           
-          # Start tests in background so we can monitor
-          timeout 600 dune runtest --instrument-with bisect_ppx --force --display=short --verbose &
+          # Start tests in background so we can monitor  
+          timeout 600 dune runtest --instrument-with bisect_ppx --force --display=short &
           TEST_PID=$!
           
           # Monitor progress
