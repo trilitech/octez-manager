@@ -1,0 +1,25 @@
+SIZE:240x24
+ Install DAL Node 
+ ⚠ Form incomplete 
+--------------------------------------------------------------------------------
+┌───────────────────────┬──────────────────────────────────────────────┬───────┐
+│ Parameter             │ Value                                        │ S     │
+├───────────────────────┼──────────────────────────────────────────────┼───────┤
+│ Node                  │ None ⚠ Node selection is required            │ ✗     │
+│ App Bin Dir           │ /usr/bin ⚠ Binary 'octez-dal-node' n…        │ ✗     │
+│ DAL RPC Addr          │ 127.0.0.1:10732                              │ ✓     │
+│ DAL P2P Addr          │ 0.0.0.0:11732                                │ ✓     │
+│ DAL Data Dir          │ …ression/.local/share/octez/dal-node-dal     │ ✓     │
+│ Extra Args            │ (none)                                       │ ✓     │
+│ Service User          │ mathias                                      │ ✓     │
+│ Enable on Boot        │ true                                         │ ✓     │
+│ Start Now             │ true                                         │ ✓     │
+│ Instance Name         │ dal                                          │ ✓     │
+│ Confirm & Install     │ Incomplete                                   │ ✗     │
+└───────────────────────┴──────────────────────────────────────────────┴───────┘
+
+
+
+
+
+--------------------------------------------------------------------------------
