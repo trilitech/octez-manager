@@ -19,6 +19,7 @@ jobs:
   coverage:
     name: Generate Coverage Report
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # TODO: Re-enable conditional after testing
     # if: |
     #   github.event_name == 'push' || 
