@@ -281,3 +281,63 @@ let drive_instance_action ~instance_index () =
   (* Open action menu *)
   ignore (send_key_and_wait "Enter") ;
   wait_until_modal_active ()
+
+(* ============================================================ *)
+(* Form Field Editing Helpers *)
+(* ============================================================ *)
+
+(** Edit a form field by pressing Enter, typing text, and confirming.
+    Assumes the cursor is already on the desired field. *)
+let edit_current_field text =
+  ignore (send_key_and_wait "Enter") ;
+  if not (wait_until_modal_active ~iterations:20 ()) then
+    Alcotest.fail "Modal did not open when editing field" ;
+  type_and_confirm text ;
+  wait_until_no_modal ~iterations:20 ()
+
+(** Navigate to a field by label and edit it.
+    This is a simplified version - in real use you'd need to know the field index. *)
+let edit_field_by_index index text =
+  navigate_down index ;
+  edit_current_field text
+
+(** Clear a field by pressing Enter, selecting all (Ctrl+A), and deleting *)
+let clear_current_field () =
+  ignore (send_key_and_wait "Enter") ;
+  if not (wait_until_modal_active ~iterations:20 ()) then
+    Alcotest.fail "Modal did not open when clearing field" ;
+  (* Select all and delete *)
+  ignore (HD.Stateful.send_key "\001") ;
+  (* Ctrl+A *)
+  ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.0 ()) ;
+  ignore (HD.Stateful.send_key "Backspace") ;
+  ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.0 ()) ;
+  ignore (send_key_and_wait "Enter") ;
+  wait_until_no_modal ~iterations:20 ()
+
+(** Check if screen shows an error or warning message *)
+let screen_shows_error () =
+  let screen = get_screen_text () in
+  contains_substring screen "✗"
+  || contains_substring screen "Error"
+  || contains_substring screen "error"
+  || contains_substring screen "Invalid"
+  || contains_substring screen "invalid"
+  || contains_substring screen "required"
+  || contains_substring screen "Required"
+
+(** Check if screen shows a validation checkmark *)
+let screen_shows_success () =
+  let screen = get_screen_text () in
+  contains_substring screen "✓"
+
+(** Try to submit the form by navigating to Confirm and pressing Enter *)
+let attempt_submit () =
+  (* Navigate to bottom of form (Confirm button) *)
+  (* This is simplified - real implementation would need to track field count *)
+  for _ = 1 to 20 do
+    ignore (send_key_and_wait "Down")
+  done ;
+  (* Press Enter on Confirm *)
+  ignore (send_key_and_wait "Enter") ;
+  ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.01 ())
