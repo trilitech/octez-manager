@@ -170,9 +170,12 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
                    app_bin_dir)
             else None)
           ~edit:(fun model_ref ->
-            let on_select path =
+            let on_select (path, bin_source) =
               let core = get_core !model_ref in
-              model_ref := set_core {core with app_bin_dir = path} !model_ref
+              model_ref :=
+                set_core
+                  {core with app_bin_dir = path; bin_source = Some bin_source}
+                  !model_ref
             in
             Modal_helpers.select_app_bin_dir_modal ~on_select ())
           ()

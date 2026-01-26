@@ -101,7 +101,7 @@ let install_baker_cmd =
       octez_version bin_dir_alias no_enable logging_mode =
     let res =
       let ( let* ) = Result.bind in
-      let* app_bin_dir =
+      let* app_bin_dir, bin_source =
         Cli_helpers.resolve_app_bin_dir
           ?octez_version
           ?bin_dir_alias
@@ -242,6 +242,7 @@ let install_baker_cmd =
           extra_args;
           service_user;
           app_bin_dir;
+          bin_source = Some bin_source;
           logging_mode;
           auto_enable = not no_enable;
           preserve_data = false;

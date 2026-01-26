@@ -183,6 +183,7 @@ let sample_node_request ?data_dir ?(bootstrap = Genesis)
     net_addr = "0.0.0.0:9732";
     service_user = "octez";
     app_bin_dir = "/opt/octez";
+    bin_source = None;
     logging_mode;
     extra_args;
     auto_enable;

@@ -82,4 +82,7 @@ val select_node_data_dir_modal : on_select:(string -> unit) -> unit -> unit
 
 val select_client_base_dir_modal : on_select:(string -> unit) -> unit -> unit
 
-val select_app_bin_dir_modal : on_select:(string -> unit) -> unit -> unit
+val select_app_bin_dir_modal :
+  on_select:(string * Octez_manager_lib.Binary_registry.bin_source -> unit) ->
+  unit ->
+  unit

@@ -31,6 +31,7 @@ type core_service_config = {
   instance_name : string;
   service_user : string;
   app_bin_dir : string;
+  bin_source : Octez_manager_lib.Binary_registry.bin_source option;
   enable_on_boot : bool;
   start_now : bool;
   extra_args : string;
