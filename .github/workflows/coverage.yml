@@ -381,10 +381,11 @@ jobs:
           echo "" >> coverage-summary.md
           
           echo "Running bisect-ppx-report summary..."
-          # Note: --ignore-missing-files and --source-path require bisect_ppx >= 2.8.0
-          # CI container has older version, so we just run summary without filtering
+          # Use --source-path to exclude test files from coverage calculation
+          # Only measure coverage of src/ directory (requires bisect_ppx >= 2.8.0)
           bisect-ppx-report summary \
-            --coverage-path _coverage > coverage-summary.txt 2>&1 || true
+            --coverage-path _coverage \
+            --source-path src > coverage-summary.txt 2>&1 || true
           
           echo "=== Coverage summary output ==="
           cat coverage-summary.txt
@@ -392,10 +393,10 @@ jobs:
           
           cat coverage-summary.txt >> coverage-summary.md
           
-          # Generate HTML report
-          # Note: --ignore-missing-files and --source-path require bisect_ppx >= 2.8.0
+          # Generate HTML report (exclude test files)
           bisect-ppx-report html \
             --coverage-path _coverage \
+            --source-path src \
             --title "Octez Manager Coverage" \
             -o coverage-report || echo "HTML generation failed"
           
@@ -404,9 +405,10 @@ jobs:
           echo "### Coverage by File" >> coverage-summary.md
           echo "" >> coverage-summary.md
           echo '```' >> coverage-summary.md
-          # Note: --ignore-missing-files and --source-path require bisect_ppx >= 2.8.0
+          # Exclude test files from per-file coverage report
           bisect-ppx-report summary \
             --coverage-path _coverage \
+            --source-path src \
             --per-file > per-file-coverage.txt 2>&1 || true
           
           cat per-file-coverage.txt >> coverage-summary.md
