@@ -5,6 +5,7 @@
 (*                                                                            *)
 (******************************************************************************)
 
+open Octez_manager_lib
 module Widgets = Miaou_widgets_display.Widgets
 module Table_widget = Miaou_widgets_display.Table_widget
 
@@ -173,11 +174,27 @@ let custom_field ~label ~get ~set ~validate ~validate_msg ~edit () =
 let app_bin_dir ~label ~get ~set ?(validate = fun _ -> true) () =
   let to_string v = v in
   let validate_msg _ = None in
+  let internal_set v m =
+    (* For direct programmatic updates, use Raw_path as fallback *)
+    set v (Binary_registry.Raw_path v) m
+  in
   let edit model_ref =
-    let on_select path = model_ref := set path !model_ref in
+    let on_select (path, bin_source) =
+      model_ref := set path bin_source !model_ref
+    in
     Modal_helpers.select_app_bin_dir_modal ~on_select ()
   in
-  Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
+  Field
+    {
+      label;
+      hint = None;
+      get;
+      set = internal_set;
+      to_string;
+      validate;
+      validate_msg;
+      edit;
+    }
 
 let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
     ?subcommand () =

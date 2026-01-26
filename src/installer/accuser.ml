@@ -66,6 +66,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         net_addr = "";
         service_user = request.service_user;
         app_bin_dir = request.app_bin_dir;
+        bin_source = request.bin_source;
         logging_mode = request.logging_mode;
         service_args = request.extra_args;
         extra_env =

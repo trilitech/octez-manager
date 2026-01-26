@@ -14,12 +14,13 @@ module Term = Cmdliner.Term
 val cmdliner_error : string -> [> `Error of bool * string]
 
 (** Resolve application binary directory from optional path, version, or alias.
-    Priority: octez_version > bin_dir_alias > app_bin_dir > auto-detect *)
+    Priority: octez_version > bin_dir_alias > app_bin_dir > auto-detect
+    Returns: (path, bin_source) tuple *)
 val resolve_app_bin_dir :
   ?octez_version:string ->
   ?bin_dir_alias:string ->
   string option ->
-  (string, string) result
+  (string * Binary_registry.bin_source, string) result
 
 (** Check if running in interactive terminal *)
 val is_interactive : unit -> bool

@@ -146,6 +146,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~net_addr:request.net_addr
       ~service_user:request.service_user
       ~app_bin_dir:request.app_bin_dir
+      ?bin_source:request.bin_source
       ~logging_mode
       ~snapshot_auto:snapshot_meta.auto
       ~snapshot_uri:snapshot_meta.uri

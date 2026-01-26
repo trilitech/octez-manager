@@ -33,6 +33,7 @@ type node_request = {
   net_addr : string;
   service_user : string;
   app_bin_dir : string;
+  bin_source : Binary_registry.bin_source option;
   logging_mode : Logging_mode.t;
   extra_args : string list;
   auto_enable : bool;
@@ -53,6 +54,7 @@ type daemon_request = {
   net_addr : string;
   service_user : string;
   app_bin_dir : string;
+  bin_source : Binary_registry.bin_source option;
   logging_mode : Logging_mode.t;
   service_args : string list;
   extra_env : (string * string) list;
@@ -81,6 +83,7 @@ type baker_request = {
   extra_args : string list;
   service_user : string;
   app_bin_dir : string;
+  bin_source : Binary_registry.bin_source option;
   logging_mode : Logging_mode.t;
   auto_enable : bool;
   preserve_data : bool;
@@ -93,6 +96,7 @@ type accuser_request = {
   extra_args : string list;
   service_user : string;
   app_bin_dir : string;
+  bin_source : Binary_registry.bin_source option;
   logging_mode : Logging_mode.t;
   auto_enable : bool;
   preserve_data : bool;
