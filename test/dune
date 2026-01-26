@@ -232,6 +232,7 @@
  (modules test_external_service_extended)
  (instrumentation
   (backend bisect_ppx)))
+
 ; UI Regression Testing Framework
 
 (library
