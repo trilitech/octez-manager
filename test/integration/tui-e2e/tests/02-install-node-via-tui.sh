@@ -14,6 +14,7 @@ tui_start
 
 # Navigate to install > node
 nav_to_install
+sleep 1  # Extra delay for menu to stabilize
 tui_send 'Return' # Confirm Node selection (already highlighted)
 tui_wait_for "Instance name"
 
