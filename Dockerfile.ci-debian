@@ -42,7 +42,7 @@ RUN eval $(opam env) && \
     linenoise \
     ppx_deriving \
     alcotest \
-    bisect_ppx.2.8.3
+    bisect_ppx
 
 # Clean up opam cache
 RUN eval $(opam env) && opam clean -a -c -s --logs
