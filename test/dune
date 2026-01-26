@@ -321,3 +321,17 @@
  (modules test_help_parser)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_form_builder)
+ (libraries alcotest octez-manager.ui)
+ (modules test_form_builder)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_form_builder_bundles)
+ (libraries alcotest octez-manager.ui)
+ (modules test_form_builder_bundles)
+ (instrumentation
+  (backend bisect_ppx)))
