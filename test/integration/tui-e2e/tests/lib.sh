@@ -116,8 +116,8 @@ tui_wait_not() {
 nav_to_install() {
 	echo "Navigating to install menu..."
 	tui_send 'c' # 'c' for create/install
-	# Wait for install menu modal (check for "Create Service" header or service options)
-	tui_wait_for "Create Service\|^Node$\|^Baker$" 10
+	# Wait for install menu modal
+	tui_wait_for "Create Service" 10
 }
 
 nav_to_instances() {
