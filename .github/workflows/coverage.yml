@@ -360,30 +360,30 @@ jobs:
       - name: Build coverage test containers
         working-directory: test/integration
         run: |
-          docker compose -f docker-compose.yml build sandbox
+          docker compose -p tui-e2e -f docker-compose.yml build sandbox
           cd tui-e2e
-          docker compose build
+          docker compose -p tui-e2e build
 
       - name: Start sandbox
         working-directory: test/integration
         run: |
-          docker compose up -d sandbox
-          timeout 300 bash -c 'until docker compose exec -T sandbox curl -sf http://localhost:8080/health 2>/dev/null; do echo "Waiting for sandbox..."; sleep 10; done'
+          docker compose -p tui-e2e up -d sandbox
+          timeout 300 bash -c 'until docker compose -p tui-e2e exec -T sandbox curl -sf http://localhost:8080/health 2>/dev/null; do echo "Waiting for sandbox..."; sleep 10; done'
 
       - name: Start TUI tester with coverage
         working-directory: test/integration/tui-e2e
         run: |
-          docker compose up -d
+          docker compose -p tui-e2e up -d
           echo "Waiting for systemd..."
           for i in {1..30}; do
-            if docker compose exec -T tui-tester systemctl is-system-running 2>/dev/null; then
+            if docker compose -p tui-e2e exec -T tui-tester systemctl is-system-running 2>/dev/null; then
               echo "Systemd is ready"
               break
             fi
             echo "Attempt $i: systemd not ready yet..."
             sleep 2
           done
-          docker compose ps
+          docker compose -p tui-e2e ps
 
       - name: Run TUI E2E tests with coverage (Shard ${{ matrix.shard }})
         working-directory: test/integration/tui-e2e
@@ -391,13 +391,13 @@ jobs:
           SHARD: ${{ matrix.shard }}
           TOTAL_SHARDS: 3
         run: |
-          docker compose exec -T -e SHARD -e TOTAL_SHARDS tui-tester /run-tests.sh
+          docker compose -p tui-e2e exec -T -e SHARD -e TOTAL_SHARDS tui-tester /run-tests.sh
 
       - name: Extract coverage data from container
         working-directory: test/integration/tui-e2e
         run: |
           mkdir -p ../../_coverage-tui-e2e
-          docker compose cp tui-tester:/coverage/. ../../_coverage-tui-e2e/ || true
+          docker compose -p tui-e2e cp tui-tester:/coverage/. ../../_coverage-tui-e2e/ || true
           ls -la ../../_coverage-tui-e2e/
 
       - name: Upload TUI E2E coverage data
@@ -410,8 +410,8 @@ jobs:
       - name: Cleanup containers
         if: always()
         run: |
-          docker compose -f test/integration/tui-e2e/docker-compose.yml down -v || true
-          docker compose -f test/integration/docker-compose.yml down -v || true
+          docker compose -p tui-e2e -f test/integration/tui-e2e/docker-compose.yml down -v || true
+          docker compose -p tui-e2e -f test/integration/docker-compose.yml down -v || true
 
   report:
     name: Generate and Post Coverage Report
