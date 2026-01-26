@@ -3,8 +3,6 @@ services:
     build:
       context: ..
       dockerfile: tui-e2e/Dockerfile
-      args:
-        - OCTEZ_MANAGER_BIN=../../_build/default/src/main.exe
     container_name: octez-tui-tester
     depends_on:
       - sandbox

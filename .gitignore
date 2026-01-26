@@ -22,3 +22,4 @@ test/integration/cli-tester/octez-manager
 docs/architecture.db
 _coverage/
 coverage-report/
+test/integration/tui-e2e/octez-manager

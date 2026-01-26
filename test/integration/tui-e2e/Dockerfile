@@ -46,15 +46,17 @@ RUN mkdir -p /usr/local/share/zcash-params && \
     curl -sfL "${ZCASH_PARAMS_URL}/sapling-spend.params" -o /usr/local/share/zcash-params/sapling-spend.params
 
 # Install INSTRUMENTED octez-manager from build context (for coverage)
-COPY octez-manager /usr/local/bin/octez-manager
+# The binary should be copied to tui-e2e/octez-manager before building
+COPY tui-e2e/octez-manager /usr/local/bin/octez-manager
 RUN chmod +x /usr/local/bin/octez-manager
 
 # Alias 'om' command for convenience
 RUN ln -s /usr/local/bin/octez-manager /usr/local/bin/om
 
-# Copy test scripts
-COPY tests/ /tests/
-COPY run-tests.sh /run-tests.sh
+# Copy test scripts (context is test/integration/)
+COPY tui-e2e/tests/ /tests/
+COPY tui-e2e/run-tests.sh /run-tests.sh
+COPY tui-e2e/shards.json /shards.json
 RUN chmod +x /run-tests.sh /tests/*.sh 2>/dev/null || true
 
 # Ensure test user exists
