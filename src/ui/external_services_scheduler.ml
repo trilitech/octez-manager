@@ -47,17 +47,25 @@ let refresh () =
     match External_service_detector.detect () with
     | Ok services ->
         Mutex.protect cache_lock (fun () -> cache := services) ;
-        (* Validate each service and cache the result *)
+        (* Validate each service and cache the result.
+           Fetch service registry once to avoid repeated I/O. *)
         Mutex.protect validation_cache_lock (fun () ->
             Hashtbl.clear validation_cache ;
-            List.iter
-              (fun (svc : External_service.t) ->
-                let validation_result = Import.validate_importable svc in
-                Hashtbl.replace
-                  validation_cache
-                  svc.config.unit_name
-                  validation_result)
-              services)
+            match Service_registry.list () with
+            | Error _ ->
+                (* If we can't read the service registry, skip validation caching *)
+                ()
+            | Ok all_services ->
+                List.iter
+                  (fun (svc : External_service.t) ->
+                    let validation_result =
+                      Import.validate_importable_with_services ~all_services svc
+                    in
+                    Hashtbl.replace
+                      validation_cache
+                      svc.config.unit_name
+                      validation_result)
+                  services)
     | Error _ ->
         (* Keep previous cache on error *)
         ())

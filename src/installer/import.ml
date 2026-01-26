@@ -52,7 +52,9 @@ type import_result = {
 
 (** {1 Validation} *)
 
-let validate_importable external_svc =
+(** Validate that an external service can be imported.
+    Version that accepts pre-fetched service list to avoid repeated I/O. *)
+let validate_importable_with_services ~all_services external_svc =
   (* 1. Check it's systemd-managed, not a standalone process *)
   let* () =
     if
@@ -67,7 +69,6 @@ let validate_importable external_svc =
     else Ok ()
   in
   (* 2. Check not already managed by octez-manager *)
-  let* all_services = Service_registry.list () in
   let suggested_name = external_svc.External_service.suggested_instance_name in
   let* () =
     if List.exists (fun s -> s.Service.instance = suggested_name) all_services
@@ -106,6 +107,12 @@ let validate_importable external_svc =
     | _, _ -> Ok ()
   in
   Ok ()
+
+(** Validate that an external service can be imported.
+    This version fetches the service list internally (does I/O). *)
+let validate_importable external_svc =
+  let* all_services = Service_registry.list () in
+  validate_importable_with_services ~all_services external_svc
 
 let missing_required_fields external_svc =
   let config = external_svc.External_service.config in

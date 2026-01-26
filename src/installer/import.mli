@@ -65,6 +65,18 @@ type import_result = {
 (** {1 Validation} *)
 
 (** Validate that an external service can be imported.
+    Version that accepts pre-fetched service list to avoid repeated I/O.
+
+    @param all_services Pre-fetched list of managed services
+    @param external_svc External service to validate
+    @return Ok () if importable, Error with reason otherwise *)
+val validate_importable_with_services :
+  all_services:Service.t list ->
+  External_service.t ->
+  (unit, Rresult.R.msg) result
+
+(** Validate that an external service can be imported.
+    This version fetches the service list internally (does I/O).
 
     Checks:
     - Service is systemd-managed (not standalone process)
