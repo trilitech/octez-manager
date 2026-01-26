@@ -86,6 +86,7 @@ let create_node_flow ~on_success =
                         app_bin_dir =
                           Form_builder_common.default_app_bin_dir
                             ~binary_name:"octez-node";
+                        bin_source = None;
                         logging_mode = Logging_mode.Journald;
                         extra_args = [];
                         auto_enable = true;
@@ -159,6 +160,7 @@ let create_baker_flow ~services ~on_success =
                       app_bin_dir =
                         Form_builder_common.default_app_bin_dir
                           ~binary_name:"octez-baker";
+                      bin_source = None;
                       logging_mode = Logging_mode.Journald;
                       auto_enable = true;
                       preserve_data = false;
@@ -210,6 +212,7 @@ let create_accuser_flow ~on_success =
                 app_bin_dir =
                   Form_builder_common.default_app_bin_dir
                     ~binary_name:"octez-baker";
+                bin_source = None;
                 logging_mode = Logging_mode.Journald;
                 service_args = [];
                 extra_env =
@@ -269,6 +272,7 @@ let create_dal_node_flow ~on_success =
                 app_bin_dir =
                   Form_builder_common.default_app_bin_dir
                     ~binary_name:"octez-baker";
+                bin_source = None;
                 logging_mode = Logging_mode.Journald;
                 service_args =
                   [

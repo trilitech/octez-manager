@@ -1133,8 +1133,13 @@ let select_app_bin_dir_modal ~on_select () =
         let path =
           Octez_manager_lib.Binary_registry.managed_version_path version
         in
-        on_select path
-    | `LinkedDir (_alias, path) -> on_select path
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Managed_version version
+        in
+        on_select (path, bin_source)
+    | `LinkedDir (alias, path) ->
+        let bin_source = Octez_manager_lib.Binary_registry.Linked_alias alias in
+        on_select (path, bin_source)
     | `LatestVersion (vi : Octez_manager_lib.Binary_downloader.version_info) ->
         (* Directly download the latest version *)
         let version = vi.Octez_manager_lib.Binary_downloader.version in
@@ -1144,7 +1149,10 @@ let select_app_bin_dir_modal ~on_select () =
               let path =
                 Octez_manager_lib.Binary_registry.managed_version_path version
               in
-              on_select path)
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Managed_version version
+              in
+              on_select (path, bin_source))
     | `DownloadOther -> (
         (* Show available versions to download *)
         match Versions_scheduler.get_cached () with
@@ -1237,7 +1245,11 @@ let select_app_bin_dir_modal ~on_select () =
                           Octez_manager_lib.Binary_registry.managed_version_path
                             version
                         in
-                        on_select path))
+                        let bin_source =
+                          Octez_manager_lib.Binary_registry.Managed_version
+                            version
+                        in
+                        on_select (path, bin_source)))
                 ())
     | `CustomPath ->
         (* Open read-only file browser - no write permissions required *)
@@ -1258,7 +1270,11 @@ let select_app_bin_dir_modal ~on_select () =
               show_error
                 ~title:"Invalid Path"
                 "Path exists but is not a directory"
-            else on_select trimmed)
+            else
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Raw_path trimmed
+              in
+              on_select (trimmed, bin_source))
           ()
   in
 

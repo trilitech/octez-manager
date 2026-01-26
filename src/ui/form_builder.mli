@@ -184,7 +184,8 @@ val custom_field :
 val app_bin_dir :
   label:string ->
   get:('model -> string) ->
-  set:(string -> 'model -> 'model) ->
+  set:
+    (string -> Octez_manager_lib.Binary_registry.bin_source -> 'model -> 'model) ->
   ?validate:('model -> bool) ->
   unit ->
   'model field

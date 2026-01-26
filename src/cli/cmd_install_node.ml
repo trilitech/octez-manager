@@ -122,7 +122,7 @@ let install_node_cmd =
       tmp_dir keep_snapshot logging_mode =
     let res =
       let ( let* ) = Result.bind in
-      let* app_bin_dir =
+      let* app_bin_dir, bin_source =
         Cli_helpers.resolve_app_bin_dir
           ?octez_version
           ?bin_dir_alias
@@ -241,6 +241,7 @@ let install_node_cmd =
               net_addr;
               service_user;
               app_bin_dir;
+              bin_source = Some bin_source;
               extra_args;
               auto_enable = not no_enable;
               logging_mode;
@@ -370,6 +371,7 @@ let install_node_cmd =
               net_addr;
               service_user;
               app_bin_dir;
+              bin_source = Some bin_source;
               extra_args;
               auto_enable = not no_enable;
               logging_mode;

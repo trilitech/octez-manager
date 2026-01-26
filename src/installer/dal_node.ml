@@ -112,6 +112,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~net_addr:request.net_addr
       ~service_user:request.service_user
       ~app_bin_dir:request.app_bin_dir
+      ?bin_source:request.bin_source
       ~logging_mode
       ~extra_args:request.service_args
       ~depends_on:request.depends_on

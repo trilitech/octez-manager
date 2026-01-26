@@ -36,6 +36,7 @@ let base_initial_model () =
         service_user = Form_builder_common.default_service_user ();
         app_bin_dir =
           Form_builder_common.default_app_bin_dir ~binary_name:"octez-baker";
+        bin_source = None;
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
@@ -76,6 +77,7 @@ let make_initial_model () =
             instance_name = svc.Service.instance;
             service_user = svc.Service.service_user;
             app_bin_dir = svc.Service.app_bin_dir;
+            bin_source = svc.Service.bin_source;
             enable_on_boot = true;
             start_now = false;
             (* Don't auto-start after edit *)
@@ -439,6 +441,7 @@ let spec =
             net_addr = "";
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
+            bin_source = model.core.bin_source;
             logging_mode;
             service_args;
             extra_env =

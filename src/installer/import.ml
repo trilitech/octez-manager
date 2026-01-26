@@ -225,6 +225,8 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
       net_addr;
       service_user;
       app_bin_dir = bin_dir;
+      bin_source = None;
+      (* No bin_source for imported services *)
       logging_mode = Logging_mode.Journald;
       extra_args;
       auto_enable = true;
@@ -361,6 +363,8 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       extra_args;
       service_user;
       app_bin_dir = bin_dir;
+      bin_source = None;
+      (* No bin_source for imported services *)
       logging_mode = Logging_mode.Journald;
       auto_enable = true;
       preserve_data = true;
@@ -397,6 +401,8 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
       extra_args;
       service_user;
       app_bin_dir = bin_dir;
+      bin_source = None;
+      (* No bin_source for imported services *)
       logging_mode = Logging_mode.Journald;
       auto_enable = true;
       preserve_data = true;
@@ -445,6 +451,8 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       net_addr;
       service_user;
       app_bin_dir = bin_dir;
+      bin_source = None;
+      (* No bin_source for imported services *)
       logging_mode = Logging_mode.Journald;
       service_args;
       extra_env = [("OCTEZ_NODE_ENDPOINT", node_endpoint)];
