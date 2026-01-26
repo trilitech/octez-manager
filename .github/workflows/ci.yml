@@ -153,7 +153,14 @@ jobs:
     name: Integration Tests (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     needs: [changes, build-and-test]
-    if: needs.changes.outputs.needs-integration == 'true'
+    # Run fast (non-instrumented) integration tests when:
+    # 1. PR has 'skip-coverage' label (opt-in for faster iteration), OR
+    # 2. Pushing a release tag (fast tests for releases)
+    # Otherwise, coverage workflow runs instrumented tests (slower but collects coverage)
+    if: |
+      needs.changes.outputs.needs-integration == 'true' && 
+      (contains(github.event.pull_request.labels.*.name, 'skip-coverage') ||
+       startsWith(github.ref, 'refs/tags/'))
     timeout-minutes: 20
     strategy:
       fail-fast: false

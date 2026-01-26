@@ -191,6 +191,16 @@ Integration tests are located in `test/integration/cli-tester/tests/` organized 
 3. **Update documentation** if needed
 4. **Create a pull request** with a clear description
 
+### CI Labels
+
+The following labels can be added to PRs to control CI behavior:
+
+| Label | Effect | Use Case |
+|-------|--------|----------|
+| `skip-coverage` | Runs fast integration tests (2-3 min/shard) instead of instrumented tests (8-9 min/shard). No coverage report will be generated. | Use when iterating quickly and coverage data isn't needed. Remove before final merge to ensure coverage is collected. |
+
+**Note:** Coverage tests always run on the main branch to maintain the coverage baseline, regardless of labels used in PRs.
+
 ### Pull Request Template
 
 Your PR description should include:
