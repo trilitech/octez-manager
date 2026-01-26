@@ -11,11 +11,27 @@
 
 (** {1 Cache Registry} *)
 
-(** Invalidate all registered caches. Call from diagnostics page. *)
-val invalidate_all : unit -> unit
-
 (** Sub-entry for keyed caches showing per-key status *)
 type sub_entry = {key : string; age : float; expired : bool}
+
+(** Register a custom cache for global invalidation.
+    Use this for caches that don't use the Cache.t API (e.g., standalone Atomic.t or Hashtbl.t).
+    
+    @param name Human-readable cache name for diagnostics
+    @param invalidate Function to clear the cache
+    @param get_age Function returning seconds since last refresh (None if empty)
+    @param get_ttl Function returning cache TTL in seconds
+    @param get_sub_entries Function returning per-key stats (empty list for simple caches) *)
+val register :
+  name:string ->
+  invalidate:(unit -> unit) ->
+  get_age:(unit -> float option) ->
+  get_ttl:(unit -> float) ->
+  get_sub_entries:(unit -> sub_entry list) ->
+  unit
+
+(** Invalidate all registered caches. Call from diagnostics page. *)
+val invalidate_all : unit -> unit
 
 (** Get cache statistics: (name, hits, misses, age_secs, ttl_secs, expired, sub_entries) for each cache.
     age_secs is None if cache is empty. sub_entries is empty for non-keyed caches. *)

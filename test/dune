@@ -354,3 +354,10 @@
  (modules test_installer_snapshot)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_cache_invalidation)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_cache_invalidation)
+ (instrumentation
+  (backend bisect_ppx)))
