@@ -6,6 +6,7 @@ _opam/
 *.swp
 .envrc
 _coverage/
+*.coverage
 TODO.md
 TODO_CAPABILITIES.md
 octez-manager
