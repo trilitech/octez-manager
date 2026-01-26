@@ -79,7 +79,7 @@ let validate_importable external_svc =
               suggested_name))
     else Ok ()
   in
-  (* 3. Check network is known or can be inferred for nodes *)
+  (* 3. Check network is known for all roles that require it *)
   let role_field = external_svc.External_service.config.role in
   let network_field = external_svc.External_service.config.network in
   let* () =
@@ -87,11 +87,22 @@ let validate_importable external_svc =
       ( role_field.External_service.value,
         External_service.is_known network_field )
     with
-    | Some External_service.Node, false ->
+    | ( Some
+          ( External_service.Node | External_service.Baker
+          | External_service.Accuser | External_service.Dal_node ),
+        false ) ->
+        let role_str =
+          match role_field.External_service.value with
+          | Some r -> External_service.role_to_string r
+          | None -> "service"
+        in
         Error
           (`Msg
-             "Network could not be detected (RPC not accessible). Please \
-              specify --network")
+             (Printf.sprintf
+                "Network could not be detected for %s. Please specify \
+                 --network or ensure the node RPC is accessible for network \
+                 detection."
+                role_str))
     | _, _ -> Ok ()
   in
   Ok ()
