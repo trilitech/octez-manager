@@ -14,7 +14,7 @@ tui_start
 
 # Navigate to install > node
 nav_to_install
-tui_send '1' # Select Node
+tui_send 'Return' # Confirm Node selection (already highlighted)
 tui_wait_for "Instance name"
 
 # Fill form fields
