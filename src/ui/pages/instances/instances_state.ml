@@ -46,6 +46,7 @@ type state = {
   num_columns : int; (* number of columns based on terminal width *)
   active_column : int; (* which column has focus, 0-indexed *)
   column_scroll : int array; (* scroll offset per column *)
+  tabs : Miaou_widgets_navigation.Tabs_widget.t; (* navigation tabs *)
 }
 
 type msg = unit
@@ -53,11 +54,12 @@ type msg = unit
 type pstate = state Miaou.Core.Navigation.t
 
 let clamp_selection services external_services idx =
+  (* Selection -1 is tabs, 0+ is content *)
   (* Total selectable items: menu + managed services + external services *)
   let len =
     services_start_idx + List.length services + List.length external_services
   in
-  max 0 (min idx (len - 1))
+  max (-1) (min idx (len - 1))
 
 let current_service state =
   if state.selected < services_start_idx then None

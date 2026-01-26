@@ -22,6 +22,7 @@ type state = {
   scroll_offset : int;
   content_height : int;
   last_visible_height : int; (* Track terminal height *)
+  tabs : Miaou_widgets_navigation.Tabs_widget.t; (* navigation tabs *)
 }
 
 type msg = unit
@@ -36,6 +37,8 @@ let init () =
       match Sys.getenv_opt "OCTEZ_MANAGER_METRICS_ADDR" with
       | Some addr -> metrics_addr_ref := addr
       | None -> ())) ;
+  let tabs = Page_tabs.make_tabs () in
+  let tabs = Page_tabs.select_tab tabs ~page_name:name in
   Navigation.make
     {
       services = Data.load_service_states ();
@@ -43,6 +46,7 @@ let init () =
       scroll_offset = 0;
       content_height = 0;
       last_visible_height = 20;
+      tabs;
     }
 
 let update ps _ = ps
@@ -184,9 +188,13 @@ let keymap _ =
     };
   ]
 
-let header =
+let header s =
+  let tabs_line =
+    Page_tabs.render s.tabs ~current_page_name:name ~has_focus:false
+  in
   [
     Widgets.title_highlight " Diagnostics & Metrics ";
+    tabs_line;
     Widgets.dim "Live system metrics and service status";
   ]
 
@@ -546,7 +554,7 @@ let view ps ~focus:_ ~size =
             (100 * visible_height / content_height)
         else ""
       in
-      let header_with_scroll = header @ [Widgets.dim scroll_indicator] in
+      let header_with_scroll = header s @ [Widgets.dim scroll_indicator] in
 
       Miaou_widgets_layout.Vsection.render
         ~size

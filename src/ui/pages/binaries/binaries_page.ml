@@ -34,6 +34,7 @@ type state = {
   expanded_majors : int list; (* list of expanded major versions *)
   expanded_managed : string list; (* list of expanded managed versions *)
   expanded_linked : string list; (* list of expanded linked directory aliases *)
+  tabs : Miaou_widgets_navigation.Tabs_widget.t; (* navigation tabs *)
 }
 
 type msg = unit
@@ -202,6 +203,8 @@ let init () =
   let expanded_managed = [] in
   let expanded_linked = [] in
   let items = build_items managed linked available expanded_majors in
+  let tabs = Page_tabs.make_tabs () in
+  let tabs = Page_tabs.select_tab tabs ~page_name:name in
   Navigation.make
     {
       managed_versions = managed;
@@ -213,6 +216,7 @@ let init () =
       expanded_majors;
       expanded_managed;
       expanded_linked;
+      tabs;
     }
 
 let update ps _ = ps
@@ -233,6 +237,7 @@ let refresh_data s =
     expanded_majors = s.expanded_majors;
     expanded_managed = s.expanded_managed;
     expanded_linked = s.expanded_linked;
+    tabs = s.tabs;
   }
 
 let refresh ps = Navigation.update refresh_data ps
@@ -836,9 +841,13 @@ let keymap _ =
     };
   ]
 
-let header =
+let header s =
+  let tabs_line =
+    Page_tabs.render s.tabs ~current_page_name:name ~has_focus:false
+  in
   [
     Widgets.title_highlight " Binaries Management ";
+    tabs_line;
     Widgets.dim "Manage Octez binary versions and linked directories";
   ]
 

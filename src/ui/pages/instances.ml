@@ -42,6 +42,8 @@ let init_state () =
   in
   (* Default to 1 column, will be updated on first render with actual cols *)
   let num_columns = 1 in
+  let tabs = Page_tabs.make_tabs () in
+  let tabs = Page_tabs.select_tab tabs ~page_name:name in
   Navigation.make
     {
       services;
@@ -54,6 +56,7 @@ let init_state () =
       active_column = 0;
       column_scroll = Array.make 10 0;
       (* max practical columns based on terminal width; 10 is a safe upper bound *)
+      tabs;
     }
 
 let force_refresh state =
@@ -156,14 +159,11 @@ struct
     ps
 
   let handled_keys () =
-    Miaou.Core.Keys.
-      [Enter; Char "b"; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
+    Miaou.Core.Keys.[Enter; Char "c"; Char "r"; Char "R"; Char "x"]
 
   let keymap _ps =
     let activate ps = Navigation.update activate_selection ps in
     let create ps = Navigation.update create_menu_modal ps in
-    let diag ps = Navigation.update go_to_diagnostics ps in
-    let binaries ps = Navigation.update go_to_binaries ps in
     let dismiss ps = Navigation.update dismiss_failure ps in
     let noop ps = ps in
     let kb key action help =
@@ -172,8 +172,6 @@ struct
     [
       kb "Enter" activate "Open";
       kb "c" create "Create";
-      kb "d" diag "Diagnostics";
-      kb "b" binaries "Binaries";
       kb "x" dismiss "Clear failure";
       {
         Miaou.Core.Tui_page.key = "?";
@@ -188,13 +186,22 @@ struct
       if Common.is_root () then Widgets.red "● SYSTEM"
       else Widgets.green "● USER"
     in
-    let hint = "Hint: c create · b binaries · d diagnostics · ? help" in
+    let tabs_focused = s.selected = -1 in
+    let tabs_line =
+      Page_tabs.render s.tabs ~current_page_name:name ~has_focus:tabs_focused
+    in
+    let hint =
+      if tabs_focused then
+        "Hint: ←/→ select tab · Enter navigate · ↓ to content"
+      else "Hint: ↑ to tabs · c create · ? help"
+    in
     [
       Printf.sprintf
         "%s   %s    %s"
         (Widgets.title_highlight " octez-manager ")
         privilege
         (Widgets.dim hint);
+      tabs_line;
       Widgets.dim (summary_line s);
     ]
 
@@ -758,14 +765,39 @@ Press **Enter** to open instance menu.|}
             Navigation.update (fun s -> move_selection s (-1)) ps
         | Some (Keys.Char "j") ->
             Navigation.update (fun s -> move_selection s 1) ps
-        | Some Keys.Left -> Navigation.update (fun s -> move_column s (-1)) ps
-        | Some Keys.Right -> Navigation.update (fun s -> move_column s 1) ps
+        | Some Keys.Left ->
+            (* If in tabs (selected = -1), move tab focus left *)
+            if s.selected = -1 then
+              let new_tabs = Page_tabs.move_left s.tabs in
+              Navigation.update (fun s -> {s with tabs = new_tabs}) ps
+            else if s.selected < services_start_idx then
+              (* In menu area but not tabs, do nothing with Left *)
+              ps
+            else
+              (* In services area, move columns *)
+              Navigation.update (fun s -> move_column s (-1)) ps
+        | Some Keys.Right ->
+            (* If in tabs (selected = -1), move tab focus right *)
+            if s.selected = -1 then
+              let new_tabs = Page_tabs.move_right s.tabs in
+              Navigation.update (fun s -> {s with tabs = new_tabs}) ps
+            else if s.selected < services_start_idx then
+              (* In menu area but not tabs, do nothing with Right *)
+              ps
+            else
+              (* In services area, move columns *)
+              Navigation.update (fun s -> move_column s 1) ps
         | Some (Keys.Char "h") ->
             Navigation.update (fun s -> move_column s (-1)) ps
         | Some (Keys.Char "l") ->
             Navigation.update (fun s -> move_column s 1) ps
         | Some Keys.Tab -> Navigation.update toggle_fold ps
-        | Some Keys.Enter -> Navigation.update activate_selection ps
+        | Some Keys.Enter ->
+            (* If in tabs, navigate to focused tab; otherwise activate selection *)
+            if s.selected = -1 then (
+              Page_tabs.navigate_to_focused s.tabs ;
+              ps)
+            else Navigation.update activate_selection ps
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
         | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
         | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps

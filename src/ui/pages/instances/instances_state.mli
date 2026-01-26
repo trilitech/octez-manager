@@ -36,6 +36,7 @@ type state = {
   num_columns : int;
   active_column : int;
   column_scroll : int array;
+  tabs : Miaou_widgets_navigation.Tabs_widget.t; (* navigation tabs *)
 }
 
 type msg = unit
