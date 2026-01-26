@@ -344,8 +344,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install bisect_ppx
-        run: opam install bisect_ppx
+      - name: Install dependencies
+        run: |
+          opam install bisect_ppx
+          # Install jq for JSON parsing
+          apt-get update && apt-get install -y jq
 
       - name: Download unit coverage data
         uses: actions/download-artifact@v4
@@ -378,8 +381,11 @@ jobs:
           echo "" >> coverage-summary.md
           
           echo "Running bisect-ppx-report summary..."
+          # Exclude test files from coverage report (only measure src/ coverage)
           bisect-ppx-report summary \
-            --coverage-path _coverage > coverage-summary.txt 2>&1 || true
+            --coverage-path _coverage \
+            --ignore-missing-files \
+            --source-path src > coverage-summary.txt 2>&1 || true
           
           echo "=== Coverage summary output ==="
           cat coverage-summary.txt
@@ -387,9 +393,11 @@ jobs:
           
           cat coverage-summary.txt >> coverage-summary.md
           
-          # Generate HTML report
+          # Generate HTML report (exclude test files)
           bisect-ppx-report html \
             --coverage-path _coverage \
+            --ignore-missing-files \
+            --source-path src \
             --title "Octez Manager Coverage" \
             -o coverage-report || echo "HTML generation failed"
           
@@ -400,6 +408,8 @@ jobs:
           echo '```' >> coverage-summary.md
           bisect-ppx-report summary \
             --coverage-path _coverage \
+            --ignore-missing-files \
+            --source-path src \
             --per-file > per-file-coverage.txt 2>&1 || true
           
           cat per-file-coverage.txt >> coverage-summary.md
