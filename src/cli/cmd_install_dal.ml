@@ -95,7 +95,7 @@ let install_dal_node_cmd =
       Cli_helpers.resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir
     with
     | Error msg -> Cli_helpers.cmdliner_error msg
-    | Ok app_bin_dir -> (
+    | Ok (app_bin_dir, bin_source) -> (
         let instance_result =
           match Cli_helpers.normalize_opt_string instance_opt with
           | Some inst -> Ok inst
@@ -175,6 +175,7 @@ let install_dal_node_cmd =
                                 net_addr;
                                 service_user;
                                 app_bin_dir;
+                                bin_source = Some bin_source;
                                 logging_mode;
                                 service_args = extra_args;
                                 extra_env =

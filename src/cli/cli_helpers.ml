@@ -20,6 +20,7 @@ let is_interactive () = Lazy.force interactive_tty
 
 let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
   (* Priority: octez_version > bin_dir_alias > app_bin_dir > auto-detect *)
+  (* Returns: (path, bin_source) *)
   match (octez_version, bin_dir_alias, app_bin_dir) with
   | Some version_input, _, _ -> (
       (* Use managed version *)
@@ -49,7 +50,9 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
       | Error e -> Error e
       | Ok version ->
           if Binary_registry.managed_version_exists version then
-            Ok (Binary_registry.managed_version_path version)
+            Ok
+              ( Binary_registry.managed_version_path version,
+                Binary_registry.Managed_version version )
           else if is_interactive () then
             (* Prompt to download *)
             let msg =
@@ -139,7 +142,9 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
                     Mutex.unlock display_mutex ;
 
                     Printf.printf "\n" ;
-                    Ok (Binary_registry.managed_version_path version)
+                    Ok
+                      ( Binary_registry.managed_version_path version,
+                        Binary_registry.Managed_version version )
                 | Error (`Msg e) ->
                     Printf.printf "\n" ;
                     Error
@@ -167,7 +172,8 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
       (* Use linked directory alias *)
       let alias = String.trim alias in
       match Binary_registry.find_linked_dir alias with
-      | Ok (Some ld) -> Ok ld.Binary_registry.path
+      | Ok (Some ld) ->
+          Ok (ld.Binary_registry.path, Binary_registry.Linked_alias alias)
       | Ok None ->
           Error
             (Printf.sprintf
@@ -179,12 +185,14 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
   | None, None, Some dir when String.trim dir <> "" -> (
       (* Use raw path *)
       match Common.make_absolute_path dir with
-      | Ok abs_path -> Ok abs_path
+      | Ok abs_path -> Ok (abs_path, Binary_registry.Raw_path abs_path)
       | Error msg -> Error msg)
   | None, None, _ -> (
       (* Auto-detect from PATH *)
       match Common.which "octez-node" with
-      | Some path -> Ok (Filename.dirname path)
+      | Some path ->
+          let dir = Filename.dirname path in
+          Ok (dir, Binary_registry.Raw_path dir)
       | None ->
           Error
             "Unable to locate octez-node in PATH. Install Octez binaries or \
