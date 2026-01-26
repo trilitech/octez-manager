@@ -330,13 +330,13 @@ jobs:
     needs: [coverage, build-instrumented-binary, integration-coverage]
     if: always() && needs.coverage.result == 'success'
     container:
-      image: ghcr.io/${{ github.repository }}-ci:latest
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
-      OPAMROOT: /home/opam/.opam
+      OPAMROOT: /root/.opam
 
     steps:
       - name: Checkout
@@ -347,8 +347,8 @@ jobs:
       - name: Install dependencies
         run: |
           opam install bisect_ppx
-          # Install jq for JSON parsing (Alpine uses apk)
-          apk add --no-cache jq
+          # Install jq for JSON parsing
+          apt-get update && apt-get install -y jq
 
       - name: Download unit coverage data
         uses: actions/download-artifact@v4
