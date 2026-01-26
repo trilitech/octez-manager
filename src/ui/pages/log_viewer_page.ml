@@ -51,15 +51,26 @@ let open_file_with_tail ?title path =
   | Error e -> Error e
 
 let open_stream_via_file ~title cmd =
-  let temp_file = Filename.temp_file "octez_log_" ".txt" in
-  (* Start background process to feed the file *)
+  (* Use a named pipe (FIFO) instead of a regular file to avoid buffering delays.
+     When journalctl writes to a FIFO, data flows directly to the reader without
+     filesystem buffering, reducing the 4-block delay mentioned in issue #455. *)
+  let temp_file = Filename.temp_file "octez_log_" ".fifo" in
+  Sys.remove temp_file ;
+  (* Create FIFO *)
+  (match Unix.mkfifo temp_file 0o600 with
+  | () -> ()
+  | exception Unix.Unix_error (Unix.EEXIST, _, _) ->
+      (* FIFO already exists, remove and recreate *)
+      Sys.remove temp_file ;
+      Unix.mkfifo temp_file 0o600) ;
+  (* Start background process to feed the FIFO *)
   let full_cmd =
     Printf.sprintf "%s > %s 2>&1 &" cmd (Filename.quote temp_file)
   in
   match Sys.command full_cmd with
   | 0 -> (
-      (* Give it a moment to create/write *)
-      Unix.sleepf 0.1 ;
+      (* Give the background process a moment to start *)
+      Unix.sleepf 0.05 ;
       match open_file_with_tail ~title temp_file with
       | Ok fp -> Ok (fp, temp_file)
       | Error e -> Error (`Msg e))
