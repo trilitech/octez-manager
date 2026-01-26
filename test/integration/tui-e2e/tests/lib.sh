@@ -115,10 +115,9 @@ tui_wait_not() {
 
 nav_to_install() {
 	echo "Navigating to install menu..."
-	tui_send 'c' # 'c' for create/install
-	# Wait for install menu modal
-	tui_wait_for "Create Service" 10
-	sleep 0.5 # Give menu time to fully render before proceeding
+	# The cursor starts on "[ Install new instance ]" - just press Enter
+	tui_send 'Return'
+	sleep 1 # Wait for modal to open and render
 }
 
 nav_to_instances() {
