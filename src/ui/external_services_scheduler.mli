@@ -20,6 +20,11 @@
     Fast, no I/O, safe to call from render functions. *)
 val get : unit -> Octez_manager_lib.External_service.t list
 
+(** Get cached validation result for a service.
+    Fast, no I/O, safe to call from render functions.
+    Returns None if the service hasn't been validated yet. *)
+val get_validation : unit_name:string -> (unit, [`Msg of string]) result option
+
 (** Force a refresh of external services (does I/O).
     Called automatically by background scheduler.
     Can be called manually for immediate refresh. *)

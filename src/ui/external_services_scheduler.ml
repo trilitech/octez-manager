@@ -18,6 +18,12 @@ let cache : External_service.t list ref = ref []
 
 let cache_lock = Mutex.create ()
 
+(** Cache for validation results: unit_name -> validation result *)
+let validation_cache : (string, (unit, [`Msg of string]) result) Hashtbl.t =
+  Hashtbl.create 17
+
+let validation_cache_lock = Mutex.create ()
+
 (** Poll interval: 30 seconds - external services don't change frequently *)
 let poll_interval = 30.0
 
@@ -27,6 +33,11 @@ let last_poll = ref 0.0
 (** Get cached external services (fast, no I/O) *)
 let get () = Mutex.protect cache_lock (fun () -> !cache)
 
+(** Get cached validation result for a service (fast, no I/O) *)
+let get_validation ~unit_name =
+  Mutex.protect validation_cache_lock (fun () ->
+      Hashtbl.find_opt validation_cache unit_name)
+
 (** Refresh external services (does I/O, called by background scheduler) *)
 let refresh () =
   let now = Unix.gettimeofday () in
@@ -34,7 +45,19 @@ let refresh () =
   else (
     last_poll := now ;
     match External_service_detector.detect () with
-    | Ok services -> Mutex.protect cache_lock (fun () -> cache := services)
+    | Ok services ->
+        Mutex.protect cache_lock (fun () -> cache := services) ;
+        (* Validate each service and cache the result *)
+        Mutex.protect validation_cache_lock (fun () ->
+            Hashtbl.clear validation_cache ;
+            List.iter
+              (fun (svc : External_service.t) ->
+                let validation_result = Import.validate_importable svc in
+                Hashtbl.replace
+                  validation_cache
+                  svc.config.unit_name
+                  validation_result)
+              services)
     | Error _ ->
         (* Keep previous cache on error *)
         ())

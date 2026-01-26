@@ -103,10 +103,14 @@ let rec next_step ps =
         s
         (fun msg -> Navigation.update (fun s -> {s with error = Some msg}) ps)
         (fun svc ->
-          match Import.validate_importable svc with
-          | Error (`Msg msg) ->
+          (* Use cached validation result to avoid I/O during keypress *)
+          match
+            External_services_scheduler.get_validation
+              ~unit_name:svc.config.unit_name
+          with
+          | Some (Error (`Msg msg)) ->
               Navigation.update (fun s -> {s with error = Some msg}) ps
-          | Ok () ->
+          | Some (Ok ()) ->
               Navigation.update
                 (fun s ->
                   {
@@ -114,6 +118,16 @@ let rec next_step ps =
                     step = ConfigureImport;
                     selected_service = Some svc;
                     error = None;
+                  })
+                ps
+          | None ->
+              (* Validation not cached yet - this shouldn't happen normally,
+                 but handle gracefully by showing a temporary message *)
+              Navigation.update
+                (fun s ->
+                  {
+                    s with
+                    error = Some "Validating service, please try again...";
                   })
                 ps)
   | ConfigureImport ->
