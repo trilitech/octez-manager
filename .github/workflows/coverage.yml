@@ -545,6 +545,7 @@ jobs:
               const changes = [];
               for (const [file, currentPct] of Object.entries(currentData)) {
                 if (file.startsWith('__')) continue; // Skip metadata
+                if (file.startsWith('test/')) continue; // Skip test files
                 const basePct = baselineData[file] || 0;
                 const fileDiff = (parseFloat(currentPct) - parseFloat(basePct)).toFixed(2);
                 if (Math.abs(fileDiff) >= 0.01) {
