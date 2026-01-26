@@ -1,0 +1,34 @@
+services:
+  tui-tester:
+    build:
+      context: ..
+      dockerfile: tui-e2e/Dockerfile
+      args:
+        - OCTEZ_MANAGER_BIN=../../_build/default/src/main.exe
+    container_name: octez-tui-tester
+    depends_on:
+      - sandbox
+    privileged: true
+    cgroup: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+    environment:
+      - SANDBOX_URL=http://sandbox:8080
+      - NODE_RPC=http://sandbox:8732
+      - TERM=xterm-256color
+      - SHARD=${SHARD:-1}
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-3}
+      - BISECT_FILE=/coverage/bisect
+
+  # Reference to sandbox from parent docker-compose
+  sandbox:
+    extends:
+      file: ../docker-compose.yml
+      service: sandbox
+
+volumes:
+  sandbox-data:
+  snapshot-cache:

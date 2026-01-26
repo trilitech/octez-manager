@@ -364,6 +364,14 @@ jobs:
           merge-multiple: true
         continue-on-error: true
 
+      - name: Download TUI E2E coverage data (all shards)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-tui-e2e-shard-*
+          path: _coverage/
+          merge-multiple: true
+        continue-on-error: true
+
       - name: List all coverage files
         run: |
           echo "Coverage files found:"

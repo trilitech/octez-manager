@@ -1,0 +1,22 @@
+{
+  "total_shards": 3,
+  "shards": {
+    "1": {
+      "tests": [
+        "01-tui-startup.sh",
+        "02-install-node-via-tui.sh",
+        "10-cli-install-tui-verify.sh"
+      ],
+      "estimated_minutes": 6
+    },
+    "2": {
+      "tests": [
+        "03-instances-shows-node.sh"
+      ],
+      "estimated_minutes": 3
+    },
+    "3": {
+      "tests": []
+    }
+  }
+}
