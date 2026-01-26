@@ -384,14 +384,27 @@ jobs:
             --title "Octez Manager Coverage" \
             -o coverage-report || echo "HTML generation failed"
           
-          # Generate per-file summary
+          # Generate per-file summary and parse into JSON for comparison
           echo "" >> coverage-summary.md
           echo "### Coverage by File" >> coverage-summary.md
           echo "" >> coverage-summary.md
           echo '```' >> coverage-summary.md
           bisect-ppx-report summary \
             --coverage-path _coverage \
-            --per-file >> coverage-summary.md 2>&1 || true
+            --per-file > per-file-coverage.txt 2>&1 || true
+          
+          cat per-file-coverage.txt >> coverage-summary.md
+          
+          # Parse per-file coverage into JSON for easy comparison
+          echo "{" > coverage-data.json
+          grep -E '^ *[0-9]+\.[0-9]+ %' per-file-coverage.txt | while IFS= read -r line; do
+            pct=$(echo "$line" | awk '{print $1}')
+            file=$(echo "$line" | awk '{print $NF}')
+            echo "  \"$file\": $pct," >> coverage-data.json
+          done
+          # Remove trailing comma and close JSON
+          sed -i '$ s/,$//' coverage-data.json
+          echo "}" >> coverage-data.json
           
           # Append files with no coverage (not instrumented or not executed)
           echo "" >> coverage-summary.md
@@ -435,13 +448,60 @@ jobs:
           
           echo "COVERAGE_PCT=$COVERAGE_PCT" >> $GITHUB_ENV
           echo "Overall coverage: $COVERAGE_PCT%"
+          
+          # Save coverage data for base branch comparison
+          echo "{\"overall\": $COVERAGE_PCT, \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"commit\": \"$GITHUB_SHA\"}" > coverage-baseline.json
+          cat coverage-data.json | jq ". + {\"__meta\": $(cat coverage-baseline.json)}" > coverage-full.json || cp coverage-baseline.json coverage-full.json
+
+      - name: Upload coverage baseline (for main branch)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-baseline
+          path: |
+            coverage-full.json
+            coverage-data.json
+          retention-days: 90
 
       - name: Get base branch coverage (for PRs)
         if: github.event_name == 'pull_request'
         run: |
-          # Try to get base coverage from previous runs
-          # For now, we'll store it in the summary
-          echo "BASE_COVERAGE=0" >> $GITHUB_ENV
+          # Download baseline coverage from main branch
+          echo "Fetching baseline coverage from main branch..."
+          
+          # Get the latest successful workflow run on main
+          MAIN_RUN_ID=$(gh run list \
+            --workflow=coverage.yml \
+            --branch=main \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          
+          if [ -n "$MAIN_RUN_ID" ]; then
+            echo "Found main branch run: $MAIN_RUN_ID"
+            
+            # Download the baseline artifact
+            gh run download $MAIN_RUN_ID \
+              --name coverage-baseline \
+              --dir baseline-coverage || {
+                echo "Failed to download baseline, using 0"
+                echo "BASE_COVERAGE=0" >> $GITHUB_ENV
+                echo "{}" > baseline-coverage/coverage-data.json
+                exit 0
+              }
+            
+            # Extract base coverage percentage
+            BASE_COVERAGE=$(jq -r '.overall // 0' baseline-coverage/coverage-full.json 2>/dev/null || echo "0")
+            echo "BASE_COVERAGE=$BASE_COVERAGE" >> $GITHUB_ENV
+            echo "Base coverage: $BASE_COVERAGE%"
+          else
+            echo "No baseline coverage found, using 0"
+            echo "BASE_COVERAGE=0" >> $GITHUB_ENV
+            echo "{}" > baseline-coverage/coverage-data.json
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
         continue-on-error: true
 
       - name: Comment PR with coverage
@@ -478,9 +538,50 @@ jobs:
               summary = 'Coverage report not available';
             }
             
+            // Calculate per-file diffs
+            let fileDiffs = '';
+            try {
+              const currentData = JSON.parse(fs.readFileSync('coverage-data.json', 'utf8'));
+              const baselineData = JSON.parse(fs.readFileSync('baseline-coverage/coverage-data.json', 'utf8'));
+              
+              const changes = [];
+              for (const [file, currentPct] of Object.entries(currentData)) {
+                if (file.startsWith('__')) continue; // Skip metadata
+                const basePct = baselineData[file] || 0;
+                const fileDiff = (parseFloat(currentPct) - parseFloat(basePct)).toFixed(2);
+                if (Math.abs(fileDiff) >= 0.01) {
+                  changes.push({ file, current: currentPct, base: basePct, diff: fileDiff });
+                }
+              }
+              
+              if (changes.length > 0) {
+                // Sort by absolute diff (largest changes first)
+                changes.sort((a, b) => Math.abs(parseFloat(b.diff)) - Math.abs(parseFloat(a.diff)));
+                
+                fileDiffs = '\n\n<details>\n<summary>📊 Coverage Changes by File</summary>\n\n';
+                fileDiffs += '```diff\n';
+                
+                const topChanges = changes.slice(0, 20); // Show top 20 changes
+                for (const {file, current, base, diff} of topChanges) {
+                  const symbol = parseFloat(diff) > 0 ? '+' : '';
+                  const prefix = parseFloat(diff) > 0 ? '+ ' : '- ';
+                  fileDiffs += `${prefix}${file.padEnd(60)} ${base}% → ${current}% (${symbol}${diff}%)\n`;
+                }
+                
+                if (changes.length > 20) {
+                  fileDiffs += `\n... and ${changes.length - 20} more files changed\n`;
+                }
+                
+                fileDiffs += '```\n</details>';
+              }
+            } catch (e) {
+              console.log('Could not calculate per-file diffs:', e.message);
+            }
+            
             const comment = `## ${emoji} Coverage Report
             
             **Overall Coverage:** ${coverage}% ${diffColor} ${diffText}
+            ${fileDiffs}
             
             ${summary}
             
@@ -490,6 +591,7 @@ jobs:
             - **Unit Tests:** ✅ Instrumented with bisect_ppx
             - **Integration Tests:** ✅ Instrumented with bisect_ppx
             - **Report Type:** Combined coverage from both test suites
+            - **Base Coverage:** ${baseCoverage}% (from main branch)
             
             </details>
             `;
