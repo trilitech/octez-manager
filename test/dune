@@ -321,3 +321,10 @@
  (modules test_help_parser)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_self_update_checker)
+ (libraries alcotest octez_manager_lib str)
+ (modules test_self_update_checker)
+ (instrumentation
+  (backend bisect_ppx)))
