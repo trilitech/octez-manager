@@ -347,8 +347,8 @@ jobs:
       - name: Install dependencies
         run: |
           opam install bisect_ppx
-          # Install jq for JSON parsing
-          apt-get update && apt-get install -y jq
+          # Install jq for JSON parsing (Alpine uses apk)
+          apk add --no-cache jq
 
       - name: Download unit coverage data
         uses: actions/download-artifact@v4
