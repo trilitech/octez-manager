@@ -56,7 +56,7 @@ RUN ln -s /usr/local/bin/octez-manager /usr/local/bin/om
 # Copy test scripts (context is test/integration/)
 COPY tui-e2e/tests/ /tests/
 COPY tui-e2e/run-tests.sh /run-tests.sh
-COPY tui-e2e/shards.json /shards.json
+COPY tui-e2e/shards.json /tests/shards.json
 RUN chmod +x /run-tests.sh /tests/*.sh 2>/dev/null || true
 
 # Ensure test user exists
