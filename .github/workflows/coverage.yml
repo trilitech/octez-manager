@@ -26,7 +26,7 @@ jobs:
     #   contains(github.event.pull_request.labels.*.name, 'coverage') ||
     #   github.event.action == 'opened'
     container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:latest
+      image: ghcr.io/${{ github.repository }}-ci-debian:20260126
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -162,7 +162,7 @@ jobs:
     name: Build Instrumented Binary (Debian)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:latest
+      image: ghcr.io/${{ github.repository }}-ci-debian:20260126
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -330,7 +330,7 @@ jobs:
     needs: [coverage, build-instrumented-binary, integration-coverage]
     if: always() && needs.coverage.result == 'success'
     container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:latest
+      image: ghcr.io/${{ github.repository }}-ci-debian:20260126
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
