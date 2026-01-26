@@ -176,6 +176,7 @@ and start_import ps =
           match status with
           | Job_manager.Succeeded ->
               Cache.invalidate_all () ;
+              Context.mark_instances_dirty () ;
               Context.toast_success "Service imported successfully!" ;
               Context.navigate "instances"
           | Job_manager.Failed msg ->
