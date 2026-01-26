@@ -15,7 +15,7 @@ tui_start
 # Navigate to install > node
 nav_to_install
 tui_send '1' # Select Node
-tui_wait_for "Instance name" 5
+tui_wait_for "Instance name"
 
 # Fill form fields
 echo "Filling form: Instance name"
