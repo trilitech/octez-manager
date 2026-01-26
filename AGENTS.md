@@ -24,12 +24,15 @@ docs/                     # Documentation site (Astro)
 Before any commit:
 
 ```bash
-dune build          # Verify compilation
-dune runtest        # Run tests
-dune fmt            # Format code (MUST pass before commit)
+dune build                      # Verify compilation
+dune runtest                    # Run tests
+dune fmt                        # Format code (MUST pass before commit)
+./scripts/check-copyright.sh    # Verify copyright headers (MUST pass before commit)
 ```
 
-**Critical:** Every commit must be properly formatted. Do not create separate "formatting" commits.
+**Critical:** 
+- Every commit must be properly formatted. Do not create separate "formatting" commits.
+- Every commit must have correct copyright headers. Run `./scripts/check-copyright.sh --fix` to automatically update headers if needed.
 
 ## Integration Tests
 
