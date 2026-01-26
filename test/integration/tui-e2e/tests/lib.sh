@@ -117,7 +117,13 @@ nav_to_install() {
 	echo "Navigating to install menu..."
 	# The cursor starts on "[ Install new instance ]" - just press Enter
 	tui_send 'Return'
-	sleep 1 # Wait for modal to open and render
+	sleep 2 # Wait for modal to open and render (instrumented binary is slow)
+	# Verify menu opened by checking if we can see service options
+	if tui_capture | grep -q "Node"; then
+		echo "✓ Install menu opened"
+	else
+		echo "⚠ Install menu may not have opened, continuing anyway..."
+	fi
 }
 
 nav_to_instances() {
