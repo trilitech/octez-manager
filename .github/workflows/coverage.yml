@@ -472,45 +472,30 @@ jobs:
             coverage-data.json
           retention-days: 90
 
-      - name: Get base branch coverage (for PRs)
+      - name: Download baseline coverage from main branch (for PRs)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: coverage.yml
+          branch: main
+          name: coverage-baseline
+          path: baseline-coverage
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: Extract baseline coverage (for PRs)
         if: github.event_name == 'pull_request'
         run: |
-          # Download baseline coverage from main branch
-          echo "Fetching baseline coverage from main branch..."
-          
-          # Get the latest successful workflow run on main
-          MAIN_RUN_ID=$(gh run list \
-            --workflow=coverage.yml \
-            --branch=main \
-            --status=success \
-            --limit=1 \
-            --json databaseId \
-            --jq '.[0].databaseId')
-          
-          if [ -n "$MAIN_RUN_ID" ]; then
-            echo "Found main branch run: $MAIN_RUN_ID"
-            
-            # Download the baseline artifact
-            gh run download $MAIN_RUN_ID \
-              --name coverage-baseline \
-              --dir baseline-coverage || {
-                echo "Failed to download baseline, using 0"
-                echo "BASE_COVERAGE=0" >> $GITHUB_ENV
-                echo "{}" > baseline-coverage/coverage-data.json
-                exit 0
-              }
-            
-            # Extract base coverage percentage
-            BASE_COVERAGE=$(jq -r '.overall // 0' baseline-coverage/coverage-full.json 2>/dev/null || echo "0")
+          if [ -f baseline-coverage/coverage-full.json ]; then
+            BASE_COVERAGE=$(jq -r '.__meta.overall // .overall // 0' baseline-coverage/coverage-full.json 2>/dev/null || echo "0")
             echo "BASE_COVERAGE=$BASE_COVERAGE" >> $GITHUB_ENV
-            echo "Base coverage: $BASE_COVERAGE%"
+            echo "Base coverage from main: $BASE_COVERAGE%"
           else
             echo "No baseline coverage found, using 0"
             echo "BASE_COVERAGE=0" >> $GITHUB_ENV
+            mkdir -p baseline-coverage
             echo "{}" > baseline-coverage/coverage-data.json
           fi
-        env:
-          GH_TOKEN: ${{ github.token }}
         continue-on-error: true
 
       - name: Comment PR with coverage
