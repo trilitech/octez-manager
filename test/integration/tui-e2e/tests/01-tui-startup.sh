@@ -7,8 +7,8 @@ echo "Test: TUI starts without errors"
 # Start TUI
 tui_start
 
-# Verify main menu appears
-if ! tui_wait_for "Instances\|Install\|Binaries" 5; then
+# Verify main menu appears (longer timeout for instrumented binary)
+if ! tui_wait_for "Instances\|Install\|Binaries" 10; then
 	echo "ERROR: Main menu did not appear"
 	tui_capture
 	exit 1

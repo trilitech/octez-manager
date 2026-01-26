@@ -25,7 +25,7 @@ tui_start() {
 	tmux new-session -d -s "$TUI_SESSION" \
 		"octez-manager 2>&1 | tee -a $TUI_LOG"
 
-	sleep 2 # Wait for TUI to initialize
+	sleep 5 # Wait for TUI to initialize (instrumented binary is slower)
 
 	if ! tmux has-session -t "$TUI_SESSION" 2>/dev/null; then
 		echo "ERROR: TUI session failed to start"
