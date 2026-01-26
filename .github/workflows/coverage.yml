@@ -324,10 +324,99 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.coverage.yml down -v || true
 
+  tui-e2e-coverage:
+    name: TUI E2E Coverage (Shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    needs: [coverage, build-instrumented-binary]
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && 
+       !contains(github.event.pull_request.labels.*.name, 'skip-coverage'))
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download instrumented binary
+        uses: actions/download-artifact@v4
+        with:
+          name: octez-manager-coverage
+          path: .
+
+      - name: Copy binary to TUI test location
+        run: |
+          mkdir -p test/integration/tui-e2e
+          cp octez-manager-instrumented test/integration/tui-e2e/octez-manager
+          chmod +x test/integration/tui-e2e/octez-manager
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build coverage test containers
+        working-directory: test/integration
+        run: |
+          docker compose -f docker-compose.yml build sandbox
+          cd tui-e2e
+          docker compose build
+
+      - name: Start sandbox
+        working-directory: test/integration
+        run: |
+          docker compose up -d sandbox
+          timeout 300 bash -c 'until docker compose exec -T sandbox curl -sf http://localhost:8080/health 2>/dev/null; do echo "Waiting for sandbox..."; sleep 10; done'
+
+      - name: Start TUI tester with coverage
+        working-directory: test/integration/tui-e2e
+        run: |
+          docker compose up -d
+          echo "Waiting for systemd..."
+          for i in {1..30}; do
+            if docker compose exec -T tui-tester systemctl is-system-running 2>/dev/null; then
+              echo "Systemd is ready"
+              break
+            fi
+            echo "Attempt $i: systemd not ready yet..."
+            sleep 2
+          done
+          docker compose ps
+
+      - name: Run TUI E2E tests with coverage (Shard ${{ matrix.shard }})
+        working-directory: test/integration/tui-e2e
+        env:
+          SHARD: ${{ matrix.shard }}
+          TOTAL_SHARDS: 3
+        run: |
+          docker compose exec -T -e SHARD -e TOTAL_SHARDS tui-tester /run-tests.sh
+
+      - name: Extract coverage data from container
+        working-directory: test/integration/tui-e2e
+        run: |
+          mkdir -p ../../_coverage-tui-e2e
+          docker compose cp tui-tester:/coverage/. ../../_coverage-tui-e2e/ || true
+          ls -la ../../_coverage-tui-e2e/
+
+      - name: Upload TUI E2E coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-tui-e2e-shard-${{ matrix.shard }}
+          path: _coverage-tui-e2e/
+          retention-days: 1
+
+      - name: Cleanup containers
+        if: always()
+        run: |
+          docker compose -f test/integration/tui-e2e/docker-compose.yml down -v || true
+          docker compose -f test/integration/docker-compose.yml down -v || true
+
   report:
     name: Generate and Post Coverage Report
     runs-on: ubuntu-latest
-    needs: [coverage, build-instrumented-binary, integration-coverage]
+    needs: [coverage, build-instrumented-binary, integration-coverage, tui-e2e-coverage]
     if: always() && needs.coverage.result == 'success'
     container:
       image: ghcr.io/${{ github.repository }}-ci-debian:latest
