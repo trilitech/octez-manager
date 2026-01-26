@@ -115,8 +115,9 @@ tui_wait_not() {
 
 nav_to_install() {
 	echo "Navigating to install menu..."
-	tui_send 'i'
-	tui_wait_for "Install" 5
+	tui_send 'c' # 'c' for create/install
+	# Wait for install menu with service type options (not just "Install" text on main page)
+	tui_wait_for "Node.*Baker.*Accuser" 10
 }
 
 nav_to_instances() {
