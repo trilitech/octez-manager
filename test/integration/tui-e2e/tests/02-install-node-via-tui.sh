@@ -14,9 +14,10 @@ tui_start
 
 # Navigate to install > node
 nav_to_install
-sleep 1  # Extra delay for menu to stabilize
-tui_send 'Return' # Confirm Node selection (already highlighted)
-tui_wait_for "Instance name"
+sleep 2           # Wait for menu to fully render (instrumented binary is slow)
+tui_send 'Return' # Select Node (already highlighted)
+sleep 1           # Wait for form to load
+tui_wait_for "Instance name" 10
 
 # Fill form fields
 echo "Filling form: Instance name"
