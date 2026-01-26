@@ -118,6 +118,7 @@ nav_to_install() {
 	tui_send 'c' # 'c' for create/install
 	# Wait for install menu modal
 	tui_wait_for "Create Service" 10
+	sleep 0.5 # Give menu time to fully render before proceeding
 }
 
 nav_to_instances() {
