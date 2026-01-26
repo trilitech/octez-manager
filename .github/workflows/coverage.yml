@@ -26,7 +26,7 @@ jobs:
     #   contains(github.event.pull_request.labels.*.name, 'coverage') ||
     #   github.event.action == 'opened'
     container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:20260126
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -162,7 +162,7 @@ jobs:
     name: Build Instrumented Binary (Debian)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:20260126
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -330,7 +330,7 @@ jobs:
     needs: [coverage, build-instrumented-binary, integration-coverage]
     if: always() && needs.coverage.result == 'success'
     container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:20260126
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -381,11 +381,9 @@ jobs:
           echo "" >> coverage-summary.md
           
           echo "Running bisect-ppx-report summary..."
-          # Use --source-path to exclude test files from coverage calculation
-          # Only measure coverage of src/ directory (requires bisect_ppx >= 2.8.0)
+          # TODO: Exclude test files from coverage (requires bisect_ppx changes or post-processing)
           bisect-ppx-report summary \
-            --coverage-path _coverage \
-            --source-path src > coverage-summary.txt 2>&1 || true
+            --coverage-path _coverage > coverage-summary.txt 2>&1 || true
           
           echo "=== Coverage summary output ==="
           cat coverage-summary.txt
@@ -393,10 +391,9 @@ jobs:
           
           cat coverage-summary.txt >> coverage-summary.md
           
-          # Generate HTML report (exclude test files)
+          # Generate HTML report
           bisect-ppx-report html \
             --coverage-path _coverage \
-            --source-path src \
             --title "Octez Manager Coverage" \
             -o coverage-report || echo "HTML generation failed"
           
@@ -405,10 +402,8 @@ jobs:
           echo "### Coverage by File" >> coverage-summary.md
           echo "" >> coverage-summary.md
           echo '```' >> coverage-summary.md
-          # Exclude test files from per-file coverage report
           bisect-ppx-report summary \
             --coverage-path _coverage \
-            --source-path src \
             --per-file > per-file-coverage.txt 2>&1 || true
           
           cat per-file-coverage.txt >> coverage-summary.md
