@@ -347,3 +347,10 @@
  (modules test_instances_render)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_installer_snapshot)
+ (libraries alcotest octez_manager_lib)
+ (modules test_installer_snapshot)
+ (instrumentation
+  (backend bisect_ppx)))
