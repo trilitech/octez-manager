@@ -406,11 +406,13 @@ jobs:
             --coverage-path _coverage \
             --per-file > per-file-coverage.txt 2>&1 || true
           
-          cat per-file-coverage.txt >> coverage-summary.md
+          # Filter out test files from per-file coverage
+          grep -v '^[[:space:]]*[0-9.]*[[:space:]]*%.*test/' per-file-coverage.txt > per-file-coverage-filtered.txt || cp per-file-coverage.txt per-file-coverage-filtered.txt
+          cat per-file-coverage-filtered.txt >> coverage-summary.md
           
-          # Parse per-file coverage into JSON for easy comparison
+          # Parse per-file coverage into JSON for easy comparison (excluding test files)
           echo "{" > coverage-data.json
-          grep -E '^ *[0-9]+\.[0-9]+ %' per-file-coverage.txt | while IFS= read -r line; do
+          grep -E '^ *[0-9]+\.[0-9]+ %' per-file-coverage.txt | grep -v 'test/' | while IFS= read -r line; do
             pct=$(echo "$line" | awk '{print $1}')
             file=$(echo "$line" | awk '{print $NF}')
             echo "  \"$file\": $pct," >> coverage-data.json
