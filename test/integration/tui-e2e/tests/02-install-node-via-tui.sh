@@ -10,13 +10,12 @@ INSTANCE="tui-node-02"
 cleanup_instance "$INSTANCE" || true
 
 # Install node via CLI first (form filling via tmux is complex and flaky)
-echo "Installing node via CLI for TUI verification..."
+# Use no snapshot for speed
+echo "Installing node via CLI for TUI verification (no snapshot)..."
 om install-node \
 	--instance "$INSTANCE" \
 	--network shadownet \
-	--snapshot \
-	--snapshot-no-check \
-	--snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
+	--no-snapshot \
 	--rpc-addr "127.0.0.1:18732" \
 	--service-user tezos \
 	--no-enable 2>&1
