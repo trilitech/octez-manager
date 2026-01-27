@@ -129,7 +129,7 @@ let make_initial_model () =
           };
         parent_node =
           (match svc.Service.depends_on with Some inst -> inst | None -> "");
-        node_data_dir = "";
+        node_data_dir = svc.Service.data_dir;
         dal;
         delegates;
         liquidity_baking_vote = (if lb_vote = "" then "pass" else lb_vote);

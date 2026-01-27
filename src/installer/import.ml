@@ -317,11 +317,26 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
   let delegates, liquidity_baking_vote, remaining_args =
     extract_baker_fields parsed.extra_args
   in
-  (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
+  (* Determine node mode based on original baker configuration *)
   let node_mode =
     match depends_on with
-    | Some instance -> Local_instance instance
-    | None -> Remote_endpoint node_endpoint
+    | Some instance ->
+        (* Managed node instance found - use managed local mode *)
+        Local_instance instance
+    | None -> (
+        (* No managed instance - check if original was "with local node" *)
+        match parsed.run_mode with
+        | Some "with local node" -> (
+            match parsed.data_dir with
+            | Some data_dir ->
+                (* Use Local_datadir to preserve "with local node" behavior *)
+                Local_datadir (node_endpoint, data_dir)
+            | None ->
+                (* Shouldn't happen, but fallback to remote *)
+                Remote_endpoint node_endpoint)
+        | _ ->
+            (* Original was remote or unknown mode *)
+            Remote_endpoint node_endpoint)
   in
   (* Check for DAL node dependency *)
   let dal_config, dal_node =
