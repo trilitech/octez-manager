@@ -3278,6 +3278,20 @@ let cache_stats_hit_miss () =
       Alcotest.(check int) "hits" 2 hits ;
       Alcotest.(check int) "misses" 1 misses
 
+let cache_invalidate_all_clears_data_cache () =
+  (* Regression test for #489: Data.cache was not registered with Cache registry,
+     so Cache.invalidate_all() after import left stale service states *)
+  let stats_before = Cache.get_stats () in
+  let data_registered =
+    List.exists
+      (fun (name, _, _, _, _, _, _) -> name = "data_service_states")
+      stats_before
+  in
+  Alcotest.(check bool)
+    "Data cache registered with Cache registry"
+    true
+    data_registered
+
 (* ============================================================================
    Port validation tests
    ============================================================================ *)
@@ -5521,6 +5535,10 @@ let () =
             `Quick
             cache_registry_no_duplicates;
           Alcotest.test_case "stats hit/miss" `Quick cache_stats_hit_miss;
+          Alcotest.test_case
+            "invalidate_all clears Data cache"
+            `Quick
+            cache_invalidate_all_clears_data_cache;
         ] );
       ( "port_validation",
         [

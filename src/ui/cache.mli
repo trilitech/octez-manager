@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -16,6 +16,17 @@ val invalidate_all : unit -> unit
 
 (** Sub-entry for keyed caches showing per-key status *)
 type sub_entry = {key : string; age : float; expired : bool}
+
+(** Register a custom cache with the global registry.
+    Use this for caches that don't use [Cache.create] but still need
+    to be invalidated by [invalidate_all]. *)
+val register :
+  name:string ->
+  invalidate:(unit -> unit) ->
+  get_age:(unit -> float option) ->
+  get_ttl:(unit -> float) ->
+  get_sub_entries:(unit -> sub_entry list) ->
+  unit
 
 (** Get cache statistics: (name, hits, misses, age_secs, ttl_secs, expired, sub_entries) for each cache.
     age_secs is None if cache is empty. sub_entries is empty for non-keyed caches. *)
