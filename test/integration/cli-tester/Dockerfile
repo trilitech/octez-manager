@@ -44,17 +44,20 @@ RUN mkdir -p /usr/local/share/zcash-params && \
     echo "Downloading sapling-spend.params..." && \
     curl -sfL "${ZCASH_PARAMS_URL}/sapling-spend.params" -o /usr/local/share/zcash-params/sapling-spend.params
 
-# Install octez-manager from build context
+# Install octez-manager and test binary from build context
 COPY cli-tester/octez-manager /usr/local/bin/octez-manager
-RUN chmod +x /usr/local/bin/octez-manager
+COPY cli-tester/test_golden_path_tui_v2 /usr/local/bin/test_golden_path_tui_v2
+RUN chmod +x /usr/local/bin/octez-manager /usr/local/bin/test_golden_path_tui_v2
 
 # Copy test scripts
 COPY cli-tester/tests/ /tests/
 COPY cli-tester/run-tests.sh /run-tests.sh
 RUN chmod +x /run-tests.sh /tests/*.sh /tests/**/*.sh 2>/dev/null || true
 
-# Ensure test user exists
+# Ensure test users exist (both tezos and octez for compatibility)
+# octez user is needed because the TUI form defaults to octez as service user
 RUN id tezos >/dev/null 2>&1 || useradd -m -s /bin/bash tezos
+RUN id octez >/dev/null 2>&1 || useradd -m -s /bin/bash octez
 
 # Create required directories
 RUN mkdir -p /var/lib/octez /etc/octez /var/log/octez \
