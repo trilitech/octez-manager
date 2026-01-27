@@ -84,13 +84,18 @@ let list_all_service_units () =
             let trimmed = String.trim line in
             if trimmed = "" then None
             else
-              (* Line format: "unit.service   loaded   active   running   Description" *)
-              (* Extract first field (unit name) *)
-              match String.split_on_char ' ' trimmed with
-              | unit_name :: _
-                when String.ends_with ~suffix:".service" unit_name ->
-                  Some unit_name
-              | _ -> None)
+              (* Line format: "[●] unit.service   loaded   active   running   Description" *)
+              (* Failed services have a ● bullet prefix, skip it *)
+              (* Extract first field that ends with .service *)
+              let fields =
+                String.split_on_char ' ' trimmed
+                |> List.filter (fun s -> s <> "")
+              in
+              match
+                List.find_opt (String.ends_with ~suffix:".service") fields
+              with
+              | Some unit_name -> Some unit_name
+              | None -> None)
           lines
     | Error _ -> []
   in
