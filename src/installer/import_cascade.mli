@@ -106,3 +106,17 @@ val pp_validation_error : Format.formatter -> validation_error -> unit
 
 (** Format dependency analysis as human-readable output *)
 val pp_analysis : Format.formatter -> dependency_analysis -> unit
+
+(** {1 Testing} *)
+
+(** Exposed for unit testing. Do not use outside tests. *)
+module For_tests : sig
+  val list_drop : int -> 'a list -> 'a list
+
+  val topological_sort : graph_node list -> string list * string list list
+
+  val build_graph_nodes :
+    all_services:External_service.t list ->
+    target_services:External_service.t list ->
+    graph_node list
+end
