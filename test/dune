@@ -399,3 +399,10 @@
  (modules test_import_cascade)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_process_scanner)
+ (libraries alcotest octez_manager_lib str)
+ (modules test_process_scanner)
+ (instrumentation
+  (backend bisect_ppx)))
