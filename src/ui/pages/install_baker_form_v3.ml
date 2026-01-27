@@ -92,7 +92,7 @@ let make_initial_model () =
       in
       let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-      let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
+      let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
       let dal_config = lookup "OCTEZ_DAL_CONFIG" in
       let dal_instance = lookup "OCTEZ_DAL_INSTANCE" in
       let dal =
@@ -101,7 +101,7 @@ let make_initial_model () =
         else if dal_config = "" then Dal_none
         else Dal_endpoint dal_config
       in
-      let lb_vote = lookup "OCTEZ_BAKER_LIQUIDITY_BAKING_VOTE" in
+      let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
       {
         core =
           {
