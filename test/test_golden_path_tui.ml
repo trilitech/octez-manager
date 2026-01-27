@@ -20,6 +20,19 @@
     - Checks for CI=true or GITHUB_ACTIONS=true environment variable
     - Binaries expected at /usr/local/bin (pre-installed in Docker image)
     
+    STATUS: EXPERIMENTAL
+    This test makes assumptions about form field positions and validation
+    behavior that were discovered during local "die and retry" development.
+    It may need adjustments when running in actual CI:
+    - Field navigation (Down/Up counts) may differ
+    - Validation modals may appear when editing fields
+    - Form submission timing may vary
+    
+    If this test fails in CI, use the "die and retry" approach:
+    1. Add Printf.eprintf statements to show screen content at each step
+    2. Check what modals actually appear
+    3. Adjust navigation and field editing logic accordingly
+    
     This test proves the TUI can actually create services programmatically
     using the headless driver, without requiring tmux. *)
 
