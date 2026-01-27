@@ -175,6 +175,26 @@ let format_diff test_name differences =
   Buffer.add_string buf "To update baseline: run with --update-regressions\n" ;
   Buffer.contents buf
 
+(** Generate diff report with full screenshot display for CI *)
+let format_diff_with_screenshot test_name differences actual_content =
+  let diff_text = format_diff test_name differences in
+  let is_ci =
+    match Sys.getenv_opt "CI" with
+    | Some "true" -> true
+    | _ -> (
+        match Sys.getenv_opt "GITHUB_ACTIONS" with
+        | Some "true" -> true
+        | _ -> false)
+  in
+  if is_ci then
+    diff_text ^ "\n\n"
+    ^ "╔════════════════════════════════════════════════════════════════╗\n"
+    ^ "║                    ACTUAL SCREENSHOT                           ║\n"
+    ^ "╚════════════════════════════════════════════════════════════════╝\n"
+    ^ actual_content ^ "\n"
+    ^ "╚════════════════════════════════════════════════════════════════╝\n"
+  else diff_text
+
 (* ============================================================ *)
 (* Test API *)
 (* ============================================================ *)
@@ -198,7 +218,9 @@ let check_regression test_name =
           Printf.printf "✓ %s: UI matches baseline\n%!" test_name ;
           true)
         else (
-          Printf.printf "%s" (format_diff test_name differences) ;
+          Printf.printf
+            "%s"
+            (format_diff_with_screenshot test_name differences current) ;
           false)
 
 (** Assert that current screen matches baseline *)
@@ -206,13 +228,35 @@ let assert_ui_regression test_name =
   if not (check_regression test_name) then
     failwith (Printf.sprintf "UI regression in %s" test_name)
 
+(** Display screenshot in terminal (for CI logs) *)
+let display_screenshot content =
+  let is_ci =
+    match Sys.getenv_opt "CI" with
+    | Some "true" -> true
+    | _ -> (
+        match Sys.getenv_opt "GITHUB_ACTIONS" with
+        | Some "true" -> true
+        | _ -> false)
+  in
+  if is_ci then (
+    Printf.printf
+      "\n╔════════════════════════════════════════════════════════════════╗\n" ;
+    Printf.printf
+      "║                        SCREENSHOT                              ║\n" ;
+    Printf.printf
+      "╚════════════════════════════════════════════════════════════════╝\n" ;
+    Printf.printf "%s\n" content ;
+    Printf.printf
+      "╚════════════════════════════════════════════════════════════════╝\n\n%!")
+
 (** Capture named screenshot for debugging *)
 let capture_debug_screenshot name =
   let path = Filename.concat regression_dir (name ^ ".debug.screen") in
   ensure_dir regression_dir ;
   let content = capture_screen () in
   write_file path content ;
-  Printf.printf "📸 Debug screenshot saved: %s\n%!" path
+  Printf.printf "📸 Debug screenshot saved: %s\n%!" path ;
+  display_screenshot content
 
 (* ============================================================ *)
 (* Test Suite Helpers *)

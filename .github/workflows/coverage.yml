@@ -223,14 +223,22 @@ jobs:
           cp _build/default/src/main.exe octez-manager-instrumented
           chmod +x octez-manager-instrumented
           
-          # Verify it's static
+          # Build golden path test binary for integration tests (v2 - declarative)
+          dune build --instrument-with bisect_ppx test/test_golden_path_tui_v2.exe
+          cp _build/default/test/test_golden_path_tui_v2.exe test_golden_path_tui_v2
+          chmod +x test_golden_path_tui_v2
+          
+          # Verify they're static
           ldd octez-manager-instrumented 2>&1 | head -10 || echo "Static binary confirmed"
+          ldd test_golden_path_tui_v2 2>&1 | head -10 || echo "Test binary confirmed"
       
       - name: Upload instrumented binary
         uses: actions/upload-artifact@v4
         with:
           name: octez-manager-coverage
-          path: octez-manager-instrumented
+          path: |
+            octez-manager-instrumented
+            test_golden_path_tui_v2
           retention-days: 1
 
   integration-coverage:
@@ -265,7 +273,8 @@ jobs:
         run: |
           mkdir -p test/integration/cli-tester
           cp octez-manager-instrumented test/integration/cli-tester/octez-manager
-          chmod +x test/integration/cli-tester/octez-manager
+          cp test_golden_path_tui_v2 test/integration/cli-tester/test_golden_path_tui_v2
+          chmod +x test/integration/cli-tester/octez-manager test/integration/cli-tester/test_golden_path_tui_v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
