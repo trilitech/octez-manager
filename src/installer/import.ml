@@ -261,6 +261,17 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
     setups (e.g., custom flags after delegates), they may need to manually adjust
     the delegates field after import via the TUI. *)
 let extract_baker_fields extra_args =
+  (* Extract liquidity baking vote FIRST, before delegates *)
+  let liquidity_baking_vote, args_after_lb =
+    let rec extract_lb acc = function
+      | [] -> (None, List.rev acc)
+      | "--liquidity-baking-toggle-vote" :: value :: rest ->
+          (Some value, List.rev_append acc rest)
+      | arg :: rest -> extract_lb (arg :: acc) rest
+    in
+    extract_lb [] extra_args
+  in
+  (* Then extract trailing delegates *)
   let is_likely_delegate arg =
     if String.length arg < 3 then false
     else
@@ -291,19 +302,9 @@ let extract_baker_fields extra_args =
     | args -> (List.rev acc, args)
   in
   let delegates, remaining_args_rev =
-    extract_trailing_delegates [] (List.rev extra_args)
+    extract_trailing_delegates [] (List.rev args_after_lb)
   in
   let remaining_args = List.rev remaining_args_rev in
-  (* Extract liquidity baking vote if present *)
-  let liquidity_baking_vote, remaining_args =
-    let rec extract_lb acc = function
-      | [] -> (None, List.rev acc)
-      | "--liquidity-baking-toggle-vote" :: value :: rest ->
-          (Some value, List.rev_append acc rest)
-      | arg :: rest -> extract_lb (arg :: acc) rest
-    in
-    extract_lb [] remaining_args
-  in
   (delegates, liquidity_baking_vote, remaining_args)
 
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
