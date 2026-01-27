@@ -394,6 +394,34 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_binaries_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_binaries_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_diagnostics_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_diagnostics_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_import_cascade)
  (libraries alcotest octez_manager_lib)
  (modules test_import_cascade)
