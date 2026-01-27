@@ -298,7 +298,11 @@ let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
     running := false ;
     on_disconnect ()
   in
-  Bg.submit_blocking run ;
+  (* Head monitors run in dedicated domains instead of the shared background
+     worker pool. Each monitor blocks forever (streaming curl -sN), so using
+     Bg.submit_blocking would permanently consume a worker and starve user
+     operations (stop/restart) when the number of nodes >= num_workers. *)
+  ignore (Domain.spawn run) ;
   let stop () =
     stopped := true ;
     (* Just set the flag - don't try to close the channel or wait.
