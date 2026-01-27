@@ -98,7 +98,7 @@ run_tests() {
 	elif [ "$mode" == "all" ] || [ -z "$mode" ]; then
 		# All mode: run all tests (for local dev)
 		log "Running all test categories"
-		for category in node dal baker accuser import binaries; do
+		for category in node dal baker accuser import binaries headless; do
 			if [ -d "$TESTS_DIR/$category" ]; then
 				for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
 					tests+=("$test")
@@ -139,6 +139,12 @@ run_tests() {
 main() {
 	local mode="${1:-}"
 	local shard_id="${2:-}"
+
+	# Check for shard environment variables (used in CI)
+	if [ -n "${SHARD:-}" ]; then
+		mode="--shard"
+		shard_id="$SHARD"
+	fi
 
 	log "Starting integration tests..."
 	log "SANDBOX_URL=$SANDBOX_URL"
