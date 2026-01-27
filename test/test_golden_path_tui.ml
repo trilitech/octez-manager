@@ -5,21 +5,23 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(** Golden Path TUI Navigation Test
+(** Golden Path TUI Test
     
-    Tests that the TUI can navigate through the service creation workflow:
-    1. Open instances page
-    2. Open create menu  
-    3. Navigate to install forms
-    4. Verify forms load correctly
+    End-to-end test that uses the headless driver to:
+    1. Navigate to node install form
+    2. Fill form fields (instance name, disable snapshot for speed)
+    3. Submit form and create a node service
+    4. Verify service was registered
     
-    NOTE: This does NOT test actual service creation, which requires:
-    - Actual octez binaries
-    - Systemd available and working
-    - Proper permissions
+    SAFETY: This test ONLY runs in CI (Docker containers with systemd).
+    It will skip when run locally to avoid creating services on your system.
     
-    Full service creation is tested in test/integration/tui-e2e tests that
-    run in CI with all dependencies available. *)
+    CI Environment Detection:
+    - Checks for CI=true or GITHUB_ACTIONS=true environment variable
+    - Binaries expected at /usr/local/bin (pre-installed in Docker image)
+    
+    This test proves the TUI can actually create services programmatically
+    using the headless driver, without requiring tmux. *)
 
 module HD = Lib_miaou_internal.Headless_driver
 module TH = Tui_test_helpers_lib.Tui_test_helpers
@@ -29,72 +31,165 @@ module Instances = Octez_manager_ui.Instances
 (* Navigation Test *)
 (* ============================================================ *)
 
-let test_navigation_workflow () =
+let test_create_node_service () =
+  (* SAFETY: Only run in CI environment *)
+  let is_ci =
+    match Sys.getenv_opt "CI" with
+    | Some "true" -> true
+    | _ -> (
+        match Sys.getenv_opt "GITHUB_ACTIONS" with
+        | Some "true" -> true
+        | _ -> false)
+  in
+
+  if not is_ci then (
+    Printf.eprintf
+      "\n\
+       ⚠ Skipping golden path test - not in CI environment.\n\
+       This test creates actual services and should only run in CI containers.\n\
+       Set CI=true environment variable to run locally (at your own risk!).\n\
+       %!" ;
+    Alcotest.skip ()) ;
+
   TH.with_test_env (fun () ->
-      Printf.eprintf "\n=== TUI Navigation Test ===\n%!" ;
+      let suffix = int_of_float (Unix.gettimeofday ()) mod 100000 in
+      let instance = Printf.sprintf "gpnode_%05d" suffix in
 
-      (* Step 1: Load instances page *)
-      Printf.eprintf "[1] Loading instances page...\n%!" ;
+      Printf.eprintf "\n=== Golden Path TUI Test (CI Mode) ===\n" ;
+      Printf.eprintf "Instance: %s\n%!" instance ;
+
+      (* In CI, binaries are at /usr/local/bin *)
+      Printf.eprintf "\n[Setup] Checking for Octez binaries...\n%!" ;
+      let bin_dir = "/usr/local/bin" in
+      let node_bin = Filename.concat bin_dir "octez-node" in
+      if not (Sys.file_exists node_bin) then (
+        Printf.eprintf
+          "⚠ Octez binaries not found at %s\n\
+           CI environment should have pre-installed binaries.\n\
+           Skipping this test.\n\
+           %!"
+          bin_dir ;
+        Alcotest.skip ()) ;
+      Printf.eprintf "✓ Found binaries at: %s\n%!" bin_dir ;
+
+      (* Helper functions *)
+      let send_continue key =
+        match HD.Stateful.send_key key with
+        | `Continue -> ()
+        | other ->
+            Alcotest.fail
+              (Printf.sprintf
+                 "Expected Continue, got %s"
+                 (match other with
+                 | `SwitchTo p -> "SwitchTo " ^ p
+                 | `Quit -> "Quit"
+                 | `Continue -> "Continue"))
+      in
+
+      let type_text text =
+        String.iter (fun c -> send_continue (String.make 1 c)) text
+      in
+
+      (* Step 1: Navigate to install form *)
+      Printf.eprintf "\n[1/3] Navigating to node install form...\n%!" ;
       HD.Stateful.init (module Instances.Page) ;
-      let screen = TH.get_screen_text () in
-      Alcotest.(check bool)
-        "instances page loads"
-        true
-        (TH.contains_substring screen "Total instances") ;
-      Printf.eprintf "✓ Instances page loaded\n%!" ;
-
-      (* Step 2: Open create menu *)
-      Printf.eprintf "[2] Opening create menu...\n%!" ;
-      ignore (HD.Stateful.send_key "c") ;
+      send_continue "c" ;
+      (* open create menu *)
       ignore (HD.Stateful.idle_wait ~iterations:10 ~sleep:0.001 ()) ;
-      Alcotest.(check bool)
-        "create menu opens"
-        true
-        (Miaou.Core.Modal_manager.has_active ()) ;
-      let modal_screen = TH.get_screen_text () in
-      Alcotest.(check bool)
-        "menu shows Node option"
-        true
-        (TH.contains_substring modal_screen "Node") ;
-      Printf.eprintf "✓ Create menu opened\n%!" ;
+      send_continue "Enter" ;
+      (* select Node *)
+      let nav = HD.Stateful.idle_wait ~iterations:20 ~sleep:0.001 () in
+      (match nav with
+      | `SwitchTo "install_node_form_v3" -> ()
+      | _ -> Alcotest.fail "Failed to navigate to install form") ;
+      Printf.eprintf "✓ Opened install form\n%!" ;
 
-      (* Step 3: Select Node and navigate to install form *)
-      Printf.eprintf "[3] Navigating to node install form...\n%!" ;
-      ignore (HD.Stateful.send_key "Enter") ;
-      let nav_result = HD.Stateful.idle_wait ~iterations:20 ~sleep:0.001 () in
-      (match nav_result with
-      | `SwitchTo "install_node_form_v3" ->
-          Printf.eprintf "✓ Navigated to install_node_form_v3\n%!"
-      | `SwitchTo other ->
-          Alcotest.fail
-            (Printf.sprintf "Expected install_node_form_v3, got %s" other)
-      | `Continue -> Alcotest.fail "Navigation did not occur"
-      | `Quit -> Alcotest.fail "Unexpected quit") ;
-
-      (* Step 4: Verify form loads *)
-      Printf.eprintf "[4] Verifying node install form loads...\n%!" ;
+      (* Step 2: Fill and submit form *)
+      Printf.eprintf "[2/3] Filling form...\n%!" ;
       HD.Stateful.init (module Octez_manager_ui.Install_node_form_v3.Page) ;
       ignore (HD.Stateful.idle_wait ~iterations:10 ~sleep:0.001 ()) ;
-      let form_screen = TH.get_screen_text () in
-      Alcotest.(check bool)
-        "form title present"
-        true
-        (TH.contains_substring form_screen "Install Node") ;
-      Alcotest.(check bool)
-        "network field present"
-        true
-        (TH.contains_substring form_screen "Network") ;
-      Alcotest.(check bool)
-        "instance name field present"
-        true
-        (TH.contains_substring form_screen "Instance Name") ;
-      Printf.eprintf "✓ Form loaded with expected fields\n%!" ;
 
-      Printf.eprintf "\n=== Navigation Test PASSED ===\n%!")
+      (* Set App Bin Dir to downloaded binaries *)
+      Printf.eprintf "  Setting binary directory to %s\n%!" bin_dir ;
+      for _ = 1 to 6 do
+        send_continue "Down"
+      done ;
+      (* Navigate to App Bin Dir field *)
+      send_continue "Enter" ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+      send_continue "\001" ;
+      (* Ctrl+A *)
+      send_continue "Backspace" ;
+      type_text bin_dir ;
+      send_continue "Enter" ;
+      ignore (HD.Stateful.idle_wait ~iterations:10 ~sleep:0.001 ()) ;
+
+      (* Go to Instance Name field (end of form) *)
+      Printf.eprintf "  Setting instance name to %s\n%!" instance ;
+      send_continue "End" ;
+      (* Jump to last field *)
+      send_continue "Up" ;
+      (* Move up from Confirm to Instance Name *)
+      send_continue "Enter" ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+      send_continue "\001" ;
+      send_continue "Backspace" ;
+      type_text instance ;
+      send_continue "Enter" ;
+      ignore (HD.Stateful.idle_wait ~iterations:10 ~sleep:0.001 ()) ;
+
+      (* Disable snapshot for speed *)
+      Printf.eprintf "  Disabling snapshot for speed\n%!" ;
+      send_continue "Home" ;
+      for _ = 1 to 2 do
+        send_continue "Down"
+      done ;
+      (* Navigate to Snapshot field *)
+      send_continue "Enter" ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+      send_continue "Enter" ;
+      (* Select first option (None) *)
+      ignore (HD.Stateful.idle_wait ~iterations:10 ~sleep:0.001 ()) ;
+
+      (* Submit *)
+      Printf.eprintf "  Submitting form...\n%!" ;
+      send_continue "End" ;
+      send_continue "Enter" ;
+      Printf.eprintf "✓ Form submitted\n%!" ;
+
+      (* Step 3: Wait for service creation *)
+      Printf.eprintf "[3/3] Waiting for service to be created...\n%!" ;
+      let rec wait_for_service attempts =
+        match Octez_manager_lib.Service_registry.find ~instance with
+        | Ok (Some _) ->
+            Printf.eprintf "✓ Service created successfully\n%!" ;
+            ()
+        | (Ok None | Error _) when attempts <= 0 ->
+            Alcotest.fail "Service was not created after waiting"
+        | Ok None | Error _ ->
+            Unix.sleepf 0.1 ;
+            wait_for_service (attempts - 1)
+      in
+      wait_for_service 300 ;
+
+      (* Wait up to 30 seconds *)
+
+      (* Cleanup *)
+      Printf.eprintf "\n[Cleanup] Removing test service...\n%!" ;
+      (match
+         Octez_manager_lib.Removal.remove_service
+           ~delete_data_dir:true
+           ~instance
+           ()
+       with
+      | Ok () -> Printf.eprintf "✓ Cleanup complete\n%!"
+      | Error (`Msg e) -> Printf.eprintf "⚠ Cleanup error: %s\n%!" e) ;
+
+      Printf.eprintf "\n=== Golden Path Test PASSED ===\n%!")
 
 let () =
   Alcotest.run
     "Golden Path (TUI)"
     [
-      ("navigation", [("workflow navigation", `Quick, test_navigation_workflow)]);
+      ("golden_path", [("create node service", `Slow, test_create_node_service)]);
     ]
