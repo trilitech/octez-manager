@@ -15,27 +15,34 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
   let* node_mode : Installer_types.resolved_baker_node_mode =
     match request.node_mode with
     | Remote_endpoint endpoint -> Ok (Remote endpoint)
+    | Local_datadir (endpoint, data_dir) ->
+        Ok (Local_unmanaged (endpoint, data_dir))
     | Local_instance inst ->
         let* svc = lookup_node_service inst in
         Ok (Local svc)
   in
   let node_data_dir =
-    match node_mode with Remote _ -> "" | Local svc -> svc.Service.data_dir
+    match node_mode with
+    | Remote _ -> ""
+    | Local_unmanaged (_, data_dir) -> data_dir
+    | Local svc -> svc.Service.data_dir
   in
   let history_mode =
     match node_mode with
     | Local svc -> svc.Service.history_mode
-    | Remote _ -> History_mode.default
+    | Local_unmanaged _ | Remote _ -> History_mode.default
   in
   let node_endpoint =
     match node_mode with
     | Remote endpoint -> endpoint_of_rpc endpoint
+    | Local_unmanaged (endpoint, _) -> endpoint_of_rpc endpoint
     | Local svc -> endpoint_of_rpc svc.Service.rpc_addr
   in
   let* network =
     match node_mode with
     | Local svc -> Ok svc.Service.network
-    | Remote _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
+    | Local_unmanaged _ | Remote _ ->
+        Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
   in
   let base_dir =
     match request.base_dir with
@@ -51,7 +58,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
   let depends_on =
     match node_mode with
     | Local svc -> Some svc.Service.instance
-    | Remote _ -> None
+    | Local_unmanaged _ | Remote _ -> None
   in
   let* service =
     install_daemon
@@ -76,7 +83,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
             ( "OCTEZ_NODE_INSTANCE",
               match node_mode with
               | Local svc -> svc.Service.instance
-              | Remote _ -> "" );
+              | Local_unmanaged _ | Remote _ -> "" );
             ("OCTEZ_BAKER_GLOBAL_ARGS", global_args_str);
             ("OCTEZ_BAKER_COMMAND_ARGS", command_args_str);
           ];
@@ -99,6 +106,6 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
             }
           in
           Service_registry.write updated_parent
-    | Remote _ -> Ok ()
+    | Local_unmanaged _ | Remote _ -> Ok ()
   in
   Ok service
