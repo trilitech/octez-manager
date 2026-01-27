@@ -748,6 +748,19 @@ let detect () =
         all_units
     in
 
+    (* Filter out external services whose instance name matches a managed instance *)
+    let external_services =
+      List.filter
+        (fun (svc : External_service.t) ->
+          let instance = svc.suggested_instance_name in
+          match Service_registry.find ~instance with
+          | Ok (Some _) ->
+              false (* Instance is managed, don't show as external *)
+          | Ok None -> true (* Not managed, show as external *)
+          | Error _ -> true (* Error reading registry, show as external *))
+        external_services
+    in
+
     (* Infer networks from connected nodes *)
     let enriched_services = infer_network_from_endpoint external_services in
 
