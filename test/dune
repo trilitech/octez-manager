@@ -142,6 +142,20 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(executable
+ (name test_golden_path_tui)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_golden_path_tui)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (test
  (name test_instance_actions)
  (libraries alcotest test_mocks unix)

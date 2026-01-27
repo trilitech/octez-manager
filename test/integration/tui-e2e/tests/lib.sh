@@ -115,8 +115,8 @@ tui_wait_not() {
 
 nav_to_install() {
 	echo "Navigating to install menu..."
-	# The cursor starts on "[ Install new instance ]" - just press Enter
-	tui_send 'Return'
+	# Use 'c' shortcut to open create menu (Enter on "Install new instance" doesn't work via tmux)
+	tui_send 'c'
 	sleep 2 # Wait for modal to open and render (instrumented binary is slow)
 	# Verify menu opened by checking if we can see service options
 	if tui_capture | grep -q "Node"; then
