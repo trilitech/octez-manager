@@ -398,6 +398,24 @@ Keep the first line under 72 characters.
 - **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
 - **Never delete untracked files without confirmation** - user scripts, test data, and work-in-progress files must be preserved unless explicitly requested
 
+## Changelog
+
+**Every user-facing change MUST have a corresponding entry in `CHANGELOG.md`** under `[Unreleased]`.
+
+This includes:
+- New features (`feat`)
+- Bug fixes (`fix`)
+- Breaking changes
+- Changed behavior
+
+This does **not** include:
+- Test-only changes (`test`)
+- CI/infrastructure changes (`ci`, `chore`)
+- Internal refactors with no user-visible effect (`refactor`)
+- Documentation-only changes (`docs`)
+
+Add the changelog entry in the same PR as the code change, not as a follow-up.
+
 ## Bug Fix PRs
 
 **Every bug fix PR MUST include a test** that reproduces the bug and validates the fix. This applies to both unit tests and integration tests as appropriate.
