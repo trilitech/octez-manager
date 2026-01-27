@@ -263,7 +263,7 @@ let resolve_network_from_node_chain node_chain_name =
 let resolve_octez_node_chain ~endpoint =
   let res =
     let ( let* ) = Result.bind in
-    let* node_chain_name =
+    let* network_identifier =
       match
         Common.run_out
           ["curl"; "-sf"; "--connect-timeout"; "2"; endpoint ^ "/config"]
@@ -272,16 +272,48 @@ let resolve_octez_node_chain ~endpoint =
           try
             let j = Yojson.Safe.from_string out in
             let open Yojson.Safe.Util in
-            match member "network" j |> member "chain_name" with
-            | `String s -> Ok (String.trim s)
-            | _ -> Error (`Msg "Failed to retrieve .network.chain_name")
+            match member "network" j with
+            | `String s ->
+                (* Built-in network: "network": "ghostnet" *)
+                Ok (String.trim s)
+            | `Assoc _ as obj -> (
+                (* Custom network: "network": {"chain_name": "...", ...} *)
+                match member "chain_name" obj with
+                | `String s -> Ok (String.trim s)
+                | _ ->
+                    Error
+                      (`Msg
+                         "Network is an object but missing 'chain_name' field"))
+            | _ ->
+                Error
+                  (`Msg
+                     "Network field is neither a string nor an object with \
+                      chain_name")
           with exn -> Error (`Msg (Printexc.to_string exn)))
       | Error s -> Error s
     in
-    resolve_network_from_node_chain node_chain_name
+    (* Try to match as alias or chain_name *)
+    let* networks = list_networks () in
+    match
+      List.find_opt
+        (fun (net : network_info) ->
+          net.alias = network_identifier || net.chain_name = network_identifier)
+        networks
+    with
+    | Some network -> Ok network
+    | None ->
+        Error
+          (`Msg
+             (Format.sprintf
+                "Network identifier '%s' not recognized. Available networks: %s"
+                network_identifier
+                (String.concat
+                   ", "
+                   (List.map (fun n -> n.alias) networks
+                   |> List.sort_uniq String.compare))))
   in
   match res with
-  | Ok network -> Ok network.human_name
+  | Ok network -> Ok network.alias
   | Error (`Msg msg) ->
       Error
         (`Msg
