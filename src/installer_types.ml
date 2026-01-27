@@ -65,10 +65,15 @@ type daemon_request = {
 }
 
 type baker_node_mode =
-  | Local_instance of string  (** instance name *)
-  | Remote_endpoint of string  (** endpoint *)
+  | Local_instance of string  (** managed instance name *)
+  | Local_datadir of string * string
+      (** (endpoint, data_dir) - unmanaged local node *)
+  | Remote_endpoint of string  (** endpoint - truly remote node *)
 
-type resolved_baker_node_mode = Local of Service.t | Remote of string
+type resolved_baker_node_mode =
+  | Local of Service.t  (** managed local instance *)
+  | Local_unmanaged of string * string  (** (endpoint, data_dir) *)
+  | Remote of string  (** remote endpoint *)
 
 type dal_config = Dal_auto | Dal_disabled | Dal_endpoint of string
 
