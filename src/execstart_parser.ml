@@ -271,10 +271,16 @@ let rec parse_args_list words acc =
         (* Special case: 'octez-baker run accuser' -> change subcommand to 'accuser' *)
         parse_args_list rest {acc with subcommand = Some "accuser"}
       else if acc.subcommand = Some "run" && word = "with" then
-        (* Baker: 'run with local node' *)
+        (* Baker: 'run with local node <path>' *)
         match rest with
-        | "local" :: "node" :: rest' ->
-            parse_args_list rest' {acc with run_mode = Some "with local node"}
+        | "local" :: "node" :: node_data_dir :: rest' ->
+            parse_args_list
+              rest'
+              {
+                acc with
+                run_mode = Some "with local node";
+                data_dir = Some (unquote node_data_dir);
+              }
         | _ ->
             parse_args_list rest {acc with extra_args = word :: acc.extra_args}
       else if acc.subcommand = Some "run" && word = "remotely" then
