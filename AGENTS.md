@@ -9,14 +9,23 @@ octez-manager is a TUI application for managing Octez blockchain services (nodes
 ### Repository Layout
 
 ```
-src/                      # Main library (octez_manager_lib)
-src/ui/                   # TUI components
-src/ui/pages/             # Individual page implementations
-src/ui/form_builder.ml    # Form system for install/edit wizards
-src/ui/*_scheduler.ml     # Background data polling
-test/                     # Unit tests
-test/integration/         # Integration tests
-docs/                     # Documentation site (Astro)
+src/                              # Main library (octez_manager_lib)
+src/ui/                           # TUI components
+src/ui/pages/instances/           # Instances page (split into submodules)
+src/ui/pages/binaries/            # Binaries management page
+src/ui/pages/diagnostics/         # Diagnostics page
+src/ui/form_builder.ml            # Form system for install/edit wizards
+src/ui/monitored_page.ml          # Page wrapper functor (metrics, global shortcuts)
+src/ui/global_shortcuts.ml        # Cross-page keyboard shortcuts (?, s, m)
+src/ui/cache.ml                   # Centralized cache management
+src/ui/*_scheduler.ml             # Background data polling (5 schedulers)
+test/                             # Unit and TUI tests
+test/tui_command_runner.ml        # Declarative TUI test runner
+test/tui_test_helpers.ml          # Headless TUI driver helpers
+test/mock_service_helpers.ml      # Mock service creation for tests
+test/ui_regression_framework.ml   # Screenshot regression testing
+test/integration/                 # Integration tests (Docker/CI)
+docs/                             # Documentation site (Astro)
 ```
 
 ## Build & Verification
@@ -131,6 +140,49 @@ wait
 ```
 
 If any run fails, the test has dependencies or conflicts.
+
+## Headless TUI Tests
+
+The project has a headless TUI test infrastructure for testing UI behavior without a real terminal. Key modules:
+
+- **`test/tui_test_helpers.ml`** — Headless driver: initializes Miaou in headless mode, provides `send_key`, `render`, `with_test_env` helpers
+- **`test/tui_command_runner.ml`** — Declarative test runner: executes scripted command sequences (`Key`, `WaitFor`, `Assert`, `Screenshot`, etc.)
+- **`test/mock_service_helpers.ml`** — Creates mock services in the registry for tests without needing real systemd
+- **`test/ui_regression_framework.ml`** — Screenshot regression testing with baseline comparison
+
+### Writing a Headless TUI Test
+
+```ocaml
+let test_my_feature () =
+  TH.with_test_env (fun () ->
+    (* Create mock services *)
+    Mock.create_mock_node ~instance:"test-node" ~network:"mainnet" () ;
+    
+    (* Initialize headless driver on a page *)
+    HD.Stateful.init (module Instances.Page) ;
+    
+    (* Run declarative commands *)
+    TCR.run_commands [
+      WaitFor [ScreenContains "test-node"; MaxIterations 100] ;
+      Key "Enter" ;
+      Assert ((fun s -> String.contains s "mainnet"), "Shows network") ;
+      Screenshot "my_test_screenshot" ;
+    ])
+```
+
+### When to Use Headless Tests
+
+- UI rendering correctness (layout, content, formatting)
+- Keyboard navigation and modal interactions
+- Form field validation and wizard flows
+- Page transitions and state management
+- Regression testing with screenshot baselines
+
+### When NOT to Use Headless Tests
+
+- Testing actual systemd operations (use integration tests)
+- Testing real network/RPC calls (use integration tests)
+- Testing CLI commands (use integration tests)
 
 ---
 
@@ -259,6 +311,9 @@ Data is fetched by background schedulers running in separate OCaml domains:
 | `Rpc_scheduler` | 1s | Node bootstrap status, head level, chain ID, protocol |
 | `System_metrics_scheduler` | 0.5s | CPU, memory, disk usage, binary versions |
 | `Delegate_scheduler` | 60s | Baker config, delegate participation, highwatermarks |
+| `External_services_scheduler` | 5s | Detected unmanaged systemd/process services |
+| `Self_update_scheduler` | 1h | Available octez-manager version |
+| `Versions_scheduler` | — | Available Octez binary versions (on-demand) |
 | `Data.refresh_cache` | 5s TTL | Service states from systemd |
 
 Each scheduler populates in-memory caches that view functions read from.
@@ -301,6 +356,10 @@ If you need new data during rendering:
 let my_cache : (string, my_data) Hashtbl.t = Hashtbl.create 17
 let cache_lock = Mutex.create ()
 
+(* Register with Cache so invalidate_all() clears this cache too *)
+let () = Cache.register "my_scheduler" (fun () ->
+  Mutex.protect cache_lock (fun () -> Hashtbl.clear my_cache))
+
 (* Called by scheduler tick - does I/O *)
 let refresh ~instance =
   let data = read_from_disk ~instance in  (* I/O happens here *)
@@ -312,6 +371,8 @@ let get ~instance =
   Mutex.protect cache_lock (fun () ->
     Hashtbl.find_opt my_cache instance)
 ```
+
+**Important:** Always register custom caches with `Cache.register` so that `Cache.invalidate_all()` can clear them. Unregistered caches cause stale data bugs (e.g., after importing a service, the old service list persists until the cache TTL expires).
 
 ### Data Flow Summary
 
@@ -353,6 +414,14 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   (* ... other functions *)
 end
 ```
+
+### Monitored_page Wrapper
+
+All pages are wrapped with `Monitored_page.Make` which adds:
+- **Render metrics tracking** via `Metrics.record_render`
+- **Global keyboard shortcuts** (`?` for help, `s` for system monitor, `m` for metrics) dispatched via `Global_shortcuts.handle`
+
+This is the single injection point for cross-page behavior. To add a new global shortcut, add it to `src/ui/global_shortcuts.ml` — it will automatically apply to all pages.
 
 ### Keymap Format
 
@@ -498,6 +567,8 @@ If you create a new function, especially in a public module:
      FROM modules WHERE path = 'src/mymodule.ml'"
    ```
 3. If the function is a utility that others might need, consider adding it to `src/common.ml`
+
+**Important:** The architecture database is a helpful tool but is NOT complete. It may be missing functions, have outdated information, or lack intent descriptions. Always verify by searching the actual code.
 
 ### Gardening Tasks
 
