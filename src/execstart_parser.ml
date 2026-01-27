@@ -267,6 +267,9 @@ let rec parse_args_list words acc =
       else if acc.subcommand = Some "run" && word = "dal" then
         (* Special case: 'octez-baker run dal' -> change subcommand to 'dal' *)
         parse_args_list rest {acc with subcommand = Some "dal"}
+      else if acc.subcommand = Some "run" && word = "accuser" then
+        (* Special case: 'octez-baker run accuser' -> change subcommand to 'accuser' *)
+        parse_args_list rest {acc with subcommand = Some "accuser"}
       else if acc.subcommand = Some "run" && word = "with" then
         (* Baker: 'run with local node' *)
         match rest with
