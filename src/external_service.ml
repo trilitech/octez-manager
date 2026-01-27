@@ -25,9 +25,10 @@ let role_of_string = function
 
 let role_of_binary_name ?subcommand binary_name =
   let name = Filename.basename binary_name |> String.lowercase_ascii in
-  (* Check for DAL subcommand first - octez-baker can run DAL node *)
+  (* Check for subcommands first - octez-baker can run DAL node or accuser *)
   match subcommand with
   | Some "dal" -> Dal_node
+  | Some "accuser" -> Accuser
   | _ ->
       if String.starts_with ~prefix:"octez-node" name then Node
       else if

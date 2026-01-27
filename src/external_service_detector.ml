@@ -564,6 +564,8 @@ let process_to_external_service (proc : Process_scanner.process_info) =
   let role =
     let subcommand =
       if Str.string_match (Str.regexp ".* run dal\\b") cmdline 0 then Some "dal"
+      else if Str.string_match (Str.regexp ".* run accuser\\b") cmdline 0 then
+        Some "accuser"
       else None
     in
     let detected_role =
