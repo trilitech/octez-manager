@@ -88,7 +88,9 @@ let back ps =
       Navigation.update
         (fun s -> {s with step = ConfigureImport; error = None})
         ps
-  | Importing -> ps
+  | Importing ->
+      (* Allow exiting from Importing state *)
+      Navigation.back ps
 
 let with_selected_service s on_error on_success =
   match List.nth_opt s.external_services s.selected_idx with
