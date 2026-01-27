@@ -64,6 +64,9 @@ let test_create_node_service () =
        %!" ;
     Alcotest.skip ()) ;
 
+  (* Save real HOME before test_env overrides it *)
+  let real_home = try Sys.getenv "HOME" with Not_found -> "/root" in
+
   TH.with_test_env (fun () ->
       let suffix = int_of_float (Unix.gettimeofday ()) mod 100000 in
       let instance = Printf.sprintf "gpnode_%05d" suffix in
@@ -71,19 +74,36 @@ let test_create_node_service () =
       Printf.eprintf "\n=== Golden Path TUI Test (CI Mode) ===\n" ;
       Printf.eprintf "Instance: %s\n%!" instance ;
 
-      (* In CI, binaries are at /usr/local/bin *)
+      (* Check for binaries - CI uses /usr/local/bin, local can use downloaded *)
       Printf.eprintf "\n[Setup] Checking for Octez binaries...\n%!" ;
-      let bin_dir = "/usr/local/bin" in
-      let node_bin = Filename.concat bin_dir "octez-node" in
-      if not (Sys.file_exists node_bin) then (
-        Printf.eprintf
-          "⚠ Octez binaries not found at %s\n\
-           CI environment should have pre-installed binaries.\n\
-           Skipping this test.\n\
-           %!"
-          bin_dir ;
-        Alcotest.skip ()) ;
-      Printf.eprintf "✓ Found binaries at: %s\n%!" bin_dir ;
+      let bin_dir =
+        let ci_path = "/usr/local/bin" in
+        let local_path =
+          Filename.concat real_home ".local/share/octez-manager/binaries/v24.1"
+        in
+        (* Try CI path first *)
+        if Sys.file_exists (Filename.concat ci_path "octez-node") then (
+          Printf.eprintf "✓ Using CI binaries at: %s\n%!" ci_path ;
+          ci_path (* Fall back to local downloaded binaries *))
+        else if Sys.file_exists (Filename.concat local_path "octez-node") then (
+          Printf.eprintf
+            "✓ Using local binaries at: %s\n\
+             (Downloaded via: octez-manager binaries download 24.1)\n\
+             %!"
+            local_path ;
+          local_path)
+        else (
+          Printf.eprintf
+            "⚠ Octez binaries not found at:\n\
+            \  - %s\n\
+            \  - %s\n\
+             Try: dune exec -- octez-manager binaries download --no-verify 24.1\n\
+             Skipping this test.\n\
+             %!"
+            ci_path
+            local_path ;
+          Alcotest.skip ())
+      in
 
       (* Helper functions *)
       let send_continue key =
@@ -174,11 +194,23 @@ let test_create_node_service () =
       Printf.eprintf "[3/3] Waiting for service to be created...\n%!" ;
       let rec wait_for_service attempts =
         match Octez_manager_lib.Service_registry.find ~instance with
-        | Ok (Some _) ->
+        | Ok (Some svc) ->
             Printf.eprintf "✓ Service created successfully\n%!" ;
+            Printf.eprintf "  Instance: %s\n%!" svc.instance ;
+            Printf.eprintf
+              "  Kind: %s\n%!"
+              (match svc.kind with
+              | Node -> "Node"
+              | Baker -> "Baker"
+              | Accuser -> "Accuser"
+              | Dal_node -> "DAL Node") ;
             ()
-        | (Ok None | Error _) when attempts <= 0 ->
+        | Ok None when attempts <= 0 ->
+            Printf.eprintf "✗ Service not found in registry after 30s\n%!" ;
             Alcotest.fail "Service was not created after waiting"
+        | Error (`Msg e) when attempts <= 0 ->
+            Printf.eprintf "✗ Error checking service: %s\n%!" e ;
+            Alcotest.fail "Service lookup failed"
         | Ok None | Error _ ->
             Unix.sleepf 0.1 ;
             wait_for_service (attempts - 1)
