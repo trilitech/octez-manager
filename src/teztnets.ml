@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -292,12 +292,14 @@ let resolve_octez_node_chain ~endpoint =
           with exn -> Error (`Msg (Printexc.to_string exn)))
       | Error s -> Error s
     in
-    (* Try to match as alias or chain_name *)
+    (* Try to match as alias or chain_name (case-insensitive for alias) *)
     let* networks = list_networks () in
+    let network_identifier_lower = String.lowercase_ascii network_identifier in
     match
       List.find_opt
         (fun (net : network_info) ->
-          net.alias = network_identifier || net.chain_name = network_identifier)
+          String.lowercase_ascii net.alias = network_identifier_lower
+          || net.chain_name = network_identifier)
         networks
     with
     | Some network -> Ok network
