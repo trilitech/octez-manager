@@ -47,10 +47,11 @@ RUN mkdir -p /usr/local/share/zcash-params && \
     echo "Downloading sapling-spend.params..." && \
     curl -sfL "${ZCASH_PARAMS_URL}/sapling-spend.params" -o /usr/local/share/zcash-params/sapling-spend.params
 
-# Install octez-manager WITH COVERAGE INSTRUMENTATION from build context
-# This binary was built with: dune build --instrument-with bisect_ppx
+# Install octez-manager and test binary WITH COVERAGE INSTRUMENTATION from build context
+# These binaries were built with: dune build --instrument-with bisect_ppx
 COPY cli-tester/octez-manager /usr/local/bin/octez-manager
-RUN chmod +x /usr/local/bin/octez-manager
+COPY cli-tester/test_golden_path_tui_v2 /usr/local/bin/test_golden_path_tui_v2
+RUN chmod +x /usr/local/bin/octez-manager /usr/local/bin/test_golden_path_tui_v2
 
 # Create directory for coverage data
 RUN mkdir -p /coverage && chmod 777 /coverage
@@ -63,8 +64,11 @@ COPY cli-tester/tests/ /tests/
 COPY cli-tester/run-tests.sh /run-tests.sh
 RUN chmod +x /run-tests.sh /tests/*.sh /tests/**/*.sh 2>/dev/null || true
 
-# Ensure test user exists
+# Ensure test users exist (both tezos and octez for compatibility)
+# octez user is needed because the TUI form validation checks if the service
+# user can execute binaries BEFORE calling ensure_service_account
 RUN id tezos >/dev/null 2>&1 || useradd -m -s /bin/bash tezos
+RUN id octez >/dev/null 2>&1 || useradd -m -s /bin/bash octez
 
 # Create required directories
 RUN mkdir -p /var/lib/octez /etc/octez /var/log/octez \

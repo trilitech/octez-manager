@@ -1,106 +1,107 @@
 {
   "metadata": {
-    "generated_at": "2026-01-23T11:00:00.000000",
-    "generated_by": "manual update - added binaries/02-list-remote-major-versions.sh",
-    "total_tests": 62,
-    "total_duration": 401.597,
+    "generated_at": "2026-01-27T19:00:00.000000",
+    "generated_by": "rebalance from CI run 21409161432 (coverage shards)",
+    "total_tests": 63,
+    "total_duration": 506.04,
     "shard_count": 5,
-    "mean_shard_duration": 80.32,
-    "max_shard_duration": 86.54,
-    "min_shard_duration": 78.73,
-    "duration_std_dev": 2.93,
-    "balance_coefficient": 3.65
+    "mean_shard_duration": 101.21,
+    "max_shard_duration": 102.0,
+    "min_shard_duration": 100.61,
+    "duration_std_dev": 0.64,
+    "balance_coefficient": 1.37
   },
   "shard-1": {
     "tests": [
-      "accuser/36-accuser-start-stop.sh",
-      "baker/40-baker-remote-endpoint.sh",
-      "node/16-start-node-syncs.sh",
-      "node/24-export-logs.sh",
-      "import/50-import-field-overrides.sh",
-      "node/14-multiple-instances.sh",
-      "import/48-import-dry-run.sh",
-      "baker/26-baker-basic-install.sh",
-      "accuser/38-accuser-show-service.sh",
-      "baker/33-baker-show-service.sh",
-      "node/22-list-status-display.sh",
-      "node/15-list-format.sh"
+      "node/20-tmp-dir-option.sh",
+      "baker/42-baker-requires-node-running.sh",
+      "node/01-install.sh",
+      "node/05-install-history-modes.sh",
+      "import/52-import-name-conflict.sh",
+      "accuser/35-accuser-basic-install.sh",
+      "dal/24-dal-show-service.sh",
+      "baker/27-baker-with-delegates.sh",
+      "node/04-install-custom-datadir.sh",
+      "binaries/01-download-and-verify.sh"
     ],
-    "test_count": 12,
-    "total_duration": 78.73
+    "test_count": 10,
+    "total_duration": 100.66
   },
   "shard-2": {
     "tests": [
-      "node/19-cascading-dependencies.sh",
-      "baker/31-baker-start-stop.sh",
-      "dal/23-dal-node-dependency.sh",
-      "baker/42-baker-requires-node-running.sh",
-      "node/25-binary-access-validation.sh",
-      "node/01-install.sh",
-      "import/52-import-name-conflict.sh",
-      "baker/29-baker-dal-config.sh",
-      "node/13-reinstall-same-instance.sh",
-      "node/11-remove-vs-purge.sh",
-      "node/10-purge-with-data.sh",
-      "node/04-install-custom-datadir.sh"
+      "headless/01-golden-path.sh",
+      "baker/32-baker-node-dependency.sh",
+      "dal/26-dal-custom-data-dir.sh",
+      "import/45-import-takeover-node.sh",
+      "node/02-show.sh",
+      "dal/25-dal-multiple-instances.sh",
+      "dal/18-dal-basic-install.sh",
+      "dal/20-dal-custom-addresses.sh",
+      "baker/33-baker-show-service.sh",
+      "node/12-show-service.sh",
+      "import/51-import-nonexistent-service.sh"
     ],
-    "test_count": 12,
-    "total_duration": 78.75
+    "test_count": 11,
+    "total_duration": 100.78
   },
   "shard-3": {
     "tests": [
-      "node/17-preserve-data-resume.sh",
-      "accuser/37-accuser-extra-args.sh",
-      "baker/32-baker-node-dependency.sh",
-      "node/21-systemd-failure-detection.sh",
-      "import/49-import-extra-args-node.sh",
-      "node/05-install-history-modes.sh",
+      "accuser/36-accuser-start-stop.sh",
+      "baker/30-baker-extra-args.sh",
+      "baker/31-baker-start-stop.sh",
+      "accuser/39-accuser-node-dependency.sh",
+      "node/16-start-node-syncs.sh",
+      "import/46-import-clone-node.sh",
+      "import/50-import-field-overrides.sh",
       "import/43-import-detect-service-based.sh",
-      "dal/21-dal-extra-args.sh",
-      "dal/18-dal-basic-install.sh",
-      "accuser/35-accuser-basic-install.sh",
+      "baker/34-baker-multiple-instances.sh",
+      "baker/26-baker-basic-install.sh",
+      "accuser/38-accuser-show-service.sh",
+      "node/10-purge-with-data.sh",
       "node/06-install-custom-rpc-net.sh",
-      "import/51-import-nonexistent-service.sh",
-      "binaries/01-download-and-verify.sh",
-      "binaries/02-list-remote-major-versions.sh"
+      "node/09-install-no-snapshot.sh"
     ],
     "test_count": 14,
-    "total_duration": 86.54
+    "total_duration": 102.0
   },
   "shard-4": {
     "tests": [
-      "baker/30-baker-extra-args.sh",
+      "node/19-cascading-dependencies.sh",
       "node/18-restart.sh",
-      "accuser/39-accuser-node-dependency.sh",
-      "dal/26-dal-custom-data-dir.sh",
-      "import/45-import-takeover-node.sh",
+      "dal/22-dal-start-stop.sh",
+      "dal/23-dal-node-dependency.sh",
+      "import/47-import-cascade-baker.sh",
+      "node/21-systemd-failure-detection.sh",
       "node/03-remove.sh",
+      "node/14-multiple-instances.sh",
       "baker/28-baker-liquidity-vote.sh",
-      "dal/25-dal-multiple-instances.sh",
+      "baker/29-baker-dal-config.sh",
+      "node/11-remove-vs-purge.sh",
       "node/23-rename-updates-dependents.sh",
-      "dal/24-dal-show-service.sh",
-      "node/07-install-extra-args.sh",
-      "node/12-show-service.sh"
+      "node/22-list-status-display.sh",
+      "binaries/02-list-remote-major-versions.sh"
     ],
-    "test_count": 12,
-    "total_duration": 78.82
+    "test_count": 14,
+    "total_duration": 100.61
   },
   "shard-5": {
     "tests": [
-      "node/20-tmp-dir-option.sh",
+      "node/17-preserve-data-resume.sh",
+      "accuser/37-accuser-extra-args.sh",
       "baker/41-baker-with-dal-node.sh",
-      "dal/22-dal-start-stop.sh",
-      "import/46-import-clone-node.sh",
-      "import/47-import-cascade-baker.sh",
-      "node/02-show.sh",
-      "node/08-install-preserve-data.sh",
-      "baker/34-baker-multiple-instances.sh",
+      "baker/40-baker-remote-endpoint.sh",
+      "node/24-export-logs.sh",
+      "node/25-binary-access-validation.sh",
+      "import/49-import-extra-args-node.sh",
+      "import/48-import-dry-run.sh",
+      "dal/21-dal-extra-args.sh",
+      "node/13-reinstall-same-instance.sh",
       "dal/19-dal-remote-endpoint.sh",
-      "dal/20-dal-custom-addresses.sh",
-      "baker/27-baker-with-delegates.sh",
-      "node/09-install-no-snapshot.sh"
+      "node/08-install-preserve-data.sh",
+      "node/07-install-extra-args.sh",
+      "node/15-list-format.sh"
     ],
-    "test_count": 12,
-    "total_duration": 78.76
+    "test_count": 14,
+    "total_duration": 101.99
   }
 }
