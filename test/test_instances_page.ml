@@ -317,6 +317,40 @@ let test_select_node_from_menu () =
         | _ -> false))
 
 (* ============================================================ *)
+(* Test: Help Modal Opens with '?' Key *)
+(* ============================================================ *)
+
+let test_help_modal_opens () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Instances.Page) ;
+
+      (* Verify no modal is open initially *)
+      check
+        bool
+        "no modal initially"
+        false
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* Press '?' to open help *)
+      ignore (HD.Stateful.send_key "?") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      (* Verify modal opened *)
+      check
+        bool
+        "help modal opened after '?' key"
+        true
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* Verify help content is displayed *)
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "help modal shows Help title"
+        true
+        (TH.contains_substring screen "Help"))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -334,6 +368,7 @@ let page_tests =
     ("fold/unfold toggles", `Quick, test_fold_unfold);
     ("create menu opens with 'c' key", `Quick, test_create_menu_opens);
     ("select Node from create menu", `Quick, test_select_node_from_menu);
+    ("help modal opens with '?' key", `Quick, test_help_modal_opens);
   ]
 
 let () = Alcotest.run "Instances Page (TUI)" [("instances_page", page_tests)]
