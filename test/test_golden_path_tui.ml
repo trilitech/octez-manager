@@ -197,13 +197,7 @@ let test_create_node_service () =
         | Ok (Some svc) ->
             Printf.eprintf "✓ Service created successfully\n%!" ;
             Printf.eprintf "  Instance: %s\n%!" svc.instance ;
-            Printf.eprintf
-              "  Kind: %s\n%!"
-              (match svc.kind with
-              | Node -> "Node"
-              | Baker -> "Baker"
-              | Accuser -> "Accuser"
-              | Dal_node -> "DAL Node") ;
+            Printf.eprintf "  Role: %s\n%!" svc.role ;
             ()
         | Ok None when attempts <= 0 ->
             Printf.eprintf "✗ Service not found in registry after 30s\n%!" ;

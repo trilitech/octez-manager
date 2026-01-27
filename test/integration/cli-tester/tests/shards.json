@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "generated_at": "2026-01-23T11:00:00.000000",
-    "generated_by": "manual update - added binaries/02-list-remote-major-versions.sh",
-    "total_tests": 62,
+    "generated_at": "2026-01-27T00:00:00.000000",
+    "generated_by": "manual update - added headless/01-golden-path.sh",
+    "total_tests": 63,
     "total_duration": 401.597,
     "shard_count": 5,
     "mean_shard_duration": 80.32,
@@ -24,9 +24,10 @@
       "accuser/38-accuser-show-service.sh",
       "baker/33-baker-show-service.sh",
       "node/22-list-status-display.sh",
-      "node/15-list-format.sh"
+      "node/15-list-format.sh",
+      "headless/01-golden-path.sh"
     ],
-    "test_count": 12,
+    "test_count": 13,
     "total_duration": 78.73
   },
   "shard-2": {

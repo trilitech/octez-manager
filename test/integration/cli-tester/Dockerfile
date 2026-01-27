@@ -44,9 +44,10 @@ RUN mkdir -p /usr/local/share/zcash-params && \
     echo "Downloading sapling-spend.params..." && \
     curl -sfL "${ZCASH_PARAMS_URL}/sapling-spend.params" -o /usr/local/share/zcash-params/sapling-spend.params
 
-# Install octez-manager from build context
+# Install octez-manager and test binary from build context
 COPY cli-tester/octez-manager /usr/local/bin/octez-manager
-RUN chmod +x /usr/local/bin/octez-manager
+COPY cli-tester/test_golden_path_tui /usr/local/bin/test_golden_path_tui
+RUN chmod +x /usr/local/bin/octez-manager /usr/local/bin/test_golden_path_tui
 
 # Copy test scripts
 COPY cli-tester/tests/ /tests/
