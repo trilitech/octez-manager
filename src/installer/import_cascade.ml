@@ -309,3 +309,11 @@ let pp_analysis fmt analysis =
       (fun (dependent, dependency) ->
         Format.fprintf fmt "    %s → %s@." dependent dependency)
       analysis.external_dependents)
+
+module For_tests = struct
+  let list_drop = list_drop
+
+  let topological_sort = topological_sort
+
+  let build_graph_nodes = build_graph_nodes
+end
