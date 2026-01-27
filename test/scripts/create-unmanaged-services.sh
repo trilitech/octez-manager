@@ -5,36 +5,41 @@
 set -euo pipefail
 
 # Parse arguments
-NETWORK="ghostnet"
+NETWORK="shadownet"
 USE_SNAPSHOT=false
-SNAPSHOT_URL=""
+SNAPSHOT_PATH=""
 
 show_usage() {
 	cat <<EOF
-Usage: $0 [OPTIONS] [NETWORK]
+Usage: $0 [OPTIONS]
 
 Create unmanaged Octez services for testing import functionality.
 
 Options:
-    --snapshot              Import a snapshot before starting the node
-    --snapshot-url <url>    Use custom snapshot URL (implies --snapshot)
+    --snapshot [FILE]       Import a snapshot before starting the node
+                            If FILE is provided, use local snapshot file
+                            Otherwise, download from default snapshot URL
+    --network NETWORK       Network to use (default: shadownet)
     -h, --help             Show this help message
 
-Arguments:
-    NETWORK                Network to use (default: ghostnet)
-
 Examples:
-    # Create services without snapshot
+    # Create services without snapshot (shadownet)
     $0
 
-    # Create services with snapshot for ghostnet
-    $0 --snapshot ghostnet
+    # Create services for ghostnet without snapshot
+    $0 --network ghostnet
 
-    # Create services with custom snapshot
-    $0 --snapshot-url https://example.com/snapshot.rolling mainnet
+    # Create services with snapshot download (shadownet)
+    $0 --snapshot
 
-    # Create services for mainnet with default snapshot
-    $0 --snapshot mainnet
+    # Create services with local snapshot file
+    $0 --snapshot /path/to/snapshot.rolling
+
+    # Create services with snapshot for specific network
+    $0 --snapshot --network ghostnet
+
+    # Create services with local snapshot for mainnet
+    $0 --snapshot snapshot_file --network mainnet
 EOF
 	exit 0
 }
@@ -43,19 +48,25 @@ while [[ $# -gt 0 ]]; do
 	case $1 in
 	--snapshot)
 		USE_SNAPSHOT=true
-		shift
+		# Check if next arg exists and is not a flag
+		if [[ $# -gt 1 && ! "$2" =~ ^-- ]]; then
+			SNAPSHOT_PATH="$2"
+			shift 2
+		else
+			shift
+		fi
 		;;
-	--snapshot-url)
-		SNAPSHOT_URL="$2"
-		USE_SNAPSHOT=true
+	--network)
+		NETWORK="$2"
 		shift 2
 		;;
 	-h | --help)
 		show_usage
 		;;
 	*)
-		NETWORK="$1"
-		shift
+		echo "Error: Unknown argument '$1'"
+		echo "Use --help for usage information"
+		exit 1
 		;;
 	esac
 done
@@ -73,8 +84,8 @@ echo "Base directory: ${BASE_DIR}"
 echo "Binary directory: ${BIN_DIR}"
 if [ "$USE_SNAPSHOT" = true ]; then
 	echo "Snapshot: enabled"
-	if [ -n "$SNAPSHOT_URL" ]; then
-		echo "Snapshot URL: ${SNAPSHOT_URL}"
+	if [ -n "$SNAPSHOT_PATH" ]; then
+		echo "Snapshot file: ${SNAPSHOT_PATH}"
 	fi
 fi
 echo ""
@@ -111,9 +122,22 @@ fi
 if [ "$USE_SNAPSHOT" = true ] && [ ! -f "${NODE_DATA_DIR}/context/store.dict" ]; then
 	echo "[3/7] Importing snapshot..."
 
-	# Determine snapshot URL
-	if [ -z "$SNAPSHOT_URL" ]; then
-		# Use default snapshot URLs based on network
+	# Check if using local file or need to download
+	if [ -n "$SNAPSHOT_PATH" ]; then
+		# Use local snapshot file
+		if [ ! -f "$SNAPSHOT_PATH" ]; then
+			echo "Error: Snapshot file not found: ${SNAPSHOT_PATH}"
+			exit 1
+		fi
+		echo "  Using local snapshot file: ${SNAPSHOT_PATH}"
+		SNAPSHOT_FILE="$SNAPSHOT_PATH"
+		CLEANUP_SNAPSHOT=false
+	else
+		# Download snapshot from default URL
+		SNAPSHOT_FILE="${BASE_DIR}/snapshot.rolling"
+		CLEANUP_SNAPSHOT=true
+
+		# Determine snapshot URL based on network
 		case "$NETWORK" in
 		mainnet)
 			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/mainnet/rolling"
@@ -121,34 +145,40 @@ if [ "$USE_SNAPSHOT" = true ] && [ ! -f "${NODE_DATA_DIR}/context/store.dict" ];
 		ghostnet)
 			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/ghostnet/rolling"
 			;;
+		shadownet)
+			echo "  Note: Using ghostnet snapshot for shadownet (no dedicated shadownet snapshots)"
+			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/ghostnet/rolling"
+			;;
 		*)
 			echo "Warning: No default snapshot URL for network ${NETWORK}"
-			echo "Please provide --snapshot-url <url>"
+			echo "Please provide a snapshot file: --snapshot /path/to/snapshot.rolling"
 			USE_SNAPSHOT=false
 			;;
 		esac
+
+		if [ "$USE_SNAPSHOT" = true ]; then
+			echo "  Downloading snapshot from ${SNAPSHOT_URL}..."
+			if command -v wget &>/dev/null; then
+				wget -O "${SNAPSHOT_FILE}" "${SNAPSHOT_URL}" --show-progress
+			elif command -v curl &>/dev/null; then
+				curl -L -o "${SNAPSHOT_FILE}" "${SNAPSHOT_URL}" --progress-bar
+			else
+				echo "Error: Neither wget nor curl found. Cannot download snapshot."
+				exit 1
+			fi
+		fi
 	fi
 
 	if [ "$USE_SNAPSHOT" = true ]; then
-		SNAPSHOT_FILE="${BASE_DIR}/snapshot.rolling"
-
-		echo "  Downloading snapshot from ${SNAPSHOT_URL}..."
-		if command -v wget &>/dev/null; then
-			wget -O "${SNAPSHOT_FILE}" "${SNAPSHOT_URL}" --show-progress
-		elif command -v curl &>/dev/null; then
-			curl -L -o "${SNAPSHOT_FILE}" "${SNAPSHOT_URL}" --progress-bar
-		else
-			echo "Error: Neither wget nor curl found. Cannot download snapshot."
-			exit 1
-		fi
-
 		echo "  Importing snapshot into node..."
 		"${BIN_DIR}/octez-node" snapshot import "${SNAPSHOT_FILE}" \
 			--data-dir "${NODE_DATA_DIR}" \
 			--no-check
 
-		echo "  Cleaning up snapshot file..."
-		rm -f "${SNAPSHOT_FILE}"
+		if [ "$CLEANUP_SNAPSHOT" = true ]; then
+			echo "  Cleaning up downloaded snapshot file..."
+			rm -f "${SNAPSHOT_FILE}"
+		fi
 
 		echo "  Snapshot imported successfully!"
 	fi
@@ -165,7 +195,6 @@ if [ ! -f "${DAL_DATA_DIR}/config.json" ]; then
 	echo "[4/7] Initializing DAL node..."
 	"${BIN_DIR}/octez-dal-node" config init \
 		--data-dir "${DAL_DATA_DIR}" \
-		--network "${NETWORK}" \
 		--rpc-addr 127.0.0.1:10732 \
 		--net-addr 0.0.0.0:11732 \
 		--endpoint http://127.0.0.1:18732
