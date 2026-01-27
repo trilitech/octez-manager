@@ -251,15 +251,15 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
 (** Extract baker-specific fields from extra_args.
     Returns (delegates, liquidity_baking_vote, remaining_extra_args) 
     
-    Note: This uses heuristics to identify delegates as trailing positional arguments.
-    According to Octez baker syntax, delegates are always the final arguments on the
-    command line, appearing after all flags. We identify them as:
+    Note: This uses heuristics to identify delegates as positional arguments.
+    Delegates can appear anywhere in the argument list (not just at the end).
+    We identify them as:
     - Tezos addresses (tz1/tz2/tz3/tz4/KT1 prefixes), or
     - Alphanumeric aliases (letters, numbers, underscores only)
     
     This approach works for standard baker configurations. If users have unusual
-    setups (e.g., custom flags after delegates), they may need to manually adjust
-    the delegates field after import via the TUI. *)
+    setups (e.g., custom flags that look like aliases), they may need to manually
+    adjust the delegates field after import via the TUI. *)
 let extract_baker_fields extra_args =
   (* Extract liquidity baking vote FIRST, before delegates *)
   let liquidity_baking_vote, args_after_lb =
@@ -271,20 +271,21 @@ let extract_baker_fields extra_args =
     in
     extract_lb [] extra_args
   in
-  (* Then extract trailing delegates *)
+  (* Then extract ALL delegate-like arguments from the remaining args *)
   let is_likely_delegate arg =
-    if String.length arg < 3 then false
+    if String.length arg < 1 then false
     else
-      let prefix = String.sub arg 0 3 in
-      (* Tezos address prefixes *)
-      if
-        prefix = "tz1" || prefix = "tz2" || prefix = "tz3" || prefix = "tz4"
-        || prefix = "KT1"
-      then true
+      let is_tezos_address =
+        if String.length arg >= 3 then
+          let prefix = String.sub arg 0 3 in
+          prefix = "tz1" || prefix = "tz2" || prefix = "tz3" || prefix = "tz4"
+          || prefix = "KT1"
+        else false
+      in
+      if is_tezos_address then true
       else
-        (* Alias: only alphanumeric and underscore, no slashes or special chars *)
-        String.length arg > 0
-        && arg.[0] <> '/'
+        (* Alias: only alphanumeric and underscore, no slashes, dashes, or special chars *)
+        arg.[0] <> '/'
         && arg.[0] <> '-'
         && String.for_all
              (fun c ->
@@ -294,17 +295,29 @@ let extract_baker_fields extra_args =
                || c = '_')
              arg
   in
-  (* Extract trailing delegates (reverse list, take while delegate-like, reverse back) *)
-  let rec extract_trailing_delegates acc = function
-    | [] -> (List.rev acc, [])
-    | arg :: rest when is_likely_delegate arg ->
-        extract_trailing_delegates (arg :: acc) rest
-    | args -> (List.rev acc, args)
+  (* Separate delegates from flags by partitioning the list *)
+  let rec partition_delegates delegates flags prev_was_flag = function
+    | [] -> (List.rev delegates, List.rev flags)
+    | arg :: rest ->
+        if
+          String.starts_with ~prefix:"--" arg
+          || String.starts_with ~prefix:"-" arg
+        then
+          (* This is a flag *)
+          partition_delegates delegates (arg :: flags) true rest
+        else if prev_was_flag then
+          (* Previous was a flag, so this is likely a flag value, not a delegate *)
+          partition_delegates delegates (arg :: flags) false rest
+        else if is_likely_delegate arg then
+          (* This looks like a delegate *)
+          partition_delegates (arg :: delegates) flags false rest
+        else
+          (* Unknown argument, treat as flag *)
+          partition_delegates delegates (arg :: flags) false rest
   in
-  let delegates, remaining_args_rev =
-    extract_trailing_delegates [] (List.rev args_after_lb)
+  let delegates, remaining_args =
+    partition_delegates [] [] false args_after_lb
   in
-  let remaining_args = List.rev remaining_args_rev in
   (delegates, liquidity_baking_vote, remaining_args)
 
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
