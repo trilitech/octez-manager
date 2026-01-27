@@ -396,6 +396,7 @@ Keep the first line under 72 characters.
 - Never commit secrets or credentials
 - Use `git mv` for renames to preserve history
 - **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
+- **Never delete untracked files without confirmation** - user scripts, test data, and work-in-progress files must be preserved unless explicitly requested
 
 ## Questions or Uncertainty
 
