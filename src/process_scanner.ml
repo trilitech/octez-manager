@@ -272,3 +272,11 @@ let is_systemd_managed pid =
 let get_standalone_processes () =
   scan_octez_processes ()
   |> List.filter (fun proc -> not (is_systemd_managed proc.pid))
+
+module For_tests = struct
+  let extract_binary_path = extract_binary_path
+
+  let is_octez_binary = is_octez_binary
+
+  let contains_substring = contains_substring
+end
