@@ -27,3 +27,14 @@ val is_systemd_managed : int -> bool
 (** Get Octez processes that are NOT managed by systemd.
     These are candidates for "standalone" external services. *)
 val get_standalone_processes : unit -> process_info list
+
+(** {1 Testing} *)
+
+(** Exposed for unit testing. Do not use outside tests. *)
+module For_tests : sig
+  val extract_binary_path : string -> string option
+
+  val is_octez_binary : string -> bool
+
+  val contains_substring : string -> string -> bool
+end
