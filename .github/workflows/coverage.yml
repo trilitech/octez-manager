@@ -16,15 +16,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  coverage:
-    name: Generate Coverage Report
+  build-and-test-coverage:
+    name: Build & Unit Tests (Coverage)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # TODO: Re-enable conditional after testing
-    # if: |
-    #   github.event_name == 'push' || 
-    #   contains(github.event.pull_request.labels.*.name, 'coverage') ||
-    #   github.event.action == 'opened'
     container:
       image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
@@ -51,7 +46,6 @@ jobs:
       - name: Ensure opam is initialized
         id: opam-init
         run: |
-          # Check if opam actually works, not just if directory exists
           if opam switch list 2>&1 | grep -q "5.3.0"; then
             echo "Opam switch 5.3.0 exists, using it..."
             echo "needs_miaou=false" >> $GITHUB_OUTPUT
@@ -84,71 +78,55 @@ jobs:
           git config --global --add safe.directory "$PWD"
           opam install . --deps-only --with-test
 
+      - name: Build instrumented static binary
+        run: |
+          eval $(opam env)
+          echo '(-ccopt -static)' > static_flags.sexp
+          dune build --instrument-with bisect_ppx --release
+          cp _build/default/src/main.exe octez-manager-instrumented
+          chmod +x octez-manager-instrumented
+
+          # Build golden path test binary for integration tests
+          dune build --instrument-with bisect_ppx test/test_golden_path_tui_v2.exe
+          cp _build/default/test/test_golden_path_tui_v2.exe test_golden_path_tui_v2
+          chmod +x test_golden_path_tui_v2
+
+          # Verify they're static
+          ldd octez-manager-instrumented 2>&1 | head -10 || echo "Static binary confirmed"
+          ldd test_golden_path_tui_v2 2>&1 | head -10 || echo "Test binary confirmed"
+
       - name: Run unit tests with coverage
         run: |
-          # Use tmpfs for fast I/O during test execution
           mkdir -p /dev/shm/coverage
           export BISECT_FILE=/dev/shm/coverage/bisect-unit
-          
+
           # Set terminal environment for headless TUI tests
           export TERM=xterm-256color
           export TERMINFO=/usr/share/terminfo
-          
-          echo "=== Environment Check ==="
-          echo "BISECT_FILE=$BISECT_FILE"
-          echo "TERM=$TERM"
-          df -h /dev/shm
-          echo "Available memory:"
-          free -h || echo "free command not available"
-          echo "Process limits:"
-          ulimit -a
-          
-          echo "=== Running tests with coverage (Debian container) ==="
-          echo "Testing if Debian fixes UI regression test hang with bisect_ppx"
-          
-          # Debug: Check environment
-          echo "PATH: $PATH"
-          echo "OPAM_SWITCH_PREFIX: $OPAM_SWITCH_PREFIX"
-          which dune || echo "dune not in PATH"
-          which opam || echo "opam not in PATH"
-          
-          # Ensure opam environment is loaded
+
           eval $(opam env)
-          echo "After eval opam env:"
-          echo "PATH: $PATH"
-          which dune || echo "dune STILL not in PATH"
-          
-          dune clean
-          
-          # Run ALL tests WITH instrumentation, but with timeout protection
+
+          # Reset static_flags before running tests (tests need dynamic linking)
+          git checkout -- static_flags.sexp
+
+          # Run tests with instrumentation (5 min timeout as safety net)
           echo "Starting tests at $(date -u '+%H:%M:%S')"
-          
-          # Use timeout to prevent indefinite hangs (5 minutes should be more than enough)
           timeout 300 dune runtest --instrument-with bisect_ppx --force || {
             exit_code=$?
             if [ $exit_code -eq 124 ]; then
               echo "ERROR: Tests timed out after 5 minutes!"
-              echo "This suggests the hang still occurs even with Debian."
               exit 1
             else
               echo "Tests failed with exit code $exit_code"
               exit $exit_code
             fi
           }
-          
           echo "Completed at $(date -u '+%H:%M:%S')"
-          
-          echo ""
-          echo "⚠️  Coverage collection disabled due to CI hang issue"
-          echo "Tests pass but coverage data not collected"
-          echo "Run locally with: dune runtest --instrument-with bisect_ppx"
-          
+
           # Copy coverage files to artifact location
-          echo "=== Copying coverage data from tmpfs ==="
           mkdir -p _coverage
           cp -v /dev/shm/coverage/* _coverage/ || echo "Warning: No coverage files generated"
           ls -lah _coverage/
-          echo "=== Coverage data ready for upload ==="
         continue-on-error: false
 
       - name: Upload unit coverage data
@@ -158,80 +136,6 @@ jobs:
           path: _coverage/
           retention-days: 1
 
-  build-instrumented-binary:
-    name: Build Instrumented Binary (Debian)
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/${{ github.repository }}-ci-debian:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      OPAMYES: "true"
-      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Cache opam packages
-        id: cache-opam
-        uses: actions/cache@v4
-        with:
-          path: /root/.opam
-          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
-      
-      - name: Ensure opam is initialized
-        run: |
-          # Check if opam actually works, not just if directory exists
-          if opam switch list 2>&1 | grep -q "5.1.1"; then
-            echo "Opam switch 5.1.1 exists, using it..."
-            eval $(opam env)
-          else
-            echo "Initializing opam and creating switch 5.1.1..."
-            opam init --disable-sandboxing --bare -y || true
-            opam switch create 5.1.1 ocaml.5.1.1 -y
-            eval $(opam env)
-          fi
-      
-      - name: Pin miaou packages
-        run: |
-          if [ -z "$MIAOU_GIT_URL" ]; then
-            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
-            exit 1
-          fi
-          eval $(opam env)
-          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
-      
-      - name: Install project dependencies
-        run: |
-          eval $(opam env)
-          git config --global --add safe.directory "$PWD"
-          opam install . --deps-only --with-test
-      
-      - name: Build instrumented static binary
-        run: |
-          # Build static binary for compatibility with Debian test container
-          eval $(opam env)
-          echo '(-ccopt -static)' > static_flags.sexp
-          dune clean
-          dune build --instrument-with bisect_ppx --release
-          cp _build/default/src/main.exe octez-manager-instrumented
-          chmod +x octez-manager-instrumented
-          
-          # Build golden path test binary for integration tests (v2 - declarative)
-          dune build --instrument-with bisect_ppx test/test_golden_path_tui_v2.exe
-          cp _build/default/test/test_golden_path_tui_v2.exe test_golden_path_tui_v2
-          chmod +x test_golden_path_tui_v2
-          
-          # Verify they're static
-          ldd octez-manager-instrumented 2>&1 | head -10 || echo "Static binary confirmed"
-          ldd test_golden_path_tui_v2 2>&1 | head -10 || echo "Test binary confirmed"
-      
       - name: Upload instrumented binary
         uses: actions/upload-artifact@v4
         with:
@@ -244,7 +148,7 @@ jobs:
   integration-coverage:
     name: Integration Tests Coverage (Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    needs: [coverage, build-instrumented-binary]
+    needs: [build-and-test-coverage]
     # Run instrumented integration tests (with coverage) when:
     # 1. Pushing to main (always maintain coverage baseline), OR
     # 2. PR without 'skip-coverage' label (default behavior)
@@ -336,8 +240,8 @@ jobs:
   report:
     name: Generate and Post Coverage Report
     runs-on: ubuntu-latest
-    needs: [coverage, build-instrumented-binary, integration-coverage]
-    if: always() && needs.coverage.result == 'success'
+    needs: [build-and-test-coverage, integration-coverage]
+    if: always() && needs.build-and-test-coverage.result == 'success'
     container:
       image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
