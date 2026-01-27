@@ -189,7 +189,7 @@ let view_details svc =
           else dal_config
         in
         let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-        let extra_args = lookup "OCTEZ_BAKER_EXTRA_ARGS" in
+        let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
         let logging = Logging_mode.to_string svc.Service.logging_mode in
         let node_depends =
           match svc.Service.depends_on with Some inst -> inst | None -> ""
@@ -223,7 +223,7 @@ let view_details svc =
     | "accuser" ->
         let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
         let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
-        let extra_args = lookup "OCTEZ_ACCUSER_EXTRA_ARGS" in
+        let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
         let depends_on =
           match svc.Service.depends_on with
           | Some inst -> inst
@@ -247,7 +247,7 @@ let view_details svc =
         let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
         let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
         let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
-        let extra_args = lookup "OCTEZ_DAL_EXTRA_ARGS" in
+        let extra_args = lookup "OCTEZ_SERVICE_ARGS" in
         let depends_on =
           match svc.Service.depends_on with
           | Some inst -> inst
