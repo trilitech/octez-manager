@@ -441,14 +441,23 @@ let build_external_service ~unit_name ~exec_start ~properties =
   (* Try to detect network via RPC probe if not already known *)
   let network_field =
     let parsed_network = build_field parsed.network in
-    match (parsed_network.value, active_state) with
-    | None, "active" -> (
+    match (parsed_network.value, active_state, role_field.value) with
+    | None, "active", Some role -> (
         (* No network but service is active - try probe *)
-        (* Try rpc_addr first (for nodes), then endpoint (for bakers/accusers) *)
         let probe_addr =
-          match rpc_addr_field.value with
-          | Some addr -> Some addr
-          | None -> endpoint_field.value
+          match role with
+          | External_service.Node ->
+              (* Nodes: probe their own RPC endpoint *)
+              rpc_addr_field.value
+          | External_service.Baker | External_service.Accuser
+          | External_service.Dal_node ->
+              (* Baker/Accuser/DAL: probe their connected node's endpoint *)
+              endpoint_field.value
+          | External_service.Unknown _ -> (
+              (* Unknown: try rpc_addr first, then endpoint *)
+              match rpc_addr_field.value with
+              | Some addr -> Some addr
+              | None -> endpoint_field.value)
         in
         match probe_addr with
         | Some addr -> (
@@ -616,9 +625,24 @@ let process_to_external_service (proc : Process_scanner.process_info) =
   (* Try to detect network via RPC probe for active processes *)
   let network_field =
     match (network.value, role.value) with
-    | None, Some External_service.Node -> (
-        (* Node with unknown network - try RPC probe *)
-        match rpc_addr.value with
+    | None, Some detected_role -> (
+        (* Unknown network - try RPC probe based on role *)
+        let probe_addr =
+          match detected_role with
+          | External_service.Node ->
+              (* Nodes: probe their own RPC endpoint *)
+              rpc_addr.value
+          | External_service.Baker | External_service.Accuser
+          | External_service.Dal_node ->
+              (* Baker/Accuser/DAL: probe their connected node's endpoint *)
+              node_endpoint.value
+          | External_service.Unknown _ -> (
+              (* Unknown: try rpc_addr first, then endpoint *)
+              match rpc_addr.value with
+              | Some addr -> Some addr
+              | None -> node_endpoint.value)
+        in
+        match probe_addr with
         | Some addr -> (
             match probe_rpc_chain_id addr with
             | Some (_chain_id, Some network_name) ->
