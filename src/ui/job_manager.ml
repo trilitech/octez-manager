@@ -75,3 +75,23 @@ let clear_finished () =
 let get_running_job () = List.find_opt (fun j -> j.status = Running) !jobs
 
 let get_latest_job () = match !jobs with [] -> None | job :: _ -> Some job
+
+let stuck_timeout_secs = 120.0
+
+let check_stuck_jobs () =
+  let now = Unix.gettimeofday () in
+  List.iter
+    (fun job ->
+      match job.status with
+      | Running when now -. job.started_at > stuck_timeout_secs ->
+          job.status <- Failed "Operation timed out" ;
+          job.finished_at <- Some now ;
+          Context.toast_error
+            (Printf.sprintf
+               "Job \"%s\" timed out after %.0fs"
+               job.description
+               stuck_timeout_secs)
+      | _ -> ())
+    !jobs
+
+let tick () = check_stuck_jobs ()
