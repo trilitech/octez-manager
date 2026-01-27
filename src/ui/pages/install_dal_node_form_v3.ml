@@ -78,7 +78,7 @@ let make_initial_model () =
       let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
       let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
       let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
-      let extra_args = lookup "OCTEZ_DAL_EXTRA_ARGS" in
+      let extra_args = lookup "OCTEZ_SERVICE_ARGS" in
       {
         core =
           {

@@ -70,7 +70,7 @@ let make_initial_model () =
       in
       let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
       let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
-      let extra_args = lookup "OCTEZ_ACCUSER_EXTRA_ARGS" in
+      let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
       {
         core =
           {
