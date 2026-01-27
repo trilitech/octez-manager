@@ -173,17 +173,20 @@ let print_service_details svc =
   (* Role-specific fields *)
   (match svc.role with
   | "node" ->
+      let extra_args = lookup "OCTEZ_SERVICE_ARGS" in
       Format.printf
         "History mode  : %s@."
         (History_mode.to_string svc.history_mode) ;
       Format.printf "Data dir      : %s@." svc.data_dir ;
       Format.printf "RPC addr      : %s@." svc.rpc_addr ;
-      Format.printf "P2P addr      : %s@." svc.net_addr
+      Format.printf "P2P addr      : %s@." svc.net_addr ;
+      if extra_args <> "" then Format.printf "Extra args    : %s@." extra_args
   | "baker" ->
       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
       let dal_cfg = lookup "OCTEZ_DAL_CONFIG" in
       let delegates = lookup "OCTEZ_BAKER_DELEGATES_ARGS" in
       let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
+      let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
       Format.printf "Base dir      : %s@." base_dir ;
       print_node_endpoint () ;
       (match String.lowercase_ascii (String.trim dal_cfg) with
@@ -196,19 +199,24 @@ let print_service_details svc =
           | Some inst -> Format.printf "DAL instance  : %s@." inst
           | None -> Format.printf "DAL endpoint  : %s@." raw)) ;
       if delegates <> "" then Format.printf "Delegates     : %s@." delegates ;
-      if lb_vote <> "" then Format.printf "LB Vote       : %s@." lb_vote
+      if lb_vote <> "" then Format.printf "LB Vote       : %s@." lb_vote ;
+      if extra_args <> "" then Format.printf "Extra args    : %s@." extra_args
   | "accuser" ->
       let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
+      let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
       Format.printf "Base dir      : %s@." base_dir ;
-      print_node_endpoint ()
+      print_node_endpoint () ;
+      if extra_args <> "" then Format.printf "Extra args    : %s@." extra_args
   | "dal-node" | "dal" ->
       let dal_data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
+      let extra_args = lookup "OCTEZ_SERVICE_ARGS" in
       Format.printf "DAL data dir  : %s@." dal_data_dir ;
       print_node_endpoint () ;
       if svc.rpc_addr <> "" then
         Format.printf "DAL RPC addr  : %s@." svc.rpc_addr ;
       if svc.net_addr <> "" then
-        Format.printf "DAL P2P addr  : %s@." svc.net_addr
+        Format.printf "DAL P2P addr  : %s@." svc.net_addr ;
+      if extra_args <> "" then Format.printf "Extra args    : %s@." extra_args
   | _ ->
       (* Fallback for unknown roles *)
       Format.printf "Data dir      : %s@." svc.data_dir ;
