@@ -392,3 +392,10 @@
  (modules test_self_update_checker)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_import_cascade)
+ (libraries alcotest octez_manager_lib)
+ (modules test_import_cascade)
+ (instrumentation
+  (backend bisect_ppx)))
