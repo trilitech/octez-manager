@@ -8,11 +8,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Binary Management**: Full lifecycle management for Octez binaries
+  - TUI page (`b` key from instances) with collapsible major version groups
+  - CLI commands: `octez-manager binaries download`, `binaries list`, `binaries prune`
+  - Parallel downloads using Domain.spawn with multi-file progress display
+  - Atomic downloads to prevent incomplete installations
+  - RAM cache for available versions list
+  - Disk space calculation in prune command
+  - Shows which instances use each binary version
+
+- **Version Update & Cascade**: Update services to new binary versions
+  - Update Version action in instance menu with downgrade prevention
+  - Cascade update: propagate version changes to dependent services (baker, accuser, DAL)
+  - Automatic systemd unit regeneration on version update
+  - Rollback support for cascade updates
+  - Managed version selection in TUI and CLI install forms (`--version` flag)
+  - Download option in binary directory selector during install
+
+- **Self-Update**: Automatic update checking for octez-manager itself
+  - Background version polling scheduler
+  - Startup notification when a new version is available
+  - `octez-manager version` and `octez-manager self-update` CLI commands
+  - Upgrade action in TUI
+
 - **Unmanaged Instances Detection**: Automatically detect and manage Octez services not installed by octez-manager
   - Detects systemd services and standalone processes (Docker, tmux, manual launches)
   - Shows real-time metrics (CPU, memory, sync status, head level) for all detected services
   - Supports Start/Stop/Restart for systemd services, view-only for standalone processes
-  - Network detection via RPC probing
+  - Network detection via RPC probing, including standalone processes
+  - Head level monitoring and time-since-block display for external nodes
+  - Daily-logs detection for log viewing
+  - Binary absolute path resolution for version detection
   - Appears in dedicated "Unmanaged Instances" section in TUI (below managed services)
   - CLI commands: `octez-manager list --external`, `octez-manager external <instance> <action>`
   - Efficient process scanning with pgrep and PID caching for minimal system impact
@@ -30,14 +56,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Preserves original service user and file ownership
   - Smart field resolution with confidence tracking
   - Auto-increments ports for Clone strategy to avoid conflicts
+  - Proper accuser detection via `run accuser` subcommand (universal octez-baker binary)
+  - Baker 'run with local node' mode preserved during import
+  - Delegate and liquidity baking vote extraction from service arguments
   - **Known limitation**: Dependency chains not tracked yet (see #360)
     - Clone strategy: safe, preserves original dependency chain
     - Takeover strategy: may break services that depend on the imported service
     - Manual verification recommended before using Takeover on services with dependents
 
+- **UI Improvements**
+  - Tab key to expand/collapse instance lists and version groups
+  - Responsive modals that adapt to terminal width
+  - Multi-line progress display during binary downloads in install forms
+  - `--prefix` option and XDG-based install paths
+  - `latest` alias for version selection
+  - Default network changed from mainnet to shadownet
+
 ### Fixed
 
+- Correct environment variable names in baker, accuser, and DAL edit forms and instance details
+- Display extra args in `instance show` CLI command
+- Store `bin_source` when installing services
+- Detect managed versions from `app_bin_dir` for legacy services
+- Remove duplicate `OCTEZ_SERVICE_ARGS` from accuser env files
+- Probe connected node endpoint for DAL/baker/accuser network detection
+- Remove nonexistent client config path from baker/accuser details
+- Allow exiting import wizard from Importing state with Esc
+- Return network alias instead of human_name from chain resolution
+- Graceful shutdown for background schedulers
 - Suppress `du` command stderr output to prevent error messages in TUI
+- Prevent stderr leakage from binary downloader to terminal in TUI
+- Prevent UI glitches during binary remove operations
+- Invalidate version cache after service upgrades
 
 ## [0.1.1] - 2026-01-15
 
