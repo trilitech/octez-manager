@@ -986,7 +986,7 @@ let import_service ?(on_log = fun _ -> ())
           let parsed = Execstart_parser.parse config.exec_start in
           match parsed.run_mode with
           | Some "with local node" -> (
-              (* Find node dependency that was imported *)
+              (* First, try to find node dependency that was imported in cascade *)
               let deps =
                 External_service.get_dependencies
                   external_svc
@@ -1001,7 +1001,19 @@ let import_service ?(on_log = fun _ -> ())
               match node_dep with
               | Some (dep_name, _) ->
                   Hashtbl.find_opt imported_services dep_name
-              | None -> None)
+              | None -> (
+                  (* No imported node found. Check if parsed data_dir matches an existing managed node *)
+                  match parsed.data_dir with
+                  | Some node_data_dir -> (
+                      match
+                        List.find_opt
+                          (fun (svc : Service.t) ->
+                            svc.role = "node" && svc.data_dir = node_data_dir)
+                          all_services
+                      with
+                      | Some svc -> Some svc.instance
+                      | None -> None)
+                  | None -> None))
           | Some "remotely" | Some _ | None ->
               (* Keep remote endpoint for "remotely" or unknown modes *)
               None)
