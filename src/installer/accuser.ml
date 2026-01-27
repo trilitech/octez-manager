@@ -75,7 +75,8 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         app_bin_dir = request.app_bin_dir;
         bin_source = request.bin_source;
         logging_mode = request.logging_mode;
-        service_args = request.extra_args;
+        service_args = [];
+        (* Accusers use OCTEZ_BAKER_COMMAND_ARGS, not OCTEZ_SERVICE_ARGS *)
         extra_env =
           [
             ("OCTEZ_CLIENT_BASE_DIR", base_dir);
