@@ -100,7 +100,7 @@ let list_all_service_units () =
       @ [
           "list-unit-files";
           "--type=service";
-          "octez-*.service";
+          "*octez*.service";
           "--no-legend";
           "--no-pager";
         ]
