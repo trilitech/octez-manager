@@ -150,12 +150,10 @@ let view_details svc =
         ]
     | "baker" ->
         let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-        let client_config = Filename.concat base_dir "config" in
-        [("Base Directory", base_dir); ("Client Config", client_config)]
+        [("Base Directory", base_dir)]
     | "accuser" ->
         let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
-        let client_config = Filename.concat base_dir "config" in
-        [("Base Directory", base_dir); ("Client Config", client_config)]
+        [("Base Directory", base_dir)]
     | "dal-node" | "dal" ->
         let data_dir = lookup "OCTEZ_DAL_DATA_DIR" in
         let config_file = Filename.concat data_dir "config.json" in
