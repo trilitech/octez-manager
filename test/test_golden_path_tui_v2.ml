@@ -148,7 +148,21 @@ let golden_path_script =
   @ [
       Comment "=== Step 5: Final Verification ===";
       Comment "Wait for the instances cache to show all 4 managed services.";
-      WaitFor [ScreenContains "Managed: 4"; MaxIterations 1000];
+      WaitFor
+        [
+          ScreenMatches
+            (fun s ->
+              (* Summary says "Managed: 4" when externals exist,
+                 or "Total instances: 4" when they don't. *)
+              let has str =
+                try
+                  ignore (Str.search_forward (Str.regexp_string str) s 0) ;
+                  true
+                with Not_found -> false
+              in
+              has "Managed: 4" || has "Total instances: 4");
+          MaxIterations 1000;
+        ];
       Comment
         "Tall single-column view: all services should be listed vertically.";
       Resize (60, 80);
