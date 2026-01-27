@@ -565,6 +565,22 @@ struct
       s)
     else submit s
 
+  (** Handle Tab key: toggle boolean fields and move down, otherwise just move down *)
+  let handle_tab s =
+    let fields = S.spec.fields !(s.model_ref) in
+    if s.cursor < List.length fields then (
+      let (Field field) = List.nth fields s.cursor in
+      (* Check if this is a boolean field by checking if value is "true" or "false" *)
+      let value_str = field.to_string (field.get !(s.model_ref)) in
+      if value_str = "true" || value_str = "false" then
+        (* Boolean field: toggle it *)
+        field.edit s.model_ref ;
+      (* Move to next field *)
+      move_state s 1)
+    else
+      (* At submit button: just move (wraps around) *)
+      move_state s 1
+
   let view ps ~focus:_ ~size =
     let s = ps.Navigation.s in
     let model = !(s.model_ref) in
@@ -693,6 +709,9 @@ struct
       | Some Miaou.Core.Keys.Down ->
           Navigation.update (fun s -> move_state s 1) ps
       | Some Miaou.Core.Keys.Enter -> Navigation.update enter ps
+      | Some Miaou.Core.Keys.Tab ->
+          (* Tab: toggle boolean fields, then move to next field *)
+          Navigation.update handle_tab ps
       | _ -> ps
 
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
@@ -717,6 +736,7 @@ struct
       kb "Up" (fun ps -> move ps (-1)) "Move up";
       kb "Down" (fun ps -> move ps 1) "Move down";
       kb "Enter" (fun ps -> Navigation.update enter ps) "Edit / Submit";
+      kb "Tab" (fun ps -> Navigation.update handle_tab ps) "Toggle & next";
       kb "Esc" back "Back";
       {
         Miaou.Core.Tui_page.key = "?";
@@ -727,5 +747,5 @@ struct
     ]
 
   let handled_keys () =
-    Miaou.Core.Keys.[Up; Down; Enter; Char "Esc"; Char "Escape"]
+    Miaou.Core.Keys.[Up; Down; Enter; Tab; Char "Esc"; Char "Escape"]
 end
