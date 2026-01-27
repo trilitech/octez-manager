@@ -722,9 +722,8 @@ let detect () =
     let external_services =
       List.filter_map
         (fun unit_name ->
-          (* Skip managed units *)
-          if is_managed_unit_name unit_name && is_in_registry ~unit_name then
-            None
+          (* Skip managed units (all octez-*@*.service patterns, regardless of registry) *)
+          if is_managed_unit_name unit_name then None
           else
             (* Get ExecStart *)
             match get_exec_start ~unit_name with
