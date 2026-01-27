@@ -263,20 +263,12 @@ let print_service_details svc =
         (Filename.concat svc.data_dir "identity.json")
   | "baker" ->
       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-      if base_dir <> "" then (
-        Format.printf "  %-16s: %s@." "Base Directory" base_dir ;
-        Format.printf
-          "  %-16s: %s@."
-          "Client Config"
-          (Filename.concat base_dir "config"))
+      if base_dir <> "" then
+        Format.printf "  %-16s: %s@." "Base Directory" base_dir
   | "accuser" ->
       let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
-      if base_dir <> "" then (
-        Format.printf "  %-16s: %s@." "Base Directory" base_dir ;
-        Format.printf
-          "  %-16s: %s@."
-          "Client Config"
-          (Filename.concat base_dir "config"))
+      if base_dir <> "" then
+        Format.printf "  %-16s: %s@." "Base Directory" base_dir
   | "dal-node" | "dal" ->
       let dal_dir = lookup "OCTEZ_DAL_DATA_DIR" in
       if dal_dir <> "" then (
