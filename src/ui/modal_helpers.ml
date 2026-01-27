@@ -1291,7 +1291,7 @@ let show_help_modal () =
       "Global shortcuts:";
       "  s  - Settings";
       "  m  - Menu";
-      "  h/?- Help";
+      "  ?  - Help";
       "  Esc/q - Close modals";
       "";
       "Page-specific keys remain available when no modal is open.";

@@ -36,7 +36,7 @@ type outcome =
 
     Reserved global shortcuts:
     - ['s'] - Navigate to Settings
-    - ['?'] or ['h'] - Show Help modal
+    - ['?'] - Show Help modal
     - ['m'] - Show Menu modal
 
     Example usage in a page:
