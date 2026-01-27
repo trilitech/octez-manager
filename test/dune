@@ -142,6 +142,24 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(executable
+ (name test_golden_path_tui_v2)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  miaou-core.helpers
+  lambda-term
+  tui_test_helpers_lib
+  tui_command_runner_lib
+  ui_regression_framework_lib
+  eio_main)
+ (modules test_golden_path_tui_v2)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (test
  (name test_instance_actions)
  (libraries alcotest test_mocks unix)
@@ -267,6 +285,19 @@
  (name ui_regression_framework_lib)
  (libraries miaou-core.lib_miaou_internal miaou-core.lib unix str)
  (modules ui_regression_framework deterministic_mocks))
+
+; TUI Command Runner - Declarative test framework
+
+(library
+ (name tui_command_runner_lib)
+ (libraries
+  miaou-core.lib_miaou_internal
+  miaou-core.lib
+  ui_regression_framework_lib
+  octez_manager_lib
+  str
+  unix)
+ (modules tui_command_runner))
 
 ; UI Regression tests run in CI (deterministic and don't hang)
 

@@ -240,6 +240,83 @@ let test_fold_unfold () =
       check bool "after space valid" true (String.length after_space > 0))
 
 (* ============================================================ *)
+(* Test: Create Menu Opens *)
+(* ============================================================ *)
+
+let test_create_menu_opens () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Instances.Page) ;
+
+      (* Press 'c' to open create menu *)
+      ignore (HD.Stateful.send_key "c") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      (* Verify modal is active *)
+      check
+        bool
+        "modal opened after 'c' key"
+        true
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* Check screen shows service options *)
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "menu shows Node option"
+        true
+        (TH.contains_substring screen "Node") ;
+      check
+        bool
+        "menu shows Baker option"
+        true
+        (TH.contains_substring screen "Baker"))
+
+(* ============================================================ *)
+(* Test: Select Node from Create Menu *)
+(* ============================================================ *)
+
+let test_select_node_from_menu () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Instances.Page) ;
+
+      (* Open create menu *)
+      ignore (HD.Stateful.send_key "c") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      (* Verify modal is active *)
+      check
+        bool
+        "create menu opened"
+        true
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* Navigate to ensure item is selected (Down then Up to return to Node) *)
+      ignore (HD.Stateful.send_key "Down") ;
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+      ignore (HD.Stateful.send_key "Up") ;
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+      (* Press Enter to select Node *)
+      ignore (HD.Stateful.send_key "Enter") ;
+      let idle_result = HD.Stateful.idle_wait ~iterations:10 ~sleep:0.001 () in
+
+      (* Verify modal closed *)
+      check
+        bool
+        "modal closed after Enter"
+        false
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* Check that navigation was requested to install form *)
+      check
+        bool
+        "Enter on Node triggers navigation to install form"
+        true
+        (match idle_result with
+        | `SwitchTo "install_node_form_v3" -> true
+        | _ -> false))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -255,6 +332,8 @@ let page_tests =
     ("periodic update works", `Quick, test_periodic_update);
     ("column navigation", `Quick, test_column_navigation);
     ("fold/unfold toggles", `Quick, test_fold_unfold);
+    ("create menu opens with 'c' key", `Quick, test_create_menu_opens);
+    ("select Node from create menu", `Quick, test_select_node_from_menu);
   ]
 
 let () = Alcotest.run "Instances Page (TUI)" [("instances_page", page_tests)]
