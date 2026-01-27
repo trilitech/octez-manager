@@ -40,6 +40,18 @@ let refresh_inflight = Atomic.make false
 
 let cache_ttl_secs = 5.0
 
+let () =
+  Cache.register
+    ~name:"data_service_states"
+    ~invalidate:(fun () ->
+      Atomic.set cache [] ;
+      Atomic.set last_refresh 0.0)
+    ~get_age:(fun () ->
+      let lr = Atomic.get last_refresh in
+      if lr = 0.0 then None else Some (Unix.gettimeofday () -. lr))
+    ~get_ttl:(fun () -> cache_ttl_secs)
+    ~get_sub_entries:(fun () -> [])
+
 let set_cache states =
   Atomic.set cache states ;
   Atomic.set last_refresh (Unix.gettimeofday ())
