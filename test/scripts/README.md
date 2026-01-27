@@ -18,17 +18,20 @@ Creates a complete set of unmanaged Octez services (node, DAL node, baker, accus
 ### Usage
 
 ```bash
-# Basic usage (no snapshot, ghostnet)
+# Basic usage (no snapshot, shadownet)
 ./create-unmanaged-services.sh
 
-# With snapshot (uses default ghostnet snapshot URL)
+# With snapshot download (uses default shadownet/ghostnet snapshot URL)
 ./create-unmanaged-services.sh --snapshot
 
-# With snapshot for mainnet
-./create-unmanaged-services.sh --snapshot mainnet
+# With local snapshot file
+./create-unmanaged-services.sh --snapshot /path/to/snapshot.rolling
 
-# With custom snapshot URL
-./create-unmanaged-services.sh --snapshot-url https://my-server.com/snapshot.rolling
+# For a specific network
+./create-unmanaged-services.sh --network ghostnet
+
+# With snapshot for mainnet
+./create-unmanaged-services.sh --snapshot --network mainnet
 
 # Show help
 ./create-unmanaged-services.sh --help
@@ -40,19 +43,19 @@ After creating the services, you can test various import scenarios:
 
 ```bash
 # List external services
-om list-external
+dune exec -- octez-manager list --external
 
 # Import single service
-om import test-octez-node --strategy takeover
+dune exec -- octez-manager import test-octez-node --strategy takeover
 
 # Import cascade (all dependent services)
-om import-cascade test-octez-node --strategy takeover
+dune exec -- octez-manager import-cascade test-octez-node --strategy takeover
 
 # Test dry-run
-om import test-octez-node --strategy takeover --dry-run
+dune exec -- octez-manager import test-octez-node --strategy takeover --dry-run
 
 # Test clone strategy
-om import test-octez-node --strategy clone --as cloned-node
+dune exec -- octez-manager import test-octez-node --strategy clone --as cloned-node
 ```
 
 ### What Gets Created
@@ -120,5 +123,6 @@ BIN_DIR="${HOME}/.local/share/octez-manager/binaries/v24.0"
 ```
 
 Default snapshot URLs are configured for:
+- **shadownet**: Uses ghostnet snapshot (no dedicated shadownet snapshots)
 - **ghostnet**: `https://snapshots.eu.tzinit.org/ghostnet/rolling`
 - **mainnet**: `https://snapshots.eu.tzinit.org/mainnet/rolling`
