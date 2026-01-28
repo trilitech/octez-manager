@@ -14,7 +14,7 @@ SIZE:234x24
 │ App Bin Dir           │ /usr/bin ⚠ Binary 'octez-node' not f…       │ ✗    │
 │ Data Dir              │ …ssion/.local/share/octez/node-shadownet    │ ✓    │
 │ RPC Address           │ 127.0.0.1:8733                              │ ✓    │
-│ P2P Address           │ 0.0.0.0:9733                                │ ✓    │
+│ P2P Address           │ 0.0.0.0:9732                                │ ✓    │
 │ Extra Args            │ (none)                                      │ ✓    │
 │ Service User          │ mathias                                     │ ✓    │
 │ Enable on Boot        │ true                                        │ ✓    │
