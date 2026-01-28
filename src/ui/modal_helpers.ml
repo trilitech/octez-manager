@@ -1289,7 +1289,6 @@ let show_help_modal () =
   let lines =
     [
       "Global shortcuts:";
-      "  s  - Settings";
       "  m  - Menu";
       "  ?  - Help";
       "  Esc/q - Close modals";
