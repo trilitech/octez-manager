@@ -69,36 +69,9 @@ let systemctl_cmd () =
   if Common.is_root () then ["systemctl"] else ["systemctl"; "--user"]
 
 let list_all_service_units () =
-  (* List all service units from both loaded units and unit files.
-     This ensures we detect both running services and newly created ones. *)
-  let list_loaded_units () =
-    let cmd =
-      systemctl_cmd ()
-      @ ["list-units"; "--type=service"; "--all"; "--no-legend"; "--no-pager"]
-    in
-    match Common.run_out cmd with
-    | Ok output ->
-        let lines = String.split_on_char '\n' output in
-        List.filter_map
-          (fun line ->
-            let trimmed = String.trim line in
-            if trimmed = "" then None
-            else
-              (* Line format: "[●] unit.service   loaded   active   running   Description" *)
-              (* Failed services have a ● bullet prefix, skip it *)
-              (* Extract first field that ends with .service *)
-              let fields =
-                String.split_on_char ' ' trimmed
-                |> List.filter (fun s -> s <> "")
-              in
-              match
-                List.find_opt (String.ends_with ~suffix:".service") fields
-              with
-              | Some unit_name -> Some unit_name
-              | None -> None)
-          lines
-    | Error _ -> []
-  in
+  (* List all service unit FILES only.
+     This avoids detecting purged services that are still loaded in systemd memory.
+     We only want to detect services that have actual unit files on disk. *)
   let list_unit_files () =
     let cmd =
       systemctl_cmd ()
@@ -130,18 +103,7 @@ let list_all_service_units () =
           lines
     | Error _ -> []
   in
-  (* Combine both lists and deduplicate *)
-  let loaded = list_loaded_units () in
-  let files = list_unit_files () in
-  let all_units = loaded @ files in
-  (* Deduplicate by converting to a set-like structure *)
-  let unique_units =
-    List.fold_left
-      (fun acc unit -> if List.mem unit acc then acc else unit :: acc)
-      []
-      all_units
-  in
-  Ok (List.rev unique_units)
+  Ok (list_unit_files ())
 
 (** Extract command from systemd's structured ExecStart format.
     Input: "{ path=/bin/foo ; argv[]=/bin/foo --arg val ; ... }"
