@@ -336,7 +336,9 @@ let invalidate_version ~role ~instance =
       | None ->
           (* Not in cache yet, nothing to do *)
           ()
-      | Some state -> state.version <- None)
+      | Some state ->
+          state.version <- None ;
+          state.last_pid_check <- 0.0)
 
 (** Get disk size *)
 let get_disk_size ~role ~instance =
@@ -630,4 +632,33 @@ module For_test = struct
 
   (** Direct access to interval calculation *)
   let effective_interval = effective_interval
+
+  (** Initialize an instance state for testing *)
+  let init_instance ~role ~instance =
+    let key = Printf.sprintf "%s/%s" role instance in
+    with_lock (fun () ->
+        if not (Hashtbl.mem table key) then
+          Hashtbl.replace table key (make_instance_state ()))
+
+  (** Set version and last_pid_check for an instance (for testing) *)
+  let set_instance_state ~role ~instance ~version ~last_pid_check =
+    let key = Printf.sprintf "%s/%s" role instance in
+    with_lock (fun () ->
+        match Hashtbl.find_opt table key with
+        | None ->
+            let state = make_instance_state () in
+            state.version <- version ;
+            state.last_pid_check <- last_pid_check ;
+            Hashtbl.replace table key state
+        | Some state ->
+            state.version <- version ;
+            state.last_pid_check <- last_pid_check)
+
+  (** Get last_pid_check timestamp for an instance *)
+  let get_last_pid_check ~role ~instance =
+    let key = Printf.sprintf "%s/%s" role instance in
+    with_lock (fun () ->
+        match Hashtbl.find_opt table key with
+        | None -> None
+        | Some state -> Some state.last_pid_check)
 end

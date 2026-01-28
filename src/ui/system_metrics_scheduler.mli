@@ -136,4 +136,18 @@ module For_test : sig
 
   (** Calculate effective polling interval based on visibility *)
   val effective_interval : key:string -> base_interval:float -> float
+
+  (** Initialize an instance state for testing *)
+  val init_instance : role:string -> instance:string -> unit
+
+  (** Set version and last_pid_check for an instance (for testing) *)
+  val set_instance_state :
+    role:string ->
+    instance:string ->
+    version:string option ->
+    last_pid_check:float ->
+    unit
+
+  (** Get last_pid_check timestamp for an instance *)
+  val get_last_pid_check : role:string -> instance:string -> float option
 end

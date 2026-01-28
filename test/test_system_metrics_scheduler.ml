@@ -290,6 +290,62 @@ let test_render_mem_sparkline_no_data () =
   Alcotest.(check string) "no data returns empty" "" sparkline ;
   System_metrics_scheduler.For_test.clear_all ()
 
+(** {2 Invalidation Tests} *)
+
+let test_invalidate_version_resets_last_pid_check () =
+  System_metrics_scheduler.For_test.clear_all () ;
+  (* Set up instance with known state *)
+  System_metrics_scheduler.For_test.set_instance_state
+    ~role:"node"
+    ~instance:"test"
+    ~version:(Some "23.3")
+    ~last_pid_check:1000.0 ;
+  (* Verify initial state *)
+  let version_before =
+    System_metrics_scheduler.get_version ~role:"node" ~instance:"test"
+  in
+  let pid_check_before =
+    System_metrics_scheduler.For_test.get_last_pid_check
+      ~role:"node"
+      ~instance:"test"
+  in
+  Alcotest.(check (option string))
+    "version set before invalidation"
+    (Some "23.3")
+    version_before ;
+  Alcotest.(check (option (float 0.01)))
+    "last_pid_check set before invalidation"
+    (Some 1000.0)
+    pid_check_before ;
+  (* Invalidate version *)
+  System_metrics_scheduler.invalidate_version ~role:"node" ~instance:"test" ;
+  (* Verify version is cleared AND last_pid_check is reset to 0.0 *)
+  let version_after =
+    System_metrics_scheduler.get_version ~role:"node" ~instance:"test"
+  in
+  let pid_check_after =
+    System_metrics_scheduler.For_test.get_last_pid_check
+      ~role:"node"
+      ~instance:"test"
+  in
+  Alcotest.(check (option string))
+    "version cleared after invalidation"
+    None
+    version_after ;
+  Alcotest.(check (option (float 0.01)))
+    "last_pid_check reset to 0.0 for immediate re-poll"
+    (Some 0.0)
+    pid_check_after ;
+  System_metrics_scheduler.For_test.clear_all ()
+
+let test_invalidate_version_nonexistent_instance () =
+  System_metrics_scheduler.For_test.clear_all () ;
+  (* Should not raise on nonexistent instance *)
+  System_metrics_scheduler.invalidate_version
+    ~role:"node"
+    ~instance:"nonexistent" ;
+  System_metrics_scheduler.For_test.clear_all ()
+
 (** {2 Test Suite} *)
 
 let version_parsing_tests =
@@ -347,6 +403,16 @@ let metrics_access_tests =
       test_render_mem_sparkline_no_data );
   ]
 
+let invalidation_tests =
+  [
+    ( "invalidate_version resets last_pid_check",
+      `Quick,
+      test_invalidate_version_resets_last_pid_check );
+    ( "invalidate_version handles nonexistent instance",
+      `Quick,
+      test_invalidate_version_nonexistent_instance );
+  ]
+
 let () =
   Alcotest.run
     "System Metrics Scheduler"
@@ -357,4 +423,5 @@ let () =
       ("version color codes", version_color_tests);
       ("visibility tracking", visibility_tests);
       ("metrics access", metrics_access_tests);
+      ("invalidation", invalidation_tests);
     ]
