@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -14,3 +14,11 @@ type t = {
 val load : unit -> (t, Rresult.R.msg) result
 
 val save : t -> (unit, Rresult.R.msg) result
+
+module For_tests : sig
+  val default : t
+
+  val to_yojson : t -> Yojson.Safe.t
+
+  val of_yojson : Yojson.Safe.t -> (t, Rresult.R.msg) result
+end

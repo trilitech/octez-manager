@@ -21,7 +21,23 @@ docs/                     # Documentation site (Astro)
 
 ## Build & Verification
 
-Before any commit:
+### Recommended: Install Git Hooks
+
+**Install once** to automatically run checks before every commit:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+This installs a pre-commit hook that automatically:
+- Formats code (`dune fmt`)
+- Checks/fixes copyright headers
+- Verifies the build passes
+- Runs quick unit tests
+
+### Manual Verification
+
+If not using hooks, run these before every commit:
 
 ```bash
 dune build                      # Verify compilation
@@ -30,9 +46,10 @@ dune fmt                        # Format code (MUST pass before commit)
 ./scripts/check-copyright.sh    # Verify copyright headers (MUST pass before commit)
 ```
 
-**Critical:** 
+**Critical:**
 - Every commit must be properly formatted. Do not create separate "formatting" commits.
 - Every commit must have correct copyright headers. Run `./scripts/check-copyright.sh --fix` to automatically update headers if needed.
+- To bypass hooks temporarily: `git commit --no-verify` (use sparingly!)
 
 ## Integration Tests
 

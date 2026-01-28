@@ -116,6 +116,12 @@ val copy_file : string -> string -> (unit, [> `Msg of string]) result
 
 val is_port_in_use : int -> bool
 
+(** Override [is_port_in_use] with a custom function (for deterministic tests). *)
+val set_port_in_use_override : (int -> bool) -> unit
+
+(** Remove the [is_port_in_use] override. *)
+val clear_port_in_use_override : unit -> unit
+
 val get_remote_file_size : string -> int64 option
 
 val get_available_space : string -> int64 option

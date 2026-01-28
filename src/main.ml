@@ -29,6 +29,7 @@ let ui_term =
   Term.(
     ret
       (const (fun page log logfile ->
+           Printexc.record_backtrace true ;
            Capabilities.register () ;
            (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
            Sys.set_signal Sys.sigpipe Sys.Signal_ignore ;

@@ -430,6 +430,14 @@ let perform_upgrade ~version ?on_progress () =
                   Upgrade_needs_elevation
                     (Printf.sprintf "sudo mv %s %s" tmp_path exe_path))))
 
+module For_tests = struct
+  let parse_version = parse_version
+
+  let is_rc = is_rc
+
+  let extract_rc_number = extract_rc_number
+end
+
 let exec_restart () =
   let exe_path =
     try Sys.executable_name with _ -> "/usr/local/bin/octez-manager"

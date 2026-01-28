@@ -315,6 +315,7 @@ Press **Enter** to open instance menu.|}
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
     Context.tick_toasts () ;
+    Job_manager.tick () ;
     let cols = size.LTerm_geom.cols in
     let progress = Context.render_progress ~cols in
     (* Render active or recent job logs *)
@@ -338,10 +339,15 @@ Press **Enter** to open instance menu.|}
             in
             let status_str =
               match job.status with
-              | Job_manager.Running -> "Running"
+              | Job_manager.Running ->
+                  let elapsed =
+                    Unix.gettimeofday () -. job.Job_manager.started_at
+                  in
+                  Printf.sprintf "Running (%.0fs)" elapsed
               | Job_manager.Pending -> "Pending"
               | Job_manager.Succeeded -> Widgets.green "Done"
-              | Job_manager.Failed _ -> Widgets.red "Failed"
+              | Job_manager.Failed msg ->
+                  Widgets.red (Printf.sprintf "Failed: %s" msg)
             in
             let phase_str =
               if job.Job_manager.phase = "" then ""

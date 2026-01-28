@@ -41,33 +41,51 @@ let unwrap_shell exec_start =
   else
     let trimmed = String.trim exec_start in
     (* Find -c or -lc flag *)
-    let has_c_flag =
-      string_contains ~needle:" -c " trimmed
-      || string_contains ~needle:" -lc " trimmed
+    let c_flag_pattern =
+      if string_contains ~needle:" -lc " trimmed then " -lc "
+      else if string_contains ~needle:" -c " trimmed then " -c "
+      else ""
     in
-    if not has_c_flag then exec_start
+    if c_flag_pattern = "" then exec_start
     else
-      (* Find the command after -c or -lc *)
-      (* Look for quoted string after -c or -lc *)
-      let rec find_quote idx =
-        if idx >= String.length trimmed then None
-        else if trimmed.[idx] = '\'' || trimmed.[idx] = '"' then Some idx
-        else find_quote (idx + 1)
+      (* Find position after -c or -lc flag *)
+      let rec find_c_flag idx =
+        if idx >= String.length trimmed - String.length c_flag_pattern then None
+        else if
+          String.sub trimmed idx (String.length c_flag_pattern) = c_flag_pattern
+        then Some (idx + String.length c_flag_pattern)
+        else find_c_flag (idx + 1)
       in
-      match find_quote 0 with
-      | None -> exec_start (* No quotes found, return original *)
-      | Some start ->
-          let quote_char = trimmed.[start] in
-          (* Find matching closing quote *)
-          let rec find_closing idx depth =
-            if idx >= String.length trimmed then String.length trimmed
-            else if trimmed.[idx] = '\\' then find_closing (idx + 2) depth
-            else if trimmed.[idx] = quote_char then
-              if depth = 0 then idx else find_closing (idx + 1) (depth - 1)
-            else find_closing (idx + 1) depth
+      match find_c_flag 0 with
+      | None -> exec_start
+      | Some after_c_idx ->
+          (* Skip whitespace after -c *)
+          let rec skip_whitespace idx =
+            if idx >= String.length trimmed then idx
+            else if trimmed.[idx] = ' ' || trimmed.[idx] = '\t' then
+              skip_whitespace (idx + 1)
+            else idx
           in
-          let end_pos = find_closing (start + 1) 0 in
-          String.sub trimmed (start + 1) (end_pos - start - 1)
+          let start_idx = skip_whitespace after_c_idx in
+          if start_idx >= String.length trimmed then exec_start
+          else
+            (* Check if command is quoted *)
+            let first_char = trimmed.[start_idx] in
+            if first_char = '\'' || first_char = '"' then
+              (* Quoted command - extract content between quotes *)
+              let quote_char = first_char in
+              let rec find_closing idx depth =
+                if idx >= String.length trimmed then String.length trimmed
+                else if trimmed.[idx] = '\\' then find_closing (idx + 2) depth
+                else if trimmed.[idx] = quote_char then
+                  if depth = 0 then idx else find_closing (idx + 1) (depth - 1)
+                else find_closing (idx + 1) depth
+              in
+              let end_pos = find_closing (start_idx + 1) 0 in
+              String.sub trimmed (start_idx + 1) (end_pos - start_idx - 1)
+            else
+              (* Unquoted command - take everything after -c *)
+              String.sub trimmed start_idx (String.length trimmed - start_idx)
 
 (** {1 Binary Path Extraction} *)
 

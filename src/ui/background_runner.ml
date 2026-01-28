@@ -11,6 +11,9 @@
 
 type task = {fn : unit -> unit; enqueued_at : float}
 
+(* The stream is forced eagerly by [start] before any domain is spawned,
+   avoiding CamlinternalLazy.Undefined when multiple domains race on
+   [Lazy.force]. *)
 let stream : task Eio.Stream.t Lazy.t = lazy (Eio.Stream.create 1024)
 
 let started = Atomic.make false
@@ -31,7 +34,12 @@ let rec worker domain_mgr stream =
           max 0. (Unix.gettimeofday () -. task.enqueued_at) *. 1000.
         in
         Metrics.record_bg_dequeue ~queued_depth:depth_after_take ~wait_ms ;
-        (try Eio.Domain_manager.run domain_mgr task.fn with _ -> ()) ;
+        (try Eio.Domain_manager.run domain_mgr task.fn
+         with exn ->
+           Context.toast_error
+             (Printf.sprintf
+                "Background task failed: %s"
+                (Printexc.to_string exn))) ;
         worker domain_mgr stream
     | None ->
         (* No task available, sleep briefly and retry *)
@@ -40,14 +48,17 @@ let rec worker domain_mgr stream =
 
 let start () =
   if Atomic.compare_and_set started false true then
+    (* Force the lazy stream here, in the caller's domain, so that the
+       spawned worker domain never races on [Lazy.force]. *)
+    let stream_val = Lazy.force stream in
     ignore
       (Domain.spawn (fun () ->
            (* Use POSIX backend to avoid io_uring resource exhaustion *)
            Eio_posix.run (fun env ->
-               let stream = Lazy.force stream in
                Eio.Switch.run (fun sw ->
                    for _ = 1 to num_workers do
-                     Eio.Fiber.fork ~sw (fun () -> worker env#domain_mgr stream)
+                     Eio.Fiber.fork ~sw (fun () ->
+                         worker env#domain_mgr stream_val)
                    done ;
                    (* Keep the switch alive indefinitely. *)
                    Eio.Fiber.await_cancel ()))))

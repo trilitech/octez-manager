@@ -84,13 +84,18 @@ let list_all_service_units () =
             let trimmed = String.trim line in
             if trimmed = "" then None
             else
-              (* Line format: "unit.service   loaded   active   running   Description" *)
-              (* Extract first field (unit name) *)
-              match String.split_on_char ' ' trimmed with
-              | unit_name :: _
-                when String.ends_with ~suffix:".service" unit_name ->
-                  Some unit_name
-              | _ -> None)
+              (* Line format: "[●] unit.service   loaded   active   running   Description" *)
+              (* Failed services have a ● bullet prefix, skip it *)
+              (* Extract first field that ends with .service *)
+              let fields =
+                String.split_on_char ' ' trimmed
+                |> List.filter (fun s -> s <> "")
+              in
+              match
+                List.find_opt (String.ends_with ~suffix:".service") fields
+              with
+              | Some unit_name -> Some unit_name
+              | None -> None)
           lines
     | Error _ -> []
   in
@@ -125,11 +130,46 @@ let list_all_service_units () =
           lines
     | Error _ -> []
   in
-  (* Combine both lists and deduplicate *)
+  (* Get loaded units and unit files *)
   let loaded = list_loaded_units () in
   let files = list_unit_files () in
-  let all_units = loaded @ files in
-  (* Deduplicate by converting to a set-like structure *)
+
+  (* Create a set of unit files for fast lookup *)
+  let file_set = List.fold_left (fun acc unit -> unit :: acc) [] files in
+
+  (* Helper to check if a unit has its own file (not just using a template) *)
+  let has_own_unit_file unit_name =
+    (* First check if it's in our file list *)
+    if List.mem unit_name file_set then true
+    else
+      (* For services not matching octez-* pattern, check FragmentPath
+         to see if they have their own file vs using a template *)
+      match
+        Common.run_out
+          (systemctl_cmd () @ ["show"; unit_name; "-p"; "FragmentPath"])
+      with
+      | Ok output ->
+          let path = String.trim output in
+          (* FragmentPath format: "FragmentPath=/path/to/service.service" *)
+          if String.starts_with ~prefix:"FragmentPath=" path then
+            let file_path =
+              String.sub path 13 (String.length path - 13)
+              (* skip "FragmentPath=" *)
+            in
+            (* Check if the path matches the unit name (not a template)
+               Template: /path/octez-node@.service
+               Instance: /path/octez-node@instance.service or /path/test.service *)
+            String.ends_with ~suffix:unit_name file_path
+          else false
+      | Error _ -> false
+  in
+
+  (* Filter loaded units to only include those with their own unit files
+     This prevents purged services (still in systemd memory, using templates) from appearing *)
+  let loaded_with_files = List.filter has_own_unit_file loaded in
+
+  (* Combine and deduplicate *)
+  let all_units = loaded_with_files @ files in
   let unique_units =
     List.fold_left
       (fun acc unit -> if List.mem unit acc then acc else unit :: acc)
@@ -717,7 +757,7 @@ let detect () =
     let external_services =
       List.filter_map
         (fun unit_name ->
-          (* Skip managed units *)
+          (* Skip managed units that are already in registry *)
           if is_managed_unit_name unit_name && is_in_registry ~unit_name then
             None
           else
@@ -742,6 +782,19 @@ let detect () =
                 Some (build_external_service ~unit_name ~exec_start ~properties)
             | _ -> None)
         all_units
+    in
+
+    (* Filter out external services whose instance name matches a managed instance *)
+    let external_services =
+      List.filter
+        (fun (svc : External_service.t) ->
+          let instance = svc.suggested_instance_name in
+          match Service_registry.find ~instance with
+          | Ok (Some _) ->
+              false (* Instance is managed, don't show as external *)
+          | Ok None -> true (* Not managed, show as external *)
+          | Error _ -> true (* Error reading registry, show as external *))
+        external_services
     in
 
     (* Infer networks from connected nodes *)
@@ -773,4 +826,6 @@ module For_tests = struct
   let chain_id_to_network = chain_id_to_network
 
   let systemctl_cmd = systemctl_cmd
+
+  let contains_octez_binary = contains_octez_binary
 end

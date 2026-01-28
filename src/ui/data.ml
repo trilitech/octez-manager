@@ -285,3 +285,9 @@ let spotlight_lines states ~limit =
       in
       Printf.sprintf "%s %s (%s)" marker svc.Service.instance svc.Service.role)
     focus
+
+module For_tests = struct
+  let parse_enabled_response = parse_enabled_response
+
+  let classify_unit_state = classify_unit_state
+end

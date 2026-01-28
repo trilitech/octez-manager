@@ -98,13 +98,19 @@ let capture_screen_with_metadata () =
 let regression_path test_name =
   Filename.concat regression_dir (test_name ^ ".screen")
 
+(** Normalize ephemeral URL date suffixes so baselines stay stable.
+    e.g. weeklynet-2026-01-28 → weeklynet-YYYY-MM-DD *)
+let normalize_ephemeral_urls s =
+  let re = Str.regexp "weeklynet-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]" in
+  Str.global_replace re "weeklynet-YYYY-MM-DD" s
+
 (** Save screen capture as baseline *)
 let save_baseline test_name =
   ensure_dir regression_dir ;
   let path = regression_path test_name in
   let width, height, content = capture_screen_with_metadata () in
   let metadata = Printf.sprintf "SIZE:%dx%d\n" width height in
-  write_file path (metadata ^ content) ;
+  write_file path (metadata ^ normalize_ephemeral_urls content) ;
   Printf.printf "✓ Saved baseline for %s\n%!" test_name
 
 (** Load baseline screen capture *)
@@ -127,8 +133,12 @@ let load_baseline test_name =
 
 (** Compare two screen captures line by line *)
 let compare_screens baseline actual =
-  let baseline_lines = String.split_on_char '\n' baseline in
-  let actual_lines = String.split_on_char '\n' actual in
+  let baseline_lines =
+    String.split_on_char '\n' (normalize_ephemeral_urls baseline)
+  in
+  let actual_lines =
+    String.split_on_char '\n' (normalize_ephemeral_urls actual)
+  in
 
   let max_lines = max (List.length baseline_lines) (List.length actual_lines) in
   let differences = ref [] in
