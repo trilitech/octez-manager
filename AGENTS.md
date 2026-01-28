@@ -398,6 +398,17 @@ Keep the first line under 72 characters.
 - **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
 - **Never delete untracked files without confirmation** - user scripts, test data, and work-in-progress files must be preserved unless explicitly requested
 
+## Bug Fix PRs
+
+**Every bug fix PR MUST include a test** that reproduces the bug and validates the fix. This applies to both unit tests and integration tests as appropriate.
+
+- The test should **fail without the fix** and **pass with the fix**
+- If the bug is in rendering or UI logic, add a headless TUI test (see `test/test_instances_page.ml` for examples)
+- If the bug is in CLI behavior, add an integration test in `test/integration/cli-tester/tests/`
+- If the bug is in core logic, add a unit test in `test/unit_tests.ml` or a dedicated test file
+
+**If a test is truly impossible**, the PR description must explain why with detailed arguments (e.g., the bug only manifests with real hardware, requires network conditions that cannot be simulated, etc.). "It's hard to test" is not a valid reason to skip the test.
+
 ## Questions or Uncertainty
 
 When unsure about:
