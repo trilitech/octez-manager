@@ -209,6 +209,19 @@ Here's a typical workflow for a complete Shadownet baking setup:
 
 ![Install Accuser](/gifs/install_accuser.gif)
 
+## Diagnostics
+
+Press `d` from the main dashboard to open the **Diagnostics** page.
+
+This page shows system-level information useful for troubleshooting:
+
+- **Service states** — Overview of all managed services and their current status
+- **Background queue** — Sparkline showing background task queue depth over time
+- **System metrics** — CPU and memory usage trends
+- **Metrics server** — Address of the Prometheus metrics endpoint (if enabled)
+
+The diagnostics page is read-only and refreshes automatically.
+
 ## Keyboard Shortcuts
 
 | Key | Action |
