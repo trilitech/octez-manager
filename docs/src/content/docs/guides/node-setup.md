@@ -57,6 +57,7 @@ octez-manager install-node \
   --instance shadownet \
   --network shadownet \
   --history-mode rolling \
+  --octez-version latest \
   --snapshot
 ```
 
