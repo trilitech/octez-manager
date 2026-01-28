@@ -469,3 +469,17 @@
  (modules test_settings2)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_data)
+ (libraries alcotest octez_manager_lib octez-manager.ui str)
+ (modules test_data)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_external_detector2)
+ (libraries alcotest octez_manager_lib)
+ (modules test_external_detector2)
+ (instrumentation
+  (backend bisect_ppx)))
