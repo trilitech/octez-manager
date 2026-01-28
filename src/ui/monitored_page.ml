@@ -43,7 +43,12 @@ struct
 
   let handle_modal_key = P.handle_modal_key
 
-  let handle_key = P.handle_key
+  let handle_key ps key ~size =
+    if Miaou.Core.Modal_manager.has_active () then P.handle_key ps key ~size
+    else
+      match Global_shortcuts.handle key with
+      | Global_shortcuts.Handled -> ps
+      | Global_shortcuts.NotGlobal -> P.handle_key ps key ~size
 
   let keymap = P.keymap
 

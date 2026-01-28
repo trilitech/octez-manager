@@ -8,7 +8,7 @@
 (** Global keyboard shortcuts that work across all pages.
 
     This module centralizes the handling of application-wide keyboard shortcuts
-    like 's' for Settings, '?' for Help, etc.
+    like '?' for Help, 'm' for Menu, etc.
 
     The key handling priority is:
     1. Modal/Dialog (if active) - handles ALL keys
@@ -21,7 +21,7 @@
 val reserved_keys : string list
 
 (** Check if a key is reserved for global use.
-    Example: [is_reserved "s"] returns [true] *)
+    Example: [is_reserved "?"] returns [true] *)
 val is_reserved : string -> bool
 
 (** Outcome of global key handling *)
@@ -35,8 +35,7 @@ type outcome =
     or [NotGlobal] if the page should handle the key itself.
 
     Reserved global shortcuts:
-    - ['s'] - Navigate to Settings
-    - ['?'] or ['h'] - Show Help modal
+    - ['?'] - Show Help modal
     - ['m'] - Show Menu modal
 
     Example usage in a page:
@@ -66,8 +65,8 @@ val handle : string -> outcome
 
     Example:
     {[
-      Global_shortcuts.warn_if_reserved "s" "start_service"
-      (* WARNING: Key 's' is reserved for global shortcuts but is being used for 'start_service' *)
+      Global_shortcuts.warn_if_reserved "?" "quick_search"
+      (* WARNING: Key '?' is reserved for global shortcuts but is being used for 'quick_search' *)
     ]}
 *)
 val warn_if_reserved : string -> string -> unit
