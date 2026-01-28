@@ -773,4 +773,6 @@ module For_tests = struct
   let chain_id_to_network = chain_id_to_network
 
   let systemctl_cmd = systemctl_cmd
+
+  let contains_octez_binary = contains_octez_binary
 end

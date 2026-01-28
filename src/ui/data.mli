@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -36,3 +36,11 @@ val activity_lines : Service_state.t list -> string list
 val formatted_timestamp : float -> string
 
 val spotlight_lines : Service_state.t list -> limit:int -> string list
+
+module For_tests : sig
+  val parse_enabled_response : string -> bool option
+
+  val classify_unit_state :
+    (Octez_manager_lib.Systemd.unit_state, Rresult.R.msg) result ->
+    bool option * Service_state.status
+end
