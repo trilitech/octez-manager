@@ -60,6 +60,8 @@ octez-manager install-node [OPTIONS]
 
 **Binary selection priority:** `--octez-version` > `--bin-dir-alias` > `--app-bin-dir` > auto-detect from PATH
 
+> **Tip:** Use `--octez-version latest` to automatically use the most recent stable Octez release. If the version isn't downloaded yet, you'll be prompted to download it.
+
 ### `install-dal-node`
 
 Install a new DAL node.
@@ -214,14 +216,20 @@ Download an Octez version from GitLab releases.
 octez-manager binaries download <VERSION> [OPTIONS]
 ```
 
+Use `latest` as the version to automatically download the most recent stable release.
+
 | Option | Description |
 |--------|-------------|
 | `--no-verify` | Skip SHA256 checksum verification |
 
-**Example:**
+**Examples:**
 
 ```bash
+# Download a specific version
 octez-manager binaries download 21.0
+
+# Download the latest stable version
+octez-manager binaries download latest
 ```
 
 #### `binaries remove`
