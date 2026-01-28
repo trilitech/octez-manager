@@ -75,4 +75,6 @@ module For_tests : sig
   val chain_id_to_network : string -> string option
 
   val systemctl_cmd : unit -> string list
+
+  val contains_octez_binary : string -> bool
 end
