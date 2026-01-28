@@ -159,8 +159,18 @@ let get_port_process port =
       Hashtbl.replace port_process_cache port (result, now) ;
       result
 
+(** Optional override for [is_port_in_use] (used by deterministic tests). *)
+let port_in_use_override : (int -> bool) option ref = ref None
+
+let set_port_in_use_override f = port_in_use_override := Some f
+
+let clear_port_in_use_override () = port_in_use_override := None
+
 (** Check if a port is in use by any running process. *)
-let is_port_in_use port = Option.is_some (get_port_process port)
+let is_port_in_use port =
+  match !port_in_use_override with
+  | Some f -> f port
+  | None -> Option.is_some (get_port_process port)
 
 type validation_error =
   | Invalid_format of string
@@ -196,17 +206,25 @@ let validate_addr ~addr ?exclude_instance ~example () =
         in
         match find_instance port with
         | Some instance -> Error (Used_by_other_instance (port, instance))
-        | None -> (
+        | None ->
             let owned_by_self =
               match exclude_instance with
               | Some inst -> port_owned_by_instance ~instance:inst port
               | None -> false
             in
             if owned_by_self then Ok ()
-            else
-              match get_port_process port with
-              | Some proc_opt -> Error (Port_in_use (port, proc_opt))
-              | None -> Ok ()))
+            else if is_port_in_use port then
+              (* Use get_port_process for the error detail when no override *)
+              let proc_opt =
+                match !port_in_use_override with
+                | Some _ -> None
+                | None -> (
+                    match get_port_process port with
+                    | Some p -> p
+                    | None -> None)
+              in
+              Error (Port_in_use (port, proc_opt))
+            else Ok ())
 
 (** Validate an RPC address. *)
 let validate_rpc_addr ?exclude_instance addr =
