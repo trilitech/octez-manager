@@ -146,6 +146,11 @@ let test_chain_id_shadownet () =
   | Some network -> check string "shadownet chain id" "shadownet" network
   | None -> fail "should recognize shadownet"
 
+let test_chain_id_tallinnnet () =
+  match ESD.chain_id_to_network "NetXe8DbhW9A1eS" with
+  | Some network -> check string "tallinnnet chain id" "tallinnnet" network
+  | None -> fail "should recognize tallinnnet"
+
 let test_chain_id_unknown () =
   let result = ESD.chain_id_to_network "NetUnknownChainId" in
   check bool "unknown chain id" true (Option.is_none result)
@@ -216,6 +221,7 @@ let chain_id_tests =
     ("chain id mainnet", `Quick, test_chain_id_mainnet);
     ("chain id ghostnet", `Quick, test_chain_id_ghostnet);
     ("chain id shadownet", `Quick, test_chain_id_shadownet);
+    ("chain id tallinnnet", `Quick, test_chain_id_tallinnnet);
     ("chain id unknown", `Quick, test_chain_id_unknown);
     ("chain id empty", `Quick, test_chain_id_empty);
     ("chain id case sensitive", `Quick, test_chain_id_case_sensitive);
