@@ -253,6 +253,7 @@ let chain_id_to_network = function
   | "NetXdQprcVkpaWU" -> Some "mainnet"
   | "NetXnHfVqm9iesp" -> Some "ghostnet"
   | "NetXsqzbfFenSTS" -> Some "shadownet"
+  | "NetXe8DbhW9A1eS" -> Some "tallinnnet"
   | _ -> None
 
 (** Probe RPC endpoint to get chain_id and detect network.
