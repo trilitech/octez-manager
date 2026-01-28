@@ -283,7 +283,12 @@
 
 (library
  (name ui_regression_framework_lib)
- (libraries miaou-core.lib_miaou_internal miaou-core.lib unix str)
+ (libraries
+  miaou-core.lib_miaou_internal
+  miaou-core.lib
+  octez_manager_lib
+  unix
+  str)
  (modules ui_regression_framework deterministic_mocks))
 
 ; TUI Command Runner - Declarative test framework
