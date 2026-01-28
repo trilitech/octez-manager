@@ -31,8 +31,7 @@ The TUI provides access to all Octez Manager features:
 |---------|-------------|-----|
 | **Install services** | Deploy nodes, bakers, accusers, and DAL nodes | `Enter` on Install |
 | **Monitor status** | Real-time service status, sync progress, delegate activity | - |
-| **View logs** | Live log streaming with search and filtering | `l` |
-| **Edit configuration** | Modify instance settings without redeploying | `e` |
+| **View logs** | Live log streaming with search and filtering | `Enter` on instance then select logs |
 | **Control services** | Start, stop, restart, and remove instances | `Enter` |
 | **Manage binaries** | Download and manage Octez versions | `b` |
 | **Import services** | Bring external services under management | `Enter` on unmanaged |
@@ -65,9 +64,9 @@ The dashboard shows all your instances organized by type:
 - **Unmanaged Instances** — External services detected on your system
 
 Each instance displays:
-- Status indicator (`●` running, `○` stopped, `!` failed)
+- Status indicator
 - Instance name and network
-- Real-time metrics (sync status, memory, signing activity)
+- Real-time metrics
 
 Select any instance with arrow keys and press `Enter` to see details, or use the action keys shown at the bottom of the screen.
 
@@ -87,14 +86,6 @@ The wizard will:
 3. Prompt for delegate addresses (your baker keys)
 4. Configure liquidity baking vote and DAL settings
 
-## Editing an Instance
-
-Need to change delegates or other settings? Select the instance and press `e` to edit.
-
-![Edit Baker](/gifs/edit_baker.gif)
-
-Changes take effect after saving. The TUI will restart the service if needed.
-
 ## Updating Service Versions
 
 To change the Octez version used by a service:
@@ -102,13 +93,6 @@ To change the Octez version used by a service:
 1. Select the instance and press `Enter`
 2. Choose **Update Version** from the menu
 3. Select a new version from the list (managed versions, linked directories, or custom path)
-
-If the service has dependents (e.g., bakers depending on a node), you'll be offered a **cascade update** to update all related services together.
-
-If the update fails to start, you can:
-- **Rollback** — Restore the previous version and restart
-- **View Logs** — Diagnose the issue
-- **Keep Stopped** — Leave for manual intervention
 
 ## Managing Binaries
 
@@ -128,7 +112,7 @@ When installing or editing services, you can select from your managed versions i
 
 ## Viewing Logs
 
-Select an instance and press `l` to open the log viewer:
+Select an instance and press `Enter`, then choose the logs option:
 
 - Logs stream in real-time (follow mode)
 - Press `/` to search for specific text
@@ -230,18 +214,7 @@ The diagnostics page is read-only and refreshes automatically.
 | `Enter` | Select / Open action menu |
 | `Tab` | Fold/unfold instance details |
 | `b` | Open Binaries page |
-| `e` | Edit selected instance |
-| `l` | View logs for selected instance |
 | `d` | Open Diagnostics page |
 | `?` | Show help |
 | `Esc` | Go back / Close modal |
 | `q` | Quit |
-
-## Tips
-
-- **Use `?` for help** — Every screen has context-specific help
-- **Watch the hints** — The bottom bar shows available actions
-- **Check metrics** — Expanded instances show CPU, memory, and sync status
-- **Monitor bakers** — Baker instances show signing activity, missed slots, and DAL participation
-- **Keep binaries updated** — Use the Binaries page to download new Octez versions before updating services
-- **Check for updates** — The upgrade button appears when new octez-manager versions are available
