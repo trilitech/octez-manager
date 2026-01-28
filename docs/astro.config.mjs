@@ -30,8 +30,8 @@ export default defineConfig({
 					label: 'Guides',
 					items: [
 						{ label: 'Node Setup', slug: 'guides/node-setup' },
-						{ label: 'Baker Setup', slug: 'guides/baker-setup' },
 						{ label: 'DAL Node Setup', slug: 'guides/dal-node-setup' },
+						{ label: 'Baker Setup', slug: 'guides/baker-setup' },
 					],
 				},
 				{

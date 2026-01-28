@@ -94,7 +94,7 @@ octez-manager instance dal-shadownet show
 ### View Logs
 
 ```bash
-# TUI: select DAL node, press 'l'
+# TUI: press Enter on instance, then select logs
 # CLI:
 octez-manager instance dal-shadownet logs
 ```

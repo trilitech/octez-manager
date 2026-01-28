@@ -48,8 +48,6 @@ This guide walks you through setting up a Tezos node with Octez Manager.
    - **Net address**: `0.0.0.0:9732` (default)
    - **Bootstrap**: `Snapshot` (recommended)
 
-> Press `?` at any time to see available actions.
-
 ## Installation via CLI
 
 ```bash
@@ -57,6 +55,7 @@ octez-manager install-node \
   --instance shadownet \
   --network shadownet \
   --history-mode rolling \
+  --octez-version latest \
   --snapshot
 ```
 
@@ -94,7 +93,7 @@ systemctl --user status octez-node@my-node
 ### View Logs
 
 ```bash
-# Via TUI: select instance, press 'l'
+# Via TUI: press Enter on instance, then select logs
 
 # Via CLI
 octez-manager instance my-node logs

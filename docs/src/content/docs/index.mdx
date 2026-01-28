@@ -78,6 +78,12 @@ octez-manager
 	<Card title="Real-time monitoring" icon="document">
 		Live logs, service status, sync progress — all in your terminal.
 	</Card>
+	<Card title="Binary management" icon="seti:config">
+		Download, store, and switch between Octez versions. Upgrade services with cascade updates and automatic rollback.
+	</Card>
+	<Card title="Self-updating" icon="up-caret">
+		Get notified of new releases and update octez-manager directly from the TUI or CLI.
+	</Card>
 </CardGrid>
 
 ---
@@ -109,6 +115,38 @@ octez-manager instance shadownet logs
 
 # Show details
 octez-manager instance shadownet show
+```
+
+---
+
+## Manage Octez binaries
+
+```bash
+# List available versions
+octez-manager binaries list-remote
+
+# Download a specific version
+octez-manager binaries download 24.1
+
+# See what's installed locally
+octez-manager binaries list
+
+# Clean up old versions
+octez-manager binaries prune
+```
+
+---
+
+## Import existing services
+
+Already running Octez services? Import them into octez-manager:
+
+```bash
+# Discover unmanaged octez services
+octez-manager list --external
+
+# Import an existing service
+octez-manager import octez-node-mainnet --strategy takeover
 ```
 
 ---
