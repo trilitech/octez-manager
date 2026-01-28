@@ -106,7 +106,7 @@ octez-client get baking rights for tz1... --cycle <current_cycle>
 ### View Logs
 
 ```bash
-# TUI: select baker, press 'l'
+# TUI: press Enter on instance, then select logs
 # CLI:
 octez-manager instance my-baker logs
 ```
