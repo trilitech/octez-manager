@@ -25,6 +25,12 @@ val port_owned_by_instance : instance:string -> int -> bool
 (** Check if a port is in use by any running process. *)
 val is_port_in_use : int -> bool
 
+(** Override [is_port_in_use] with a custom function (for deterministic tests). *)
+val set_port_in_use_override : (int -> bool) -> unit
+
+(** Remove the [is_port_in_use] override. *)
+val clear_port_in_use_override : unit -> unit
+
 (** Validation error types. *)
 type validation_error =
   | Invalid_format of string  (** Invalid host:port format *)

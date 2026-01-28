@@ -175,6 +175,25 @@ let setup_deterministic_env () =
   (* Disable any randomness in octez-manager *)
   Unix.putenv "OCTEZ_MANAGER_TEST_MODE" "1" ;
 
+  (* Override port-in-use checks so the form always gets clean default ports.
+     Common.is_port_in_use is used by the System capability registered via
+     Capabilities.register(); Port_validation has its own independent check.
+     We set the ref-based overrides AND re-register the System capability
+     with a mock is_port_in_use to be fully robust against linking issues. *)
+  Octez_manager_lib.Common.set_port_in_use_override (fun _port -> false) ;
+  Octez_manager_lib.Port_validation.set_port_in_use_override (fun _port ->
+      false) ;
+  Octez_manager_lib.Port_validation.clear_port_process_cache () ;
+  (* Re-register System capability with is_port_in_use always returning false *)
+  let module Mock_system : Octez_manager_lib.Manager_interfaces.System = struct
+    include Octez_manager_lib.Common
+
+    let is_port_in_use _port = false
+  end in
+  Miaou_interfaces.Capability.register
+    Octez_manager_lib.Manager_interfaces.System_capability.key
+    (module Mock_system : Octez_manager_lib.Manager_interfaces.System) ;
+
   (* Register deterministic Miaou system capability *)
   Miaou_interfaces.System.set deterministic_miaou_system ;
 

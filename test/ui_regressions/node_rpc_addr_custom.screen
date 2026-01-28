@@ -13,8 +13,8 @@ SIZE:234x24
 │ Check Snapshot        │ true                                        │ ✓    │
 │ App Bin Dir           │ /usr/bin ⚠ Binary 'octez-node' not f…       │ ✗    │
 │ Data Dir              │ …ession/.local/share/octez/node-ghostnet    │ ✓    │
-│ RPC Address           │ 127.0.0.1:8733                              │ ✓    │
-│ P2P Address           │ 0.0.0.0:9733                                │ ✓    │
+│ RPC Address           │ 127.0.0.1:8732                              │ ✓    │
+│ P2P Address           │ 0.0.0.0:9732                                │ ✓    │
 │ Extra Args            │ (none)                                      │ ✓    │
 │ Service User          │ mathias                                     │ ✓    │
 │ Enable on Boot        │ true                                        │ ✓    │
