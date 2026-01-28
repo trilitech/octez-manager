@@ -19,9 +19,21 @@ Install with a single command:
 curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
 ```
 
-This downloads the latest release and installs it to `/usr/local/bin/`.
+This downloads the latest release and installs it to:
+- `~/.local/bin/` when run as a regular user
+- `/usr/local/bin/` when run as root
 
-Verify the installation:
+> **Note:** If `~/.local/bin` is not in your PATH, the installer will show instructions to add it.
+
+### Custom Installation Directory
+
+Use `--prefix` to specify a custom location:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh -s -- --prefix=/opt/bin
+```
+
+### Verify Installation
 
 ```bash
 octez-manager --version
