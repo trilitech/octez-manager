@@ -434,3 +434,38 @@
  (modules test_process_scanner)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_self_update_checker2)
+ (libraries alcotest octez_manager_lib)
+ (modules test_self_update_checker2)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_system_metrics)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_system_metrics)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_import_fields)
+ (libraries alcotest octez_manager_lib)
+ (modules test_import_fields)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_systemd_templates)
+ (libraries alcotest octez_manager_lib)
+ (modules test_systemd_templates)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_settings2)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_settings2)
+ (instrumentation
+  (backend bisect_ppx)))

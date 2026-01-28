@@ -59,6 +59,14 @@ let of_yojson json =
     Ok {app_bin_dir; default_history_mode; default_logging_mode}
   with Type_error (msg, _) -> R.error_msg msg
 
+module For_tests = struct
+  let default = default
+
+  let to_yojson = to_yojson
+
+  let of_yojson = of_yojson
+end
+
 let load () =
   let path = settings_path () in
   if Sys.file_exists path then
