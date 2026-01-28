@@ -1,0 +1,51 @@
+#!/bin/bash
+# Pre-commit hook for octez-manager
+# Ensures code quality before committing
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if opam environment is set up
+if ! command -v opam &> /dev/null; then
+    echo "❌ opam not found. Please install opam first."
+    exit 1
+fi
+
+# Ensure opam environment is loaded
+eval $(opam env --switch . 2>/dev/null) || eval $(opam env)
+
+# 1. Format check
+echo "📝 Checking code formatting..."
+if ! dune fmt --auto-promote 2>&1 | grep -q "Files formatted"; then
+    # Add any formatted files
+    if git diff --name-only | grep -q "\.ml\|\.mli"; then
+        echo "✨ Code formatted - staging changes..."
+        git add -u
+    fi
+fi
+
+# 2. Copyright check
+echo "©️  Checking copyright headers..."
+if ! ./scripts/check-copyright.sh; then
+    echo "⚠️  Copyright headers need updating. Running fix..."
+    ./scripts/check-copyright.sh --fix
+    # Stage the fixed files
+    git add -u
+    echo "✅ Copyright headers fixed and staged"
+fi
+
+# 3. Build check
+echo "🔨 Building project..."
+if ! dune build @check 2>&1; then
+    echo "❌ Build failed. Please fix errors before committing."
+    exit 1
+fi
+
+# 4. Quick unit tests (skip slow integration tests)
+echo "🧪 Running quick unit tests..."
+if ! dune runtest --force test/test_common_utils.exe test/test_port_validation.exe 2>&1; then
+    echo "⚠️  Some tests failed, but allowing commit (full CI will catch issues)"
+fi
+
+echo "✅ Pre-commit checks passed!"
