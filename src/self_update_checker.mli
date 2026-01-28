@@ -96,3 +96,13 @@ val compare_versions : string -> string -> int
 
 (** Check if update is a major version bump *)
 val is_major_update : current:string -> latest:string -> bool
+
+(** {1 Testing} *)
+
+module For_tests : sig
+  val parse_version : string -> int list
+
+  val is_rc : string -> bool
+
+  val extract_rc_number : string -> int option
+end

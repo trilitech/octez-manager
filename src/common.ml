@@ -659,23 +659,32 @@ let copy_file src dst =
       remove_path dst ;
       e
 
+let port_in_use_override : (int -> bool) option ref = ref None
+
+let set_port_in_use_override f = port_in_use_override := Some f
+
+let clear_port_in_use_override () = port_in_use_override := None
+
 let is_port_in_use (port : int) : bool =
-  (* Check using ss (if available) or lsof *)
-  let has_ss =
-    match Bos.OS.Cmd.exists (Bos.Cmd.v "ss") with
-    | Ok exists -> exists
-    | Error _ -> false
-  in
-  if has_ss then
-    match run_out ["ss"; "-ltnH"; Printf.sprintf "sport = :%d" port] with
-    | Ok out -> String.trim out <> ""
-    | Error _ -> false
-  else
-    match
-      run_out ["lsof"; "-nP"; "-iTCP:" ^ string_of_int port; "-sTCP:LISTEN"]
-    with
-    | Ok out -> String.trim out <> ""
-    | Error _ -> false
+  match !port_in_use_override with
+  | Some f -> f port
+  | None -> (
+      (* Check using ss (if available) or lsof *)
+      let has_ss =
+        match Bos.OS.Cmd.exists (Bos.Cmd.v "ss") with
+        | Ok exists -> exists
+        | Error _ -> false
+      in
+      if has_ss then
+        match run_out ["ss"; "-ltnH"; Printf.sprintf "sport = :%d" port] with
+        | Ok out -> String.trim out <> ""
+        | Error _ -> false
+      else
+        match
+          run_out ["lsof"; "-nP"; "-iTCP:" ^ string_of_int port; "-sTCP:LISTEN"]
+        with
+        | Ok out -> String.trim out <> ""
+        | Error _ -> false)
 
 let get_remote_file_size url =
   (* Use curl -I (HEAD request) to get Content-Length *)

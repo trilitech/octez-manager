@@ -177,3 +177,24 @@ val rollback_import :
   original_unit:string ->
   new_instance:string option ->
   (unit, Rresult.R.msg) result
+
+(** {1 Testing} *)
+
+module For_tests : sig
+  val extract_baker_fields :
+    string list -> string list * string option * string list
+
+  val resolve_field :
+    override:string option ->
+    detected:string External_service.field ->
+    field_name:string ->
+    (string, Rresult.R.msg) result
+
+  val resolve_rpc_addr :
+    overrides:field_overrides -> external_svc:External_service.t -> string
+
+  val resolve_net_addr :
+    overrides:field_overrides -> external_svc:External_service.t -> string
+
+  val missing_required_fields : External_service.t -> string list
+end
