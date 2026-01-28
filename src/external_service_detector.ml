@@ -130,11 +130,46 @@ let list_all_service_units () =
           lines
     | Error _ -> []
   in
-  (* Combine both lists and deduplicate *)
+  (* Get loaded units and unit files *)
   let loaded = list_loaded_units () in
   let files = list_unit_files () in
-  let all_units = loaded @ files in
-  (* Deduplicate by converting to a set-like structure *)
+
+  (* Create a set of unit files for fast lookup *)
+  let file_set = List.fold_left (fun acc unit -> unit :: acc) [] files in
+
+  (* Helper to check if a unit has its own file (not just using a template) *)
+  let has_own_unit_file unit_name =
+    (* First check if it's in our file list *)
+    if List.mem unit_name file_set then true
+    else
+      (* For services not matching octez-* pattern, check FragmentPath
+         to see if they have their own file vs using a template *)
+      match
+        Common.run_out
+          (systemctl_cmd () @ ["show"; unit_name; "-p"; "FragmentPath"])
+      with
+      | Ok output ->
+          let path = String.trim output in
+          (* FragmentPath format: "FragmentPath=/path/to/service.service" *)
+          if String.starts_with ~prefix:"FragmentPath=" path then
+            let file_path =
+              String.sub path 13 (String.length path - 13)
+              (* skip "FragmentPath=" *)
+            in
+            (* Check if the path matches the unit name (not a template)
+               Template: /path/octez-node@.service
+               Instance: /path/octez-node@instance.service or /path/test.service *)
+            String.ends_with ~suffix:unit_name file_path
+          else false
+      | Error _ -> false
+  in
+
+  (* Filter loaded units to only include those with their own unit files
+     This prevents purged services (still in systemd memory, using templates) from appearing *)
+  let loaded_with_files = List.filter has_own_unit_file loaded in
+
+  (* Combine and deduplicate *)
+  let all_units = loaded_with_files @ files in
   let unique_units =
     List.fold_left
       (fun acc unit -> if List.mem unit acc then acc else unit :: acc)
