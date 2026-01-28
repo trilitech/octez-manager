@@ -320,6 +320,18 @@ let extract_baker_fields extra_args =
   in
   (delegates, liquidity_baking_vote, remaining_args)
 
+module For_tests = struct
+  let extract_baker_fields = extract_baker_fields
+
+  let resolve_field = resolve_field
+
+  let resolve_rpc_addr = resolve_rpc_addr
+
+  let resolve_net_addr = resolve_net_addr
+
+  let missing_required_fields = missing_required_fields
+end
+
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~node_endpoint ~bin_dir ~depends_on ~imported_services
     ~all_external_services =
