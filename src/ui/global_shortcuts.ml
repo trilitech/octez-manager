@@ -9,7 +9,7 @@
 
 (** List of keys reserved for global shortcuts. Pages should avoid using these
     for page-specific actions. *)
-let reserved_keys = ["s"; "?"; "m"; "Esc"; "q"]
+let reserved_keys = ["?"; "m"; "Esc"; "q"]
 
 (** Check if a key is reserved for global use *)
 let is_reserved key = List.mem key reserved_keys
@@ -42,9 +42,6 @@ type outcome =
 *)
 let handle key =
   match key with
-  | "s" ->
-      Context.navigate "settings" ;
-      Handled
   | "?" ->
       Modal_helpers.show_help_modal () ;
       Handled
