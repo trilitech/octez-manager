@@ -169,16 +169,16 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
                  version
                  version))
   | None, Some alias, _ -> (
-      (* Use linked directory alias *)
+      (* Use registered directory alias *)
       let alias = String.trim alias in
-      match Binary_registry.find_linked_dir alias with
+      match Binary_registry.find_registered_dir alias with
       | Ok (Some ld) ->
-          Ok (ld.Binary_registry.path, Binary_registry.Linked_alias alias)
+          Ok (ld.Binary_registry.path, Binary_registry.Registered_alias alias)
       | Ok None ->
           Error
             (Printf.sprintf
-               "Linked directory alias '%s' not found. Create it with:\n\
-               \  octez-manager binaries link --alias %s /path/to/binaries"
+               "Registered directory alias '%s' not found. Create it with:\n\
+               \  octez-manager binaries register --alias %s /path/to/binaries"
                alias
                alias)
       | Error (`Msg e) -> Error e)

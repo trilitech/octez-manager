@@ -11,22 +11,23 @@ let ( let* ) = Result.bind
 
 type bin_source =
   | Managed_version of string
-  | Linked_alias of string
+  | Registered_alias of string
   | Raw_path of string
 
-type linked_dir = {alias : string; path : string}
+type registered_dir = {alias : string; path : string}
 
 (* Bin source operations *)
 
 let bin_source_to_string = function
   | Managed_version v -> Printf.sprintf "v%s (managed)" v
-  | Linked_alias a -> Printf.sprintf "%s (linked)" a
+  | Registered_alias a -> Printf.sprintf "%s (registered)" a
   | Raw_path p -> p
 
 let bin_source_to_yojson = function
   | Managed_version v ->
       `Assoc [("type", `String "managed"); ("version", `String v)]
-  | Linked_alias a -> `Assoc [("type", `String "linked"); ("alias", `String a)]
+  | Registered_alias a ->
+      `Assoc [("type", `String "registered"); ("alias", `String a)]
   | Raw_path p ->
       (* For backward compatibility, raw paths are stored as plain string
          in the app_bin_dir field - handled in service.ml *)
@@ -41,9 +42,13 @@ let bin_source_of_yojson json =
         | `String "managed" ->
             let version = member "version" json |> to_string in
             Ok (Managed_version version)
-        | `String "linked" ->
+        | `String "registered" ->
             let alias = member "alias" json |> to_string in
-            Ok (Linked_alias alias)
+            Ok (Registered_alias alias)
+        | `String "linked" ->
+            (* Backward compatibility: old "linked" type *)
+            let alias = member "alias" json |> to_string in
+            Ok (Registered_alias alias)
         | `String "path" ->
             let path = member "path" json |> to_string in
             Ok (Raw_path path)
@@ -64,17 +69,17 @@ let binaries_dir () =
 let managed_version_path version =
   Filename.concat (binaries_dir ()) ("v" ^ version)
 
-let linked_dirs_file () =
+let registered_dirs_file () =
   Filename.concat
     (Common.xdg_data_home ())
-    "octez-manager/linked-directories.json"
+    "octez-manager/registered-directories.json"
 
-(* Linked directories JSON operations *)
+(* Registered directories JSON operations *)
 
-let linked_dir_to_yojson ld =
+let registered_dir_to_yojson ld =
   `Assoc [("alias", `String ld.alias); ("path", `String ld.path)]
 
-let linked_dir_of_yojson json =
+let registered_dir_of_yojson json =
   let open Yojson.Safe.Util in
   try
     let alias = member "alias" json |> to_string in
@@ -82,79 +87,80 @@ let linked_dir_of_yojson json =
     Ok {alias; path}
   with Type_error (msg, _) -> R.error_msg msg
 
-let linked_dirs_to_yojson dirs = `List (List.map linked_dir_to_yojson dirs)
+let registered_dirs_to_yojson dirs =
+  `List (List.map registered_dir_to_yojson dirs)
 
-let linked_dirs_of_yojson json =
+let registered_dirs_of_yojson json =
   let open Yojson.Safe.Util in
   try
     let dirs = to_list json in
     let rec parse acc = function
       | [] -> Ok (List.rev acc)
       | h :: t -> (
-          match linked_dir_of_yojson h with
+          match registered_dir_of_yojson h with
           | Ok ld -> parse (ld :: acc) t
           | Error _ as e -> e)
     in
     parse [] dirs
   with Type_error (msg, _) -> R.error_msg msg
 
-(* Linked directories file operations *)
+(* Registered directories file operations *)
 
 let ensure_parent_dir path =
   let dir = Filename.dirname path in
   let owner, group = Common.current_user_group_names () in
   Common.ensure_dir_path ~owner ~group ~mode:0o755 dir
 
-let load_linked_dirs () =
-  let path = linked_dirs_file () in
+let load_registered_dirs () =
+  let path = registered_dirs_file () in
   if Sys.file_exists path then
     try
       let json = Yojson.Safe.from_file path in
-      linked_dirs_of_yojson json
+      registered_dirs_of_yojson json
     with exn ->
       R.error_msgf
-        "Failed to load linked directories: %s"
+        "Failed to load registered directories: %s"
         (Printexc.to_string exn)
   else Ok []
 
-let save_linked_dirs dirs =
-  let path = linked_dirs_file () in
+let save_registered_dirs dirs =
+  let path = registered_dirs_file () in
   let* () = ensure_parent_dir path in
   try
-    let json = linked_dirs_to_yojson dirs in
+    let json = registered_dirs_to_yojson dirs in
     Yojson.Safe.to_file path json ;
     Ok ()
   with exn ->
     R.error_msgf
-      "Failed to save linked directories: %s"
+      "Failed to save registered directories: %s"
       (Printexc.to_string exn)
 
-let find_linked_dir alias =
-  let* dirs = load_linked_dirs () in
+let find_registered_dir alias =
+  let* dirs = load_registered_dirs () in
   Ok (List.find_opt (fun ld -> ld.alias = alias) dirs)
 
-let add_linked_dir ~alias ~path =
+let add_registered_dir ~alias ~path =
   if not (Sys.file_exists path) then R.error_msgf "Path does not exist: %s" path
   else if not (Sys.is_directory path) then
     R.error_msgf "Path is not a directory: %s" path
   else
-    let* dirs = load_linked_dirs () in
+    let* dirs = load_registered_dirs () in
     if List.exists (fun ld -> ld.alias = alias) dirs then
       R.error_msgf "Alias '%s' already exists" alias
     else
       let dirs = {alias; path} :: dirs in
-      save_linked_dirs dirs
+      save_registered_dirs dirs
 
-let remove_linked_dir alias =
-  let* dirs = load_linked_dirs () in
+let remove_registered_dir alias =
+  let* dirs = load_registered_dirs () in
   if not (List.exists (fun ld -> ld.alias = alias) dirs) then
     R.error_msgf "Alias '%s' not found" alias
   else
     let dirs = List.filter (fun ld -> ld.alias <> alias) dirs in
-    save_linked_dirs dirs
+    save_registered_dirs dirs
 
-let rename_linked_dir ~old_alias ~new_alias =
-  let* dirs = load_linked_dirs () in
+let rename_registered_dir ~old_alias ~new_alias =
+  let* dirs = load_registered_dirs () in
   if not (List.exists (fun ld -> ld.alias = old_alias) dirs) then
     R.error_msgf "Alias '%s' not found" old_alias
   else if List.exists (fun ld -> ld.alias = new_alias) dirs then
@@ -166,7 +172,7 @@ let rename_linked_dir ~old_alias ~new_alias =
           if ld.alias = old_alias then {ld with alias = new_alias} else ld)
         dirs
     in
-    save_linked_dirs dirs
+    save_registered_dirs dirs
 
 (* Managed versions *)
 
@@ -241,16 +247,16 @@ let resolve_bin_source = function
       let path = managed_version_path version in
       if Sys.file_exists path && Sys.is_directory path then Ok path
       else R.error_msgf "Managed version v%s is not installed" version
-  | Linked_alias alias -> (
-      match find_linked_dir alias with
+  | Registered_alias alias -> (
+      match find_registered_dir alias with
       | Ok (Some ld) ->
           if Sys.file_exists ld.path && Sys.is_directory ld.path then Ok ld.path
           else
             R.error_msgf
-              "Linked directory '%s' path does not exist: %s"
+              "Registered directory '%s' path does not exist: %s"
               alias
               ld.path
-      | Ok None -> R.error_msgf "Linked alias '%s' not found" alias
+      | Ok None -> R.error_msgf "Registered alias '%s' not found" alias
       | Error _ as e -> e)
   | Raw_path path ->
       if Sys.file_exists path && Sys.is_directory path then Ok path
@@ -266,13 +272,13 @@ module For_tests = struct
 
   let bin_source_of_legacy = bin_source_of_legacy
 
-  let linked_dir_to_yojson = linked_dir_to_yojson
+  let registered_dir_to_yojson = registered_dir_to_yojson
 
-  let linked_dir_of_yojson = linked_dir_of_yojson
+  let registered_dir_of_yojson = registered_dir_of_yojson
 
-  let linked_dirs_to_yojson = linked_dirs_to_yojson
+  let registered_dirs_to_yojson = registered_dirs_to_yojson
 
-  let linked_dirs_of_yojson = linked_dirs_of_yojson
+  let registered_dirs_of_yojson = registered_dirs_of_yojson
 
   let compare_versions = compare_versions
 end
