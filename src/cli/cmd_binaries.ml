@@ -139,17 +139,20 @@ let list_cmd =
                 Printf.printf "  v%s - %s (%s)\n" version size_str usage)
               versions)) ;
 
-      (* List linked directories *)
-      (match Binary_registry.load_linked_dirs () with
+      (* List registered directories *)
+      (match Binary_registry.load_registered_dirs () with
       | Error (`Msg msg) ->
-          Printf.eprintf "Warning: Failed to load linked directories: %s\n" msg
+          Printf.eprintf
+            "Warning: Failed to load registered directories: %s\n"
+            msg
       | Ok dirs ->
           if dirs <> [] then (
-            Printf.printf "\nLinked Directories:\n" ;
+            Printf.printf "\nRegistered Directories:\n" ;
             List.iter
-              (fun (ld : Binary_registry.linked_dir) ->
+              (fun (ld : Binary_registry.registered_dir) ->
                 let count =
-                  count_instances_using (Binary_registry.Linked_alias ld.alias)
+                  count_instances_using
+                    (Binary_registry.Registered_alias ld.alias)
                 in
                 let usage =
                   if count = 0 then "unused"
@@ -166,12 +169,12 @@ let list_cmd =
   let info =
     Cmd.info
       "list"
-      ~doc:"List installed managed versions and linked directories"
+      ~doc:"List installed managed versions and registered directories"
       ~man:
         [
           `S Manpage.s_description;
           `P
-            "Shows all managed binary versions and linked directories with \
+            "Shows all managed binary versions and registered directories with \
              their disk usage and instance counts.";
         ]
   in
@@ -389,8 +392,8 @@ let remove_cmd =
   in
   Cmd.v info term
 
-(** link command *)
-let link_cmd =
+(** register command *)
+let register_cmd =
   let term =
     let run path alias =
       let alias =
@@ -400,10 +403,10 @@ let link_cmd =
             (* Generate alias from path basename *)
             Filename.basename path
       in
-      match Binary_registry.add_linked_dir ~alias ~path with
+      match Binary_registry.add_registered_dir ~alias ~path with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok () ->
-          Printf.printf "✓ Linked directory: %s -> %s\n" alias path ;
+          Printf.printf "✓ Registered directory: %s -> %s\n" alias path ;
           `Ok ()
     in
     let path_arg =
@@ -419,8 +422,8 @@ let link_cmd =
   in
   let info =
     Cmd.info
-      "link"
-      ~doc:"Link a local directory containing Octez binaries"
+      "register"
+      ~doc:"Register a local directory containing Octez binaries"
       ~man:
         [
           `S Manpage.s_description;
@@ -432,17 +435,17 @@ let link_cmd =
   in
   Cmd.v info term
 
-(** unlink command *)
-let unlink_cmd =
+(** unregister command *)
+let unregister_cmd =
   let term =
     let run alias_or_path force =
       (* Try as alias first, then as path *)
       let alias =
-        match Binary_registry.find_linked_dir alias_or_path with
+        match Binary_registry.find_registered_dir alias_or_path with
         | Ok (Some ld) -> ld.alias
         | Ok None | Error _ -> (
             (* Maybe it's a path - find by path *)
-            match Binary_registry.load_linked_dirs () with
+            match Binary_registry.load_registered_dirs () with
             | Ok dirs -> (
                 match
                   List.find_opt
@@ -452,7 +455,8 @@ let unlink_cmd =
                 | Some ld -> ld.alias
                 | None ->
                     Printf.eprintf
-                      "Error: No linked directory found with alias or path: %s\n"
+                      "Error: No registered directory found with alias or \
+                       path: %s\n"
                       alias_or_path ;
                     exit 1)
             | Error (`Msg msg) ->
@@ -460,46 +464,47 @@ let unlink_cmd =
                 exit 1)
       in
 
-      let bin_source = Binary_registry.Linked_alias alias in
+      let bin_source = Binary_registry.Registered_alias alias in
       let instances = get_instances_using bin_source in
       if instances <> [] && not force then (
         Printf.printf
-          "Linked directory '%s' is currently used by the following instances:\n"
+          "Registered directory '%s' is currently used by the following \
+           instances:\n"
           alias ;
         List.iter (fun inst -> Printf.printf "  - %s\n" inst) instances ;
         Printf.printf
-          "\nUse --force to unlink anyway (may break these instances)\n" ;
+          "\nUse --force to unregister anyway (may break these instances)\n" ;
         `Ok ())
       else
-        match Binary_registry.remove_linked_dir alias with
+        match Binary_registry.remove_registered_dir alias with
         | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
         | Ok () ->
-            Printf.printf "✓ Unlinked directory: %s\n" alias ;
+            Printf.printf "✓ Unregistered directory: %s\n" alias ;
             `Ok ()
     in
     let alias_arg =
-      let doc = "Alias or path of linked directory to remove" in
+      let doc = "Alias or path of registered directory to remove" in
       Arg.(
         required & pos 0 (some string) None & info [] ~docv:"ALIAS_OR_PATH" ~doc)
     in
     let force_flag =
-      let doc = "Force unlinking even if in use" in
+      let doc = "Force unregistering even if in use" in
       Arg.(value & flag & info ["force"; "f"] ~doc)
     in
     Term.(ret (const run $ alias_arg $ force_flag))
   in
   let info =
     Cmd.info
-      "unlink"
-      ~doc:"Unlink a linked directory"
+      "unregister"
+      ~doc:"Unregister a registered directory"
       ~man:
         [
           `S Manpage.s_description;
-          `P "Removes a linked directory from the registry.";
-          `P "This does not delete any files, only the link.";
+          `P "Removes a registered directory from the registry.";
+          `P "This does not delete any files, only the registration.";
           `P
             "If the directory is in use by any instances, you must use --force \
-             to unlink it.";
+             to unregister it.";
         ]
   in
   Cmd.v info term
@@ -599,7 +604,7 @@ let binaries_cmd =
         [
           `S Manpage.s_description;
           `P
-            "Commands for managing Octez binary versions and linked \
+            "Commands for managing Octez binary versions and registered \
              directories.";
           `P
             "You can download official releases, link local directories (e.g., \
@@ -613,7 +618,7 @@ let binaries_cmd =
       list_cmd;
       download_cmd;
       remove_cmd;
-      link_cmd;
-      unlink_cmd;
+      register_cmd;
+      unregister_cmd;
       prune_cmd;
     ]
