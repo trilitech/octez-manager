@@ -301,6 +301,7 @@ jobs:
 
       - name: Build static binary
         run: |
+          eval $(opam env)
           echo '(-ccopt -static)' > static_flags.sexp
           dune build --release
 
