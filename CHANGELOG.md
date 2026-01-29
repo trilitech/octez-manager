@@ -6,23 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Fixed
-
-- Add Tallinnnet chain_id for network detection
-- Refresh version display immediately after self-upgrade
-- Register Data cache with Cache registry to fix stale imports after remove
-- Remove non-functional 's' global shortcut (no settings page exists)
-- Wire global shortcuts so '?' opens help modal from any screen
-- Prevent background runner worker starvation from head monitor streams
-- Prevent background runner crash from Lazy.force domain race condition
-- Preserve extra args and filter phantom services during import
-- Only filter managed services that exist in registry
-- Hide external services that were imported with takeover strategy
-- Filter out managed template services from external instances list
-- Parse failed systemd services in external service detector
-
-## [0.2.0] - 2026-01-23
-
 ### Added
 
 - **Self-Update System**: Check for and install octez-manager updates
@@ -56,14 +39,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Version Notifications**: Get notified when new Octez versions are available
   - Toast notification on TUI startup when newer versions exist
   - Dismissible per-version (won't show again for dismissed versions)
-  - User preferences stored in `~/.config/octez-manager/version-check.json`
-  - Smart semantic version comparison (handles RC versions, multi-digit, padding)
+  - Preferences stored in `~/.config/octez-manager/version-check.json`
 
 - **Update Version Action**: Change the binary version used by running services
   - New "Update Version" option in instance action menu
   - Select from managed versions or linked directories
   - Version filtering prevents accidental downgrades
-  - Extracts version from non-managed binaries for comparison
 
 - **Cascade Update and Rollback**: Update services along with their dependents
   - Automatically detects dependent services (bakers/accusers depending on a node)
@@ -80,7 +61,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Network detection via RPC probing
   - Appears in dedicated "Unmanaged Instances" section in TUI (below managed services)
   - CLI: `octez-manager list --external` to include unmanaged services
-  - Efficient process scanning with pgrep and PID caching for minimal system impact
 
 - **Import External Services**: Convert detected external services into managed instances
   - `octez-manager import <service-name>` CLI command with options:
@@ -96,10 +76,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Preserves existing data directories (no re-sync required)
   - Preserves original service user and file ownership
   - Auto-increments ports for Clone strategy to avoid conflicts
-
-- **Graceful Shutdown**: Background schedulers now shut down cleanly on exit
-  - All background workers (RPC, delegate, system metrics, external services) stop properly
-  - Prevents orphaned threads and resource leaks
+  - **Note**: When using Takeover strategy, verify no other services depend on the imported service
 
 ### Changed
 
@@ -108,14 +85,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Warning displayed when `$EDITOR` is not set in interactive edit mode
-- Multiple import wizard navigation and state management issues
-- Binary downloader stderr output no longer pollutes TUI display
-- External services detection filters out child processes (validator, validator-hypervisor)
-- Process scanner uses `/proc/PID/exe` for reliable binary path detection
-- `du` command stderr output suppressed to prevent TUI error messages
+- Import wizard navigation and error handling improvements
+- Binary download progress no longer causes display glitches
+- Warning now displayed when `$EDITOR` is not set in interactive edit mode
 - File browser `h` key now properly toggles hidden files
-- Extra arguments use space-separated format instead of `=` syntax for compatibility
+- Extra arguments preserved correctly during import
+- Tallinnnet network detection support
+- Version display refreshes immediately after self-upgrade
+- `?` help shortcut now works from all screens
+- Imported services no longer appear in unmanaged instances list
+- Failed systemd services now detected and displayed correctly
+- Clean exit without hanging on quit
 
 ## [0.1.1] - 2026-01-15
 
