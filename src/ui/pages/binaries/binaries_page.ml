@@ -141,6 +141,13 @@ let load_available_versions () =
   | Some versions ->
       (* Filter to only the 2 latest major versions *)
       let filtered_versions = filter_latest_n_major_versions 2 versions in
+      (* Filter out versions < 23.0 *)
+      let filtered_versions =
+        List.filter
+          (fun (v : Binary_downloader.version_info) ->
+            Binary_registry.compare_versions v.version "23.0" >= 0)
+          filtered_versions
+      in
       (* Filter out already installed versions *)
       let managed =
         match Binary_registry.list_managed_versions () with
