@@ -55,9 +55,7 @@ let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
         | true -> Common.remove_tree svc.data_dir
         | false -> Ok ()
       in
-      let* () = Service_registry.remove ~instance in
-      let* services = Service_registry.list () in
-      Systemd.sync_logrotate (logrotate_specs_of services)
+      Service_registry.remove ~instance
 
 let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
   let* svc_opt = Service_registry.find ~instance in
@@ -237,9 +235,7 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
         Filename.concat (Common.env_instances_base_dir ()) old_instance
       in
       let _ = Common.remove_tree old_env_dir in
-      (* Sync logrotate *)
-      let* services = Service_registry.list () in
-      Systemd.sync_logrotate (logrotate_specs_of services)
+      Ok ()
 
 let cleanup_dependencies () =
   let* services = Service_registry.list () in
