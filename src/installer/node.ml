@@ -210,10 +210,6 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
         ())
     else Ok ()
   in
-  log "Listing services for logrotate...\n" ;
-  let* services = Service_registry.list () in
-  log "Syncing logrotate...\n" ;
-  let* () = Systemd.sync_logrotate (logrotate_specs_of services) in
   log "Enabling service...\n" ;
   let* () =
     if request.auto_enable then
