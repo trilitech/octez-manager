@@ -1058,9 +1058,20 @@ let import_service ?(on_log = fun _ -> ())
           | Some "remotely" | Some _ | None ->
               (* Keep remote endpoint for "remotely" or unknown modes *)
               None)
-      | Some External_service.Accuser ->
-          (* Accuser always runs remotely, never link *)
-          None
+      | Some External_service.Accuser -> (
+          (* Accuser: link to node if available in cascade *)
+          let deps =
+            External_service.get_dependencies external_svc all_external_services
+          in
+          let node_dep =
+            List.find_opt
+              (fun (dep_name, dep_role) ->
+                dep_role = "node" && Hashtbl.mem imported_services dep_name)
+              deps
+          in
+          match node_dep with
+          | Some (dep_name, _) -> Hashtbl.find_opt imported_services dep_name
+          | None -> None)
       | Some External_service.Dal_node -> (
           (* DAL: link to node if available *)
           let deps =
