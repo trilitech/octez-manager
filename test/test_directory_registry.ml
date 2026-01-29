@@ -71,7 +71,7 @@ let test_directory_entry_to_yojson () =
       dir_type = Directory_registry.Node_data_dir;
       created_at = "2026-01-01 12:00:00";
       last_used_at = "2026-01-25 10:30:00";
-      linked_services = ["node-mainnet"; "node-testnet"];
+      registered_services = ["node-mainnet"; "node-testnet"];
     }
   in
   let json = DR.directory_entry_to_yojson entry in
@@ -92,20 +92,17 @@ let test_directory_entry_of_yojson () =
         ("path", `String "/var/lib/tezos/node");
         ("dir_type", `String "node_data_dir");
         ("created_at", `String "2026-01-01 12:00:00");
-        ("last_used_at", `String "2026-01-25 10:30:00");
-        ( "linked_services",
-          `List [`String "node-mainnet"; `String "node-testnet"] );
+        ("registered_services", `List []);
       ]
   in
   let result = DR.directory_entry_of_yojson json in
   match result with
   | Ok entry ->
-      check string "path" "/var/lib/tezos/node" entry.Directory_registry.path ;
       check
-        int
-        "linked_services count"
-        2
-        (List.length entry.Directory_registry.linked_services)
+        string
+        "last_used_at defaults to created_at"
+        "2026-01-01 12:00:00"
+        entry.Directory_registry.last_used_at
   | Error (`Msg err) -> Alcotest.fail (Printf.sprintf "Parse failed: %s" err)
 
 let test_directory_entry_of_yojson_backward_compat () =
@@ -116,7 +113,7 @@ let test_directory_entry_of_yojson_backward_compat () =
         ("path", `String "/var/lib/tezos/node");
         ("dir_type", `String "node_data_dir");
         ("created_at", `String "2026-01-01 12:00:00");
-        ("linked_services", `List []);
+        ("registered_services", `List []);
       ]
   in
   let result = DR.directory_entry_of_yojson json in
@@ -135,7 +132,7 @@ let test_directory_entry_of_yojson_missing_path () =
       [
         ("dir_type", `String "node_data_dir");
         ("created_at", `String "2026-01-01 12:00:00");
-        ("linked_services", `List []);
+        ("registered_services", `List []);
       ]
   in
   let result = DR.directory_entry_of_yojson json in
@@ -150,7 +147,7 @@ let test_directory_entry_of_yojson_invalid_dir_type () =
         ("path", `String "/var/lib/tezos/node");
         ("dir_type", `String "invalid_type");
         ("created_at", `String "2026-01-01 12:00:00");
-        ("linked_services", `List []);
+        ("registered_services", `List []);
       ]
   in
   let result = DR.directory_entry_of_yojson json in
@@ -165,7 +162,7 @@ let test_directory_entry_roundtrip () =
       dir_type = Directory_registry.Client_base_dir;
       created_at = "2026-01-15 08:00:00";
       last_used_at = "2026-01-25 14:20:00";
-      linked_services = ["baker-alpha"; "baker-beta"];
+      registered_services = ["baker-alpha"; "baker-beta"];
     }
   in
   let json = DR.directory_entry_to_yojson entry in

@@ -8,11 +8,12 @@
 (** Binary source types - how an instance references its Octez binaries *)
 type bin_source =
   | Managed_version of string  (** Downloaded/managed version e.g. "24.0" *)
-  | Linked_alias of string  (** Linked directory alias e.g. "dev-build" *)
+  | Registered_alias of string
+      (** Registered directory alias e.g. "dev-build" *)
   | Raw_path of string  (** Raw filesystem path e.g. "/usr/local/bin" *)
 
-(** Linked directory entry *)
-type linked_dir = {alias : string; path : string}
+(** Registered directory entry *)
+type registered_dir = {alias : string; path : string}
 
 (** {2 Bin source operations} *)
 
@@ -39,28 +40,30 @@ val managed_version_path : string -> string
 (** Resolve a bin_source to an actual filesystem path *)
 val resolve_bin_source : bin_source -> (string, Rresult.R.msg) result
 
-(** {2 Linked directories management} *)
+(** {2 Registered directories management} *)
 
-(** Path to linked-directories.json *)
-val linked_dirs_file : unit -> string
+(** Path to registered-directories.json *)
+val registered_dirs_file : unit -> string
 
-(** Load all linked directories *)
-val load_linked_dirs : unit -> (linked_dir list, Rresult.R.msg) result
+(** Load all registered directories *)
+val load_registered_dirs : unit -> (registered_dir list, Rresult.R.msg) result
 
-(** Save linked directories *)
-val save_linked_dirs : linked_dir list -> (unit, Rresult.R.msg) result
+(** Save registered directories *)
+val save_registered_dirs : registered_dir list -> (unit, Rresult.R.msg) result
 
-(** Find a linked directory by alias *)
-val find_linked_dir : string -> (linked_dir option, Rresult.R.msg) result
+(** Find a registered directory by alias *)
+val find_registered_dir :
+  string -> (registered_dir option, Rresult.R.msg) result
 
-(** Add a new linked directory. Fails if alias already exists. *)
-val add_linked_dir : alias:string -> path:string -> (unit, Rresult.R.msg) result
+(** Add a new registered directory. Fails if alias already exists. *)
+val add_registered_dir :
+  alias:string -> path:string -> (unit, Rresult.R.msg) result
 
-(** Remove a linked directory by alias *)
-val remove_linked_dir : string -> (unit, Rresult.R.msg) result
+(** Remove a registered directory by alias *)
+val remove_registered_dir : string -> (unit, Rresult.R.msg) result
 
-(** Rename a linked directory alias *)
-val rename_linked_dir :
+(** Rename a registered directory alias *)
+val rename_registered_dir :
   old_alias:string -> new_alias:string -> (unit, Rresult.R.msg) result
 
 (** {2 Managed versions} *)
@@ -90,14 +93,15 @@ module For_tests : sig
 
   val bin_source_of_legacy : string -> bin_source
 
-  val linked_dir_to_yojson : linked_dir -> Yojson.Safe.t
+  val registered_dir_to_yojson : registered_dir -> Yojson.Safe.t
 
-  val linked_dir_of_yojson : Yojson.Safe.t -> (linked_dir, Rresult.R.msg) result
+  val registered_dir_of_yojson :
+    Yojson.Safe.t -> (registered_dir, Rresult.R.msg) result
 
-  val linked_dirs_to_yojson : linked_dir list -> Yojson.Safe.t
+  val registered_dirs_to_yojson : registered_dir list -> Yojson.Safe.t
 
-  val linked_dirs_of_yojson :
-    Yojson.Safe.t -> (linked_dir list, Rresult.R.msg) result
+  val registered_dirs_of_yojson :
+    Yojson.Safe.t -> (registered_dir list, Rresult.R.msg) result
 
   val compare_versions : string -> string -> int
 end

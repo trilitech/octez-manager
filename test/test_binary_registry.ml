@@ -25,10 +25,10 @@ let test_bin_source_to_string_managed () =
   let result = BR.bin_source_to_string source in
   check string "managed version string" "v24.0 (managed)" result
 
-let test_bin_source_to_string_linked () =
-  let source = Binary_registry.Linked_alias "dev-build" in
+let test_bin_source_to_string_registered () =
+  let source = Binary_registry.Registered_alias "dev-build" in
   let result = BR.bin_source_to_string source in
-  check string "linked alias string" "dev-build (linked)" result
+  check string "registered alias string" "dev-build (registered)" result
 
 let test_bin_source_to_string_raw () =
   let source = Binary_registry.Raw_path "/usr/local/bin" in
@@ -45,13 +45,17 @@ let test_bin_source_to_yojson_managed () =
   in
   check (testable Yojson.Safe.pp Yojson.Safe.equal) "managed JSON" expected json
 
-let test_bin_source_to_yojson_linked () =
-  let source = Binary_registry.Linked_alias "dev-build" in
+let test_bin_source_to_yojson_registered () =
+  let source = Binary_registry.Registered_alias "dev-build" in
   let json = BR.bin_source_to_yojson source in
   let expected =
-    `Assoc [("type", `String "linked"); ("alias", `String "dev-build")]
+    `Assoc [("type", `String "registered"); ("alias", `String "dev-build")]
   in
-  check (testable Yojson.Safe.pp Yojson.Safe.equal) "linked JSON" expected json
+  check
+    (testable Yojson.Safe.pp Yojson.Safe.equal)
+    "registered JSON"
+    expected
+    json
 
 let test_bin_source_to_yojson_raw () =
   let source = Binary_registry.Raw_path "/usr/local/bin" in
@@ -75,14 +79,14 @@ let test_bin_source_of_yojson_managed () =
   | Ok _ -> Alcotest.fail "Expected Managed_version \"24.0\""
   | Error (`Msg err) -> Alcotest.fail (Printf.sprintf "Parse failed: %s" err)
 
-let test_bin_source_of_yojson_linked () =
+let test_bin_source_of_yojson_registered () =
   let json =
-    `Assoc [("type", `String "linked"); ("alias", `String "dev-build")]
+    `Assoc [("type", `String "registered"); ("alias", `String "dev-build")]
   in
   let result = BR.bin_source_of_yojson json in
   match result with
-  | Ok (Binary_registry.Linked_alias "dev-build") -> ()
-  | Ok _ -> Alcotest.fail "Expected Linked_alias \"dev-build\""
+  | Ok (Binary_registry.Registered_alias "dev-build") -> ()
+  | Ok _ -> Alcotest.fail "Expected Registered_alias \"dev-build\""
   | Error (`Msg err) -> Alcotest.fail (Printf.sprintf "Parse failed: %s" err)
 
 let test_bin_source_of_yojson_raw () =
@@ -120,13 +124,13 @@ let test_bin_source_of_legacy () =
   | Binary_registry.Raw_path "/legacy/path" -> ()
   | _ -> Alcotest.fail "Expected Raw_path"
 
-(** {2 linked_dir JSON serialization tests} *)
+(** {2 registered_dir JSON serialization tests} *)
 
-let test_linked_dir_to_yojson () =
-  let ld : Binary_registry.linked_dir =
+let test_registered_dir_to_yojson () =
+  let ld : Binary_registry.registered_dir =
     {alias = "dev"; path = "/home/user/dev"}
   in
-  let json = BR.linked_dir_to_yojson ld in
+  let json = BR.registered_dir_to_yojson ld in
   let expected =
     `Assoc [("alias", `String "dev"); ("path", `String "/home/user/dev")]
   in
@@ -136,35 +140,35 @@ let test_linked_dir_to_yojson () =
     expected
     json
 
-let test_linked_dir_of_yojson () =
+let test_registered_dir_of_yojson () =
   let json =
     `Assoc [("alias", `String "dev"); ("path", `String "/home/user/dev")]
   in
-  let result = BR.linked_dir_of_yojson json in
+  let result = BR.registered_dir_of_yojson json in
   match result with
   | Ok ld ->
       check string "alias" "dev" ld.Binary_registry.alias ;
       check string "path" "/home/user/dev" ld.Binary_registry.path
   | Error (`Msg err) -> Alcotest.fail (Printf.sprintf "Parse failed: %s" err)
 
-let test_linked_dir_of_yojson_missing_field () =
+let test_registered_dir_of_yojson_missing_field () =
   let json = `Assoc [("alias", `String "dev")] in
-  let result = BR.linked_dir_of_yojson json in
+  let result = BR.registered_dir_of_yojson json in
   check_error_result result
 
-let test_linked_dirs_to_yojson () =
-  let dirs : Binary_registry.linked_dir list =
+let test_registered_dirs_to_yojson () =
+  let dirs : Binary_registry.registered_dir list =
     [
       {alias = "dev"; path = "/home/user/dev"};
       {alias = "prod"; path = "/opt/octez"};
     ]
   in
-  let json = BR.linked_dirs_to_yojson dirs in
+  let json = BR.registered_dirs_to_yojson dirs in
   match json with
   | `List [_; _] -> ()
   | _ -> Alcotest.fail "Expected list of 2 elements"
 
-let test_linked_dirs_of_yojson () =
+let test_registered_dirs_of_yojson () =
   let json =
     `List
       [
@@ -172,23 +176,23 @@ let test_linked_dirs_of_yojson () =
         `Assoc [("alias", `String "prod"); ("path", `String "/opt/octez")];
       ]
   in
-  let result = BR.linked_dirs_of_yojson json in
+  let result = BR.registered_dirs_of_yojson json in
   match result with
   | Ok dirs ->
       check int "list length" 2 (List.length dirs) ;
       check string "first alias" "dev" (List.hd dirs).Binary_registry.alias
   | Error (`Msg err) -> Alcotest.fail (Printf.sprintf "Parse failed: %s" err)
 
-let test_linked_dirs_of_yojson_empty () =
+let test_registered_dirs_of_yojson_empty () =
   let json = `List [] in
-  let result = BR.linked_dirs_of_yojson json in
+  let result = BR.registered_dirs_of_yojson json in
   match result with
   | Ok dirs -> check int "empty list" 0 (List.length dirs)
   | Error (`Msg err) -> Alcotest.fail (Printf.sprintf "Parse failed: %s" err)
 
-let test_linked_dirs_of_yojson_invalid_entry () =
+let test_registered_dirs_of_yojson_invalid_entry () =
   let json = `List [`Assoc [("alias", `String "dev")]] in
-  let result = BR.linked_dirs_of_yojson json in
+  let result = BR.registered_dirs_of_yojson json in
   check_error_result result
 
 (** {2 compare_versions tests} *)
@@ -231,16 +235,25 @@ let () =
       ( "bin_source_to_string",
         [
           test_case "managed version" `Quick test_bin_source_to_string_managed;
-          test_case "linked alias" `Quick test_bin_source_to_string_linked;
+          test_case
+            "registered alias"
+            `Quick
+            test_bin_source_to_string_registered;
           test_case "raw path" `Quick test_bin_source_to_string_raw;
         ] );
       ( "bin_source JSON serialization",
         [
           test_case "to_yojson managed" `Quick test_bin_source_to_yojson_managed;
-          test_case "to_yojson linked" `Quick test_bin_source_to_yojson_linked;
+          test_case
+            "to_yojson registered"
+            `Quick
+            test_bin_source_to_yojson_registered;
           test_case "to_yojson raw" `Quick test_bin_source_to_yojson_raw;
           test_case "of_yojson managed" `Quick test_bin_source_of_yojson_managed;
-          test_case "of_yojson linked" `Quick test_bin_source_of_yojson_linked;
+          test_case
+            "of_yojson registered"
+            `Quick
+            test_bin_source_of_yojson_registered;
           test_case "of_yojson raw" `Quick test_bin_source_of_yojson_raw;
           test_case
             "of_yojson backward compat"
@@ -256,24 +269,24 @@ let () =
             test_bin_source_of_yojson_invalid_format;
           test_case "of_legacy" `Quick test_bin_source_of_legacy;
         ] );
-      ( "linked_dir JSON serialization",
+      ( "registered_dir JSON serialization",
         [
-          test_case "to_yojson" `Quick test_linked_dir_to_yojson;
-          test_case "of_yojson" `Quick test_linked_dir_of_yojson;
+          test_case "to_yojson" `Quick test_registered_dir_to_yojson;
+          test_case "of_yojson" `Quick test_registered_dir_of_yojson;
           test_case
-            "of_yojson missing field"
+            "of_yojson_missing_field"
             `Quick
-            test_linked_dir_of_yojson_missing_field;
-          test_case "list to_yojson" `Quick test_linked_dirs_to_yojson;
-          test_case "list of_yojson" `Quick test_linked_dirs_of_yojson;
+            test_registered_dir_of_yojson_missing_field;
+          test_case "list to_yojson" `Quick test_registered_dirs_to_yojson;
+          test_case "list of_yojson" `Quick test_registered_dirs_of_yojson;
           test_case
-            "list of_yojson empty"
+            "list of_yojson_empty"
             `Quick
-            test_linked_dirs_of_yojson_empty;
+            test_registered_dirs_of_yojson_empty;
           test_case
-            "list of_yojson invalid"
+            "list of_yojson_invalid_entry"
             `Quick
-            test_linked_dirs_of_yojson_invalid_entry;
+            test_registered_dirs_of_yojson_invalid_entry;
         ] );
       ( "compare_versions",
         [

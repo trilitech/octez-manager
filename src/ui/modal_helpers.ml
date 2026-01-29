@@ -792,9 +792,11 @@ let select_directory_modal ~title ~dir_type ~on_select () =
 
   let to_string = function
     | Existing_dir entry ->
-        (* Show path + linked services *)
+        (* Show path + registered services *)
         let services_str =
-          match entry.Octez_manager_lib.Directory_registry.linked_services with
+          match
+            entry.Octez_manager_lib.Directory_registry.registered_services
+          with
           | [] -> ""
           | svcs -> "  (" ^ String.concat ", " svcs ^ ")"
         in
@@ -844,7 +846,7 @@ let select_directory_modal ~title ~dir_type ~on_select () =
                    Octez_manager_lib.Directory_registry.add
                      ~path:trimmed
                      ~dir_type
-                     ~linked_services:[]
+                     ~registered_services:[]
                  with
                 | Ok () -> ()
                 | Error (`Msg msg) ->
@@ -1026,15 +1028,15 @@ let select_app_bin_dir_modal ~on_select () =
     | Error _ -> []
   in
 
-  (* Load linked directories *)
-  let linked_dirs =
-    match Octez_manager_lib.Binary_registry.load_linked_dirs () with
+  (* Load registered directories *)
+  let registered_dirs =
+    match Octez_manager_lib.Binary_registry.load_registered_dirs () with
+    | Error _ -> []
     | Ok dirs ->
         List.map
-          (fun (ld : Octez_manager_lib.Binary_registry.linked_dir) ->
-            `LinkedDir (ld.alias, ld.path))
+          (fun (ld : Octez_manager_lib.Binary_registry.registered_dir) ->
+            `Registered (ld.alias, ld.path))
           dirs
-    | Error _ -> []
   in
 
   (* Get latest uninstalled version to feature at the top *)
@@ -1097,7 +1099,7 @@ let select_app_bin_dir_modal ~on_select () =
 
   (* Build sections with separators *)
   let items =
-    if managed_versions = [] && linked_dirs = [] then
+    if managed_versions = [] && registered_dirs = [] then
       (* No installed versions - show latest uninstalled if available *)
       match latest_uninstalled with
       | Some vi -> [`LatestVersion vi; `DownloadOther; `CustomPath]
@@ -1107,19 +1109,20 @@ let select_app_bin_dir_modal ~on_select () =
       match latest_uninstalled with
       | Some vi ->
           `LatestVersion vi
-          :: (managed_versions @ linked_dirs @ [`DownloadOther; `CustomPath])
-      | None -> managed_versions @ linked_dirs @ [`DownloadOther; `CustomPath]
+          :: (managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath])
+      | None ->
+          managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath]
   in
 
   let to_string :
       [ `ManagedVersion of string
-      | `LinkedDir of string * string
+      | `Registered of string * string
       | `LatestVersion of Octez_manager_lib.Binary_downloader.version_info
       | `DownloadOther
       | `CustomPath ] ->
       string = function
     | `ManagedVersion v -> Printf.sprintf "v%s (managed)" v
-    | `LinkedDir (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `Registered (alias, path) -> Printf.sprintf "%s  →  %s" alias path
     | `LatestVersion vi ->
         Printf.sprintf
           "Latest (v%s)  <download>"
@@ -1137,8 +1140,10 @@ let select_app_bin_dir_modal ~on_select () =
           Octez_manager_lib.Binary_registry.Managed_version version
         in
         on_select (path, bin_source)
-    | `LinkedDir (alias, path) ->
-        let bin_source = Octez_manager_lib.Binary_registry.Linked_alias alias in
+    | `Registered (alias, path) ->
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Registered_alias alias
+        in
         on_select (path, bin_source)
     | `LatestVersion (vi : Octez_manager_lib.Binary_downloader.version_info) ->
         (* Directly download the latest version *)
