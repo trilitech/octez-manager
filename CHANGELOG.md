@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Failed systemd services now correctly detected and displayed in external services list (fixes #489)
+- Network detection now correctly probes connected node endpoint for DAL/baker/accuser services (fixes #488)
+- Removed nonexistent client config path from baker/accuser instance details (fixes #483)
+- Import wizard now correctly handles multiple edge cases (fixes #490):
+  - Network name matching is now case-insensitive
+  - Accusers running as `octez-baker run accuser` now properly identified
+  - Baker "with local node" mode now preserved after import
+  - Extra arguments now correctly displayed in CLI, TUI details, and edit forms
+  - Environment variables now consistent across all service types
+  - Duplicate environment variables removed from accuser configuration
+
 ## [0.2.0] - 2026-01-29
 
 ### Added
