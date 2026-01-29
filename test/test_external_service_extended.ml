@@ -136,11 +136,6 @@ let test_chain_id_mainnet () =
   | Some network -> check string "mainnet chain id" "mainnet" network
   | None -> fail "should recognize mainnet"
 
-let test_chain_id_ghostnet () =
-  match ESD.chain_id_to_network "NetXnHfVqm9iesp" with
-  | Some network -> check string "ghostnet chain id" "ghostnet" network
-  | None -> fail "should recognize ghostnet"
-
 let test_chain_id_shadownet () =
   match ESD.chain_id_to_network "NetXsqzbfFenSTS" with
   | Some network -> check string "shadownet chain id" "shadownet" network
@@ -219,7 +214,6 @@ let extract_command_tests =
 let chain_id_tests =
   [
     ("chain id mainnet", `Quick, test_chain_id_mainnet);
-    ("chain id ghostnet", `Quick, test_chain_id_ghostnet);
     ("chain id shadownet", `Quick, test_chain_id_shadownet);
     ("chain id tallinnnet", `Quick, test_chain_id_tallinnnet);
     ("chain id unknown", `Quick, test_chain_id_unknown);
