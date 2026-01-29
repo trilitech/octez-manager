@@ -144,6 +144,7 @@ jobs:
 
       - name: Check completions are up to date
         run: |
+          eval $(opam env)
           mkdir -p /tmp/completions-check
           dune exec -- octez-manager-gen-completion --out-dir /tmp/completions-check
           if ! diff -q completions/octez-manager.bash /tmp/completions-check/octez-manager.bash >/dev/null 2>&1 || \
