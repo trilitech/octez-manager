@@ -62,6 +62,13 @@ let list_remote_cmd =
       match Binary_downloader.fetch_versions ~include_rc () with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
       | Ok versions ->
+          (* Filter out versions < 23.0 *)
+          let versions =
+            List.filter
+              (fun (v : Binary_downloader.version_info) ->
+                Binary_registry.compare_versions v.version "23.0" >= 0)
+              versions
+          in
           if versions = [] then (
             Printf.printf "No versions available.\n" ;
             `Ok ())
@@ -188,6 +195,13 @@ let download_cmd =
               Printf.eprintf "Error: No versions available\n" ;
               exit 1
           | Ok versions -> (
+              (* Filter out versions < 23.0 *)
+              let versions =
+                List.filter
+                  (fun (v : Binary_downloader.version_info) ->
+                    Binary_registry.compare_versions v.version "23.0" >= 0)
+                  versions
+              in
               (* Sort versions to get the latest *)
               let sorted =
                 List.sort
