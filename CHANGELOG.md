@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Octez versions < 23.0 now filtered out from binaries page and CLI commands (baker requires >= v23.0)
+
 ## [0.2.0] - 2026-01-29
 
 ### Added
