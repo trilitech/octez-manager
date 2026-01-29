@@ -17,23 +17,24 @@ let name = "binaries"
 type item_type =
   | ManagedVersion of
       string * int64 option * int (* version, size, instance_count *)
-  | LinkedDir of
-      Binary_registry.linked_dir * int (* linked_dir, instance_count *)
-  | LinkAction (* Button to link a new directory *)
+  | RegisteredDir of
+      Binary_registry.registered_dir * int (* registered_dir, instance_count *)
+  | RegisterAction (* Button to register a new directory *)
   | AvailableVersion of Binary_downloader.version_info
   | AvailableMajorGroup of int * Binary_downloader.version_info list
 (* major version, list of minor versions *)
 
 type state = {
   managed_versions : (string * int64 option * int) list;
-  linked_dirs : (Binary_registry.linked_dir * int) list;
+  registered_dirs : (Binary_registry.registered_dir * int) list;
   available_versions : Binary_downloader.version_info list;
   items : item_type list;
   selected : int;
   loading_remote : bool;
   expanded_majors : int list; (* list of expanded major versions *)
   expanded_managed : string list; (* list of expanded managed versions *)
-  expanded_linked : string list; (* list of expanded linked directory aliases *)
+  expanded_registered : string list;
+      (* list of expanded registered directory aliases *)
 }
 
 type msg = unit
@@ -89,15 +90,14 @@ let load_managed_versions () =
           (version, size, count))
         versions
 
-let load_linked_dirs () =
-  match Binary_registry.load_linked_dirs () with
+let load_registered_dirs () =
+  match Binary_registry.load_registered_dirs () with
   | Error _ -> []
   | Ok dirs ->
       List.map
-        (fun (ld : Binary_registry.linked_dir) ->
+        (fun (ld : Binary_registry.registered_dir) ->
           let count =
-            count_instances_using
-              (Binary_registry.Linked_alias ld.Binary_registry.alias)
+            count_instances_using (Binary_registry.Registered_alias ld.alias)
           in
           (ld, count))
         dirs
@@ -159,13 +159,11 @@ let load_available_versions () =
           not (List.mem v.version managed))
         filtered_versions
 
-let build_items managed linked available expanded_majors =
+let build_items _managed registered available expanded_majors =
   let items = ref [] in
-  List.iter
-    (fun (v, s, c) -> items := ManagedVersion (v, s, c) :: !items)
-    managed ;
-  List.iter (fun (ld, c) -> items := LinkedDir (ld, c) :: !items) linked ;
-  items := LinkAction :: !items ;
+  items := RegisterAction :: !items ;
+  List.iter (fun (ld, c) -> items := RegisteredDir (ld, c) :: !items) registered ;
+  items := RegisterAction :: !items ;
 
   (* Group available versions by major version *)
   let major_groups = Hashtbl.create 10 in
@@ -203,43 +201,42 @@ let build_items managed linked available expanded_majors =
 
 let init () =
   let managed = load_managed_versions () in
-  let linked = load_linked_dirs () in
+  let registered = load_registered_dirs () in
   let available = load_available_versions () in
   let expanded_majors = [] in
   let expanded_managed = [] in
-  let expanded_linked = [] in
-  let items = build_items managed linked available expanded_majors in
+  let expanded_registered = [] in
+  let items = build_items managed registered available expanded_majors in
   Navigation.make
     {
       managed_versions = managed;
-      linked_dirs = linked;
+      registered_dirs = registered;
       available_versions = available;
       items;
       selected = 0;
       loading_remote = false;
       expanded_majors;
       expanded_managed;
-      expanded_linked;
+      expanded_registered;
     }
 
 let update ps _ = ps
 
 let refresh_data s =
   let managed = load_managed_versions () in
-  let linked = load_linked_dirs () in
+  let registered = load_registered_dirs () in
   let available = load_available_versions () in
-  let items = build_items managed linked available s.expanded_majors in
-  let selected = min s.selected (max 0 (List.length items - 1)) in
+  let items = build_items managed registered available s.expanded_majors in
   {
     managed_versions = managed;
-    linked_dirs = linked;
+    registered_dirs = registered;
     available_versions = available;
     items;
-    selected;
+    selected = s.selected;
     loading_remote = false;
     expanded_majors = s.expanded_majors;
     expanded_managed = s.expanded_managed;
-    expanded_linked = s.expanded_linked;
+    expanded_registered = s.expanded_registered;
   }
 
 let refresh ps = Navigation.update refresh_data ps
@@ -258,7 +255,7 @@ let toggle_major_expansion s major =
   let items =
     build_items
       s.managed_versions
-      s.linked_dirs
+      s.registered_dirs
       s.available_versions
       expanded_majors
   in
@@ -272,13 +269,13 @@ let toggle_managed_expansion s version =
   in
   {s with expanded_managed}
 
-let toggle_linked_expansion s alias =
-  let expanded_linked =
-    if List.mem alias s.expanded_linked then
-      List.filter (( <> ) alias) s.expanded_linked
-    else alias :: s.expanded_linked
+let toggle_registered_expansion s alias =
+  let expanded_registered =
+    if List.mem alias s.expanded_registered then
+      List.filter (( <> ) alias) s.expanded_registered
+    else alias :: s.expanded_registered
   in
-  {s with expanded_linked}
+  {s with expanded_registered}
 
 let move_up s =
   let selected = if s.selected > 0 then s.selected - 1 else s.selected in
@@ -334,7 +331,7 @@ let remove_version version =
 let unlink_directory ld =
   let count =
     count_instances_using
-      (Binary_registry.Linked_alias ld.Binary_registry.alias)
+      (Binary_registry.Registered_alias ld.Binary_registry.alias)
   in
   if count > 0 then
     Modal_helpers.show_error
@@ -351,7 +348,7 @@ let unlink_directory ld =
         if confirmed then
           (* Run unlink in background to avoid blocking UI *)
           Background_runner.enqueue (fun () ->
-              match Binary_registry.remove_linked_dir ld.alias with
+              match Binary_registry.remove_registered_dir ld.alias with
               | Ok () ->
                   Context.toast_success
                     (Printf.sprintf "Unlinked '%s'" ld.alias) ;
@@ -418,7 +415,7 @@ let link_directory () =
     ~require_writable:false
     ~on_select:(fun path ->
       let alias = Filename.basename path in
-      match Binary_registry.add_linked_dir ~alias ~path with
+      match Binary_registry.add_registered_dir ~alias ~path with
       | Ok () ->
           Context.toast_success (Printf.sprintf "Linked '%s'" alias) ;
           Context.mark_instances_dirty ()
@@ -499,15 +496,15 @@ let handle_action s =
           (* If unused, allow removal *)
           remove_version version ;
           s)
-    | LinkedDir (ld, count) ->
+    | RegisteredDir (ld, count) ->
         if count > 0 then
           (* If has instances, toggle expansion *)
-          toggle_linked_expansion s ld.Binary_registry.alias
+          toggle_registered_expansion s ld.Binary_registry.alias
         else (
           (* If unused, allow unlinking *)
           unlink_directory ld ;
           s)
-    | LinkAction ->
+    | RegisterAction ->
         link_directory () ;
         s
     | AvailableVersion vi ->
@@ -525,8 +522,8 @@ let toggle_current_group s =
     | AvailableMajorGroup (major, _) -> toggle_major_expansion s major
     | ManagedVersion (version, _, count) ->
         if count > 0 then toggle_managed_expansion s version else s
-    | LinkedDir (ld, count) ->
-        if count > 0 then toggle_linked_expansion s ld.Binary_registry.alias
+    | RegisteredDir (ld, count) ->
+        if count > 0 then toggle_registered_expansion s ld.Binary_registry.alias
         else s
     | _ -> s
 
@@ -548,13 +545,13 @@ let view ps ~focus:_ ~size:_ =
 
   (* Set help hint based on selected item *)
   (match List.nth_opt s.items s.selected with
-  | Some LinkAction ->
+  | Some RegisterAction ->
       Miaou.Core.Help_hint.set
         (Some
            "Linked directories let you use Octez binaries from other locations \
             (dev builds, system installs, custom versions). Press Enter to \
             browse for a directory.")
-  | Some (LinkedDir (_, count)) ->
+  | Some (RegisteredDir (_, count)) ->
       if count > 0 then
         Miaou.Core.Help_hint.set
           (Some
@@ -638,13 +635,13 @@ let view ps ~focus:_ ~size:_ =
        "Link to Octez binaries from development builds or custom locations") ;
   add "" ;
 
-  if s.linked_dirs = [] then add (Widgets.dim "  No linked directories")
+  if s.registered_dirs = [] then add (Widgets.dim "  No linked directories")
   else
     List.iter
       (fun (ld, count) ->
         let is_selected =
           match List.nth_opt s.items s.selected with
-          | Some (LinkedDir (ld2, _))
+          | Some (RegisteredDir (ld2, _))
             when ld.Binary_registry.alias = ld2.Binary_registry.alias ->
               true
           | _ -> false
@@ -658,7 +655,7 @@ let view ps ~focus:_ ~size:_ =
         (* Add expansion indicator *)
         let expansion_indicator =
           if count > 0 then
-            if List.mem ld.Binary_registry.alias s.expanded_linked then " ▼"
+            if List.mem ld.Binary_registry.alias s.expanded_registered then " ▼"
             else " ▶"
           else ""
         in
@@ -673,20 +670,20 @@ let view ps ~focus:_ ~size:_ =
         in
         add (if is_selected then Widgets.bold line else line) ;
         (* Render sub-items if expanded *)
-        if List.mem ld.Binary_registry.alias s.expanded_linked then
+        if List.mem ld.Binary_registry.alias s.expanded_registered then
           let instances =
             get_instances_using
-              (Binary_registry.Linked_alias ld.Binary_registry.alias)
+              (Binary_registry.Registered_alias ld.Binary_registry.alias)
           in
           List.iter
             (fun inst -> add (Widgets.dim (Printf.sprintf "      → %s" inst)))
             instances)
-      s.linked_dirs ;
+      s.registered_dirs ;
 
   (* Add link directory button *)
   let link_action_selected =
     match List.nth_opt s.items s.selected with
-    | Some LinkAction -> true
+    | Some RegisterAction -> true
     | _ -> false
   in
   let link_button =

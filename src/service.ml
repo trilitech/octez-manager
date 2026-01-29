@@ -81,16 +81,16 @@ let get_bin_source t =
           Binary_registry.Managed_version version
         else Binary_registry.Raw_path t.app_bin_dir
       else
-        (* Check if this matches a linked directory *)
-        match Binary_registry.load_linked_dirs () with
+        (* Check if this matches a registered directory *)
+        match Binary_registry.load_registered_dirs () with
         | Ok dirs -> (
             match
               List.find_opt
-                (fun (ld : Binary_registry.linked_dir) ->
+                (fun (ld : Binary_registry.registered_dir) ->
                   ld.path = t.app_bin_dir)
                 dirs
             with
-            | Some ld -> Binary_registry.Linked_alias ld.alias
+            | Some ld -> Binary_registry.Registered_alias ld.alias
             | None -> Binary_registry.Raw_path t.app_bin_dir)
         | Error _ -> Binary_registry.Raw_path t.app_bin_dir)
 

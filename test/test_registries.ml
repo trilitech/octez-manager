@@ -64,7 +64,7 @@ let test_add_and_find () =
         add
           ~path:"/data/test-node"
           ~dir_type:Node_data_dir
-          ~linked_services:["node-main"]
+          ~registered_services:["node-main"]
       in
       Alcotest.(check (result unit r_msg)) "Add succeeds" (Ok ()) result ;
 
@@ -82,7 +82,7 @@ let test_add_and_find () =
           Alcotest.(check (list string))
             "Services match"
             ["node-main"]
-            entry.linked_services
+            entry.registered_services
       | None -> Alcotest.fail "Entry not found after add")
 
 let test_json_roundtrip () =
@@ -93,7 +93,7 @@ let test_json_roundtrip () =
       dir_type = Node_data_dir;
       created_at = "2026-01-01T00:00:00Z";
       last_used_at = "2026-01-01T00:00:00Z";
-      linked_services = ["node-main"; "baker-main"];
+      registered_services = ["node-main"; "baker-main"];
     }
   in
   let json = For_test.directory_entry_to_yojson entry in
@@ -104,8 +104,8 @@ let test_json_roundtrip () =
       Alcotest.(check bool) "Dir type" true (entry.dir_type = decoded.dir_type) ;
       Alcotest.(check (list string))
         "Services"
-        entry.linked_services
-        decoded.linked_services
+        entry.registered_services
+        decoded.registered_services
   | Error (`Msg msg) -> Alcotest.fail ("JSON roundtrip failed: " ^ msg)
 
 let test_entry_limiting () =
@@ -114,7 +114,7 @@ let test_entry_limiting () =
       (* Add 15 entries of same type *)
       for i = 1 to 15 do
         let path = Printf.sprintf "/data/node%d" i in
-        let _ = add ~path ~dir_type:Node_data_dir ~linked_services:[] in
+        let _ = add ~path ~dir_type:Node_data_dir ~registered_services:[] in
         ()
       done ;
 
@@ -130,7 +130,7 @@ let test_remove () =
       let path = "/data/removeme" in
 
       (* Add entry *)
-      let _ = add ~path ~dir_type:Client_base_dir ~linked_services:[] in
+      let _ = add ~path ~dir_type:Client_base_dir ~registered_services:[] in
 
       (* Verify it exists *)
       (match find_by_path path with
@@ -147,19 +147,21 @@ let test_remove () =
       | Ok (Some _) -> Alcotest.fail "Entry still exists after removal"
       | Error _ -> Alcotest.fail "Error checking after removal")
 
-let test_update_linked_services () =
+let test_update_registered_services () =
   with_fake_xdg (fun () ->
       let open Directory_registry in
       let path = "/data/node" in
 
       (* Add with initial services *)
       let _ =
-        add ~path ~dir_type:Node_data_dir ~linked_services:["service-1"]
+        add ~path ~dir_type:Node_data_dir ~registered_services:["service-1"]
       in
 
       (* Update services *)
       let result =
-        update_linked_services ~path ~linked_services:["service-1"; "service-2"]
+        update_registered_services
+          ~path
+          ~registered_services:["service-1"; "service-2"]
       in
       Alcotest.(check (result unit r_msg)) "Update succeeds" (Ok ()) result ;
 
@@ -169,7 +171,7 @@ let test_update_linked_services () =
           Alcotest.(check int)
             "Two services"
             2
-            (List.length entry.linked_services)
+            (List.length entry.registered_services)
       | _ -> Alcotest.fail "Entry not found after update")
 
 let test_list_by_type () =
@@ -180,13 +182,16 @@ let test_list_by_type () =
 
       (* Add different types *)
       let _ =
-        add ~path:"/data/node1" ~dir_type:Node_data_dir ~linked_services:[]
+        add ~path:"/data/node1" ~dir_type:Node_data_dir ~registered_services:[]
       in
       let _ =
-        add ~path:"/data/client1" ~dir_type:Client_base_dir ~linked_services:[]
+        add
+          ~path:"/data/client1"
+          ~dir_type:Client_base_dir
+          ~registered_services:[]
       in
       let _ =
-        add ~path:"/data/node2" ~dir_type:Node_data_dir ~linked_services:[]
+        add ~path:"/data/node2" ~dir_type:Node_data_dir ~registered_services:[]
       in
 
       (* List only nodes *)
@@ -279,9 +284,9 @@ let () =
           Alcotest.test_case "entry_limiting" `Quick test_entry_limiting;
           Alcotest.test_case "remove" `Quick test_remove;
           Alcotest.test_case
-            "update_linked_services"
+            "update_registered_services"
             `Quick
-            test_update_linked_services;
+            test_update_registered_services;
           Alcotest.test_case "list_by_type" `Quick test_list_by_type;
         ] );
       ( "keys_reader",

@@ -12,8 +12,8 @@
 
 type base_dir_entry = Directory_registry.directory_entry
 
-let add ~path ~linked_services =
-  Directory_registry.add ~path ~dir_type:Client_base_dir ~linked_services
+let add ~path ~registered_services =
+  Directory_registry.add ~path ~dir_type:Client_base_dir ~registered_services
 
 let find_by_path path = Directory_registry.find_by_path path
 
