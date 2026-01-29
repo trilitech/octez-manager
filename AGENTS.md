@@ -405,6 +405,19 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 Keep the first line under 72 characters.
 
+## Pull Request Requirements
+
+All pull requests must include:
+
+1. **Changelog entry** - Add an entry to `CHANGELOG.md` under the `[Unreleased]` section
+   - Use the appropriate category: `Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, or `Security`
+   - Write user-facing descriptions (what changed, not how it was implemented)
+   - Reference the issue number if applicable
+   - Example: `- Node sync status now displays bootstrap phase (fixes #123)`
+   - Small internal refactorings or documentation-only changes may skip this if they don't affect users
+
+2. **Tests** (for bug fixes) - See "Bug Fix PRs" section below
+
 ## Git Hygiene
 
 - **Always use pull requests** - never push directly to main
