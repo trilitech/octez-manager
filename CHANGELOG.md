@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Add Tallinnnet chain_id for network detection
+- Refresh version display immediately after self-upgrade
+- Register Data cache with Cache registry to fix stale imports after remove
+- Remove non-functional 's' global shortcut (no settings page exists)
+- Wire global shortcuts so '?' opens help modal from any screen
+- Prevent background runner worker starvation from head monitor streams
+- Prevent background runner crash from Lazy.force domain race condition
+- Preserve extra args and filter phantom services during import
+- Only filter managed services that exist in registry
+- Hide external services that were imported with takeover strategy
+- Filter out managed template services from external instances list
+- Parse failed systemd services in external service detector
+
 ## [0.2.0] - 2026-01-23
 
 ### Added
