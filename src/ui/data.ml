@@ -172,6 +172,8 @@ let schedule_refresh ?detail () =
           ~finally:(fun () -> Atomic.set refresh_inflight false)
           (fun () -> ignore (refresh_cache ?detail ())))
 
+let force_refresh () = ignore (refresh_cache ())
+
 let load_service_states ?detail () =
   match detail with
   | Some true ->
