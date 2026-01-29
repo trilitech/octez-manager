@@ -84,7 +84,13 @@ val clear_visibility : unit -> unit
 (** {2 Scheduler Control} *)
 
 (** Start the background polling loop.
-    Only starts once; subsequent calls are no-ops. *)
+    Only starts once; subsequent calls are no-ops.
+
+    On startup:
+    - Runs one tick immediately (synchronously) to populate metrics before
+      the first UI render
+    - Fetches latest Octez version in a separate domain (non-blocking)
+    - Spawns a background domain that ticks every 0.5s *)
 val start : unit -> unit
 
 (** Perform one tick of polling. *)
