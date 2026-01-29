@@ -101,6 +101,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `?` help shortcut now works from all screens
 - Imported services no longer appear in unmanaged instances list
 - Failed systemd services now detected and displayed correctly
+- Nonexistent client config path removed from baker/accuser instance details (fixes #483)
 - Clean exit without hanging on quit
 
 ## [0.1.1] - 2026-01-15
