@@ -128,7 +128,7 @@ jobs:
       - name: Build
         run: |
           eval $(opam env)
-          echo '(-ccopt -static)' > static_flags.sexp
+          echo '(-ccopt "-static -no-pie")' > static_flags.sexp
           dune build --release
 
       - name: Test
@@ -302,7 +302,7 @@ jobs:
       - name: Build static binary
         run: |
           eval $(opam env)
-          echo '(-ccopt -static)' > static_flags.sexp
+          echo '(-ccopt "-static -no-pie")' > static_flags.sexp
           dune build --release
 
       - name: Prepare release artifact
