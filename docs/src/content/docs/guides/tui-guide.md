@@ -94,9 +94,13 @@ To change the Octez version used by a service:
 2. Choose **Update Version** from the menu
 3. Select a new version from the list (managed versions, linked directories, or custom path)
 
+![Update Version](/gifs/update_version.gif)
+
 ## Managing Binaries
 
 Press `b` from the main dashboard to open the **Binaries** page.
+
+![Download Binaries](/gifs/download_binaries.gif)
 
 From here you can:
 - **Download** official Octez releases from GitLab
@@ -155,6 +159,8 @@ To bring an unmanaged systemd service under octez-manager's control:
 2. Press `Enter` to open the action menu
 3. Choose **Import to Managed**
 4. Follow the import wizard
+
+![Import Wizard](/gifs/import_wizard.gif)
 
 The wizard will:
 - Detect the service configuration automatically
