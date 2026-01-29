@@ -101,10 +101,13 @@ _octez-manager() {
   opts_install_accuser=(
     '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
     '--base-dir[Accuser base directory]:DIR:_directories'
+    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
     '--extra-arg[Additional arguments appended to the accuser command.]:ARG:'
     '--instance[Accuser instance name]:NAME:'
     '--no-enable[Disable automatic enable --now]'
     '--node-instance[Existing octez-manager node instance to reuse for endpoint; can also be a custom RPC endpoint]:NODE:'
+    '--octez-version[Use a managed Octez version (e.g., '\''24.1'\'' or '\''latest'\''). Overrides]:VERSION:'
+    '--app-bin-dir.[download VERSION]:Download:_directories'
     '--service-user[System user]:USER:_users'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
@@ -114,6 +117,7 @@ _octez-manager() {
   opts_install_baker=(
     '--app-bin-dir[Directory containing Octez binaries.]:DIR:_directories'
     '--base-dir[Baker base directory for wallets (defaults to an instance-specific path).]:DIR:_directories'
+    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
     '--dal-endpoint[DAL node endpoint (e.g., http://localhost:10732). Use '\''none'\'' to opt-out with --without-dal flag. Defaults to '\''none'\''.]:ENDPOINT:_urls'
     '--delegate[Delegate key hash or alias passed as --delegate.]:KEY:'
     '--extra-arg[Additional arguments appended to the baker command.]:ARG:'
@@ -121,6 +125,8 @@ _octez-manager() {
     '--liquidity-baking-vote[Liquidity baking toggle vote (on, off or pass). Defaults to '\''pass'\''.]:VOTE:->lb-votes'
     '--no-enable[Disable automatic systemctl enable --now]'
     '--node-instance[Existing octez-manager node instance to reuse for data-dir and network. Use '\''octez-manager list'\'' to see available node instances. It can also be a custom RPC endpoint for the baker to contact. Defaults to http://127.0.0.1:8732]:NODE:'
+    '--octez-version[Use a managed Octez version (e.g., '\''24.1'\'' or '\''latest'\''). Overrides]:VERSION:'
+    '--app-bin-dir.[download VERSION]:Download:_directories'
     '--service-user[System user owning the service]:USER:_users'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
@@ -129,12 +135,14 @@ _octez-manager() {
   local -a opts_install_dal_node
   opts_install_dal_node=(
     '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
+    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
     '--data-dir[DAL node data directory]:DIR:_directories'
     '--extra-arg[Additional arguments appended to the dal-node command.]:ARG:'
     '--instance[Instance name used for dal-node.env and systemd units.]:NAME:'
     '--net-addr[DAL node P2P address]:ADDR:'
     '--no-enable[Disable automatic enable --now]'
     '--node-instance[Existing octez-manager node instance to reuse for network resolution. It can also be a custom RPC endpoint for the DAL node to contact.]:NODE:'
+    '--octez-version[Use a managed Octez version. Overrides --app-bin-dir. Download versions with: octez-manager binaries download VERSION]:VERSION:_directories'
     '--rpc-addr[DAL node RPC address]:ADDR:'
     '--service-user[System user]:USER:_users'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
@@ -144,6 +152,7 @@ _octez-manager() {
   local -a opts_install_node
   opts_install_node=(
     '--app-bin-dir[Directory containing Octez binaries (defaults to the directory holding octez-node found in $PATH).]:DIR:_directories'
+    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
     '--data-dir[Custom data directory (defaults to /var/lib/octez/<inst>).]:DIR:_directories'
     '--extra-arg[Additional arguments appended to the node command.]:ARG:'
     '--history-mode[History mode to configure on octez-node (rolling|full|archive).]:MODE:->history-modes'
@@ -152,6 +161,8 @@ _octez-manager() {
     '--net-addr[P2P address]:ADDR:'
     '--network[Chain network (default: shadownet).]:NET:'
     '--no-enable[Disable automatic systemctl enable --now.]'
+    '--octez-version[Use a managed Octez version (e.g., '\''24.1'\'' or '\''latest'\''). Overrides]:VERSION:'
+    '--app-bin-dir.[download VERSION]:Download:_directories'
     '--preserve-data[Preserve existing data in data-dir instead of clearing it. When set, no snapshot will be imported even if --snapshot is specified.]'
     '--rpc-addr[RPC address]:ADDR:'
     '--service-user[System user owning the service.]:USER:_users'
