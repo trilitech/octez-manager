@@ -1,0 +1,101 @@
+#!/bin/bash
+# Test: Import accuser with cascade (imports node dependency)
+# This test validates issue #512 fix: accusers should link to imported nodes
+# instead of trying to query the stopped node's RPC endpoint
+set -euo pipefail
+source /tests/lib.sh
+
+NODE_INSTANCE="cascade-accuser-node"
+ACCUSER_INSTANCE="cascade-accuser"
+NODE_DATA="/var/lib/octez-external/$NODE_INSTANCE"
+ACCUSER_DATA="/var/lib/octez-external/$ACCUSER_INSTANCE"
+NODE_RPC="127.0.0.1:18753"
+
+echo "Test: Cascade import - accuser with node dependency"
+
+# Cleanup
+cleanup_instance "$NODE_INSTANCE" || true
+cleanup_instance "$ACCUSER_INSTANCE" || true
+rm -rf "$NODE_DATA" "$ACCUSER_DATA" || true
+for inst in "$NODE_INSTANCE" "$ACCUSER_INSTANCE"; do
+	for role in node accuser; do
+		systemctl stop "octez-${role}@${inst}.service" 2>/dev/null || true
+		systemctl disable "octez-${role}@${inst}.service" 2>/dev/null || true
+		rm -f "/etc/systemd/system/octez-${role}@${inst}.service" || true
+	done
+done
+systemctl daemon-reload
+
+# Create external node service
+echo "Creating external node service..."
+mkdir -p "$NODE_DATA"
+inject_identity "$NODE_INSTANCE" "$NODE_DATA"
+chown -R tezos:tezos "$NODE_DATA"
+create_external_service "node" "$NODE_INSTANCE" "$NODE_DATA" "$NODE_RPC" "shadownet"
+systemctl enable "octez-node@${NODE_INSTANCE}.service"
+systemctl start "octez-node@${NODE_INSTANCE}.service"
+
+# Wait for node to be ready
+wait_for_node_ready "$NODE_RPC" 30
+
+# Create external accuser service that depends on node
+echo "Creating external accuser service that depends on node..."
+create_external_service "accuser" "$ACCUSER_INSTANCE" "$ACCUSER_DATA" "" "shadownet" "http://$NODE_RPC"
+
+# Import accuser with cascade
+# Prior to fix #512, this would fail because:
+# 1. Cascade import stops the node (Takeover strategy)
+# 2. Accuser import tries to query node RPC to resolve network
+# 3. RPC call fails with "Blank input data"
+# After fix #512, accuser links to imported node and uses its network field
+echo "Importing accuser with cascade (should also import node)..."
+om import "octez-accuser@${ACCUSER_INSTANCE}" --cascade --network shadownet 2>&1 || {
+	# Stop services to avoid long sync
+	systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
+	systemctl stop "octez-accuser@${ACCUSER_INSTANCE}.service" 2>/dev/null || true
+	echo "ERROR: Import command failed"
+	echo "This indicates the accuser could not link to the imported node"
+	om list 2>&1
+	exit 1
+}
+
+# Verify both node and accuser are now managed
+if ! service_is_managed "$NODE_INSTANCE"; then
+	echo "ERROR: Node should be imported as part of cascade"
+	om list 2>&1
+	exit 1
+fi
+
+if ! service_is_managed "$ACCUSER_INSTANCE"; then
+	echo "ERROR: Accuser should be imported"
+	om list 2>&1
+	exit 1
+fi
+
+# Verify the accuser service has depends_on pointing to the node
+echo "Verifying accuser depends_on node..."
+ACCUSER_JSON=$(om show "$ACCUSER_INSTANCE" --json 2>/dev/null || echo "{}")
+DEPENDS_ON=$(echo "$ACCUSER_JSON" | jq -r '.depends_on // empty')
+
+if [ -z "$DEPENDS_ON" ]; then
+	echo "ERROR: Accuser should have depends_on set to node instance"
+	echo "This indicates the fix for #512 did not work correctly"
+	om show "$ACCUSER_INSTANCE"
+	exit 1
+fi
+
+if [ "$DEPENDS_ON" != "$NODE_INSTANCE" ]; then
+	echo "ERROR: Accuser depends_on='$DEPENDS_ON', expected '$NODE_INSTANCE'"
+	om show "$ACCUSER_INSTANCE"
+	exit 1
+fi
+
+echo "✓ Accuser correctly linked to node (depends_on='$DEPENDS_ON')"
+echo "Cascade import successful"
+
+# Cleanup
+cleanup_instance "$ACCUSER_INSTANCE"
+cleanup_instance "$NODE_INSTANCE"
+rm -rf "$NODE_DATA" "$ACCUSER_DATA"
+
+echo "Cascade import accuser test passed"
