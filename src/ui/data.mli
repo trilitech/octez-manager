@@ -27,6 +27,8 @@ end
 
 val load_service_states : ?detail:bool -> unit -> Service_state.t list
 
+val force_refresh : unit -> unit
+
 val summarize : Service_state.t list -> Summary.t
 
 val diagnostics_lines : Service_state.t list -> string list
