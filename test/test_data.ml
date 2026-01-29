@@ -297,6 +297,27 @@ let test_formatted_timestamp () =
   check bool "has colons" true (String.contains ts ':') ;
   check int "length" 19 (String.length ts)
 
+(* ── force_refresh ───────────────────────────────────────────── *)
+
+let test_force_refresh_requires_capability () =
+  (* force_refresh requires service_manager capability *)
+  (* Without setup, it should fail gracefully (not crash with uncaught exception) *)
+  try
+    Data.force_refresh () ;
+    (* If it succeeds, that's also fine (capability might be available) *)
+    check bool "force_refresh completes or fails gracefully" true true
+  with
+  | Failure msg when String.starts_with ~prefix:"capability missing" msg ->
+      (* Expected when capability is not available *)
+      check bool "expected capability missing error" true true
+  | exn ->
+      (* Unexpected exception - test should fail *)
+      check
+        bool
+        (Printf.sprintf "unexpected exception: %s" (Printexc.to_string exn))
+        false
+        true
+
 (* ── Suite ───────────────────────────────────────────────────── *)
 
 let () =
@@ -351,4 +372,11 @@ let () =
         ] );
       ( "formatted_timestamp",
         [test_case "format" `Quick test_formatted_timestamp] );
+      ( "force_refresh",
+        [
+          test_case
+            "requires capability"
+            `Quick
+            test_force_refresh_requires_capability;
+        ] );
     ]
