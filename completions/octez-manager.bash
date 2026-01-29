@@ -67,7 +67,7 @@ _octez_manager() {
       COMPREPLY=( $(compgen -f -- "$cur") )
       return 0
       ;;
-    --tmp-dir)
+    --bin-dir-alias|--app-bin-dir.|--tmp-dir|--octez-version)
       COMPREPLY=( $(compgen -d -- "$cur") )
       return 0
       ;;
@@ -134,28 +134,28 @@ _octez_manager() {
       ;;
     install-accuser)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --base-dir --extra-arg --instance --no-enable --node-instance --service-user --help --version"
+        opts="--app-bin-dir --base-dir --bin-dir-alias --extra-arg --instance --no-enable --node-instance --octez-version --app-bin-dir. --service-user --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-baker)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --base-dir --dal-endpoint --delegate --extra-arg --instance --liquidity-baking-vote --no-enable --node-instance --service-user --help --version"
+        opts="--app-bin-dir --base-dir --bin-dir-alias --dal-endpoint --delegate --extra-arg --instance --liquidity-baking-vote --no-enable --node-instance --octez-version --app-bin-dir. --service-user --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-dal-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg --instance --net-addr --no-enable --node-instance --rpc-addr --service-user --help --version"
+        opts="--app-bin-dir --bin-dir-alias --data-dir --extra-arg --instance --net-addr --no-enable --node-instance --octez-version --rpc-addr --service-user --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
       ;;
     install-node)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --data-dir --extra-arg --history-mode --instance --keep-snapshot --net-addr --network --no-enable --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --tmp-dir --help --version"
+        opts="--app-bin-dir --bin-dir-alias --data-dir --extra-arg --history-mode --instance --keep-snapshot --net-addr --network --no-enable --octez-version --app-bin-dir. --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --tmp-dir --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
