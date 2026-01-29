@@ -34,6 +34,8 @@ let run_unit_action ~verb ~instance action =
       match status with
       | Job_manager.Succeeded ->
           Context.toast_success (Printf.sprintf "%s: %s finished" instance verb) ;
+          (* Force immediate data refresh for removal/purge operations *)
+          if verb = "remove" || verb = "purge" then Data.force_refresh () ;
           Context.mark_instances_dirty ()
       | Job_manager.Failed msg ->
           (* Record failure for display in status line *)
