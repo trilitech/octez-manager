@@ -553,7 +553,7 @@ let confirm_edit_modal svc =
 
 type version_choice =
   | ManagedVersion of string
-  | LinkedDir of string * string (* alias, path *)
+  | RegisteredDir of string * string (* alias, path *)
 
 (** Get all dependent services transitively.
     If A depends on B and B depends on C, updating C should include both A and B.
@@ -722,14 +722,14 @@ and show_rollback_modal ~instance ~svc ~old_bin_source ~new_bin_source ~error:_
   let old_version_str =
     match old_bin_source with
     | Binary_registry.Managed_version v -> "v" ^ v
-    | Binary_registry.Linked_alias a -> a
+    | Binary_registry.Registered_alias a -> a
     | Binary_registry.Raw_path p -> p
   in
 
   let new_version_str =
     match new_bin_source with
     | Binary_registry.Managed_version v -> "v" ^ v
-    | Binary_registry.Linked_alias a -> a
+    | Binary_registry.Registered_alias a -> a
     | Binary_registry.Raw_path p -> p
   in
 
@@ -928,7 +928,7 @@ let update_version_modal svc =
   let current_version_opt =
     match current_bin_source with
     | Binary_registry.Managed_version v -> Some v
-    | Binary_registry.Linked_alias _ | Binary_registry.Raw_path _ ->
+    | Binary_registry.Registered_alias _ | Binary_registry.Raw_path _ ->
         (* Try to get version from the actual binary *)
         let binary_name =
           match svc.Service.role with
@@ -977,30 +977,29 @@ let update_version_modal svc =
     | Error _ -> []
   in
 
-  let linked_dirs =
-    match Binary_registry.load_linked_dirs () with
+  let registered_dirs =
+    match Binary_registry.load_registered_dirs () with
     | Ok dirs ->
         List.map
-          (fun (ld : Binary_registry.linked_dir) ->
-            LinkedDir (ld.alias, ld.path))
+          (fun (ld : Binary_registry.registered_dir) ->
+            RegisteredDir (ld.alias, ld.path))
           dirs
     | Error _ -> []
   in
-
-  let all_choices = managed_versions @ linked_dirs in
+  let all_choices = managed_versions @ registered_dirs in
 
   if all_choices = [] then (
     Modal_helpers.show_error
       ~title:"No Versions Available"
-      "No managed versions or linked directories available. Download a version \
-       or link a directory first." ;
+      "No managed versions or registered directories available. Download a \
+       version or register a directory first." ;
     ())
   else
     let modal_title = Printf.sprintf "Update Version · %s" instance in
 
     let to_string = function
       | ManagedVersion v -> Printf.sprintf "v%s (managed)" v
-      | LinkedDir (alias, path) -> Printf.sprintf "%s (%s)" alias path
+      | RegisteredDir (alias, path) -> Printf.sprintf "%s (%s)" alias path
     in
 
     Modal_helpers.open_choice_modal
@@ -1011,7 +1010,7 @@ let update_version_modal svc =
         let new_bin_source =
           match choice with
           | ManagedVersion v -> Binary_registry.Managed_version v
-          | LinkedDir (alias, _) -> Binary_registry.Linked_alias alias
+          | RegisteredDir (alias, _) -> Binary_registry.Registered_alias alias
         in
 
         (* Check if it's actually different *)
@@ -1022,7 +1021,7 @@ let update_version_modal svc =
           let new_version_str =
             match new_bin_source with
             | Binary_registry.Managed_version v -> "v" ^ v
-            | Binary_registry.Linked_alias a -> a
+            | Binary_registry.Registered_alias a -> a
             | Binary_registry.Raw_path p -> p
           in
 

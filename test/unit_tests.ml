@@ -3633,9 +3633,9 @@ let binary_registry_bin_source_to_string () =
        (Binary_registry.Managed_version "24.0")) ;
   Alcotest.(check string)
     "linked"
-    "dev-build (linked)"
+    "dev-build (registered)"
     (Binary_registry.bin_source_to_string
-       (Binary_registry.Linked_alias "dev-build")) ;
+       (Binary_registry.Registered_alias "dev-build")) ;
   Alcotest.(check string)
     "raw"
     "/usr/local/bin"
@@ -3650,7 +3650,7 @@ let binary_registry_bin_source_roundtrip () =
     | Error (`Msg e) -> Alcotest.fail e
   in
   test_roundtrip (Binary_registry.Managed_version "24.0") ;
-  test_roundtrip (Binary_registry.Linked_alias "dev-build") ;
+  test_roundtrip (Binary_registry.Registered_alias "dev-build") ;
   test_roundtrip (Binary_registry.Raw_path "/usr/local/bin")
 
 let binary_registry_bin_source_legacy () =
@@ -3664,50 +3664,53 @@ let binary_registry_bin_source_legacy () =
         bs
   | Error (`Msg e) -> Alcotest.fail e
 
-let binary_registry_linked_dirs_crud () =
+let binary_registry_registered_dirs_crud () =
   with_fake_xdg (fun xdg ->
       (* Create a test directory for linking *)
       let test_dir = Filename.concat xdg.data "test-linked-dir" in
       Unix.mkdir test_dir 0o755 ;
       (* Initially empty *)
-      let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
+      let dirs = expect_ok (Binary_registry.load_registered_dirs ()) in
       Alcotest.(check int) "initial empty" 0 (List.length dirs) ;
       (* Add a linked directory *)
-      expect_ok (Binary_registry.add_linked_dir ~alias:"test" ~path:test_dir) ;
-      let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
+      expect_ok
+        (Binary_registry.add_registered_dir ~alias:"test" ~path:test_dir) ;
+      let dirs = expect_ok (Binary_registry.load_registered_dirs ()) in
       Alcotest.(check int) "after add" 1 (List.length dirs) ;
       let ld = List.hd dirs in
       Alcotest.(check string) "alias" "test" ld.alias ;
       Alcotest.(check string) "path" test_dir ld.path ;
       (* Find by alias *)
-      let found = expect_ok (Binary_registry.find_linked_dir "test") in
+      let found = expect_ok (Binary_registry.find_registered_dir "test") in
       Alcotest.(check bool) "found" true (Option.is_some found) ;
       let not_found =
-        expect_ok (Binary_registry.find_linked_dir "nonexistent")
+        expect_ok (Binary_registry.find_registered_dir "nonexistent")
       in
       Alcotest.(check bool) "not found" true (Option.is_none not_found) ;
       (* Add with nonexistent path should fail *)
       (match
-         Binary_registry.add_linked_dir ~alias:"bad" ~path:"/nonexistent"
+         Binary_registry.add_registered_dir ~alias:"bad" ~path:"/nonexistent"
        with
       | Error _ -> ()
       | Ok () -> Alcotest.fail "add with nonexistent path should fail") ;
       (* Add duplicate should fail *)
-      (match Binary_registry.add_linked_dir ~alias:"test" ~path:test_dir with
+      (match
+         Binary_registry.add_registered_dir ~alias:"test" ~path:test_dir
+       with
       | Error _ -> ()
       | Ok () -> Alcotest.fail "duplicate add should fail") ;
       (* Rename *)
       expect_ok
-        (Binary_registry.rename_linked_dir
+        (Binary_registry.rename_registered_dir
            ~old_alias:"test"
            ~new_alias:"renamed") ;
-      let found = expect_ok (Binary_registry.find_linked_dir "renamed") in
+      let found = expect_ok (Binary_registry.find_registered_dir "renamed") in
       Alcotest.(check bool) "renamed found" true (Option.is_some found) ;
-      let old = expect_ok (Binary_registry.find_linked_dir "test") in
+      let old = expect_ok (Binary_registry.find_registered_dir "test") in
       Alcotest.(check bool) "old not found" true (Option.is_none old) ;
       (* Remove *)
-      expect_ok (Binary_registry.remove_linked_dir "renamed") ;
-      let dirs = expect_ok (Binary_registry.load_linked_dirs ()) in
+      expect_ok (Binary_registry.remove_registered_dir "renamed") ;
+      let dirs = expect_ok (Binary_registry.load_registered_dirs ()) in
       Alcotest.(check int) "after remove" 0 (List.length dirs))
 
 let binary_registry_managed_versions () =
@@ -3784,17 +3787,18 @@ let binary_registry_path_resolution () =
         | Ok _ -> Alcotest.fail "should fail for uninstalled"
         | Error _ -> ()) ;
         (* Test linked alias *)
-        expect_ok (Binary_registry.add_linked_dir ~alias:"test" ~path:v24_dir) ;
+        expect_ok
+          (Binary_registry.add_registered_dir ~alias:"test" ~path:v24_dir) ;
         (match
            Binary_registry.resolve_bin_source
-             (Binary_registry.Linked_alias "test")
+             (Binary_registry.Registered_alias "test")
          with
         | Ok path -> Alcotest.(check string) "linked path" v24_dir path
         | Error (`Msg e) -> Alcotest.fail e) ;
         (* Test unknown alias *)
         (match
            Binary_registry.resolve_bin_source
-             (Binary_registry.Linked_alias "unknown")
+             (Binary_registry.Registered_alias "unknown")
          with
         | Ok _ -> Alcotest.fail "should fail for unknown alias"
         | Error _ -> ()) ;
@@ -5643,7 +5647,7 @@ let () =
           Alcotest.test_case
             "linked dirs CRUD"
             `Quick
-            binary_registry_linked_dirs_crud;
+            binary_registry_registered_dirs_crud;
           Alcotest.test_case
             "managed versions"
             `Quick
