@@ -153,8 +153,6 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
         | Error _ -> Ok () (* Error finding parent, skip *))
     | None -> Ok ()
   in
-  let* services = Service_registry.list () in
-  let* () = Systemd.sync_logrotate (logrotate_specs_of services) in
   let* () =
     if request.auto_enable then
       Systemd.enable
