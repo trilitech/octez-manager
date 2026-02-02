@@ -9,6 +9,7 @@ module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 module Vsection = Miaou_widgets_layout.Vsection
 module Widgets = Miaou_widgets_display.Widgets
+module Pager = Miaou_widgets_display.Pager_widget
 module Service_state = Data.Service_state
 
 let name = "rpc_browser"
@@ -116,23 +117,26 @@ let keymap _ps =
     };
   ]
 
-let view ps ~focus:_ ~size =
+let view ps ~focus ~size =
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
   let rows = size.LTerm_geom.rows in
-  let lines =
+  let body =
     match s.State.mode with
-    | State.List _ -> Rpc_browser_render_list.render ~state:s ~cols
-    | State.Result _ -> Rpc_browser_render_result.render ~state:s ~cols ~rows
+    | State.List _ ->
+        let lines = Rpc_browser_render_list.render ~state:s ~cols in
+        String.concat "\n" lines
+    | State.Result _ ->
+        let pager_focus = focus && s.State.focus = State.FocusPager in
+        Rpc_browser_render_result.render ~state:s ~cols ~rows ~focus:pager_focus
   in
-  let body = String.concat "\n" lines in
   Vsection.render ~size ~header:[] ~content_footer:[] ~child:(fun _ -> body)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
   ps
 
-let handle_key ps key ~size:_ =
+let handle_key ps key ~size =
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
@@ -177,49 +181,45 @@ let handle_key ps key ~size:_ =
               Navigation.update (fun _ -> new_state) ps
           | _ -> ps)
     | State.Result _ -> (
-        match Keys.of_string key with
-        | Some Keys.Escape -> back ps
-        | Some Keys.Up | Some (Keys.Char "k") ->
-            let new_state = State.scroll (-1) s in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | Some Keys.Down | Some (Keys.Char "j") ->
-            let new_state = State.scroll 1 s in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | Some Keys.PageUp ->
-            let new_state = State.scroll (-10) s in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | Some Keys.PageDown ->
-            let new_state = State.scroll 10 s in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | Some (Keys.Char "g") ->
-            let new_state =
-              match s.State.mode with
-              | State.Result r ->
-                  {s with mode = State.Result {r with scroll_offset = 0}}
-              | _ -> s
-            in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | Some (Keys.Char "G") ->
-            let new_state =
-              match s.State.mode with
-              | State.Result r ->
-                  let lines = String.split_on_char '\n' r.body in
-                  let total = List.length lines in
-                  {
-                    s with
-                    mode =
-                      State.Result {r with scroll_offset = max 0 (total - 20)};
-                  }
-              | _ -> s
-            in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | _ -> ps)
+        (* Handle save key *)
+        if key = "s" then (
+          match s.State.mode with
+          | State.Result {raw_body; request; _} ->
+              (* Save to file *)
+              let filename =
+                let base =
+                  request
+                  |> String.split_on_char '/'
+                  |> List.filter (fun s -> s <> "")
+                  |> String.concat "_"
+                in
+                Printf.sprintf "rpc_%s_%d.json" base (int_of_float (Unix.time ()))
+              in
+              (try
+                 let oc = open_out filename in
+                 output_string oc raw_body ;
+                 close_out oc ;
+                 let new_state = State.set_error (Printf.sprintf "Saved to %s" filename) s in
+                 state_ref := Some new_state ;
+                 Navigation.update (fun _ -> new_state) ps
+               with exn ->
+                 let new_state = State.set_error (Printf.sprintf "Save failed: %s" (Printexc.to_string exn)) s in
+                 state_ref := Some new_state ;
+                 Navigation.update (fun _ -> new_state) ps)
+          | _ -> ps)
+        else
+          match Keys.of_string key with
+          | Some Keys.Escape -> back ps
+          | _ ->
+              (* Delegate to pager for all other keys *)
+              (match State.get_pager s with
+              | Some pager ->
+                  let win = size.LTerm_geom.rows - 3 in
+                  let pager', _consumed = Pager.handle_key pager ~key ~win in
+                  let new_state = State.set_pager pager' s in
+                  state_ref := Some new_state ;
+                  Navigation.update (fun _ -> new_state) ps
+              | None -> ps))
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
