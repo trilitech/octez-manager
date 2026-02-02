@@ -328,7 +328,7 @@ let remove_version version =
                   Context.toast_error (Printf.sprintf "Remove failed: %s" msg)))
       ()
 
-let unlink_directory ld =
+let unregister_directory ld =
   let count =
     count_instances_using
       (Binary_registry.Registered_alias ld.Binary_registry.alias)
@@ -337,24 +337,26 @@ let unlink_directory ld =
     Modal_helpers.show_error
       ~title:"Directory In Use"
       (Printf.sprintf
-         "Linked directory '%s' is used by %d instance(s). Cannot unlink."
+         "Registered directory '%s' is used by %d instance(s). Cannot \
+          unregister."
          ld.alias
          count)
   else
     Modal_helpers.confirm_modal
-      ~title:(Printf.sprintf "Unlink directory '%s'?" ld.alias)
+      ~title:(Printf.sprintf "Unregister directory '%s'?" ld.alias)
       ~message:""
       ~on_result:(fun confirmed ->
         if confirmed then
-          (* Run unlink in background to avoid blocking UI *)
+          (* Run unregister in background to avoid blocking UI *)
           Background_runner.enqueue (fun () ->
               match Binary_registry.remove_registered_dir ld.alias with
               | Ok () ->
                   Context.toast_success
-                    (Printf.sprintf "Unlinked '%s'" ld.alias) ;
+                    (Printf.sprintf "Unregistered '%s'" ld.alias) ;
                   Context.mark_instances_dirty ()
               | Error (`Msg msg) ->
-                  Context.toast_error (Printf.sprintf "Unlink failed: %s" msg)))
+                  Context.toast_error
+                    (Printf.sprintf "Unregister failed: %s" msg)))
       ()
 
 let download_version (version_info : Binary_downloader.version_info) =
@@ -409,7 +411,7 @@ let download_version (version_info : Binary_downloader.version_info) =
           Context.multi_progress_finish () ;
           Context.toast_error (Printf.sprintf "Download failed: %s" msg))
 
-let link_directory () =
+let register_directory () =
   Modal_helpers.open_file_browser_modal
     ~dirs_only:true
     ~require_writable:false
@@ -417,9 +419,10 @@ let link_directory () =
       let alias = Filename.basename path in
       match Binary_registry.add_registered_dir ~alias ~path with
       | Ok () ->
-          Context.toast_success (Printf.sprintf "Linked '%s'" alias) ;
+          Context.toast_success (Printf.sprintf "Registered '%s'" alias) ;
           Context.mark_instances_dirty ()
-      | Error (`Msg msg) -> Modal_helpers.show_error ~title:"Link Failed" msg)
+      | Error (`Msg msg) ->
+          Modal_helpers.show_error ~title:"Register Failed" msg)
     ()
 
 let prune_unused s =
@@ -501,11 +504,11 @@ let handle_action s =
           (* If has instances, toggle expansion *)
           toggle_registered_expansion s ld.Binary_registry.alias
         else (
-          (* If unused, allow unlinking *)
-          unlink_directory ld ;
+          (* If unused, allow unregistering *)
+          unregister_directory ld ;
           s)
     | RegisterAction ->
-        link_directory () ;
+        register_directory () ;
         s
     | AvailableVersion vi ->
         download_version vi ;
@@ -548,9 +551,9 @@ let view ps ~focus:_ ~size:_ =
   | Some RegisterAction ->
       Miaou.Core.Help_hint.set
         (Some
-           "Linked directories let you use Octez binaries from other locations \
-            (dev builds, system installs, custom versions). Press Enter to \
-            browse for a directory.")
+           "Registered directories let you use Octez binaries from other \
+            locations (dev builds, system installs, custom versions). Press \
+            Enter to browse for a directory.")
   | Some (RegisteredDir (_, count)) ->
       if count > 0 then
         Miaou.Core.Help_hint.set
@@ -559,7 +562,7 @@ let view ps ~focus:_ ~size:_ =
               Press ? for help.")
       else
         Miaou.Core.Help_hint.set
-          (Some "Press Enter to unlink this directory. Press ? for help.")
+          (Some "Press Enter to unregister this directory. Press ? for help.")
   | Some (ManagedVersion (_, _, count)) ->
       if count > 0 then
         Miaou.Core.Help_hint.set
@@ -629,13 +632,13 @@ let view ps ~focus:_ ~size:_ =
       s.managed_versions ;
 
   add "" ;
-  add (Widgets.fg 13 (Widgets.bold "━━━ Linked Directories ━━━")) ;
+  add (Widgets.fg 13 (Widgets.bold "━━━ Registered Directories ━━━")) ;
   add
     (Widgets.dim
-       "Link to Octez binaries from development builds or custom locations") ;
+       "Register Octez binaries from development builds or custom locations") ;
   add "" ;
 
-  if s.registered_dirs = [] then add (Widgets.dim "  No linked directories")
+  if s.registered_dirs = [] then add (Widgets.dim "  No registered directories")
   else
     List.iter
       (fun (ld, count) ->
@@ -680,7 +683,7 @@ let view ps ~focus:_ ~size:_ =
             instances)
       s.registered_dirs ;
 
-  (* Add link directory button *)
+  (* Add register directory button *)
   let link_action_selected =
     match List.nth_opt s.items s.selected with
     | Some RegisterAction -> true
@@ -688,7 +691,7 @@ let view ps ~focus:_ ~size:_ =
   in
   let link_button =
     let prefix = if link_action_selected then "➤ " else "  " in
-    Printf.sprintf "%s%s" prefix (Widgets.fg 10 "[+ Link a directory...]")
+    Printf.sprintf "%s%s" prefix (Widgets.fg 10 "[+ Register a directory...]")
   in
   add (if link_action_selected then Widgets.bold link_button else link_button) ;
 
@@ -788,7 +791,7 @@ let handle_key ps key ~size:_ =
             s)
           ps
     | Some (Keys.Char "l") ->
-        link_directory () ;
+        register_directory () ;
         ps
     | Some (Keys.Char "p") -> Navigation.update prune_unused ps
     | Some Keys.Enter -> Navigation.update handle_action ps
@@ -821,9 +824,9 @@ let keymap _ =
     kb
       "l"
       (fun ps ->
-        link_directory () ;
+        register_directory () ;
         ps)
-      "Link directory";
+      "Register directory";
     kb "p" (fun ps -> Navigation.update prune_unused ps) "Prune unused";
     kb "Enter" (fun ps -> Navigation.update handle_action ps) "Action";
     kb
@@ -843,7 +846,7 @@ let keymap _ =
 let header =
   [
     Widgets.title_highlight " Binaries Management ";
-    Widgets.dim "Manage Octez binary versions and linked directories";
+    Widgets.dim "Manage Octez binary versions and registered directories";
   ]
 
 let footer = []

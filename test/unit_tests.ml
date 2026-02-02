@@ -3632,7 +3632,7 @@ let binary_registry_bin_source_to_string () =
     (Binary_registry.bin_source_to_string
        (Binary_registry.Managed_version "24.0")) ;
   Alcotest.(check string)
-    "linked"
+    "registered"
     "dev-build (registered)"
     (Binary_registry.bin_source_to_string
        (Binary_registry.Registered_alias "dev-build")) ;
@@ -3666,13 +3666,13 @@ let binary_registry_bin_source_legacy () =
 
 let binary_registry_registered_dirs_crud () =
   with_fake_xdg (fun xdg ->
-      (* Create a test directory for linking *)
-      let test_dir = Filename.concat xdg.data "test-linked-dir" in
+      (* Create a test directory for registering *)
+      let test_dir = Filename.concat xdg.data "test-registered-dir" in
       Unix.mkdir test_dir 0o755 ;
       (* Initially empty *)
       let dirs = expect_ok (Binary_registry.load_registered_dirs ()) in
       Alcotest.(check int) "initial empty" 0 (List.length dirs) ;
-      (* Add a linked directory *)
+      (* Add a registered directory *)
       expect_ok
         (Binary_registry.add_registered_dir ~alias:"test" ~path:test_dir) ;
       let dirs = expect_ok (Binary_registry.load_registered_dirs ()) in
@@ -3786,14 +3786,14 @@ let binary_registry_path_resolution () =
          with
         | Ok _ -> Alcotest.fail "should fail for uninstalled"
         | Error _ -> ()) ;
-        (* Test linked alias *)
+        (* Test registered alias *)
         expect_ok
           (Binary_registry.add_registered_dir ~alias:"test" ~path:v24_dir) ;
         (match
            Binary_registry.resolve_bin_source
              (Binary_registry.Registered_alias "test")
          with
-        | Ok path -> Alcotest.(check string) "linked path" v24_dir path
+        | Ok path -> Alcotest.(check string) "registered path" v24_dir path
         | Error (`Msg e) -> Alcotest.fail e) ;
         (* Test unknown alias *)
         (match
@@ -5645,7 +5645,7 @@ let () =
             `Quick
             binary_registry_bin_source_legacy;
           Alcotest.test_case
-            "linked dirs CRUD"
+            "registered dirs CRUD"
             `Quick
             binary_registry_registered_dirs_crud;
           Alcotest.test_case
