@@ -99,8 +99,8 @@ let test_render_help () =
 
 let test_render_list_mode () =
   let state = State.init ~instances:[] in
-  let lines = Render.render ~state ~cols:80 ~rows:24 in
-  Alcotest.(check bool) "has lines" true (List.length lines >= 1)
+  let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
+  Alcotest.(check bool) "has content" true (String.length result >= 1)
 
 let test_render_result_mode () =
   let state = State.init ~instances:[] in
@@ -108,8 +108,8 @@ let test_render_result_mode () =
   let state =
     State.set_result ~body:"{\"version\": \"1.0\"}" ~raw_body:"{}" state
   in
-  let lines = Render.render ~state ~cols:80 ~rows:24 in
-  Alcotest.(check bool) "has lines" true (List.length lines > 2)
+  let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
+  Alcotest.(check bool) "has content" true (String.length result > 2)
 
 let test_render_result_with_scroll () =
   let state = State.init ~instances:[] in
@@ -119,8 +119,8 @@ let test_render_result_with_scroll () =
   in
   let state = State.set_result ~body:long_body ~raw_body:long_body state in
   let state = State.scroll 10 state in
-  let lines = Render.render ~state ~cols:80 ~rows:24 in
-  Alcotest.(check bool) "has lines" true (List.length lines > 0)
+  let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
 
 let test_render_result_with_error () =
   let state = State.init ~instances:[] in
@@ -129,8 +129,8 @@ let test_render_result_with_error () =
     State.set_result ~body:"error data" ~raw_body:"error data" state
   in
   let state = State.set_error "Parse error" state in
-  let lines = Render.render ~state ~cols:80 ~rows:24 in
-  Alcotest.(check bool) "has lines" true (List.length lines > 0)
+  let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
 (* Test Runner                                                   *)
