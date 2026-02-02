@@ -44,44 +44,56 @@ let visible_length s =
   in
   loop 0 0
 
-let render_pager_header ~slot ~is_focused =
-  let id_marker =
-    if is_focused then Printf.sprintf ">>>[%d]<<<" slot.State.id
-    else Printf.sprintf "[%d]" slot.State.id
-  in
-  let id_str =
-    if is_focused then Widgets.bold (Widgets.fg 14 id_marker)
-    else Widgets.dim id_marker
-  in
-  let request_str =
-    if slot.State.request = "" then Widgets.dim "(empty)"
-    else
-      let short_req =
-        if String.length slot.State.request > 40 then
-          String.sub slot.State.request 0 37 ^ "..."
-        else slot.State.request
-      in
-      if is_focused then Widgets.bold (Widgets.fg 14 short_req)
-      else Widgets.dim short_req
-  in
-  let time_str =
-    match slot.State.response_time_ms with
-    | Some t ->
-        if is_focused then Widgets.fg 14 (Printf.sprintf " [%.0fms]" t)
-        else Widgets.dim (Printf.sprintf " [%.0fms]" t)
-    | None -> ""
-  in
-  let size_str =
-    match slot.State.response_size with
-    | Some s when s >= 1024 ->
-        if is_focused then Widgets.fg 14 (Printf.sprintf " %dKB" (s / 1024))
-        else Widgets.dim (Printf.sprintf " %dKB" (s / 1024))
-    | Some s ->
-        if is_focused then Widgets.fg 14 (Printf.sprintf " %dB" s)
-        else Widgets.dim (Printf.sprintf " %dB" s)
-    | None -> ""
-  in
-  Printf.sprintf "%s GET %s%s%s" id_str request_str time_str size_str
+let render_pager_header ~slot ~is_focused ~is_target =
+  if is_focused || is_target then
+    (* For focused/target pagers, return plain text - styling applied externally *)
+    let marker =
+      if is_focused then Printf.sprintf ">>>[%d]<<<" slot.State.id
+      else Printf.sprintf ">[%d]<" slot.State.id
+    in
+    let request_str =
+      if slot.State.request = "" then "(empty)"
+      else if String.length slot.State.request > 40 then
+        String.sub slot.State.request 0 37 ^ "..."
+      else slot.State.request
+    in
+    let time_str =
+      match slot.State.response_time_ms with
+      | Some t -> Printf.sprintf " [%.0fms]" t
+      | None -> ""
+    in
+    let size_str =
+      match slot.State.response_size with
+      | Some s when s >= 1024 -> Printf.sprintf " %dKB" (s / 1024)
+      | Some s -> Printf.sprintf " %dB" s
+      | None -> ""
+    in
+    Printf.sprintf "%s GET %s%s%s" marker request_str time_str size_str
+  else
+    let id_marker = Printf.sprintf "[%d]" slot.State.id in
+    let id_str = Widgets.dim id_marker in
+    let request_str =
+      if slot.State.request = "" then Widgets.dim "(empty)"
+      else
+        let short_req =
+          if String.length slot.State.request > 40 then
+            String.sub slot.State.request 0 37 ^ "..."
+          else slot.State.request
+        in
+        Widgets.dim short_req
+    in
+    let time_str =
+      match slot.State.response_time_ms with
+      | Some t -> Widgets.dim (Printf.sprintf " [%.0fms]" t)
+      | None -> ""
+    in
+    let size_str =
+      match slot.State.response_size with
+      | Some s when s >= 1024 -> Widgets.dim (Printf.sprintf " %dKB" (s / 1024))
+      | Some s -> Widgets.dim (Printf.sprintf " %dB" s)
+      | None -> ""
+    in
+    Printf.sprintf "%s GET %s%s%s" id_str request_str time_str size_str
 
 let render_loading () =
   let spinner = Context.render_spinner "" in
@@ -92,29 +104,45 @@ let render_error msg = Widgets.red ("Error: " ^ msg)
 let render_help ~num_pagers =
   let split_hint = if num_pagers < 10 then "S: split  " else "" in
   let close_hint = if num_pagers > 1 then "x: close  " else "" in
+  let pager_hint = if num_pagers > 1 then "C-x N: pager  " else "" in
   Widgets.dim
     (Printf.sprintf
-       "?: help  %s%s0-9: focus  Space: fold  f/F: fold/unfold  s: save  Esc: \
-        back"
+       "?: help  %s%s%s1-5: shortcut  Space: fold  f/F: fold  s: save  Esc: back"
        split_hint
-       close_hint)
+       close_hint
+       pager_hint)
 
 (** Render using pager widget when available *)
 let render_with_pager ~pager ~cols ~rows ~focus =
   Pager.render ~cols ~win:rows pager ~focus
 
 (** Render a single pager slot with consistent width *)
-let render_single_pager ~slot ~cols ~rows ~is_focused =
-  let header = render_pager_header ~slot ~is_focused in
-  (* Pad header to full width *)
+let render_single_pager ~slot ~cols ~rows ~is_focused ~is_target =
+  let header = render_pager_header ~slot ~is_focused ~is_target in
+  (* Pad header to full width - use background color for focused pager *)
   let header_visible_len = visible_length header in
   let header_padded =
-    if header_visible_len >= cols then header
+    if is_focused then
+      let padding =
+        if header_visible_len >= cols then ""
+        else String.make (cols - header_visible_len) ' '
+      in
+      (* White text on blue background for focused pager header *)
+      Widgets.bg 33 (Widgets.fg 15 (header ^ padding))
+    else if is_target then
+      (* Yellow background for target pager when browser is focused *)
+      let padding =
+        if header_visible_len >= cols then ""
+        else String.make (cols - header_visible_len) ' '
+      in
+      Widgets.bg 136 (Widgets.fg 0 (header ^ padding))
+    else if header_visible_len >= cols then header
     else header ^ String.make (cols - header_visible_len) ' '
   in
-  (* Use bold bright border for focused pager, dim for unfocused *)
+  (* Use background color for focused/target pager border, dim for unfocused *)
   let border =
-    if is_focused then Widgets.bold (Widgets.fg 14 (String.make cols '='))
+    if is_focused then Widgets.bg 33 (String.make cols ' ')
+    else if is_target then Widgets.bg 136 (String.make cols ' ')
     else Widgets.dim (String.make cols '-')
   in
   let chrome_lines = 2 in
@@ -293,7 +321,7 @@ let split_lines_padded s ~target_lines ~width =
     padded
 
 (** Render a row of pagers horizontally (side-by-side) *)
-let render_pager_row ~pagers ~focused_id ~pager_width ~pager_height ~focus
+let render_pager_row ~pagers ~focused_id ~target_id ~pager_width ~pager_height ~focus
     ~(result_focus : State.result_focus) =
   if pagers = [] then ""
   else
@@ -306,11 +334,16 @@ let render_pager_row ~pagers ~focused_id ~pager_width ~pager_height ~focus
             focus && slot.State.id = focused_id
             && match result_focus with State.FocusPager _ -> true | _ -> false
           in
+          let is_target =
+            (not is_focused) && slot.State.id = target_id
+            && match result_focus with State.FocusBrowser -> true | _ -> false
+          in
           render_single_pager
             ~slot
             ~cols:(pager_width - 1)
             ~rows:pager_height
-            ~is_focused)
+            ~is_focused
+            ~is_target)
         pagers
     in
     (* Split each render into lines and pad/truncate to exact dimensions *)
@@ -334,7 +367,7 @@ let render_pager_row ~pagers ~focused_id ~pager_width ~pager_height ~focus
     String.concat "\n" combined_lines
 
 (** Render pagers in a grid layout *)
-let render_grid ~pagers ~focused_id ~cols ~rows ~grid_cols ~grid_rows ~focus
+let render_grid ~pagers ~focused_id ~target_id ~cols ~rows ~grid_cols ~grid_rows ~focus
     ~(result_focus : State.result_focus) =
   let pager_width = cols / grid_cols in
   let pager_height = rows / grid_rows in
@@ -356,6 +389,7 @@ let render_grid ~pagers ~focused_id ~cols ~rows ~grid_cols ~grid_rows ~focus
           render_pager_row
             ~pagers:row_pagers
             ~focused_id
+            ~target_id
             ~pager_width
             ~pager_height
             ~focus
@@ -383,12 +417,14 @@ let render_pager_tabs ~pagers ~focused_id =
 let render ~state ~cols ~rows ~focus =
   match state.State.mode with
   | State.List _ -> Widgets.dim "(list mode - use list renderer)"
-  | State.Result {pagers; focus = result_focus; _} ->
+  | State.Result {pagers; focus = result_focus; last_pager_id} ->
       let focused_id =
         match result_focus with
         | State.FocusPager id -> id
         | State.FocusBrowser -> 0
       in
+      (* target_id is the pager that will receive next RPC result *)
+      let target_id = last_pager_id in
       let num_pagers = List.length pagers in
       let help = render_help ~num_pagers in
       let error_line =
@@ -406,8 +442,12 @@ let render ~state ~cols ~rows ~focus =
           focus
           && match result_focus with State.FocusPager _ -> true | _ -> false
         in
+        let is_target =
+          (not is_focused) && slot.State.id = target_id
+          && match result_focus with State.FocusBrowser -> true | _ -> false
+        in
         let content =
-          render_single_pager ~slot ~cols ~rows:(rows - 2) ~is_focused
+          render_single_pager ~slot ~cols ~rows:(rows - 2) ~is_focused ~is_target
         in
         Printf.sprintf "%s\n%s%s" content error_line help
       else
@@ -426,6 +466,7 @@ let render ~state ~cols ~rows ~focus =
           render_grid
             ~pagers:visible
             ~focused_id
+            ~target_id
             ~cols
             ~rows:(available_rows - 1)
             ~grid_cols

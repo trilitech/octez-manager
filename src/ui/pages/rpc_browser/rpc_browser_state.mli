@@ -12,7 +12,11 @@
 open Octez_manager_lib
 
 (** Entry kind for navigation list. *)
-type entry_kind = Get | Sub | Dyn of string
+type entry_kind =
+  | Get
+  | Sub
+  | Dyn of string  (** Dynamic segment to prompt for *)
+  | DynValue of (string * string)  (** Recent dynamic value: (typ, value) *)
 
 (** A navigation entry. *)
 type entry = {name : string; kind : entry_kind}
@@ -56,6 +60,13 @@ type dynamic_value = {
   timestamp : float;  (** When it was used *)
 }
 
+(** Recent path entry for LRU shortcuts. *)
+type recent_path = {
+  rp_path : string;  (** RPC path e.g., "/chains/main/blocks/head" *)
+  rp_desc : string;  (** Description for display *)
+  rp_timestamp : float;  (** When it was used *)
+}
+
 (** OpenAPI loading status. *)
 type openapi_status = Loading | Ready | Error of string | NotAvailable
 
@@ -69,6 +80,7 @@ type state = {
   error : string option;  (** Last error message *)
   dynamic_history : dynamic_value list;
       (** Recent user-provided dynamic values *)
+  recent_paths : recent_path list;  (** LRU list of recently used RPC paths *)
   cached_entries : entry list;  (** Cached entries for side-by-side display *)
   cached_cursor : int;  (** Cached cursor position for side-by-side display *)
 }
@@ -278,3 +290,19 @@ val set_cached_entries : entry list -> state -> state
 
 (** Navigate up one level while staying in Result mode. *)
 val navigate_cached_up : state -> state
+
+(** {1 Recent Paths LRU} *)
+
+(** Add a path to the recent paths LRU list.
+    @param path The RPC path (e.g., "/chains/main/blocks/head")
+    @param desc Description for display *)
+val add_recent_path : path:string -> desc:string -> state -> state
+
+(** Get recent paths sorted by timestamp (most recent first). *)
+val get_recent_paths : state -> recent_path list
+
+(** Load recent paths from disk. *)
+val load_recent_paths : unit -> recent_path list
+
+(** Save recent paths to disk. *)
+val save_recent_paths : recent_path list -> unit
