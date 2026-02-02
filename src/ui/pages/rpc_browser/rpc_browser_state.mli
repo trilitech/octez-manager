@@ -174,8 +174,8 @@ val save_dynamic_history : dynamic_value list -> unit
 
 (** {1 JSON Folding} *)
 
-(** Toggle fold at current pager line.
-    @param line Current line in pager view *)
+(** Toggle fold at a specific line in the JSON view.
+    @param line Line number to toggle fold at *)
 val toggle_fold : line:int -> state -> state
 
 (** Unfold all JSON sections. *)
