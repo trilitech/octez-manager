@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **RPC Browser**: Interactive RPC endpoint explorer accessible via `r` key
+  - Navigate endpoint tree with cursor keys and Enter
+  - JSON syntax highlighting for responses
+  - Response time and size displayed in result header
+  - Quick access shortcuts (1-5) for common endpoints
+  - Smart defaults for dynamic segments (chain_id → "main", block_id → "head")
+  - Instance selection via Tab to query any managed node
+  - Browse RPC action in node context menu
+
 ## [0.2.0] - 2026-01-29
 
 ### Added
