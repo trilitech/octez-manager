@@ -25,13 +25,7 @@ type t = {
   raw_json : string;
   folded : (node_id, bool) Hashtbl.t;
   mutable line_to_node : (int * node_id) list;  (* line -> node_id for foldable lines *)
-  next_id : int ref;
 }
-
-let new_id t =
-  let id = !(t.next_id) in
-  t.next_id := id + 1 ;
-  id
 
 (* Convert Yojson to our node type, assigning IDs *)
 let rec json_to_node next_id (json : Yojson.Safe.t) : json_node =
@@ -50,15 +44,6 @@ let rec json_to_node next_id (json : Yojson.Safe.t) : json_node =
       let id = !next_id in
       next_id := !next_id + 1 ;
       JObject {id; fields = List.map (fun (k, v) -> (k, json_to_node next_id v)) fields}
-  | `Tuple items ->
-      let id = !next_id in
-      next_id := !next_id + 1 ;
-      JArray {id; items = List.map (json_to_node next_id) items}
-  | `Variant (name, opt) ->
-      let id = !next_id in
-      next_id := !next_id + 1 ;
-      let items = match opt with None -> [] | Some v -> [json_to_node next_id v] in
-      JObject {id; fields = [(name, JArray {id = !next_id; items})]}
 
 let of_json json =
   let next_id = ref 0 in
@@ -85,7 +70,6 @@ let of_json json =
     raw_json = Yojson.Safe.pretty_to_string json;
     folded;
     line_to_node = [];
-    next_id;
   }
 
 let of_string json_str =
@@ -106,12 +90,6 @@ let render_key k = Widgets.fg 14 (Printf.sprintf "\"%s\"" k)
 let render_number n = Widgets.magenta n
 let render_bool b = Widgets.green (if b then "true" else "false")
 let render_null () = Widgets.dim "null"
-
-let fold_indicator is_folded count kind =
-  if is_folded then
-    let bracket = if kind = `Array then "[]" else "{}" in
-    Widgets.dim (Printf.sprintf " %s (%d items)" bracket count)
-  else ""
 
 (* Render JSON with folding *)
 let render t =
