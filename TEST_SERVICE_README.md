@@ -41,7 +41,7 @@ To use a different network, RPC port, or binary version, edit the configuration 
 
 ```bash
 SERVICE_NAME="test-octez-node"
-NETWORK="weeklynet"           # Change to: mainnet, weeklynet, etc.
+NETWORK="shadownet"           # Change to: mainnet, shadownet, weeklynet, etc.
 RPC_PORT="8733"              # Change to any available port
 DATA_DIR="/tmp/test-octez-node-data"
 BINARY_VERSION="v24.0"       # Change to installed version

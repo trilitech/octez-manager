@@ -40,7 +40,7 @@ let dedupe_networks infos =
         Hashtbl.add seen key () ;
         true))
 
-(* 5 minutes - networks don't change often, but shadownet rotates *)
+(* 5 minutes - networks don't change often, but weeklynet rotates *)
 let network_cache =
   Cache.create_result ~name:"networks" ~ttl:300.0 (fun () ->
       let* infos = fetch_network_infos_raw () in

@@ -171,8 +171,21 @@ let fallback_networks =
     {
       alias = "shadownet";
       network_url = "https://teztnets.com/shadownet";
-      chain_name = "TEZOS-WEEKLYNET-2025-12-10T00:00:00.000Z";
+      chain_name = "TEZOS_SHADOWNET";
       human_name = "Shadownet";
+      description = Some "Testnet mirroring mainnet protocol";
+      faucet_url = None;
+      rpc_url = None;
+      docker_build = None;
+      git_ref = None;
+      last_updated = None;
+      category = Some "Testnet";
+    };
+    {
+      alias = "weeklynet";
+      network_url = "https://teztnets.com/weeklynet";
+      chain_name = "TEZOS-WEEKLYNET-2025-12-10T00:00:00.000Z";
+      human_name = "Weeklynet";
       description = Some "Weekly ephemeral testnet";
       faucet_url = None;
       rpc_url = None;
@@ -261,7 +274,7 @@ let resolve_octez_node_chain ~endpoint =
             let open Yojson.Safe.Util in
             match member "network" j with
             | `String s ->
-                (* Built-in network: "network": "shadownet" *)
+                (* Built-in network: "network": "weeklynet" *)
                 Ok (String.trim s)
             | `Assoc _ as obj -> (
                 (* Custom network: "network": {"chain_name": "...", ...} *)
