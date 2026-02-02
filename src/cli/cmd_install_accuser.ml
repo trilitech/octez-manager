@@ -68,8 +68,8 @@ let install_accuser_cmd =
   in
   let bin_dir_alias =
     let doc =
-      "Use a linked directory by alias. Overrides --app-bin-dir. Create \
-       aliases with: octez-manager binaries link"
+      "Use a registered directory by alias. Overrides --app-bin-dir. Create \
+       aliases with: octez-manager binaries register"
     in
     Arg.(
       value & opt (some string) None & info ["bin-dir-alias"] ~doc ~docv:"ALIAS")

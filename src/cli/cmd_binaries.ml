@@ -607,8 +607,8 @@ let binaries_cmd =
             "Commands for managing Octez binary versions and registered \
              directories.";
           `P
-            "You can download official releases, link local directories (e.g., \
-             dev builds), and manage versions used by instances.";
+            "You can download official releases, register local directories \
+             (e.g., dev builds), and manage versions used by instances.";
         ]
   in
   Cmd.group

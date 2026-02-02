@@ -8,7 +8,7 @@
 (** Headless TUI tests for the binaries management page.
 
     The binaries page displays installed Octez binary versions in collapsible
-    groups and allows downloading, linking, pruning, and navigating versions.
+    groups and allows downloading, registering, pruning, and navigating versions.
     These tests verify rendering and keyboard interaction without network I/O. *)
 
 open Alcotest

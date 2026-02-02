@@ -52,7 +52,7 @@ octez-manager install-node [OPTIONS]
 | `--tmp-dir <PATH>` | Temporary directory for snapshot download | /tmp |
 | `--service-user <USER>` | System user for the service | current user |
 | `--octez-version <VER>` | Use a managed binary version | - |
-| `--bin-dir-alias <ALIAS>` | Use a linked directory alias | - |
+| `--bin-dir-alias <ALIAS>` | Use a registered directory alias | - |
 | `--app-bin-dir <PATH>` | Directory containing Octez binaries | auto |
 | `--no-enable` | Don't auto-start the service | false |
 | `--preserve-data` | Keep existing data directory | false |
@@ -79,7 +79,7 @@ octez-manager install-dal-node [OPTIONS]
 | `--net-addr <ADDR>` | P2P address | 0.0.0.0:11732 |
 | `--service-user <USER>` | System user for the service | current user |
 | `--octez-version <VER>` | Use a managed binary version | - |
-| `--bin-dir-alias <ALIAS>` | Use a linked directory alias | - |
+| `--bin-dir-alias <ALIAS>` | Use a registered directory alias | - |
 | `--app-bin-dir <PATH>` | Directory containing Octez binaries | auto |
 | `--no-enable` | Don't auto-start the service | false |
 | `--extra-arg <ARG>` | Extra argument for octez-dal-node (repeatable) | - |
@@ -102,7 +102,7 @@ octez-manager install-baker [OPTIONS]
 | `--base-dir <PATH>` | Baker base directory | auto |
 | `--service-user <USER>` | System user for the service | current user |
 | `--octez-version <VER>` | Use a managed binary version | - |
-| `--bin-dir-alias <ALIAS>` | Use a linked directory alias | - |
+| `--bin-dir-alias <ALIAS>` | Use a registered directory alias | - |
 | `--app-bin-dir <PATH>` | Directory containing Octez binaries | auto |
 | `--no-enable` | Don't auto-start the service | false |
 | `--extra-arg <ARG>` | Extra argument for octez-baker (repeatable) | - |
@@ -122,7 +122,7 @@ octez-manager install-accuser [OPTIONS]
 | `--base-dir <PATH>` | Accuser base directory | auto |
 | `--service-user <USER>` | System user for the service | current user |
 | `--octez-version <VER>` | Use a managed binary version | - |
-| `--bin-dir-alias <ALIAS>` | Use a linked directory alias | - |
+| `--bin-dir-alias <ALIAS>` | Use a registered directory alias | - |
 | `--app-bin-dir <PATH>` | Directory containing Octez binaries | auto |
 | `--no-enable` | Don't auto-start the service | false |
 | `--extra-arg <ARG>` | Extra argument for octez-accuser (repeatable) | - |
@@ -202,7 +202,7 @@ Manage Octez binary versions. Binaries are stored in:
 
 #### `binaries list`
 
-List installed managed versions and linked directories.
+List installed managed versions and registered directories.
 
 ```bash
 octez-manager binaries list
@@ -256,12 +256,12 @@ octez-manager binaries prune [OPTIONS]
 |--------|-------------|
 | `--dry-run, -n` | Show what would be removed with disk space |
 
-#### `binaries link`
+#### `binaries register`
 
 Create an alias for a custom binary directory (e.g., a dev build).
 
 ```bash
-octez-manager binaries link <PATH> [OPTIONS]
+octez-manager binaries register <PATH> [OPTIONS]
 ```
 
 | Option | Description |
@@ -271,15 +271,15 @@ octez-manager binaries link <PATH> [OPTIONS]
 **Example:**
 
 ```bash
-octez-manager binaries link ~/octez/_build/default/src --alias dev-build
+octez-manager binaries register ~/octez/_build/default/src --alias dev-build
 ```
 
-#### `binaries unlink`
+#### `binaries unregister`
 
-Remove a linked directory alias.
+Remove a registered directory alias.
 
 ```bash
-octez-manager binaries unlink <ALIAS_OR_PATH> [OPTIONS]
+octez-manager binaries unregister <ALIAS_OR_PATH> [OPTIONS]
 ```
 
 | Option | Description |
@@ -443,8 +443,8 @@ octez-manager install-node \
   --octez-version 21.0 \
   --snapshot
 
-# Link a local dev build
-octez-manager binaries link ~/octez/_build/default/src --alias dev
+# Register a local dev build
+octez-manager binaries register ~/octez/_build/default/src --alias dev
 
 # Install using the dev build
 octez-manager install-node \

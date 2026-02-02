@@ -136,7 +136,7 @@ let test_registered_dir_to_yojson () =
   in
   check
     (testable Yojson.Safe.pp Yojson.Safe.equal)
-    "linked_dir JSON"
+    "registered_dir JSON"
     expected
     json
 
