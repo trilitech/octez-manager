@@ -10,7 +10,7 @@ open Rresult
 let ( let* ) = Result.bind
 
 (** Current version - kept in sync with main.ml *)
-let current_version = "0.2.0"
+let current_version = "0.2.1"
 
 (** GitHub repository info *)
 let github_owner = "trilitech"
