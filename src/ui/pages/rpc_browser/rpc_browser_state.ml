@@ -24,6 +24,7 @@ type mode =
       response_time_ms : float option;
       response_size : int option;
       pager : Pager.t option;
+      foldable : Foldable_json.t option;
     }
 
 type openapi_status = Loading | Ready | Error of string | NotAvailable
@@ -181,6 +182,7 @@ let execute_get ~url state =
           response_time_ms = None;
           response_size = None;
           pager = None;
+          foldable = None;
         };
     error = None;
     focus = FocusPager;
@@ -197,19 +199,28 @@ let set_result ~body ~raw_body ?response_time_ms ?response_size state =
       let size =
         match response_size with Some s -> Some s | None -> r.response_size
       in
-      (* Create pager from body for scrolling/search *)
-      let pager = Pager.open_text ~title:"Response" body in
+      (* Create foldable JSON from raw body *)
+      let foldable = Foldable_json.of_string raw_body in
+      (* Use foldable render if available, otherwise fall back to highlighted body *)
+      let display_body =
+        match foldable with
+        | Some f -> Foldable_json.render f
+        | None -> body
+      in
+      (* Create pager from rendered content *)
+      let pager = Pager.open_text ~title:"Response" display_body in
       {
         state with
         mode =
           Result
             {
               r with
-              body;
+              body = display_body;
               raw_body;
               response_time_ms = time;
               response_size = size;
               pager = Some pager;
+              foldable;
             };
       }
   | List _ -> state
@@ -293,3 +304,36 @@ let get_recent_values ~segment_type state =
     lst
   |> fun lst ->
   if List.length lst > 10 then List.filteri (fun i _ -> i < 10) lst else lst
+
+(* JSON Folding functions *)
+let update_pager_from_foldable state =
+  match state.mode with
+  | Result ({foldable = Some f; _} as r) ->
+      let new_body = Foldable_json.render f in
+      let pager = Pager.open_text ~title:"Response" new_body in
+      {state with mode = Result {r with body = new_body; pager = Some pager}}
+  | _ -> state
+
+let toggle_fold ~line state =
+  match state.mode with
+  | Result ({foldable = Some f; _} as r) ->
+      let f' = Foldable_json.toggle_fold_at_line f ~line in
+      let state' = {state with mode = Result {r with foldable = Some f'}} in
+      update_pager_from_foldable state'
+  | _ -> state
+
+let unfold_all_json state =
+  match state.mode with
+  | Result ({foldable = Some f; _} as r) ->
+      let f' = Foldable_json.unfold_all f in
+      let state' = {state with mode = Result {r with foldable = Some f'}} in
+      update_pager_from_foldable state'
+  | _ -> state
+
+let fold_all_json state =
+  match state.mode with
+  | Result ({foldable = Some f; _} as r) ->
+      let f' = Foldable_json.fold_all f in
+      let state' = {state with mode = Result {r with foldable = Some f'}} in
+      update_pager_from_foldable state'
+  | _ -> state
