@@ -43,7 +43,7 @@ let render_loading () =
 let render_error msg = Widgets.red ("Error: " ^ msg)
 
 let render_help () =
-  Widgets.dim "?: help  Tab: fold  f/F: fold/unfold all  s: save  Esc: back"
+  Widgets.dim "?: help  Space: fold  f/F: fold/unfold all  s: save  Esc: back"
 
 (** Render using pager widget when available *)
 let render_with_pager ~pager ~cols ~rows ~focus =
