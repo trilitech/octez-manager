@@ -260,7 +260,7 @@ let import_cmd =
           `P "Import with custom name:";
           `Pre "  octez-manager import tezos-node-mainnet --as my-node";
           `P "Preview import plan:";
-          `Pre "  octez-manager import tezos-baker-weeklynet --dry-run";
+          `Pre "  octez-manager import tezos-baker-shadownet --dry-run";
           `P "Clone instead of takeover:";
           `Pre "  octez-manager import my-baker --strategy clone";
           `P "Import baker with all dependencies (node + DAL):";

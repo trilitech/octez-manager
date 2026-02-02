@@ -956,7 +956,7 @@ MISC OPTIONS
 
      --network=NETWORK
        Select which network to run. Possible values are: sandbox,
-       mainnet, ghostnet. Default is mainnet. You can also specify custom
+       mainnet, shadownet. Default is mainnet. You can also specify custom
        networks by passing a path to a file containing the custom network
        configuration, or by passing a URL from which such a file can be
        downloaded. If you have a file named after a built-in network, you
@@ -1259,7 +1259,7 @@ let snapshots_slug_of_network () =
   let cases =
     [
       ("mainnet", Some "mainnet");
-      ("  Weeklynet  ", Some "weeklynet");
+      ("  Shadownet  ", Some "shadownet");
       ("https://snapshots.tzinit.org/networks/Seoulnet.json", Some "seoulnet");
       ("", None);
     ]
@@ -1810,13 +1810,13 @@ let snapshots_list_fallback () =
       | Error (`Msg msg) -> Alcotest.failf "list fallback error: %s" msg)
 
 let snapshots_list_missing_entries_error () =
-  let html = "<a href=\"/weeklynet/rolling.html\">Rolling</a>" in
+  let html = "<a href=\"/shadownet/rolling.html\">Rolling</a>" in
   let fetch url =
     if String.equal url snapshot_root then Ok (200, html)
     else Ok (404, "missing")
   in
   Snapshots.For_tests.with_fetch fetch (fun () ->
-      match Snapshots.list ~network_slug:"weeklynet" with
+      match Snapshots.list ~network_slug:"shadownet" with
       | Error _ -> ()
       | Ok _ -> Alcotest.fail "expected missing entry error")
 
@@ -1921,8 +1921,8 @@ let teztnets_parse_pairs_assoc_keys () =
     "{\n\
     \  \"custom\": {\"human_name\": \"Custom\", \"config_url\": \
      \"https://example/custom.json\"},\n\
-    \  \"weekly\": {\"humanName\": \"Weeklynet\", \"networkJsonUrl\": \
-     \"https://teztnets.com/weeklynet\"}\n\
+    \  \"weekly\": {\"humanName\": \"Shadownet\", \"networkJsonUrl\": \
+     \"https://teztnets.com/shadownet\"}\n\
      }"
   in
   match Teztnets.parse_networks json with
@@ -1935,7 +1935,7 @@ let teztnets_parse_pairs_assoc_keys () =
       let expected =
         [
           ("Custom", "https://example/custom.json");
-          ("Weeklynet", "https://teztnets.com/weeklynet");
+          ("Shadownet", "https://teztnets.com/shadownet");
         ]
       in
       Alcotest.(check list_pairs)
@@ -1970,8 +1970,8 @@ let teztnets_list_networks_custom_fetch () =
     \  \"nets\": [\n\
     \    {\"humanName\": \"Seoulnet\", \"networkJsonUrl\": \
      \"https://example/seoul.json\"},\n\
-    \    {\"slug\": \"weeklynet\", \"networkJsonUrl\": \
-     \"https://teztnets.com/weeklynet\"}\n\
+    \    {\"slug\": \"shadownet\", \"networkJsonUrl\": \
+     \"https://teztnets.com/shadownet\"}\n\
     \  ]\n\
      }"
   in
@@ -1986,7 +1986,7 @@ let teztnets_list_networks_custom_fetch () =
         "list networks"
         [
           ("Seoulnet", "https://example/seoul.json");
-          ("unknown", "https://teztnets.com/weeklynet");
+          ("unknown", "https://teztnets.com/shadownet");
         ]
         pairs
   | Error (`Msg msg) -> Alcotest.failf "list_networks error: %s" msg
@@ -2096,7 +2096,7 @@ let teztnets_resolve_network_alias_lowercase () =
       \  \"nets\": [\n\
       \    {\"humanName\": \"Seoulnet\", \"networkJsonUrl\": \
        \"https://teztnets.com/seoulnet\"},\n\
-      \    {\"slug\": \"ghostnet\"}\n\
+      \    {\"slug\": \"shadownet\"}\n\
       \  ]\n\
        }"
     in
@@ -2117,7 +2117,7 @@ let teztnets_resolve_network_alias_mixed_case () =
       \  \"nets\": [\n\
       \    {\"humanName\": \"Seoulnet\", \"networkJsonUrl\": \
        \"https://teztnets.com/seoulnet\"},\n\
-      \    {\"slug\": \"weeklynet\"}\n\
+      \    {\"slug\": \"shadownet\"}\n\
       \  ]\n\
        }"
     in
@@ -2133,7 +2133,7 @@ let teztnets_resolve_network_alias_mixed_case () =
 
 let teztnets_resolve_network_alias_not_found () =
   let fetch () =
-    let json = "{\"nets\": [{\"slug\": \"weeklynet\"}]}" in
+    let json = "{\"nets\": [{\"slug\": \"shadownet\"}]}" in
     Teztnets.list_networks ~fetch:(fun () -> Ok json) ()
   in
   match Teztnets.resolve_network_for_octez_node ~fetch "unknownnet" with
@@ -4774,7 +4774,7 @@ let cli_import_service_lookup () =
   let mock_services =
     [
       ("octez-node-mainnet", "mainnet-node");
-      ("octez-baker-weeklynet", "weeklynet-baker");
+      ("octez-baker-shadownet", "shadownet-baker");
       ("my-custom-node", "custom");
     ]
   in
@@ -4810,10 +4810,10 @@ let cli_import_field_overrides () =
   Alcotest.(check bool) "empty base_dir" true (Option.is_none empty.base_dir) ;
 
   (* Test with network override *)
-  let with_network = {Import.empty_overrides with network = Some "weeklynet"} in
+  let with_network = {Import.empty_overrides with network = Some "shadownet"} in
   Alcotest.(check (option string))
     "network override"
-    (Some "weeklynet")
+    (Some "shadownet")
     with_network.network ;
   Alcotest.(check bool)
     "other fields still none"

@@ -29,7 +29,7 @@
                ~set:(fun v m -> {m with name = v});
           choice ~label:"Network" ~get:(fun m -> m.network)
                  ~set:(fun v m -> {m with network = v})
-                 ~items:["mainnet"; "weeklynet"];
+                 ~items:["mainnet"; "shadownet"];
           toggle ~label:"Enable on Boot" ~get:(fun m -> m.enable)
                  ~set:(fun v m -> {m with enable = v});
         ];

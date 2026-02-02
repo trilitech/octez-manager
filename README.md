@@ -25,7 +25,7 @@
 - **Terminal UI** with real-time monitoring and logs
 - **Snapshot import** from tzinit.org with automatic download
 - **Multiple instances** per service type
-- **Network discovery** from teztnets.com (mainnet, weeklynet, etc.)
+- **Network discovery** from teztnets.com (mainnet, shadownet, etc.)
 
 ## Quick Start
 
