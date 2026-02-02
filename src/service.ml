@@ -70,7 +70,7 @@ let get_bin_source t =
   | Some bs -> bs
   | None -> (
       (* For backward compatibility with services created before bin_source field:
-         Detect if app_bin_dir matches a managed version or linked directory *)
+         Detect if app_bin_dir matches a managed version or registered directory *)
       let binaries_dir = Binary_registry.binaries_dir () in
       (* Check if this is a managed version path *)
       if String.starts_with ~prefix:binaries_dir t.app_bin_dir then
