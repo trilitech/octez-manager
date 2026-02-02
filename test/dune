@@ -525,3 +525,10 @@
  (modules test_rpc_browser_render_list)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_rpc_browser_render_result)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_rpc_browser_render_result)
+ (instrumentation
+  (backend bisect_ppx)))
