@@ -57,7 +57,7 @@ let ui_cmd =
 
 let root_cmd =
   let doc = "Terminal UI for managing Octez services" in
-  let info = Cmd.info "octez-manager" ~doc ~version:"0.1.1" in
+  let info = Cmd.info "octez-manager" ~doc ~version:"0.2.1" in
   Cmd.group
     info
     ~default:ui_term
