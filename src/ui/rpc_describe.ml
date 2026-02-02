@@ -80,7 +80,7 @@ let parse_describe_json (j : Yojson.Safe.t) : entry list =
     match List.assoc_opt "static" kvs with
     | Some (`Assoc stat) -> (
         match List.assoc_opt "get_service" stat with
-        | Some (`Assoc _) -> add_entry {name = "[GET]"; kind = Get}
+        | Some (`Assoc _) -> add_entry {name = ""; kind = Get}
         | _ -> ())
     | _ -> ()
   in

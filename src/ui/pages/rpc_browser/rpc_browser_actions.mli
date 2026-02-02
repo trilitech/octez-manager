@@ -98,3 +98,20 @@ val execute_shortcut :
   Rpc_browser_state.state ->
   (Rpc_browser_state.state -> unit) ->
   bool
+
+(** {1 Cached Entry Actions} *)
+
+(** Handle Enter on cached entry in Result mode browser panel.
+    Uses the cached cursor position to select the entry.
+    For Sub/Dyn entries, navigates while staying in Result mode.
+    For Get entries, executes the GET and updates the pager. *)
+val handle_cached_enter :
+  Rpc_browser_state.state -> (Rpc_browser_state.state -> unit) -> unit
+
+(** Navigate back one level in the cached browser while staying in Result mode. *)
+val navigate_cached_back :
+  Rpc_browser_state.state -> (Rpc_browser_state.state -> unit) -> unit
+
+(** Fetch entries and update only cached_entries (for Result mode browser). *)
+val fetch_cached_entries :
+  Rpc_browser_state.state -> (Rpc_browser_state.state -> unit) -> unit
