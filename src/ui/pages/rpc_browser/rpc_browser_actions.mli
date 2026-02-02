@@ -75,3 +75,19 @@ val fetch_entries_sync : Rpc_browser_state.state -> Rpc_browser_state.state
 (** Fetch entries for current path and call update callback. *)
 val fetch_entries :
   Rpc_browser_state.state -> (Rpc_browser_state.state -> unit) -> unit
+
+(** {1 Quick Access Shortcuts} *)
+
+(** Quick access shortcuts: (key, path, description) *)
+val shortcuts : (string * string * string) list
+
+(** Execute a shortcut by key.
+    @param key Key pressed (e.g., "1", "2")
+    @param state Current state
+    @param on_update Callback to update state
+    @return true if shortcut was handled, false otherwise *)
+val execute_shortcut :
+  key:string ->
+  Rpc_browser_state.state ->
+  (Rpc_browser_state.state -> unit) ->
+  bool
