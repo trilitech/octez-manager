@@ -89,10 +89,26 @@ let handled_keys () =
 
 let cycle_instance ps =
   let s = ps.Navigation.s in
-  let new_state = Actions.cycle_instance ~delta:1 s in
-  let new_state = Actions.fetch_entries_sync new_state in
-  state_ref := Some new_state ;
-  Navigation.update (fun _ -> new_state) ps
+  (* Only cycle instance in List mode; in Result mode, Tab cycles pagers *)
+  match s.State.mode with
+  | State.List _ ->
+      let new_state = Actions.cycle_instance ~delta:1 s in
+      let new_state = Actions.fetch_entries_sync new_state in
+      state_ref := Some new_state ;
+      Navigation.update (fun _ -> new_state) ps
+  | State.Result _ ->
+      (* Cycle through pagers in Result mode *)
+      let pager_ids = State.get_pager_ids s |> List.sort compare in
+      let current_id = State.get_focused_pager_id s in
+      let next_id =
+        match List.find_opt (fun id -> id > current_id) pager_ids with
+        | Some id -> id
+        | None -> (
+            match pager_ids with [] -> current_id | first :: _ -> first)
+      in
+      let new_state = State.focus_pager next_id s in
+      state_ref := Some new_state ;
+      Navigation.update (fun _ -> new_state) ps
 
 let keymap _ps =
   let noop ps = ps in
@@ -103,7 +119,7 @@ let keymap _ps =
     kb "Esc" back "Back";
     kb "↑/↓" noop "Navigate";
     kb "r" refresh "Refresh";
-    kb "Tab" cycle_instance "Instance";
+    kb "Tab" cycle_instance "Instance/Pager";
     {
       Miaou.Core.Tui_page.key = "?";
       action = noop;
@@ -357,11 +373,6 @@ let handle_key ps key ~size =
               Navigation.update (fun _ -> new_state) ps
           | Some (Keys.Char "u") | Some Keys.Backspace -> back ps
           | Some (Keys.Char "r") -> refresh ps
-          | Some Keys.Tab ->
-              let new_state = Actions.cycle_instance ~delta:1 s in
-              let new_state = Actions.fetch_entries_sync new_state in
-              state_ref := Some new_state ;
-              Navigation.update (fun _ -> new_state) ps
           | _ -> ps)
     | State.Result _ -> (
         let result_focus = State.get_result_focus s in
@@ -435,7 +446,8 @@ let handle_key ps key ~size =
             match !state_ref with
             | Some new_s -> Navigation.update (fun _ -> new_s) ps
             | None -> ps
-          else ps) (* Handle fold keys *)
+          else ps)
+          (* Handle fold keys *)
         else if key = "f" then (
           (* Fold all sections *)
           let new_state = State.fold_all_json s in
