@@ -504,3 +504,10 @@
  (modules test_rpc_describe)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_json_highlighter)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_json_highlighter)
+ (instrumentation
+  (backend bisect_ppx)))
