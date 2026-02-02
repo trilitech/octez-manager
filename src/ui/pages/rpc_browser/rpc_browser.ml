@@ -125,13 +125,18 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
   let left_lines = String.split_on_char '\n' left in
   let right_lines = String.split_on_char '\n' right in
   let separator = Widgets.dim "│" in
+  (* Use Widgets.visible_chars_count for proper ANSI handling *)
+  let truncate_line line width =
+    let visible_len = Widgets.visible_chars_count line in
+    if visible_len <= width then line
+    else
+      (* Truncate to width visible chars - need to find byte position *)
+      let byte_idx = Widgets.visible_byte_index_of_pos line width in
+      String.sub line 0 byte_idx ^ "\027[0m"
+  in
   let pad_line line width =
-    (* Strip ANSI codes to calculate visible length *)
-    let visible_len =
-      let re = Str.regexp "\027\\[[0-9;]*m" in
-      String.length (Str.global_replace re "" line)
-    in
-    if visible_len >= width then line
+    let visible_len = Widgets.visible_chars_count line in
+    if visible_len >= width then truncate_line line width
     else line ^ String.make (width - visible_len) ' '
   in
   let right_width = total_width - left_width - 1 in
