@@ -12,7 +12,7 @@ open Import
 let import_cmd =
   let term =
     let run external_name instance_override network_override strategy cascade
-        dry_run interactive =
+        dry_run interactive extra_args =
       Capabilities.register () ;
 
       (* Validate that editor is available if interactive mode is requested *)
@@ -96,6 +96,8 @@ let import_cmd =
                           rpc_addr = None;
                           net_addr = None;
                           delegates = None;
+                          extra_args =
+                            (if extra_args = [] then None else Some extra_args);
                         }
                       in
                       let options : Import.import_options =
@@ -229,10 +231,17 @@ let import_cmd =
       in
       Arg.(value & flag & info ["interactive"; "i"] ~doc)
     in
+    let extra_args_arg =
+      let doc =
+        "Additional arguments to append to the service command (repeatable)"
+      in
+      Arg.(value & opt_all string [] & info ["extra-arg"] ~doc ~docv:"ARG")
+    in
     Term.(
       ret
         (const run $ external_name_arg $ instance_arg $ network_arg
-       $ strategy_arg $ cascade_flag $ dry_run_flag $ interactive_flag))
+       $ strategy_arg $ cascade_flag $ dry_run_flag $ interactive_flag
+       $ extra_args_arg))
   in
   let info =
     Cmd.info

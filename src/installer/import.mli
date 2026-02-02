@@ -32,6 +32,7 @@ type field_overrides = {
   net_addr : string option;
   base_dir : string option;  (** For baker/accuser *)
   delegates : string list option;  (** For baker *)
+  extra_args : string list option;  (** Additional command-line arguments *)
 }
 
 (** Empty overrides (all None) *)

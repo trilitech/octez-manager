@@ -21,6 +21,7 @@ type field_overrides = {
   net_addr : string option;
   base_dir : string option;
   delegates : string list option;
+  extra_args : string list option;
 }
 
 let empty_overrides =
@@ -31,6 +32,7 @@ let empty_overrides =
     net_addr = None;
     base_dir = None;
     delegates = None;
+    extra_args = None;
   }
 
 type import_options = {
@@ -181,6 +183,15 @@ let resolve_net_addr ~overrides ~external_svc =
   | Some addr -> addr
   | None -> External_service.value_or ~default:default_net config.net_addr
 
+let resolve_extra_args ~overrides ~external_svc =
+  let config = external_svc.External_service.config in
+  match overrides.extra_args with
+  | Some args -> args
+  | None ->
+      (* Parse ExecStart to extract extra arguments from original service *)
+      let parsed = Execstart_parser.parse config.exec_start in
+      parsed.extra_args
+
 (** {1 Service Creation from External} *)
 
 (** Get service user from external service, with fallback to current user.
@@ -195,13 +206,11 @@ let get_service_user external_svc =
       current_user
 
 let create_node_from_external ~instance ~external_svc ~network ~data_dir
-    ~rpc_addr ~net_addr ~bin_dir =
+    ~rpc_addr ~net_addr ~bin_dir ~extra_args =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
-  (* Parse ExecStart to extract extra arguments and history mode *)
+  (* Parse ExecStart to extract history mode *)
   let parsed = Execstart_parser.parse config.exec_start in
-  (* Preserve extra arguments from original ExecStart (e.g., --metrics-addr, --cors-origin) *)
-  let extra_args = parsed.extra_args in
   (* Detect history mode from ExecStart, default to Rolling if not found *)
   let history_mode =
     match parsed.history_mode with
@@ -334,14 +343,14 @@ end
 
 let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
     ~node_endpoint ~bin_dir ~depends_on ~imported_services
-    ~all_external_services =
+    ~all_external_services ~extra_args =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
-  (* Parse ExecStart to extract extra arguments *)
+  (* Parse ExecStart to extract run mode for node mode determination *)
   let parsed = Execstart_parser.parse config.exec_start in
-  (* Extract baker-specific fields *)
+  (* Extract baker-specific fields from the provided extra_args *)
   let delegates, liquidity_baking_vote, remaining_args =
-    extract_baker_fields parsed.extra_args
+    extract_baker_fields extra_args
   in
   (* Determine node mode based on original baker configuration *)
   let node_mode =
@@ -421,19 +430,14 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
-    ~node_endpoint ~bin_dir ~depends_on =
-  let config = external_svc.External_service.config in
+    ~node_endpoint ~bin_dir ~depends_on ~extra_args =
   let service_user = get_service_user external_svc in
-  (* Parse ExecStart to extract extra arguments *)
-  let parsed = Execstart_parser.parse config.exec_start in
   (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
   let node_mode =
     match depends_on with
     | Some instance -> Local_instance instance
     | None -> Remote_endpoint node_endpoint
   in
-  (* Preserve extra arguments from original ExecStart *)
-  let extra_args = parsed.extra_args in
   let request : accuser_request =
     {
       instance;
@@ -459,11 +463,9 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_dal_from_external ~instance ~external_svc ~network ~data_dir
-    ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy ~depends_on =
-  let config = external_svc.External_service.config in
+    ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy ~depends_on
+    ~extra_args =
   let service_user = get_service_user external_svc in
-  (* Parse ExecStart to extract extra arguments *)
-  let parsed = Execstart_parser.parse config.exec_start in
   (* For Clone strategy, increment ports to avoid conflicts *)
   let rpc_addr, net_addr =
     if strategy = Clone then
@@ -479,8 +481,8 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       (increment_port rpc_addr, increment_port net_addr)
     else (rpc_addr, net_addr)
   in
-  (* Preserve extra arguments from original ExecStart (e.g., --attester-profiles) *)
-  let service_args = parsed.extra_args in
+  (* Use the provided extra_args *)
+  let service_args = extra_args in
   let request : daemon_request =
     {
       role = "dal-node";
@@ -1007,6 +1009,9 @@ let import_service ?(on_log = fun _ -> ())
   let* base_dir = resolve_base_dir ~overrides:options.overrides ~external_svc in
   let rpc_addr = resolve_rpc_addr ~overrides:options.overrides ~external_svc in
   let net_addr = resolve_net_addr ~overrides:options.overrides ~external_svc in
+  let extra_args =
+    resolve_extra_args ~overrides:options.overrides ~external_svc
+  in
   (* 5. Get node endpoint for baker/accuser/dal and resolve depends_on *)
   let node_endpoint =
     match config.node_endpoint.value with
@@ -1149,6 +1154,7 @@ let import_service ?(on_log = fun _ -> ())
               ~rpc_addr
               ~net_addr
               ~bin_dir
+              ~extra_args
         | Some External_service.Baker ->
             create_baker_from_external
               ~instance:instance_name
@@ -1160,6 +1166,7 @@ let import_service ?(on_log = fun _ -> ())
               ~depends_on:depends_on_instance
               ~imported_services
               ~all_external_services
+              ~extra_args
         | Some External_service.Accuser ->
             create_accuser_from_external
               ~instance:instance_name
@@ -1169,6 +1176,7 @@ let import_service ?(on_log = fun _ -> ())
               ~node_endpoint
               ~bin_dir
               ~depends_on:depends_on_instance
+              ~extra_args
         | Some External_service.Dal_node ->
             create_dal_from_external
               ~instance:instance_name
@@ -1181,6 +1189,7 @@ let import_service ?(on_log = fun _ -> ())
               ~bin_dir
               ~strategy:options.strategy
               ~depends_on:depends_on_instance
+              ~extra_args
         | Some (External_service.Unknown role_str) ->
             Error (`Msg (Printf.sprintf "Unknown role: %s" role_str))
         | None -> Error (`Msg "Role not detected for external service")

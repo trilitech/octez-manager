@@ -140,6 +140,7 @@ and start_import ps =
             rpc_addr = None;
             net_addr = None;
             delegates = None;
+            extra_args = None;
           }
         in
         let options : Import.import_options =
