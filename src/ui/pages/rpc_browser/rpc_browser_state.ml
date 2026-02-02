@@ -209,6 +209,12 @@ let set_result ~body ~raw_body ?response_time_ms ?response_size state =
       in
       (* Create pager from rendered content *)
       let pager = Pager.open_text ~title:"Response" display_body in
+      (* Enable cursor mode when foldable JSON is available for fold/unfold *)
+      let pager =
+        match foldable with
+        | Some _ -> Pager.set_cursor_mode pager true
+        | None -> pager
+      in
       {
         state with
         mode =
@@ -308,9 +314,17 @@ let get_recent_values ~segment_type state =
 (* JSON Folding functions *)
 let update_pager_from_foldable state =
   match state.mode with
-  | Result ({foldable = Some f; _} as r) ->
+  | Result ({foldable = Some f; pager = old_pager; _} as r) ->
       let new_body = Foldable_json.render f in
       let pager = Pager.open_text ~title:"Response" new_body in
+      (* Preserve cursor mode and position from old pager *)
+      let pager =
+        match old_pager with
+        | Some old_p ->
+            let pager = Pager.set_cursor_mode pager (Pager.cursor_mode old_p) in
+            Pager.set_cursor pager (Pager.get_cursor_line old_p)
+        | None -> Pager.set_cursor_mode pager true
+      in
       {state with mode = Result {r with body = new_body; pager = Some pager}}
   | _ -> state
 

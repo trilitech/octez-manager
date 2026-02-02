@@ -117,6 +117,41 @@ let keymap _ps =
     };
   ]
 
+(* Minimum width for side-by-side layout *)
+let side_by_side_min_width = 140
+
+(* Render two columns side by side *)
+let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
+  let left_lines = String.split_on_char '\n' left in
+  let right_lines = String.split_on_char '\n' right in
+  let separator = Widgets.dim "│" in
+  let pad_line line width =
+    (* Strip ANSI codes to calculate visible length *)
+    let visible_len =
+      let re = Str.regexp "\027\\[[0-9;]*m" in
+      String.length (Str.global_replace re "" line)
+    in
+    if visible_len >= width then line
+    else line ^ String.make (width - visible_len) ' '
+  in
+  let right_width = total_width - left_width - 1 in
+  let combined =
+    List.mapi
+      (fun i _ ->
+        let left_line =
+          match List.nth_opt left_lines i with Some l -> l | None -> ""
+        in
+        let right_line =
+          match List.nth_opt right_lines i with Some r -> r | None -> ""
+        in
+        Printf.sprintf "%s%s%s"
+          (pad_line left_line left_width)
+          separator
+          (pad_line right_line right_width))
+      (List.init rows (fun i -> i))
+  in
+  String.concat "\n" combined
+
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
@@ -127,8 +162,31 @@ let view ps ~focus ~size =
         let lines = Rpc_browser_render_list.render ~state:s ~cols in
         String.concat "\n" lines
     | State.Result _ ->
-        let pager_focus = focus && s.State.focus = State.FocusPager in
-        Rpc_browser_render_result.render ~state:s ~cols ~rows ~focus:pager_focus
+        (* Check if we should use side-by-side layout *)
+        if cols >= side_by_side_min_width then
+          (* Side-by-side: browser on left, result on right *)
+          let left_width = 50 in
+          let right_width = cols - left_width - 1 in
+          let browser_focus = focus && s.State.focus = State.FocusBrowser in
+          let pager_focus = focus && s.State.focus = State.FocusPager in
+          (* Render browser list for left panel *)
+          let left_state =
+            {s with mode = State.List {entries = []; cursor = 0; loading = false}}
+          in
+          let left_lines = Rpc_browser_render_list.render ~state:left_state ~cols:left_width in
+          let left =
+            if browser_focus then
+              (* Add focus indicator *)
+              (Widgets.fg 14 "▶ Browser") :: left_lines |> String.concat "\n"
+            else
+              (Widgets.dim "  Browser") :: left_lines |> String.concat "\n"
+          in
+          let right = Rpc_browser_render_result.render ~state:s ~cols:right_width ~rows ~focus:pager_focus in
+          render_side_by_side ~left ~right ~left_width ~total_width:cols ~rows
+        else
+          (* Regular full-width result view *)
+          let pager_focus = focus && s.State.focus = State.FocusPager in
+          Rpc_browser_render_result.render ~state:s ~cols ~rows ~focus:pager_focus
   in
   Vsection.render ~size ~header:[] ~content_footer:[] ~child:(fun _ -> body)
 
@@ -221,16 +279,25 @@ let handle_key ps key ~size =
         else
           match Keys.of_string key with
           | Some Keys.Escape -> back ps
-          | Some Keys.Tab ->
-              (* Toggle fold at current scroll position *)
-              let line =
-                match s.State.mode with
-                | State.Result {scroll_offset; _} -> scroll_offset
-                | _ -> 0
-              in
-              let new_state = State.toggle_fold ~line s in
+          | Some Keys.Left ->
+              (* Switch focus to browser panel *)
+              let new_state = State.set_focus State.FocusBrowser s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
+          | Some Keys.Right ->
+              (* Switch focus to pager panel *)
+              let new_state = State.set_focus State.FocusPager s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | Some Keys.Tab ->
+              (* Toggle fold at cursor position (uses pager cursor mode) *)
+              (match State.get_pager s with
+              | Some pager ->
+                  let line = Pager.get_cursor_line pager in
+                  let new_state = State.toggle_fold ~line s in
+                  state_ref := Some new_state ;
+                  Navigation.update (fun _ -> new_state) ps
+              | None -> ps)
           | _ ->
               (* Delegate to pager for all other keys *)
               (match State.get_pager s with
