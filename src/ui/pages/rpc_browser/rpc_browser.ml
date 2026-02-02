@@ -132,21 +132,26 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows
     else line ^ String.make (width - visible_len) ' '
   in
   let right_width = total_width - left_width - 1 in
-  (* Colorized separator based on focus *)
+  (* Colorized separator - bright for focused side, very dim otherwise *)
   let separator =
-    if left_focused || right_focused then Widgets.fg 14 "|" else Widgets.dim "|"
+    if left_focused then Widgets.bold (Widgets.fg 14 "|")
+    else if right_focused then Widgets.bold (Widgets.fg 14 "|")
+    else Widgets.dim "|"
   in
-  (* Top border line - use = for focused, - for unfocused *)
+  (* Top border line - bold bright for focused, very dim for unfocused *)
   let left_border =
-    if left_focused then Widgets.fg 14 (String.make left_width '=')
+    if left_focused then
+      Widgets.bold (Widgets.fg 14 (String.make left_width '#'))
     else Widgets.dim (String.make left_width '-')
   in
   let right_border =
-    if right_focused then Widgets.fg 14 (String.make right_width '=')
+    if right_focused then
+      Widgets.bold (Widgets.fg 14 (String.make right_width '#'))
     else Widgets.dim (String.make right_width '-')
   in
   let corner =
-    if left_focused || right_focused then Widgets.fg 14 "+" else Widgets.dim "+"
+    if left_focused || right_focused then Widgets.bold (Widgets.fg 14 "+")
+    else Widgets.dim "+"
   in
   let top_border = Printf.sprintf "%s%s%s" left_border corner right_border in
   (* Content rows *)
@@ -252,10 +257,10 @@ let view ps ~focus ~size =
           let header =
             Printf.sprintf
               "%s  %s"
-              (Widgets.fg 14 "▶ Browser")
+              (Widgets.bold (Widgets.fg 14 "▶ BROWSER"))
               (Widgets.dim ("→ Pager " ^ pager_tabs))
           in
-          let border = Widgets.fg 14 (String.make cols '-') in
+          let border = Widgets.bold (Widgets.fg 14 (String.make cols '#')) in
           header :: border :: lines |> String.concat "\n"
         else
           (* Show only pager with focus border *)
@@ -268,9 +273,9 @@ let view ps ~focus ~size =
             Printf.sprintf
               "%s  %s"
               (Widgets.dim "← Browser")
-              (Widgets.fg 14 ("▶ Pager " ^ pager_tabs))
+              (Widgets.bold (Widgets.fg 14 ("▶ PAGER " ^ pager_tabs)))
           in
-          let border = Widgets.fg 14 (String.make cols '-') in
+          let border = Widgets.bold (Widgets.fg 14 (String.make cols '#')) in
           let result =
             Rpc_browser_render_result.render
               ~state:s
