@@ -99,10 +99,10 @@ let regression_path test_name =
   Filename.concat regression_dir (test_name ^ ".screen")
 
 (** Normalize ephemeral URL date suffixes so baselines stay stable.
-    e.g. shadownet-2026-01-28 → shadownet-YYYY-MM-DD *)
+    e.g. weeklynet-2026-01-28 → weeklynet-YYYY-MM-DD *)
 let normalize_ephemeral_urls s =
-  let re = Str.regexp "shadownet-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]" in
-  Str.global_replace re "shadownet-YYYY-MM-DD" s
+  let re = Str.regexp "weeklynet-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]" in
+  Str.global_replace re "weeklynet-YYYY-MM-DD" s
 
 (** Save screen capture as baseline *)
 let save_baseline test_name =

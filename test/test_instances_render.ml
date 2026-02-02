@@ -260,7 +260,7 @@ let test_different_networks () =
         ();
       Mock_service_helpers.running_service
         ~instance:"node-3"
-        ~network:"shadownet"
+        ~network:"weeklynet"
         ();
     ]
   in
