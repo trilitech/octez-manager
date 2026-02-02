@@ -32,9 +32,9 @@ let test_slug_mainnet () =
   let result = Snapshots.slug_of_network "mainnet" in
   check_string_opt "mainnet slug" (Some "mainnet") result
 
-let test_slug_ghostnet () =
-  let result = Snapshots.slug_of_network "ghostnet" in
-  check_string_opt "ghostnet slug" (Some "ghostnet") result
+let test_slug_weeklynet () =
+  let result = Snapshots.slug_of_network "weeklynet" in
+  check_string_opt "weeklynet slug" (Some "weeklynet") result
 
 let test_slug_parisnet () =
   let result = Snapshots.slug_of_network "parisnet" in
@@ -237,7 +237,7 @@ let test_slug_special_characters () =
 let slug_tests =
   [
     ("slug mainnet", `Quick, test_slug_mainnet);
-    ("slug ghostnet", `Quick, test_slug_ghostnet);
+    ("slug weeklynet", `Quick, test_slug_weeklynet);
     ("slug parisnet", `Quick, test_slug_parisnet);
     ("slug unknown network", `Quick, test_slug_unknown_network);
     ("slug empty string", `Quick, test_slug_empty_string);

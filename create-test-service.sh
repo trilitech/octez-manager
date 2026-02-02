@@ -5,7 +5,7 @@ set -e
 
 # Configuration
 SERVICE_NAME="test-octez-node"
-NETWORK="ghostnet"
+NETWORK="weeklynet"
 RPC_PORT="8733"
 DATA_DIR="/tmp/test-octez-node-data"
 BINARY_VERSION="v24.0"

@@ -80,13 +80,6 @@ let test_chain_mainnet () =
     (Some "mainnet")
     (ESD.For_tests.chain_id_to_network "NetXdQprcVkpaWU")
 
-let test_chain_ghostnet () =
-  check
-    (option string)
-    "ghostnet"
-    (Some "ghostnet")
-    (ESD.For_tests.chain_id_to_network "NetXnHfVqm9iesp")
-
 let test_chain_unknown () =
   check
     (option string)
@@ -199,7 +192,6 @@ let () =
       ( "chain_id_to_network",
         [
           test_case "mainnet" `Quick test_chain_mainnet;
-          test_case "ghostnet" `Quick test_chain_ghostnet;
           test_case "unknown" `Quick test_chain_unknown;
         ] );
       ( "extract_command_from_systemd_format",

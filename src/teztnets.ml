@@ -261,7 +261,7 @@ let resolve_octez_node_chain ~endpoint =
             let open Yojson.Safe.Util in
             match member "network" j with
             | `String s ->
-                (* Built-in network: "network": "ghostnet" *)
+                (* Built-in network: "network": "weeklynet" *)
                 Ok (String.trim s)
             | `Assoc _ as obj -> (
                 (* Custom network: "network": {"chain_name": "...", ...} *)

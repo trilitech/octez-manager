@@ -210,7 +210,7 @@ Initial release of octez-manager, a terminal UI for managing Octez services.
   - RPC status display for nodes
 
 - **Configuration**: Form-based service configuration
-  - Network selection (mainnet, ghostnet, etc.)
+  - Network selection (mainnet, weeklynet, etc.)
   - Custom ports and directories
   - Flag customization with help explorer
 

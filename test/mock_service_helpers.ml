@@ -122,7 +122,7 @@ let mixed_services ?(running = 3) ?(stopped = 2) ?(failed = 1) () =
 let multi_role_services () =
   [
     running_service ~instance:"node-1" ~role:"node" ~network:"mainnet" ();
-    running_service ~instance:"node-2" ~role:"node" ~network:"ghostnet" ();
+    running_service ~instance:"node-2" ~role:"node" ~network:"weeklynet" ();
     baker_service ~instance:"baker-1" ~network:"mainnet" ();
     accuser_service ~instance:"accuser-1" ~network:"mainnet" ();
     dal_service ~instance:"dal-1" ~network:"mainnet" ();
