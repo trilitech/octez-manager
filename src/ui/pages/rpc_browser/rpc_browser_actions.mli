@@ -85,8 +85,11 @@ val fetch_entries :
 
 (** {1 Quick Access Shortcuts} *)
 
-(** Quick access shortcuts: (key, path, description) *)
-val shortcuts : (string * string * string) list
+(** Get shortcuts from LRU or defaults: (key, path, description) list *)
+val get_shortcuts : Rpc_browser_state.state -> (string * string * string) list
+
+(** Default shortcuts for when no recent paths exist *)
+val default_shortcuts : (string * string) list
 
 (** Execute a shortcut by key.
     @param key Key pressed (e.g., "1", "2")

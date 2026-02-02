@@ -30,6 +30,7 @@ let render_entry_kind = function
   | State.Get -> Widgets.green "[GET]"
   | State.Sub -> Widgets.fg 14 "[SUB]"
   | State.Dyn typ -> Widgets.yellow (Printf.sprintf "[DYN:%s]" typ)
+  | State.DynValue (typ, _) -> Widgets.dim (Printf.sprintf "[%s]" typ)
 
 let render_entry ~cursor ~idx entry =
   let is_selected = cursor = idx in
@@ -61,7 +62,8 @@ let render_entries ~cursor ~entries =
   if entries = [] then [Widgets.dim "  (no entries at this path)"]
   else List.mapi (fun idx entry -> render_entry ~cursor ~idx entry) entries
 
-let render_shortcuts () =
+let render_shortcuts ~state =
+  let shortcuts = Rpc_browser_actions.get_shortcuts state in
   let header = Widgets.bold "Quick Access:" in
   let items =
     List.map
@@ -71,7 +73,7 @@ let render_shortcuts () =
           (Widgets.fg 14 key)
           (Widgets.bold path)
           (Widgets.dim (Printf.sprintf "(%s)" desc)))
-      Rpc_browser_actions.shortcuts
+      shortcuts
   in
   header :: items
 
@@ -100,7 +102,7 @@ let render ~state ~cols =
   match state.State.mode with
   | State.List {entries; cursor; loading} ->
       let shortcuts_section =
-        if state.State.path = [] then render_shortcuts () @ [""] else []
+        if state.State.path = [] then render_shortcuts ~state @ [""] else []
       in
       let entries_header =
         if state.State.path = [] then [Widgets.bold "All Endpoints:"] else []

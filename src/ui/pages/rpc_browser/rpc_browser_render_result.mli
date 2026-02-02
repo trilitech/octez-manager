@@ -22,9 +22,10 @@ val min_pager_rows : int
 
 (** Render pager header with ID, request URL, response time, and size.
     @param slot Pager slot to render header for
-    @param is_focused Whether this pager is focused *)
+    @param is_focused Whether this pager is focused
+    @param is_target Whether this pager is the target for next RPC result *)
 val render_pager_header :
-  slot:Rpc_browser_state.pager_slot -> is_focused:bool -> string
+  slot:Rpc_browser_state.pager_slot -> is_focused:bool -> is_target:bool -> string
 
 (** {1 Status Rendering} *)
 
@@ -58,12 +59,14 @@ val render_with_pager :
     @param slot The pager slot to render
     @param cols Available width
     @param rows Available height
-    @param is_focused Whether this pager is focused *)
+    @param is_focused Whether this pager is focused
+    @param is_target Whether this pager is the target for next RPC result *)
 val render_single_pager :
   slot:Rpc_browser_state.pager_slot ->
   cols:int ->
   rows:int ->
   is_focused:bool ->
+  is_target:bool ->
   string
 
 (** {1 Multi-Pager Layout} *)
