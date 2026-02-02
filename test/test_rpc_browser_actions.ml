@@ -73,19 +73,23 @@ let test_build_rpc_url_path () =
 (* ============================================================ *)
 
 let test_default_chain_id () =
-  let result = Actions.default_for_dynamic ~name:"chain_id" ~typ:"string" in
+  let state = State.init ~instances:[] in
+  let result = Actions.default_for_dynamic ~name:"chain_id" ~typ:"string" state in
   Alcotest.(check string) "main" "main" result
 
 let test_default_block_id () =
-  let result = Actions.default_for_dynamic ~name:"block_id" ~typ:"string" in
+  let state = State.init ~instances:[] in
+  let result = Actions.default_for_dynamic ~name:"block_id" ~typ:"string" state in
   Alcotest.(check string) "head" "head" result
 
 let test_default_block_hash () =
-  let result = Actions.default_for_dynamic ~name:"block_hash" ~typ:"string" in
+  let state = State.init ~instances:[] in
+  let result = Actions.default_for_dynamic ~name:"block_hash" ~typ:"string" state in
   Alcotest.(check string) "head" "head" result
 
 let test_default_unknown () =
-  let result = Actions.default_for_dynamic ~name:"unknown" ~typ:"string" in
+  let state = State.init ~instances:[] in
+  let result = Actions.default_for_dynamic ~name:"unknown" ~typ:"string" state in
   Alcotest.(check string) "empty" "" result
 
 (* ============================================================ *)
