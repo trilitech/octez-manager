@@ -83,6 +83,20 @@ let handled_keys () =
   Miaou.Core.Keys.
     [Escape; Enter; Up; Down; Char "j"; Char "k"; Char "u"; Char "r"; Tab]
 
+let enter ps =
+  let s = ps.Navigation.s in
+  Actions.handle_enter s update_state ;
+  match !state_ref with
+  | Some new_s -> Navigation.update (fun _ -> new_s) ps
+  | None -> ps
+
+let cycle_instance ps =
+  let s = ps.Navigation.s in
+  let new_state = Actions.cycle_instance ~delta:1 s in
+  let new_state = Actions.fetch_entries_sync new_state in
+  state_ref := Some new_state ;
+  Navigation.update (fun _ -> new_state) ps
+
 let keymap _ps =
   let noop ps = ps in
   let kb key action help =
@@ -90,10 +104,10 @@ let keymap _ps =
   in
   [
     kb "Esc" back "Back";
-    kb "Enter" noop "Select";
+    kb "Enter" enter "Select";
     kb "↑/↓" noop "Navigate";
     kb "r" refresh "Refresh";
-    kb "Tab" noop "Instance";
+    kb "Tab" cycle_instance "Instance";
     {
       Miaou.Core.Tui_page.key = "?";
       action = noop;
