@@ -74,12 +74,17 @@ val render_single_pager :
 val render_hidden_indicator :
   hidden_left:int list -> hidden_right:int list -> string
 
-(** Calculate grid layout based on available space and number of pagers.
+(** Layout orientation for multi-pager display. *)
+type layout = Horizontal | Vertical
+
+(** Calculate optimal layout based on available space and number of pagers.
+    Chooses the orientation that gives each pager the most space.
     @param cols Available width
     @param rows Available height
     @param num_pagers Total number of pagers
-    @return (max_horizontal, max_vertical, max_visible) *)
-val calculate_grid : cols:int -> rows:int -> num_pagers:int -> int * int * int
+    @return (layout_orientation, visible_count, max_visible) *)
+val calculate_layout :
+  cols:int -> rows:int -> num_pagers:int -> layout * int * int
 
 (** Get visible pager slots based on focus - focused pager is always visible.
     @param pagers All pager slots

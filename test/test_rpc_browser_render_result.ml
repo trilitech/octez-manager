@@ -85,24 +85,44 @@ let test_hidden_indicator_both () =
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
-(* Grid Calculation Tests                                        *)
+(* Layout Calculation Tests                                      *)
 (* ============================================================ *)
 
-let test_calculate_grid_small () =
-  let h, v, max_visible =
-    Render.calculate_grid ~cols:80 ~rows:24 ~num_pagers:1
+let test_calculate_layout_single () =
+  let layout, visible_count, max_visible =
+    Render.calculate_layout ~cols:80 ~rows:24 ~num_pagers:1
   in
-  Alcotest.(check int) "max_h" 1 h ;
-  Alcotest.(check int) "max_v" 1 v ;
-  Alcotest.(check int) "max_visible" 1 max_visible
+  Alcotest.(check int) "visible_count" 1 visible_count ;
+  Alcotest.(check int) "max_visible" 1 max_visible ;
+  (* Single pager always uses vertical layout *)
+  Alcotest.(check bool) "vertical layout" true (layout = Render.Vertical)
 
-let test_calculate_grid_large () =
-  let h, v, max_visible =
-    Render.calculate_grid ~cols:200 ~rows:50 ~num_pagers:6
+let test_calculate_layout_prefers_horizontal_when_wide () =
+  (* Wide terminal: 200 cols, 24 rows, 2 pagers
+     Horizontal: each gets 100 cols x 24 rows = 2400 area
+     Vertical: each gets 200 cols x 12 rows = 2400 area
+     Should prefer horizontal when equal or better *)
+  let layout, visible_count, _max_visible =
+    Render.calculate_layout ~cols:200 ~rows:24 ~num_pagers:2
   in
-  Alcotest.(check bool) "h >= 1" true (h >= 1) ;
-  Alcotest.(check bool) "v >= 1" true (v >= 1) ;
-  Alcotest.(check bool) "max_visible >= 1" true (max_visible >= 1)
+  Alcotest.(check int) "visible_count" 2 visible_count ;
+  Alcotest.(check bool)
+    "horizontal layout for wide terminal"
+    true
+    (layout = Render.Horizontal)
+
+let test_calculate_layout_prefers_vertical_when_tall () =
+  (* Narrow but tall: 80 cols, 60 rows, 2 pagers
+     Horizontal: each gets 40 cols x 60 rows - 40 < min_pager_cols (80), not viable
+     Vertical: each gets 80 cols x 30 rows = 2400 area, viable *)
+  let layout, visible_count, _max_visible =
+    Render.calculate_layout ~cols:80 ~rows:60 ~num_pagers:2
+  in
+  Alcotest.(check int) "visible_count" 2 visible_count ;
+  Alcotest.(check bool)
+    "vertical layout for tall terminal"
+    true
+    (layout = Render.Vertical)
 
 (* ============================================================ *)
 (* Visible Pagers Tests                                          *)
@@ -213,10 +233,17 @@ let () =
           Alcotest.test_case "right" `Quick test_hidden_indicator_right;
           Alcotest.test_case "both" `Quick test_hidden_indicator_both;
         ] );
-      ( "grid",
+      ( "layout",
         [
-          Alcotest.test_case "small" `Quick test_calculate_grid_small;
-          Alcotest.test_case "large" `Quick test_calculate_grid_large;
+          Alcotest.test_case "single" `Quick test_calculate_layout_single;
+          Alcotest.test_case
+            "horizontal when wide"
+            `Quick
+            test_calculate_layout_prefers_horizontal_when_wide;
+          Alcotest.test_case
+            "vertical when tall"
+            `Quick
+            test_calculate_layout_prefers_vertical_when_tall;
         ] );
       ( "visible_pagers",
         [
