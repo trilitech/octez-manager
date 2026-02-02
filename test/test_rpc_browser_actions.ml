@@ -118,8 +118,26 @@ let test_cycle_instance_backward () =
   Alcotest.(check int) "idx 0" 0 new_state.State.selected_idx
 
 (* ============================================================ *)
-(* Test Runner                                                   *)
+(* Shortcuts Tests                                               *)
 (* ============================================================ *)
+
+let test_shortcuts_defined () =
+  let shortcuts = Actions.shortcuts in
+  Alcotest.(check bool) "has shortcuts" true (List.length shortcuts >= 5)
+
+let test_shortcuts_format () =
+  List.iter
+    (fun (key, path, desc) ->
+      Alcotest.(check bool) "key not empty" true (String.length key > 0) ;
+      Alcotest.(check bool)
+        "path starts with /"
+        true
+        (String.length path > 0 && path.[0] = '/') ;
+      Alcotest.(check bool) "desc not empty" true (String.length desc > 0))
+    Actions.shortcuts
+
+(* ============================================================ *)
+(* Test Runner                                                   *)
 
 let () =
   Alcotest.run
@@ -155,5 +173,10 @@ let () =
           Alcotest.test_case "forward" `Quick test_cycle_instance_forward;
           Alcotest.test_case "wrap" `Quick test_cycle_instance_wrap;
           Alcotest.test_case "backward" `Quick test_cycle_instance_backward;
+        ] );
+      ( "shortcuts",
+        [
+          Alcotest.test_case "defined" `Quick test_shortcuts_defined;
+          Alcotest.test_case "format" `Quick test_shortcuts_format;
         ] );
     ]
