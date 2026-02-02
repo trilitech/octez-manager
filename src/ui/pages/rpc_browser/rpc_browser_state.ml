@@ -40,6 +40,8 @@ type state = {
   error : string option;
   focus : focus;
   dynamic_history : dynamic_value list;
+  cached_entries : entry list;
+  cached_cursor : int;
 }
 
 (* Dynamic history file path *)
@@ -107,6 +109,8 @@ let init ~instances =
     error = None;
     focus = FocusBrowser;
     dynamic_history;
+    cached_entries = [];
+    cached_cursor = 0;
   }
 
 let select_instance idx state =
@@ -119,6 +123,8 @@ let select_instance idx state =
       mode = List {entries = []; cursor = 0; loading = true};
       error = None;
       focus = FocusBrowser;
+      cached_entries = [];
+      cached_cursor = 0;
     }
 
 let current_instance state = List.nth_opt state.instances state.selected_idx
@@ -161,7 +167,11 @@ let navigate_root state =
 let set_entries entries state =
   match state.mode with
   | List m ->
-      {state with mode = List {m with entries; loading = false}; error = None}
+      {state with
+       mode = List {m with entries; loading = false};
+       error = None;
+       cached_entries = entries;
+       cached_cursor = m.cursor}
   | Result _ -> state
 
 let set_loading loading state =
@@ -234,13 +244,15 @@ let set_result ~body ~raw_body ?response_time_ms ?response_size state =
 let cursor_up state =
   match state.mode with
   | List m when m.cursor > 0 ->
-      {state with mode = List {m with cursor = m.cursor - 1}}
+      let new_cursor = m.cursor - 1 in
+      {state with mode = List {m with cursor = new_cursor}; cached_cursor = new_cursor}
   | _ -> state
 
 let cursor_down state =
   match state.mode with
   | List m when m.cursor < List.length m.entries - 1 ->
-      {state with mode = List {m with cursor = m.cursor + 1}}
+      let new_cursor = m.cursor + 1 in
+      {state with mode = List {m with cursor = new_cursor}; cached_cursor = new_cursor}
   | _ -> state
 
 let scroll delta state =
