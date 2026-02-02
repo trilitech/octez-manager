@@ -69,6 +69,20 @@ let run ?page ?(log = false) ?logfile () =
                latest_version
                current_str)
       | _ -> ()) ;
+  (* Start self-update scheduler to check for octez-manager updates *)
+  Self_update_scheduler.start () ;
+  (* Check immediately for octez-manager updates and show notification *)
+  Background_runner.enqueue (fun () ->
+      Self_update_scheduler.check_now () ;
+      if Self_update_scheduler.update_available () then
+        match Self_update_scheduler.get_latest_version () with
+        | Some version ->
+            Context.toast_info
+              (Printf.sprintf
+                 "octez-manager %s is available. Run 'octez-manager \
+                  self-update' to upgrade."
+                 version)
+        | None -> ()) ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
     if !quit_requested then raise Exit
@@ -93,6 +107,7 @@ let run ?page ?(log = false) ?logfile () =
     System_metrics_scheduler.shutdown () ;
     External_services_scheduler.shutdown () ;
     Versions_scheduler.shutdown () ;
+    Self_update_scheduler.stop () ;
     (* Cleanup: kill any active download process *)
     Common.kill_active_download () ;
     Ok ()
