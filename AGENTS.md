@@ -51,6 +51,76 @@ dune fmt                        # Format code (MUST pass before commit)
 - Every commit must have correct copyright headers. Run `./scripts/check-copyright.sh --fix` to automatically update headers if needed.
 - To bypass hooks temporarily: `git commit --no-verify` (use sparingly!)
 
+## OCaml LSP Server
+
+Claude Code can use the OCaml LSP server for code intelligence features like go-to-definition, find-references, hover documentation, and workspace symbol search.
+
+### Installation (Claude Code)
+
+The OCaml LSP plugin is available via the [claude-code-lsps](https://github.com/Piebald-AI/claude-code-lsps) marketplace:
+
+```bash
+# Add the marketplace (one-time)
+claude
+/plugin marketplace add Piebald-AI/claude-code-lsps
+
+# Install the OCaml LSP plugin
+/plugins  # Navigate to Marketplaces > claude-code-lsps > Browse plugins
+# Select ocaml-lsp with spacebar, press "i" to install
+# Restart Claude Code
+```
+
+### Building the Index for Project-Wide References
+
+By default, `findReferences` only searches the current file. To enable **project-wide** find references, you must build the ocaml-index:
+
+```bash
+opam exec -- dune build @ocaml-index
+```
+
+This creates an index in `_build/default/.ocaml-index` that the LSP uses for cross-file reference lookups.
+
+### Keeping the Index Up to Date
+
+**The index must be rebuilt when code changes.** Options:
+
+1. **Manual rebuild** after significant changes:
+   ```bash
+   opam exec -- dune build @ocaml-index
+   ```
+
+2. **Continuous rebuild** during development:
+   ```bash
+   opam exec -- dune build @ocaml-index --watch
+   ```
+
+Note: Unlike `dune build @check`, the `@ocaml-index` target builds the entire project including tests.
+
+### Available LSP Operations
+
+| Operation | Status | Description |
+|-----------|--------|-------------|
+| `hover` | ✅ | Type signature and documentation |
+| `goToDefinition` | ✅ | Jump to symbol definition |
+| `findReferences` | ✅ | Find all usages (requires index for cross-file) |
+| `documentSymbol` | ✅ | List symbols in current file |
+| `workspaceSymbol` | ✅ | Search symbols across project |
+| `goToImplementation` | ❌ | Not supported by ocaml-lsp |
+| `incomingCalls` | ❌ | Not supported by ocaml-lsp |
+| `outgoingCalls` | ❌ | Not supported by ocaml-lsp |
+
+### Requirements
+
+Project-wide references require:
+- OCaml 5.2+ (we use 5.3.0)
+- Dune 3.16+ (we use 3.20.2)
+- ocaml-lsp-server 1.18+ (we use 1.23.1)
+- Merlin 5.1-502+ (we use 5.6-504)
+
+All requirements are satisfied by the project's opam switch.
+
+---
+
 ## Integration Tests
 
 Integration tests live in `test/integration/cli-tester/tests/` and are run in parallel during CI using time-based sharding.
