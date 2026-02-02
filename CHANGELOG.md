@@ -8,9 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Renamed "linked directories" terminology to "registered directories" throughout the codebase for clarity
-  - CLI commands: `binaries link` → `binaries register`, `binaries unlink` → `binaries unregister`
-  - Updated all UI text, documentation, and help messages
+- Renamed "linked directories" to "registered directories" (CLI commands: `binaries link` → `binaries register`, `binaries unlink` → `binaries unregister`)
 
 ### Removed
 
