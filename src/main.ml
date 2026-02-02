@@ -77,6 +77,7 @@ let root_cmd =
       Cmd_utils.cleanup_dependencies_cmd;
       Cmd_utils.list_networks_cmd;
       Cmd_utils.list_snapshots_cmd;
+      Cmd_rpc.rpc_cmd;
       ui_cmd;
     ]
 
