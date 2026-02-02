@@ -46,7 +46,8 @@
   env_file_parser
   process_scanner
   external_service_detector
-  self_update_checker)
+  self_update_checker
+  http_client)
  (libraries
   rresult
   yojson
