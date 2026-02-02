@@ -164,6 +164,7 @@ struct
     let create ps = Navigation.update create_menu_modal ps in
     let diag ps = Navigation.update go_to_diagnostics ps in
     let binaries ps = Navigation.update go_to_binaries ps in
+    let rpc_browser ps = Navigation.update go_to_rpc_browser ps in
     let dismiss ps = Navigation.update dismiss_failure ps in
     let noop ps = ps in
     let kb key action help =
@@ -174,6 +175,7 @@ struct
       kb "c" create "Create";
       kb "d" diag "Diagnostics";
       kb "b" binaries "Binaries";
+      kb "r" rpc_browser "RPC Browser";
       kb "x" dismiss "Clear failure";
       {
         Miaou.Core.Tui_page.key = "?";
@@ -188,7 +190,7 @@ struct
       if Common.is_root () then Widgets.red "● SYSTEM"
       else Widgets.green "● USER"
     in
-    let hint = "Hint: c create · b binaries · d diagnostics · ? help" in
+    let hint = "Hint: c create · b binaries · d diagnostics · r rpc · ? help" in
     [
       Printf.sprintf
         "%s   %s    %s"
