@@ -1070,21 +1070,26 @@ let update_version_modal svc =
 let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
+      let is_node = svc.Service.role = "node" in
+      let base_items =
+        [
+          `Details;
+          `Edit;
+          `Start;
+          `Stop;
+          `Restart;
+          `Update_version;
+          `Logs;
+          `Export_logs;
+          `Remove;
+        ]
+      in
+      let items = if is_node then `Browse_rpc :: base_items else base_items in
       Modal_helpers.open_choice_modal
         ~title:("Actions · " ^ svc.Service.instance)
-        ~items:
-          [
-            `Details;
-            `Edit;
-            `Start;
-            `Stop;
-            `Restart;
-            `Update_version;
-            `Logs;
-            `Export_logs;
-            `Remove;
-          ]
+        ~items
         ~to_string:(function
+          | `Browse_rpc -> "Browse RPC"
           | `Details -> "Details"
           | `Edit -> "Edit"
           | `Start -> "Start"
@@ -1098,6 +1103,7 @@ let instance_actions_modal state =
           let instance = svc.Service.instance in
           let role = svc.Service.role in
           match choice with
+          | `Browse_rpc -> Context.navigate Rpc_browser.name
           | `Details ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Instance_details.name
@@ -1153,6 +1159,10 @@ let go_to_diagnostics state =
 
 let go_to_binaries state =
   Context.navigate Binaries.name ;
+  state
+
+let go_to_rpc_browser state =
+  Context.navigate Rpc_browser.name ;
   state
 
 let current_external_service s =
