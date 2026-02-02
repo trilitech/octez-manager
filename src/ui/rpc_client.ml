@@ -24,11 +24,9 @@ let rpc_get (s : Service.t) path =
   Common.run_out ["/bin/sh"; "-lc"; cmd_s]
 
 (* Cache tool availability to avoid shell probes on each request. *)
-let has_curl_cached =
-  lazy (Sys.command "command -v curl >/dev/null 2>&1" = 0)
+let has_curl_cached = lazy (Sys.command "command -v curl >/dev/null 2>&1" = 0)
 
-let has_wget_cached =
-  lazy (Sys.command "command -v wget >/dev/null 2>&1" = 0)
+let has_wget_cached = lazy (Sys.command "command -v wget >/dev/null 2>&1" = 0)
 
 let curl_available () = Lazy.force has_curl_cached
 
