@@ -28,13 +28,13 @@ let build_rpc_url service path =
   base ^ path_str
 
 let default_for_dynamic ~name ~typ state =
-  let _ = typ in
-  (* First check history for recent values *)
-  match State.get_recent_values ~segment_type:name state with
+  let _ = name in
+  (* First check history for recent values - use typ (without angle brackets) *)
+  match State.get_recent_values ~segment_type:typ state with
   | recent :: _ -> recent
   | [] -> (
       (* Fall back to hardcoded defaults *)
-      match name with
+      match typ with
       | "chain_id" -> "main"
       | "block_id" -> "head"
       | "block_hash" -> "head"
@@ -47,7 +47,8 @@ let pending_dynamic_update : (State.state -> unit) option ref = ref None
 
 let prompt_dynamic ~name ~typ state on_value on_update =
   let default = default_for_dynamic ~name ~typ state in
-  let recent_values = State.get_recent_values ~segment_type:name state in
+  (* Use typ (without angle brackets) for history lookup *)
+  let recent_values = State.get_recent_values ~segment_type:typ state in
   let title =
     if List.length recent_values > 0 then
       Printf.sprintf "Enter %s (recent: %s)" name
@@ -66,8 +67,8 @@ let prompt_dynamic ~name ~typ state on_value on_update =
     ~placeholder
     ~on_submit:(fun text ->
       let value = if text = "" then default else text in
-      (* Record the value in history *)
-      let new_state = State.add_dynamic_value ~segment_type:name ~value state in
+      (* Record the value in history - use typ (without angle brackets) *)
+      let new_state = State.add_dynamic_value ~segment_type:typ ~value state in
       (match !pending_dynamic_update with
       | Some update -> update new_state
       | None -> ()) ;
