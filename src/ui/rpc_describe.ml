@@ -1,0 +1,190 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+open Octez_manager_lib
+
+type describe_source = [`Describe | `None]
+
+type entry_kind = Sub | Get | Dyn of string
+
+type entry = {name : string; kind : entry_kind}
+
+(* Cache with TTL *)
+type cache_entry = {
+  entries : entry list;
+  source : describe_source;
+  timestamp : float;
+}
+
+let describe_cache : (string * string, cache_entry) Hashtbl.t =
+  Hashtbl.create 97
+
+let cache_mutex = Mutex.create ()
+
+let cache_ttl = 4.0
+
+let clear_cache () =
+  Mutex.lock cache_mutex ;
+  Hashtbl.clear describe_cache ;
+  Mutex.unlock cache_mutex
+
+let get_cached ~rpc_addr ~segs =
+  let key = (rpc_addr, String.concat "/" segs) in
+  Mutex.lock cache_mutex ;
+  let result =
+    match Hashtbl.find_opt describe_cache key with
+    | Some {entries; source; timestamp}
+      when Unix.gettimeofday () -. timestamp < cache_ttl ->
+        Some (entries, source)
+    | Some _ ->
+        Hashtbl.remove describe_cache key ;
+        None
+    | None -> None
+  in
+  Mutex.unlock cache_mutex ;
+  result
+
+let cache_put ~rpc_addr ~segs ~entries ~source =
+  let key = (rpc_addr, String.concat "/" segs) in
+  Mutex.lock cache_mutex ;
+  Hashtbl.replace
+    describe_cache
+    key
+    {entries; source; timestamp = Unix.gettimeofday ()} ;
+  Mutex.unlock cache_mutex
+
+let candidate_paths segs =
+  if segs = [] then ["/describe?recurse=yes"]
+  else
+    let joined = "/" ^ String.concat "/" segs in
+    [
+      "/describe" ^ joined ^ "?recurse=yes";
+      (* prefix form *)
+      joined ^ "/describe?recurse=yes";
+      (* suffix form *)
+    ]
+
+let parse_describe_json (j : Yojson.Safe.t) : entry list =
+  let entries = ref [] in
+  let add_entry e = entries := e :: !entries in
+  (* Helper to extract string from JSON *)
+  let get_string key kvs =
+    match List.assoc_opt key kvs with Some (`String s) -> Some s | _ -> None
+  in
+  (* Check for GET service *)
+  let check_get_service kvs =
+    match List.assoc_opt "static" kvs with
+    | Some (`Assoc stat) -> (
+        match List.assoc_opt "get_service" stat with
+        | Some (`Assoc _) -> add_entry {name = "[GET]"; kind = Get}
+        | _ -> ())
+    | _ -> ()
+  in
+  (* Parse subdirs for suffixes and dynamic_dispatch *)
+  let parse_subdirs subdirs_json =
+    match subdirs_json with
+    | `Assoc kv -> (
+        (* Static suffixes *)
+        (match List.assoc_opt "suffixes" kv with
+        | Some (`List items) ->
+            List.iter
+              (fun item ->
+                match item with
+                | `Assoc item_kv -> (
+                    match get_string "name" item_kv with
+                    | Some name -> add_entry {name; kind = Sub}
+                    | None -> ())
+                | _ -> ())
+              items
+        | _ -> ()) ;
+        (* Dynamic dispatch *)
+        match List.assoc_opt "dynamic_dispatch" kv with
+        | Some (`Assoc dd) -> (
+            match List.assoc_opt "arg" dd with
+            | Some (`Assoc arg) ->
+                let arg_name =
+                  match get_string "name" arg with
+                  | Some n -> n
+                  | None -> "value"
+                in
+                add_entry {name = "<" ^ arg_name ^ ">"; kind = Dyn arg_name}
+            | _ -> ())
+        | _ -> ())
+    | _ -> ()
+  in
+  (* Parse the JSON structure *)
+  (match j with
+  | `Assoc kvs -> (
+      check_get_service kvs ;
+      (* Check static.subdirs *)
+      (match List.assoc_opt "static" kvs with
+      | Some (`Assoc stat) -> (
+          match List.assoc_opt "subdirs" stat with
+          | Some subdirs -> parse_subdirs subdirs
+          | None -> ())
+      | _ -> ()) ;
+      (* Also check top-level subdirs *)
+      match List.assoc_opt "subdirs" kvs with
+      | Some subdirs -> parse_subdirs subdirs
+      | None -> ())
+  | _ -> ()) ;
+  List.rev !entries
+
+let parse_description (j : Yojson.Safe.t) : string option =
+  match j with
+  | `Assoc kvs -> (
+      match List.assoc_opt "static" kvs with
+      | Some (`Assoc stat) -> (
+          match List.assoc_opt "get_service" stat with
+          | Some (`Assoc gs) -> (
+              match List.assoc_opt "description" gs with
+              | Some (`String d) -> Some d
+              | _ -> None)
+          | _ -> None)
+      | _ -> None)
+  | _ -> None
+
+let fetch_entries_uncached (s : Service.t) ~segs =
+  let paths = candidate_paths segs in
+  let rec try_paths = function
+    | [] -> ([], `None)
+    | p :: ps -> (
+        match Rpc_client.http_get_string s p with
+        | Error _ -> try_paths ps
+        | Ok body -> (
+            try
+              let j = Yojson.Safe.from_string body in
+              let entries = parse_describe_json j in
+              if entries <> [] then (entries, `Describe) else try_paths ps
+            with _ -> try_paths ps))
+  in
+  try_paths paths
+
+let fetch_entries (s : Service.t) ~segs =
+  match get_cached ~rpc_addr:s.rpc_addr ~segs with
+  | Some (entries, source) -> (entries, source)
+  | None ->
+      let entries, source = fetch_entries_uncached s ~segs in
+      cache_put ~rpc_addr:s.rpc_addr ~segs ~entries ~source ;
+      (entries, source)
+
+let fetch_description (s : Service.t) ~segs =
+  let paths = candidate_paths segs in
+  let rec try_paths = function
+    | [] -> None
+    | p :: ps -> (
+        match Rpc_client.http_get_string s p with
+        | Error _ -> try_paths ps
+        | Ok body -> (
+            try
+              let j = Yojson.Safe.from_string body in
+              match parse_description j with
+              | Some d -> Some d
+              | None -> try_paths ps
+            with _ -> try_paths ps))
+  in
+  try_paths paths
