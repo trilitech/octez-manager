@@ -51,7 +51,9 @@ let prompt_dynamic ~name ~typ state on_value on_update =
   let recent_values = State.get_recent_values ~segment_type:typ state in
   let title =
     if List.length recent_values > 0 then
-      Printf.sprintf "Enter %s (recent: %s)" name
+      Printf.sprintf
+        "Enter %s (recent: %s)"
+        name
         (String.concat ", " (List.filteri (fun i _ -> i < 3) recent_values))
     else Printf.sprintf "Enter %s" name
   in
@@ -96,14 +98,15 @@ let fetch_entries_sync state =
       in
       State.set_entries state_entries state
 
-let execute_get state on_update =
+(* Internal: execute GET with a specific path for the HTTP request *)
+let execute_get_internal ~url_path state on_update =
   match State.current_instance state with
   | None -> on_update (State.set_error "No instance selected" state)
   | Some service -> (
-      let url = build_rpc_url service state.State.path in
+      let url = build_rpc_url service url_path in
       let state = State.execute_get ~url state in
       on_update state ;
-      let path = "/" ^ String.concat "/" state.State.path in
+      let path = "/" ^ String.concat "/" url_path in
       let start_time = Unix.gettimeofday () in
       match Rpc_client.http_get_url service path with
       | Ok body ->
@@ -124,21 +127,35 @@ let execute_get state on_update =
                state)
       | Error msg -> on_update (State.set_error msg state))
 
+(* Execute GET with an additional endpoint name appended to the path *)
+let execute_get_with_name endpoint_name state on_update =
+  let url_path = state.State.path @ [endpoint_name] in
+  execute_get_internal ~url_path state on_update
+
+let execute_get state on_update =
+  execute_get_internal ~url_path:state.State.path state on_update
+
 let fetch_entries state on_update =
   let new_state = fetch_entries_sync state in
   on_update new_state
 
 let handle_enter state on_update =
   match get_selected_entry state with
-  | None -> ()
+  | None -> on_update (State.set_error "No entry selected" state)
   | Some entry -> (
       match entry.State.kind with
       | State.Sub ->
           let new_state = State.navigate_to entry.State.name state in
           fetch_entries new_state on_update
-      | State.Get -> execute_get state on_update
+      | State.Get ->
+          (* Execute GET - if entry name is empty, GET is at current path *)
+          if entry.State.name = "" then execute_get state on_update
+          else execute_get_with_name entry.State.name state on_update
       | State.Dyn typ ->
-          prompt_dynamic ~name:entry.State.name ~typ state
+          prompt_dynamic
+            ~name:entry.State.name
+            ~typ
+            state
             (fun value ->
               let new_state = State.navigate_to value state in
               fetch_entries new_state on_update)
@@ -183,3 +200,58 @@ let execute_shortcut ~key state on_update =
                    state)
           | Error msg -> on_update (State.set_error msg state)) ;
           true)
+
+let fetch_cached_entries state on_update =
+  match State.current_instance state with
+  | None -> on_update (State.set_error "No instance selected" state)
+  | Some service ->
+      let segs = state.State.path in
+      let entries, _source = Rpc_describe.fetch_entries service ~segs in
+      let state_entries =
+        List.map
+          (fun (e : Rpc_describe.entry) ->
+            let kind =
+              match e.Rpc_describe.kind with
+              | Rpc_describe.Sub -> State.Sub
+              | Rpc_describe.Get -> State.Get
+              | Rpc_describe.Dyn typ -> State.Dyn typ
+            in
+            {State.name = e.Rpc_describe.name; kind})
+          entries
+      in
+      on_update (State.set_cached_entries state_entries state)
+
+let handle_cached_enter state on_update =
+  match State.get_cached_entry state with
+  | None ->
+      (* No entry found at cursor position *)
+      on_update
+        (State.set_error
+           (Printf.sprintf
+              "No entry at cursor %d (entries: %d)"
+              state.State.cached_cursor
+              (List.length state.State.cached_entries))
+           state)
+  | Some entry -> (
+      match entry.State.kind with
+      | State.Sub ->
+          (* Navigate path but stay in Result mode *)
+          let new_state = State.navigate_cached entry.State.name state in
+          fetch_cached_entries new_state on_update
+      | State.Get ->
+          (* Execute GET - if entry name is empty, GET is at current path *)
+          if entry.State.name = "" then execute_get state on_update
+          else execute_get_with_name entry.State.name state on_update
+      | State.Dyn typ ->
+          prompt_dynamic
+            ~name:entry.State.name
+            ~typ
+            state
+            (fun value ->
+              let new_state = State.navigate_cached value state in
+              fetch_cached_entries new_state on_update)
+            on_update)
+
+let navigate_cached_back state on_update =
+  let new_state = State.navigate_cached_up state in
+  fetch_cached_entries new_state on_update

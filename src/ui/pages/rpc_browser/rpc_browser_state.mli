@@ -17,7 +17,22 @@ type entry_kind = Get | Sub | Dyn of string
 (** A navigation entry. *)
 type entry = {name : string; kind : entry_kind}
 
+(** A single pager slot for multi-pager view. *)
+type pager_slot = {
+  id : int;  (** 0-9 identifier *)
+  request : string;  (** URL or empty if new *)
+  body : string;  (** Rendered content *)
+  raw_body : string;  (** Raw JSON *)
+  pager : Miaou_widgets_display.Pager_widget.t option;  (** Pager widget *)
+  foldable : Foldable_json.t option;  (** Fold state *)
+  response_time_ms : float option;
+  response_size : int option;
+}
+
 (** Focus for side-by-side mode. *)
+type result_focus = FocusBrowser | FocusPager of int
+
+(** @deprecated Use result_focus instead *)
 type focus = FocusBrowser | FocusPager
 
 (** Display mode. *)
@@ -28,14 +43,10 @@ type mode =
       loading : bool;  (** Whether entries are being fetched *)
     }
   | Result of {
-      request : string;  (** Full URL requested *)
-      body : string;  (** Response body (may be highlighted) *)
-      raw_body : string;  (** Original unformatted response *)
-      scroll_offset : int;  (** Vertical scroll position *)
-      response_time_ms : float option;  (** Request duration in milliseconds *)
-      response_size : int option;  (** Response body size in bytes *)
-      pager : Miaou_widgets_display.Pager_widget.t option;  (** Pager for scrolling/search *)
-      foldable : Foldable_json.t option;  (** Foldable JSON state *)
+      pagers : pager_slot list;  (** All pagers, max 10 *)
+      focus : result_focus;  (** Browser or which pager *)
+      last_pager_id : int;
+          (** Last focused pager, used when browser is focused *)
     }
 
 (** Dynamic segment value history entry. *)
@@ -56,8 +67,8 @@ type state = {
   mode : mode;  (** Current display mode *)
   openapi_status : openapi_status;  (** OpenAPI spec status *)
   error : string option;  (** Last error message *)
-  focus : focus;  (** Current focus for side-by-side mode *)
-  dynamic_history : dynamic_value list;  (** Recent user-provided dynamic values *)
+  dynamic_history : dynamic_value list;
+      (** Recent user-provided dynamic values *)
   cached_entries : entry list;  (** Cached entries for side-by-side display *)
   cached_cursor : int;  (** Cached cursor position for side-by-side display *)
 }
@@ -99,9 +110,66 @@ val set_entries : entry list -> state -> state
 (** Set loading state for entries. *)
 val set_loading : bool -> state -> state
 
+(** {1 Pager Management} *)
+
+(** Create an empty pager slot with the given ID. *)
+val create_empty_pager : int -> pager_slot
+
+(** Add a new pager to the state. Focus moves to the new pager.
+    Returns None if already at max (10) pagers. *)
+val add_pager : state -> state option
+
+(** Remove a pager by ID. Returns None if only 1 pager remains or ID not found. *)
+val remove_pager : int -> state -> state option
+
+(** Focus a pager by ID. Returns unchanged state if ID not found. *)
+val focus_pager : int -> state -> state
+
+(** Get the currently focused pager slot, if any. *)
+val get_focused_pager : state -> pager_slot option
+
+(** Get the focused pager ID (returns 0 if focus is on browser). *)
+val get_focused_pager_id : state -> int
+
+(** Set result in a specific pager slot.
+    @param pager_id Target pager ID
+    @param request The request URL
+    @param body Formatted/highlighted body
+    @param raw_body Original response
+    @param response_time_ms Optional request duration in milliseconds
+    @param response_size Optional response body size in bytes *)
+val set_pager_result :
+  pager_id:int ->
+  request:string ->
+  body:string ->
+  raw_body:string ->
+  ?response_time_ms:float ->
+  ?response_size:int ->
+  state ->
+  state
+
+(** Find the next available pager ID (0-9), or None if all slots used. *)
+val next_available_id : state -> int option
+
+(** Get the list of all pager IDs in the current state. *)
+val get_pager_ids : state -> int list
+
+(** Check if we're in Result mode. *)
+val is_result_mode : state -> bool
+
+(** Get the current result_focus. Returns FocusBrowser if not in Result mode. *)
+val get_result_focus : state -> result_focus
+
+(** Set the result focus. Only works in Result mode. *)
+val set_result_focus : result_focus -> state -> state
+
 (** {1 Result Mode} *)
 
-(** Execute a GET request (sets mode to Result with loading).
+(** Enter result mode with a single empty pager (pager 0).
+    Focus is set to pager 0. *)
+val enter_result_mode : state -> state
+
+(** Execute a GET request on the focused pager (sets loading state).
     @param url Full URL being requested *)
 val execute_get : url:string -> state -> state
 
@@ -144,19 +212,23 @@ val set_openapi_status : openapi_status -> state -> state
 
 (** {1 Focus} *)
 
-(** Switch focus between browser and pager in side-by-side mode. *)
+(** Switch focus between browser and pager in side-by-side mode.
+    When switching to pager, focuses pager 0. *)
 val toggle_focus : state -> state
 
-(** Set focus explicitly. *)
-val set_focus : focus -> state -> state
+(** Set focus to browser in Result mode. *)
+val focus_browser : state -> state
 
 (** {1 Pager} *)
 
-(** Get the pager from result mode, if available. *)
+(** Get the pager from the focused pager slot, if available. *)
 val get_pager : state -> Miaou_widgets_display.Pager_widget.t option
 
-(** Update the pager in result mode. *)
+(** Update the pager in the focused pager slot. *)
 val set_pager : Miaou_widgets_display.Pager_widget.t -> state -> state
+
+(** Get all pager slots in Result mode. *)
+val get_pagers : state -> pager_slot list
 
 (** {1 Dynamic Value History} *)
 
@@ -176,12 +248,33 @@ val save_dynamic_history : dynamic_value list -> unit
 
 (** {1 JSON Folding} *)
 
-(** Toggle fold at a specific line in the JSON view.
+(** Toggle fold at a specific line in the JSON view of the focused pager.
     @param line Line number to toggle fold at *)
 val toggle_fold : line:int -> state -> state
 
-(** Unfold all JSON sections. *)
+(** Unfold all JSON sections in the focused pager. *)
 val unfold_all_json : state -> state
 
-(** Fold all JSON sections. *)
+(** Fold all JSON sections in the focused pager. *)
 val fold_all_json : state -> state
+
+(** {1 Cached Cursor for Result Mode} *)
+
+(** Move cached cursor up in result mode browser panel. *)
+val cached_cursor_up : state -> state
+
+(** Move cached cursor down in result mode browser panel. *)
+val cached_cursor_down : state -> state
+
+(** Get the entry at the cached cursor position. *)
+val get_cached_entry : state -> entry option
+
+(** Navigate to a child path while staying in Result mode.
+    Updates path and clears cached entries (to be refetched). *)
+val navigate_cached : string -> state -> state
+
+(** Set cached entries (used after fetching for Result mode browser). *)
+val set_cached_entries : entry list -> state -> state
+
+(** Navigate up one level while staying in Result mode. *)
+val navigate_cached_up : state -> state

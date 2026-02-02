@@ -17,6 +17,12 @@
   cmd_self_update
   cmd_utils
   cmd_rpc)
- (libraries octez_manager_lib octez-manager.ui cmdliner rresult yojson linenoise)
+ (libraries
+  octez_manager_lib
+  octez-manager.ui
+  cmdliner
+  rresult
+  yojson
+  linenoise)
  (instrumentation
   (backend bisect_ppx)))

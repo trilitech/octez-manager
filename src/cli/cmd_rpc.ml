@@ -44,8 +44,7 @@ let execute_get service path =
 let get_completions service prefix =
   (* Split prefix into path segments *)
   let segments =
-    String.split_on_char '/' prefix
-    |> List.filter (fun s -> s <> "")
+    String.split_on_char '/' prefix |> List.filter (fun s -> s <> "")
   in
   (* Get parent path and partial segment *)
   let parent_segs, partial =
@@ -54,16 +53,26 @@ let get_completions service prefix =
     | last :: rest -> (List.rev rest, last)
   in
   (* Fetch entries at parent path *)
-  let entries, _ = Octez_manager_ui.Rpc_describe.fetch_entries service ~segs:parent_segs in
+  let entries, _ =
+    Octez_manager_ui.Rpc_describe.fetch_entries service ~segs:parent_segs
+  in
   (* Filter by partial match *)
   List.filter_map
     (fun (e : Octez_manager_ui.Rpc_describe.entry) ->
-      if String.length partial = 0 || String.sub e.name 0 (min (String.length partial) (String.length e.name)) = partial then
+      if
+        String.length partial = 0
+        || String.sub
+             e.name
+             0
+             (min (String.length partial) (String.length e.name))
+           = partial
+      then
         let kind_str =
           match e.kind with
           | Octez_manager_ui.Rpc_describe.Sub -> "[SUB]"
           | Octez_manager_ui.Rpc_describe.Get -> "[GET]"
-          | Octez_manager_ui.Rpc_describe.Dyn typ -> Printf.sprintf "[DYN:%s]" typ
+          | Octez_manager_ui.Rpc_describe.Dyn typ ->
+              Printf.sprintf "[DYN:%s]" typ
         in
         Some (e.name, kind_str)
       else None)
@@ -100,8 +109,8 @@ let completion_callback service input =
         let name = e.name in
         if
           String.length partial = 0
-          || (String.length name >= String.length partial
-             && String.sub name 0 (String.length partial) = partial)
+          || String.length name >= String.length partial
+             && String.sub name 0 (String.length partial) = partial
         then Some (build_path (parent_segs @ [name]))
         else None)
       entries
@@ -109,7 +118,10 @@ let completion_callback service input =
 (** Interactive RPC REPL with linenoise *)
 let run_interactive service =
   Printf.printf "RPC Interactive Mode\n" ;
-  Printf.printf "Instance: %s (%s)\n" service.Service.instance service.Service.network ;
+  Printf.printf
+    "Instance: %s (%s)\n"
+    service.Service.instance
+    service.Service.network ;
   Printf.printf "Commands: /path (execute), Tab (complete), help, exit\n\n" ;
   flush stdout ;
   (* Set up linenoise completion *)
@@ -122,7 +134,12 @@ let run_interactive service =
         let completions = completion_callback service line_so_far in
         match completions with
         | c :: _ when c <> line_so_far ->
-            let hint = String.sub c (String.length line_so_far) (String.length c - String.length line_so_far) in
+            let hint =
+              String.sub
+                c
+                (String.length line_so_far)
+                (String.length c - String.length line_so_far)
+            in
             Some (hint, LNoise.Cyan, false)
         | _ -> None
       else None) ;
@@ -131,8 +148,8 @@ let run_interactive service =
     Filename.concat (Common.xdg_config_home ()) "octez-manager/rpc_history"
   in
   let history_dir = Filename.dirname history_file in
-  if not (Sys.file_exists history_dir) then (
-    try Unix.mkdir history_dir 0o755 with _ -> ()) ;
+  (if not (Sys.file_exists history_dir) then
+     try Unix.mkdir history_dir 0o755 with _ -> ()) ;
   ignore (LNoise.history_load ~filename:history_file) ;
   ignore (LNoise.history_set ~max_length:100) ;
   (* Main loop *)
@@ -158,7 +175,9 @@ let run_interactive service =
           else if String.length line > 0 && line.[0] = '/' then (
             (* Strip [GET] suffix if present (user selected from completion) *)
             let path =
-              if String.length line > 6 && String.sub line (String.length line - 6) 6 = "/[GET]"
+              if
+                String.length line > 6
+                && String.sub line (String.length line - 6) 6 = "/[GET]"
               then String.sub line 0 (String.length line - 6)
               else line
             in
@@ -183,7 +202,8 @@ let get_cmd =
       & info ["i"; "instance"] ~doc:"Instance name" ~docv:"INSTANCE")
   in
   let path_arg =
-    Arg.(required & pos 0 (some string) None & info [] ~doc:"RPC path" ~docv:"PATH")
+    Arg.(
+      required & pos 0 (some string) None & info [] ~doc:"RPC path" ~docv:"PATH")
   in
   let term =
     Term.(
@@ -250,11 +270,11 @@ let list_cmd =
                  let source_str =
                    match source with `Describe -> "describe" | `None -> "none"
                  in
-                 Printf.printf "Path: /%s (source: %s)\n\n"
+                 Printf.printf
+                   "Path: /%s (source: %s)\n\n"
                    (String.concat "/" segs)
                    source_str ;
-                 if entries = [] then
-                   Printf.printf "  (no entries)\n"
+                 if entries = [] then Printf.printf "  (no entries)\n"
                  else
                    List.iter
                      (fun (e : Octez_manager_ui.Rpc_describe.entry) ->
@@ -279,8 +299,7 @@ let instances_cmd =
     Term.(
       const (fun () ->
           let instances = list_instances () in
-          if instances = [] then
-            Printf.printf "No node instances found.\n"
+          if instances = [] then Printf.printf "No node instances found.\n"
           else (
             Printf.printf "Available node instances:\n" ;
             List.iter (fun i -> Printf.printf "  %s\n" i) instances) ;

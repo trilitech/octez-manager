@@ -34,9 +34,13 @@ let render_entry_kind = function
 let render_entry ~cursor ~idx entry =
   let is_selected = cursor = idx in
   let marker = if is_selected then Widgets.fg 14 "▸ " else "  " in
-  let name =
-    if is_selected then Widgets.bold entry.State.name else entry.State.name
+  (* For GET at current path, show [GET] as the name *)
+  let display_name =
+    match (entry.State.name, entry.State.kind) with
+    | "", State.Get -> "[GET]"
+    | name, _ -> name
   in
+  let name = if is_selected then Widgets.bold display_name else display_name in
   let kind = render_entry_kind entry.State.kind in
   Printf.sprintf "%s%-40s %s" marker name kind
 
