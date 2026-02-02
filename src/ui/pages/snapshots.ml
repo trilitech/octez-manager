@@ -103,7 +103,7 @@ let move_selection ps delta =
 let select_network ps =
   Modal_helpers.open_choice_modal
     ~title:"Select Network"
-    ~items:["mainnet"; "ghostnet"; "weeklynet"]
+    ~items:["mainnet"; "weeklynet"]
     ~to_string:(fun x -> x)
     ~on_select:(fun _network ->
       (* TODO: Implement network selection properly *)

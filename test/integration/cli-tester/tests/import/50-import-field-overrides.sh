@@ -19,36 +19,35 @@ systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
 rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
 systemctl daemon-reload
 
-# Create external service on ghostnet
+# Create external service on weeklynet
 echo "Creating external service..."
 mkdir -p "$DATA_DIR"
 inject_identity "$EXTERNAL_INSTANCE" "$DATA_DIR"
 chown -R tezos:tezos "$DATA_DIR"
-create_external_service "node" "$EXTERNAL_INSTANCE" "$DATA_DIR" "$RPC_ADDR" "ghostnet"
+create_external_service "node" "$EXTERNAL_INSTANCE" "$DATA_DIR" "$RPC_ADDR" "weeklynet"
 systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
 systemctl start "octez-node@${EXTERNAL_INSTANCE}.service"
 sleep 2
 
-
 # Import with custom name override
 echo "Importing with custom instance name..."
 om import "octez-node@${EXTERNAL_INSTANCE}" --as "$CUSTOM_INSTANCE" 2>&1 || {
-# Stop service
-systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-    echo "Import failed, showing current state..."
-    om list 2>&1
+	# Stop service
+	systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
+	echo "Import failed, showing current state..."
+	om list 2>&1
 }
 
 # Verify service has custom name
 if ! service_is_managed "$CUSTOM_INSTANCE"; then
-    echo "ERROR: Service should be imported with custom name"
-    om list 2>&1
-    exit 1
+	echo "ERROR: Service should be imported with custom name"
+	om list 2>&1
+	exit 1
 fi
 
 # Verify original name is not in managed instances
 if om list 2>&1 | grep -v "external" | grep -q "$EXTERNAL_INSTANCE"; then
-    echo "WARNING: Original name found in managed instances"
+	echo "WARNING: Original name found in managed instances"
 fi
 
 echo "Field overrides test completed"
