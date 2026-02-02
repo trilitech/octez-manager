@@ -256,11 +256,11 @@ let test_different_networks () =
         ();
       Mock_service_helpers.running_service
         ~instance:"node-2"
-        ~network:"weeklynet"
+        ~network:"shadownet"
         ();
       Mock_service_helpers.running_service
         ~instance:"node-3"
-        ~network:"weeklynet"
+        ~network:"shadownet"
         ();
     ]
   in

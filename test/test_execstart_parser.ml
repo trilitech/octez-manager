@@ -188,11 +188,11 @@ let test_parse_dal_node_command () =
 
 let test_parse_shell_wrapped_node () =
   let cmd =
-    "/bin/sh -c '/usr/bin/octez-node run --data-dir /data --network weeklynet'"
+    "/bin/sh -c '/usr/bin/octez-node run --data-dir /data --network shadownet'"
   in
   let result = Execstart_parser.parse cmd in
   check_option_string "data_dir from shell" (Some "/data") result.data_dir ;
-  check_option_string "network from shell" (Some "weeklynet") result.network
+  check_option_string "network from shell" (Some "shadownet") result.network
 
 let test_parse_shell_with_double_quotes () =
   let cmd = "/bin/bash -c \"/usr/bin/octez-node run --network mainnet\"" in

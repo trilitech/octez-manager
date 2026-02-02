@@ -884,10 +884,10 @@ let test_node_form_change_network () =
         "shows network options"
         true
         (TH.contains_substring picker_screen "mainnet"
-        || TH.contains_substring picker_screen "ghostnet"
+        || TH.contains_substring picker_screen "shadownet"
         || TH.contains_substring picker_screen "Network") ;
 
-      (* Navigate down to select a different network (ghostnet) *)
+      (* Navigate down to select a different network (shadownet) *)
       ignore (TH.send_key_and_wait "Down") ;
 
       (* Select it *)
@@ -898,13 +898,12 @@ let test_node_form_change_network () =
 
       (* The form should now show the selected network *)
       let screen2 = TH.get_screen_text () in
-      (* Either ghostnet is shown or we stayed on shadownet - both are valid *)
+      (* Either shadownet is shown or we stayed on shadownet - both are valid *)
       check
         bool
         "network field has value"
         true
-        (TH.contains_substring screen2 "shadownet"
-        || TH.contains_substring screen2 "ghostnet"))
+        (TH.contains_substring screen2 "shadownet"))
 
 (** Test: Navigate through entire node form without errors.
     Verifies all fields are accessible and form structure is intact.

@@ -25,13 +25,13 @@ let sample_network_json =
   {|
 [
   {
-    "alias": "ghostnet",
-    "network_url": "https://teztnets.com/ghostnet",
+    "alias": "shadownet",
+    "network_url": "https://teztnets.com/shadownet",
     "chain_name": "NetXnHfVqm9iesp",
-    "human_name": "Ghostnet",
-    "description": "Long-running testnet",
-    "faucet_url": "https://faucet.ghostnet.teztnets.com",
-    "rpc_url": "https://rpc.ghostnet.teztnets.com"
+    "human_name": "Shadownet",
+    "description": "Shadow testnet",
+    "faucet_url": "https://faucet.shadownet.teztnets.com",
+    "rpc_url": "https://rpc.shadownet.teztnets.com"
   },
   {
     "alias": "parisnet",
@@ -117,7 +117,7 @@ let test_fallback_has_mainnet () =
   (* Just check fallback list is not empty *)
   check bool "fallback pairs exist" true (List.length pairs > 0)
 
-let test_fallback_has_ghostnet () =
+let test_fallback_has_shadownet () =
   let pairs = Teztnets.fallback_pairs in
   (* Check all pairs have non-empty values *)
   let all_valid =
@@ -134,7 +134,7 @@ let test_fallback_has_ghostnet () =
 let test_resolve_network_from_chain () =
   let result = Teztnets.resolve_network_from_node_chain "NetXnHfVqm9iesp" in
   match result with
-  | Ok network -> check string "resolved to ghostnet" "ghostnet" network.alias
+  | Ok network -> check string "resolved to shadownet" "shadownet" network.alias
   | Error _ -> check bool "or not found" true true
 
 let test_resolve_unknown_chain () =
@@ -155,13 +155,13 @@ let test_resolve_for_octez_node_mainnet () =
   | Ok url -> check bool "got URL" true (String.length url > 0)
   | Error _ -> fail "should resolve mainnet"
 
-let test_resolve_for_octez_node_ghostnet () =
+let test_resolve_for_octez_node_shadownet () =
   let result =
-    Teztnets.resolve_network_for_octez_node ~fetch:(fun () -> Ok []) "ghostnet"
+    Teztnets.resolve_network_for_octez_node ~fetch:(fun () -> Ok []) "shadownet"
   in
   match result with
-  | Ok url -> check bool "got ghostnet URL" true (String.length url > 0)
-  | Error _ -> fail "should resolve ghostnet"
+  | Ok url -> check bool "got shadownet URL" true (String.length url > 0)
+  | Error _ -> fail "should resolve shadownet"
 
 let test_resolve_for_octez_node_unknown () =
   let result =
@@ -230,7 +230,7 @@ let fallback_tests =
   [
     ("fallback not empty", `Quick, test_fallback_pairs_not_empty);
     ("fallback has mainnet", `Quick, test_fallback_has_mainnet);
-    ("fallback has ghostnet", `Quick, test_fallback_has_ghostnet);
+    ("fallback has shadownet", `Quick, test_fallback_has_shadownet);
   ]
 
 let resolve_tests =
@@ -242,7 +242,7 @@ let resolve_tests =
 let resolve_octez_tests =
   [
     ("resolve mainnet", `Quick, test_resolve_for_octez_node_mainnet);
-    ("resolve ghostnet", `Quick, test_resolve_for_octez_node_ghostnet);
+    ("resolve shadownet", `Quick, test_resolve_for_octez_node_shadownet);
     ("resolve unknown", `Quick, test_resolve_for_octez_node_unknown);
   ]
 

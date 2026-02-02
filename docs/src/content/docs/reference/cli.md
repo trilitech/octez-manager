@@ -40,7 +40,7 @@ octez-manager install-node [OPTIONS]
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--instance <NAME>` | Instance name | (prompted) |
-| `--network <NET>` | Network (mainnet, weeklynet, etc.) | (prompted) |
+| `--network <NET>` | Network (mainnet, shadownet, etc.) | (prompted) |
 | `--history-mode <MODE>` | rolling, full, archive | rolling |
 | `--data-dir <PATH>` | Data directory | auto |
 | `--rpc-addr <ADDR>` | RPC address | 127.0.0.1:8732 |

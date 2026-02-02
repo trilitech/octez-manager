@@ -26,8 +26,8 @@ Examples:
     # Create services without snapshot (shadownet)
     $0
 
-    # Create services for weeklynet without snapshot
-    $0 --network weeklynet
+    # Create services for shadownet without snapshot
+    $0 --network shadownet
 
     # Create services with snapshot download (shadownet)
     $0 --snapshot
@@ -36,7 +36,7 @@ Examples:
     $0 --snapshot /path/to/snapshot.rolling
 
     # Create services with snapshot for specific network
-    $0 --snapshot --network weeklynet
+    $0 --snapshot --network shadownet
 
     # Create services with local snapshot for mainnet
     $0 --snapshot snapshot_file --network mainnet
@@ -143,11 +143,11 @@ if [ "$USE_SNAPSHOT" = true ] && [ ! -f "${NODE_DATA_DIR}/context/store.dict" ];
 			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/mainnet/rolling"
 			;;
 		shadownet)
-			echo "  Note: Using weeklynet snapshot for shadownet (no dedicated shadownet snapshots)"
-			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/weeklynet/rolling"
+			echo "  Note: Using shadownet snapshot for shadownet (no dedicated shadownet snapshots)"
+			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/shadownet/rolling"
 			;;
-		weeklynet)
-			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/weeklynet/rolling"
+		shadownet)
+			SNAPSHOT_URL="https://snapshots.eu.tzinit.org/shadownet/rolling"
 			;;
 		*)
 			echo "Warning: No default snapshot URL for network ${NETWORK}"
