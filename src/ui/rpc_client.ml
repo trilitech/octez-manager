@@ -23,12 +23,16 @@ let rpc_get (s : Service.t) path =
   let cmd_s = Common.cmd_to_string argv ^ " 2>/dev/null" in
   Common.run_out ["/bin/sh"; "-lc"; cmd_s]
 
-let curl_available () = Sys.command "command -v curl >/dev/null 2>&1" = 0
+(* Cache tool availability to avoid shell probes on each request. *)
+let has_curl_cached =
+  lazy (Sys.command "command -v curl >/dev/null 2>&1" = 0)
 
-let wget_available () = Sys.command "command -v wget >/dev/null 2>&1" = 0
+let has_wget_cached =
+  lazy (Sys.command "command -v wget >/dev/null 2>&1" = 0)
 
-(* Cache curl availability to avoid a shell probe on each request. *)
-let has_curl_cached = lazy (curl_available ())
+let curl_available () = Lazy.force has_curl_cached
+
+let wget_available () = Lazy.force has_wget_cached
 
 let rec try_fetch_methods last_err = function
   | [] -> (
@@ -87,7 +91,7 @@ let absolutize_url (s : Service.t) (path : string) : string =
 let http_fetch_methods ~url ~rpc_path (s : Service.t) :
     (unit -> (string, string) result option) list =
   let via_curl () =
-    if Lazy.force has_curl_cached then
+    if curl_available () then
       Some
         (with_request_slot (fun () ->
              match
