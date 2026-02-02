@@ -18,6 +18,7 @@ _octez-manager() {
     'list-available-networks:Show networks advertised on teztnets.com (with fallbacks).'
     'list-snapshots:List downloads published on snapshots.tzinit.org for a network.'
     'purge-all:Purge all registered instances. This removes each service, deletes data directories, log files, and (when run as root) drops service users that are no longer referenced by other services.'
+    'rpc:Query RPC endpoints on node instances'
     'self-update:Check for and install octez-manager updates'
     'ui:Launch the interactive terminal UI (same as running without arguments)'
     'version:Show version information and check for updates'
@@ -212,6 +213,12 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
+  local -a opts_rpc
+  opts_rpc=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
   local -a opts_self_update
   opts_self_update=(
     '-c[Only check for updates, don'\''t install]'
@@ -331,6 +338,10 @@ _octez-manager() {
         purge-all)
           _arguments \
             $opts_purge_all
+          ;;
+        rpc)
+          _arguments \
+            $opts_rpc
           ;;
         self-update)
           _arguments \
