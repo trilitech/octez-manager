@@ -46,11 +46,12 @@ let visible_length s =
 
 let render_pager_header ~slot ~is_focused =
   let id_marker =
-    if is_focused then Printf.sprintf "[%d*]" slot.State.id
+    if is_focused then Printf.sprintf ">>>[%d]<<<" slot.State.id
     else Printf.sprintf "[%d]" slot.State.id
   in
   let id_str =
-    if is_focused then Widgets.fg 14 id_marker else Widgets.dim id_marker
+    if is_focused then Widgets.bold (Widgets.fg 14 id_marker)
+    else Widgets.dim id_marker
   in
   let request_str =
     if slot.State.request = "" then Widgets.dim "(empty)"
@@ -60,17 +61,24 @@ let render_pager_header ~slot ~is_focused =
           String.sub slot.State.request 0 37 ^ "..."
         else slot.State.request
       in
-      if is_focused then Widgets.bold short_req else Widgets.dim short_req
+      if is_focused then Widgets.bold (Widgets.fg 14 short_req)
+      else Widgets.dim short_req
   in
   let time_str =
     match slot.State.response_time_ms with
-    | Some t -> Widgets.dim (Printf.sprintf " [%.0fms]" t)
+    | Some t ->
+        if is_focused then Widgets.fg 14 (Printf.sprintf " [%.0fms]" t)
+        else Widgets.dim (Printf.sprintf " [%.0fms]" t)
     | None -> ""
   in
   let size_str =
     match slot.State.response_size with
-    | Some s when s >= 1024 -> Widgets.dim (Printf.sprintf " %dKB" (s / 1024))
-    | Some s -> Widgets.dim (Printf.sprintf " %dB" s)
+    | Some s when s >= 1024 ->
+        if is_focused then Widgets.fg 14 (Printf.sprintf " %dKB" (s / 1024))
+        else Widgets.dim (Printf.sprintf " %dKB" (s / 1024))
+    | Some s ->
+        if is_focused then Widgets.fg 14 (Printf.sprintf " %dB" s)
+        else Widgets.dim (Printf.sprintf " %dB" s)
     | None -> ""
   in
   Printf.sprintf "%s GET %s%s%s" id_str request_str time_str size_str
@@ -104,8 +112,9 @@ let render_single_pager ~slot ~cols ~rows ~is_focused =
     if header_visible_len >= cols then header
     else header ^ String.make (cols - header_visible_len) ' '
   in
-  let separator =
-    if is_focused then Widgets.fg 14 (String.make cols '-')
+  (* Use bold bright border for focused pager, dim for unfocused *)
+  let border =
+    if is_focused then Widgets.bold (Widgets.fg 14 (String.make cols '='))
     else Widgets.dim (String.make cols '-')
   in
   let chrome_lines = 2 in
@@ -118,7 +127,7 @@ let render_single_pager ~slot ~cols ~rows ~is_focused =
         if slot.State.request = "" then Widgets.dim "(no request yet)"
         else render_loading ()
   in
-  Printf.sprintf "%s\n%s\n%s" header_padded separator body_content
+  Printf.sprintf "%s\n%s\n%s" header_padded border body_content
 
 (** Render hidden pager indicator *)
 let render_hidden_indicator ~hidden_left ~hidden_right =
