@@ -58,6 +58,8 @@ type state = {
   error : string option;  (** Last error message *)
   focus : focus;  (** Current focus for side-by-side mode *)
   dynamic_history : dynamic_value list;  (** Recent user-provided dynamic values *)
+  cached_entries : entry list;  (** Cached entries for side-by-side display *)
+  cached_cursor : int;  (** Cached cursor position for side-by-side display *)
 }
 
 (** {1 Initialization} *)
