@@ -126,29 +126,42 @@ let handle_key ps key ~size:_ =
     let s = ps.Navigation.s in
     match s.State.mode with
     | State.List _ -> (
-        match Keys.of_string key with
-        | Some Keys.Escape -> back ps
-        | Some Keys.Enter -> (
-            Actions.handle_enter s update_state ;
+        (* Check for shortcut keys (1-9) when at root *)
+        let shortcut_keys = ["1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
+        let is_shortcut_key =
+          s.State.path = [] && List.exists (fun k -> key = k) shortcut_keys
+        in
+        if is_shortcut_key then
+          let handled = Actions.execute_shortcut ~key s update_state in
+          if handled then
             match !state_ref with
             | Some new_s -> Navigation.update (fun _ -> new_s) ps
-            | None -> ps)
-        | Some Keys.Up | Some (Keys.Char "k") ->
-            let new_state = State.cursor_up s in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | Some Keys.Down | Some (Keys.Char "j") ->
-            let new_state = State.cursor_down s in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | Some (Keys.Char "u") | Some Keys.Backspace -> back ps
-        | Some (Keys.Char "r") -> refresh ps
-        | Some Keys.Tab ->
-            let new_state = Actions.cycle_instance ~delta:1 s in
-            let new_state = Actions.fetch_entries_sync new_state in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps
-        | _ -> ps)
+            | None -> ps
+          else ps
+        else
+          match Keys.of_string key with
+          | Some Keys.Escape -> back ps
+          | Some Keys.Enter -> (
+              Actions.handle_enter s update_state ;
+              match !state_ref with
+              | Some new_s -> Navigation.update (fun _ -> new_s) ps
+              | None -> ps)
+          | Some Keys.Up | Some (Keys.Char "k") ->
+              let new_state = State.cursor_up s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | Some Keys.Down | Some (Keys.Char "j") ->
+              let new_state = State.cursor_down s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | Some (Keys.Char "u") | Some Keys.Backspace -> back ps
+          | Some (Keys.Char "r") -> refresh ps
+          | Some Keys.Tab ->
+              let new_state = Actions.cycle_instance ~delta:1 s in
+              let new_state = Actions.fetch_entries_sync new_state in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | _ -> ps)
     | State.Result _ -> (
         match Keys.of_string key with
         | Some Keys.Escape -> back ps
