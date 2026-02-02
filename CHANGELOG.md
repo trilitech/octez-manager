@@ -9,6 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - TUI now shows notification when octez-manager update is available and recommends running `self-update` command
+- **RPC Browser**: Interactive RPC endpoint explorer accessible via `r` key
+  - Navigate endpoint tree with cursor keys and Enter
+  - JSON syntax highlighting for responses
+  - Response time and size displayed in result header
+  - Quick access shortcuts (1-5) for common endpoints
+  - Smart defaults for dynamic segments (chain_id → "main", block_id → "head")
+  - Instance selection via Tab to query any managed node
+  - Browse RPC action in node context menu
+- **RPC CLI**: Command-line RPC tools with `octez-manager rpc` subcommands
+  - `rpc get -i INSTANCE PATH` - Execute GET request
+  - `rpc list -i INSTANCE [PATH]` - List available endpoints
+  - `rpc interactive -i INSTANCE` - Interactive mode with tab completion
+  - `rpc instances` - List available node instances
 
 ### Changed
 
