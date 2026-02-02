@@ -54,10 +54,24 @@ val render_help : unit -> string
 
 (** {1 Main Rendering} *)
 
+(** Render using pager widget.
+    @param pager The pager widget
+    @param cols Terminal width
+    @param rows Terminal height
+    @param focus Whether pager has focus *)
+val render_with_pager :
+  pager:Miaou_widgets_display.Pager_widget.t ->
+  cols:int ->
+  rows:int ->
+  focus:bool ->
+  string
+
 (** Render complete result view from state.
+    Uses pager widget when available for scrolling/search support.
     @param state Current RPC Browser state (must be in Result mode)
     @param cols Terminal width
     @param rows Terminal height
-    @return List of rendered lines *)
+    @param focus Whether result view has focus
+    @return Rendered content as single string *)
 val render :
-  state:Rpc_browser_state.state -> cols:int -> rows:int -> string list
+  state:Rpc_browser_state.state -> cols:int -> rows:int -> focus:bool -> string

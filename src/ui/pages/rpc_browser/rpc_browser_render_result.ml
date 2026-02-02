@@ -6,6 +6,7 @@
 (******************************************************************************)
 
 module Widgets = Miaou_widgets_display.Widgets
+module Pager = Miaou_widgets_display.Pager_widget
 module State = Rpc_browser_state
 
 let render_header ~request ~response_time_ms ~response_size =
@@ -42,45 +43,33 @@ let render_loading () =
 let render_error msg = Widgets.red ("Error: " ^ msg)
 
 let render_help () =
-  let keys =
-    [
-      ("j/k", "scroll");
-      ("PgUp/Dn", "page");
-      ("g/G", "top/bottom");
-      ("Esc", "back");
-    ]
-  in
-  let parts = List.map (fun (k, v) -> Printf.sprintf "%s: %s" k v) keys in
-  Widgets.dim (String.concat "  " parts)
+  Widgets.dim "?: help  s: save  Esc: back"
 
-let render ~state ~cols ~rows =
-  let _ = cols in
+(** Render using pager widget when available *)
+let render_with_pager ~pager ~cols ~rows ~focus =
+  Pager.render ~cols ~win:rows pager ~focus
+
+(** Render result mode - returns pager output or fallback *)
+let render ~state ~cols ~rows ~focus =
   match state.State.mode with
   | State.List _ ->
       (* List mode is handled by a different renderer *)
-      [Widgets.dim "(list mode - use list renderer)"]
-  | State.Result
-      {request; body; scroll_offset; response_time_ms; response_size; _} ->
+      Widgets.dim "(list mode - use list renderer)"
+  | State.Result {request; response_time_ms; response_size; pager; _} ->
       let header = render_header ~request ~response_time_ms ~response_size in
-      let separator = Widgets.dim (String.make 60 '-') in
       let help = render_help () in
-      (* Calculate available height for body *)
-      let chrome_lines = 4 in
-      (* header + 2 separators + help *)
-      let visible_height = max 1 (rows - chrome_lines) in
-      let body_lines = render_body ~body ~scroll_offset ~visible_height in
-      let total_lines = List.length (String.split_on_char '\n' body) in
-      let scroll_ind =
-        render_scroll_indicator ~current:scroll_offset ~total:total_lines
-      in
-      let header_with_scroll =
-        if scroll_ind = "" then header
-        else Printf.sprintf "%s  %s" header scroll_ind
+      let separator = Widgets.dim (String.make (min 60 cols) '-') in
+      (* Calculate available height for pager (minus header/help chrome) *)
+      let chrome_lines = 3 in
+      let pager_rows = max 1 (rows - chrome_lines) in
+      let body_content =
+        match pager with
+        | Some p -> render_with_pager ~pager:p ~cols ~rows:pager_rows ~focus
+        | None -> Widgets.dim "Loading..."
       in
       let error_line =
         match state.State.error with
-        | Some msg -> [render_error msg]
-        | None -> []
+        | Some msg -> "\n" ^ render_error msg
+        | None -> ""
       in
-      [header_with_scroll; separator]
-      @ body_lines @ error_line @ [separator; help]
+      Printf.sprintf "%s\n%s\n%s%s\n%s" header separator body_content error_line help
