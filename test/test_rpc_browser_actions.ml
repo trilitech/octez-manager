@@ -134,19 +134,18 @@ let test_cycle_instance_backward () =
 (* ============================================================ *)
 
 let test_shortcuts_defined () =
-  let shortcuts = Actions.shortcuts in
+  let shortcuts = Actions.default_shortcuts in
   Alcotest.(check bool) "has shortcuts" true (List.length shortcuts >= 5)
 
 let test_shortcuts_format () =
   List.iter
-    (fun (key, path, desc) ->
-      Alcotest.(check bool) "key not empty" true (String.length key > 0) ;
+    (fun (path, desc) ->
       Alcotest.(check bool)
         "path starts with /"
         true
         (String.length path > 0 && path.[0] = '/') ;
       Alcotest.(check bool) "desc not empty" true (String.length desc > 0))
-    Actions.shortcuts
+    Actions.default_shortcuts
 
 (* ============================================================ *)
 (* Test Runner                                                   *)

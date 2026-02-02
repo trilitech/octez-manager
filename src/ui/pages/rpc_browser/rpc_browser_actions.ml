@@ -7,15 +7,27 @@
 
 module State = Rpc_browser_state
 
-(** Quick access shortcuts for common RPC endpoints *)
-let shortcuts =
+(** Default shortcuts for when no recent paths exist *)
+let default_shortcuts =
   [
-    ("1", "/version", "Node version");
-    ("2", "/chains/main/blocks/head", "Latest block");
-    ("3", "/chains/main/is_bootstrapped", "Bootstrap status");
-    ("4", "/network/connections", "Network peers");
-    ("5", "/config/network", "Network config");
+    ("/version", "Node version");
+    ("/chains/main/blocks/head", "Latest block");
+    ("/chains/main/is_bootstrapped", "Bootstrap status");
+    ("/network/connections", "Network peers");
+    ("/config/network", "Network config");
   ]
+
+(** Get shortcuts from LRU or defaults - returns (key, path, desc) list *)
+let get_shortcuts state =
+  let recent = State.get_recent_paths state in
+  if List.length recent > 0 then
+    List.mapi
+      (fun i rp -> (string_of_int (i + 1), rp.State.rp_path, rp.State.rp_desc))
+      recent
+  else
+    List.mapi
+      (fun i (path, desc) -> (string_of_int (i + 1), path, desc))
+      default_shortcuts
 
 let get_selected_entry state =
   match state.State.mode with
@@ -84,18 +96,30 @@ let fetch_entries_sync state =
   | Some service ->
       let segs = state.State.path in
       let entries, _source = Rpc_describe.fetch_entries service ~segs in
-      let state_entries =
-        List.map
-          (fun (e : Rpc_describe.entry) ->
-            let kind =
-              match e.Rpc_describe.kind with
-              | Rpc_describe.Sub -> State.Sub
-              | Rpc_describe.Get -> State.Get
-              | Rpc_describe.Dyn typ -> State.Dyn typ
+      (* Expand Dyn entries to include recent values *)
+      let expand_entry (e : Rpc_describe.entry) =
+        match e.Rpc_describe.kind with
+        | Rpc_describe.Sub -> [{State.name = e.Rpc_describe.name; kind = State.Sub}]
+        | Rpc_describe.Get -> [{State.name = e.Rpc_describe.name; kind = State.Get}]
+        | Rpc_describe.Dyn typ ->
+            (* Get recent values for this type, limit to 5 *)
+            let recent =
+              State.get_recent_values ~segment_type:typ state
+              |> fun lst ->
+              if List.length lst > 5 then List.filteri (fun i _ -> i < 5) lst
+              else lst
             in
-            {State.name = e.Rpc_describe.name; kind})
-          entries
+            (* Create DynValue entries for recent values *)
+            let recent_entries =
+              List.map
+                (fun value ->
+                  {State.name = "<>" ^ value; kind = State.DynValue (typ, value)})
+                recent
+            in
+            (* Add the original Dyn entry after recent values *)
+            recent_entries @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
       in
+      let state_entries = List.concat_map expand_entry entries in
       State.set_entries state_entries state
 
 (* Internal: execute GET with a specific path for the HTTP request *)
@@ -159,7 +183,12 @@ let handle_enter state on_update =
             (fun value ->
               let new_state = State.navigate_to value state in
               fetch_entries new_state on_update)
-            on_update)
+            on_update
+      | State.DynValue (typ, value) ->
+          (* Navigate directly with the recent value, record in history *)
+          let new_state = State.add_dynamic_value ~segment_type:typ ~value state in
+          let new_state = State.navigate_to value new_state in
+          fetch_entries new_state on_update)
 
 let cycle_instance ~delta state =
   let n = List.length state.State.instances in
@@ -169,15 +198,18 @@ let cycle_instance ~delta state =
     State.select_instance new_idx state
 
 let execute_shortcut ~key state on_update =
+  let shortcuts = get_shortcuts state in
   match List.find_opt (fun (k, _, _) -> k = key) shortcuts with
   | None -> false
-  | Some (_, path, _) -> (
+  | Some (_, path, desc) -> (
       match State.current_instance state with
       | None ->
           on_update (State.set_error "No instance selected" state) ;
           true
       | Some service ->
           let url = Rpc_client.endpoint_of service ^ path in
+          (* Record in LRU before executing *)
+          let state = State.add_recent_path ~path ~desc state in
           let state = State.execute_get ~url state in
           on_update state ;
           let start_time = Unix.gettimeofday () in
@@ -207,18 +239,27 @@ let fetch_cached_entries state on_update =
   | Some service ->
       let segs = state.State.path in
       let entries, _source = Rpc_describe.fetch_entries service ~segs in
-      let state_entries =
-        List.map
-          (fun (e : Rpc_describe.entry) ->
-            let kind =
-              match e.Rpc_describe.kind with
-              | Rpc_describe.Sub -> State.Sub
-              | Rpc_describe.Get -> State.Get
-              | Rpc_describe.Dyn typ -> State.Dyn typ
+      (* Expand Dyn entries to include recent values *)
+      let expand_entry (e : Rpc_describe.entry) =
+        match e.Rpc_describe.kind with
+        | Rpc_describe.Sub -> [{State.name = e.Rpc_describe.name; kind = State.Sub}]
+        | Rpc_describe.Get -> [{State.name = e.Rpc_describe.name; kind = State.Get}]
+        | Rpc_describe.Dyn typ ->
+            let recent =
+              State.get_recent_values ~segment_type:typ state
+              |> fun lst ->
+              if List.length lst > 5 then List.filteri (fun i _ -> i < 5) lst
+              else lst
             in
-            {State.name = e.Rpc_describe.name; kind})
-          entries
+            let recent_entries =
+              List.map
+                (fun value ->
+                  {State.name = "<>" ^ value; kind = State.DynValue (typ, value)})
+                recent
+            in
+            recent_entries @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
       in
+      let state_entries = List.concat_map expand_entry entries in
       on_update (State.set_cached_entries state_entries state)
 
 let handle_cached_enter state on_update =
@@ -250,7 +291,12 @@ let handle_cached_enter state on_update =
             (fun value ->
               let new_state = State.navigate_cached value state in
               fetch_cached_entries new_state on_update)
-            on_update)
+            on_update
+      | State.DynValue (typ, value) ->
+          (* Navigate directly with the recent value, record in history *)
+          let new_state = State.add_dynamic_value ~segment_type:typ ~value state in
+          let new_state = State.navigate_cached value new_state in
+          fetch_cached_entries new_state on_update)
 
 let navigate_cached_back state on_update =
   let new_state = State.navigate_cached_up state in
