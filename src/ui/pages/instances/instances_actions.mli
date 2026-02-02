@@ -89,6 +89,9 @@ val go_to_diagnostics : state -> state
 (** Navigate to binaries management page *)
 val go_to_binaries : state -> state
 
+(** Navigate to RPC browser page *)
+val go_to_rpc_browser : state -> state
+
 (** Activate the current selection (enter key) *)
 val activate_selection : state -> state
 
