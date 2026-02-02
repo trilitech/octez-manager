@@ -132,30 +132,14 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows
     else line ^ String.make (width - visible_len) ' '
   in
   let right_width = total_width - left_width - 1 in
-  (* Colorized separator - bright for focused side, very dim otherwise *)
+  (* Vertical separator between browser and pagers - consistent character *)
   let separator =
-    if left_focused then Widgets.bold (Widgets.fg 14 "|")
-    else if right_focused then Widgets.bold (Widgets.fg 14 "|")
-    else Widgets.dim "|"
+    if left_focused then Widgets.bold (Widgets.fg 14 "│")
+    else if right_focused then Widgets.fg 14 "│"
+    else Widgets.dim "│"
   in
-  (* Top border line - bold bright for focused, very dim for unfocused *)
-  let left_border =
-    if left_focused then
-      Widgets.bold (Widgets.fg 14 (String.make left_width '#'))
-    else Widgets.dim (String.make left_width '-')
-  in
-  let right_border =
-    if right_focused then
-      Widgets.bold (Widgets.fg 14 (String.make right_width '#'))
-    else Widgets.dim (String.make right_width '-')
-  in
-  let corner =
-    if left_focused || right_focused then Widgets.bold (Widgets.fg 14 "+")
-    else Widgets.dim "+"
-  in
-  let top_border = Printf.sprintf "%s%s%s" left_border corner right_border in
-  (* Content rows *)
-  let content_rows = rows - 1 in
+  (* No top border here - focus is shown in individual panel headers *)
+  let content_rows = rows in
   let combined =
     List.mapi
       (fun i _ ->
@@ -172,7 +156,7 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows
           (pad_line right_line right_width))
       (List.init content_rows (fun i -> i))
   in
-  top_border ^ "\n" ^ String.concat "\n" combined
+  String.concat "\n" combined
 
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
@@ -213,8 +197,14 @@ let view ps ~focus ~size =
           in
           let left =
             if browser_focus then
-              Widgets.fg 14 "▶ Browser" :: left_lines |> String.concat "\n"
-            else Widgets.dim "  Browser" :: left_lines |> String.concat "\n"
+              let header = Widgets.bold (Widgets.fg 14 "▶▶ BROWSER ◀◀") in
+              let border =
+                Widgets.bold (Widgets.fg 14 (String.make left_width '='))
+              in
+              header :: border :: left_lines |> String.concat "\n"
+            else
+              let header = Widgets.dim "   Browser" in
+              header :: left_lines |> String.concat "\n"
           in
           let right =
             Rpc_browser_render_result.render
