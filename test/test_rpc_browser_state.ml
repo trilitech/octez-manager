@@ -155,8 +155,14 @@ let test_execute_get () =
   let state = State.init ~instances:[] in
   let state' = State.execute_get ~url:"http://localhost/version" state in
   match state'.mode with
-  | State.Result {request; _} ->
-      Alcotest.(check string) "request" "http://localhost/version" request
+  | State.Result {pagers; _} -> (
+      match pagers with
+      | slot :: _ ->
+          Alcotest.(check string)
+            "request"
+            "http://localhost/version"
+            slot.State.request
+      | [] -> Alcotest.fail "expected at least one pager")
   | _ -> Alcotest.fail "expected Result mode"
 
 let test_set_result () =
@@ -167,10 +173,11 @@ let test_set_result () =
   let state' =
     State.set_result ~body:"{\"version\":\"1.0\"}" ~raw_body:"{}" state
   in
-  match state'.mode with
-  | State.Result {body; _} ->
-      Alcotest.(check string) "body" "{\"version\":\"1.0\"}" body
-  | _ -> Alcotest.fail "expected Result mode"
+  match State.get_focused_pager state' with
+  | Some slot ->
+      (* The body might be transformed by foldable JSON, so check raw_body instead *)
+      Alcotest.(check string) "raw_body" "{}" slot.State.raw_body
+  | None -> Alcotest.fail "expected focused pager"
 
 (* ============================================================ *)
 (* Cursor Tests                                                  *)

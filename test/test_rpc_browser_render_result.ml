@@ -10,67 +10,26 @@ module State = Rpc_browser_state
 module Render = Rpc_browser_render_result
 
 (* ============================================================ *)
-(* Header Tests                                                  *)
+(* Pager Header Tests                                           *)
 (* ============================================================ *)
 
-let test_render_header () =
-  let result =
-    Render.render_header
-      ~request:"/chains/main/blocks/head"
-      ~response_time_ms:None
-      ~response_size:None
-  in
+let make_pager_slot ?(id = 0) ?(request = "") ?(body = "") ?(raw_body = "") () =
+  State.create_empty_pager id |> fun slot ->
+  {slot with State.request; body; raw_body}
+
+let test_render_pager_header_focused () =
+  let slot = make_pager_slot ~id:0 ~request:"/chains/main/blocks/head" () in
+  let result = Render.render_pager_header ~slot ~is_focused:true in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
-let test_render_header_with_time () =
-  let result =
-    Render.render_header
-      ~request:"/version"
-      ~response_time_ms:(Some 42.0)
-      ~response_size:(Some 1234)
-  in
+let test_render_pager_header_unfocused () =
+  let slot = make_pager_slot ~id:1 ~request:"/version" () in
+  let result = Render.render_pager_header ~slot ~is_focused:false in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
-(* ============================================================ *)
-(* Body Rendering Tests                                          *)
-(* ============================================================ *)
-
-let test_render_body_short () =
-  let body = "line1\nline2\nline3" in
-  let lines = Render.render_body ~body ~scroll_offset:0 ~visible_height:10 in
-  Alcotest.(check int) "3 lines" 3 (List.length lines)
-
-let test_render_body_scrolled () =
-  let body = "line1\nline2\nline3\nline4\nline5" in
-  let lines = Render.render_body ~body ~scroll_offset:2 ~visible_height:2 in
-  Alcotest.(check int) "2 visible" 2 (List.length lines) ;
-  Alcotest.(check string) "starts at line3" "line3" (List.hd lines)
-
-let test_render_body_overflow () =
-  let body = "line1\nline2\nline3" in
-  let lines = Render.render_body ~body ~scroll_offset:10 ~visible_height:2 in
-  (* Should clamp to end *)
-  Alcotest.(check int) "clamped" 2 (List.length lines)
-
-let test_render_body_empty () =
-  let body = "" in
-  let lines = Render.render_body ~body ~scroll_offset:0 ~visible_height:10 in
-  Alcotest.(check int) "1 empty line" 1 (List.length lines)
-
-(* ============================================================ *)
-(* Scroll Indicator Tests                                        *)
-(* ============================================================ *)
-
-let test_scroll_indicator_single () =
-  let result = Render.render_scroll_indicator ~current:0 ~total:1 in
-  Alcotest.(check string) "empty" "" result
-
-let test_scroll_indicator_multiple () =
-  let result = Render.render_scroll_indicator ~current:5 ~total:100 in
-  Alcotest.(check bool) "has content" true (String.length result > 0)
-
-let test_scroll_indicator_end () =
-  let result = Render.render_scroll_indicator ~current:99 ~total:100 in
+let test_render_pager_header_empty () =
+  let slot = make_pager_slot ~id:2 () in
+  let result = Render.render_pager_header ~slot ~is_focused:true in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
@@ -89,8 +48,99 @@ let test_render_error () =
 (* Help Line Tests                                               *)
 (* ============================================================ *)
 
-let test_render_help () =
-  let result = Render.render_help () in
+let test_render_help_single () =
+  let result = Render.render_help ~num_pagers:1 in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
+let test_render_help_multiple () =
+  let result = Render.render_help ~num_pagers:5 in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
+(* ============================================================ *)
+(* Hidden Indicator Tests                                        *)
+(* ============================================================ *)
+
+let test_hidden_indicator_none () =
+  let result =
+    Render.render_hidden_indicator ~hidden_left:[] ~hidden_right:[]
+  in
+  Alcotest.(check string) "empty" "" result
+
+let test_hidden_indicator_left () =
+  let result =
+    Render.render_hidden_indicator ~hidden_left:[0; 1] ~hidden_right:[]
+  in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
+let test_hidden_indicator_right () =
+  let result =
+    Render.render_hidden_indicator ~hidden_left:[] ~hidden_right:[3; 4]
+  in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
+let test_hidden_indicator_both () =
+  let result =
+    Render.render_hidden_indicator ~hidden_left:[0] ~hidden_right:[5]
+  in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
+(* ============================================================ *)
+(* Grid Calculation Tests                                        *)
+(* ============================================================ *)
+
+let test_calculate_grid_small () =
+  let h, v, max_visible =
+    Render.calculate_grid ~cols:80 ~rows:24 ~num_pagers:1
+  in
+  Alcotest.(check int) "max_h" 1 h ;
+  Alcotest.(check int) "max_v" 1 v ;
+  Alcotest.(check int) "max_visible" 1 max_visible
+
+let test_calculate_grid_large () =
+  let h, v, max_visible =
+    Render.calculate_grid ~cols:200 ~rows:50 ~num_pagers:6
+  in
+  Alcotest.(check bool) "h >= 1" true (h >= 1) ;
+  Alcotest.(check bool) "v >= 1" true (v >= 1) ;
+  Alcotest.(check bool) "max_visible >= 1" true (max_visible >= 1)
+
+(* ============================================================ *)
+(* Visible Pagers Tests                                          *)
+(* ============================================================ *)
+
+let test_get_visible_pagers_all_fit () =
+  let pagers = [make_pager_slot ~id:0 (); make_pager_slot ~id:1 ()] in
+  let visible, left, right =
+    Render.get_visible_pagers ~pagers ~focused_id:0 ~max_visible:5
+  in
+  Alcotest.(check int) "all visible" 2 (List.length visible) ;
+  Alcotest.(check int) "none left" 0 (List.length left) ;
+  Alcotest.(check int) "none right" 0 (List.length right)
+
+let test_get_visible_pagers_overflow () =
+  let pagers = List.init 5 (fun i -> make_pager_slot ~id:i ()) in
+  let visible, left, right =
+    Render.get_visible_pagers ~pagers ~focused_id:2 ~max_visible:2
+  in
+  Alcotest.(check int) "2 visible" 2 (List.length visible) ;
+  Alcotest.(check bool)
+    "some hidden"
+    true
+    (List.length left + List.length right > 0)
+
+(* ============================================================ *)
+(* Pager Tabs Tests                                              *)
+(* ============================================================ *)
+
+let test_render_pager_tabs () =
+  let pagers =
+    [
+      make_pager_slot ~id:0 ();
+      make_pager_slot ~id:1 ();
+      make_pager_slot ~id:2 ();
+    ]
+  in
+  let result = Render.render_pager_tabs ~pagers ~focused_id:1 in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
@@ -111,17 +161,6 @@ let test_render_result_mode () =
   let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
   Alcotest.(check bool) "has content" true (String.length result > 2)
 
-let test_render_result_with_scroll () =
-  let state = State.init ~instances:[] in
-  let state = State.execute_get ~url:"http://localhost/data" state in
-  let long_body =
-    String.concat "\n" (List.init 100 (fun i -> Printf.sprintf "line %d" i))
-  in
-  let state = State.set_result ~body:long_body ~raw_body:long_body state in
-  let state = State.scroll 10 state in
-  let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
-  Alcotest.(check bool) "has content" true (String.length result > 0)
-
 let test_render_result_with_error () =
   let state = State.init ~instances:[] in
   let state = State.execute_get ~url:"http://localhost/error" state in
@@ -132,6 +171,14 @@ let test_render_result_with_error () =
   let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
+let test_render_multi_pager () =
+  let state = State.init ~instances:[] in
+  let state = State.execute_get ~url:"http://localhost/v1" state in
+  let state = State.set_result ~body:"{}" ~raw_body:"{}" state in
+  let state = match State.add_pager state with Some s -> s | None -> state in
+  let result = Render.render ~state ~cols:200 ~rows:50 ~focus:true in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
 (* ============================================================ *)
 (* Test Runner                                                   *)
 (* ============================================================ *)
@@ -140,35 +187,48 @@ let () =
   Alcotest.run
     "Rpc_browser_render_result"
     [
-      ( "header",
+      ( "pager_header",
         [
-          Alcotest.test_case "render" `Quick test_render_header;
-          Alcotest.test_case "with time" `Quick test_render_header_with_time;
-        ] );
-      ( "body",
-        [
-          Alcotest.test_case "short" `Quick test_render_body_short;
-          Alcotest.test_case "scrolled" `Quick test_render_body_scrolled;
-          Alcotest.test_case "overflow" `Quick test_render_body_overflow;
-          Alcotest.test_case "empty" `Quick test_render_body_empty;
-        ] );
-      ( "scroll_indicator",
-        [
-          Alcotest.test_case "single" `Quick test_scroll_indicator_single;
-          Alcotest.test_case "multiple" `Quick test_scroll_indicator_multiple;
-          Alcotest.test_case "end" `Quick test_scroll_indicator_end;
+          Alcotest.test_case "focused" `Quick test_render_pager_header_focused;
+          Alcotest.test_case
+            "unfocused"
+            `Quick
+            test_render_pager_header_unfocused;
+          Alcotest.test_case "empty" `Quick test_render_pager_header_empty;
         ] );
       ( "loading_error",
         [
           Alcotest.test_case "loading" `Quick test_render_loading;
           Alcotest.test_case "error" `Quick test_render_error;
         ] );
-      ("help", [Alcotest.test_case "render" `Quick test_render_help]);
+      ( "help",
+        [
+          Alcotest.test_case "single" `Quick test_render_help_single;
+          Alcotest.test_case "multiple" `Quick test_render_help_multiple;
+        ] );
+      ( "hidden_indicator",
+        [
+          Alcotest.test_case "none" `Quick test_hidden_indicator_none;
+          Alcotest.test_case "left" `Quick test_hidden_indicator_left;
+          Alcotest.test_case "right" `Quick test_hidden_indicator_right;
+          Alcotest.test_case "both" `Quick test_hidden_indicator_both;
+        ] );
+      ( "grid",
+        [
+          Alcotest.test_case "small" `Quick test_calculate_grid_small;
+          Alcotest.test_case "large" `Quick test_calculate_grid_large;
+        ] );
+      ( "visible_pagers",
+        [
+          Alcotest.test_case "all fit" `Quick test_get_visible_pagers_all_fit;
+          Alcotest.test_case "overflow" `Quick test_get_visible_pagers_overflow;
+        ] );
+      ("pager_tabs", [Alcotest.test_case "render" `Quick test_render_pager_tabs]);
       ( "render",
         [
           Alcotest.test_case "list mode" `Quick test_render_list_mode;
           Alcotest.test_case "result mode" `Quick test_render_result_mode;
-          Alcotest.test_case "with scroll" `Quick test_render_result_with_scroll;
           Alcotest.test_case "with error" `Quick test_render_result_with_error;
+          Alcotest.test_case "multi pager" `Quick test_render_multi_pager;
         ] );
     ]
