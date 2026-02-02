@@ -12,7 +12,7 @@ These scripts create and manage a test octez-node service for testing the import
 This will:
 - Create a data directory at `/tmp/test-octez-node-data`
 - Create a systemd user service `test-octez-node.service`
-- Start a Ghostnet node on RPC port 8733
+- Start a Weeklynet node on RPC port 8733
 - Show the service status
 
 ### Clean up the test service
@@ -30,7 +30,7 @@ This will:
 
 **Default configuration:**
 - Service name: `test-octez-node.service`
-- Network: Ghostnet
+- Network: Weeklynet
 - RPC endpoint: http://127.0.0.1:8733
 - Data directory: `/tmp/test-octez-node-data`
 - Binary: `~/.local/share/octez-manager/binaries/v24.0/octez-node`
@@ -41,7 +41,7 @@ To use a different network, RPC port, or binary version, edit the configuration 
 
 ```bash
 SERVICE_NAME="test-octez-node"
-NETWORK="ghostnet"           # Change to: mainnet, ghostnet, etc.
+NETWORK="weeklynet"           # Change to: mainnet, weeklynet, etc.
 RPC_PORT="8733"              # Change to any available port
 DATA_DIR="/tmp/test-octez-node-data"
 BINARY_VERSION="v24.0"       # Change to installed version

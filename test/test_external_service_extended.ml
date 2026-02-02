@@ -60,7 +60,7 @@ let test_is_managed_unit_name_valid () =
   check bool "valid managed unit" true result
 
 let test_is_managed_unit_name_baker () =
-  let result = ESD.is_managed_unit_name "octez-baker@ghostnet.service" in
+  let result = ESD.is_managed_unit_name "octez-baker@weeklynet.service" in
   check bool "baker unit" true result
 
 let test_is_managed_unit_name_dal () =
