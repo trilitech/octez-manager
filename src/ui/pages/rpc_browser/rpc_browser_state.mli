@@ -35,6 +35,7 @@ type mode =
       response_time_ms : float option;  (** Request duration in milliseconds *)
       response_size : int option;  (** Response body size in bytes *)
       pager : Miaou_widgets_display.Pager_widget.t option;  (** Pager for scrolling/search *)
+      foldable : Foldable_json.t option;  (** Foldable JSON state *)
     }
 
 (** Dynamic segment value history entry. *)
@@ -170,3 +171,15 @@ val load_dynamic_history : unit -> dynamic_value list
 
 (** Save dynamic history to disk. *)
 val save_dynamic_history : dynamic_value list -> unit
+
+(** {1 JSON Folding} *)
+
+(** Toggle fold at current pager line.
+    @param line Current line in pager view *)
+val toggle_fold : line:int -> state -> state
+
+(** Unfold all JSON sections. *)
+val unfold_all_json : state -> state
+
+(** Fold all JSON sections. *)
+val fold_all_json : state -> state
