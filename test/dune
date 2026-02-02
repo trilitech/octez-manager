@@ -497,3 +497,10 @@
  (modules test_rpc_client)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_rpc_describe)
+ (libraries alcotest octez-manager.ui yojson)
+ (modules test_rpc_describe)
+ (instrumentation
+  (backend bisect_ppx)))
