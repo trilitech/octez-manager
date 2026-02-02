@@ -200,14 +200,57 @@ let view ps ~focus ~size =
               ~focus:pager_focus
           in
           render_side_by_side ~left ~right ~left_width ~total_width:cols ~rows
+        else if
+          (* Single-column mode: show browser OR pager based on focus *)
+          is_browser_focused
+        then
+          (* Show only browser list *)
+          let left_state =
+            {
+              s with
+              mode =
+                State.List
+                  {
+                    entries = s.State.cached_entries;
+                    cursor = s.State.cached_cursor;
+                    loading = false;
+                  };
+            }
+          in
+          let lines = Rpc_browser_render_list.render ~state:left_state ~cols in
+          let pager_tabs =
+            Rpc_browser_render_result.render_pager_tabs
+              ~pagers:(State.get_pagers s)
+              ~focused_id:(State.get_focused_pager_id s)
+          in
+          let header =
+            Printf.sprintf
+              "%s  %s"
+              (Widgets.fg 14 "▶ Browser")
+              (Widgets.dim ("→ Pager " ^ pager_tabs))
+          in
+          header :: lines |> String.concat "\n"
         else
-          (* Regular full-width result view *)
-          let pager_focus = focus && not is_browser_focused in
-          Rpc_browser_render_result.render
-            ~state:s
-            ~cols
-            ~rows
-            ~focus:pager_focus
+          (* Show only pager *)
+          let pager_tabs =
+            Rpc_browser_render_result.render_pager_tabs
+              ~pagers:(State.get_pagers s)
+              ~focused_id:(State.get_focused_pager_id s)
+          in
+          let header =
+            Printf.sprintf
+              "%s  %s"
+              (Widgets.dim "← Browser")
+              (Widgets.fg 14 ("▶ Pager " ^ pager_tabs))
+          in
+          let result =
+            Rpc_browser_render_result.render
+              ~state:s
+              ~cols
+              ~rows:(rows - 1)
+              ~focus
+          in
+          header ^ "\n" ^ result
   in
   Vsection.render ~size ~header:[] ~content_footer:[] ~child:(fun _ -> body)
 
@@ -260,8 +303,6 @@ let handle_key ps key ~size =
               Navigation.update (fun _ -> new_state) ps
           | _ -> ps)
     | State.Result _ -> (
-        let cols = size.LTerm_geom.cols in
-        let is_side_by_side = cols >= side_by_side_min_width in
         let result_focus = State.get_result_focus s in
         let is_browser_focused =
           match result_focus with State.FocusBrowser -> true | _ -> false
@@ -343,8 +384,8 @@ let handle_key ps key ~size =
           let new_state = State.unfold_all_json s in
           state_ref := Some new_state ;
           Navigation.update (fun _ -> new_state) ps)
-        else if is_side_by_side && is_browser_focused then
-          (* Browser panel navigation in Result mode - only in side-by-side layout *)
+        else if is_browser_focused then
+          (* Browser panel navigation in Result mode *)
           match Keys.of_string key with
           | Some Keys.Escape -> back ps
           | Some (Keys.Char "u") | Some Keys.Backspace -> (
@@ -367,17 +408,18 @@ let handle_key ps key ~size =
               | Some new_s -> Navigation.update (fun _ -> new_s) ps
               | None -> ps)
           | Some Keys.Right ->
-              (* Switch focus to pager 0 *)
-              let new_state = State.focus_pager 0 s in
+              (* Switch focus to pager (last focused or 0) *)
+              let pager_id = State.get_focused_pager_id s in
+              let new_state = State.focus_pager pager_id s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
           | _ -> ps
         else
-          (* Pager-focused handling (or single column mode) *)
+          (* Pager-focused handling *)
           match Keys.of_string key with
           | Some Keys.Escape -> back ps
-          | Some Keys.Left when is_side_by_side ->
-              (* Switch focus to browser panel - only in side-by-side layout *)
+          | Some Keys.Left ->
+              (* Switch focus to browser panel *)
               let new_state = State.focus_browser s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
