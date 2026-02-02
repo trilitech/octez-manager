@@ -47,7 +47,7 @@ The installation wizard guides you through:
 1. **Instance name** — A unique identifier (e.g., `shadownet`)
 2. **Network** — Select `shadownet` for testing
 3. **History mode** — `rolling` is recommended for most users
-4. **Binary selection** — Choose from managed versions, linked directories, or custom path
+4. **Binary selection** — Choose from managed versions, registered directories, or custom path
 5. **RPC/Net addresses** — Keep defaults unless you need specific ports
 6. **Bootstrap method** — `Snapshot` downloads pre-built state (faster)
 
@@ -92,7 +92,7 @@ To change the Octez version used by a service:
 
 1. Select the instance and press `Enter`
 2. Choose **Update Version** from the menu
-3. Select a new version from the list (managed versions, linked directories, or custom path)
+3. Select a new version from the list (managed versions, registered directories, or custom path)
 
 ![Update Version](/gifs/update_version.gif)
 
@@ -104,7 +104,7 @@ Press `b` from the main dashboard to open the **Binaries** page.
 
 From here you can:
 - **Download** official Octez releases from GitLab
-- **Link** custom build directories (e.g., dev builds)
+- **Register** custom build directories (e.g., dev builds)
 - **Remove** specific versions
 - **Prune** all unused versions (shows disk space to be freed)
 
