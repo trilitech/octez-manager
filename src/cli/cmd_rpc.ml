@@ -30,9 +30,15 @@ let execute_get service path =
   match Octez_manager_ui.Rpc_client.http_get_url service path with
   | Ok body -> (
       match Octez_manager_ui.Json_highlighter.highlight body with
-      | Ok highlighted -> Printf.printf "%s\n" highlighted
-      | Error _ -> Printf.printf "%s\n" body)
-  | Error msg -> Printf.eprintf "Error: %s\n" msg
+      | Ok highlighted ->
+          Printf.printf "%s\n" highlighted ;
+          flush stdout
+      | Error _ ->
+          Printf.printf "%s\n" body ;
+          flush stdout)
+  | Error msg ->
+      Printf.eprintf "Error: %s\n" msg ;
+      flush stderr
 
 (** Get completions for a path prefix *)
 let get_completions service prefix =
@@ -105,6 +111,7 @@ let run_interactive service =
   Printf.printf "RPC Interactive Mode\n" ;
   Printf.printf "Instance: %s (%s)\n" service.Service.instance service.Service.network ;
   Printf.printf "Commands: /path (execute), Tab (complete), help, exit\n\n" ;
+  flush stdout ;
   (* Set up linenoise completion *)
   LNoise.set_completion_callback (fun line_so_far ln_completions ->
       let completions = completion_callback service line_so_far in
@@ -146,16 +153,25 @@ let run_interactive service =
             Printf.printf "  ↑/↓         Navigate history\n" ;
             Printf.printf "  help        Show this help\n" ;
             Printf.printf "  exit        Quit\n\n" ;
+            flush stdout ;
             loop ())
           else if String.length line > 0 && line.[0] = '/' then (
-            execute_get service line ;
+            (* Strip [GET] suffix if present (user selected from completion) *)
+            let path =
+              if String.length line > 6 && String.sub line (String.length line - 6) 6 = "/[GET]"
+              then String.sub line 0 (String.length line - 6)
+              else line
+            in
+            execute_get service path ;
             loop ())
           else (
             Printf.printf "Unknown command. Type 'help' for usage.\n" ;
+            flush stdout ;
             loop ()))
   in
   loop () ;
-  Printf.printf "Goodbye.\n"
+  Printf.printf "Goodbye.\n" ;
+  flush stdout
 
 (** rpc get command *)
 let get_cmd =
