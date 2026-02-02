@@ -38,7 +38,7 @@ We successfully built a **production-ready UI regression testing framework** and
 ### Install Node Form (19 tests)
 - Empty form state
 - Instance name variations (short, long, with numbers)
-- Network selection (mainnet, ghostnet)
+- Network selection (mainnet, weeklynet)
 - History mode selection (rolling, full, archive)
 - Snapshot import configuration
 - Data directory customization

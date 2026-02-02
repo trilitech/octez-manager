@@ -21,14 +21,14 @@ Creates a complete set of unmanaged Octez services (node, DAL node, baker, accus
 # Basic usage (no snapshot, shadownet)
 ./create-unmanaged-services.sh
 
-# With snapshot download (uses default shadownet/ghostnet snapshot URL)
+# With snapshot download (uses default shadownet/weeklynet snapshot URL)
 ./create-unmanaged-services.sh --snapshot
 
 # With local snapshot file
 ./create-unmanaged-services.sh --snapshot /path/to/snapshot.rolling
 
 # For a specific network
-./create-unmanaged-services.sh --network ghostnet
+./create-unmanaged-services.sh --network weeklynet
 
 # With snapshot for mainnet
 ./create-unmanaged-services.sh --snapshot --network mainnet
@@ -123,6 +123,6 @@ BIN_DIR="${HOME}/.local/share/octez-manager/binaries/v24.0"
 ```
 
 Default snapshot URLs are configured for:
-- **shadownet**: Uses ghostnet snapshot (no dedicated shadownet snapshots)
-- **ghostnet**: `https://snapshots.eu.tzinit.org/ghostnet/rolling`
+- **shadownet**: Uses weeklynet snapshot (no dedicated shadownet snapshots)
+- **weeklynet**: `https://snapshots.eu.tzinit.org/weeklynet/rolling`
 - **mainnet**: `https://snapshots.eu.tzinit.org/mainnet/rolling`
