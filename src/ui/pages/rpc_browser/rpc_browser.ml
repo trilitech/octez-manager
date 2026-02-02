@@ -297,7 +297,7 @@ let handle_key ps key ~size =
               let new_state = State.set_focus State.FocusPager s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
-          | Some Keys.Tab ->
+          | Some (Keys.Char " ") ->
               (* Toggle fold at cursor position (uses pager cursor mode) *)
               (match State.get_pager s with
               | Some pager ->
