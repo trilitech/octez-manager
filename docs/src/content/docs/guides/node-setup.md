@@ -12,12 +12,12 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 | Network | Purpose | Recommended For |
 |---------|---------|-----------------|
 | **Shadownet** | Testnet mirroring mainnet | Testing with mainnet-like conditions |
-| **Shadownet** | Weekly ephemeral testnet | Protocol testing |
+| **Weeklynet** | Weekly ephemeral testnet | Protocol testing |
 | **Mainnet** | Production network | Not recommended yet (see below) |
 
 > **Tip:** Start with Shadownet for testing — it mirrors mainnet conditions. For faster iteration, consider a protocolnet which has shorter block times.
 
-> **Warning:** Octez Manager is experimental software. We recommend using it only on testnets (Shadownet, Shadownet) until it matures. Mainnet usage is at your own risk.
+> **Warning:** Octez Manager is experimental software. We recommend using it only on testnets (Shadownet, Weeklynet) until it matures. Mainnet usage is at your own risk.
 
 ### History Mode
 
@@ -42,7 +42,7 @@ This guide walks you through setting up a Tezos node with Octez Manager.
 2. Select **[ Install new instance ]** → **Node**
 3. Configure:
    - **Instance name**: Unique identifier (e.g., `shadownet`)
-   - **Network**: `shadownet` (or `mainnet`/`shadownet`)
+   - **Network**: `shadownet` (or `mainnet`/`weeklynet`)
    - **History mode**: `rolling` (recommended)
    - **RPC address**: `127.0.0.1:8732` (default)
    - **Net address**: `0.0.0.0:9732` (default)
