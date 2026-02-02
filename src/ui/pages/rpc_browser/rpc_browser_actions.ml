@@ -7,6 +7,16 @@
 
 module State = Rpc_browser_state
 
+(** Quick access shortcuts for common RPC endpoints *)
+let shortcuts =
+  [
+    ("1", "/version", "Node version");
+    ("2", "/chains/main/blocks/head", "Latest block");
+    ("3", "/chains/main/is_bootstrapped", "Bootstrap status");
+    ("4", "/network/connections", "Network peers");
+    ("5", "/config/network", "Network config");
+  ]
+
 let get_selected_entry state =
   match state.State.mode with
   | State.List {entries; cursor; _} -> List.nth_opt entries cursor
@@ -72,14 +82,24 @@ let execute_get state on_update =
       let state = State.execute_get ~url state in
       on_update state ;
       let path = "/" ^ String.concat "/" state.State.path in
+      let start_time = Unix.gettimeofday () in
       match Rpc_client.http_get_url service path with
       | Ok body ->
+          let end_time = Unix.gettimeofday () in
+          let response_time_ms = (end_time -. start_time) *. 1000.0 in
+          let response_size = String.length body in
           let highlighted =
             match Json_highlighter.highlight body with
             | Ok h -> h
             | Error _ -> body
           in
-          on_update (State.set_result ~body:highlighted ~raw_body:body state)
+          on_update
+            (State.set_result
+               ~body:highlighted
+               ~raw_body:body
+               ~response_time_ms
+               ~response_size
+               state)
       | Error msg -> on_update (State.set_error msg state))
 
 let fetch_entries state on_update =
@@ -106,3 +126,36 @@ let cycle_instance ~delta state =
   else
     let new_idx = (state.State.selected_idx + delta + n) mod n in
     State.select_instance new_idx state
+
+let execute_shortcut ~key state on_update =
+  match List.find_opt (fun (k, _, _) -> k = key) shortcuts with
+  | None -> false
+  | Some (_, path, _) -> (
+      match State.current_instance state with
+      | None ->
+          on_update (State.set_error "No instance selected" state) ;
+          true
+      | Some service ->
+          let url = Rpc_client.endpoint_of service ^ path in
+          let state = State.execute_get ~url state in
+          on_update state ;
+          let start_time = Unix.gettimeofday () in
+          (match Rpc_client.http_get_url service path with
+          | Ok body ->
+              let end_time = Unix.gettimeofday () in
+              let response_time_ms = (end_time -. start_time) *. 1000.0 in
+              let response_size = String.length body in
+              let highlighted =
+                match Json_highlighter.highlight body with
+                | Ok h -> h
+                | Error _ -> body
+              in
+              on_update
+                (State.set_result
+                   ~body:highlighted
+                   ~raw_body:body
+                   ~response_time_ms
+                   ~response_size
+                   state)
+          | Error msg -> on_update (State.set_error msg state)) ;
+          true)

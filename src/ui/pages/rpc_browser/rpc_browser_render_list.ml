@@ -57,6 +57,20 @@ let render_entries ~cursor ~entries =
   if entries = [] then [Widgets.dim "  (no entries at this path)"]
   else List.mapi (fun idx entry -> render_entry ~cursor ~idx entry) entries
 
+let render_shortcuts () =
+  let header = Widgets.bold "Quick Access:" in
+  let items =
+    List.map
+      (fun (key, path, desc) ->
+        Printf.sprintf
+          "  %s. %s  %s"
+          (Widgets.fg 14 key)
+          (Widgets.bold path)
+          (Widgets.dim (Printf.sprintf "(%s)" desc)))
+      Rpc_browser_actions.shortcuts
+  in
+  header :: items
+
 let render_help () =
   let keys =
     [
@@ -81,12 +95,19 @@ let render ~state ~cols =
   let separator = Widgets.dim (String.make 60 '-') in
   match state.State.mode with
   | State.List {entries; cursor; loading} ->
+      let shortcuts_section =
+        if state.State.path = [] then render_shortcuts () @ [""] else []
+      in
+      let entries_header =
+        if state.State.path = [] then [Widgets.bold "All Endpoints:"] else []
+      in
       let content =
         if loading then [render_loading ()] else render_entries ~cursor ~entries
       in
       let error_lines = render_error state.State.error in
       let help = render_help () in
-      [header; separator] @ content @ error_lines @ [separator; help]
+      [header; separator] @ shortcuts_section @ entries_header @ content
+      @ error_lines @ [separator; help]
   | State.Result _ ->
       (* Result mode is handled by a different renderer *)
       [header; separator; Widgets.dim "  (result mode - use detail renderer)"]
