@@ -25,6 +25,9 @@ type pstate = state Navigation.t
 
 let state_ref : state option ref = ref None
 
+(* Chord state for C-x prefix *)
+let pending_chord : string option ref = ref None
+
 let update_state s =
   state_ref := Some s ;
   Context.mark_instances_dirty ()
@@ -197,11 +200,14 @@ let view ps ~focus ~size =
           in
           let left =
             if browser_focus then
-              let header = Widgets.bold (Widgets.fg 14 "▶▶ BROWSER ◀◀") in
-              let border =
-                Widgets.bold (Widgets.fg 14 (String.make left_width '='))
+              let header_text = " ▶▶ BROWSER ◀◀ " in
+              let header_len = String.length header_text in
+              let header_padded =
+                if header_len >= left_width then header_text
+                else header_text ^ String.make (left_width - header_len) ' '
               in
-              header :: border :: left_lines |> String.concat "\n"
+              let header = Widgets.bg 33 (Widgets.fg 15 header_padded) in
+              header :: left_lines |> String.concat "\n"
             else
               let header = Widgets.dim "   Browser" in
               header :: left_lines |> String.concat "\n"
@@ -239,41 +245,51 @@ let view ps ~focus ~size =
             }
           in
           let lines = Rpc_browser_render_list.render ~state:left_state ~cols in
-          let pager_tabs =
-            Rpc_browser_render_result.render_pager_tabs
-              ~pagers:(State.get_pagers s)
-              ~focused_id:(State.get_focused_pager_id s)
+          let pager_ids = State.get_pager_ids s in
+          let focused = State.get_focused_pager_id s in
+          let tabs_plain =
+            pager_ids
+            |> List.sort compare
+            |> List.map (fun id ->
+                   if id = focused then Printf.sprintf "[%d*]" id
+                   else Printf.sprintf "[%d]" id)
+            |> String.concat ""
           in
-          let header =
-            Printf.sprintf
-              "%s  %s"
-              (Widgets.bold (Widgets.fg 14 "▶ BROWSER"))
-              (Widgets.dim ("→ Pager " ^ pager_tabs))
+          let header_text = " ▶▶ BROWSER ◀◀  → Pager " ^ tabs_plain ^ " " in
+          let header_len = String.length header_text in
+          let header_padded =
+            if header_len >= cols then header_text
+            else header_text ^ String.make (cols - header_len) ' '
           in
-          let border = Widgets.bold (Widgets.fg 14 (String.make cols '#')) in
-          header :: border :: lines |> String.concat "\n"
+          let header = Widgets.bg 33 (Widgets.fg 15 header_padded) in
+          header :: lines |> String.concat "\n"
         else
           (* Show only pager with focus border *)
-          let pager_tabs =
-            Rpc_browser_render_result.render_pager_tabs
-              ~pagers:(State.get_pagers s)
-              ~focused_id:(State.get_focused_pager_id s)
+          let pager_ids = State.get_pager_ids s in
+          let focused = State.get_focused_pager_id s in
+          let tabs_plain =
+            pager_ids
+            |> List.sort compare
+            |> List.map (fun id ->
+                   if id = focused then Printf.sprintf "[%d*]" id
+                   else Printf.sprintf "[%d]" id)
+            |> String.concat ""
           in
-          let header =
-            Printf.sprintf
-              "%s  %s"
-              (Widgets.dim "← Browser")
-              (Widgets.bold (Widgets.fg 14 ("▶ PAGER " ^ pager_tabs)))
+          let header_text = " ← Browser  ▶▶ PAGER " ^ tabs_plain ^ " ◀◀ " in
+          let header_len = String.length header_text in
+          let header_padded =
+            if header_len >= cols then header_text
+            else header_text ^ String.make (cols - header_len) ' '
           in
-          let border = Widgets.bold (Widgets.fg 14 (String.make cols '#')) in
+          let header = Widgets.bg 33 (Widgets.fg 15 header_padded) in
           let result =
             Rpc_browser_render_result.render
               ~state:s
               ~cols
-              ~rows:(rows - 2)
+              ~rows:(rows - 1)
               ~focus
           in
-          header ^ "\n" ^ border ^ "\n" ^ result
+          header ^ "\n" ^ result
   in
   Vsection.render ~size ~header:[] ~content_footer:[] ~child:(fun _ -> body)
 
@@ -287,7 +303,29 @@ let handle_key ps key ~size =
     ps)
   else
     let s = ps.Navigation.s in
-    match s.State.mode with
+    (* Handle C-x chord for pager selection *)
+    match !pending_chord with
+    | Some "C-x" ->
+        pending_chord := None ;
+        if String.length key = 1 && key.[0] >= '0' && key.[0] <= '9' then
+          let pager_id = Char.code key.[0] - Char.code '0' in
+          let pager_ids = State.get_pager_ids s in
+          if List.mem pager_id pager_ids then (
+            let new_state = State.focus_pager pager_id s in
+            state_ref := Some new_state ;
+            Navigation.update (fun _ -> new_state) ps)
+          else ps
+        else ps
+    | Some _ ->
+        pending_chord := None ;
+        ps
+    | None -> (
+        (* Check for C-x prefix *)
+        if key = "C-x" then (
+          pending_chord := Some "C-x" ;
+          ps)
+        else
+          match s.State.mode with
     | State.List _ -> (
         (* Check for shortcut keys (1-9) when at root *)
         let shortcut_keys = ["1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
@@ -390,15 +428,14 @@ let handle_key ps key ~size =
               let new_state = State.set_error "Cannot close last pager" s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
-          (* Handle pager focus keys 0-9 *))
-        else if String.length key = 1 && key.[0] >= '0' && key.[0] <= '9' then
-          let pager_id = Char.code key.[0] - Char.code '0' in
-          let pager_ids = State.get_pager_ids s in
-          if List.mem pager_id pager_ids then (
-            let new_state = State.focus_pager pager_id s in
-            state_ref := Some new_state ;
-            Navigation.update (fun _ -> new_state) ps)
-          else ps (* Handle fold keys *)
+          (* Handle shortcut keys 1-9 *))
+        else if String.length key = 1 && key.[0] >= '1' && key.[0] <= '9' then (
+          let handled = Actions.execute_shortcut ~key s update_state in
+          if handled then
+            match !state_ref with
+            | Some new_s -> Navigation.update (fun _ -> new_s) ps
+            | None -> ps
+          else ps) (* Handle fold keys *)
         else if key = "f" then (
           (* Fold all sections *)
           let new_state = State.fold_all_json s in
@@ -466,7 +503,7 @@ let handle_key ps key ~size =
                   let new_state = State.set_pager pager' s in
                   state_ref := Some new_state ;
                   Navigation.update (fun _ -> new_state) ps
-              | None -> ps))
+              | None -> ps)))
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 

@@ -19,17 +19,22 @@ let make_pager_slot ?(id = 0) ?(request = "") ?(body = "") ?(raw_body = "") () =
 
 let test_render_pager_header_focused () =
   let slot = make_pager_slot ~id:0 ~request:"/chains/main/blocks/head" () in
-  let result = Render.render_pager_header ~slot ~is_focused:true in
+  let result = Render.render_pager_header ~slot ~is_focused:true ~is_target:false in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 let test_render_pager_header_unfocused () =
   let slot = make_pager_slot ~id:1 ~request:"/version" () in
-  let result = Render.render_pager_header ~slot ~is_focused:false in
+  let result = Render.render_pager_header ~slot ~is_focused:false ~is_target:false in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
+let test_render_pager_header_target () =
+  let slot = make_pager_slot ~id:1 ~request:"/version" () in
+  let result = Render.render_pager_header ~slot ~is_focused:false ~is_target:true in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 let test_render_pager_header_empty () =
   let slot = make_pager_slot ~id:2 () in
-  let result = Render.render_pager_header ~slot ~is_focused:true in
+  let result = Render.render_pager_header ~slot ~is_focused:true ~is_target:false in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
@@ -219,6 +224,7 @@ let () =
             "unfocused"
             `Quick
             test_render_pager_header_unfocused;
+          Alcotest.test_case "target" `Quick test_render_pager_header_target;
           Alcotest.test_case "empty" `Quick test_render_pager_header_empty;
         ] );
       ( "loading_error",
