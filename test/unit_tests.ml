@@ -1259,7 +1259,7 @@ let snapshots_slug_of_network () =
   let cases =
     [
       ("mainnet", Some "mainnet");
-      ("  Ghostnet  ", Some "ghostnet");
+      ("  Weeklynet  ", Some "weeklynet");
       ("https://snapshots.tzinit.org/networks/Seoulnet.json", Some "seoulnet");
       ("", None);
     ]
@@ -1810,13 +1810,13 @@ let snapshots_list_fallback () =
       | Error (`Msg msg) -> Alcotest.failf "list fallback error: %s" msg)
 
 let snapshots_list_missing_entries_error () =
-  let html = "<a href=\"/ghostnet/rolling.html\">Rolling</a>" in
+  let html = "<a href=\"/weeklynet/rolling.html\">Rolling</a>" in
   let fetch url =
     if String.equal url snapshot_root then Ok (200, html)
     else Ok (404, "missing")
   in
   Snapshots.For_tests.with_fetch fetch (fun () ->
-      match Snapshots.list ~network_slug:"ghostnet" with
+      match Snapshots.list ~network_slug:"weeklynet" with
       | Error _ -> ()
       | Ok _ -> Alcotest.fail "expected missing entry error")
 
@@ -1921,7 +1921,8 @@ let teztnets_parse_pairs_assoc_keys () =
     "{\n\
     \  \"custom\": {\"human_name\": \"Custom\", \"config_url\": \
      \"https://example/custom.json\"},\n\
-    \  \"ghost\": {\"humanName\": \"Ghostnet\"}\n\
+    \  \"weekly\": {\"humanName\": \"Weeklynet\", \"networkJsonUrl\": \
+     \"https://teztnets.com/weeklynet\"}\n\
      }"
   in
   match Teztnets.parse_networks json with
@@ -1932,7 +1933,10 @@ let teztnets_parse_pairs_assoc_keys () =
           infos
       in
       let expected =
-        [("Custom", "https://example/custom.json"); ("Ghostnet", "ghostnet")]
+        [
+          ("Custom", "https://example/custom.json");
+          ("Weeklynet", "https://teztnets.com/weeklynet");
+        ]
       in
       Alcotest.(check list_pairs)
         "assoc pairs"
@@ -1966,7 +1970,8 @@ let teztnets_list_networks_custom_fetch () =
     \  \"nets\": [\n\
     \    {\"humanName\": \"Seoulnet\", \"networkJsonUrl\": \
      \"https://example/seoul.json\"},\n\
-    \    {\"slug\": \"ghostnet\"}\n\
+    \    {\"slug\": \"weeklynet\", \"networkJsonUrl\": \
+     \"https://teztnets.com/weeklynet\"}\n\
     \  ]\n\
      }"
   in
@@ -1979,7 +1984,10 @@ let teztnets_list_networks_custom_fetch () =
       in
       Alcotest.(check list_pairs)
         "list networks"
-        [("Seoulnet", "https://example/seoul.json"); ("unknown", "ghostnet")]
+        [
+          ("Seoulnet", "https://example/seoul.json");
+          ("unknown", "https://teztnets.com/weeklynet");
+        ]
         pairs
   | Error (`Msg msg) -> Alcotest.failf "list_networks error: %s" msg
 
@@ -2068,12 +2076,6 @@ let teztnets_resolve_network_builtin () =
   | Ok net -> Alcotest.(check string) "mainnet builtin" "mainnet" net
   | Error (`Msg msg) -> Alcotest.failf "mainnet should be builtin: %s" msg
 
-let teztnets_resolve_network_builtin_ghostnet () =
-  let fetch () = Error (`Msg "should not fetch") in
-  match Teztnets.resolve_network_for_octez_node ~fetch "ghostnet" with
-  | Ok net -> Alcotest.(check string) "ghostnet builtin" "ghostnet" net
-  | Error (`Msg msg) -> Alcotest.failf "ghostnet should be builtin: %s" msg
-
 let teztnets_resolve_network_builtin_case_insensitive () =
   let fetch () = Error (`Msg "should not fetch") in
   match Teztnets.resolve_network_for_octez_node ~fetch "Mainnet" with
@@ -2115,7 +2117,7 @@ let teztnets_resolve_network_alias_mixed_case () =
       \  \"nets\": [\n\
       \    {\"humanName\": \"Seoulnet\", \"networkJsonUrl\": \
        \"https://teztnets.com/seoulnet\"},\n\
-      \    {\"slug\": \"ghostnet\"}\n\
+      \    {\"slug\": \"weeklynet\"}\n\
       \  ]\n\
        }"
     in
@@ -2131,7 +2133,7 @@ let teztnets_resolve_network_alias_mixed_case () =
 
 let teztnets_resolve_network_alias_not_found () =
   let fetch () =
-    let json = "{\"nets\": [{\"slug\": \"ghostnet\"}]}" in
+    let json = "{\"nets\": [{\"slug\": \"weeklynet\"}]}" in
     Teztnets.list_networks ~fetch:(fun () -> Ok json) ()
   in
   match Teztnets.resolve_network_for_octez_node ~fetch "unknownnet" with
@@ -4354,7 +4356,6 @@ let external_service_detector_chain_id_mapping () =
           true
   in
   test_mapping "NetXdQprcVkpaWU" (Some "mainnet") ;
-  test_mapping "NetXnHfVqm9iesp" (Some "ghostnet") ;
   test_mapping "NetXsqzbfFenSTS" (Some "shadownet") ;
   test_mapping "NetUnknownChainId" None
 
@@ -4773,7 +4774,7 @@ let cli_import_service_lookup () =
   let mock_services =
     [
       ("octez-node-mainnet", "mainnet-node");
-      ("octez-baker-ghostnet", "ghostnet-baker");
+      ("octez-baker-weeklynet", "weeklynet-baker");
       ("my-custom-node", "custom");
     ]
   in
@@ -4809,10 +4810,10 @@ let cli_import_field_overrides () =
   Alcotest.(check bool) "empty base_dir" true (Option.is_none empty.base_dir) ;
 
   (* Test with network override *)
-  let with_network = {Import.empty_overrides with network = Some "ghostnet"} in
+  let with_network = {Import.empty_overrides with network = Some "weeklynet"} in
   Alcotest.(check (option string))
     "network override"
-    (Some "ghostnet")
+    (Some "weeklynet")
     with_network.network ;
   Alcotest.(check bool)
     "other fields still none"
@@ -5267,10 +5268,6 @@ let () =
             "resolve builtin mainnet"
             `Quick
             teztnets_resolve_network_builtin;
-          Alcotest.test_case
-            "resolve builtin ghostnet"
-            `Quick
-            teztnets_resolve_network_builtin_ghostnet;
           Alcotest.test_case
             "resolve builtin case insensitive"
             `Quick

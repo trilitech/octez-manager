@@ -107,7 +107,7 @@ let parse_networks (json_s : string) : (network_info list, [> R.msg]) result =
       in
       let is_mn s =
         let s = String.lowercase_ascii s in
-        s = "mainnet" || s = "ghostnet"
+        s = "mainnet"
       in
       let final_url =
         match (slug, human_name, network_url) with
@@ -156,19 +156,6 @@ let fallback_networks =
       category = Some "Protocol";
     };
     {
-      alias = "ghostnet";
-      network_url = "ghostnet";
-      chain_name = "TEZOS_ITHACANET_2022-01-25T15:00:00Z";
-      human_name = "Ghostnet";
-      description = Some "Long-running testnet";
-      faucet_url = Some "https://faucet.ghostnet.teztnets.com";
-      rpc_url = Some "https://rpc.ghostnet.teztnets.com";
-      docker_build = None;
-      git_ref = None;
-      last_updated = None;
-      category = Some "Testnet";
-    };
-    {
       alias = "seoulnet";
       network_url = "https://teztnets.com/seoulnet";
       chain_name = "TEZOS_SEOULNET_2025-07-11T08:00:00Z";
@@ -215,7 +202,7 @@ let is_http_url s =
 
 let is_builtin_network s =
   let lower = String.lowercase_ascii (String.trim s) in
-  lower = "mainnet" || lower = "ghostnet" || lower = "sandbox"
+  lower = "mainnet" || lower = "sandbox"
 
 let resolve_network_for_octez_node :
     ?fetch:(unit -> (network_info list, [> Rresult.R.msg]) result) ->

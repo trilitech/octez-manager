@@ -251,7 +251,6 @@ let get_unit_content ~unit_name =
 (** Known Tezos network chain IDs *)
 let chain_id_to_network = function
   | "NetXdQprcVkpaWU" -> Some "mainnet"
-  | "NetXnHfVqm9iesp" -> Some "ghostnet"
   | "NetXsqzbfFenSTS" -> Some "shadownet"
   | "NetXe8DbhW9A1eS" -> Some "tallinnnet"
   | _ -> None

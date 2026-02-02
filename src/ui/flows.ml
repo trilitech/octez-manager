@@ -54,7 +54,7 @@ let create_node_flow ~on_success =
       else
         open_choice_modal
           ~title:"Network"
-          ~items:["mainnet"; "ghostnet"; "weeklynet"]
+          ~items:["mainnet"; "weeklynet"]
           ~to_string:(fun x -> x)
           ~on_select:(fun network ->
             open_choice_modal
@@ -194,7 +194,7 @@ let create_accuser_flow ~on_success =
       else
         open_choice_modal
           ~title:"Network"
-          ~items:["mainnet"; "ghostnet"; "weeklynet"]
+          ~items:["mainnet"; "weeklynet"]
           ~to_string:(fun x -> x)
           ~on_select:(fun network ->
             let base_dir = Common.default_role_dir "accuser" instance in
@@ -253,7 +253,7 @@ let create_dal_node_flow ~on_success =
       else
         open_choice_modal
           ~title:"Network"
-          ~items:["mainnet"; "ghostnet"; "weeklynet"]
+          ~items:["mainnet"; "weeklynet"]
           ~to_string:(fun x -> x)
           ~on_select:(fun network ->
             let client_base_dir = Common.default_role_dir "dal-node" instance in
