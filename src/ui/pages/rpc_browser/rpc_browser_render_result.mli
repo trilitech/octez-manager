@@ -8,36 +8,23 @@
 (** RPC Browser result mode rendering.
 
     Pure rendering functions for the result viewing mode of the RPC Browser.
-    Displays JSON responses with syntax highlighting and scrolling support. *)
+    Supports multi-pager layout with grid display and dynamic sizing. *)
 
-(** {1 Header Rendering} *)
+(** {1 Layout Constants} *)
 
-(** Render header with request URL, response time, and size.
-    @param request URL that was requested
-    @param response_time_ms Response time in milliseconds
-    @param response_size Response body size in bytes *)
-val render_header :
-  request:string ->
-  response_time_ms:float option ->
-  response_size:int option ->
-  string
+(** Minimum width per pager (standard terminal width). *)
+val min_pager_cols : int
 
-(** {1 Body Rendering} *)
+(** Minimum height per pager (standard terminal height). *)
+val min_pager_rows : int
 
-(** Render JSON body with optional syntax highlighting.
-    Applies scroll offset and limits visible lines to fit height.
-    @param body Response body (may be highlighted)
-    @param scroll_offset Vertical scroll position
-    @param visible_height Number of visible lines
-    @return List of rendered lines *)
-val render_body :
-  body:string -> scroll_offset:int -> visible_height:int -> string list
+(** {1 Pager Header Rendering} *)
 
-(** Render scroll position indicator.
-    @param current Current scroll position
-    @param total Total number of lines
-    @return Scroll indicator string *)
-val render_scroll_indicator : current:int -> total:int -> string
+(** Render pager header with ID, request URL, response time, and size.
+    @param slot Pager slot to render header for
+    @param is_focused Whether this pager is focused *)
+val render_pager_header :
+  slot:Rpc_browser_state.pager_slot -> is_focused:bool -> string
 
 (** {1 Status Rendering} *)
 
@@ -49,10 +36,11 @@ val render_error : string -> string
 
 (** {1 Help Line} *)
 
-(** Render keyboard help line for result mode. *)
-val render_help : unit -> string
+(** Render keyboard help line for result mode.
+    @param num_pagers Number of pagers currently open *)
+val render_help : num_pagers:int -> string
 
-(** {1 Main Rendering} *)
+(** {1 Single Pager Rendering} *)
 
 (** Render using pager widget.
     @param pager The pager widget
@@ -66,8 +54,53 @@ val render_with_pager :
   focus:bool ->
   string
 
-(** Render complete result view from state.
-    Uses pager widget when available for scrolling/search support.
+(** Render a single pager slot.
+    @param slot The pager slot to render
+    @param cols Available width
+    @param rows Available height
+    @param is_focused Whether this pager is focused *)
+val render_single_pager :
+  slot:Rpc_browser_state.pager_slot ->
+  cols:int ->
+  rows:int ->
+  is_focused:bool ->
+  string
+
+(** {1 Multi-Pager Layout} *)
+
+(** Render hidden pager indicator showing which pagers are off-screen.
+    @param hidden_left IDs of pagers hidden to the left
+    @param hidden_right IDs of pagers hidden to the right *)
+val render_hidden_indicator :
+  hidden_left:int list -> hidden_right:int list -> string
+
+(** Calculate grid layout based on available space and number of pagers.
+    @param cols Available width
+    @param rows Available height
+    @param num_pagers Total number of pagers
+    @return (max_horizontal, max_vertical, max_visible) *)
+val calculate_grid : cols:int -> rows:int -> num_pagers:int -> int * int * int
+
+(** Get visible pager slots based on focus - focused pager is always visible.
+    @param pagers All pager slots
+    @param focused_id ID of the focused pager
+    @param max_visible Maximum number of visible pagers
+    @return (visible_pagers, hidden_left_ids, hidden_right_ids) *)
+val get_visible_pagers :
+  pagers:Rpc_browser_state.pager_slot list ->
+  focused_id:int ->
+  max_visible:int ->
+  Rpc_browser_state.pager_slot list * int list * int list
+
+(** Render pager tabs for single-column mode.
+    @param pagers All pager slots
+    @param focused_id ID of the focused pager *)
+val render_pager_tabs :
+  pagers:Rpc_browser_state.pager_slot list -> focused_id:int -> string
+
+(** {1 Main Rendering} *)
+
+(** Render complete result view from state with multi-pager support.
     @param state Current RPC Browser state (must be in Result mode)
     @param cols Terminal width
     @param rows Terminal height
