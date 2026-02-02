@@ -12,8 +12,15 @@
 
 (** {1 Header Rendering} *)
 
-(** Render header with request URL. *)
-val render_header : request:string -> string
+(** Render header with request URL, response time, and size.
+    @param request URL that was requested
+    @param response_time_ms Response time in milliseconds
+    @param response_size Response body size in bytes *)
+val render_header :
+  request:string ->
+  response_time_ms:float option ->
+  response_size:int option ->
+  string
 
 (** {1 Body Rendering} *)
 

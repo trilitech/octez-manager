@@ -8,7 +8,20 @@
 module Widgets = Miaou_widgets_display.Widgets
 module State = Rpc_browser_state
 
-let render_header ~request = Printf.sprintf "GET %s" (Widgets.bold request)
+let render_header ~request ~response_time_ms ~response_size =
+  let base = Printf.sprintf "GET %s" (Widgets.bold request) in
+  let time_str =
+    match response_time_ms with
+    | Some t -> Widgets.dim (Printf.sprintf " [%.0fms]" t)
+    | None -> ""
+  in
+  let size_str =
+    match response_size with
+    | Some s when s >= 1024 -> Widgets.dim (Printf.sprintf " %dKB" (s / 1024))
+    | Some s -> Widgets.dim (Printf.sprintf " %dB" s)
+    | None -> ""
+  in
+  Printf.sprintf "%s%s%s" base time_str size_str
 
 let render_body ~body ~scroll_offset ~visible_height =
   let lines = String.split_on_char '\n' body in
@@ -46,8 +59,9 @@ let render ~state ~cols ~rows =
   | State.List _ ->
       (* List mode is handled by a different renderer *)
       [Widgets.dim "(list mode - use list renderer)"]
-  | State.Result {request; body; scroll_offset; _} ->
-      let header = render_header ~request in
+  | State.Result
+      {request; body; scroll_offset; response_time_ms; response_size; _} ->
+      let header = render_header ~request ~response_time_ms ~response_size in
       let separator = Widgets.dim (String.make 60 '-') in
       let help = render_help () in
       (* Calculate available height for body *)
