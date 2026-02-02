@@ -112,11 +112,11 @@ let keymap _ps =
 (* Minimum width for side-by-side layout *)
 let side_by_side_min_width = 140
 
-(* Render two columns side by side *)
-let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
+(* Render two columns side by side with focus-aware borders *)
+let render_side_by_side ~left ~right ~left_width ~total_width ~rows
+    ~left_focused ~right_focused =
   let left_lines = String.split_on_char '\n' left in
   let right_lines = String.split_on_char '\n' right in
-  let separator = Widgets.dim "│" in
   (* Use Widgets.visible_chars_count for proper ANSI handling *)
   let truncate_line line width =
     let visible_len = Widgets.visible_chars_count line in
@@ -132,6 +132,25 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
     else line ^ String.make (width - visible_len) ' '
   in
   let right_width = total_width - left_width - 1 in
+  (* Colorized separator based on focus *)
+  let separator =
+    if left_focused || right_focused then Widgets.fg 14 "|" else Widgets.dim "|"
+  in
+  (* Top border line - use = for focused, - for unfocused *)
+  let left_border =
+    if left_focused then Widgets.fg 14 (String.make left_width '=')
+    else Widgets.dim (String.make left_width '-')
+  in
+  let right_border =
+    if right_focused then Widgets.fg 14 (String.make right_width '=')
+    else Widgets.dim (String.make right_width '-')
+  in
+  let corner =
+    if left_focused || right_focused then Widgets.fg 14 "+" else Widgets.dim "+"
+  in
+  let top_border = Printf.sprintf "%s%s%s" left_border corner right_border in
+  (* Content rows *)
+  let content_rows = rows - 1 in
   let combined =
     List.mapi
       (fun i _ ->
@@ -146,9 +165,9 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
           (pad_line left_line left_width)
           separator
           (pad_line right_line right_width))
-      (List.init rows (fun i -> i))
+      (List.init content_rows (fun i -> i))
   in
-  String.concat "\n" combined
+  top_border ^ "\n" ^ String.concat "\n" combined
 
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
@@ -196,15 +215,22 @@ let view ps ~focus ~size =
             Rpc_browser_render_result.render
               ~state:s
               ~cols:right_width
-              ~rows
+              ~rows:(rows - 1)
               ~focus:pager_focus
           in
-          render_side_by_side ~left ~right ~left_width ~total_width:cols ~rows
+          render_side_by_side
+            ~left
+            ~right
+            ~left_width
+            ~total_width:cols
+            ~rows
+            ~left_focused:browser_focus
+            ~right_focused:pager_focus
         else if
           (* Single-column mode: show browser OR pager based on focus *)
           is_browser_focused
         then
-          (* Show only browser list *)
+          (* Show only browser list with focus border *)
           let left_state =
             {
               s with
@@ -229,9 +255,10 @@ let view ps ~focus ~size =
               (Widgets.fg 14 "▶ Browser")
               (Widgets.dim ("→ Pager " ^ pager_tabs))
           in
-          header :: lines |> String.concat "\n"
+          let border = Widgets.fg 14 (String.make cols '-') in
+          header :: border :: lines |> String.concat "\n"
         else
-          (* Show only pager *)
+          (* Show only pager with focus border *)
           let pager_tabs =
             Rpc_browser_render_result.render_pager_tabs
               ~pagers:(State.get_pagers s)
@@ -243,14 +270,15 @@ let view ps ~focus ~size =
               (Widgets.dim "← Browser")
               (Widgets.fg 14 ("▶ Pager " ^ pager_tabs))
           in
+          let border = Widgets.fg 14 (String.make cols '-') in
           let result =
             Rpc_browser_render_result.render
               ~state:s
               ~cols
-              ~rows:(rows - 1)
+              ~rows:(rows - 2)
               ~focus
           in
-          header ^ "\n" ^ result
+          header ^ "\n" ^ border ^ "\n" ^ result
   in
   Vsection.render ~size ~header:[] ~content_footer:[] ~child:(fun _ -> body)
 
@@ -348,6 +376,8 @@ let handle_key ps key ~size =
         else if key = "S" then (
           match State.add_pager s with
           | Some new_state ->
+              (* Keep focus on browser after creating pager *)
+              let new_state = State.focus_browser new_state in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
           | None ->
