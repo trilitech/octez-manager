@@ -87,7 +87,7 @@ val clear_error : Service.t -> unit
 (** {1 Head Monitoring} *)
 
 (** Handle for controlling a head monitor stream. *)
-type monitor_handle = { stop : unit -> unit; alive : unit -> bool }
+type monitor_handle = {stop : unit -> unit; alive : unit -> bool}
 
 (** Start streaming head updates from a node.
     Spawns a dedicated domain for the curl process.
@@ -98,6 +98,7 @@ type monitor_handle = { stop : unit -> unit; alive : unit -> bool }
     @return Handle to stop the monitor *)
 val start_head_monitor :
   Service.t ->
-  on_head:(level:int option -> proto:string option -> chain_id:string option -> unit) ->
+  on_head:
+    (level:int option -> proto:string option -> chain_id:string option -> unit) ->
   on_disconnect:(unit -> unit) ->
   monitor_handle
