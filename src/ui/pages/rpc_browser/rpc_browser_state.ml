@@ -18,6 +18,8 @@ type mode =
       body : string;
       raw_body : string;
       scroll_offset : int;
+      response_time_ms : float option;
+      response_size : int option;
     }
 
 type openapi_status = Loading | Ready | Error of string | NotAvailable
@@ -105,13 +107,40 @@ let execute_get ~url state =
     state with
     mode =
       Result
-        {request = url; body = "Loading..."; raw_body = ""; scroll_offset = 0};
+        {
+          request = url;
+          body = "Loading...";
+          raw_body = "";
+          scroll_offset = 0;
+          response_time_ms = None;
+          response_size = None;
+        };
     error = None;
   }
 
-let set_result ~body ~raw_body state =
+let set_result ~body ~raw_body ?response_time_ms ?response_size state =
   match state.mode with
-  | Result r -> {state with mode = Result {r with body; raw_body}}
+  | Result r ->
+      let time =
+        match response_time_ms with
+        | Some t -> Some t
+        | None -> r.response_time_ms
+      in
+      let size =
+        match response_size with Some s -> Some s | None -> r.response_size
+      in
+      {
+        state with
+        mode =
+          Result
+            {
+              r with
+              body;
+              raw_body;
+              response_time_ms = time;
+              response_size = size;
+            };
+      }
   | List _ -> state
 
 let cursor_up state =
