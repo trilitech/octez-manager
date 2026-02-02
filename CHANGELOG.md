@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed "linked directories" terminology to "registered directories" throughout the codebase for clarity
+  - CLI commands: `binaries link` → `binaries register`, `binaries unlink` → `binaries unregister`
+  - Updated all UI text, documentation, and help messages
+
 ### Removed
 
 - Ghostnet support - Ghostnet testnet has been deprecated and is no longer available as a network option
@@ -25,12 +31,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Binary Management**: Download and manage official Octez binary releases
   - New TUI page accessible via `b` key from the instances screen
   - CLI commands:
-    - `binaries list` - Show installed versions and registered directories
+    - `binaries list` - Show installed versions and linked directories
     - `binaries download <version>` - Download from GitLab releases
     - `binaries remove <version>` - Remove an installed version
     - `binaries prune` - Remove all unused versions with disk space preview
-    - `binaries register <alias> <path>` - Create alias for custom build directory
-    - `binaries unregister <alias>` - Remove a registered directory alias
+    - `binaries link <alias> <path>` - Create alias for custom build directory
+    - `binaries unlink <alias>` - Remove a linked directory alias
     - `binaries list-remote` - Show available versions from GitLab
   - Progress display during downloads with speed and ETA
   - Disk space calculation and display when pruning
@@ -38,7 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Installer Integration**: Use managed binaries when installing services
   - New flags for all install commands: `--octez-version <version>` and `--bin-dir-alias <alias>`
-  - TUI binary selector shows managed versions and registered directories
+  - TUI binary selector shows managed versions and linked directories
   - Inline download prompt when selecting an uninstalled version in interactive mode
   - Priority: `--octez-version` > `--bin-dir-alias` > `--app-bin-dir` > auto-detect from PATH
 
@@ -49,7 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Update Version Action**: Change the binary version used by running services
   - New "Update Version" option in instance action menu
-  - Select from managed versions or registered directories
+  - Select from managed versions or linked directories
   - Version filtering prevents accidental downgrades
 
 - **Cascade Update and Rollback**: Update services along with their dependents
