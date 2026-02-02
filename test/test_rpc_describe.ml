@@ -55,7 +55,7 @@ let test_parse_get_service () =
   let entries = Rpc_describe.parse_describe_json json in
   Alcotest.(check int) "one entry" 1 (List.length entries) ;
   let entry = List.hd entries in
-  Alcotest.(check string) "name is [GET]" "[GET]" entry.name ;
+  Alcotest.(check string) "name is empty (GET at current path)" "" entry.name ;
   Alcotest.(check bool)
     "kind is Get"
     true
@@ -102,7 +102,7 @@ let test_parse_combined () =
   let entries = Rpc_describe.parse_describe_json json in
   Alcotest.(check int) "four entries" 4 (List.length entries) ;
   let names = List.map (fun e -> e.Rpc_describe.name) entries in
-  Alcotest.(check bool) "has GET" true (List.mem "[GET]" names) ;
+  Alcotest.(check bool) "has GET (empty name)" true (List.mem "" names) ;
   Alcotest.(check bool) "has blocks" true (List.mem "blocks" names) ;
   Alcotest.(check bool) "has mempool" true (List.mem "mempool" names) ;
   Alcotest.(check bool) "has dynamic" true (List.mem "<chain_id>" names)

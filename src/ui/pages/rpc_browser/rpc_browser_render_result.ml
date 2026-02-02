@@ -14,6 +14,23 @@ let min_pager_cols = 80
 
 let min_pager_rows = 24
 
+(** Calculate visible length of a string (excluding ANSI escape codes) *)
+let visible_length s =
+  let len = String.length s in
+  let rec skip_escape i =
+    if i >= len then len
+    else
+      match s.[i] with
+      | 'A' .. 'Z' | 'a' .. 'z' -> i + 1
+      | _ -> skip_escape (i + 1)
+  in
+  let rec loop i acc =
+    if i >= len then acc
+    else if s.[i] = '\027' then loop (skip_escape (i + 1)) acc
+    else loop (i + 1) (acc + 1)
+  in
+  loop 0 0
+
 let render_pager_header ~slot ~is_focused =
   let id_marker =
     if is_focused then Printf.sprintf "[%d*]" slot.State.id
@@ -65,12 +82,18 @@ let render_help ~num_pagers =
 let render_with_pager ~pager ~cols ~rows ~focus =
   Pager.render ~cols ~win:rows pager ~focus
 
-(** Render a single pager slot *)
+(** Render a single pager slot with consistent width *)
 let render_single_pager ~slot ~cols ~rows ~is_focused =
   let header = render_pager_header ~slot ~is_focused in
+  (* Pad header to full width *)
+  let header_visible_len = visible_length header in
+  let header_padded =
+    if header_visible_len >= cols then header
+    else header ^ String.make (cols - header_visible_len) ' '
+  in
   let separator =
-    if is_focused then Widgets.fg 14 (String.make (min 60 cols) '-')
-    else Widgets.dim (String.make (min 60 cols) '-')
+    if is_focused then Widgets.fg 14 (String.make cols '-')
+    else Widgets.dim (String.make cols '-')
   in
   let chrome_lines = 2 in
   let pager_rows = max 1 (rows - chrome_lines) in
@@ -82,7 +105,7 @@ let render_single_pager ~slot ~cols ~rows ~is_focused =
         if slot.State.request = "" then Widgets.dim "(no request yet)"
         else render_loading ()
   in
-  Printf.sprintf "%s\n%s\n%s" header separator body_content
+  Printf.sprintf "%s\n%s\n%s" header_padded separator body_content
 
 (** Render hidden pager indicator *)
 let render_hidden_indicator ~hidden_left ~hidden_right =
@@ -179,23 +202,6 @@ let get_visible_pagers ~pagers ~focused_id ~max_visible =
       |> List.map (fun p -> p.State.id)
     in
     (visible, hidden_left, hidden_right)
-
-(** Calculate visible length of a string (excluding ANSI escape codes) *)
-let visible_length s =
-  let len = String.length s in
-  let rec skip_escape i =
-    if i >= len then len
-    else
-      match s.[i] with
-      | 'A' .. 'Z' | 'a' .. 'z' -> i + 1
-      | _ -> skip_escape (i + 1)
-  in
-  let rec loop i acc =
-    if i >= len then acc
-    else if s.[i] = '\027' then loop (skip_escape (i + 1)) acc
-    else loop (i + 1) (acc + 1)
-  in
-  loop 0 0
 
 (** Truncate a string with ANSI codes to a visible width *)
 let truncate_to_width s ~width =
