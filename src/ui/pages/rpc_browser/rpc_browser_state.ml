@@ -8,7 +8,7 @@
 open Octez_manager_lib
 module Pager = Miaou_widgets_display.Pager_widget
 
-type entry_kind = Get | Sub | Dyn of string
+type entry_kind = Get | Sub | Dyn of string | DynValue of (string * string)
 
 type entry = {name : string; kind : entry_kind}
 
@@ -42,6 +42,8 @@ type openapi_status = Loading | Ready | Error of string | NotAvailable
 
 type dynamic_value = {segment_type : string; value : string; timestamp : float}
 
+type recent_path = {rp_path : string; rp_desc : string; rp_timestamp : float}
+
 type state = {
   instances : Service.t list;
   selected_idx : int;
@@ -50,6 +52,7 @@ type state = {
   openapi_status : openapi_status;
   error : string option;
   dynamic_history : dynamic_value list;
+  recent_paths : recent_path list;
   cached_entries : entry list;
   cached_cursor : int;
 }
@@ -59,6 +62,61 @@ let history_file () =
   Filename.concat
     (Common.xdg_config_home ())
     "octez-manager/rpc_dynamic_history.json"
+
+(* Recent paths file path *)
+let recent_paths_file () =
+  Filename.concat
+    (Common.xdg_config_home ())
+    "octez-manager/rpc_recent_paths.json"
+
+let load_recent_paths () =
+  let path = recent_paths_file () in
+  if Sys.file_exists path then
+    try
+      let ic = open_in path in
+      let content = really_input_string ic (in_channel_length ic) in
+      close_in ic ;
+      match Yojson.Safe.from_string content with
+      | `List items ->
+          List.filter_map
+            (fun item ->
+              match item with
+              | `Assoc kvs -> (
+                  match
+                    ( List.assoc_opt "path" kvs,
+                      List.assoc_opt "desc" kvs,
+                      List.assoc_opt "timestamp" kvs )
+                  with
+                  | Some (`String p), Some (`String d), Some (`Float ts) ->
+                      Some {rp_path = p; rp_desc = d; rp_timestamp = ts}
+                  | _ -> None)
+              | _ -> None)
+            items
+      | _ -> []
+    with _ -> []
+  else []
+
+let save_recent_paths paths =
+  let path = recent_paths_file () in
+  let dir = Filename.dirname path in
+  (if not (Sys.file_exists dir) then try Unix.mkdir dir 0o755 with _ -> ()) ;
+  try
+    let json =
+      `List
+        (List.map
+           (fun rp ->
+             `Assoc
+               [
+                 ("path", `String rp.rp_path);
+                 ("desc", `String rp.rp_desc);
+                 ("timestamp", `Float rp.rp_timestamp);
+               ])
+           paths)
+    in
+    let oc = open_out path in
+    output_string oc (Yojson.Safe.pretty_to_string json) ;
+    close_out oc
+  with _ -> ()
 
 let load_dynamic_history () =
   let path = history_file () in
@@ -111,6 +169,7 @@ let save_dynamic_history history =
 
 let init ~instances =
   let dynamic_history = load_dynamic_history () in
+  let recent_paths = load_recent_paths () in
   {
     instances;
     selected_idx = 0;
@@ -119,6 +178,7 @@ let init ~instances =
     openapi_status = NotAvailable;
     error = None;
     dynamic_history;
+    recent_paths;
     cached_entries = [];
     cached_cursor = 0;
   }
@@ -636,3 +696,30 @@ let navigate_cached_up state =
   | _ ->
       let new_path = List.rev (List.tl (List.rev state.path)) in
       {state with path = new_path; cached_entries = []; cached_cursor = 0}
+
+(* Recent paths LRU functions *)
+let max_recent_paths = 5
+
+let add_recent_path ~path ~desc state =
+  let now = Unix.gettimeofday () in
+  let new_entry = {rp_path = path; rp_desc = desc; rp_timestamp = now} in
+  (* Remove existing entry for same path, then prepend *)
+  let filtered =
+    List.filter (fun rp -> rp.rp_path <> path) state.recent_paths
+  in
+  let new_paths =
+    new_entry :: filtered |> fun lst ->
+    if List.length lst > max_recent_paths then
+      List.filteri (fun i _ -> i < max_recent_paths) lst
+    else lst
+  in
+  save_recent_paths new_paths ;
+  {state with recent_paths = new_paths}
+
+let get_recent_paths state =
+  state.recent_paths
+  |> List.sort (fun a b -> compare b.rp_timestamp a.rp_timestamp)
+  |> fun lst ->
+  if List.length lst > max_recent_paths then
+    List.filteri (fun i _ -> i < max_recent_paths) lst
+  else lst
