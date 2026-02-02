@@ -241,7 +241,7 @@ let cleanup_deterministic_env () =
 let mock_service_list () =
   [
     ("node-mainnet", "node", "active", "enabled", "mainnet");
-    ("node-ghostnet", "node", "active", "disabled", "ghostnet");
+    ("node-weeklynet", "node", "active", "disabled", "weeklynet");
     ("baker-mainnet", "baker", "inactive", "enabled", "mainnet");
     ("accuser-mainnet", "accuser", "active", "enabled", "mainnet");
     ("dal-mainnet", "dal-node", "failed", "disabled", "mainnet");
@@ -259,7 +259,10 @@ let mock_binary_versions () =
 let mock_networks () =
   [
     ("mainnet", "NetXdQprcVkpaWU", "Mainnet", "https://mainnet.teztnets.com");
-    ("ghostnet", "NetXnHfVqm9iesp", "Ghostnet", "https://ghostnet.teztnets.com");
+    ( "weeklynet",
+      "NetXnHfVqm9iesp",
+      "Weeklynet",
+      "https://weeklynet.teztnets.com" );
     ("parisnet", "NetXXQqwsmK8xHF", "Parisnet", "https://parisnet.teztnets.com");
   ]
 

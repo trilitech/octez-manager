@@ -256,7 +256,7 @@ let test_different_networks () =
         ();
       Mock_service_helpers.running_service
         ~instance:"node-2"
-        ~network:"ghostnet"
+        ~network:"weeklynet"
         ();
       Mock_service_helpers.running_service
         ~instance:"node-3"
