@@ -286,7 +286,9 @@ let unit_template ~user_mode ~role ~app_bin_dir ~user ?prestart () =
       "[Unit]\n\
        Description=Octez %s (%%i)\n\
        After=network-online.target\n\
-       Wants=network-online.target\n\n\
+       Wants=network-online.target\n\
+       StartLimitBurst=10\n\
+       StartLimitIntervalSec=300s\n\n\
        [Service]\n\
        Environment=APP_BIN_DIR=%s\n\
        Environment=ROLE=%s\n\
@@ -308,8 +310,6 @@ let unit_template ~user_mode ~role ~app_bin_dir ~user ?prestart () =
   let common_hardening =
     "Restart=on-failure\n\
      RestartSec=5s\n\
-     StartLimitBurst=10\n\
-     StartLimitIntervalSec=300s\n\
      NoNewPrivileges=yes\n\
      PrivateTmp=yes\n\
      ProtectSystem=strict\n\
