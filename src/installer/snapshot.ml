@@ -22,7 +22,7 @@ let resolve_snapshot_download ~network ~history_mode =
     | None ->
         R.error_msg
           "Unable to infer a tzinit network slug from --network. Provide \
-           either a known alias (mainnet/weeklynet/...) or a teztnets JSON \
+           either a known alias (mainnet/shadownet/...) or a teztnets JSON \
            URL."
   in
   let* kind_slug, kind_label =

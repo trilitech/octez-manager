@@ -61,7 +61,7 @@ let test_node_network_mainnet () =
       ignore (TH.send_key_and_wait "Enter") ;
       URF.assert_ui_regression "node_network_mainnet")
 
-let test_node_network_ghostnet () =
+let test_node_network_shadownet () =
   TH.with_test_env (fun () ->
       DM.setup_deterministic_env () ;
 
@@ -71,7 +71,7 @@ let test_node_network_ghostnet () =
       ignore (TH.send_key_and_wait "Down") ;
       ignore (TH.send_key_and_wait "Down") ;
       ignore (TH.send_key_and_wait "Enter") ;
-      URF.assert_ui_regression "node_network_ghostnet")
+      URF.assert_ui_regression "node_network_shadownet")
 
 (** Test: History mode field *)
 let test_node_history_mode_focus () =
@@ -463,7 +463,7 @@ let node_form_tests =
     ("instance_name_long", `Quick, test_node_instance_name_long);
     ("instance_name_numbers", `Quick, test_node_instance_name_with_numbers);
     ("network_mainnet", `Quick, test_node_network_mainnet);
-    ("network_ghostnet", `Quick, test_node_network_ghostnet);
+    ("network_shadownet", `Quick, test_node_network_shadownet);
     ("history_mode_focus", `Quick, test_node_history_mode_focus);
     ("history_mode_full", `Quick, test_node_history_mode_full);
     ("history_mode_archive", `Quick, test_node_history_mode_archive);

@@ -19,12 +19,12 @@ systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
 rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
 systemctl daemon-reload
 
-# Create external service on weeklynet
+# Create external service on shadownet
 echo "Creating external service..."
 mkdir -p "$DATA_DIR"
 inject_identity "$EXTERNAL_INSTANCE" "$DATA_DIR"
 chown -R tezos:tezos "$DATA_DIR"
-create_external_service "node" "$EXTERNAL_INSTANCE" "$DATA_DIR" "$RPC_ADDR" "weeklynet"
+create_external_service "node" "$EXTERNAL_INSTANCE" "$DATA_DIR" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${EXTERNAL_INSTANCE}.service"
 systemctl start "octez-node@${EXTERNAL_INSTANCE}.service"
 sleep 2

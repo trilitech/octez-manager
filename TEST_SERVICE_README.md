@@ -12,7 +12,7 @@ These scripts create and manage a test octez-node service for testing the import
 This will:
 - Create a data directory at `/tmp/test-octez-node-data`
 - Create a systemd user service `test-octez-node.service`
-- Start a Weeklynet node on RPC port 8733
+- Start a Shadownet node on RPC port 8733
 - Show the service status
 
 ### Clean up the test service
@@ -30,7 +30,7 @@ This will:
 
 **Default configuration:**
 - Service name: `test-octez-node.service`
-- Network: Weeklynet
+- Network: Shadownet
 - RPC endpoint: http://127.0.0.1:8733
 - Data directory: `/tmp/test-octez-node-data`
 - Binary: `~/.local/share/octez-manager/binaries/v24.0/octez-node`
