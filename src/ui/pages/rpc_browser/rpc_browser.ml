@@ -84,13 +84,6 @@ let handled_keys () =
   Miaou.Core.Keys.
     [Escape; Enter; Up; Down; Char "j"; Char "k"; Char "u"; Char "r"; Tab]
 
-let enter ps =
-  let s = ps.Navigation.s in
-  Actions.handle_enter s update_state ;
-  match !state_ref with
-  | Some new_s -> Navigation.update (fun _ -> new_s) ps
-  | None -> ps
-
 let cycle_instance ps =
   let s = ps.Navigation.s in
   let new_state = Actions.cycle_instance ~delta:1 s in
@@ -105,7 +98,6 @@ let keymap _ps =
   in
   [
     kb "Esc" back "Back";
-    kb "Enter" enter "Select";
     kb "↑/↓" noop "Navigate";
     kb "r" refresh "Refresh";
     kb "Tab" cycle_instance "Instance";
@@ -149,7 +141,8 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
         let right_line =
           match List.nth_opt right_lines i with Some r -> r | None -> ""
         in
-        Printf.sprintf "%s%s%s"
+        Printf.sprintf
+          "%s%s%s"
           (pad_line left_line left_width)
           separator
           (pad_line right_line right_width))
@@ -161,6 +154,10 @@ let view ps ~focus ~size =
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
   let rows = size.LTerm_geom.rows in
+  let result_focus = State.get_result_focus s in
+  let is_browser_focused =
+    match result_focus with State.FocusBrowser -> true | _ -> false
+  in
   let body =
     match s.State.mode with
     | State.List _ ->
@@ -172,29 +169,45 @@ let view ps ~focus ~size =
           (* Side-by-side: browser on left, result on right *)
           let left_width = 50 in
           let right_width = cols - left_width - 1 in
-          let browser_focus = focus && s.State.focus = State.FocusBrowser in
-          let pager_focus = focus && s.State.focus = State.FocusPager in
+          let browser_focus = focus && is_browser_focused in
+          let pager_focus = focus && not is_browser_focused in
           (* Render browser list using cached entries *)
           let left_state =
-            {s with mode = State.List {
-              entries = s.State.cached_entries;
-              cursor = s.State.cached_cursor;
-              loading = false
-            }}
+            {
+              s with
+              mode =
+                State.List
+                  {
+                    entries = s.State.cached_entries;
+                    cursor = s.State.cached_cursor;
+                    loading = false;
+                  };
+            }
           in
-          let left_lines = Rpc_browser_render_list.render ~state:left_state ~cols:left_width in
+          let left_lines =
+            Rpc_browser_render_list.render ~state:left_state ~cols:left_width
+          in
           let left =
             if browser_focus then
-              (Widgets.fg 14 "▶ Browser") :: left_lines |> String.concat "\n"
-            else
-              (Widgets.dim "  Browser") :: left_lines |> String.concat "\n"
+              Widgets.fg 14 "▶ Browser" :: left_lines |> String.concat "\n"
+            else Widgets.dim "  Browser" :: left_lines |> String.concat "\n"
           in
-          let right = Rpc_browser_render_result.render ~state:s ~cols:right_width ~rows ~focus:pager_focus in
+          let right =
+            Rpc_browser_render_result.render
+              ~state:s
+              ~cols:right_width
+              ~rows
+              ~focus:pager_focus
+          in
           render_side_by_side ~left ~right ~left_width ~total_width:cols ~rows
         else
           (* Regular full-width result view *)
-          let pager_focus = focus && s.State.focus = State.FocusPager in
-          Rpc_browser_render_result.render ~state:s ~cols ~rows ~focus:pager_focus
+          let pager_focus = focus && not is_browser_focused in
+          Rpc_browser_render_result.render
+            ~state:s
+            ~cols
+            ~rows
+            ~focus:pager_focus
   in
   Vsection.render ~size ~header:[] ~content_footer:[] ~child:(fun _ -> body)
 
@@ -247,33 +260,79 @@ let handle_key ps key ~size =
               Navigation.update (fun _ -> new_state) ps
           | _ -> ps)
     | State.Result _ -> (
-        (* Handle save key *)
+        let cols = size.LTerm_geom.cols in
+        let is_side_by_side = cols >= side_by_side_min_width in
+        let result_focus = State.get_result_focus s in
+        let is_browser_focused =
+          match result_focus with State.FocusBrowser -> true | _ -> false
+        in
+        (* Handle save key - saves the focused pager's content *)
         if key = "s" then (
-          match s.State.mode with
-          | State.Result {raw_body; request; _} ->
+          match State.get_focused_pager s with
+          | Some slot when slot.State.raw_body <> "" -> (
               (* Save to file - use raw JSON (unfolded, no colors) *)
               let filename =
                 let base =
-                  request
-                  |> String.split_on_char '/'
-                  |> List.filter (fun s -> s <> "")
+                  slot.State.request |> String.split_on_char '/'
+                  |> List.filter (fun str -> str <> "")
                   |> String.concat "_"
                 in
-                Printf.sprintf "rpc_%s_%d.json" base (int_of_float (Unix.time ()))
+                Printf.sprintf
+                  "rpc_%s_%d.json"
+                  base
+                  (int_of_float (Unix.time ()))
               in
-              (try
-                 let oc = open_out filename in
-                 output_string oc raw_body ;
-                 close_out oc ;
-                 let new_state = State.set_error (Printf.sprintf "Saved to %s" filename) s in
-                 state_ref := Some new_state ;
-                 Navigation.update (fun _ -> new_state) ps
-               with exn ->
-                 let new_state = State.set_error (Printf.sprintf "Save failed: %s" (Printexc.to_string exn)) s in
-                 state_ref := Some new_state ;
-                 Navigation.update (fun _ -> new_state) ps)
-          | _ -> ps)
-        (* Handle fold keys *)
+              try
+                let oc = open_out filename in
+                output_string oc slot.State.raw_body ;
+                close_out oc ;
+                let new_state =
+                  State.set_error (Printf.sprintf "Saved to %s" filename) s
+                in
+                state_ref := Some new_state ;
+                Navigation.update (fun _ -> new_state) ps
+              with exn ->
+                let new_state =
+                  State.set_error
+                    (Printf.sprintf "Save failed: %s" (Printexc.to_string exn))
+                    s
+                in
+                state_ref := Some new_state ;
+                Navigation.update (fun _ -> new_state) ps)
+          | _ ->
+              let new_state = State.set_error "No content to save" s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+              (* Handle split key - create new pager *))
+        else if key = "S" then (
+          match State.add_pager s with
+          | Some new_state ->
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | None ->
+              let new_state = State.set_error "Maximum pagers reached (10)" s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+              (* Handle close pager key *))
+        else if key = "x" then (
+          let focused_id = State.get_focused_pager_id s in
+          match State.remove_pager focused_id s with
+          | Some new_state ->
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | None ->
+              let new_state = State.set_error "Cannot close last pager" s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          (* Handle pager focus keys 0-9 *))
+        else if String.length key = 1 && key.[0] >= '0' && key.[0] <= '9' then
+          let pager_id = Char.code key.[0] - Char.code '0' in
+          let pager_ids = State.get_pager_ids s in
+          if List.mem pager_id pager_ids then (
+            let new_state = State.focus_pager pager_id s in
+            state_ref := Some new_state ;
+            Navigation.update (fun _ -> new_state) ps)
+          else ps (* Handle fold keys *)
         else if key = "f" then (
           (* Fold all sections *)
           let new_state = State.fold_all_json s in
@@ -284,31 +343,56 @@ let handle_key ps key ~size =
           let new_state = State.unfold_all_json s in
           state_ref := Some new_state ;
           Navigation.update (fun _ -> new_state) ps)
-        else
+        else if is_side_by_side && is_browser_focused then
+          (* Browser panel navigation in Result mode - only in side-by-side layout *)
           match Keys.of_string key with
           | Some Keys.Escape -> back ps
-          | Some Keys.Left ->
-              (* Switch focus to browser panel *)
-              let new_state = State.set_focus State.FocusBrowser s in
+          | Some (Keys.Char "u") | Some Keys.Backspace -> (
+              (* Navigate back in browser while staying in Result mode *)
+              Actions.navigate_cached_back s update_state ;
+              match !state_ref with
+              | Some new_s -> Navigation.update (fun _ -> new_s) ps
+              | None -> ps)
+          | Some Keys.Up | Some (Keys.Char "k") ->
+              let new_state = State.cached_cursor_up s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
+          | Some Keys.Down | Some (Keys.Char "j") ->
+              let new_state = State.cached_cursor_down s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | Some Keys.Enter -> (
+              Actions.handle_cached_enter s update_state ;
+              match !state_ref with
+              | Some new_s -> Navigation.update (fun _ -> new_s) ps
+              | None -> ps)
           | Some Keys.Right ->
-              (* Switch focus to pager panel *)
-              let new_state = State.set_focus State.FocusPager s in
+              (* Switch focus to pager 0 *)
+              let new_state = State.focus_pager 0 s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
-          | Some (Keys.Char " ") ->
+          | _ -> ps
+        else
+          (* Pager-focused handling (or single column mode) *)
+          match Keys.of_string key with
+          | Some Keys.Escape -> back ps
+          | Some Keys.Left when is_side_by_side ->
+              (* Switch focus to browser panel - only in side-by-side layout *)
+              let new_state = State.focus_browser s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
+          | Some (Keys.Char " ") -> (
               (* Toggle fold at cursor position (uses pager cursor mode) *)
-              (match State.get_pager s with
+              match State.get_pager s with
               | Some pager ->
                   let line = Pager.get_cursor_line pager in
                   let new_state = State.toggle_fold ~line s in
                   state_ref := Some new_state ;
                   Navigation.update (fun _ -> new_state) ps
               | None -> ps)
-          | _ ->
+          | _ -> (
               (* Delegate to pager for all other keys *)
-              (match State.get_pager s with
+              match State.get_pager s with
               | Some pager ->
                   let win = size.LTerm_geom.rows - 3 in
                   let pager', _consumed = Pager.handle_key pager ~key ~win in

@@ -24,7 +24,8 @@ type t = {
   root : json_node;
   raw_json : string;
   folded : (node_id, bool) Hashtbl.t;
-  mutable line_to_node : (int * node_id) list;  (* line -> node_id for foldable lines *)
+  mutable line_to_node : (int * node_id) list;
+      (* line -> node_id for foldable lines *)
 }
 
 (* Convert Yojson to our node type, assigning IDs *)
@@ -43,7 +44,11 @@ let rec json_to_node next_id (json : Yojson.Safe.t) : json_node =
   | `Assoc fields ->
       let id = !next_id in
       next_id := !next_id + 1 ;
-      JObject {id; fields = List.map (fun (k, v) -> (k, json_to_node next_id v)) fields}
+      JObject
+        {
+          id;
+          fields = List.map (fun (k, v) -> (k, json_to_node next_id v)) fields;
+        }
 
 let of_json json =
   let next_id = ref 0 in
@@ -85,10 +90,15 @@ let is_folded t id = Hashtbl.find_opt t.folded id |> Option.value ~default:false
 (* Render helpers *)
 let indent n = String.make (n * 2) ' '
 
-let render_string s = Widgets.yellow (Printf.sprintf "\"%s\"" (String.escaped s))
+let render_string s =
+  Widgets.yellow (Printf.sprintf "\"%s\"" (String.escaped s))
+
 let render_key k = Widgets.fg 14 (Printf.sprintf "\"%s\"" k)
+
 let render_number n = Widgets.magenta n
+
 let render_bool b = Widgets.green (if b then "true" else "false")
+
 let render_null () = Widgets.dim "null"
 
 (* Render JSON with folding *)
@@ -118,8 +128,7 @@ let render t =
         if folded then (
           line_map := (!current_line, id) :: !line_map ;
           add_inline (Widgets.dim (Printf.sprintf "[...] (%d items)" count)))
-        else if items = [] then
-          add_inline "[]"
+        else if items = [] then add_inline "[]"
         else (
           line_map := (!current_line, id) :: !line_map ;
           add_line "[" ;
@@ -138,8 +147,7 @@ let render t =
         if folded then (
           line_map := (!current_line, id) :: !line_map ;
           add_inline (Widgets.dim (Printf.sprintf "{...} (%d fields)" count)))
-        else if fields = [] then
-          add_inline "{}"
+        else if fields = [] then add_inline "{}"
         else (
           line_map := (!current_line, id) :: !line_map ;
           add_line "{" ;
