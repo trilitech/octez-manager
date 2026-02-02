@@ -24,7 +24,7 @@ let get_var_doc = function
         "P2P network listen address in format 'host:port' (e.g., ':9732')\n\
          # Use ':PORT' to listen on all interfaces on the specified port"
   | "OCTEZ_NETWORK" ->
-      Some "Network name (e.g., 'mainnet', 'ghostnet', 'nairobinet')"
+      Some "Network name (e.g., 'mainnet', 'weeklynet', 'nairobinet')"
   | "APP_BIN_DIR" ->
       Some "Directory containing Octez binaries (octez-node, octez-baker, etc.)"
   | "OCTEZ_NODE_ENDPOINT" ->
