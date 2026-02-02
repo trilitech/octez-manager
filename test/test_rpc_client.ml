@@ -11,10 +11,18 @@ open Octez_manager_ui
 (* Helper to create a minimal Service.t for testing *)
 let make_test_service ?(rpc_addr = "127.0.0.1:8732") ?(app_bin_dir = "/usr/bin")
     () =
-  Service.make ~instance:"test-node" ~role:"node" ~network:"mainnet"
-    ~history_mode:History_mode.Full ~data_dir:"/tmp/test"
-    ~rpc_addr ~net_addr:"[::]:9732" ~service_user:"tezos"
-    ~app_bin_dir ~logging_mode:Logging_mode.Journald ()
+  Service.make
+    ~instance:"test-node"
+    ~role:"node"
+    ~network:"mainnet"
+    ~history_mode:History_mode.Full
+    ~data_dir:"/tmp/test"
+    ~rpc_addr
+    ~net_addr:"[::]:9732"
+    ~service_user:"tezos"
+    ~app_bin_dir
+    ~logging_mode:Logging_mode.Journald
+    ()
 
 (* ============================================================ *)
 (* URL Building Tests                                            *)
@@ -40,13 +48,16 @@ let test_absolutize_url_with_leading_slash () =
   let url = Rpc_client.absolutize_url s "/chains/main/blocks/head" in
   Alcotest.(check string)
     "with leading slash"
-    "http://127.0.0.1:8732/chains/main/blocks/head" url
+    "http://127.0.0.1:8732/chains/main/blocks/head"
+    url
 
 let test_absolutize_url_without_leading_slash () =
   let s = make_test_service ~rpc_addr:"127.0.0.1:8732" () in
   let url = Rpc_client.absolutize_url s "version" in
   Alcotest.(check string)
-    "without leading slash" "http://127.0.0.1:8732/version" url
+    "without leading slash"
+    "http://127.0.0.1:8732/version"
+    url
 
 let test_absolutize_url_empty_path () =
   let s = make_test_service ~rpc_addr:"127.0.0.1:8732" () in
@@ -82,7 +93,7 @@ let test_at_least_one_http_tool () =
 let test_monitor_handle_type () =
   (* Just verify the type exists and has expected fields *)
   let handle : Rpc_client.monitor_handle =
-    { stop = (fun () -> ()); alive = (fun () -> true) }
+    {stop = (fun () -> ()); alive = (fun () -> true)}
   in
   Alcotest.(check bool) "alive returns true" true (handle.alive ()) ;
   handle.stop () ;
@@ -103,35 +114,52 @@ let test_rpc_last_error_initially_none () =
 (* ============================================================ *)
 
 let () =
-  Alcotest.run "Rpc_client"
+  Alcotest.run
+    "Rpc_client"
     [
       ( "url_building",
         [
-          Alcotest.test_case "endpoint_of raw address" `Quick
+          Alcotest.test_case
+            "endpoint_of raw address"
+            `Quick
             test_endpoint_of_raw_address;
-          Alcotest.test_case "endpoint_of http address" `Quick
+          Alcotest.test_case
+            "endpoint_of http address"
+            `Quick
             test_endpoint_of_http_address;
-          Alcotest.test_case "endpoint_of https address" `Quick
+          Alcotest.test_case
+            "endpoint_of https address"
+            `Quick
             test_endpoint_of_https_address;
-          Alcotest.test_case "absolutize_url with leading slash" `Quick
+          Alcotest.test_case
+            "absolutize_url with leading slash"
+            `Quick
             test_absolutize_url_with_leading_slash;
-          Alcotest.test_case "absolutize_url without leading slash" `Quick
+          Alcotest.test_case
+            "absolutize_url without leading slash"
+            `Quick
             test_absolutize_url_without_leading_slash;
-          Alcotest.test_case "absolutize_url empty path" `Quick
+          Alcotest.test_case
+            "absolutize_url empty path"
+            `Quick
             test_absolutize_url_empty_path;
         ] );
       ( "tool_detection",
         [
           Alcotest.test_case "curl cached" `Quick test_curl_available_cached;
           Alcotest.test_case "wget cached" `Quick test_wget_available_cached;
-          Alcotest.test_case "at least one tool" `Quick
+          Alcotest.test_case
+            "at least one tool"
+            `Quick
             test_at_least_one_http_tool;
         ] );
       ( "monitor_handle",
         [Alcotest.test_case "type exists" `Quick test_monitor_handle_type] );
       ( "error_tracking",
         [
-          Alcotest.test_case "initially none" `Quick
+          Alcotest.test_case
+            "initially none"
+            `Quick
             test_rpc_last_error_initially_none;
         ] );
     ]
