@@ -511,3 +511,10 @@
  (modules test_json_highlighter)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_rpc_browser_state)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_rpc_browser_state)
+ (instrumentation
+  (backend bisect_ppx)))
