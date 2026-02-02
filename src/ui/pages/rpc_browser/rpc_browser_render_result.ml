@@ -103,38 +103,45 @@ let render_hidden_indicator ~hidden_left ~hidden_right =
   if left_str = "" && right_str = "" then ""
   else Widgets.dim (Printf.sprintf " %s%s" left_str right_str)
 
-(** Layout orientation *)
-type layout = Horizontal | Vertical
+(** Grid layout: (columns, rows) *)
+type grid_layout = {grid_cols : int; grid_rows : int}
 
-(** Calculate optimal layout based on available space and number of pagers.
-    Choose the orientation that gives each pager the most space. *)
+(** Calculate optimal grid layout for given number of pagers.
+    Tries different grid arrangements and picks the one that maximizes
+    space per pager while respecting minimum constraints. *)
 let calculate_layout ~cols ~rows ~num_pagers =
-  if num_pagers <= 1 then (Vertical, 1, num_pagers)
+  if num_pagers <= 0 then ({grid_cols = 1; grid_rows = 1}, 0)
+  else if num_pagers = 1 then ({grid_cols = 1; grid_rows = 1}, 1)
   else
-    (* Calculate space per pager for each orientation *)
-    let h_cols_per_pager = cols / num_pagers in
-    let h_rows_per_pager = rows in
-    let v_cols_per_pager = cols in
-    let v_rows_per_pager = rows / num_pagers in
-    (* Calculate "area" (cols * rows) for each orientation *)
-    let h_area = h_cols_per_pager * h_rows_per_pager in
-    let v_area = v_cols_per_pager * v_rows_per_pager in
-    (* Check minimum constraints *)
-    let h_viable = h_cols_per_pager >= min_pager_cols in
-    let v_viable = v_rows_per_pager >= min_pager_rows in
-    match (h_viable, v_viable) with
-    | true, true ->
-        (* Both viable - pick the one with more area per pager *)
-        if h_area >= v_area then (Horizontal, num_pagers, num_pagers)
-        else (Vertical, num_pagers, num_pagers)
-    | true, false -> (Horizontal, num_pagers, num_pagers)
-    | false, true -> (Vertical, num_pagers, num_pagers)
-    | false, false ->
-        (* Neither viable at full count - reduce visible pagers *)
-        let max_h = max 1 (cols / min_pager_cols) in
-        let max_v = max 1 (rows / min_pager_rows) in
-        if max_h >= max_v then (Horizontal, max_h, max_h)
-        else (Vertical, max_v, max_v)
+    (* Maximum grid dimensions based on minimum pager sizes *)
+    let max_grid_cols = max 1 (cols / min_pager_cols) in
+    let max_grid_rows = max 1 (rows / min_pager_rows) in
+    (* Try all viable grid configurations and pick the best one *)
+    let best_layout = ref {grid_cols = 1; grid_rows = num_pagers} in
+    let best_area = ref 0 in
+    let best_visible = ref (min num_pagers max_grid_rows) in
+    for gc = 1 to max_grid_cols do
+      for gr = 1 to max_grid_rows do
+        let capacity = gc * gr in
+        if capacity >= num_pagers || capacity >= !best_visible then begin
+          let visible = min num_pagers capacity in
+          let pager_width = cols / gc in
+          let pager_height = rows / gr in
+          let area = pager_width * pager_height in
+          (* Prefer layouts that show all pagers, then maximize area *)
+          let dominated =
+            visible < !best_visible
+            || (visible = !best_visible && area <= !best_area)
+          in
+          if not dominated then begin
+            best_layout := {grid_cols = gc; grid_rows = gr} ;
+            best_area := area ;
+            best_visible := visible
+          end
+        end
+      done
+    done ;
+    (!best_layout, !best_visible)
 
 (** Get visible pager slots based on focus - focused pager is always visible *)
 let get_visible_pagers ~pagers ~focused_id ~max_visible =
@@ -190,62 +197,132 @@ let visible_length s =
   in
   loop 0 0
 
-(** Split a string into lines, padding to ensure consistent count *)
+(** Truncate a string with ANSI codes to a visible width *)
+let truncate_to_width s ~width =
+  let len = String.length s in
+  let buf = Buffer.create width in
+  let rec skip_escape i =
+    if i >= len then len
+    else
+      match s.[i] with
+      | 'A' .. 'Z' | 'a' .. 'z' -> i + 1
+      | _ -> skip_escape (i + 1)
+  in
+  let rec loop i visible_count =
+    if i >= len || visible_count >= width then ()
+    else if s.[i] = '\027' then begin
+      (* Copy the entire escape sequence *)
+      let end_idx = skip_escape (i + 1) in
+      Buffer.add_substring buf s i (end_idx - i) ;
+      loop end_idx visible_count
+    end
+    else begin
+      Buffer.add_char buf s.[i] ;
+      loop (i + 1) (visible_count + 1)
+    end
+  in
+  loop 0 0 ;
+  Buffer.contents buf
+
+(** Split a string into lines, padding/truncating to ensure consistent dimensions *)
 let split_lines_padded s ~target_lines ~width =
   let lines = String.split_on_char '\n' s in
+  (* Take only target_lines lines *)
+  let trimmed =
+    if List.length lines <= target_lines then lines
+    else List.filteri (fun i _ -> i < target_lines) lines
+  in
   let padded =
-    if List.length lines >= target_lines then lines
+    if List.length trimmed >= target_lines then trimmed
     else
       let padding =
-        List.init (target_lines - List.length lines) (fun _ -> "")
+        List.init (target_lines - List.length trimmed) (fun _ -> "")
       in
-      lines @ padding
+      trimmed @ padding
   in
-  (* Ensure each line is exactly width chars (for alignment) *)
+  (* Ensure each line is exactly width chars (truncate or pad) *)
   List.map
     (fun line ->
       let visible_len = visible_length line in
-      if visible_len >= width then line
-      else line ^ String.make (width - visible_len) ' ')
+      if visible_len > width then truncate_to_width line ~width
+      else if visible_len < width then
+        line ^ String.make (width - visible_len) ' '
+      else line)
     padded
 
-(** Render multiple pagers horizontally (side-by-side) *)
-let render_horizontal ~pagers ~focused_id ~cols ~rows ~focus
+(** Render a row of pagers horizontally (side-by-side) *)
+let render_pager_row ~pagers ~focused_id ~pager_width ~pager_height ~focus
     ~(result_focus : State.result_focus) =
-  let num_pagers = List.length pagers in
-  let pager_width = cols / num_pagers in
-  let separator_col = Widgets.dim "│" in
-  (* Render each pager to its own string *)
-  let pager_renders =
-    List.map
-      (fun slot ->
-        let is_focused =
-          focus && slot.State.id = focused_id
-          && match result_focus with State.FocusPager _ -> true | _ -> false
+  if pagers = [] then ""
+  else
+    let separator_col = Widgets.dim "│" in
+    (* Render each pager to its own string *)
+    let pager_renders =
+      List.map
+        (fun slot ->
+          let is_focused =
+            focus && slot.State.id = focused_id
+            && match result_focus with State.FocusPager _ -> true | _ -> false
+          in
+          render_single_pager
+            ~slot
+            ~cols:(pager_width - 1)
+            ~rows:pager_height
+            ~is_focused)
+        pagers
+    in
+    (* Split each render into lines and pad/truncate to exact dimensions *)
+    let line_arrays =
+      List.map
+        (fun s ->
+          split_lines_padded
+            s
+            ~target_lines:pager_height
+            ~width:(pager_width - 1))
+        pager_renders
+    in
+    (* Join lines horizontally *)
+    let combined_lines =
+      List.init pager_height (fun i ->
+          let row_parts =
+            List.map (fun lines -> List.nth lines i) line_arrays
+          in
+          String.concat separator_col row_parts)
+    in
+    String.concat "\n" combined_lines
+
+(** Render pagers in a grid layout *)
+let render_grid ~pagers ~focused_id ~cols ~rows ~grid_cols ~grid_rows ~focus
+    ~(result_focus : State.result_focus) =
+  let pager_width = cols / grid_cols in
+  let pager_height = rows / grid_rows in
+  let separator_row = Widgets.dim (String.make cols '-') in
+  (* Arrange pagers into grid rows *)
+  let pager_array = Array.of_list pagers in
+  let num_pagers = Array.length pager_array in
+  let grid_row_renders =
+    List.init grid_rows (fun row_idx ->
+        let start = row_idx * grid_cols in
+        let row_pagers =
+          List.init grid_cols (fun col_idx ->
+              let idx = start + col_idx in
+              if idx < num_pagers then Some pager_array.(idx) else None)
+          |> List.filter_map Fun.id
         in
-        render_single_pager ~slot ~cols:(pager_width - 1) ~rows ~is_focused)
-      pagers
+        if row_pagers = [] then ""
+        else
+          render_pager_row
+            ~pagers:row_pagers
+            ~focused_id
+            ~pager_width
+            ~pager_height
+            ~focus
+            ~result_focus)
   in
-  (* Split each render into lines *)
-  let max_lines =
-    List.fold_left
-      (fun acc s -> max acc (List.length (String.split_on_char '\n' s)))
-      0
-      pager_renders
-  in
-  let line_arrays =
-    List.map
-      (fun s ->
-        split_lines_padded s ~target_lines:max_lines ~width:(pager_width - 1))
-      pager_renders
-  in
-  (* Join lines horizontally *)
-  let combined_lines =
-    List.init max_lines (fun i ->
-        let row_parts = List.map (fun lines -> List.nth lines i) line_arrays in
-        String.concat separator_col row_parts)
-  in
-  String.concat "\n" combined_lines
+  (* Join grid rows with separator *)
+  String.concat
+    ("\n" ^ separator_row ^ "\n")
+    (List.filter (fun s -> s <> "") grid_row_renders)
 
 (** Render pager tabs for single-column mode *)
 let render_pager_tabs ~pagers ~focused_id =
@@ -292,9 +369,10 @@ let render ~state ~cols ~rows ~focus =
         in
         Printf.sprintf "%s\n%s%s" content error_line help
       else
-        (* Multi-pager layout - choose optimal orientation *)
-        let layout, _visible_count, max_visible =
-          calculate_layout ~cols ~rows:(rows - 2) ~num_pagers
+        (* Multi-pager layout - calculate optimal grid *)
+        let available_rows = rows - 2 in
+        let {grid_cols; grid_rows}, max_visible =
+          calculate_layout ~cols ~rows:available_rows ~num_pagers
         in
         let visible, hidden_left, hidden_right =
           get_visible_pagers ~pagers ~focused_id ~max_visible
@@ -302,40 +380,15 @@ let render ~state ~cols ~rows ~focus =
         let hidden_indicator =
           render_hidden_indicator ~hidden_left ~hidden_right
         in
-        let num_visible = List.length visible in
-
         let content =
-          match layout with
-          | Vertical ->
-              (* Vertical stack *)
-              let pager_height = (rows - 3) / num_visible in
-              let pager_strs =
-                List.map
-                  (fun slot ->
-                    let is_focused =
-                      focus && slot.State.id = focused_id
-                      &&
-                      match result_focus with
-                      | State.FocusPager _ -> true
-                      | _ -> false
-                    in
-                    render_single_pager
-                      ~slot
-                      ~cols
-                      ~rows:pager_height
-                      ~is_focused)
-                  visible
-              in
-              String.concat "\n" pager_strs
-          | Horizontal ->
-              (* Horizontal side-by-side *)
-              let pager_height = rows - 3 in
-              render_horizontal
-                ~pagers:visible
-                ~focused_id
-                ~cols
-                ~rows:pager_height
-                ~focus
-                ~result_focus
+          render_grid
+            ~pagers:visible
+            ~focused_id
+            ~cols
+            ~rows:(available_rows - 1)
+            ~grid_cols
+            ~grid_rows
+            ~focus
+            ~result_focus
         in
         Printf.sprintf "%s%s\n%s%s" content hidden_indicator error_line help

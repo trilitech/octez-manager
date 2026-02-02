@@ -89,40 +89,45 @@ let test_hidden_indicator_both () =
 (* ============================================================ *)
 
 let test_calculate_layout_single () =
-  let layout, visible_count, max_visible =
+  let Render.{grid_cols; grid_rows}, max_visible =
     Render.calculate_layout ~cols:80 ~rows:24 ~num_pagers:1
   in
-  Alcotest.(check int) "visible_count" 1 visible_count ;
   Alcotest.(check int) "max_visible" 1 max_visible ;
-  (* Single pager always uses vertical layout *)
-  Alcotest.(check bool) "vertical layout" true (layout = Render.Vertical)
+  Alcotest.(check int) "grid_cols" 1 grid_cols ;
+  Alcotest.(check int) "grid_rows" 1 grid_rows
 
 let test_calculate_layout_prefers_horizontal_when_wide () =
   (* Wide terminal: 200 cols, 24 rows, 2 pagers
-     Horizontal: each gets 100 cols x 24 rows = 2400 area
-     Vertical: each gets 200 cols x 12 rows = 2400 area
-     Should prefer horizontal when equal or better *)
-  let layout, visible_count, _max_visible =
+     Horizontal 2x1: each gets 100 cols x 24 rows = 2400 area
+     Vertical 1x2: each gets 200 cols x 12 rows = 2400 area - but 12 < min_pager_rows
+     Should use horizontal *)
+  let Render.{grid_cols; grid_rows}, max_visible =
     Render.calculate_layout ~cols:200 ~rows:24 ~num_pagers:2
   in
-  Alcotest.(check int) "visible_count" 2 visible_count ;
-  Alcotest.(check bool)
-    "horizontal layout for wide terminal"
-    true
-    (layout = Render.Horizontal)
+  Alcotest.(check int) "max_visible" 2 max_visible ;
+  Alcotest.(check int) "grid_cols for wide" 2 grid_cols ;
+  Alcotest.(check int) "grid_rows for wide" 1 grid_rows
 
 let test_calculate_layout_prefers_vertical_when_tall () =
   (* Narrow but tall: 80 cols, 60 rows, 2 pagers
-     Horizontal: each gets 40 cols x 60 rows - 40 < min_pager_cols (80), not viable
-     Vertical: each gets 80 cols x 30 rows = 2400 area, viable *)
-  let layout, visible_count, _max_visible =
+     Horizontal 2x1: each gets 40 cols - 40 < min_pager_cols (80), not viable
+     Vertical 1x2: each gets 80 cols x 30 rows, viable *)
+  let Render.{grid_cols; grid_rows}, max_visible =
     Render.calculate_layout ~cols:80 ~rows:60 ~num_pagers:2
   in
-  Alcotest.(check int) "visible_count" 2 visible_count ;
-  Alcotest.(check bool)
-    "vertical layout for tall terminal"
-    true
-    (layout = Render.Vertical)
+  Alcotest.(check int) "max_visible" 2 max_visible ;
+  Alcotest.(check int) "grid_cols for tall" 1 grid_cols ;
+  Alcotest.(check int) "grid_rows for tall" 2 grid_rows
+
+let test_calculate_layout_grid () =
+  (* Large terminal: 320 cols, 72 rows, 5 pagers
+     Should arrange in a 2x3 grid (capacity 6, shows all 5) *)
+  let Render.{grid_cols; grid_rows}, max_visible =
+    Render.calculate_layout ~cols:320 ~rows:72 ~num_pagers:5
+  in
+  Alcotest.(check int) "max_visible for grid" 5 max_visible ;
+  (* Grid should accommodate all 5: either 2x3 or 3x2 depending on which gives more area *)
+  Alcotest.(check bool) "fits all pagers" true (grid_cols * grid_rows >= 5)
 
 (* ============================================================ *)
 (* Visible Pagers Tests                                          *)
@@ -244,6 +249,7 @@ let () =
             "vertical when tall"
             `Quick
             test_calculate_layout_prefers_vertical_when_tall;
+          Alcotest.test_case "grid" `Quick test_calculate_layout_grid;
         ] );
       ( "visible_pagers",
         [
