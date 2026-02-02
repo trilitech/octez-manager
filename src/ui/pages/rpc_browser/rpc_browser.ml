@@ -169,14 +169,17 @@ let view ps ~focus ~size =
           let right_width = cols - left_width - 1 in
           let browser_focus = focus && s.State.focus = State.FocusBrowser in
           let pager_focus = focus && s.State.focus = State.FocusPager in
-          (* Render browser list for left panel *)
+          (* Render browser list using cached entries *)
           let left_state =
-            {s with mode = State.List {entries = []; cursor = 0; loading = false}}
+            {s with mode = State.List {
+              entries = s.State.cached_entries;
+              cursor = s.State.cached_cursor;
+              loading = false
+            }}
           in
           let left_lines = Rpc_browser_render_list.render ~state:left_state ~cols:left_width in
           let left =
             if browser_focus then
-              (* Add focus indicator *)
               (Widgets.fg 14 "▶ Browser") :: left_lines |> String.concat "\n"
             else
               (Widgets.dim "  Browser") :: left_lines |> String.concat "\n"
