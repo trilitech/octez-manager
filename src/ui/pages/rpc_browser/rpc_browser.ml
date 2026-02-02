@@ -185,7 +185,7 @@ let handle_key ps key ~size =
         if key = "s" then (
           match s.State.mode with
           | State.Result {raw_body; request; _} ->
-              (* Save to file *)
+              (* Save to file - use raw JSON (unfolded, no colors) *)
               let filename =
                 let base =
                   request
@@ -207,9 +207,30 @@ let handle_key ps key ~size =
                  state_ref := Some new_state ;
                  Navigation.update (fun _ -> new_state) ps)
           | _ -> ps)
+        (* Handle fold keys *)
+        else if key = "f" then (
+          (* Fold all sections *)
+          let new_state = State.fold_all_json s in
+          state_ref := Some new_state ;
+          Navigation.update (fun _ -> new_state) ps)
+        else if key = "F" then (
+          (* Unfold all sections *)
+          let new_state = State.unfold_all_json s in
+          state_ref := Some new_state ;
+          Navigation.update (fun _ -> new_state) ps)
         else
           match Keys.of_string key with
           | Some Keys.Escape -> back ps
+          | Some Keys.Tab ->
+              (* Toggle fold at current scroll position *)
+              let line =
+                match s.State.mode with
+                | State.Result {scroll_offset; _} -> scroll_offset
+                | _ -> 0
+              in
+              let new_state = State.toggle_fold ~line s in
+              state_ref := Some new_state ;
+              Navigation.update (fun _ -> new_state) ps
           | _ ->
               (* Delegate to pager for all other keys *)
               (match State.get_pager s with
