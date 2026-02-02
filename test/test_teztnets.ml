@@ -156,12 +156,11 @@ let test_resolve_for_octez_node_mainnet () =
   | Error _ -> fail "should resolve mainnet"
 
 let test_resolve_for_octez_node_shadownet () =
-  let result =
-    Teztnets.resolve_network_for_octez_node ~fetch:(fun () -> Ok []) "shadownet"
-  in
+  (* Use the actual list_networks which will return fallback *)
+  let result = Teztnets.resolve_network_for_octez_node "shadownet" in
   match result with
   | Ok url -> check bool "got shadownet URL" true (String.length url > 0)
-  | Error _ -> fail "should resolve shadownet"
+  | Error _ -> fail "should resolve shadownet from fallback networks"
 
 let test_resolve_for_octez_node_unknown () =
   let result =
