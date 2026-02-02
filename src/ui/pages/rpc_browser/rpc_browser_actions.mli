@@ -43,21 +43,28 @@ val execute_get :
 (** {1 Dynamic Value Prompts} *)
 
 (** Get smart default for dynamic segment.
+    Checks history for recent values first, then falls back to hardcoded defaults.
     @param name Segment name (e.g., "chain_id", "block_id")
     @param typ Type hint from OpenAPI
+    @param state Current state (for history lookup)
     @return Default value *)
-val default_for_dynamic : name:string -> typ:string -> string
+val default_for_dynamic :
+  name:string -> typ:string -> Rpc_browser_state.state -> string
 
 (** Open modal to prompt for dynamic segment value.
+    Shows recent values from history as hints.
+    Records entered value to history.
     @param name Segment name
     @param typ Type hint
     @param state Current state
-    @param on_value Callback with entered value *)
+    @param on_value Callback with entered value
+    @param on_update Callback to update state (for recording history) *)
 val prompt_dynamic :
   name:string ->
   typ:string ->
   Rpc_browser_state.state ->
   (string -> unit) ->
+  (Rpc_browser_state.state -> unit) ->
   unit
 
 (** {1 Instance Cycling} *)

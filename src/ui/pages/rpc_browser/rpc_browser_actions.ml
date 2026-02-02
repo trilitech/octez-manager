@@ -27,30 +27,51 @@ let build_rpc_url service path =
   let path_str = if path = [] then "/" else "/" ^ String.concat "/" path in
   base ^ path_str
 
-let default_for_dynamic ~name ~typ =
+let default_for_dynamic ~name ~typ state =
   let _ = typ in
-  match name with
-  | "chain_id" -> "main"
-  | "block_id" -> "head"
-  | "block_hash" -> "head"
-  | "contract_id" -> ""
-  | "pkh" -> ""
-  | _ -> ""
+  (* First check history for recent values *)
+  match State.get_recent_values ~segment_type:name state with
+  | recent :: _ -> recent
+  | [] -> (
+      (* Fall back to hardcoded defaults *)
+      match name with
+      | "chain_id" -> "main"
+      | "block_id" -> "head"
+      | "block_hash" -> "head"
+      | "contract_id" -> ""
+      | "pkh" -> ""
+      | _ -> "")
 
-let prompt_dynamic ~name ~typ state on_value =
-  let default = default_for_dynamic ~name ~typ in
-  let _ = state in
-  let title = Printf.sprintf "Enter %s" name in
+(* State ref for recording dynamic values *)
+let pending_dynamic_update : (State.state -> unit) option ref = ref None
+
+let prompt_dynamic ~name ~typ state on_value on_update =
+  let default = default_for_dynamic ~name ~typ state in
+  let recent_values = State.get_recent_values ~segment_type:name state in
+  let title =
+    if List.length recent_values > 0 then
+      Printf.sprintf "Enter %s (recent: %s)" name
+        (String.concat ", " (List.filteri (fun i _ -> i < 3) recent_values))
+    else Printf.sprintf "Enter %s" name
+  in
   let placeholder =
     if default = "" then Some typ
     else Some (Printf.sprintf "%s (default: %s)" typ default)
   in
+  (* Store update callback for use after modal closes *)
+  pending_dynamic_update := Some on_update ;
   Modal_helpers.prompt_text_modal
     ~title
     ~initial:default
     ~placeholder
     ~on_submit:(fun text ->
       let value = if text = "" then default else text in
+      (* Record the value in history *)
+      let new_state = State.add_dynamic_value ~segment_type:name ~value state in
+      (match !pending_dynamic_update with
+      | Some update -> update new_state
+      | None -> ()) ;
+      pending_dynamic_update := None ;
       on_value value)
     ()
 
@@ -116,9 +137,11 @@ let handle_enter state on_update =
           fetch_entries new_state on_update
       | State.Get -> execute_get state on_update
       | State.Dyn typ ->
-          prompt_dynamic ~name:entry.State.name ~typ state (fun value ->
+          prompt_dynamic ~name:entry.State.name ~typ state
+            (fun value ->
               let new_state = State.navigate_to value state in
-              fetch_entries new_state on_update))
+              fetch_entries new_state on_update)
+            on_update)
 
 let cycle_instance ~delta state =
   let n = List.length state.State.instances in
