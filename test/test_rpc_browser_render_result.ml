@@ -14,7 +14,21 @@ module Render = Rpc_browser_render_result
 (* ============================================================ *)
 
 let test_render_header () =
-  let result = Render.render_header ~request:"/chains/main/blocks/head" in
+  let result =
+    Render.render_header
+      ~request:"/chains/main/blocks/head"
+      ~response_time_ms:None
+      ~response_size:None
+  in
+  Alcotest.(check bool) "has content" true (String.length result > 0)
+
+let test_render_header_with_time () =
+  let result =
+    Render.render_header
+      ~request:"/version"
+      ~response_time_ms:(Some 42.0)
+      ~response_size:(Some 1234)
+  in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
@@ -126,7 +140,11 @@ let () =
   Alcotest.run
     "Rpc_browser_render_result"
     [
-      ("header", [Alcotest.test_case "render" `Quick test_render_header]);
+      ( "header",
+        [
+          Alcotest.test_case "render" `Quick test_render_header;
+          Alcotest.test_case "with time" `Quick test_render_header_with_time;
+        ] );
       ( "body",
         [
           Alcotest.test_case "short" `Quick test_render_body_short;

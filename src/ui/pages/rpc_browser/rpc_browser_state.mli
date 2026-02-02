@@ -29,6 +29,8 @@ type mode =
       body : string;  (** Response body (may be highlighted) *)
       raw_body : string;  (** Original unformatted response *)
       scroll_offset : int;  (** Vertical scroll position *)
+      response_time_ms : float option;  (** Request duration in milliseconds *)
+      response_size : int option;  (** Response body size in bytes *)
     }
 
 (** OpenAPI loading status. *)
@@ -89,8 +91,16 @@ val execute_get : url:string -> state -> state
 
 (** Set result body after successful request.
     @param body Formatted/highlighted body
-    @param raw_body Original response *)
-val set_result : body:string -> raw_body:string -> state -> state
+    @param raw_body Original response
+    @param response_time_ms Optional request duration in milliseconds
+    @param response_size Optional response body size in bytes *)
+val set_result :
+  body:string ->
+  raw_body:string ->
+  ?response_time_ms:float ->
+  ?response_size:int ->
+  state ->
+  state
 
 (** {1 Cursor Movement} *)
 
