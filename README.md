@@ -23,6 +23,7 @@
 
 - **Install and manage** Octez services as systemd units
 - **Terminal UI** with real-time monitoring and logs
+- **RPC Browser** — Interactively explore and query RPC endpoints with syntax highlighting
 - **Snapshot import** from tzinit.org with automatic download
 - **Multiple instances** per service type
 - **Network discovery** from teztnets.com (mainnet, shadownet, etc.)
