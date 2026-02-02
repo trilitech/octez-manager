@@ -14,7 +14,7 @@ let min_pager_cols = 80
 
 let min_pager_rows = 24
 
-(** Calculate visible length of a string (excluding ANSI escape codes) *)
+(** Calculate visible length of a string (excluding ANSI escape codes, handling UTF-8) *)
 let visible_length s =
   let len = String.length s in
   let rec skip_escape i =
@@ -24,10 +24,23 @@ let visible_length s =
       | 'A' .. 'Z' | 'a' .. 'z' -> i + 1
       | _ -> skip_escape (i + 1)
   in
+  (* Get byte length of UTF-8 character starting at position i *)
+  let utf8_char_len i =
+    if i >= len then 0
+    else
+      let c = Char.code s.[i] in
+      if c land 0x80 = 0 then 1 (* ASCII: 0xxxxxxx *)
+      else if c land 0xE0 = 0xC0 then 2 (* 2-byte: 110xxxxx *)
+      else if c land 0xF0 = 0xE0 then 3 (* 3-byte: 1110xxxx *)
+      else if c land 0xF8 = 0xF0 then 4 (* 4-byte: 11110xxx *)
+      else 1 (* Invalid, treat as 1 *)
+  in
   let rec loop i acc =
     if i >= len then acc
     else if s.[i] = '\027' then loop (skip_escape (i + 1)) acc
-    else loop (i + 1) (acc + 1)
+    else
+      let char_len = utf8_char_len i in
+      loop (i + char_len) (acc + 1)
   in
   loop 0 0
 
@@ -203,16 +216,27 @@ let get_visible_pagers ~pagers ~focused_id ~max_visible =
     in
     (visible, hidden_left, hidden_right)
 
-(** Truncate a string with ANSI codes to a visible width *)
+(** Truncate a string with ANSI codes to a visible width (handles UTF-8) *)
 let truncate_to_width s ~width =
   let len = String.length s in
-  let buf = Buffer.create width in
+  let buf = Buffer.create (width * 4) in
   let rec skip_escape i =
     if i >= len then len
     else
       match s.[i] with
       | 'A' .. 'Z' | 'a' .. 'z' -> i + 1
       | _ -> skip_escape (i + 1)
+  in
+  (* Get byte length of UTF-8 character starting at position i *)
+  let utf8_char_len i =
+    if i >= len then 0
+    else
+      let c = Char.code s.[i] in
+      if c land 0x80 = 0 then 1
+      else if c land 0xE0 = 0xC0 then 2
+      else if c land 0xF0 = 0xE0 then 3
+      else if c land 0xF8 = 0xF0 then 4
+      else 1
   in
   let rec loop i visible_count =
     if i >= len || visible_count >= width then ()
@@ -223,8 +247,11 @@ let truncate_to_width s ~width =
       loop end_idx visible_count
     end
     else begin
-      Buffer.add_char buf s.[i] ;
-      loop (i + 1) (visible_count + 1)
+      (* Copy entire UTF-8 character *)
+      let char_len = utf8_char_len i in
+      let char_len = min char_len (len - i) in
+      Buffer.add_substring buf s i char_len ;
+      loop (i + char_len) (visible_count + 1)
     end
   in
   loop 0 0 ;
