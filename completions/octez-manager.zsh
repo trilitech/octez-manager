@@ -101,7 +101,7 @@ _octez-manager() {
   opts_install_accuser=(
     '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
     '--base-dir[Accuser base directory]:DIR:_directories'
-    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
+    '--bin-dir-alias[Use a registered directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries register]:ALIAS:_directories'
     '--extra-arg[Additional arguments appended to the accuser command.]:ARG:'
     '--instance[Accuser instance name]:NAME:'
     '--no-enable[Disable automatic enable --now]'
@@ -117,7 +117,7 @@ _octez-manager() {
   opts_install_baker=(
     '--app-bin-dir[Directory containing Octez binaries.]:DIR:_directories'
     '--base-dir[Baker base directory for wallets (defaults to an instance-specific path).]:DIR:_directories'
-    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
+    '--bin-dir-alias[Use a registered directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries register]:ALIAS:_directories'
     '--dal-endpoint[DAL node endpoint (e.g., http://localhost:10732). Use '\''none'\'' to opt-out with --without-dal flag. Defaults to '\''none'\''.]:ENDPOINT:_urls'
     '--delegate[Delegate key hash or alias passed as --delegate.]:KEY:'
     '--extra-arg[Additional arguments appended to the baker command.]:ARG:'
@@ -135,7 +135,7 @@ _octez-manager() {
   local -a opts_install_dal_node
   opts_install_dal_node=(
     '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
-    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
+    '--bin-dir-alias[Use a registered directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries register]:ALIAS:_directories'
     '--data-dir[DAL node data directory]:DIR:_directories'
     '--extra-arg[Additional arguments appended to the dal-node command.]:ARG:'
     '--instance[Instance name used for dal-node.env and systemd units.]:NAME:'
@@ -152,7 +152,7 @@ _octez-manager() {
   local -a opts_install_node
   opts_install_node=(
     '--app-bin-dir[Directory containing Octez binaries (defaults to the directory holding octez-node found in $PATH).]:DIR:_directories'
-    '--bin-dir-alias[Use a linked directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries link]:ALIAS:_directories'
+    '--bin-dir-alias[Use a registered directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries register]:ALIAS:_directories'
     '--data-dir[Custom data directory (defaults to /var/lib/octez/<inst>).]:DIR:_directories'
     '--extra-arg[Additional arguments appended to the node command.]:ARG:'
     '--history-mode[History mode to configure on octez-node (rolling|full|archive).]:MODE:->history-modes'
