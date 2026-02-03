@@ -553,3 +553,10 @@
  (modules test_public_nodes_cache)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_cmd_rpc)
+ (libraries alcotest octez_manager_lib octez_manager_cli)
+ (modules test_cmd_rpc)
+ (instrumentation
+  (backend bisect_ppx)))
