@@ -49,7 +49,43 @@ dune fmt                        # Format code (MUST pass before commit)
 **Critical:**
 - Every commit must be properly formatted. Do not create separate "formatting" commits.
 - Every commit must have correct copyright headers. Run `./scripts/check-copyright.sh --fix` to automatically update headers if needed.
+- Shell completions must be up to date. Run `make completions` after CLI changes.
 - To bypass hooks temporarily: `git commit --no-verify` (use sparingly!)
+
+### Verification Check Pattern
+
+When adding new verification checks (like format-check, completions-check), follow this **non-destructive pattern**:
+
+```makefile
+# CORRECT: Non-destructive check (matches CI)
+check-something:
+	@mkdir -p /tmp/octez-something-check
+	@generate-something --out-dir /tmp/octez-something-check
+	@if ! diff -q expected/file /tmp/octez-something-check/file >/dev/null 2>&1; then \
+		echo "ERROR: Something is out of date."; \
+		echo "Run: make generate-something"; \
+		diff -u expected/file /tmp/octez-something-check/file || true; \
+		rm -rf /tmp/octez-something-check; \
+		exit 1; \
+	fi
+	@rm -rf /tmp/octez-something-check
+	@echo "Something is up to date."
+```
+
+**Why this pattern?**
+- ✅ **Non-destructive**: Doesn't modify the working directory
+- ✅ **Consistent with CI**: Same logic runs locally and in CI
+- ✅ **Helpful**: Shows actual diff when check fails
+- ✅ **Clean**: Cleans up temp directory after check
+
+**Anti-pattern (DO NOT use):**
+```makefile
+# WRONG: Destructive check
+check-something: generate-something
+	@git diff --exit-code something/ || exit 1
+```
+
+This modifies the working directory, leaving uncommitted changes if the check fails.
 
 ## OCaml LSP Server
 

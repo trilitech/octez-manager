@@ -35,8 +35,24 @@ fmt-check:
 completions:
 	$(DUNE) exec -- octez-manager-gen-completion
 
-completions-check: completions
-	@git --no-pager diff --exit-code completions/ || (echo "Completions are out of date. Run 'make completions' and commit." && false)
+completions-check:
+	@mkdir -p /tmp/octez-completions-check
+	@$(DUNE) exec -- octez-manager-gen-completion --out-dir /tmp/octez-completions-check
+	@if ! diff -q completions/octez-manager.bash /tmp/octez-completions-check/octez-manager.bash >/dev/null 2>&1 || \
+	    ! diff -q completions/octez-manager.zsh /tmp/octez-completions-check/octez-manager.zsh >/dev/null 2>&1; then \
+		echo "ERROR: Shell completion files are out of date."; \
+		echo "Run: make completions"; \
+		echo ""; \
+		echo "=== Bash diff ==="; \
+		diff -u completions/octez-manager.bash /tmp/octez-completions-check/octez-manager.bash || true; \
+		echo ""; \
+		echo "=== Zsh diff ==="; \
+		diff -u completions/octez-manager.zsh /tmp/octez-completions-check/octez-manager.zsh || true; \
+		rm -rf /tmp/octez-completions-check; \
+		exit 1; \
+	fi
+	@rm -rf /tmp/octez-completions-check
+	@echo "Completion files are up to date."
 
 lint-sync-io:
 	@./scripts/check-sync-io.sh
