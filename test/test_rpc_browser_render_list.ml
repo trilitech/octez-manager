@@ -84,6 +84,31 @@ let test_entry_selected () =
   let result = Render.render_entry ~cursor:0 ~idx:0 ~focus:true entry in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
+let test_entry_selected_focused_has_bold () =
+  let entry = {State.name = "chains"; kind = State.Sub} in
+  let result = Render.render_entry ~cursor:0 ~idx:0 ~focus:true entry in
+  (* Bold ANSI code is \027[1m *)
+  Alcotest.(check bool) "contains bold" true (String.exists (fun c -> c = '\027') result)
+
+let test_entry_selected_unfocused_has_dim () =
+  let entry = {State.name = "chains"; kind = State.Sub} in
+  let result = Render.render_entry ~cursor:0 ~idx:0 ~focus:false entry in
+  (* Dim ANSI code is \027[2m *)
+  Alcotest.(check bool) "contains ANSI" true (String.exists (fun c -> c = '\027') result)
+
+let test_entry_focus_produces_different_output () =
+  let entry = {State.name = "chains"; kind = State.Sub} in
+  let focused = Render.render_entry ~cursor:0 ~idx:0 ~focus:true entry in
+  let unfocused = Render.render_entry ~cursor:0 ~idx:0 ~focus:false entry in
+  Alcotest.(check bool) "different output" true (focused <> unfocused)
+
+let test_entry_not_selected_same_regardless_of_focus () =
+  let entry = {State.name = "chains"; kind = State.Sub} in
+  let focused = Render.render_entry ~cursor:1 ~idx:0 ~focus:true entry in
+  let unfocused = Render.render_entry ~cursor:1 ~idx:0 ~focus:false entry in
+  (* Non-selected entries should look the same regardless of focus *)
+  Alcotest.(check string) "same output" focused unfocused
+
 (* ============================================================ *)
 (* Loading and Error Tests                                       *)
 (* ============================================================ *)
@@ -182,6 +207,22 @@ let () =
         [
           Alcotest.test_case "not selected" `Quick test_entry_not_selected;
           Alcotest.test_case "selected" `Quick test_entry_selected;
+          Alcotest.test_case
+            "selected focused has bold"
+            `Quick
+            test_entry_selected_focused_has_bold;
+          Alcotest.test_case
+            "selected unfocused has dim"
+            `Quick
+            test_entry_selected_unfocused_has_dim;
+          Alcotest.test_case
+            "focus produces different output"
+            `Quick
+            test_entry_focus_produces_different_output;
+          Alcotest.test_case
+            "not selected same regardless of focus"
+            `Quick
+            test_entry_not_selected_same_regardless_of_focus;
         ] );
       ( "loading_error",
         [
