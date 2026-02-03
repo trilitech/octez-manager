@@ -1161,7 +1161,7 @@ let go_to_binaries state =
   state
 
 let go_to_rpc_browser state =
-  Context.navigate Rpc_browser.name ;
+  Context.navigate Rpc_node_selection.name ;
   state
 
 let current_external_service s =
