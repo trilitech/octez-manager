@@ -667,14 +667,16 @@ let update_focused_pager_from_foldable state =
       | Some f ->
           let new_body = Foldable_json.render f in
           let pager = Pager.open_text ~title:"Response" new_body in
-          (* Preserve cursor mode and position from old pager *)
+          (* Preserve cursor mode, position, and search from old pager *)
           let pager =
             match slot.pager with
             | Some old_p ->
                 let pager =
                   Pager.set_cursor_mode pager (Pager.cursor_mode old_p)
                 in
-                Pager.set_cursor pager (Pager.get_cursor_line old_p)
+                let pager = Pager.set_cursor pager (Pager.get_cursor_line old_p) in
+                (* Preserve search query *)
+                Pager.set_search pager old_p.Pager.search
             | None -> Pager.set_cursor_mode pager true
           in
           let pager_id = get_focused_pager_id state in
