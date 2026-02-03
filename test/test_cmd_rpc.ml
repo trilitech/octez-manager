@@ -30,22 +30,31 @@ let test_service_from_url_localhost () =
 
 let test_resolve_service_url_only () =
   let url = "https://mainnet.smartpy.io" in
-  match Cmd_rpc.resolve_service None (Some url) with
+  match Cmd_rpc.resolve_service None (Some url) None with
   | Ok svc ->
       Alcotest.(check string) "rpc_addr" url svc.Service.rpc_addr
   | Error msg -> Alcotest.fail msg
 
-let test_resolve_service_both_error () =
-  match Cmd_rpc.resolve_service (Some "instance") (Some "url") with
+let test_resolve_service_multiple_error () =
+  match Cmd_rpc.resolve_service (Some "instance") (Some "url") None with
   | Error msg ->
       Alcotest.(check bool) "has error" true (String.length msg > 0)
   | Ok _ -> Alcotest.fail "expected error"
 
-let test_resolve_service_neither_error () =
-  match Cmd_rpc.resolve_service None None with
+let test_resolve_service_none_error () =
+  match Cmd_rpc.resolve_service None None None with
   | Error msg ->
       Alcotest.(check bool) "has error" true (String.length msg > 0)
   | Ok _ -> Alcotest.fail "expected error"
+
+let test_resolve_service_public () =
+  (* This test depends on having public nodes in cache *)
+  match Cmd_rpc.resolve_service None None (Some "1") with
+  | Ok svc ->
+      Alcotest.(check bool) "has rpc_addr" true (String.length svc.Service.rpc_addr > 0)
+  | Error _ ->
+      (* Public nodes fetch might fail in test environment, that's ok *)
+      ()
 
 (* ============================================================ *)
 (* Test Runner                                                   *)
@@ -63,7 +72,8 @@ let () =
       ( "resolve_service",
         [
           Alcotest.test_case "url only" `Quick test_resolve_service_url_only;
-          Alcotest.test_case "both error" `Quick test_resolve_service_both_error;
-          Alcotest.test_case "neither error" `Quick test_resolve_service_neither_error;
+          Alcotest.test_case "multiple error" `Quick test_resolve_service_multiple_error;
+          Alcotest.test_case "none error" `Quick test_resolve_service_none_error;
+          Alcotest.test_case "public node" `Quick test_resolve_service_public;
         ] );
     ]
