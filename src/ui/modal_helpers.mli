@@ -86,3 +86,16 @@ val select_app_bin_dir_modal :
   on_select:(string * Octez_manager_lib.Binary_registry.bin_source -> unit) ->
   unit ->
   unit
+
+(** Show a spinner modal while a background task runs.
+    @param title Modal title
+    @param label Text shown next to spinner
+    @param work Background work function
+    @param on_complete Called when work completes *)
+val show_spinner_modal :
+  title:string ->
+  label:string ->
+  work:(unit -> (unit, [ `Msg of string ]) result) ->
+  on_complete:([ `Succeeded | `Failed of string | `Cancelled ] -> unit) ->
+  unit ->
+  unit

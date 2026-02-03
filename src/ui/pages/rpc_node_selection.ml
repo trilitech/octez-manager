@@ -231,11 +231,15 @@ let init () =
 let update ps _ = ps
 
 let refresh ps =
-  let public_nodes, error = fetch_public_nodes () in
-  let local_instances = load_local_instances () in
-  Navigation.update
-    (fun s -> {s with public_nodes; local_instances; error})
-    ps
+  (* Check for pending navigation (e.g., from activate_selection) *)
+  match Context.consume_navigation () with
+  | Some page -> Navigation.goto page ps
+  | None ->
+      let public_nodes, error = fetch_public_nodes () in
+      let local_instances = load_local_instances () in
+      Navigation.update
+        (fun s -> {s with public_nodes; local_instances; error})
+        ps
 
 let move ps _ = ps
 
@@ -378,14 +382,14 @@ let handle_key ps key ~size:_ =
   | _ -> ps
 
 let keymap _ps =
-  let noop ps = ps in
   let kb key action help =
     {Miaou.Core.Tui_page.key; action; help; display_only = false}
   in
+  let activate ps = Navigation.update activate_selection ps in
   [
-    kb "Enter" noop "Select";
-    kb "↑/↓" noop "Navigate";
-    kb "r" (fun ps -> refresh ps) "Refresh";
+    kb "Enter" activate "Select";
+    kb "↑/↓" (fun ps -> ps) "Navigate";
+    kb "r" refresh "Refresh";
     kb "Esc" back "Back";
   ]
 

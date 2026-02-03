@@ -120,11 +120,21 @@ let fetch_entries_sync state =
             recent_entries @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
       in
       let state_entries = List.concat_map expand_entry entries in
-      State.set_entries state_entries state
+      (* Add [change target] button at the top *)
+      let change_target_entry =
+        {State.name = "[change target]"; kind = State.ChangeTarget}
+      in
+      State.set_entries (change_target_entry :: state_entries) state
+
+(* Get the target instance for the current/focused pager, falling back to current_instance *)
+let get_target_instance state =
+  match State.get_pager_target state with
+  | Some svc -> Some svc
+  | None -> State.current_instance state
 
 (* Internal: execute GET with a specific path for the HTTP request *)
 let execute_get_internal ~url_path state on_update =
-  match State.current_instance state with
+  match get_target_instance state with
   | None -> on_update (State.set_error "No instance selected" state)
   | Some service -> (
       let url = build_rpc_url service url_path in
@@ -188,7 +198,57 @@ let handle_enter state on_update =
           (* Navigate directly with the recent value, record in history *)
           let new_state = State.add_dynamic_value ~segment_type:typ ~value state in
           let new_state = State.navigate_to value new_state in
-          fetch_entries new_state on_update)
+          fetch_entries new_state on_update
+      | State.ChangeTarget ->
+          (* Open modal to select target instance with sections *)
+          let all_instances = State.get_instances state in
+          (* Local instances have non-empty data_dir or app_bin_dir *)
+          let is_local svc =
+            svc.Octez_manager_lib.Service.data_dir <> ""
+            || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+          in
+          let local = List.filter is_local all_instances in
+          let public = State.public_nodes () in
+          (* Get current target for highlighting *)
+          let current_target = get_target_instance state in
+          let is_current svc =
+            match current_target with
+            | None -> false
+            | Some curr ->
+                curr.Octez_manager_lib.Service.rpc_addr = svc.Octez_manager_lib.Service.rpc_addr
+          in
+          (* Build items with section headers *)
+          let items =
+            (if local <> [] then
+               `Header "── Local Instances ──"
+               :: List.map (fun s -> `Instance s) local
+             else [])
+            @ (if public <> [] then
+                 `Header "── Public Nodes ──"
+                 :: List.map (fun s -> `Instance s) public
+               else [])
+          in
+          if items = [] then on_update (State.set_error "No instances available" state)
+          else
+            Modal_helpers.open_choice_modal
+              ~title:"Select target instance"
+              ~items
+              ~to_string:(function
+                | `Header h -> h
+                | `Instance svc ->
+                    let name = svc.Octez_manager_lib.Service.instance in
+                    let network = svc.Octez_manager_lib.Service.network in
+                    let label = Printf.sprintf "%s (%s)" name network in
+                    if is_current svc then
+                      Miaou_widgets_display.Widgets.fg 14 ("✓ " ^ label)
+                    else
+                      "  " ^ label)
+              ~on_select:(function
+                | `Header _ -> ()  (* Headers not selectable *)
+                | `Instance svc ->
+                    let new_state = State.set_pager_target (Some svc) state in
+                    on_update new_state)
+              ())
 
 let cycle_instance ~delta state =
   let n = List.length state.State.instances in
@@ -202,7 +262,7 @@ let execute_shortcut ~key state on_update =
   match List.find_opt (fun (k, _, _) -> k = key) shortcuts with
   | None -> false
   | Some (_, path, desc) -> (
-      match State.current_instance state with
+      match get_target_instance state with
       | None ->
           on_update (State.set_error "No instance selected" state) ;
           true
@@ -260,7 +320,11 @@ let fetch_cached_entries state on_update =
             recent_entries @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
       in
       let state_entries = List.concat_map expand_entry entries in
-      on_update (State.set_cached_entries state_entries state)
+      (* Add [change target] button at the top *)
+      let change_target_entry =
+        {State.name = "[change target]"; kind = State.ChangeTarget}
+      in
+      on_update (State.set_cached_entries (change_target_entry :: state_entries) state)
 
 let handle_cached_enter state on_update =
   match State.get_cached_entry state with
@@ -296,7 +360,57 @@ let handle_cached_enter state on_update =
           (* Navigate directly with the recent value, record in history *)
           let new_state = State.add_dynamic_value ~segment_type:typ ~value state in
           let new_state = State.navigate_cached value new_state in
-          fetch_cached_entries new_state on_update)
+          fetch_cached_entries new_state on_update
+      | State.ChangeTarget ->
+          (* Open modal to select target instance with sections *)
+          let all_instances = State.get_instances state in
+          (* Local instances have non-empty data_dir or app_bin_dir *)
+          let is_local svc =
+            svc.Octez_manager_lib.Service.data_dir <> ""
+            || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+          in
+          let local = List.filter is_local all_instances in
+          let public = State.public_nodes () in
+          (* Get current target for highlighting *)
+          let current_target = get_target_instance state in
+          let is_current svc =
+            match current_target with
+            | None -> false
+            | Some curr ->
+                curr.Octez_manager_lib.Service.rpc_addr = svc.Octez_manager_lib.Service.rpc_addr
+          in
+          (* Build items with section headers *)
+          let items =
+            (if local <> [] then
+               `Header "── Local Instances ──"
+               :: List.map (fun s -> `Instance s) local
+             else [])
+            @ (if public <> [] then
+                 `Header "── Public Nodes ──"
+                 :: List.map (fun s -> `Instance s) public
+               else [])
+          in
+          if items = [] then on_update (State.set_error "No instances available" state)
+          else
+            Modal_helpers.open_choice_modal
+              ~title:"Select target instance"
+              ~items
+              ~to_string:(function
+                | `Header h -> h
+                | `Instance svc ->
+                    let name = svc.Octez_manager_lib.Service.instance in
+                    let network = svc.Octez_manager_lib.Service.network in
+                    let label = Printf.sprintf "%s (%s)" name network in
+                    if is_current svc then
+                      Miaou_widgets_display.Widgets.fg 14 ("✓ " ^ label)
+                    else
+                      "  " ^ label)
+              ~on_select:(function
+                | `Header _ -> ()  (* Headers not selectable *)
+                | `Instance svc ->
+                    let new_state = State.set_pager_target (Some svc) state in
+                    on_update new_state)
+              ())
 
 let navigate_cached_back state on_update =
   let new_state = State.navigate_cached_up state in

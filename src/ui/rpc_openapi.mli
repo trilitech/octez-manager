@@ -49,3 +49,17 @@ val download_sync : unit -> (unit, string) result
 (** Read OpenAPI spec from cache.
     @return JSON string if available *)
 val read_spec : unit -> string option
+
+(** {1 Navigation} *)
+
+(** Check if OpenAPI data is available for navigation. *)
+val is_available : unit -> bool
+
+(** Get navigation entries for a path from OpenAPI.
+    Returns list of alternating [name; kind; name; kind; ...] where kind is
+    "__SUB__", "__GET__", or "__DYN__".
+    @param segs Path segments to navigate to *)
+val entries_for : segs:string list -> string list
+
+(** Clear cached trie and entries (useful when OpenAPI is re-downloaded). *)
+val clear_cache : unit -> unit
