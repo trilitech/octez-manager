@@ -32,8 +32,9 @@ val render_entry_kind : Rpc_browser_state.entry_kind -> string
 (** Render single entry line with cursor and kind badge.
     @param cursor Current cursor position
     @param idx Entry index
+    @param focus Whether the panel has focus (affects cursor highlighting)
     @param entry Entry to render *)
-val render_entry : cursor:int -> idx:int -> Rpc_browser_state.entry -> string
+val render_entry : cursor:int -> idx:int -> focus:bool -> Rpc_browser_state.entry -> string
 
 (** {1 Status Rendering} *)
 
@@ -46,10 +47,11 @@ val render_error : string option -> string list
 (** {1 Main Rendering} *)
 
 (** Render complete list view from state.
+    @param focus Whether the panel has focus (affects cursor highlighting)
     @param state Current RPC Browser state
     @param cols Terminal width (for truncation)
     @return List of rendered lines *)
-val render : state:Rpc_browser_state.state -> cols:int -> string list
+val render : focus:bool -> state:Rpc_browser_state.state -> cols:int -> string list
 
 (** {1 Help Line} *)
 
