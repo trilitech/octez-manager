@@ -33,14 +33,22 @@ let update_state s =
   Context.mark_instances_dirty ()
 
 let init () =
-  let service_states = Data.load_service_states () in
+  (* Check if a specific instance was selected from rpc_node_selection *)
   let nodes =
-    List.filter_map
-      (fun (ss : Service_state.t) ->
-        if ss.service.Octez_manager_lib.Service.role = "node" then
-          Some ss.service
-        else None)
-      service_states
+    match State.get_selected_instance () with
+    | Some service ->
+        (* Clear the override so next time we load local instances *)
+        State.clear_selected_instance () ;
+        [service]
+    | None ->
+        (* No override, load local node instances *)
+        let service_states = Data.load_service_states () in
+        List.filter_map
+          (fun (ss : Service_state.t) ->
+            if ss.service.Octez_manager_lib.Service.role = "node" then
+              Some ss.service
+            else None)
+          service_states
   in
   let state = State.init ~instances:nodes in
   state_ref := Some state ;
