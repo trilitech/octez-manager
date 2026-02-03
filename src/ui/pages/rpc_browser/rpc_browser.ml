@@ -520,14 +520,31 @@ let handle_key ps key ~size =
                     | None -> ())
               () ;
             ps)
-          (* Handle shortcut keys 1-9 *))
+          (* Handle shortcut keys 1-9, but not if pager is in input mode *))
         else if String.length key = 1 && key.[0] >= '1' && key.[0] <= '9' then (
-          let handled = Actions.execute_shortcut ~key s update_state in
-          if handled then
-            match !state_ref with
-            | Some new_s -> Navigation.update (fun _ -> new_s) ps
+          (* Check if pager is in search/input mode - if so, pass to pager *)
+          let pager_in_input_mode =
+            match State.get_pager s with
+            | Some p -> p.Pager.input_mode <> `None
+            | None -> false
+          in
+          if pager_in_input_mode then
+            (* Let pager handle digit keys in search mode *)
+            match State.get_pager s with
+            | Some pager ->
+                let win = size.LTerm_geom.rows - 3 in
+                let pager', _consumed = Pager.handle_key pager ~key ~win in
+                let new_state = State.set_pager pager' s in
+                state_ref := Some new_state ;
+                Navigation.update (fun _ -> new_state) ps
             | None -> ps
-          else ps)
+          else
+            let handled = Actions.execute_shortcut ~key s update_state in
+            if handled then
+              match !state_ref with
+              | Some new_s -> Navigation.update (fun _ -> new_s) ps
+              | None -> ps
+            else ps)
           (* Handle fold keys *)
         else if key = "f" then (
           (* Fold all sections *)
