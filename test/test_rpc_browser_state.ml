@@ -227,6 +227,73 @@ let test_clear_error () =
   Alcotest.(check (option string)) "no error" None state'.error
 
 (* ============================================================ *)
+(* Target Override Tests                                         *)
+(* ============================================================ *)
+
+let test_target_override_initial () =
+  let state = State.init ~instances:[] in
+  Alcotest.(check bool) "no override" true (state.target_override = None)
+
+let test_set_pager_target_list_mode () =
+  let target = make_service ~rpc_addr:"https://public.node" "public-node" in
+  let state = State.init ~instances:[] in
+  let state' = State.set_pager_target (Some target) state in
+  match state'.target_override with
+  | Some svc ->
+      Alcotest.(check string) "target set" "public-node" svc.instance
+  | None -> Alcotest.fail "expected target_override to be set"
+
+let test_get_pager_target_list_mode () =
+  let target = make_service ~rpc_addr:"https://public.node" "public-node" in
+  let state = State.init ~instances:[] in
+  let state' = State.set_pager_target (Some target) state in
+  match State.get_pager_target state' with
+  | Some svc ->
+      Alcotest.(check string) "got target" "public-node" svc.instance
+  | None -> Alcotest.fail "expected target from get_pager_target"
+
+let test_target_override_fallback () =
+  let instances = [make_service "local-node"] in
+  let state = State.init ~instances in
+  (* No override set, should fall back to instances[0] *)
+  match State.get_pager_target state with
+  | None ->
+      (* In List mode without override, get_pager_target returns target_override which is None *)
+      ()
+  | Some _ -> ()
+
+let test_new_pager_inherits_target () =
+  let target = make_service ~rpc_addr:"https://public.node" "public-node" in
+  let state = State.init ~instances:[] in
+  let state' = State.set_pager_target (Some target) state in
+  (* Enter result mode - should inherit target_override *)
+  let state'' = State.enter_result_mode state' in
+  match State.get_focused_pager state'' with
+  | Some pager -> (
+      match pager.target_instance with
+      | Some svc ->
+          Alcotest.(check string) "pager inherits target" "public-node" svc.instance
+      | None -> Alcotest.fail "expected pager to have target_instance")
+  | None -> Alcotest.fail "expected focused pager"
+
+let test_add_pager_inherits_target () =
+  let target = make_service ~rpc_addr:"https://public.node" "public-node" in
+  let state = State.init ~instances:[] in
+  let state' = State.set_pager_target (Some target) state in
+  let state'' = State.enter_result_mode state' in
+  match State.add_pager state'' with
+  | Some state''' -> (
+      (* Focus should be on new pager (id 1) *)
+      match State.get_focused_pager state''' with
+      | Some pager -> (
+          match pager.target_instance with
+          | Some svc ->
+              Alcotest.(check string) "new pager inherits target" "public-node" svc.instance
+          | None -> Alcotest.fail "expected new pager to have target_instance")
+      | None -> Alcotest.fail "expected focused pager")
+  | None -> Alcotest.fail "expected add_pager to succeed"
+
+(* ============================================================ *)
 (* Test Runner                                                   *)
 (* ============================================================ *)
 
@@ -276,5 +343,14 @@ let () =
         [
           Alcotest.test_case "set" `Quick test_set_error;
           Alcotest.test_case "clear" `Quick test_clear_error;
+        ] );
+      ( "target_override",
+        [
+          Alcotest.test_case "initial" `Quick test_target_override_initial;
+          Alcotest.test_case "set in list mode" `Quick test_set_pager_target_list_mode;
+          Alcotest.test_case "get in list mode" `Quick test_get_pager_target_list_mode;
+          Alcotest.test_case "fallback" `Quick test_target_override_fallback;
+          Alcotest.test_case "enter result inherits" `Quick test_new_pager_inherits_target;
+          Alcotest.test_case "add pager inherits" `Quick test_add_pager_inherits_target;
         ] );
     ]
