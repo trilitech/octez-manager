@@ -607,7 +607,7 @@ let snapshot_field =
          This allows users to either sync from genesis or provide a custom URL. *)
       let items =
         match filtered_snapshots with
-        | `Loading -> [`Loading]
+        | `Loading -> [`None; `Loading; `Custom]
         | `NoMatches -> [`None; `Custom]
         | `Entries entries ->
             (`None :: (entries |> List.map (fun e -> `Tzinit e))) @ [`Custom]
