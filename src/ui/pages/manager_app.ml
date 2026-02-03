@@ -21,6 +21,7 @@ let register_pages () =
   Binaries.register () ;
   Diagnostics.register () ;
   Log_viewer_page.register () ;
+  Rpc_node_selection.register () ;
   Rpc_browser.register ()
 
 let find_page_or_default name default_name =

@@ -57,6 +57,15 @@ type state = {
   cached_cursor : int;
 }
 
+(* Selected instance override - set by rpc_node_selection page *)
+let selected_instance_override : Service.t option ref = ref None
+
+let set_selected_instance inst = selected_instance_override := inst
+
+let get_selected_instance () = !selected_instance_override
+
+let clear_selected_instance () = selected_instance_override := None
+
 (* Dynamic history file path *)
 let history_file () =
   Filename.concat

@@ -85,6 +85,18 @@ type state = {
   cached_cursor : int;  (** Cached cursor position for side-by-side display *)
 }
 
+(** {1 Selected Instance Override} *)
+
+(** Set the selected instance override.
+    Used by rpc_node_selection to pass the selected node to the RPC browser. *)
+val set_selected_instance : Service.t option -> unit
+
+(** Get the selected instance override. *)
+val get_selected_instance : unit -> Service.t option
+
+(** Clear the selected instance override. *)
+val clear_selected_instance : unit -> unit
+
 (** {1 Initialization} *)
 
 (** Create initial state.
