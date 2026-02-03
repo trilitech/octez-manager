@@ -715,6 +715,14 @@ let table_lines_single state =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
   in
+  let binaries_row =
+    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage binaries ]")
+  in
+  let rpc_row =
+    let marker = if state.selected = 2 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Browse RPCs ]")
+  in
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
     else
@@ -747,7 +755,7 @@ let table_lines_single state =
       let separator = Widgets.dim (String.make 80 '-') in
       "" :: separator :: external_rows
   in
-  (install_row :: "" :: instance_rows) @ external_rows
+  (install_row :: binaries_row :: rpc_row :: "" :: instance_rows) @ external_rows
 
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
@@ -774,10 +782,18 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Reduce available height for columns to make room for external services *)
   let columns_visible_height = max 5 (visible_height - reserved_for_external) in
-  (* Header row (install) spans full width in single line *)
+  (* Header row (install, binaries, rpcs) spans full width in single line *)
   let install_row =
     let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
     Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+  in
+  let binaries_row =
+    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage binaries ]")
+  in
+  let rpc_row =
+    let marker = if state.selected = 2 then Widgets.bold "➤" else " " in
+    Printf.sprintf "%s %s" marker (Widgets.bold "[ Browse RPCs ]")
   in
   (* When selection is in menu area, use -1 to dim all columns equally *)
   let effective_active_column =
@@ -804,7 +820,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     trim_end instance_rows
   in
   (* Append external services below the columnar grid *)
-  let result = install_row :: "" :: instance_rows_trimmed in
+  let result = install_row :: binaries_row :: rpc_row :: "" :: instance_rows_trimmed in
   if external_line_count > 0 then
     let separator = Widgets.dim (String.make (min cols 120) '-') in
     result @ [""; separator] @ external_lines
@@ -821,11 +837,19 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
       let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
       Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
     in
+    let binaries_row =
+      let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
+      Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage binaries ]")
+    in
+    let rpc_row =
+      let marker = if state.selected = 2 then Widgets.bold "➤" else " " in
+      Printf.sprintf "%s %s" marker (Widgets.bold "[ Browse RPCs ]")
+    in
     let external_rows = render_external_services_section state in
     let external_rows =
       if external_rows = [] then [] else "" :: external_rows
     in
-    install_row :: "" :: "  No managed instances." :: external_rows
+    install_row :: binaries_row :: rpc_row :: "" :: "  No managed instances." :: external_rows
   else if num_columns <= 1 then table_lines_single state
   else
     (* For matrix layout, subtract for menu rows (install + separator) *)

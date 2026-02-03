@@ -8,9 +8,17 @@
 open Octez_manager_lib
 module Pager = Miaou_widgets_display.Pager_widget
 
-type entry_kind = Get | Sub | Dyn of string | DynValue of (string * string)
+type entry_kind =
+  | Get
+  | Sub
+  | Dyn of string
+  | DynValue of (string * string)
+  | ChangeTarget  (** Button to change target instance *)
 
 type entry = {name : string; kind : entry_kind}
+
+(** Get public nodes from the shared cache (fetches from Taquito if needed) *)
+let public_nodes () : Service.t list = Public_nodes_cache.get_services ()
 
 type pager_slot = {
   id : int;
@@ -21,6 +29,7 @@ type pager_slot = {
   foldable : Foldable_json.t option;
   response_time_ms : float option;
   response_size : int option;
+  target_instance : Service.t option;  (** Target node for this pager *)
 }
 
 type result_focus = FocusBrowser | FocusPager of int
@@ -55,6 +64,7 @@ type state = {
   recent_paths : recent_path list;
   cached_entries : entry list;
   cached_cursor : int;
+  target_override : Service.t option;  (** Global target override for RPC calls *)
 }
 
 (* Selected instance override - set by rpc_node_selection page *)
@@ -190,6 +200,7 @@ let init ~instances =
     recent_paths;
     cached_entries = [];
     cached_cursor = 0;
+    target_override = None;
   }
 
 let select_instance idx state =
@@ -206,6 +217,20 @@ let select_instance idx state =
     }
 
 let current_instance state = List.nth_opt state.instances state.selected_idx
+
+let get_instances state = state.instances
+
+(** Get all available target instances: public nodes + local instances *)
+let get_all_targets state =
+  let local = state.instances in
+  let public = public_nodes () in
+  (* Combine, avoiding duplicates by rpc_addr *)
+  let local_addrs = List.map (fun s -> s.Service.rpc_addr) local in
+  let unique_public =
+    List.filter (fun s -> not (List.mem s.Service.rpc_addr local_addrs)) public
+  in
+  (* Local instances first, then public *)
+  local @ unique_public
 
 let navigate_to segment state =
   {
@@ -261,7 +286,7 @@ let set_loading loading state =
 
 (* Pager management functions *)
 
-let create_empty_pager id =
+let create_empty_pager ?(target_instance = None) id =
   {
     id;
     request = "";
@@ -271,6 +296,7 @@ let create_empty_pager id =
     foldable = None;
     response_time_ms = None;
     response_size = None;
+    target_instance;
   }
 
 let get_pager_ids state =
@@ -299,7 +325,13 @@ let set_result_focus focus state =
   | List _ -> state
 
 let enter_result_mode state =
-  let pager0 = create_empty_pager 0 in
+  (* Use target_override if set, else current instance *)
+  let target =
+    match state.target_override with
+    | Some _ as t -> t
+    | None -> current_instance state
+  in
+  let pager0 = create_empty_pager ~target_instance:target 0 in
   {
     state with
     mode = Result {pagers = [pager0]; focus = FocusPager 0; last_pager_id = 0};
@@ -313,7 +345,13 @@ let add_pager state =
         match next_available_id state with
         | None -> None
         | Some new_id ->
-            let new_pager = create_empty_pager new_id in
+            (* Use target_override if set, else current instance *)
+            let target =
+              match state.target_override with
+              | Some _ as t -> t
+              | None -> current_instance state
+            in
+            let new_pager = create_empty_pager ~target_instance:target new_id in
             Some
               {
                 state with
@@ -400,6 +438,31 @@ let get_focused_pager_id state =
   | Result {focus = FocusPager id; _} -> id
   | Result {focus = FocusBrowser; last_pager_id; _} -> last_pager_id
   | List _ -> 0
+
+let get_pager_target state =
+  match state.mode with
+  | List _ -> state.target_override
+  | Result _ -> (
+      match get_focused_pager state with
+      | Some pager -> (
+          (* Pager target if set, else fall back to global target_override *)
+          match pager.target_instance with
+          | Some _ as t -> t
+          | None -> state.target_override)
+      | None -> state.target_override)
+
+let set_pager_target target state =
+  match state.mode with
+  | Result {pagers; focus; last_pager_id} ->
+      let pager_id = get_focused_pager_id state in
+      let new_pagers =
+        List.map
+          (fun p ->
+            if p.id = pager_id then {p with target_instance = target} else p)
+          pagers
+      in
+      {state with mode = Result {pagers = new_pagers; focus; last_pager_id}; target_override = target}
+  | List _ -> {state with target_override = target}
 
 let get_pagers state =
   match state.mode with Result {pagers; _} -> pagers | List _ -> []

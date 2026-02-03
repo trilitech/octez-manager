@@ -20,11 +20,9 @@ val render_breadcrumb : string list -> string
 
 (** {1 Instance Rendering} *)
 
-(** Render instance selector showing current instance.
-    @param instances Available instances
-    @param selected_idx Currently selected index *)
-val render_instance_selector :
-  instances:Service.t list -> selected_idx:int -> string
+(** Render instance selector showing current target instance.
+    @param target Currently active target instance *)
+val render_instance_selector : target:Service.t option -> string
 
 (** {1 Entry Rendering} *)
 

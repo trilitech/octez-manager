@@ -1335,15 +1335,18 @@ let external_service_actions_modal state ext =
     state)
 
 let activate_selection s =
-  if s.selected = 0 then create_menu_modal s
-  else
-    match current_service s with
-    | Some _ -> instance_actions_modal s
-    | None -> (
-        (* Check if it's an external service *)
-        match current_external_service s with
-        | Some ext -> external_service_actions_modal s ext
-        | None -> s)
+  match s.selected with
+  | 0 -> create_menu_modal s
+  | 1 -> go_to_binaries s
+  | 2 -> go_to_rpc_browser s
+  | _ -> (
+      match current_service s with
+      | Some _ -> instance_actions_modal s
+      | None -> (
+          (* Check if it's an external service *)
+          match current_external_service s with
+          | Some ext -> external_service_actions_modal s ext
+          | None -> s))
 
 let dismiss_failure s =
   match current_service s with

@@ -18,8 +18,8 @@ let render_breadcrumb path =
       in
       String.concat " / " parts
 
-let render_instance_selector ~instances ~selected_idx =
-  match List.nth_opt instances selected_idx with
+let render_instance_selector ~target =
+  match target with
   | None -> Widgets.dim "No instance selected"
   | Some svc ->
       let name = svc.Service.instance in
@@ -31,6 +31,7 @@ let render_entry_kind = function
   | State.Sub -> Widgets.fg 14 "[SUB]"
   | State.Dyn typ -> Widgets.yellow (Printf.sprintf "[DYN:%s]" typ)
   | State.DynValue (typ, _) -> Widgets.dim (Printf.sprintf "[%s]" typ)
+  | State.ChangeTarget -> Widgets.fg 11 "[TARGET]"
 
 let render_entry ~cursor ~idx entry =
   let is_selected = cursor = idx in
@@ -53,8 +54,8 @@ let render_error = function
   | None -> []
   | Some msg -> [Widgets.red ("Error: " ^ msg)]
 
-let render_header ~instances ~selected_idx ~path =
-  let instance = render_instance_selector ~instances ~selected_idx in
+let render_header ~target ~path =
+  let instance = render_instance_selector ~target in
   let breadcrumb = render_breadcrumb path in
   Printf.sprintf "RPC Browser │ %s │ %s" instance breadcrumb
 
@@ -92,10 +93,15 @@ let render_help () =
 
 let render ~state ~cols =
   let _ = cols in
+  (* Get the actual target: override if set, else instances[selected_idx] *)
+  let target =
+    match state.State.target_override with
+    | Some _ as t -> t
+    | None -> List.nth_opt state.State.instances state.State.selected_idx
+  in
   let header =
     render_header
-      ~instances:state.State.instances
-      ~selected_idx:state.State.selected_idx
+      ~target
       ~path:state.State.path
   in
   let separator = Widgets.dim (String.make 60 '-') in

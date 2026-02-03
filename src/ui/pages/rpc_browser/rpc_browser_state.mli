@@ -17,9 +17,13 @@ type entry_kind =
   | Sub
   | Dyn of string  (** Dynamic segment to prompt for *)
   | DynValue of (string * string)  (** Recent dynamic value: (typ, value) *)
+  | ChangeTarget  (** Button to change target instance *)
 
 (** A navigation entry. *)
 type entry = {name : string; kind : entry_kind}
+
+(** Get public nodes from cache (fetches from Taquito if needed) *)
+val public_nodes : unit -> Service.t list
 
 (** A single pager slot for multi-pager view. *)
 type pager_slot = {
@@ -31,6 +35,7 @@ type pager_slot = {
   foldable : Foldable_json.t option;  (** Fold state *)
   response_time_ms : float option;
   response_size : int option;
+  target_instance : Service.t option;  (** Target node for this pager *)
 }
 
 (** Focus for side-by-side mode. *)
@@ -83,6 +88,7 @@ type state = {
   recent_paths : recent_path list;  (** LRU list of recently used RPC paths *)
   cached_entries : entry list;  (** Cached entries for side-by-side display *)
   cached_cursor : int;  (** Cached cursor position for side-by-side display *)
+  target_override : Service.t option;  (** Global target override for RPC calls *)
 }
 
 (** {1 Selected Instance Override} *)
@@ -112,6 +118,12 @@ val select_instance : int -> state -> state
 (** Get the currently selected instance, if any. *)
 val current_instance : state -> Service.t option
 
+(** Get all available instances. *)
+val get_instances : state -> Service.t list
+
+(** Get all available target instances: public nodes + local instances *)
+val get_all_targets : state -> Service.t list
+
 (** {1 Navigation} *)
 
 (** Navigate into a child path.
@@ -136,8 +148,15 @@ val set_loading : bool -> state -> state
 
 (** {1 Pager Management} *)
 
-(** Create an empty pager slot with the given ID. *)
-val create_empty_pager : int -> pager_slot
+(** Create an empty pager slot with the given ID.
+    @param target_instance Optional target node for this pager *)
+val create_empty_pager : ?target_instance:Service.t option -> int -> pager_slot
+
+(** Set the target instance for the focused pager. *)
+val set_pager_target : Service.t option -> state -> state
+
+(** Get the target instance for the focused pager. *)
+val get_pager_target : state -> Service.t option
 
 (** Add a new pager to the state. Focus moves to the new pager.
     Returns None if already at max (10) pagers. *)
