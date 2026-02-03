@@ -15,6 +15,31 @@ let get_service instance =
   | Ok None -> Error (Printf.sprintf "Instance '%s' not found" instance)
   | Error (`Msg msg) -> Error msg
 
+(** Create a synthetic service for a raw URL endpoint *)
+let service_from_url url =
+  Service.make
+    ~instance:(Printf.sprintf "url:%s" url)
+    ~role:"node"
+    ~network:"unknown"
+    ~history_mode:History_mode.Rolling
+    ~data_dir:""
+    ~rpc_addr:url
+    ~net_addr:""
+    ~service_user:""
+    ~app_bin_dir:""
+    ~logging_mode:Logging_mode.Journald
+    ()
+
+(** Resolve service from --instance or --url options *)
+let resolve_service instance_opt url_opt =
+  match (instance_opt, url_opt) with
+  | Some _, Some _ ->
+      Error "Cannot specify both --instance and --url"
+  | None, None ->
+      Error "Must specify either --instance or --url"
+  | Some instance, None -> get_service instance
+  | None, Some url -> Ok (service_from_url url)
+
 (** List available node instances *)
 let list_instances () =
   match Service_registry.list () with
@@ -192,15 +217,22 @@ let run_interactive service =
   Printf.printf "Goodbye.\n" ;
   flush stdout
 
+(** Common argument definitions *)
+let instance_arg =
+  Arg.(
+    value
+    & opt (some string) None
+    & info ["i"; "instance"] ~doc:"Local instance name" ~docv:"INSTANCE")
+
+let url_arg =
+  Arg.(
+    value
+    & opt (some string) None
+    & info ["u"; "url"] ~doc:"RPC endpoint URL (e.g., https://mainnet.tezos.ecadinfra.com)" ~docv:"URL")
+
 (** rpc get command *)
 let get_cmd =
   let doc = "Execute a GET request to an RPC endpoint" in
-  let instance_arg =
-    Arg.(
-      required
-      & opt (some string) None
-      & info ["i"; "instance"] ~doc:"Instance name" ~docv:"INSTANCE")
-  in
   let path_arg =
     Arg.(
       required & pos 0 (some string) None & info [] ~doc:"RPC path" ~docv:"PATH")
@@ -208,56 +240,44 @@ let get_cmd =
   let term =
     Term.(
       ret
-        (const (fun instance path ->
-             match get_service instance with
+        (const (fun instance_opt url_opt path ->
+             match resolve_service instance_opt url_opt with
              | Error msg -> Cli_helpers.cmdliner_error msg
              | Ok service ->
                  let path = if path.[0] = '/' then path else "/" ^ path in
                  execute_get service path ;
                  `Ok ())
-        $ instance_arg $ path_arg))
+        $ instance_arg $ url_arg $ path_arg))
   in
   Cmd.v (Cmd.info "get" ~doc) term
 
 (** rpc interactive command *)
 let interactive_cmd =
   let doc = "Start interactive RPC mode with completion" in
-  let instance_arg =
-    Arg.(
-      required
-      & opt (some string) None
-      & info ["i"; "instance"] ~doc:"Instance name" ~docv:"INSTANCE")
-  in
   let term =
     Term.(
       ret
-        (const (fun instance ->
-             match get_service instance with
+        (const (fun instance_opt url_opt ->
+             match resolve_service instance_opt url_opt with
              | Error msg -> Cli_helpers.cmdliner_error msg
              | Ok service ->
                  run_interactive service ;
                  `Ok ())
-        $ instance_arg))
+        $ instance_arg $ url_arg))
   in
   Cmd.v (Cmd.info "interactive" ~doc ~docs:"COMMANDS") term
 
 (** rpc list command - list available endpoints *)
 let list_cmd =
   let doc = "List available RPC endpoints at a path" in
-  let instance_arg =
-    Arg.(
-      required
-      & opt (some string) None
-      & info ["i"; "instance"] ~doc:"Instance name" ~docv:"INSTANCE")
-  in
   let path_arg =
     Arg.(value & pos 0 string "/" & info [] ~doc:"RPC path" ~docv:"PATH")
   in
   let term =
     Term.(
       ret
-        (const (fun instance path ->
-             match get_service instance with
+        (const (fun instance_opt url_opt path ->
+             match resolve_service instance_opt url_opt with
              | Error msg -> Cli_helpers.cmdliner_error msg
              | Ok service ->
                  let segs =
@@ -288,7 +308,7 @@ let list_cmd =
                        Printf.printf "  %-40s %s\n" e.name kind_str)
                      entries ;
                  `Ok ())
-        $ instance_arg $ path_arg))
+        $ instance_arg $ url_arg $ path_arg))
   in
   Cmd.v (Cmd.info "list" ~doc) term
 
