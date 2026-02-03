@@ -33,16 +33,24 @@ let render_entry_kind = function
   | State.DynValue (typ, _) -> Widgets.dim (Printf.sprintf "[%s]" typ)
   | State.ChangeTarget -> Widgets.fg 11 "[TARGET]"
 
-let render_entry ~cursor ~idx entry =
+let render_entry ~cursor ~idx ~focus entry =
   let is_selected = cursor = idx in
-  let marker = if is_selected then Widgets.fg 14 "▸ " else "  " in
+  let marker =
+    if is_selected then
+      if focus then Widgets.fg 14 "▸ " else Widgets.dim "▸ "
+    else "  "
+  in
   (* For GET at current path, show [GET] as the name *)
   let display_name =
     match (entry.State.name, entry.State.kind) with
     | "", State.Get -> "[GET]"
     | name, _ -> name
   in
-  let name = if is_selected then Widgets.bold display_name else display_name in
+  let name =
+    if is_selected then
+      if focus then Widgets.bold display_name else Widgets.dim display_name
+    else display_name
+  in
   let kind = render_entry_kind entry.State.kind in
   Printf.sprintf "%s%-40s %s" marker name kind
 
@@ -59,9 +67,9 @@ let render_header ~target ~path =
   let breadcrumb = render_breadcrumb path in
   Printf.sprintf "RPC Browser │ %s │ %s" instance breadcrumb
 
-let render_entries ~cursor ~entries =
+let render_entries ~cursor ~entries ~focus =
   if entries = [] then [Widgets.dim "  (no entries at this path)"]
-  else List.mapi (fun idx entry -> render_entry ~cursor ~idx entry) entries
+  else List.mapi (fun idx entry -> render_entry ~cursor ~idx ~focus entry) entries
 
 let render_shortcuts ~state =
   let shortcuts = Rpc_browser_actions.get_shortcuts state in
@@ -91,8 +99,15 @@ let render_help () =
   let parts = List.map (fun (k, v) -> Printf.sprintf "%s: %s" k v) keys in
   Widgets.dim (String.concat "  " parts)
 
-let render ~state ~cols =
-  let _ = cols in
+let render ~focus ~state ~cols =
+  (* Truncate a line to fit within cols, preserving ANSI codes *)
+  let truncate line =
+    let visible_len = Widgets.visible_chars_count line in
+    if visible_len <= cols then line
+    else
+      let byte_idx = Widgets.visible_byte_index_of_pos line (cols - 3) in
+      String.sub line 0 byte_idx ^ "\027[0m..."
+  in
   (* Get the actual target: override if set, else instances[selected_idx] *)
   let target =
     match state.State.target_override with
@@ -104,7 +119,7 @@ let render ~state ~cols =
       ~target
       ~path:state.State.path
   in
-  let separator = Widgets.dim (String.make 60 '-') in
+  let separator = Widgets.dim (String.make (min 60 cols) '-') in
   match state.State.mode with
   | State.List {entries; cursor; loading} ->
       let shortcuts_section =
@@ -114,12 +129,15 @@ let render ~state ~cols =
         if state.State.path = [] then [Widgets.bold "All Endpoints:"] else []
       in
       let content =
-        if loading then [render_loading ()] else render_entries ~cursor ~entries
+        if loading then [render_loading ()] else render_entries ~cursor ~entries ~focus
       in
       let error_lines = render_error state.State.error in
       let help = render_help () in
-      [header; separator] @ shortcuts_section @ entries_header @ content
-      @ error_lines @ [separator; help]
+      let lines =
+        [header; separator] @ shortcuts_section @ entries_header @ content
+        @ error_lines @ [separator; help]
+      in
+      List.map truncate lines
   | State.Result _ ->
       (* Result mode is handled by a different renderer *)
-      [header; separator; Widgets.dim "  (result mode - use detail renderer)"]
+      List.map truncate [header; separator; Widgets.dim "  (result mode - use detail renderer)"]

@@ -223,7 +223,7 @@ let view ps ~focus ~size =
   let body =
     match s.State.mode with
     | State.List _ ->
-        let lines = Rpc_browser_render_list.render ~state:s ~cols in
+        let lines = Rpc_browser_render_list.render ~focus ~state:s ~cols in
         String.concat "\n" lines
     | State.Result _ ->
         (* Check if we should use side-by-side layout *)
@@ -247,7 +247,7 @@ let view ps ~focus ~size =
             }
           in
           let left_lines =
-            Rpc_browser_render_list.render ~state:left_state ~cols:left_width
+            Rpc_browser_render_list.render ~focus:browser_focus ~state:left_state ~cols:left_width
           in
           let left =
             if browser_focus then
@@ -295,7 +295,7 @@ let view ps ~focus ~size =
                   };
             }
           in
-          let lines = Rpc_browser_render_list.render ~state:left_state ~cols in
+          let lines = Rpc_browser_render_list.render ~focus ~state:left_state ~cols in
           let pager_ids = State.get_pager_ids s in
           let focused = State.get_focused_pager_id s in
           let tabs_plain =
