@@ -76,12 +76,12 @@ let test_entry_kind_dyn () =
 
 let test_entry_not_selected () =
   let entry = {State.name = "chains"; kind = State.Sub} in
-  let result = Render.render_entry ~cursor:1 ~idx:0 entry in
+  let result = Render.render_entry ~cursor:1 ~idx:0 ~focus:true entry in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 let test_entry_selected () =
   let entry = {State.name = "chains"; kind = State.Sub} in
-  let result = Render.render_entry ~cursor:0 ~idx:0 entry in
+  let result = Render.render_entry ~cursor:0 ~idx:0 ~focus:true entry in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
@@ -118,12 +118,12 @@ let test_render_help () =
 
 let test_render_empty_state () =
   let state = State.init ~instances:[] in
-  let lines = Render.render ~state ~cols:80 in
+  let lines = Render.render ~focus:true ~state ~cols:80 in
   Alcotest.(check bool) "has lines" true (List.length lines > 0)
 
 let test_render_with_loading () =
   let state = State.init ~instances:[] in
-  let lines = Render.render ~state ~cols:80 in
+  let lines = Render.render ~focus:true ~state ~cols:80 in
   Alcotest.(check bool) "has lines" true (List.length lines > 0)
 
 let test_render_with_entries () =
@@ -135,13 +135,13 @@ let test_render_with_entries () =
     ]
   in
   let state = State.set_entries entries state in
-  let lines = Render.render ~state ~cols:80 in
+  let lines = Render.render ~focus:true ~state ~cols:80 in
   Alcotest.(check bool) "has lines" true (List.length lines > 2)
 
 let test_render_with_error () =
   let state = State.init ~instances:[] in
   let state = State.set_error "Something went wrong" state in
-  let lines = Render.render ~state ~cols:80 in
+  let lines = Render.render ~focus:true ~state ~cols:80 in
   Alcotest.(check bool) "has lines" true (List.length lines > 0)
 
 let test_render_with_path () =
@@ -150,7 +150,7 @@ let test_render_with_path () =
   let state =
     State.set_entries [{State.name = "main"; kind = State.Sub}] state
   in
-  let lines = Render.render ~state ~cols:80 in
+  let lines = Render.render ~focus:true ~state ~cols:80 in
   Alcotest.(check bool) "has lines" true (List.length lines > 0)
 
 (* ============================================================ *)
