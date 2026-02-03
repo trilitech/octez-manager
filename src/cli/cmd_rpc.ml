@@ -30,15 +30,40 @@ let service_from_url url =
     ~logging_mode:Logging_mode.Journald
     ()
 
-(** Resolve service from --instance or --url options *)
-let resolve_service instance_opt url_opt =
-  match (instance_opt, url_opt) with
-  | Some _, Some _ ->
-      Error "Cannot specify both --instance and --url"
-  | None, None ->
-      Error "Must specify either --instance or --url"
-  | Some instance, None -> get_service instance
-  | None, Some url -> Ok (service_from_url url)
+(** Get public nodes from Taquito *)
+let get_public_nodes () =
+  Octez_manager_ui.Public_nodes_cache.get_services ()
+
+(** Find a public node by index (1-based) or partial name match *)
+let find_public_node query =
+  let nodes = get_public_nodes () in
+  (* Try as index first *)
+  match int_of_string_opt query with
+  | Some idx when idx >= 1 && idx <= List.length nodes ->
+      Some (List.nth nodes (idx - 1))
+  | _ ->
+      (* Try partial name match (case-insensitive) *)
+      let query_lower = String.lowercase_ascii query in
+      List.find_opt
+        (fun svc ->
+          let name = String.lowercase_ascii svc.Service.instance in
+          String.sub name 0 (min (String.length query_lower) (String.length name))
+          = query_lower)
+        nodes
+
+(** Resolve service from --instance, --url, or --public options *)
+let resolve_service instance_opt url_opt public_opt =
+  match (instance_opt, url_opt, public_opt) with
+  | Some _, Some _, _ | Some _, _, Some _ | _, Some _, Some _ ->
+      Error "Cannot specify multiple target options (use only one of --instance, --url, or --public)"
+  | None, None, None ->
+      Error "Must specify a target: --instance, --url, or --public"
+  | Some instance, None, None -> get_service instance
+  | None, Some url, None -> Ok (service_from_url url)
+  | None, None, Some query -> (
+      match find_public_node query with
+      | Some svc -> Ok svc
+      | None -> Error (Printf.sprintf "Public node '%s' not found. Use 'rpc public-nodes' to list available nodes." query))
 
 (** List available node instances *)
 let list_instances () =
@@ -230,6 +255,12 @@ let url_arg =
     & opt (some string) None
     & info ["u"; "url"] ~doc:"RPC endpoint URL (e.g., https://mainnet.tezos.ecadinfra.com)" ~docv:"URL")
 
+let public_arg =
+  Arg.(
+    value
+    & opt (some string) None
+    & info ["p"; "public"] ~doc:"Public node (index or name from 'rpc public-nodes')" ~docv:"NODE")
+
 (** rpc get command *)
 let get_cmd =
   let doc = "Execute a GET request to an RPC endpoint" in
@@ -240,14 +271,14 @@ let get_cmd =
   let term =
     Term.(
       ret
-        (const (fun instance_opt url_opt path ->
-             match resolve_service instance_opt url_opt with
+        (const (fun instance_opt url_opt public_opt path ->
+             match resolve_service instance_opt url_opt public_opt with
              | Error msg -> Cli_helpers.cmdliner_error msg
              | Ok service ->
                  let path = if path.[0] = '/' then path else "/" ^ path in
                  execute_get service path ;
                  `Ok ())
-        $ instance_arg $ url_arg $ path_arg))
+        $ instance_arg $ url_arg $ public_arg $ path_arg))
   in
   Cmd.v (Cmd.info "get" ~doc) term
 
@@ -257,13 +288,13 @@ let interactive_cmd =
   let term =
     Term.(
       ret
-        (const (fun instance_opt url_opt ->
-             match resolve_service instance_opt url_opt with
+        (const (fun instance_opt url_opt public_opt ->
+             match resolve_service instance_opt url_opt public_opt with
              | Error msg -> Cli_helpers.cmdliner_error msg
              | Ok service ->
                  run_interactive service ;
                  `Ok ())
-        $ instance_arg $ url_arg))
+        $ instance_arg $ url_arg $ public_arg))
   in
   Cmd.v (Cmd.info "interactive" ~doc ~docs:"COMMANDS") term
 
@@ -276,8 +307,8 @@ let list_cmd =
   let term =
     Term.(
       ret
-        (const (fun instance_opt url_opt path ->
-             match resolve_service instance_opt url_opt with
+        (const (fun instance_opt url_opt public_opt path ->
+             match resolve_service instance_opt url_opt public_opt with
              | Error msg -> Cli_helpers.cmdliner_error msg
              | Ok service ->
                  let segs =
@@ -308,7 +339,7 @@ let list_cmd =
                        Printf.printf "  %-40s %s\n" e.name kind_str)
                      entries ;
                  `Ok ())
-        $ instance_arg $ url_arg $ path_arg))
+        $ instance_arg $ url_arg $ public_arg $ path_arg))
   in
   Cmd.v (Cmd.info "list" ~doc) term
 
@@ -328,8 +359,32 @@ let instances_cmd =
   in
   Cmd.v (Cmd.info "instances" ~doc) (Term.ret term)
 
+(** rpc public-nodes command - list public nodes from Taquito *)
+let public_nodes_cmd =
+  let doc = "List available public RPC nodes from Taquito" in
+  let term =
+    Term.(
+      const (fun () ->
+          let nodes = get_public_nodes () in
+          if nodes = [] then Printf.printf "No public nodes available.\n"
+          else (
+            Printf.printf "Available public RPC nodes:\n" ;
+            Printf.printf "  Use -p/--public with index or name (e.g., -p 1 or -p ecad)\n\n" ;
+            List.iteri
+              (fun i svc ->
+                Printf.printf
+                  "  %2d. %-30s  %s\n"
+                  (i + 1)
+                  svc.Service.instance
+                  svc.Service.rpc_addr)
+              nodes) ;
+          `Ok ())
+      $ const ())
+  in
+  Cmd.v (Cmd.info "public-nodes" ~doc) (Term.ret term)
+
 (** Main rpc command group *)
 let rpc_cmd =
   let doc = "Query RPC endpoints on node instances" in
   let info = Cmd.info "rpc" ~doc in
-  Cmd.group info [get_cmd; list_cmd; interactive_cmd; instances_cmd]
+  Cmd.group info [get_cmd; list_cmd; interactive_cmd; instances_cmd; public_nodes_cmd]
