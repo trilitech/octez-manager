@@ -164,13 +164,46 @@ let fetch_entries_uncached (s : Service.t) ~segs =
   in
   try_paths paths
 
+(** Convert OpenAPI entries to our entry format.
+    OpenAPI returns alternating [name; kind; name; kind; ...] *)
+let entries_from_openapi openapi_entries =
+  let rec pairs acc = function
+    | [] -> List.rev acc
+    | name :: kind :: rest ->
+        let entry =
+          match kind with
+          | "__SUB__" -> Some {name; kind = Sub}
+          | "__GET__" -> Some {name = ""; kind = Get}  (* GET at current path *)
+          | "__DYN__" ->
+              (* Extract type from name like "<block_id>" *)
+              let typ =
+                if String.length name > 2 && name.[0] = '<' then
+                  String.sub name 1 (String.length name - 2)
+                else "value"
+              in
+              Some {name; kind = Dyn typ}
+          | _ -> None
+        in
+        pairs (match entry with Some e -> e :: acc | None -> acc) rest
+    | _ -> List.rev acc
+  in
+  pairs [] openapi_entries
+
 let fetch_entries (s : Service.t) ~segs =
   match get_cached ~rpc_addr:s.rpc_addr ~segs with
   | Some (entries, source) -> (entries, source)
   | None ->
-      let entries, source = fetch_entries_uncached s ~segs in
-      cache_put ~rpc_addr:s.rpc_addr ~segs ~entries ~source ;
-      (entries, source)
+      (* Try OpenAPI first (works for public nodes without /describe) *)
+      let openapi_entries = Rpc_openapi.entries_for ~segs in
+      if openapi_entries <> [] then
+        let entries = entries_from_openapi openapi_entries in
+        cache_put ~rpc_addr:s.rpc_addr ~segs ~entries ~source:`None ;
+        (entries, `None)
+      else
+        (* Fall back to describe endpoint *)
+        let entries, source = fetch_entries_uncached s ~segs in
+        cache_put ~rpc_addr:s.rpc_addr ~segs ~entries ~source ;
+        (entries, source)
 
 let fetch_description (s : Service.t) ~segs =
   let paths = candidate_paths segs in

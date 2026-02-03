@@ -29,8 +29,8 @@ let get_recent_failure ~instance =
       None
   | None -> None
 
-(** Number of menu items before services (just Install button) *)
-let menu_item_count = 1
+(** Number of menu items before services (Install, Binaries, RPCs buttons) *)
+let menu_item_count = 3
 
 (** Index where services start (after menu items + separator line) *)
 let services_start_idx = menu_item_count + 1

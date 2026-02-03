@@ -1319,3 +1319,88 @@ let show_menu_modal () =
     ~to_string:(fun (label, _) -> label)
     ~on_select:(fun (_, target) -> Context.navigate target)
     ()
+
+(** Reference to close spinner modal from callback *)
+let spinner_modal_close_ref : (unit -> unit) option ref = ref None
+
+(** Show a spinner modal while a background task runs.
+    @param title Modal title
+    @param label Text shown next to spinner
+    @param work Background work function
+    @param on_complete Called when work completes *)
+let show_spinner_modal ~title ~label ~work ~on_complete () =
+  let done_ref = ref false in
+  let result_ref = ref None in
+  (* Start background work *)
+  Job_manager.submit
+    ~description:title
+    (fun ~append_log:_ () -> work ())
+    ~on_complete:(fun status ->
+      result_ref := Some status ;
+      done_ref := true ;
+      (* Close modal if still open *)
+      (match !spinner_modal_close_ref with
+      | Some close -> close ()
+      | None -> ()) ;
+      (* Convert Job_manager.status to polymorphic variant for interface *)
+      let result : [ `Succeeded | `Failed of string | `Cancelled ] =
+        match status with
+        | Job_manager.Succeeded -> `Succeeded
+        | Job_manager.Failed msg -> `Failed msg
+        | _ -> `Cancelled
+      in
+      on_complete result) ;
+  (* Create modal *)
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size:_ =
+      let spinner = Context.render_spinner label in
+      spinner
+
+    let move ps _ = ps
+
+    let refresh ps =
+      (* Auto-close if work is done *)
+      if !done_ref then (
+        match !spinner_modal_close_ref with
+        | Some close -> close ()
+        | None -> ()) ;
+      ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {title; left = None; max_width = Some (Clamped {ratio = 0.5; min = 40; max = 60}); dim_background = true}
+  in
+  spinner_modal_close_ref :=
+    Some (fun () -> Miaou.Core.Modal_manager.close_top `Commit) ;
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> spinner_modal_close_ref := None)

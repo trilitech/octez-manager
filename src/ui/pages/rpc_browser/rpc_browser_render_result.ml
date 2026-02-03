@@ -45,6 +45,16 @@ let visible_length s =
   loop 0 0
 
 let render_pager_header ~slot ~is_focused ~is_target =
+  (* Get target instance name - use short form for display *)
+  let target_name =
+    match slot.State.target_instance with
+    | Some svc ->
+        let name = svc.Octez_manager_lib.Service.instance in
+        (* Truncate long names *)
+        if String.length name > 20 then String.sub name 0 17 ^ "..."
+        else name
+    | None -> "?"
+  in
   if is_focused || is_target then
     (* For focused/target pagers, return plain text - styling applied externally *)
     let marker =
@@ -68,10 +78,11 @@ let render_pager_header ~slot ~is_focused ~is_target =
       | Some s -> Printf.sprintf " %dB" s
       | None -> ""
     in
-    Printf.sprintf "%s GET %s%s%s" marker request_str time_str size_str
+    Printf.sprintf "%s @%s GET %s%s%s" marker target_name request_str time_str size_str
   else
     let id_marker = Printf.sprintf "[%d]" slot.State.id in
     let id_str = Widgets.dim id_marker in
+    let target_str = Widgets.dim (Printf.sprintf "@%s" target_name) in
     let request_str =
       if slot.State.request = "" then Widgets.dim "(empty)"
       else
@@ -93,7 +104,7 @@ let render_pager_header ~slot ~is_focused ~is_target =
       | Some s -> Widgets.dim (Printf.sprintf " %dB" s)
       | None -> ""
     in
-    Printf.sprintf "%s GET %s%s%s" id_str request_str time_str size_str
+    Printf.sprintf "%s %s GET %s%s%s" id_str target_str request_str time_str size_str
 
 let render_loading () =
   let spinner = Context.render_spinner "" in

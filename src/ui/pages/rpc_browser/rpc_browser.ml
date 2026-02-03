@@ -33,22 +33,48 @@ let update_state s =
   Context.mark_instances_dirty ()
 
 let init () =
+  (* Trigger OpenAPI download if needed (for public nodes without /describe) *)
+  if Rpc_openapi.needs_download () then
+    Modal_helpers.show_spinner_modal
+      ~title:"Fetching OpenAPI"
+      ~label:"Downloading RPC specifications..."
+      ~work:(fun () ->
+        match Rpc_openapi.download_sync () with
+        | Ok () -> Ok ()
+        | Error msg -> Error (`Msg msg))
+      ~on_complete:(fun status ->
+        match status with
+        | `Succeeded ->
+            (* Clear rpc_describe cache so new OpenAPI entries are used *)
+            Rpc_describe.clear_cache () ;
+            Context.toast_info "OpenAPI specs ready - public nodes now browsable"
+        | `Failed msg ->
+            Context.toast_warn (Printf.sprintf "OpenAPI download failed: %s" msg)
+        | `Cancelled -> ())
+      () ;
+  (* Load local node instances *)
+  let local_nodes =
+    let service_states = Data.load_service_states () in
+    List.filter_map
+      (fun (ss : Service_state.t) ->
+        if ss.service.Octez_manager_lib.Service.role = "node" then
+          Some ss.service
+        else None)
+      service_states
+  in
   (* Check if a specific instance was selected from rpc_node_selection *)
   let nodes =
     match State.get_selected_instance () with
     | Some service ->
-        (* Clear the override so next time we load local instances *)
+        (* Clear the override so next time we use local instances *)
         State.clear_selected_instance () ;
-        [service]
+        (* Include selected instance + local nodes (selected first) *)
+        let is_same svc =
+          svc.Octez_manager_lib.Service.rpc_addr = service.Octez_manager_lib.Service.rpc_addr
+        in
+        service :: List.filter (fun svc -> not (is_same svc)) local_nodes
     | None ->
-        (* No override, load local node instances *)
-        let service_states = Data.load_service_states () in
-        List.filter_map
-          (fun (ss : Service_state.t) ->
-            if ss.service.Octez_manager_lib.Service.role = "node" then
-              Some ss.service
-            else None)
-          service_states
+        local_nodes
   in
   let state = State.init ~instances:nodes in
   state_ref := Some state ;
@@ -128,6 +154,7 @@ let keymap _ps =
     kb "↑/↓" noop "Navigate";
     kb "r" refresh "Refresh";
     kb "Tab" cycle_instance "Instance/Pager";
+    kb "@" noop "Target instance";
     {
       Miaou.Core.Tui_page.key = "?";
       action = noop;
@@ -447,6 +474,52 @@ let handle_key ps key ~size =
               let new_state = State.set_error "Cannot close last pager" s in
               state_ref := Some new_state ;
               Navigation.update (fun _ -> new_state) ps
+          (* Handle target instance selection *))
+        else if key = "@" || key = "t" then (
+          (* Open modal to select target instance with sections *)
+          let all_instances = State.get_instances s in
+          (* Local instances have non-empty data_dir or app_bin_dir *)
+          let is_local svc =
+            svc.Octez_manager_lib.Service.data_dir <> ""
+            || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+          in
+          let local = List.filter is_local all_instances in
+          let public = State.public_nodes () in
+          let items =
+            (if local <> [] then
+               `Header "── Local Instances ──"
+               :: List.map (fun svc -> `Instance svc) local
+             else [])
+            @ (if public <> [] then
+                 `Header "── Public Nodes ──"
+                 :: List.map (fun svc -> `Instance svc) public
+               else [])
+          in
+          if items = [] then (
+            let new_state = State.set_error "No instances available" s in
+            state_ref := Some new_state ;
+            Navigation.update (fun _ -> new_state) ps)
+          else (
+            Modal_helpers.open_choice_modal
+              ~title:"Select target instance for pager"
+              ~items
+              ~to_string:(function
+                | `Header h -> h
+                | `Instance svc ->
+                    let name = svc.Octez_manager_lib.Service.instance in
+                    let network = svc.Octez_manager_lib.Service.network in
+                    Printf.sprintf "  %s (%s)" name network)
+              ~on_select:(function
+                | `Header _ -> ()
+                | `Instance svc ->
+                    match !state_ref with
+                    | Some current_state ->
+                        let new_state = State.set_pager_target (Some svc) current_state in
+                        state_ref := Some new_state ;
+                        update_state new_state
+                    | None -> ())
+              () ;
+            ps)
           (* Handle shortcut keys 1-9 *))
         else if String.length key = 1 && key.[0] >= '1' && key.[0] <= '9' then (
           let handled = Actions.execute_shortcut ~key s update_state in

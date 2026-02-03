@@ -1,0 +1,189 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Cache for public RPC nodes fetched from Taquito *)
+
+open Octez_manager_lib
+
+type node_info = {
+  label : string;
+  rpc_addr : string;
+  network : string option;
+}
+
+(* Cached public nodes *)
+let cached_nodes : node_info list ref = ref []
+
+(* Curated fallback list *)
+let curated_defaults : node_info list =
+  [
+    {label = "ECAD Infra (mainnet)"; rpc_addr = "https://mainnet.tezos.ecadinfra.com"; network = Some "mainnet"};
+    {label = "Tezos Mainnet (ecadlabs)"; rpc_addr = "https://mainnet.api.tez.ie"; network = Some "mainnet"};
+    {label = "Tezos Ghostnet"; rpc_addr = "https://rpc.ghostnet.teztnets.com"; network = Some "ghostnet"};
+    {label = "Tezos Mainnet (SmartPy)"; rpc_addr = "https://mainnet.smartpy.io"; network = Some "mainnet"};
+  ]
+
+(** Parse Taquito JSON format to extract public nodes *)
+let parse_taquito_json (txt : string) : node_info list =
+  try
+    let j = Yojson.Safe.from_string txt in
+    let parse_assoc_list lst ~get_rpc ~get_label ~get_net =
+      List.filter_map
+        (function
+          | `Assoc kv ->
+              let rpc = get_rpc kv in
+              if rpc = "" then None
+              else
+                Some
+                  {
+                    label = get_label kv rpc;
+                    rpc_addr = rpc;
+                    network = get_net kv;
+                  }
+          | _ -> None)
+        lst
+    in
+    match j with
+    | `List lst ->
+        parse_assoc_list
+          lst
+          ~get_rpc:(fun kv ->
+            match List.assoc_opt "rpc" kv with
+            | Some (`String s) -> s
+            | _ -> (
+                match List.assoc_opt "rpc_url" kv with
+                | Some (`String s) -> s
+                | _ -> ""))
+          ~get_label:(fun kv rpc ->
+            match List.assoc_opt "name" kv with
+            | Some (`String s) when s <> "" -> s
+            | _ -> rpc)
+          ~get_net:(fun kv ->
+            match List.assoc_opt "network" kv with
+            | Some (`String s) -> Some s
+            | _ -> None)
+    | `Assoc kvs -> (
+        (* Taquito format: providers map + rpc_endpoints list *)
+        let provider_names =
+          match List.assoc_opt "providers" kvs with
+          | Some (`List provs) ->
+              List.fold_left
+                (fun acc p ->
+                  match p with
+                  | `Assoc pkv ->
+                      let id =
+                        match List.assoc_opt "id" pkv with
+                        | Some (`String s) -> s
+                        | _ -> ""
+                      in
+                      let name =
+                        match List.assoc_opt "name" pkv with
+                        | Some (`String s) -> s
+                        | _ -> id
+                      in
+                      if id <> "" then (id, name) :: acc else acc
+                  | _ -> acc)
+                []
+                provs
+          | _ -> []
+        in
+        match List.assoc_opt "rpc_endpoints" kvs with
+        | Some (`List eps) ->
+            parse_assoc_list
+              eps
+              ~get_rpc:(fun kv ->
+                match List.assoc_opt "url" kv with
+                | Some (`String s) -> s
+                | _ -> "")
+              ~get_label:(fun kv rpc ->
+                let provider_id =
+                  match List.assoc_opt "provider" kv with
+                  | Some (`String s) -> s
+                  | _ -> ""
+                in
+                let provider_name =
+                  match List.assoc_opt provider_id provider_names with
+                  | Some n -> n
+                  | None -> provider_id
+                in
+                let network =
+                  match List.assoc_opt "network" kv with
+                  | Some (`String s) -> s
+                  | _ -> "unknown"
+                in
+                if provider_name <> "" then
+                  Printf.sprintf "%s (%s)" provider_name network
+                else rpc)
+              ~get_net:(fun kv ->
+                match List.assoc_opt "network" kv with
+                | Some (`String s) -> Some s
+                | _ -> None)
+        | _ -> [])
+    | _ -> []
+  with _ -> []
+
+(** Fetch public nodes from Taquito URLs *)
+let fetch_nodes () : node_info list =
+  let urls =
+    [
+      "https://taquito.io/docs/rpc_nodes.json";
+      "https://taquito.io/rpc_nodes.json";
+      "https://www.taquito.io/docs/rpc_nodes.json";
+    ]
+  in
+  let rec try_urls = function
+    | [] -> []
+    | url :: rest -> (
+        let cmd = ["curl"; "-fsSL"; "--max-time"; "5"; url] in
+        match Common.run_out cmd with
+        | Ok body ->
+            let nodes = parse_taquito_json body in
+            if nodes <> [] then nodes else try_urls rest
+        | Error _ -> try_urls rest)
+  in
+  try_urls urls
+
+(** Set cached nodes (called by rpc_node_selection when it fetches) *)
+let set_cache nodes = cached_nodes := nodes
+
+(** Get cached nodes, or fetch if empty *)
+let get_nodes () : node_info list =
+  if !cached_nodes <> [] then !cached_nodes
+  else
+    let nodes = fetch_nodes () in
+    if nodes <> [] then (
+      cached_nodes := nodes ;
+      nodes)
+    else curated_defaults
+
+(** Convert node_info to Service.t for RPC calls *)
+let to_service (info : node_info) : Service.t =
+  {
+    Service.instance = info.label;
+    role = "node";
+    network = Option.value ~default:"mainnet" info.network;
+    history_mode = History_mode.Rolling;
+    data_dir = "";
+    rpc_addr = info.rpc_addr;
+    net_addr = "";
+    service_user = "";
+    app_bin_dir = "";
+    bin_source = None;
+    created_at = "";
+    logging_mode = Logging_mode.Journald;
+    snapshot_auto = false;
+    snapshot_uri = None;
+    snapshot_network_slug = None;
+    snapshot_no_check = false;
+    extra_args = [];
+    depends_on = None;
+    dependents = [];
+  }
+
+(** Get all public nodes as Service.t list *)
+let get_services () : Service.t list =
+  List.map to_service (get_nodes ())

@@ -46,12 +46,12 @@ let test_breadcrumb_nested () =
 (* ============================================================ *)
 
 let test_instance_selector_empty () =
-  let result = Render.render_instance_selector ~instances:[] ~selected_idx:0 in
+  let result = Render.render_instance_selector ~target:None in
   Alcotest.(check bool) "shows no instance" true (String.length result > 0)
 
 let test_instance_selector_valid () =
-  let instances = [make_service "node1"; make_service "node2"] in
-  let result = Render.render_instance_selector ~instances ~selected_idx:0 in
+  let target = Some (make_service "node1") in
+  let result = Render.render_instance_selector ~target in
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
