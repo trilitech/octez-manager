@@ -241,3 +241,26 @@ val endpoint :
   ?default_port:int ->
   unit ->
   'model field
+
+(** {1 Testing utilities}
+
+    Exposed for unit testing. Not intended for production use. *)
+module For_tests : sig
+  (** Parse a host:port string. Returns [Ok ()] if valid, [Error msg] otherwise. *)
+  val parse_host_port : string -> (unit, string) result
+
+  (** Check if a field's validation passes for the given model. *)
+  val field_validate : 'model field -> 'model -> bool
+
+  (** Get validation error message for a field (None if valid). *)
+  val field_validate_msg : 'model field -> 'model -> string option
+
+  (** Get a field's label. *)
+  val field_label : 'model field -> string
+
+  (** Get a field's hint (None if no hint set). *)
+  val field_hint : 'model field -> string option
+
+  (** Get the string representation of a field's current value. *)
+  val field_get_string : 'model field -> 'model -> string
+end
