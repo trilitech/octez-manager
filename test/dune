@@ -615,6 +615,18 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_binary_help_explorer_extended)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
+ (modules test_binary_help_explorer_extended)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_binaries_page_pure)
  (libraries alcotest octez_manager_lib octez-manager.ui)
  (modules test_binaries_page_pure)
