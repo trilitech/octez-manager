@@ -762,6 +762,13 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_metrics)
+ (libraries alcotest qcheck-core qcheck-alcotest octez-manager.ui str unix)
+ (modules test_metrics)
+ (instrumentation
+  (backend bisect_ppx)))
+
 ; Fuzz tests (adversarial generators, high iteration count)
 
 (test
