@@ -16,7 +16,7 @@ type endpoint = {template : string; placeholders : string list [@warning "-69"]}
 type node = {
   mutable get : bool;
   statics : (string, node) Hashtbl.t;
-  mutable placeholder_name : string option;  (* e.g., "chain_id", "block_id" *)
+  mutable placeholder_name : string option; (* e.g., "chain_id", "block_id" *)
 }
 
 let current_status = ref NotDownloaded
@@ -47,7 +47,9 @@ let openapi_urls =
 
 (* Memoization for trie building - declared early so download_sync can clear them *)
 let cached_trie : node option ref = ref None
+
 let cached_endpoints : endpoint list ref = ref []
+
 let entries_cache : (string, string list) Hashtbl.t = Hashtbl.create 97
 
 let ensure_dir path =
@@ -192,7 +194,8 @@ let build_trie (eps : endpoint list) : node =
               c
           | None ->
               let c = make_node () in
-              if is_placeholder then c.placeholder_name <- extract_placeholder_name p ;
+              if is_placeholder then
+                c.placeholder_name <- extract_placeholder_name p ;
               Hashtbl.add n.statics key c ;
               c
         in
@@ -367,8 +370,7 @@ let entries_for ~(segs : string list) : string list =
           res)
 
 (** Check if OpenAPI data is available for navigation *)
-let is_available () =
-  match read_spec () with Some _ -> true | None -> false
+let is_available () = match read_spec () with Some _ -> true | None -> false
 
 (** Clear caches (useful when OpenAPI is re-downloaded) *)
 let clear_cache () =

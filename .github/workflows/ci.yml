@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       needs-integration: ${{ steps.filter.outputs.needs-integration }}
-      docs-only: ${{ steps.filter.outputs.docs-only }}
+      has-source: ${{ steps.filter.outputs.has-source }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -33,26 +33,32 @@ jobs:
               - 'test/integration/**'
               - '.github/workflows/ci.yml'
               - 'Makefile'
-            docs-only:
-              - 'docs/**'
-              - '**/*.md'
+            has-source:
+              - 'src/**'
+              - 'test/**'
+              - 'dune-project'
+              - '*.opam'
+              - '.ocamlformat'
+              - 'Makefile'
+              - 'scripts/**'
+              - '.github/workflows/**'
 
   docs-check:
     name: Build and Test
     needs: changes
-    if: needs.changes.outputs.docs-only == 'true'
+    if: needs.changes.outputs.has-source == 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Documentation-only change
         run: |
-          echo "This PR only modifies documentation files."
+          echo "This change does not modify source code."
           echo "Skipping full build and test pipeline."
           echo "✓ Documentation check passed"
 
   build-and-test:
     name: Build and Test
     needs: changes
-    if: needs.changes.outputs.docs-only == 'false'
+    if: needs.changes.outputs.has-source == 'true'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}-ci-debian:latest

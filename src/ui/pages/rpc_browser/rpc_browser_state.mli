@@ -88,7 +88,8 @@ type state = {
   recent_paths : recent_path list;  (** LRU list of recently used RPC paths *)
   cached_entries : entry list;  (** Cached entries for side-by-side display *)
   cached_cursor : int;  (** Cached cursor position for side-by-side display *)
-  target_override : Service.t option;  (** Global target override for RPC calls *)
+  target_override : Service.t option;
+      (** Global target override for RPC calls *)
 }
 
 (** {1 Selected Instance Override} *)

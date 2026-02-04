@@ -22,7 +22,10 @@ let test_parse_simple_list () =
   Alcotest.(check int) "two nodes" 2 (List.length nodes) ;
   let first = List.hd nodes in
   Alcotest.(check string) "first label" "ECAD Infra" first.label ;
-  Alcotest.(check string) "first rpc" "https://mainnet.ecadinfra.com" first.rpc_addr
+  Alcotest.(check string)
+    "first rpc"
+    "https://mainnet.ecadinfra.com"
+    first.rpc_addr
 
 let test_parse_with_rpc_url () =
   let json =
@@ -33,7 +36,10 @@ let test_parse_with_rpc_url () =
   let nodes = Public_nodes_cache.parse_taquito_json json in
   Alcotest.(check int) "one node" 1 (List.length nodes) ;
   let first = List.hd nodes in
-  Alcotest.(check string) "rpc_url parsed" "https://node.example.com" first.rpc_addr
+  Alcotest.(check string)
+    "rpc_url parsed"
+    "https://node.example.com"
+    first.rpc_addr
 
 let test_parse_taquito_format () =
   let json =
@@ -51,7 +57,10 @@ let test_parse_taquito_format () =
   let nodes = Public_nodes_cache.parse_taquito_json json in
   Alcotest.(check int) "two nodes" 2 (List.length nodes) ;
   let first = List.hd nodes in
-  Alcotest.(check string) "provider name used" "ECAD Infra (mainnet)" first.label
+  Alcotest.(check string)
+    "provider name used"
+    "ECAD Infra (mainnet)"
+    first.label
 
 let test_parse_empty () =
   let json = "[]" in
@@ -74,20 +83,43 @@ let test_parse_missing_rpc () =
 
 let test_to_service () =
   let info : Public_nodes_cache.node_info =
-    {label = "Test Node"; rpc_addr = "https://test.node"; network = Some "mainnet"}
+    {
+      label = "Test Node";
+      rpc_addr = "https://test.node";
+      network = Some "mainnet";
+    }
   in
   let svc = Public_nodes_cache.to_service info in
-  Alcotest.(check string) "instance" "Test Node" svc.Octez_manager_lib.Service.instance ;
-  Alcotest.(check string) "network" "mainnet" svc.Octez_manager_lib.Service.network ;
-  Alcotest.(check string) "rpc_addr" "https://test.node" svc.Octez_manager_lib.Service.rpc_addr ;
-  Alcotest.(check string) "data_dir empty" "" svc.Octez_manager_lib.Service.data_dir
+  Alcotest.(check string)
+    "instance"
+    "Test Node"
+    svc.Octez_manager_lib.Service.instance ;
+  Alcotest.(check string)
+    "network"
+    "mainnet"
+    svc.Octez_manager_lib.Service.network ;
+  Alcotest.(check string)
+    "rpc_addr"
+    "https://test.node"
+    svc.Octez_manager_lib.Service.rpc_addr ;
+  Alcotest.(check string)
+    "data_dir empty"
+    ""
+    svc.Octez_manager_lib.Service.data_dir
 
 let test_to_service_no_network () =
   let info : Public_nodes_cache.node_info =
-    {label = "Unknown Network"; rpc_addr = "https://unknown.node"; network = None}
+    {
+      label = "Unknown Network";
+      rpc_addr = "https://unknown.node";
+      network = None;
+    }
   in
   let svc = Public_nodes_cache.to_service info in
-  Alcotest.(check string) "defaults to mainnet" "mainnet" svc.Octez_manager_lib.Service.network
+  Alcotest.(check string)
+    "defaults to mainnet"
+    "mainnet"
+    svc.Octez_manager_lib.Service.network
 
 (* ============================================================ *)
 (* Test Runner                                                   *)

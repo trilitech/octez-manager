@@ -25,7 +25,10 @@ val min_pager_rows : int
     @param is_focused Whether this pager is focused
     @param is_target Whether this pager is the target for next RPC result *)
 val render_pager_header :
-  slot:Rpc_browser_state.pager_slot -> is_focused:bool -> is_target:bool -> string
+  slot:Rpc_browser_state.pager_slot ->
+  is_focused:bool ->
+  is_target:bool ->
+  string
 
 (** {1 Status Rendering} *)
 
