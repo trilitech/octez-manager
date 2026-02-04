@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Coverage badge on README, updated automatically from CI via dynamic gist-based shield
+- Fuzz testing with adversarial generators for core parsers (Env_file_parser, Execstart_parser, Teztnets, Snapshots) — 13 properties at 10k iterations each
 - Property-based testing with QCheck: 57 properties covering parsers, validators, formatters, and data transformers (#587)
 - TUI now shows notification when octez-manager update is available and recommends running `self-update` command
 - **RPC Browser**: Interactive RPC endpoint explorer accessible via `r` key

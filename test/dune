@@ -761,3 +761,12 @@
  (modules test_external_detector_props)
  (instrumentation
   (backend bisect_ppx)))
+
+; Fuzz tests (adversarial generators, high iteration count)
+
+(test
+ (name test_fuzz)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_fuzz)
+ (instrumentation
+  (backend bisect_ppx)))
