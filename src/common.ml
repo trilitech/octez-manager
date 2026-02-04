@@ -221,7 +221,9 @@ let read_lines_eio flow ~on_line =
   in
   loop ()
 
-let run_eio (Mgr mgr) ~quiet ?on_log argv =
+(* In TUI mode stdout/stderr are always captured via pipes — there is no
+   terminal to inherit — so the [quiet] flag has no effect on the Eio path. *)
+let run_eio (Mgr mgr) ~quiet:_ ?on_log argv =
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
@@ -238,7 +240,6 @@ let run_eio (Mgr mgr) ~quiet ?on_log argv =
       read_lines_eio (stdout_r :> _ Eio.Flow.source) ~on_line:handle_line)
     (fun () ->
       read_lines_eio (stderr_r :> _ Eio.Flow.source) ~on_line:handle_line) ;
-  ignore (quiet : bool) ;
   match Eio.Process.await proc with
   | `Exited 0 -> Ok ()
   | _ ->
@@ -480,8 +481,8 @@ let run ?(quiet = false) ?on_log argv =
       Ok ()
   | _ -> (
       match Atomic.get proc_mgr_ref with
-      | Some mgr when quiet || on_log <> None -> run_eio mgr ~quiet ?on_log argv
-      | _ -> run_blocking ~quiet ?on_log argv)
+      | Some mgr -> run_eio mgr ~quiet ?on_log argv
+      | None -> run_blocking ~quiet ?on_log argv)
 
 let run_silent = run ~quiet:true
 

@@ -9,12 +9,14 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-(** Parallel submit function ref. Defaults to Domain.spawn (fire-and-forget).
-    Set to Domain_pool.submit at TUI startup for pooled execution. *)
-let parallel_submit_ref : ((unit -> unit) -> unit) ref =
-  ref (fun fn -> ignore (Domain.spawn (fun () -> try fn () with _ -> ())))
+(** Parallel submit function. Defaults to Domain.spawn (fire-and-forget).
+    Set to Domain_pool.submit at TUI startup for pooled execution.
+    Uses Atomic.t for safe cross-domain reads. *)
+let parallel_submit_ref : ((unit -> unit) -> unit) Atomic.t =
+  Atomic.make (fun fn ->
+      ignore (Domain.spawn (fun () -> try fn () with _ -> ())))
 
-let set_parallel_submit f = parallel_submit_ref := f
+let set_parallel_submit f = Atomic.set parallel_submit_ref f
 
 (** Utilities *)
 
@@ -461,23 +463,27 @@ let download_version ~version ?(verify_checksums = true) ?progress
       let remaining = Atomic.make n in
       let mu = Mutex.create () in
       let cond = Condition.create () in
+      let submit_fn = Atomic.get parallel_submit_ref in
       List.iteri
         (fun i (binary, _index, progress_for_file) ->
-          !parallel_submit_ref (fun () ->
-              let r =
-                download_binary
-                  ~version
-                  ~arch
-                  ~binary
-                  ~dest_dir
-                  ?progress:progress_for_file
-                  ()
-              in
-              results.(i) <- Result.map (fun _ -> binary) r ;
-              if Atomic.fetch_and_add remaining (-1) = 1 then (
-                Mutex.lock mu ;
-                Condition.broadcast cond ;
-                Mutex.unlock mu)))
+          submit_fn (fun () ->
+              Fun.protect
+                ~finally:(fun () ->
+                  if Atomic.fetch_and_add remaining (-1) = 1 then (
+                    Mutex.lock mu ;
+                    Condition.broadcast cond ;
+                    Mutex.unlock mu))
+                (fun () ->
+                  let r =
+                    download_binary
+                      ~version
+                      ~arch
+                      ~binary
+                      ~dest_dir
+                      ?progress:progress_for_file
+                      ()
+                  in
+                  results.(i) <- Result.map (fun _ -> binary) r)))
         download_tasks ;
       (* Wait for all downloads to complete *)
       Mutex.lock mu ;
