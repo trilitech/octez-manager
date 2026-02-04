@@ -18,3 +18,11 @@
     for the given instance. Returns the path to the created archive on success. *)
 val export_logs :
   instance:string -> svc:Service.t -> (string, [> `Msg of string]) result
+
+module For_tests : sig
+  val get_instance_details : svc:Service.t -> string
+
+  val format_timestamp : float -> string
+
+  val export_filename : instance:string -> timestamp:string -> string
+end
