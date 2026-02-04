@@ -572,12 +572,12 @@ let start () =
     Worker_queue.start worker ;
     (* Fetch latest version in separate domain - don't block worker queue *)
     ignore (Domain.spawn (fun () -> try fetch_latest_version () with _ -> ())) ;
-    (* Run first tick immediately to start populating metrics *)
-    (try tick () with _ -> ()) ;
-    (* Spawn scheduler domain that submits poll requests periodically *)
+    (* Spawn scheduler domain that submits poll requests periodically.
+       Runs first tick immediately (no initial delay) to start populating
+       metrics as early as possible. *)
     ignore
       (Domain.spawn (fun () ->
-           (* Submit poll requests periodically *)
+           Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick ;
            while not (Atomic.get shutdown_requested) do
              Unix.sleepf 0.5 ;
              Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick
