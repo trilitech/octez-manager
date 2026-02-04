@@ -218,6 +218,109 @@ let test_render_multi_pager () =
   Alcotest.(check bool) "has content" true (String.length result > 0)
 
 (* ============================================================ *)
+(* visible_length Tests                                          *)
+(* ============================================================ *)
+
+module FT = Render.For_tests
+
+let test_visible_length_plain () =
+  Alcotest.(check int) "plain ASCII" 5 (FT.visible_length "hello")
+
+let test_visible_length_empty () =
+  Alcotest.(check int) "empty" 0 (FT.visible_length "")
+
+let test_visible_length_ansi () =
+  (* \027[31m = red, \027[0m = reset *)
+  let s = "\027[31mhello\027[0m" in
+  Alcotest.(check int) "ANSI stripped" 5 (FT.visible_length s)
+
+let test_visible_length_multiple_ansi () =
+  let s = "\027[1m\027[31mhi\027[0m" in
+  Alcotest.(check int) "multiple ANSI" 2 (FT.visible_length s)
+
+let test_visible_length_utf8 () =
+  (* "café" = 4 visible chars, but 5 bytes (é is 2 bytes) *)
+  Alcotest.(check int) "UTF-8" 4 (FT.visible_length "caf\xc3\xa9")
+
+let test_visible_length_utf8_emoji () =
+  (* 😀 = 4 bytes, 1 visible char *)
+  Alcotest.(check int) "emoji" 1 (FT.visible_length "\xf0\x9f\x98\x80")
+
+let test_visible_length_mixed () =
+  (* ANSI + UTF-8 *)
+  let s = "\027[32mcaf\xc3\xa9\027[0m" in
+  Alcotest.(check int) "mixed ANSI+UTF8" 4 (FT.visible_length s)
+
+(* ============================================================ *)
+(* truncate_to_width Tests                                       *)
+(* ============================================================ *)
+
+let test_truncate_short () =
+  let result = FT.truncate_to_width "hi" ~width:10 in
+  Alcotest.(check string) "not truncated" "hi" result
+
+let test_truncate_exact () =
+  let result = FT.truncate_to_width "hello" ~width:5 in
+  Alcotest.(check string) "exact fit" "hello" result
+
+let test_truncate_long () =
+  let result = FT.truncate_to_width "hello world" ~width:5 in
+  Alcotest.(check int) "truncated length" 5 (FT.visible_length result)
+
+let test_truncate_ansi () =
+  let s = "\027[31mhello world\027[0m" in
+  let result = FT.truncate_to_width s ~width:5 in
+  Alcotest.(check int) "truncated ANSI" 5 (FT.visible_length result)
+
+let test_truncate_zero_width () =
+  let result = FT.truncate_to_width "hello" ~width:0 in
+  Alcotest.(check int) "zero width" 0 (FT.visible_length result)
+
+(* ============================================================ *)
+(* split_lines_padded Tests                                      *)
+(* ============================================================ *)
+
+let test_split_lines_exact () =
+  let lines = FT.split_lines_padded "a\nb\nc" ~target_lines:3 ~width:5 in
+  Alcotest.(check int) "3 lines" 3 (List.length lines) ;
+  List.iter
+    (fun line ->
+      Alcotest.(check int) "each line width 5" 5 (FT.visible_length line))
+    lines
+
+let test_split_lines_too_few () =
+  let lines = FT.split_lines_padded "a" ~target_lines:3 ~width:5 in
+  Alcotest.(check int) "padded to 3" 3 (List.length lines)
+
+let test_split_lines_too_many () =
+  let lines = FT.split_lines_padded "a\nb\nc\nd\ne" ~target_lines:2 ~width:5 in
+  Alcotest.(check int) "trimmed to 2" 2 (List.length lines)
+
+let test_split_lines_empty () =
+  let lines = FT.split_lines_padded "" ~target_lines:3 ~width:5 in
+  Alcotest.(check int) "empty padded" 3 (List.length lines)
+
+(* ============================================================ *)
+(* PBT: visible_length invariants                                *)
+(* ============================================================ *)
+
+let test_visible_length_non_negative =
+  QCheck.Test.make
+    ~name:"visible_length is always non-negative"
+    ~count:500
+    QCheck.string
+    (fun s -> FT.visible_length s >= 0)
+
+let test_truncate_respects_width =
+  QCheck.Test.make
+    ~name:"truncate_to_width respects width"
+    ~count:500
+    QCheck.(pair string (int_range 0 100))
+    (fun (s, width) ->
+      let result = FT.truncate_to_width s ~width in
+      FT.visible_length result <= width)
+
+(* ============================================================ *)
 (* Test Runner                                                   *)
 (* ============================================================ *)
 
@@ -278,4 +381,36 @@ let () =
           Alcotest.test_case "with error" `Quick test_render_result_with_error;
           Alcotest.test_case "multi pager" `Quick test_render_multi_pager;
         ] );
+      ( "visible_length",
+        [
+          Alcotest.test_case "plain" `Quick test_visible_length_plain;
+          Alcotest.test_case "empty" `Quick test_visible_length_empty;
+          Alcotest.test_case "ANSI" `Quick test_visible_length_ansi;
+          Alcotest.test_case
+            "multiple ANSI"
+            `Quick
+            test_visible_length_multiple_ansi;
+          Alcotest.test_case "UTF-8" `Quick test_visible_length_utf8;
+          Alcotest.test_case "emoji" `Quick test_visible_length_utf8_emoji;
+          Alcotest.test_case "mixed" `Quick test_visible_length_mixed;
+        ] );
+      ( "truncate_to_width",
+        [
+          Alcotest.test_case "short" `Quick test_truncate_short;
+          Alcotest.test_case "exact" `Quick test_truncate_exact;
+          Alcotest.test_case "long" `Quick test_truncate_long;
+          Alcotest.test_case "ANSI" `Quick test_truncate_ansi;
+          Alcotest.test_case "zero width" `Quick test_truncate_zero_width;
+        ] );
+      ( "split_lines_padded",
+        [
+          Alcotest.test_case "exact" `Quick test_split_lines_exact;
+          Alcotest.test_case "too few" `Quick test_split_lines_too_few;
+          Alcotest.test_case "too many" `Quick test_split_lines_too_many;
+          Alcotest.test_case "empty" `Quick test_split_lines_empty;
+        ] );
+      ( "PBT",
+        List.map
+          QCheck_alcotest.to_alcotest
+          [test_visible_length_non_negative; test_truncate_respects_width] );
     ]
