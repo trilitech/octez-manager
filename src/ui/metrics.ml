@@ -661,3 +661,25 @@ let stop_recording () = state.recording_enabled <- false
 let is_recording () = state.recording_enabled
 
 let get_recording_duration () = state.recording_duration
+
+module For_tests = struct
+  let percentile = percentile
+
+  let metrics_text () = Mutex.protect state.lock (fun () -> metrics_text ())
+
+  let reset () =
+    Mutex.protect state.lock (fun () ->
+        state.enabled <- false ;
+        state.render_hist <- Page_map.empty ;
+        state.bg_queue_depth <- 0 ;
+        state.bg_queue_max <- 0 ;
+        state.service_statuses <- Service_map.empty ;
+        state.scheduler_hist <- Scheduler_map.empty ;
+        state.last_input_ts <- None ;
+        state.server_addr <- None ;
+        state.server_port <- None ;
+        state.recording_enabled <- false ;
+        state.recording_duration <- 60 ;
+        state.snapshots_next <- 0 ;
+        state.snapshots_count <- 0)
+end
