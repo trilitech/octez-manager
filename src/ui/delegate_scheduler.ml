@@ -172,19 +172,18 @@ let start () =
          (Printf.sprintf
             "delegate_scheduler: startup refresh failed: %s"
             (Printexc.to_string exn))) ;
-    (* Spawn dedicated domain for delegate polling - no Eio needed for simple I/O *)
-    ignore
-      (Domain.spawn (fun () ->
-           (* Delay to let UI initialize first *)
-           Unix.sleepf 2.0 ;
-           (* Simple polling loop *)
-           while not (Atomic.get shutdown_requested) do
-             let now = Unix.gettimeofday () in
-             if now -. !last_poll >= poll_interval then (
-               last_poll := now ;
-               Metrics.record_scheduler_tick ~scheduler:"delegate" tick) ;
-             Unix.sleepf 5.0
-           done)))
+    (* Submit delegate polling fiber to domain pool *)
+    Domain_pool.submit (fun () ->
+        (* Delay to let UI initialize first *)
+        Eio_unix.sleep 2.0 ;
+        (* Simple polling loop *)
+        while not (Atomic.get shutdown_requested) do
+          let now = Unix.gettimeofday () in
+          if now -. !last_poll >= poll_interval then (
+            last_poll := now ;
+            Metrics.record_scheduler_tick ~scheduler:"delegate" tick) ;
+          Eio_unix.sleep 5.0
+        done))
 
 (** Get delegate data for display *)
 let get_delegate_data ~pkh = Delegate_data.get ~pkh
