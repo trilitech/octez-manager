@@ -609,7 +609,12 @@
 
 (test
  (name test_binary_help_explorer)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
  (modules test_binary_help_explorer)
  (instrumentation
   (backend bisect_ppx)))
