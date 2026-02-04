@@ -794,3 +794,16 @@
  (modules test_fuzz)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_cli_helpers)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_cli
+  octez_manager_lib
+  str)
+ (modules test_cli_helpers)
+ (instrumentation
+  (backend bisect_ppx)))

@@ -670,3 +670,17 @@ let history_mode_opt_term =
     value
     & opt (some (enum history_mode_choices)) None
     & info ["history-mode"] ~doc:history_mode_doc ~docv:"MODE")
+
+module For_tests = struct
+  let split_at_last_comma line =
+    match String.rindex_opt line ',' with
+    | None -> ("", String.trim line)
+    | Some idx ->
+        let before = String.sub line 0 (idx + 1) in
+        let after =
+          String.trim (String.sub line (idx + 1) (String.length line - idx - 1))
+        in
+        (before, after)
+
+  let compute_required_space ~ratio size = Int64.add size (Int64.div size ratio)
+end
