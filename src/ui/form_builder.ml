@@ -729,3 +729,21 @@ struct
   let handled_keys () =
     Miaou.Core.Keys.[Up; Down; Enter; Char "Esc"; Char "Escape"]
 end
+
+(*****************************************************************************)
+(*                            TESTING UTILITIES                              *)
+(*****************************************************************************)
+
+module For_tests = struct
+  let parse_host_port = parse_host_port
+
+  let field_validate (Field f) model = f.validate model
+
+  let field_validate_msg (Field f) model = f.validate_msg model
+
+  let field_label (Field f) = f.label
+
+  let field_hint (Field f) = f.hint
+
+  let field_get_string (Field f) model = f.to_string (f.get model)
+end
