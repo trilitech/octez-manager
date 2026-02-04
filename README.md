@@ -9,6 +9,11 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/trilitech/octez-manager/actions/workflows/coverage.yml"><img src="https://github.com/trilitech/octez-manager/actions/workflows/coverage.yml/badge.svg?branch=main" alt="CI"></a>
+  <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FGIST_OWNER%2FGIST_ID%2Fraw%2Foctez-manager-coverage.json" alt="Coverage">
+</p>
+
+<p align="center">
   <a href="https://octez-manager.tezos.com"><strong>Documentation</strong></a>
 </p>
 
