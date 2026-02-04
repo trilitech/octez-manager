@@ -893,4 +893,26 @@ module For_tests = struct
     | Value Text -> "text"
 
   let parse_initial_args = parse_initial_args
+
+  let truncate = truncate
+
+  let wrap_text = wrap_text
+
+  let option_label = option_label
+
+  let render_value = render_value
+
+  let format_tokens = format_tokens
+
+  let name_matches_excluded = name_matches_excluded
+
+  let is_excluded_option = is_excluded_option
+
+  let excluded_node_options = excluded_node_options
+
+  let excluded_baker_options = excluded_baker_options
+
+  let make_row opt = {opt; value = None; selected = false}
+
+  let make_row_selected opt value = {opt; value; selected = true}
 end
