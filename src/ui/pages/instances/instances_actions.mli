@@ -97,3 +97,25 @@ val activate_selection : state -> state
 
 (** Dismiss failure status for selected instance *)
 val dismiss_failure : state -> state
+
+(** Functions exposed for testing. *)
+module For_tests : sig
+  (** Extract version string from binary --version output. *)
+  val extract_version_string : string -> string option
+
+  (** Map a service role to its binary name. *)
+  val role_to_binary_name : string -> string
+
+  (** BFS to collect all transitive dependents. *)
+  val collect_dependents :
+    get_deps:(string -> Service.t list) -> string -> Service.t list
+
+  (** Remove duplicate services preserving order. *)
+  val dedup_services : Service.t list -> Service.t list
+
+  (** Build journalctl arguments for a unit. *)
+  val journalctl_args : string -> string list
+
+  (** Get current external service from state. *)
+  val current_external_service : state -> External_service.t option
+end
