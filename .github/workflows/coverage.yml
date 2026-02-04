@@ -391,6 +391,19 @@ jobs:
             coverage-data.json
           retention-days: 90
 
+      - name: Update coverage badge (for main branch)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ${{ vars.COVERAGE_GIST_ID }}
+          filename: octez-manager-coverage.json
+          label: coverage
+          message: "${{ env.COVERAGE_PCT }}%"
+          valColorRange: ${{ env.COVERAGE_PCT }}
+          minColorRange: 0
+          maxColorRange: 100
+
       - name: Download baseline coverage from main branch (for PRs)
         if: github.event_name == 'pull_request'
         uses: dawidd6/action-download-artifact@v6
