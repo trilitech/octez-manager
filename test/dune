@@ -609,3 +609,10 @@
  (modules test_binaries_page_pure)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_modal_helpers)
+ (libraries alcotest octez-manager.ui)
+ (modules test_modal_helpers)
+ (instrumentation
+  (backend bisect_ppx)))

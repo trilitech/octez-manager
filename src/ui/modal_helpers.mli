@@ -99,3 +99,9 @@ val show_spinner_modal :
   on_complete:([`Succeeded | `Failed of string | `Cancelled] -> unit) ->
   unit ->
   unit
+
+module For_tests : sig
+  val first_nonempty_line : string list -> string option
+
+  val wrap_text : width:int -> string -> string list
+end
