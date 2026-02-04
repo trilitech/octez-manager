@@ -574,3 +574,24 @@
  (modules test_baker_highwatermarks)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_charts)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_charts)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_dal_health)
+ (libraries alcotest octez-manager.ui)
+ (modules test_dal_health)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_foldable_json)
+ (libraries alcotest octez-manager.ui yojson str)
+ (modules test_foldable_json)
+ (instrumentation
+  (backend bisect_ppx)))
