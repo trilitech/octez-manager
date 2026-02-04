@@ -41,3 +41,15 @@ val max_level : delegate_activity -> int option
 (** Format a short summary for display.
     Returns None if no activities. *)
 val format_summary : delegate_activity list -> string option
+
+(** {2 Testing} *)
+
+module For_tests : sig
+  val parse_highwatermark : Yojson.Safe.t -> highwatermark option
+
+  val parse_entry : Yojson.Safe.t -> (string * highwatermark option) option
+
+  val parse_entries : Yojson.Safe.t -> (string * highwatermark option) list
+
+  val read_file : string -> delegate_activity list
+end

@@ -199,3 +199,13 @@ let format_summary activities =
         activities
     in
     if parts = [] then None else Some (String.concat " " parts)
+
+module For_tests = struct
+  let parse_highwatermark = parse_highwatermark
+
+  let parse_entry = parse_entry
+
+  let parse_entries = parse_entries
+
+  let read_file = read_file
+end
