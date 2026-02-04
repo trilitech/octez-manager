@@ -36,5 +36,9 @@ val submit : (unit -> unit) -> unit
 (** Store the global pool reference. Call once at startup. *)
 val set : t -> unit
 
-(** Shutdown the pool. Signals all worker domains to stop. *)
+(** Shutdown the pool. Signals all worker domains to stop.
+    
+    Workers exit their event loop within 1 second. Running tasks may be
+    cancelled mid-execution when the parent switch exits. Call this before
+    switch exit to minimize the cancellation window. *)
 val shutdown : unit -> unit

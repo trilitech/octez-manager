@@ -61,10 +61,17 @@ let submit fn =
                  (Printexc.to_string exn)))
 
 (** Shutdown the pool by signaling all worker domains to stop.
-    Workers finish their current task and exit within 1s (the stop-check
-    interval).  The pool domains themselves are daemon fibers under the
-    parent switch, so they are cancelled automatically when the switch
-    exits — no explicit join is needed. *)
+    
+    Shutdown semantics:
+    - Sets the stop flag, causing workers to exit their event loop within 1s
+      (the stop-check interval in [Eio.Fiber.first]).
+    - When the parent switch exits, all daemon fibers are cancelled
+      automatically via [Eio.Fiber.fork_daemon].
+    - Running tasks may be interrupted mid-execution when switch cancellation
+      occurs; no graceful task completion is guaranteed.
+    - No explicit join is needed—switch cancellation handles cleanup.
+    
+    Use this before switch exit to minimize the cancellation window. *)
 let shutdown () =
   match Atomic.get pool_ref with
   | Some pool -> Atomic.set pool.stop true
