@@ -711,3 +711,16 @@
  (modules test_system_metrics_props)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_data_transformers_props)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  yojson)
+ (modules test_data_transformers_props)
+ (instrumentation
+  (backend bisect_ppx)))
