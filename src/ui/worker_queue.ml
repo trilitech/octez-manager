@@ -28,7 +28,6 @@ type 'a t = {
   queue : 'a request Queue.t;
   pending : (string, unit) Hashtbl.t;
   lock : Mutex.t;
-  cond : Condition.t;
   mutable running : bool;
   metrics : metrics;
 }
@@ -39,7 +38,6 @@ let create ~name () =
     queue = Queue.create ();
     pending = Hashtbl.create 17;
     lock = Mutex.create ();
-    cond = Condition.create ();
     running = false;
     metrics =
       {
@@ -65,7 +63,6 @@ let submit t ~key ~work ~on_complete =
     else (
       Hashtbl.add t.pending key () ;
       Queue.add {key; work; on_complete} t.queue ;
-      Condition.signal t.cond ;
       true)
   in
   Mutex.unlock t.lock ;
@@ -78,16 +75,14 @@ let submit_unit t ~key ~work =
 let worker_loop t =
   while t.running do
     Mutex.lock t.lock ;
-    while Queue.is_empty t.queue && t.running do
-      Condition.wait t.cond t.lock
-    done ;
     let req_opt =
-      if t.running && not (Queue.is_empty t.queue) then Some (Queue.pop t.queue)
-      else None
+      if not (Queue.is_empty t.queue) then Some (Queue.pop t.queue) else None
     in
     Mutex.unlock t.lock ;
     match req_opt with
-    | None -> ()
+    | None ->
+        (* No work available — yield briefly via Eio-friendly sleep *)
+        Eio_unix.sleep 0.01
     | Some req -> (
         let start_time = Unix.gettimeofday () in
         let result = try req.work () with _ -> Obj.magic () in
@@ -107,12 +102,11 @@ let worker_loop t =
 let start t =
   if not t.running then (
     t.running <- true ;
-    ignore (Domain.spawn (fun () -> worker_loop t)))
+    Domain_pool.submit (fun () -> worker_loop t))
 
 let stop t =
   Mutex.lock t.lock ;
   t.running <- false ;
-  Condition.broadcast t.cond ;
   Mutex.unlock t.lock
 
 (** Compute percentile from sorted list. p is 0.0-1.0 *)

@@ -7,6 +7,20 @@
 
 open Rresult
 
+(* Pluggable hook for Eio-based download with progress.
+   Set by the TUI at startup via Eio_process.init. *)
+let download_with_progress_hook :
+    (url:string ->
+    dest_path:string ->
+    on_progress:(int -> int option -> unit) ->
+    (unit, [> `Msg of string]) result)
+    option
+    Atomic.t =
+  Atomic.make None
+
+let set_download_with_progress_hook f =
+  Atomic.set download_with_progress_hook (Some f)
+
 let download_file ?(quiet = false) ~url ~dest_path () =
   Cmd_runner.append_debug_log (Printf.sprintf "DOWNLOAD %s -> %s" url dest_path) ;
   (* Connection timeout 30s, speed limit 100KB/s for at least 60s before abort *)
@@ -63,7 +77,7 @@ let kill_active_download () =
    - Column 2: Total size in bytes (may have K/M/G suffix)
    - Column 4: Bytes received (may have K/M/G suffix)
 *)
-let download_file_with_progress ~url ~dest_path ~on_progress =
+let download_file_with_progress_blocking ~url ~dest_path ~on_progress =
   Cmd_runner.append_debug_log
     (Printf.sprintf "DOWNLOAD_PROGRESS %s -> %s" url dest_path) ;
   let cmd =
@@ -161,6 +175,13 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
   | Unix.WEXITED 0 -> Ok ()
   | Unix.WEXITED _ | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
       R.error_msgf "curl download failed for %s" url
+
+let download_file_with_progress ~url ~dest_path ~on_progress =
+  Cmd_runner.append_debug_log
+    (Printf.sprintf "DOWNLOAD_PROGRESS %s -> %s" url dest_path) ;
+  match Atomic.get download_with_progress_hook with
+  | Some f -> f ~url ~dest_path ~on_progress
+  | None -> download_file_with_progress_blocking ~url ~dest_path ~on_progress
 
 let get_remote_file_size url =
   (* Use curl -I (HEAD request) to get Content-Length *)
