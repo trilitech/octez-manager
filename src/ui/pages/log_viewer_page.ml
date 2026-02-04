@@ -440,6 +440,12 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let has_modal = has_modal
 end
 
+module For_tests = struct
+  let source_label = function
+    | Log_viewer.Journald -> "journald"
+    | Log_viewer.DailyLogs -> "daily logs"
+end
+
 module Page =
   Monitored_page.Make
     (Page_Impl)
