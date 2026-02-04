@@ -168,6 +168,19 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_instances_actions_pure)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  str)
+ (modules test_instances_actions_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_node_env)
  (libraries alcotest octez_manager_lib unix)
  (modules test_node_env)
