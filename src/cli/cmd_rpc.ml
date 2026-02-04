@@ -31,8 +31,7 @@ let service_from_url url =
     ()
 
 (** Get public nodes from Taquito *)
-let get_public_nodes () =
-  Octez_manager_ui.Public_nodes_cache.get_services ()
+let get_public_nodes () = Octez_manager_ui.Public_nodes_cache.get_services ()
 
 (** Find a public node by index (1-based) or partial name match *)
 let find_public_node query =
@@ -47,7 +46,10 @@ let find_public_node query =
       List.find_opt
         (fun svc ->
           let name = String.lowercase_ascii svc.Service.instance in
-          String.sub name 0 (min (String.length query_lower) (String.length name))
+          String.sub
+            name
+            0
+            (min (String.length query_lower) (String.length name))
           = query_lower)
         nodes
 
@@ -55,7 +57,9 @@ let find_public_node query =
 let resolve_service instance_opt url_opt public_opt =
   match (instance_opt, url_opt, public_opt) with
   | Some _, Some _, _ | Some _, _, Some _ | _, Some _, Some _ ->
-      Error "Cannot specify multiple target options (use only one of --instance, --url, or --public)"
+      Error
+        "Cannot specify multiple target options (use only one of --instance, \
+         --url, or --public)"
   | None, None, None ->
       Error "Must specify a target: --instance, --url, or --public"
   | Some instance, None, None -> get_service instance
@@ -63,7 +67,12 @@ let resolve_service instance_opt url_opt public_opt =
   | None, None, Some query -> (
       match find_public_node query with
       | Some svc -> Ok svc
-      | None -> Error (Printf.sprintf "Public node '%s' not found. Use 'rpc public-nodes' to list available nodes." query))
+      | None ->
+          Error
+            (Printf.sprintf
+               "Public node '%s' not found. Use 'rpc public-nodes' to list \
+                available nodes."
+               query))
 
 (** List available node instances *)
 let list_instances () =
@@ -253,13 +262,19 @@ let url_arg =
   Arg.(
     value
     & opt (some string) None
-    & info ["u"; "url"] ~doc:"RPC endpoint URL (e.g., https://mainnet.tezos.ecadinfra.com)" ~docv:"URL")
+    & info
+        ["u"; "url"]
+        ~doc:"RPC endpoint URL (e.g., https://mainnet.tezos.ecadinfra.com)"
+        ~docv:"URL")
 
 let public_arg =
   Arg.(
     value
     & opt (some string) None
-    & info ["p"; "public"] ~doc:"Public node (index or name from 'rpc public-nodes')" ~docv:"NODE")
+    & info
+        ["p"; "public"]
+        ~doc:"Public node (index or name from 'rpc public-nodes')"
+        ~docv:"NODE")
 
 (** rpc get command *)
 let get_cmd =
@@ -369,7 +384,8 @@ let public_nodes_cmd =
           if nodes = [] then Printf.printf "No public nodes available.\n"
           else (
             Printf.printf "Available public RPC nodes:\n" ;
-            Printf.printf "  Use -p/--public with index or name (e.g., -p 1 or -p ecad)\n\n" ;
+            Printf.printf
+              "  Use -p/--public with index or name (e.g., -p 1 or -p ecad)\n\n" ;
             List.iteri
               (fun i svc ->
                 Printf.printf
@@ -387,4 +403,6 @@ let public_nodes_cmd =
 let rpc_cmd =
   let doc = "Query RPC endpoints on node instances" in
   let info = Cmd.info "rpc" ~doc in
-  Cmd.group info [get_cmd; list_cmd; interactive_cmd; instances_cmd; public_nodes_cmd]
+  Cmd.group
+    info
+    [get_cmd; list_cmd; interactive_cmd; instances_cmd; public_nodes_cmd]

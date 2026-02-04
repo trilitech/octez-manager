@@ -64,7 +64,8 @@ type state = {
   recent_paths : recent_path list;
   cached_entries : entry list;
   cached_cursor : int;
-  target_override : Service.t option;  (** Global target override for RPC calls *)
+  target_override : Service.t option;
+      (** Global target override for RPC calls *)
 }
 
 (* Selected instance override - set by rpc_node_selection page *)
@@ -461,7 +462,11 @@ let set_pager_target target state =
             if p.id = pager_id then {p with target_instance = target} else p)
           pagers
       in
-      {state with mode = Result {pagers = new_pagers; focus; last_pager_id}; target_override = target}
+      {
+        state with
+        mode = Result {pagers = new_pagers; focus; last_pager_id};
+        target_override = target;
+      }
   | List _ -> {state with target_override = target}
 
 let get_pagers state =
@@ -674,7 +679,9 @@ let update_focused_pager_from_foldable state =
                 let pager =
                   Pager.set_cursor_mode pager (Pager.cursor_mode old_p)
                 in
-                let pager = Pager.set_cursor pager (Pager.get_cursor_line old_p) in
+                let pager =
+                  Pager.set_cursor pager (Pager.get_cursor_line old_p)
+                in
                 (* Preserve search query *)
                 Pager.set_search pager old_p.Pager.search
             | None -> Pager.set_cursor_mode pager true

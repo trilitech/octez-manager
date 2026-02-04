@@ -239,8 +239,7 @@ let test_set_pager_target_list_mode () =
   let state = State.init ~instances:[] in
   let state' = State.set_pager_target (Some target) state in
   match state'.target_override with
-  | Some svc ->
-      Alcotest.(check string) "target set" "public-node" svc.instance
+  | Some svc -> Alcotest.(check string) "target set" "public-node" svc.instance
   | None -> Alcotest.fail "expected target_override to be set"
 
 let test_get_pager_target_list_mode () =
@@ -248,8 +247,7 @@ let test_get_pager_target_list_mode () =
   let state = State.init ~instances:[] in
   let state' = State.set_pager_target (Some target) state in
   match State.get_pager_target state' with
-  | Some svc ->
-      Alcotest.(check string) "got target" "public-node" svc.instance
+  | Some svc -> Alcotest.(check string) "got target" "public-node" svc.instance
   | None -> Alcotest.fail "expected target from get_pager_target"
 
 let test_target_override_fallback () =
@@ -272,7 +270,10 @@ let test_new_pager_inherits_target () =
   | Some pager -> (
       match pager.target_instance with
       | Some svc ->
-          Alcotest.(check string) "pager inherits target" "public-node" svc.instance
+          Alcotest.(check string)
+            "pager inherits target"
+            "public-node"
+            svc.instance
       | None -> Alcotest.fail "expected pager to have target_instance")
   | None -> Alcotest.fail "expected focused pager"
 
@@ -288,7 +289,10 @@ let test_add_pager_inherits_target () =
       | Some pager -> (
           match pager.target_instance with
           | Some svc ->
-              Alcotest.(check string) "new pager inherits target" "public-node" svc.instance
+              Alcotest.(check string)
+                "new pager inherits target"
+                "public-node"
+                svc.instance
           | None -> Alcotest.fail "expected new pager to have target_instance")
       | None -> Alcotest.fail "expected focused pager")
   | None -> Alcotest.fail "expected add_pager to succeed"
@@ -347,10 +351,22 @@ let () =
       ( "target_override",
         [
           Alcotest.test_case "initial" `Quick test_target_override_initial;
-          Alcotest.test_case "set in list mode" `Quick test_set_pager_target_list_mode;
-          Alcotest.test_case "get in list mode" `Quick test_get_pager_target_list_mode;
+          Alcotest.test_case
+            "set in list mode"
+            `Quick
+            test_set_pager_target_list_mode;
+          Alcotest.test_case
+            "get in list mode"
+            `Quick
+            test_get_pager_target_list_mode;
           Alcotest.test_case "fallback" `Quick test_target_override_fallback;
-          Alcotest.test_case "enter result inherits" `Quick test_new_pager_inherits_target;
-          Alcotest.test_case "add pager inherits" `Quick test_add_pager_inherits_target;
+          Alcotest.test_case
+            "enter result inherits"
+            `Quick
+            test_new_pager_inherits_target;
+          Alcotest.test_case
+            "add pager inherits"
+            `Quick
+            test_add_pager_inherits_target;
         ] );
     ]

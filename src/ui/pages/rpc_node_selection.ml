@@ -15,7 +15,6 @@ module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
-
 open Octez_manager_lib
 
 let name = "rpc_node_selection"
@@ -163,7 +162,8 @@ let parse_taquito_json (txt : string) : node_item list =
                         | None when provider <> "" -> provider
                         | None -> rpc
                       in
-                      Some {label; rpc_addr = rpc; is_public = true; network = net}
+                      Some
+                        {label; rpc_addr = rpc; is_public = true; network = net}
                 | _ -> None)
               eps
         | _ -> [])
@@ -251,8 +251,12 @@ let back ps = Navigation.back ps
 
 let total_items s =
   (* PUBLIC NODES header + nodes + LOCAL INSTANCES header + instances *)
-  let public_count = if s.public_nodes = [] then 0 else 1 + List.length s.public_nodes in
-  let local_count = if s.local_instances = [] then 0 else 1 + List.length s.local_instances in
+  let public_count =
+    if s.public_nodes = [] then 0 else 1 + List.length s.public_nodes
+  in
+  let local_count =
+    if s.local_instances = [] then 0 else 1 + List.length s.local_instances
+  in
   public_count + local_count
 
 let get_item_at_cursor s =
@@ -307,32 +311,38 @@ let view ps ~focus:_ ~size =
   let lines =
     (* Error/warning *)
     (match s.error with Some e -> [Widgets.yellow e; ""] | None -> [])
-    @ (* PUBLIC NODES section *)
-    [
-      (if s.cursor = public_header_idx then
-         Widgets.bold (Widgets.cyan "> PUBLIC NODES")
-       else Widgets.bold (Widgets.cyan "  PUBLIC NODES"));
-    ]
+    (* PUBLIC NODES section *)
+    @ [
+        (if s.cursor = public_header_idx then
+           Widgets.bold (Widgets.cyan "> PUBLIC NODES")
+         else Widgets.bold (Widgets.cyan "  PUBLIC NODES"));
+      ]
     @ List.mapi
         (fun i item ->
           let idx = 1 + i in
           let prefix = if s.cursor = idx then "> " else "  " in
           let network_str =
-            match item.network with Some n -> Printf.sprintf " [%s]" n | None -> ""
+            match item.network with
+            | Some n -> Printf.sprintf " [%s]" n
+            | None -> ""
           in
           let line =
-            Printf.sprintf "%s%s%s  %s" prefix item.label network_str
+            Printf.sprintf
+              "%s%s%s  %s"
+              prefix
+              item.label
+              network_str
               (Widgets.dim item.rpc_addr)
           in
           if s.cursor = idx then Widgets.bold line else line)
         s.public_nodes
     @ [""]
-    @ (* LOCAL INSTANCES section *)
-    [
-      (if s.cursor = local_header_idx then
-         Widgets.bold (Widgets.green "> LOCAL INSTANCES")
-       else Widgets.bold (Widgets.green "  LOCAL INSTANCES"));
-    ]
+    (* LOCAL INSTANCES section *)
+    @ [
+        (if s.cursor = local_header_idx then
+           Widgets.bold (Widgets.green "> LOCAL INSTANCES")
+         else Widgets.bold (Widgets.green "  LOCAL INSTANCES"));
+      ]
     @
     if s.local_instances = [] then [Widgets.dim "  (no local nodes configured)"]
     else
@@ -341,10 +351,16 @@ let view ps ~focus:_ ~size =
           let idx = local_header_idx + 1 + i in
           let prefix = if s.cursor = idx then "> " else "  " in
           let network_str =
-            match item.network with Some n -> Printf.sprintf " [%s]" n | None -> ""
+            match item.network with
+            | Some n -> Printf.sprintf " [%s]" n
+            | None -> ""
           in
           let line =
-            Printf.sprintf "%s%s%s  %s" prefix item.label network_str
+            Printf.sprintf
+              "%s%s%s  %s"
+              prefix
+              item.label
+              network_str
               (Widgets.dim item.rpc_addr)
           in
           if s.cursor = idx then Widgets.bold line else line)
@@ -354,11 +370,7 @@ let view ps ~focus:_ ~size =
   let header =
     [Widgets.title_highlight " Browse RPCs - Select Node "; ""; hint; ""]
   in
-  Vsection.render
-    ~size
-    ~header
-    ~content_footer:[]
-    ~child:(fun _ ->
+  Vsection.render ~size ~header ~content_footer:[] ~child:(fun _ ->
       let truncate line =
         if Widgets.visible_chars_count line <= cols then line
         else
@@ -393,7 +405,8 @@ let keymap _ps =
     kb "Esc" back "Back";
   ]
 
-let handled_keys () = Keys.[Escape; Enter; Up; Down; Char "j"; Char "k"; Char "r"]
+let handled_keys () =
+  Keys.[Escape; Enter; Up; Down; Char "j"; Char "k"; Char "r"]
 
 let has_modal _ = false
 

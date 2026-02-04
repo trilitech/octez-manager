@@ -51,8 +51,7 @@ let render_pager_header ~slot ~is_focused ~is_target =
     | Some svc ->
         let name = svc.Octez_manager_lib.Service.instance in
         (* Truncate long names *)
-        if String.length name > 20 then String.sub name 0 17 ^ "..."
-        else name
+        if String.length name > 20 then String.sub name 0 17 ^ "..." else name
     | None -> "?"
   in
   if is_focused || is_target then
@@ -78,7 +77,13 @@ let render_pager_header ~slot ~is_focused ~is_target =
       | Some s -> Printf.sprintf " %dB" s
       | None -> ""
     in
-    Printf.sprintf "%s @%s GET %s%s%s" marker target_name request_str time_str size_str
+    Printf.sprintf
+      "%s @%s GET %s%s%s"
+      marker
+      target_name
+      request_str
+      time_str
+      size_str
   else
     let id_marker = Printf.sprintf "[%d]" slot.State.id in
     let id_str = Widgets.dim id_marker in
@@ -104,7 +109,13 @@ let render_pager_header ~slot ~is_focused ~is_target =
       | Some s -> Widgets.dim (Printf.sprintf " %dB" s)
       | None -> ""
     in
-    Printf.sprintf "%s %s GET %s%s%s" id_str target_str request_str time_str size_str
+    Printf.sprintf
+      "%s %s GET %s%s%s"
+      id_str
+      target_str
+      request_str
+      time_str
+      size_str
 
 let render_loading () =
   let spinner = Context.render_spinner "" in
@@ -118,7 +129,8 @@ let render_help ~num_pagers =
   let pager_hint = if num_pagers > 1 then "C-x N: pager  " else "" in
   Widgets.dim
     (Printf.sprintf
-       "?: help  %s%s%s1-5: shortcut  Space: fold  f/F: fold  s: save  Esc: back"
+       "?: help  %s%s%s1-5: shortcut  Space: fold  f/F: fold  s: save  Esc: \
+        back"
        split_hint
        close_hint
        pager_hint)
@@ -332,8 +344,8 @@ let split_lines_padded s ~target_lines ~width =
     padded
 
 (** Render a row of pagers horizontally (side-by-side) *)
-let render_pager_row ~pagers ~focused_id ~target_id ~pager_width ~pager_height ~focus
-    ~(result_focus : State.result_focus) =
+let render_pager_row ~pagers ~focused_id ~target_id ~pager_width ~pager_height
+    ~focus ~(result_focus : State.result_focus) =
   if pagers = [] then ""
   else
     let separator_col = Widgets.dim "│" in
@@ -378,8 +390,8 @@ let render_pager_row ~pagers ~focused_id ~target_id ~pager_width ~pager_height ~
     String.concat "\n" combined_lines
 
 (** Render pagers in a grid layout *)
-let render_grid ~pagers ~focused_id ~target_id ~cols ~rows ~grid_cols ~grid_rows ~focus
-    ~(result_focus : State.result_focus) =
+let render_grid ~pagers ~focused_id ~target_id ~cols ~rows ~grid_cols ~grid_rows
+    ~focus ~(result_focus : State.result_focus) =
   let pager_width = cols / grid_cols in
   let pager_height = rows / grid_rows in
   let separator_row = Widgets.dim (String.make cols '-') in
@@ -458,7 +470,12 @@ let render ~state ~cols ~rows ~focus =
           && match result_focus with State.FocusBrowser -> true | _ -> false
         in
         let content =
-          render_single_pager ~slot ~cols ~rows:(rows - 2) ~is_focused ~is_target
+          render_single_pager
+            ~slot
+            ~cols
+            ~rows:(rows - 2)
+            ~is_focused
+            ~is_target
         in
         Printf.sprintf "%s\n%s%s" content error_line help
       else

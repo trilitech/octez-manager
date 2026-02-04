@@ -34,7 +34,8 @@ val render_entry_kind : Rpc_browser_state.entry_kind -> string
     @param idx Entry index
     @param focus Whether the panel has focus (affects cursor highlighting)
     @param entry Entry to render *)
-val render_entry : cursor:int -> idx:int -> focus:bool -> Rpc_browser_state.entry -> string
+val render_entry :
+  cursor:int -> idx:int -> focus:bool -> Rpc_browser_state.entry -> string
 
 (** {1 Status Rendering} *)
 
@@ -51,7 +52,8 @@ val render_error : string option -> string list
     @param state Current RPC Browser state
     @param cols Terminal width (for truncation)
     @return List of rendered lines *)
-val render : focus:bool -> state:Rpc_browser_state.state -> cols:int -> string list
+val render :
+  focus:bool -> state:Rpc_browser_state.state -> cols:int -> string list
 
 (** {1 Help Line} *)
 
