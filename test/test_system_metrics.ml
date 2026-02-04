@@ -115,6 +115,29 @@ let test_parse_version_with_extra () =
     (Some "20.3")
     (SM.parse_version_output output)
 
+(* ── empty record ────────────────────────────────────────────── *)
+
+let test_empty_record () =
+  let e = SM.empty in
+  check (option string) "no version" None e.version ;
+  check (float 0.01) "zero cpu" 0.0 e.cpu_percent ;
+  check int64 "zero rss" 0L e.memory_rss ;
+  check (float 0.01) "zero mem%" 0.0 e.memory_percent ;
+  check (option int64) "no dir size" None e.data_dir_size ;
+  check (list int) "no pids" [] e.pids
+
+(* ── format_bytes edge cases ─────────────────────────────────── *)
+
+let test_format_bytes_just_under_kb () =
+  check string "1023B" "1023B" (SM.format_bytes 1023L)
+
+let test_format_bytes_exact_mb () =
+  check string "1M" "1M" (SM.format_bytes 1048576L)
+
+let test_format_bytes_negative () =
+  let result = SM.format_bytes (-1L) in
+  check bool "some output" true (String.length result > 0)
+
 (* ── Suite ───────────────────────────────────────────────────── *)
 
 let () =
@@ -141,7 +164,11 @@ let () =
           test_case "TB" `Quick test_format_bytes_tb;
           test_case "large GB" `Quick test_format_bytes_large_gb;
           test_case "500MB" `Quick test_format_bytes_500mb;
+          test_case "just under KB" `Quick test_format_bytes_just_under_kb;
+          test_case "exact MB" `Quick test_format_bytes_exact_mb;
+          test_case "negative" `Quick test_format_bytes_negative;
         ] );
+      ("empty", [test_case "empty record" `Quick test_empty_record]);
       ( "parse_version_output",
         [
           test_case "simple" `Quick test_parse_version_simple;

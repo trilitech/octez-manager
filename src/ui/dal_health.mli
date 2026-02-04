@@ -13,6 +13,8 @@ type check = {name : string; status : status}
 
 type t = {status : status; checks : check list; last_fetch : float}
 
+val status_of_string : string -> status
+
 val status_to_string : status -> string
 
 val fetch : rpc_endpoint:string -> t option
