@@ -102,3 +102,14 @@ val start_head_monitor :
     (level:int option -> proto:string option -> chain_id:string option -> unit) ->
   on_disconnect:(unit -> unit) ->
   monitor_handle
+
+module For_tests : sig
+  val try_fetch_methods :
+    string option ->
+    (unit -> (string, string) result option) list ->
+    (string, string) result
+
+  val octez_client_bin : Service.t -> string
+
+  val with_request_slot : (unit -> 'a) -> 'a
+end

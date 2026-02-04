@@ -110,6 +110,107 @@ let test_rpc_last_error_initially_none () =
   Alcotest.(check (option string)) "no error initially" None err
 
 (* ============================================================ *)
+(* try_fetch_methods Tests                                       *)
+(* ============================================================ *)
+
+let test_try_fetch_no_methods () =
+  let result = Rpc_client.For_tests.try_fetch_methods None [] in
+  Alcotest.(check (result string string))
+    "no methods"
+    (Error "no HTTP methods available")
+    result
+
+let test_try_fetch_first_succeeds () =
+  let m1 () = Some (Ok "response") in
+  let m2 () = failwith "should not be called" in
+  Alcotest.(check (result string string))
+    "first wins"
+    (Ok "response")
+    (Rpc_client.For_tests.try_fetch_methods None [m1; m2])
+
+let test_try_fetch_fallback () =
+  let m1 () = None in
+  let m2 () = Some (Ok "fallback") in
+  Alcotest.(check (result string string))
+    "fallback"
+    (Ok "fallback")
+    (Rpc_client.For_tests.try_fetch_methods None [m1; m2])
+
+let test_try_fetch_error_then_success () =
+  let m1 () = Some (Error "fail1") in
+  let m2 () = Some (Ok "recovered") in
+  Alcotest.(check (result string string))
+    "recovered"
+    (Ok "recovered")
+    (Rpc_client.For_tests.try_fetch_methods None [m1; m2])
+
+let test_try_fetch_all_error () =
+  let m1 () = Some (Error "err1") in
+  let m2 () = Some (Error "err2") in
+  Alcotest.(check (result string string))
+    "last error"
+    (Error "err2")
+    (Rpc_client.For_tests.try_fetch_methods None [m1; m2])
+
+let test_try_fetch_none_then_error () =
+  let m1 () = None in
+  let m2 () = Some (Error "only-error") in
+  Alcotest.(check (result string string))
+    "propagated"
+    (Error "only-error")
+    (Rpc_client.For_tests.try_fetch_methods None [m1; m2])
+
+(* ============================================================ *)
+(* octez_client_bin Tests                                        *)
+(* ============================================================ *)
+
+let test_octez_client_bin () =
+  let s = make_test_service ~app_bin_dir:"/opt/octez" () in
+  Alcotest.(check string)
+    "bin"
+    "/opt/octez/octez-client"
+    (Rpc_client.For_tests.octez_client_bin s)
+
+let test_octez_client_bin_default () =
+  let s = make_test_service () in
+  Alcotest.(check string)
+    "default bin"
+    "/usr/bin/octez-client"
+    (Rpc_client.For_tests.octez_client_bin s)
+
+(* ============================================================ *)
+(* with_request_slot Tests                                       *)
+(* ============================================================ *)
+
+let test_with_request_slot_basic () =
+  Alcotest.(check int)
+    "basic"
+    42
+    (Rpc_client.For_tests.with_request_slot (fun () -> 42))
+
+let test_with_request_slot_exception () =
+  (* with_request_slot propagates exceptions from the callback *)
+  Alcotest.(check bool)
+    "exception propagated"
+    true
+    (try
+       ignore
+         (Rpc_client.For_tests.with_request_slot (fun () -> failwith "boom")) ;
+       false
+     with _ -> true)
+
+(* ============================================================ *)
+(* absolutize_url edge cases                                     *)
+(* ============================================================ *)
+
+let test_absolutize_url_https () =
+  let s = make_test_service ~rpc_addr:"https://mainnet.api.tez.ie" () in
+  Alcotest.(check string)
+    "https"
+    "https://mainnet.api.tez.ie/chains/main/blocks/head"
+    (Rpc_client.absolutize_url s "/chains/main/blocks/head")
+
+(* ============================================================ *)
 (* Test Runner                                                   *)
 (* ============================================================ *)
 
@@ -143,6 +244,10 @@ let () =
             "absolutize_url empty path"
             `Quick
             test_absolutize_url_empty_path;
+          Alcotest.test_case
+            "absolutize_url https"
+            `Quick
+            test_absolutize_url_https;
         ] );
       ( "tool_detection",
         [
@@ -161,5 +266,33 @@ let () =
             "initially none"
             `Quick
             test_rpc_last_error_initially_none;
+        ] );
+      ( "try_fetch_methods",
+        [
+          Alcotest.test_case "no methods" `Quick test_try_fetch_no_methods;
+          Alcotest.test_case
+            "first succeeds"
+            `Quick
+            test_try_fetch_first_succeeds;
+          Alcotest.test_case "fallback" `Quick test_try_fetch_fallback;
+          Alcotest.test_case
+            "error then success"
+            `Quick
+            test_try_fetch_error_then_success;
+          Alcotest.test_case "all error" `Quick test_try_fetch_all_error;
+          Alcotest.test_case
+            "none then error"
+            `Quick
+            test_try_fetch_none_then_error;
+        ] );
+      ( "octez_client_bin",
+        [
+          Alcotest.test_case "custom path" `Quick test_octez_client_bin;
+          Alcotest.test_case "default path" `Quick test_octez_client_bin_default;
+        ] );
+      ( "with_request_slot",
+        [
+          Alcotest.test_case "basic" `Quick test_with_request_slot_basic;
+          Alcotest.test_case "exception" `Quick test_with_request_slot_exception;
         ] );
     ]

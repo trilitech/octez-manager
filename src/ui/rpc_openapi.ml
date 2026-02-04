@@ -377,3 +377,26 @@ let clear_cache () =
   cached_trie := None ;
   cached_endpoints := [] ;
   Hashtbl.clear entries_cache
+
+module For_tests = struct
+  type nonrec endpoint = endpoint = {
+    template : string;
+    placeholders : string list;
+  }
+
+  type nonrec node = node
+
+  let parse_openapi_json = parse_openapi_json
+
+  let extract_placeholders = extract_placeholders
+
+  let extract_placeholder_name = extract_placeholder_name
+
+  let build_trie = build_trie
+
+  let traverse = traverse
+
+  let with_prefix = with_prefix
+
+  let node_has_get (n : node) = n.get
+end

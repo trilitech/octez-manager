@@ -63,3 +63,23 @@ val entries_for : segs:string list -> string list
 
 (** Clear cached trie and entries (useful when OpenAPI is re-downloaded). *)
 val clear_cache : unit -> unit
+
+module For_tests : sig
+  type endpoint = {template : string; placeholders : string list}
+
+  type node
+
+  val parse_openapi_json : string -> endpoint list
+
+  val extract_placeholders : string -> string list
+
+  val extract_placeholder_name : string -> string option
+
+  val build_trie : endpoint list -> node
+
+  val traverse : node -> string list -> node option
+
+  val with_prefix : string -> endpoint list -> endpoint list
+
+  val node_has_get : node -> bool
+end
