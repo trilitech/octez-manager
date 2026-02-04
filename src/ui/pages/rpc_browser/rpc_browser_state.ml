@@ -271,12 +271,14 @@ let navigate_root state =
 let set_entries entries state =
   match state.mode with
   | List m ->
+      let len = List.length entries in
+      let cursor = if len = 0 then 0 else min m.cursor (len - 1) in
       {
         state with
-        mode = List {m with entries; loading = false};
+        mode = List {entries; cursor; loading = false};
         error = None;
         cached_entries = entries;
-        cached_cursor = m.cursor;
+        cached_cursor = cursor;
       }
   | Result _ -> state
 
