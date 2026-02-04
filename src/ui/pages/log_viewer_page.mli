@@ -7,4 +7,6 @@
 
 val name : string
 
+module Page : Miaou.Core.Tui_page.PAGE_SIG
+
 val register : unit -> unit

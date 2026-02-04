@@ -616,3 +616,47 @@
  (modules test_modal_helpers)
  (instrumentation
   (backend bisect_ppx)))
+
+(executable
+ (name test_instance_details)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  mock_service_helpers_lib)
+ (modules test_instance_details)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_log_viewer_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  mock_service_helpers_lib)
+ (modules test_log_viewer_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_import_wizard)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_import_wizard)
+ (instrumentation
+  (backend bisect_ppx)))
