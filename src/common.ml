@@ -252,16 +252,26 @@ let run_eio (Mgr mgr) ~quiet:_ ?on_log argv =
       append_debug_log ("RUN ERROR: " ^ msg) ;
       Error (`Msg msg)
 
+(* Drain stderr in parallel with stdout to prevent the process from blocking
+   if the stderr pipe buffer fills up. *)
 let run_out_eio (Mgr mgr) argv =
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w argv in
+  let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
   Eio.Flow.close stdout_w ;
-  let output =
-    Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stdout_r |> take_all)
-  in
+  Eio.Flow.close stderr_w ;
+  let stdout_out = ref "" in
+  Eio.Fiber.both
+    (fun () ->
+      stdout_out :=
+        Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stdout_r |> take_all))
+    (fun () ->
+      (* Drain stderr silently *)
+      ignore
+        Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stderr_r |> take_all)) ;
   match Eio.Process.await proc with
-  | `Exited 0 -> Ok (String.trim output)
+  | `Exited 0 -> Ok (String.trim !stdout_out)
   | _ -> Error (`Msg (Printf.sprintf "Command failed: %s" (cmd_to_string argv)))
 
 let run_out_silent_eio (Mgr mgr) argv =
