@@ -81,8 +81,9 @@ let worker_loop t =
     Mutex.unlock t.lock ;
     match req_opt with
     | None ->
-        (* No work available — yield briefly via Eio-friendly sleep *)
-        Eio_unix.sleep 0.01
+        (* No work available — yield briefly via Eio-friendly sleep.
+           100ms is acceptable latency for background polling queues. *)
+        Eio_unix.sleep 0.1
     | Some req -> (
         let start_time = Unix.gettimeofday () in
         let result = try req.work () with _ -> Obj.magic () in
