@@ -82,6 +82,7 @@ let shutdown () =
   External_services_scheduler.shutdown () ;
   Versions_scheduler.shutdown () ;
   Self_update_scheduler.stop () ;
+  Domain_pool.shutdown () ;
   Download.kill_active_download ()
 
 let run ?page ?(log = false) ?logfile () =

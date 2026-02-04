@@ -5,7 +5,22 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(** HTTP downloads and checksums. *)
+(** HTTP downloads and checksums.
+
+    The [download_file_with_progress] function supports a pluggable
+    hook for non-blocking Eio-based execution in TUI mode. *)
+
+(** {1 Hook registration} *)
+
+(** Override [download_file_with_progress] with a non-blocking implementation. *)
+val set_download_with_progress_hook :
+  (url:string ->
+  dest_path:string ->
+  on_progress:(int -> int option -> unit) ->
+  (unit, [> `Msg of string]) result) ->
+  unit
+
+(** {1 Downloads} *)
 
 (** Download a file using curl.
     @param quiet suppress output (default [false])
