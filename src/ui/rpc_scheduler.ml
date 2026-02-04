@@ -347,4 +347,17 @@ module For_tests = struct
     let original = !poll_boot_ref in
     poll_boot_ref := stub ;
     Fun.protect ~finally:(fun () -> poll_boot_ref := original) f
+
+  let poll_interval = poll_interval
+
+  let is_due_for_poll = is_due_for_poll
+
+  let boot_pending_interval = boot_pending_interval
+
+  let boot_ok_interval = boot_ok_interval
+
+  let set_boot_state instance state =
+    Hashtbl.replace last_boot_state instance state
+
+  let set_boot_at instance time = Hashtbl.replace last_boot_at instance time
 end

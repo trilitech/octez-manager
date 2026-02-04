@@ -315,3 +315,11 @@ let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
   in
   let alive () = !running in
   {stop; alive}
+
+module For_tests = struct
+  let try_fetch_methods = try_fetch_methods
+
+  let octez_client_bin = octez_client_bin
+
+  let with_request_slot = with_request_slot
+end

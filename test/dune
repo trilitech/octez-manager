@@ -617,6 +617,13 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_rpc_scheduler)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_rpc_scheduler)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (executable
  (name test_instance_details)
  (libraries
