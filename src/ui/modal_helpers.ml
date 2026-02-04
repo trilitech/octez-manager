@@ -1409,3 +1409,9 @@ let show_spinner_modal ~title ~label ~work ~on_complete () =
     ~init:(Modal.init ())
     ~ui
     ~on_close:(fun _ _ -> spinner_modal_close_ref := None)
+
+module For_tests = struct
+  let first_nonempty_line = first_nonempty_line
+
+  let wrap_text = wrap_text
+end
