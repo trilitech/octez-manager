@@ -16,6 +16,8 @@ let proc_mgr_ref : any_proc_mgr option Atomic.t = Atomic.make None
 
 let set_process_mgr mgr = Atomic.set proc_mgr_ref (Some (Mgr mgr))
 
+let get_process_mgr () = Atomic.get proc_mgr_ref
+
 let is_root () = Unix.geteuid () = 0
 
 let home_dir () =

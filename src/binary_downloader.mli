@@ -119,6 +119,13 @@ val binary_url : version:string -> arch:arch -> binary:string -> string
     @param arch Architecture *)
 val checksums_url : version:string -> arch:arch -> string
 
+(** {2 Parallel submit} *)
+
+(** Set the parallel submit function for concurrent downloads.
+    Defaults to [Domain.spawn] (fire-and-forget). Set to [Domain_pool.submit]
+    at TUI startup for pooled execution. *)
+val set_parallel_submit : ((unit -> unit) -> unit) -> unit
+
 (** {2 For tests} *)
 
 module For_tests : sig

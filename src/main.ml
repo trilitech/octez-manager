@@ -45,6 +45,8 @@ let ui_term =
              in
              Octez_manager_ui.Domain_pool.set pool ;
              Common.set_process_mgr (Eio.Stdenv.process_mgr env) ;
+             Binary_downloader.set_parallel_submit
+               Octez_manager_ui.Domain_pool.submit ;
              Miaou_helpers.Fiber_runtime.init ~env ~sw ;
              Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
            in
