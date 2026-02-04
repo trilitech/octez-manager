@@ -51,14 +51,13 @@ let refresh () =
 let start () =
   (* Initial fetch *)
   refresh () ;
-  (* Spawn background domain that refreshes periodically *)
-  ignore
-    (Domain.spawn (fun () ->
-         while not (Atomic.get shutdown_requested) do
-           Unix.sleepf 300.0 ;
-           (* 5 minutes *)
-           refresh ()
-         done))
+  (* Submit background refresh fiber to domain pool *)
+  Domain_pool.submit (fun () ->
+      while not (Atomic.get shutdown_requested) do
+        Eio_unix.sleep 300.0 ;
+        (* 5 minutes *)
+        refresh ()
+      done)
 
 (** Shutdown scheduler *)
 let shutdown () = Atomic.set shutdown_requested true

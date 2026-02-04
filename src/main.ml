@@ -37,6 +37,14 @@ let ui_term =
              (* Use POSIX backend to avoid io_uring resource exhaustion *)
              Eio_posix.run @@ fun env ->
              Eio.Switch.run @@ fun sw ->
+             let pool =
+               Octez_manager_ui.Domain_pool.create
+                 ~sw
+                 ~domain_mgr:(Eio.Stdenv.domain_mgr env)
+                 ~num_domains:4
+             in
+             Octez_manager_ui.Domain_pool.set pool ;
+             Common.set_process_mgr (Eio.Stdenv.process_mgr env) ;
              Miaou_helpers.Fiber_runtime.init ~env ~sw ;
              Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
            in

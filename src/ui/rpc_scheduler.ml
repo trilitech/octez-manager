@@ -306,16 +306,15 @@ let start () =
     started := true ;
     (* Start the worker that processes RPC requests *)
     Worker_queue.start worker ;
-    (* Spawn scheduler domain that submits poll requests *)
-    ignore
-      (Domain.spawn (fun () ->
-           (* Brief delay to let UI initialize *)
-           Unix.sleepf 0.2 ;
-           (* Submit poll requests periodically *)
-           while not (Atomic.get shutdown_requested) do
-             Metrics.record_scheduler_tick ~scheduler:"rpc" tick ;
-             Unix.sleepf 1.0
-           done)))
+    (* Submit scheduler fiber to domain pool *)
+    Domain_pool.submit (fun () ->
+        (* Brief delay to let UI initialize *)
+        Eio_unix.sleep 0.2 ;
+        (* Submit poll requests periodically *)
+        while not (Atomic.get shutdown_requested) do
+          Metrics.record_scheduler_tick ~scheduler:"rpc" tick ;
+          Eio_unix.sleep 1.0
+        done))
 
 (** Stop all active head monitors. Call this on app exit to kill curl processes. *)
 let stop_all_monitors () =
