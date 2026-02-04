@@ -49,9 +49,7 @@ let prop_comment_lines_skipped =
     QCheck.string
     (fun s ->
       (* Remove newlines to test a single comment line *)
-      let single_line =
-        String.concat "" (String.split_on_char '\n' s)
-      in
+      let single_line = String.concat "" (String.split_on_char '\n' s) in
       let line = "# " ^ single_line in
       let result = Env_file_parser.parse_string line in
       List.length result = 0)
@@ -104,8 +102,9 @@ let prop_expand_vars_known_var_replaces =
 
 let prop_parse_string_line_count =
   QCheck.Test.make
-    ~name:"parse_string returns at most as many pairs as non-comment non-blank \
-           lines"
+    ~name:
+      "parse_string returns at most as many pairs as non-comment non-blank \
+       lines"
     ~count:300
     QCheck.string
     (fun s ->
