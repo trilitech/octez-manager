@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Migrated scheduler background I/O from per-task OS domains to a fixed-size Eio fiber pool (9 fewer domains at steady state)
+- Migrated all background I/O from per-task OS domains to a fixed-size Eio fiber pool (head monitors, background runner, binary downloads, and schedulers now share 4 pooled domains)
 - Renamed "linked directories" to "registered directories" (CLI commands: `binaries link` → `binaries register`, `binaries unlink` → `binaries unregister`)
 
 ### Fixed

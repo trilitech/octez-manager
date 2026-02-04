@@ -17,12 +17,15 @@ let create ~sw ~domain_mgr ~num_domains =
   for _ = 1 to num_domains do
     Eio.Fiber.fork_daemon ~sw (fun () ->
         Eio.Domain_manager.run domain_mgr (fun () ->
+            Eio.Switch.run @@ fun domain_sw ->
             let rec loop () =
               if Atomic.get stop then ()
               else
                 match Eio.Stream.take_nonblocking stream with
                 | Some task ->
-                    (try task () with exn -> ignore (Printexc.to_string exn)) ;
+                    Eio.Fiber.fork ~sw:domain_sw (fun () ->
+                        try task ()
+                        with exn -> ignore (Printexc.to_string exn)) ;
                     loop ()
                 | None ->
                     Eio_unix.sleep 0.01 ;

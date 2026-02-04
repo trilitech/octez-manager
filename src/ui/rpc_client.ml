@@ -6,7 +6,6 @@
 (******************************************************************************)
 
 open Octez_manager_lib
-module Bg = Background_runner
 
 (* Helper to compute endpoint URL for a service. *)
 let endpoint_of (s : Service.t) =
@@ -252,68 +251,91 @@ let rpc_is_bootstrapped_cached (s : Service.t) : bool option =
 
 type monitor_handle = {stop : unit -> unit; alive : unit -> bool}
 
+let parse_head_line line ~on_head =
+  try
+    let j = Yojson.Safe.from_string line in
+    let open Yojson.Safe.Util in
+    let level = match member "level" j with `Int l -> Some l | _ -> None in
+    let proto =
+      match member "protocol" j with `String p -> Some p | _ -> None
+    in
+    let chain_id =
+      match member "chain_id" j with `String c -> Some c | _ -> None
+    in
+    on_head ~level ~proto ~chain_id
+  with _ -> ()
+
+let run_head_monitor_eio (Common.Mgr mgr) ~stopped ~url ~on_head =
+  Eio.Switch.run @@ fun sw ->
+  let argv =
+    [
+      "curl";
+      "-sN";
+      "--connect-timeout";
+      "2";
+      "--max-time";
+      "86400";
+      "--no-buffer";
+      url;
+    ]
+  in
+  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w argv in
+  Eio.Flow.close stdout_w ;
+  let reader =
+    Eio.Buf_read.of_flow
+      ~max_size:(10 * 1024 * 1024)
+      (stdout_r :> _ Eio.Flow.source)
+  in
+  let rec loop () =
+    if Atomic.get stopped then
+      try Eio.Process.signal proc Sys.sigterm with _ -> ()
+    else
+      match Eio.Buf_read.line reader with
+      | line ->
+          parse_head_line line ~on_head ;
+          loop ()
+      | exception End_of_file -> ()
+  in
+  loop () ;
+  try ignore (Eio.Process.await proc) with _ -> ()
+
+let run_head_monitor_blocking ~stopped ~cmd ~on_head =
+  let ic = Unix.open_process_in cmd in
+  let rec loop () =
+    if Atomic.get stopped then ()
+    else
+      match input_line ic with
+      | exception End_of_file -> ()
+      | exception Sys_error _ -> ()
+      | line ->
+          parse_head_line line ~on_head ;
+          loop ()
+  in
+  loop () ;
+  try ignore (Unix.close_process_in ic) with _ -> ()
+
 let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
     =
-  let stopped = ref false in
-  let running = ref true in
-  let ic_ref = ref None in
+  let stopped = Atomic.make false in
+  let running = Atomic.make true in
   let url = absolutize_url s "/monitor/heads/main" in
-  (* Use --max-time to ensure curl doesn't hang forever *)
-  let cmd =
-    Printf.sprintf
-      "curl -sN --connect-timeout 2 --max-time 86400 --no-buffer %s"
-      url
-  in
   let run () =
-    let ic = Unix.open_process_in cmd in
-    ic_ref := Some ic ;
-    let rec loop () =
-      if !stopped then ()
-      else
-        match input_line ic with
-        | exception End_of_file -> ()
-        | exception Sys_error _ -> () (* Channel closed by stop() *)
-        | line ->
-            (try
-               let j = Yojson.Safe.from_string line in
-               let open Yojson.Safe.Util in
-               let level =
-                 match member "level" j with `Int l -> Some l | _ -> None
-               in
-               let proto =
-                 match member "protocol" j with
-                 | `String p -> Some p
-                 | _ -> None
-               in
-               let chain_id =
-                 match member "chain_id" j with
-                 | `String c -> Some c
-                 | _ -> None
-               in
-               on_head ~level ~proto ~chain_id
-             with _ -> ()) ;
-            loop ()
-    in
-    loop () ;
-    ic_ref := None ;
-    (try ignore (Unix.close_process_in ic) with _ -> ()) ;
-    running := false ;
+    (match Common.get_process_mgr () with
+    | Some mgr -> run_head_monitor_eio mgr ~stopped ~url ~on_head
+    | None ->
+        let cmd =
+          Printf.sprintf
+            "curl -sN --connect-timeout 2 --max-time 86400 --no-buffer %s"
+            url
+        in
+        run_head_monitor_blocking ~stopped ~cmd ~on_head) ;
+    Atomic.set running false ;
     on_disconnect ()
   in
-  (* Head monitors run in dedicated domains instead of the shared background
-     worker pool. Each monitor blocks forever (streaming curl -sN), so using
-     Bg.submit_blocking would permanently consume a worker and starve user
-     operations (stop/restart) when the number of nodes >= num_workers. *)
-  ignore (Domain.spawn run) ;
-  let stop () =
-    stopped := true ;
-    (* Just set the flag - don't try to close the channel or wait.
-       The background worker will exit on next input_line timeout/error
-       and clean up the process. Since we're exiting anyway, orphaned
-       curl processes will be cleaned up by the OS. *)
-    ()
-  in
-  let alive () = !running in
+  Domain_pool.submit (fun () -> try run () with _ -> ()) ;
+  let stop () = Atomic.set stopped true in
+  let alive () = Atomic.get running in
   {stop; alive}
 
 module For_tests = struct

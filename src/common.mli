@@ -5,10 +5,16 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Existential wrapper for the Eio process manager. *)
+type any_proc_mgr = Mgr : _ Eio.Process.mgr -> any_proc_mgr
+
 (** Set the Eio process manager. Call at TUI startup. When set, all
     process execution uses Eio.Process (non-blocking for fibers).
     When not set, uses blocking Unix I/O (CLI mode). *)
 val set_process_mgr : _ Eio.Process.mgr -> unit
+
+(** Get the Eio process manager, if set. *)
+val get_process_mgr : unit -> any_proc_mgr option
 
 val is_root : unit -> bool
 
