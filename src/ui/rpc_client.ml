@@ -288,14 +288,28 @@ let run_head_monitor_eio (Common.Mgr mgr) ~stopped ~url ~on_head =
       (stdout_r :> _ Eio.Flow.source)
   in
   let rec loop () =
-    if Atomic.get stopped then
-      try Eio.Process.signal proc Sys.sigterm with _ -> ()
-    else
-      match Eio.Buf_read.line reader with
-      | line ->
-          parse_head_line line ~on_head ;
-          loop ()
-      | exception End_of_file -> ()
+    match
+      Eio.Fiber.first
+        (fun () ->
+          match Eio.Buf_read.line reader with
+          | line -> `Line line
+          | exception End_of_file -> `Eof)
+        (fun () ->
+          (* Periodically check the stop flag so we don't block forever
+             waiting for the next JSON line from the streaming endpoint. *)
+          let rec wait () =
+            if Atomic.get stopped then `Stopped
+            else (
+              Eio_unix.sleep 0.5 ;
+              wait ())
+          in
+          wait ())
+    with
+    | `Line line ->
+        parse_head_line line ~on_head ;
+        loop ()
+    | `Eof -> ()
+    | `Stopped -> ( try Eio.Process.signal proc Sys.sigterm with _ -> ())
   in
   loop () ;
   try ignore (Eio.Process.await proc) with _ -> ()
