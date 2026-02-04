@@ -14,6 +14,12 @@
     In CLI mode (when {!init} is not called), {!Cmd_runner} and
     {!Download} use their default blocking Unix implementations. *)
 
+(** Existential wrapper for the Eio process manager. *)
+type any_proc_mgr = Mgr : _ Eio.Process.mgr -> any_proc_mgr
+
+(** Return the process manager set by {!init}, or [None] in CLI mode. *)
+val get_process_mgr : unit -> any_proc_mgr option
+
 (** Initialize Eio-based process execution.
 
     Registers Eio implementations for [Cmd_runner.run],

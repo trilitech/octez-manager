@@ -22,20 +22,20 @@ val set_run_hook :
   (quiet:bool ->
   ?on_log:(string -> unit) ->
   string list ->
-  (unit, [> `Msg of string]) result) ->
+  (unit, [`Msg of string]) result) ->
   unit
 
 (** Override [run_out] with a non-blocking implementation. *)
 val set_run_out_hook :
-  (string list -> (string, [> `Msg of string]) result) -> unit
+  (string list -> (string, [`Msg of string]) result) -> unit
 
 (** Override [run_out_silent] with a non-blocking implementation. *)
 val set_run_out_silent_hook :
-  (string list -> (string, [> `Msg of string]) result) -> unit
+  (string list -> (string, [`Msg of string]) result) -> unit
 
 (** Override [run_streaming] with a non-blocking implementation. *)
 val set_run_streaming_hook :
-  (on_log:(string -> unit) -> string list -> (unit, [> `Msg of string]) result) ->
+  (on_log:(string -> unit) -> string list -> (unit, [`Msg of string]) result) ->
   unit
 
 (** {1 Command execution} *)
