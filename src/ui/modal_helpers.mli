@@ -95,7 +95,7 @@ val select_app_bin_dir_modal :
 val show_spinner_modal :
   title:string ->
   label:string ->
-  work:(unit -> (unit, [ `Msg of string ]) result) ->
-  on_complete:([ `Succeeded | `Failed of string | `Cancelled ] -> unit) ->
+  work:(unit -> (unit, [`Msg of string]) result) ->
+  on_complete:([`Succeeded | `Failed of string | `Cancelled] -> unit) ->
   unit ->
   unit

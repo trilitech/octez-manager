@@ -99,13 +99,14 @@ let fetch_entries_sync state =
       (* Expand Dyn entries to include recent values *)
       let expand_entry (e : Rpc_describe.entry) =
         match e.Rpc_describe.kind with
-        | Rpc_describe.Sub -> [{State.name = e.Rpc_describe.name; kind = State.Sub}]
-        | Rpc_describe.Get -> [{State.name = e.Rpc_describe.name; kind = State.Get}]
+        | Rpc_describe.Sub ->
+            [{State.name = e.Rpc_describe.name; kind = State.Sub}]
+        | Rpc_describe.Get ->
+            [{State.name = e.Rpc_describe.name; kind = State.Get}]
         | Rpc_describe.Dyn typ ->
             (* Get recent values for this type, limit to 5 *)
             let recent =
-              State.get_recent_values ~segment_type:typ state
-              |> fun lst ->
+              State.get_recent_values ~segment_type:typ state |> fun lst ->
               if List.length lst > 5 then List.filteri (fun i _ -> i < 5) lst
               else lst
             in
@@ -113,11 +114,15 @@ let fetch_entries_sync state =
             let recent_entries =
               List.map
                 (fun value ->
-                  {State.name = "<>" ^ value; kind = State.DynValue (typ, value)})
+                  {
+                    State.name = "<>" ^ value;
+                    kind = State.DynValue (typ, value);
+                  })
                 recent
             in
             (* Add the original Dyn entry after recent values *)
-            recent_entries @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
+            recent_entries
+            @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
       in
       let state_entries = List.concat_map expand_entry entries in
       (* Add [change target] button at the top *)
@@ -196,7 +201,9 @@ let handle_enter state on_update =
             on_update
       | State.DynValue (typ, value) ->
           (* Navigate directly with the recent value, record in history *)
-          let new_state = State.add_dynamic_value ~segment_type:typ ~value state in
+          let new_state =
+            State.add_dynamic_value ~segment_type:typ ~value state
+          in
           let new_state = State.navigate_to value new_state in
           fetch_entries new_state on_update
       | State.ChangeTarget ->
@@ -215,7 +222,8 @@ let handle_enter state on_update =
             match current_target with
             | None -> false
             | Some curr ->
-                curr.Octez_manager_lib.Service.rpc_addr = svc.Octez_manager_lib.Service.rpc_addr
+                curr.Octez_manager_lib.Service.rpc_addr
+                = svc.Octez_manager_lib.Service.rpc_addr
           in
           (* Build items with section headers *)
           let items =
@@ -223,12 +231,14 @@ let handle_enter state on_update =
                `Header "── Local Instances ──"
                :: List.map (fun s -> `Instance s) local
              else [])
-            @ (if public <> [] then
-                 `Header "── Public Nodes ──"
-                 :: List.map (fun s -> `Instance s) public
-               else [])
+            @
+            if public <> [] then
+              `Header "── Public Nodes ──"
+              :: List.map (fun s -> `Instance s) public
+            else []
           in
-          if items = [] then on_update (State.set_error "No instances available" state)
+          if items = [] then
+            on_update (State.set_error "No instances available" state)
           else
             Modal_helpers.open_choice_modal
               ~title:"Select target instance"
@@ -241,10 +251,9 @@ let handle_enter state on_update =
                     let label = Printf.sprintf "%s (%s)" name network in
                     if is_current svc then
                       Miaou_widgets_display.Widgets.fg 14 ("✓ " ^ label)
-                    else
-                      "  " ^ label)
+                    else "  " ^ label)
               ~on_select:(function
-                | `Header _ -> ()  (* Headers not selectable *)
+                | `Header _ -> () (* Headers not selectable *)
                 | `Instance svc ->
                     let new_state = State.set_pager_target (Some svc) state in
                     on_update new_state)
@@ -302,29 +311,35 @@ let fetch_cached_entries state on_update =
       (* Expand Dyn entries to include recent values *)
       let expand_entry (e : Rpc_describe.entry) =
         match e.Rpc_describe.kind with
-        | Rpc_describe.Sub -> [{State.name = e.Rpc_describe.name; kind = State.Sub}]
-        | Rpc_describe.Get -> [{State.name = e.Rpc_describe.name; kind = State.Get}]
+        | Rpc_describe.Sub ->
+            [{State.name = e.Rpc_describe.name; kind = State.Sub}]
+        | Rpc_describe.Get ->
+            [{State.name = e.Rpc_describe.name; kind = State.Get}]
         | Rpc_describe.Dyn typ ->
             let recent =
-              State.get_recent_values ~segment_type:typ state
-              |> fun lst ->
+              State.get_recent_values ~segment_type:typ state |> fun lst ->
               if List.length lst > 5 then List.filteri (fun i _ -> i < 5) lst
               else lst
             in
             let recent_entries =
               List.map
                 (fun value ->
-                  {State.name = "<>" ^ value; kind = State.DynValue (typ, value)})
+                  {
+                    State.name = "<>" ^ value;
+                    kind = State.DynValue (typ, value);
+                  })
                 recent
             in
-            recent_entries @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
+            recent_entries
+            @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
       in
       let state_entries = List.concat_map expand_entry entries in
       (* Add [change target] button at the top *)
       let change_target_entry =
         {State.name = "[change target]"; kind = State.ChangeTarget}
       in
-      on_update (State.set_cached_entries (change_target_entry :: state_entries) state)
+      on_update
+        (State.set_cached_entries (change_target_entry :: state_entries) state)
 
 let handle_cached_enter state on_update =
   match State.get_cached_entry state with
@@ -358,7 +373,9 @@ let handle_cached_enter state on_update =
             on_update
       | State.DynValue (typ, value) ->
           (* Navigate directly with the recent value, record in history *)
-          let new_state = State.add_dynamic_value ~segment_type:typ ~value state in
+          let new_state =
+            State.add_dynamic_value ~segment_type:typ ~value state
+          in
           let new_state = State.navigate_cached value new_state in
           fetch_cached_entries new_state on_update
       | State.ChangeTarget ->
@@ -377,7 +394,8 @@ let handle_cached_enter state on_update =
             match current_target with
             | None -> false
             | Some curr ->
-                curr.Octez_manager_lib.Service.rpc_addr = svc.Octez_manager_lib.Service.rpc_addr
+                curr.Octez_manager_lib.Service.rpc_addr
+                = svc.Octez_manager_lib.Service.rpc_addr
           in
           (* Build items with section headers *)
           let items =
@@ -385,12 +403,14 @@ let handle_cached_enter state on_update =
                `Header "── Local Instances ──"
                :: List.map (fun s -> `Instance s) local
              else [])
-            @ (if public <> [] then
-                 `Header "── Public Nodes ──"
-                 :: List.map (fun s -> `Instance s) public
-               else [])
+            @
+            if public <> [] then
+              `Header "── Public Nodes ──"
+              :: List.map (fun s -> `Instance s) public
+            else []
           in
-          if items = [] then on_update (State.set_error "No instances available" state)
+          if items = [] then
+            on_update (State.set_error "No instances available" state)
           else
             Modal_helpers.open_choice_modal
               ~title:"Select target instance"
@@ -403,10 +423,9 @@ let handle_cached_enter state on_update =
                     let label = Printf.sprintf "%s (%s)" name network in
                     if is_current svc then
                       Miaou_widgets_display.Widgets.fg 14 ("✓ " ^ label)
-                    else
-                      "  " ^ label)
+                    else "  " ^ label)
               ~on_select:(function
-                | `Header _ -> ()  (* Headers not selectable *)
+                | `Header _ -> () (* Headers not selectable *)
                 | `Instance svc ->
                     let new_state = State.set_pager_target (Some svc) state in
                     on_update new_state)

@@ -88,13 +88,19 @@ let test_entry_selected_focused_has_bold () =
   let entry = {State.name = "chains"; kind = State.Sub} in
   let result = Render.render_entry ~cursor:0 ~idx:0 ~focus:true entry in
   (* Bold ANSI code is \027[1m *)
-  Alcotest.(check bool) "contains bold" true (String.exists (fun c -> c = '\027') result)
+  Alcotest.(check bool)
+    "contains bold"
+    true
+    (String.exists (fun c -> c = '\027') result)
 
 let test_entry_selected_unfocused_has_dim () =
   let entry = {State.name = "chains"; kind = State.Sub} in
   let result = Render.render_entry ~cursor:0 ~idx:0 ~focus:false entry in
   (* Dim ANSI code is \027[2m *)
-  Alcotest.(check bool) "contains ANSI" true (String.exists (fun c -> c = '\027') result)
+  Alcotest.(check bool)
+    "contains ANSI"
+    true
+    (String.exists (fun c -> c = '\027') result)
 
 let test_entry_focus_produces_different_output () =
   let entry = {State.name = "chains"; kind = State.Sub} in

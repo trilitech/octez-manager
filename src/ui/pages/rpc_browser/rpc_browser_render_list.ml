@@ -36,8 +36,7 @@ let render_entry_kind = function
 let render_entry ~cursor ~idx ~focus entry =
   let is_selected = cursor = idx in
   let marker =
-    if is_selected then
-      if focus then Widgets.fg 14 "▸ " else Widgets.dim "▸ "
+    if is_selected then if focus then Widgets.fg 14 "▸ " else Widgets.dim "▸ "
     else "  "
   in
   (* For GET at current path, show [GET] as the name *)
@@ -69,7 +68,8 @@ let render_header ~target ~path =
 
 let render_entries ~cursor ~entries ~focus =
   if entries = [] then [Widgets.dim "  (no entries at this path)"]
-  else List.mapi (fun idx entry -> render_entry ~cursor ~idx ~focus entry) entries
+  else
+    List.mapi (fun idx entry -> render_entry ~cursor ~idx ~focus entry) entries
 
 let render_shortcuts ~state =
   let shortcuts = Rpc_browser_actions.get_shortcuts state in
@@ -114,11 +114,7 @@ let render ~focus ~state ~cols =
     | Some _ as t -> t
     | None -> List.nth_opt state.State.instances state.State.selected_idx
   in
-  let header =
-    render_header
-      ~target
-      ~path:state.State.path
-  in
+  let header = render_header ~target ~path:state.State.path in
   let separator = Widgets.dim (String.make (min 60 cols) '-') in
   match state.State.mode with
   | State.List {entries; cursor; loading} ->
@@ -129,7 +125,8 @@ let render ~focus ~state ~cols =
         if state.State.path = [] then [Widgets.bold "All Endpoints:"] else []
       in
       let content =
-        if loading then [render_loading ()] else render_entries ~cursor ~entries ~focus
+        if loading then [render_loading ()]
+        else render_entries ~cursor ~entries ~focus
       in
       let error_lines = render_error state.State.error in
       let help = render_help () in
@@ -140,4 +137,6 @@ let render ~focus ~state ~cols =
       List.map truncate lines
   | State.Result _ ->
       (* Result mode is handled by a different renderer *)
-      List.map truncate [header; separator; Widgets.dim "  (result mode - use detail renderer)"]
+      List.map
+        truncate
+        [header; separator; Widgets.dim "  (result mode - use detail renderer)"]

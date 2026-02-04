@@ -9,11 +9,7 @@
 
 open Octez_manager_lib
 
-type node_info = {
-  label : string;
-  rpc_addr : string;
-  network : string option;
-}
+type node_info = {label : string; rpc_addr : string; network : string option}
 
 (* Cached public nodes *)
 let cached_nodes : node_info list ref = ref []
@@ -21,10 +17,26 @@ let cached_nodes : node_info list ref = ref []
 (* Curated fallback list *)
 let curated_defaults : node_info list =
   [
-    {label = "ECAD Infra (mainnet)"; rpc_addr = "https://mainnet.tezos.ecadinfra.com"; network = Some "mainnet"};
-    {label = "Tezos Mainnet (ecadlabs)"; rpc_addr = "https://mainnet.api.tez.ie"; network = Some "mainnet"};
-    {label = "Tezos Ghostnet"; rpc_addr = "https://rpc.ghostnet.teztnets.com"; network = Some "ghostnet"};
-    {label = "Tezos Mainnet (SmartPy)"; rpc_addr = "https://mainnet.smartpy.io"; network = Some "mainnet"};
+    {
+      label = "ECAD Infra (mainnet)";
+      rpc_addr = "https://mainnet.tezos.ecadinfra.com";
+      network = Some "mainnet";
+    };
+    {
+      label = "Tezos Mainnet (ecadlabs)";
+      rpc_addr = "https://mainnet.api.tez.ie";
+      network = Some "mainnet";
+    };
+    {
+      label = "Tezos Ghostnet";
+      rpc_addr = "https://rpc.ghostnet.teztnets.com";
+      network = Some "ghostnet";
+    };
+    {
+      label = "Tezos Mainnet (SmartPy)";
+      rpc_addr = "https://mainnet.smartpy.io";
+      network = Some "mainnet";
+    };
   ]
 
 (** Parse Taquito JSON format to extract public nodes *)
@@ -185,5 +197,4 @@ let to_service (info : node_info) : Service.t =
   }
 
 (** Get all public nodes as Service.t list *)
-let get_services () : Service.t list =
-  List.map to_service (get_nodes ())
+let get_services () : Service.t list = List.map to_service (get_nodes ())

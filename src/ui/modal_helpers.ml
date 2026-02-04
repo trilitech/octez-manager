@@ -1343,7 +1343,7 @@ let show_spinner_modal ~title ~label ~work ~on_complete () =
       | Some close -> close ()
       | None -> ()) ;
       (* Convert Job_manager.status to polymorphic variant for interface *)
-      let result : [ `Succeeded | `Failed of string | `Cancelled ] =
+      let result : [`Succeeded | `Failed of string | `Cancelled] =
         match status with
         | Job_manager.Succeeded -> `Succeeded
         | Job_manager.Failed msg -> `Failed msg
@@ -1372,10 +1372,10 @@ let show_spinner_modal ~title ~label ~work ~on_complete () =
 
     let refresh ps =
       (* Auto-close if work is done *)
-      if !done_ref then (
-        match !spinner_modal_close_ref with
-        | Some close -> close ()
-        | None -> ()) ;
+      (if !done_ref then
+         match !spinner_modal_close_ref with
+         | Some close -> close ()
+         | None -> ()) ;
       ps
 
     let service_select ps _ = ps
@@ -1395,7 +1395,12 @@ let show_spinner_modal ~title ~label ~work ~on_complete () =
     let has_modal _ = true
   end in
   let ui : Miaou.Core.Modal_manager.ui =
-    {title; left = None; max_width = Some (Clamped {ratio = 0.5; min = 40; max = 60}); dim_background = true}
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.5; min = 40; max = 60});
+      dim_background = true;
+    }
   in
   spinner_modal_close_ref :=
     Some (fun () -> Miaou.Core.Modal_manager.close_top `Commit) ;

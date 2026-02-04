@@ -173,7 +173,7 @@ let entries_from_openapi openapi_entries =
         let entry =
           match kind with
           | "__SUB__" -> Some {name; kind = Sub}
-          | "__GET__" -> Some {name = ""; kind = Get}  (* GET at current path *)
+          | "__GET__" -> Some {name = ""; kind = Get} (* GET at current path *)
           | "__DYN__" ->
               (* Extract type from name like "<block_id>" *)
               let typ =
@@ -195,10 +195,10 @@ let fetch_entries (s : Service.t) ~segs =
   | None ->
       (* Try OpenAPI first (works for public nodes without /describe) *)
       let openapi_entries = Rpc_openapi.entries_for ~segs in
-      if openapi_entries <> [] then
+      if openapi_entries <> [] then (
         let entries = entries_from_openapi openapi_entries in
         cache_put ~rpc_addr:s.rpc_addr ~segs ~entries ~source:`None ;
-        (entries, `None)
+        (entries, `None))
       else
         (* Fall back to describe endpoint *)
         let entries, source = fetch_entries_uncached s ~segs in
