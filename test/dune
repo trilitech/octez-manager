@@ -667,3 +667,26 @@
  (modules test_import_wizard)
  (instrumentation
   (backend bisect_ppx)))
+
+; Property-based tests (QCheck)
+
+(test
+ (name test_execstart_parser_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_execstart_parser_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_env_file_parser_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_env_file_parser_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_version_checker_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_version_checker_props)
+ (instrumentation
+  (backend bisect_ppx)))
