@@ -124,6 +124,24 @@ let get_instance_details ~svc =
      else String.concat ", " svc.Service.dependents) ;
   Buffer.contents buf
 
+module For_tests = struct
+  let get_instance_details = get_instance_details
+
+  let format_timestamp unix_time =
+    let tm = Unix.localtime unix_time in
+    Printf.sprintf
+      "%04d%02d%02d-%02d%02d%02d"
+      (1900 + tm.tm_year)
+      (tm.tm_mon + 1)
+      tm.tm_mday
+      tm.tm_hour
+      tm.tm_min
+      tm.tm_sec
+
+  let export_filename ~instance ~timestamp =
+    Printf.sprintf "%s-logs-%s" instance timestamp
+end
+
 (** Get version information *)
 let get_version_info ~svc =
   let buf = Buffer.create 512 in

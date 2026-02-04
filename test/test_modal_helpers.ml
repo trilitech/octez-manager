@@ -114,6 +114,30 @@ let test_wrap_multiple_spaces () =
     (fun line -> check bool "within width" true (String.length line <= 20))
     result
 
+(* ── extract_major ────────────────────────────────────────────── *)
+
+let test_extract_major_simple () =
+  check int "24" 24 (MH.For_tests.extract_major "24.0")
+
+let test_extract_major_three_parts () =
+  check int "1" 1 (MH.For_tests.extract_major "1.2.3")
+
+let test_extract_major_single () =
+  check int "42" 42 (MH.For_tests.extract_major "42")
+
+let test_extract_major_empty () =
+  check int "0" 0 (MH.For_tests.extract_major "")
+
+let test_extract_major_malformed () =
+  check int "0" 0 (MH.For_tests.extract_major "abc.def")
+
+let test_extract_major_leading_v () =
+  (* "v24.0" - the 'v' makes int_of_string fail, returns 0 *)
+  check int "0" 0 (MH.For_tests.extract_major "v24.0")
+
+let test_extract_major_zero () =
+  check int "0" 0 (MH.For_tests.extract_major "0.1.2")
+
 (* ── Suite ────────────────────────────────────────────────────── *)
 
 let () =
@@ -145,5 +169,15 @@ let () =
           test_case "long word" `Quick test_wrap_long_word;
           test_case "newline and long" `Quick test_wrap_newline_and_long;
           test_case "multiple spaces" `Quick test_wrap_multiple_spaces;
+        ] );
+      ( "extract_major",
+        [
+          test_case "simple" `Quick test_extract_major_simple;
+          test_case "three parts" `Quick test_extract_major_three_parts;
+          test_case "single number" `Quick test_extract_major_single;
+          test_case "empty" `Quick test_extract_major_empty;
+          test_case "malformed" `Quick test_extract_major_malformed;
+          test_case "leading v" `Quick test_extract_major_leading_v;
+          test_case "zero major" `Quick test_extract_major_zero;
         ] );
     ]
