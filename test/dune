@@ -560,3 +560,17 @@
  (modules test_cmd_rpc)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_delegate_data)
+ (libraries alcotest octez-manager.ui yojson unix)
+ (modules test_delegate_data)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_baker_highwatermarks)
+ (libraries alcotest octez-manager.ui yojson unix str)
+ (modules test_baker_highwatermarks)
+ (instrumentation
+  (backend bisect_ppx)))
