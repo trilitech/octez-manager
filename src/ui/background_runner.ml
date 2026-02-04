@@ -5,78 +5,30 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(* Background runner backed by an Eio stream. Producers enqueue tasks from any
-   thread; a dedicated Eio runtime hosts worker fibers that execute tasks in
-   separate domains to keep the UI responsive. *)
-
-type task = {fn : unit -> unit; enqueued_at : float}
-
-(* The stream is forced eagerly by [start] before any domain is spawned,
-   avoiding CamlinternalLazy.Undefined when multiple domains race on
-   [Lazy.force]. *)
-let stream : task Eio.Stream.t Lazy.t = lazy (Eio.Stream.create 1024)
-
-let started = Atomic.make false
-
-let shutdown_requested = Atomic.make false
-
-let num_workers = 4
+(* Background runner that delegates to Domain_pool. Producers enqueue tasks
+   from any thread; tasks run as fibers on pooled Eio domains. *)
 
 let queue_depth = Atomic.make 0
 
-let rec worker domain_mgr stream =
-  if Atomic.get shutdown_requested then ()
-  else
-    match Eio.Stream.take_nonblocking stream with
-    | Some task ->
-        let depth_after_take = Atomic.fetch_and_add queue_depth (-1) - 1 in
-        let wait_ms =
-          max 0. (Unix.gettimeofday () -. task.enqueued_at) *. 1000.
-        in
-        Metrics.record_bg_dequeue ~queued_depth:depth_after_take ~wait_ms ;
-        (try Eio.Domain_manager.run domain_mgr task.fn
-         with exn ->
-           Context.toast_error
-             (Printf.sprintf
-                "Background task failed: %s"
-                (Printexc.to_string exn))) ;
-        worker domain_mgr stream
-    | None ->
-        (* No task available, sleep briefly and retry *)
-        Unix.sleepf 0.01 ;
-        worker domain_mgr stream
-
-let start () =
-  if Atomic.compare_and_set started false true then
-    (* Force the lazy stream here, in the caller's domain, so that the
-       spawned worker domain never races on [Lazy.force]. *)
-    let stream_val = Lazy.force stream in
-    ignore
-      (Domain.spawn (fun () ->
-           (* Use POSIX backend to avoid io_uring resource exhaustion *)
-           Eio_posix.run (fun env ->
-               Eio.Switch.run (fun sw ->
-                   for _ = 1 to num_workers do
-                     Eio.Fiber.fork ~sw (fun () ->
-                         worker env#domain_mgr stream_val)
-                   done ;
-                   (* Keep the switch alive indefinitely. *)
-                   Eio.Fiber.await_cancel ()))))
-
 let default_enqueue fn =
-  start () ;
-  let stream = Lazy.force stream in
-  let task = {fn; enqueued_at = Unix.gettimeofday ()} in
+  let enqueued_at = Unix.gettimeofday () in
   let depth_after_enqueue = Atomic.fetch_and_add queue_depth 1 + 1 in
   Metrics.record_bg_enqueue ~queued_depth:depth_after_enqueue ;
-  try Eio.Stream.add stream task with _ -> ()
+  Domain_pool.submit (fun () ->
+      let depth_after_take = Atomic.fetch_and_add queue_depth (-1) - 1 in
+      let wait_ms = max 0. (Unix.gettimeofday () -. enqueued_at) *. 1000. in
+      Metrics.record_bg_dequeue ~queued_depth:depth_after_take ~wait_ms ;
+      try fn ()
+      with exn ->
+        Context.toast_error
+          (Printf.sprintf "Background task failed: %s" (Printexc.to_string exn)))
 
 let enqueue_ref : ((unit -> unit) -> unit) Atomic.t =
   Atomic.make default_enqueue
 
 let enqueue fn = (Atomic.get enqueue_ref) fn
 
-let shutdown () = Atomic.set shutdown_requested true
+let shutdown () = ()
 
 let submit_blocking ?on_complete f =
   let task () =

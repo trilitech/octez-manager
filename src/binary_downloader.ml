@@ -9,6 +9,13 @@ open Rresult
 
 let ( let* ) = Result.bind
 
+(** Parallel submit function ref. Defaults to Domain.spawn (fire-and-forget).
+    Set to Domain_pool.submit at TUI startup for pooled execution. *)
+let parallel_submit_ref : ((unit -> unit) -> unit) ref =
+  ref (fun fn -> ignore (Domain.spawn (fun () -> try fn () with _ -> ())))
+
+let set_parallel_submit f = parallel_submit_ref := f
+
 (** Utilities *)
 
 let iso8601_now () =
@@ -440,41 +447,48 @@ let download_version ~version ?(verify_checksums = true) ?progress
           binary_list
       in
 
-      (* Spawn parallel download domains *)
-      let domains =
-        List.map
-          (fun (binary, _index, progress_for_file) ->
-            Domain.spawn (fun () ->
+      (* Download binaries concurrently using parallel_submit *)
+      let n = List.length download_tasks in
+      let results = Array.make n (Error (`Msg "not started")) in
+      let remaining = Atomic.make n in
+      let mu = Mutex.create () in
+      let cond = Condition.create () in
+      List.iteri
+        (fun i (binary, _index, progress_for_file) ->
+          !parallel_submit_ref (fun () ->
+              let r =
                 download_binary
                   ~version
                   ~arch
                   ~binary
                   ~dest_dir
                   ?progress:progress_for_file
-                  ()))
-          download_tasks
+                  ()
+              in
+              results.(i) <- Result.map (fun _ -> binary) r ;
+              if Atomic.fetch_and_add remaining (-1) = 1 then (
+                Mutex.lock mu ;
+                Condition.broadcast cond ;
+                Mutex.unlock mu)))
+        download_tasks ;
+      (* Wait for all downloads to complete *)
+      Mutex.lock mu ;
+      while Atomic.get remaining > 0 do
+        Condition.wait cond mu
+      done ;
+      Mutex.unlock mu ;
+      (* Collect: first error wins, or all binaries *)
+      let rec collect acc i =
+        if i >= n then Ok (List.rev acc)
+        else
+          match results.(i) with
+          | Ok binary -> collect (binary :: acc) (i + 1)
+          | Error _ as e ->
+              (try Cmd_runner.run_out ["rm"; "-rf"; dest_dir] |> ignore
+               with _ -> ()) ;
+              e
       in
-
-      (* Collect results from all domains *)
-      let rec collect_results acc = function
-        | [] -> Ok (List.rev acc)
-        | domain :: rest -> (
-            match Domain.join domain with
-            | Ok _path ->
-                let binary, _, _ =
-                  List.nth
-                    download_tasks
-                    (List.length domains - List.length acc - 1)
-                in
-                collect_results (binary :: acc) rest
-            | Error _ as e ->
-                (* Cleanup on failure *)
-                (try Cmd_runner.run_out ["rm"; "-rf"; dest_dir] |> ignore
-                 with _ -> ()) ;
-                e)
-      in
-
-      collect_results [] domains
+      collect [] 0
     in
 
     let* downloaded_binaries = download_all_parallel () in
