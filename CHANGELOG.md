@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Property-based testing with QCheck: 57 properties covering parsers, validators, formatters, and data transformers (#587)
 - TUI now shows notification when octez-manager update is available and recommends running `self-update` command
 - **RPC Browser**: Interactive RPC endpoint explorer accessible via `r` key
   - Navigate endpoint tree with cursor keys and Enter
