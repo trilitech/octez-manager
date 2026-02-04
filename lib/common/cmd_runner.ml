@@ -5,6 +5,42 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(* Pluggable hooks for Eio-based process execution.
+   When set, these override the default blocking implementations.
+   The TUI sets these at startup via Eio_process.init. *)
+let run_hook :
+    (quiet:bool ->
+    ?on_log:(string -> unit) ->
+    string list ->
+    (unit, [> `Msg of string]) result)
+    option
+    Atomic.t =
+  Atomic.make None
+
+let run_out_hook :
+    (string list -> (string, [> `Msg of string]) result) option Atomic.t =
+  Atomic.make None
+
+let run_out_silent_hook :
+    (string list -> (string, [> `Msg of string]) result) option Atomic.t =
+  Atomic.make None
+
+let run_streaming_hook :
+    (on_log:(string -> unit) ->
+    string list ->
+    (unit, [> `Msg of string]) result)
+    option
+    Atomic.t =
+  Atomic.make None
+
+let set_run_hook f = Atomic.set run_hook (Some f)
+
+let set_run_out_hook f = Atomic.set run_out_hook (Some f)
+
+let set_run_out_silent_hook f = Atomic.set run_out_silent_hook (Some f)
+
+let set_run_streaming_hook f = Atomic.set run_streaming_hook (Some f)
+
 let append_debug_log line =
   try
     let oc =
@@ -35,9 +71,56 @@ let sh_quote s =
 
 let cmd_to_string argv = String.concat " " (List.map sh_quote argv)
 
+let run_blocking ?(quiet = false) ?on_log argv =
+  let cmd_str = cmd_to_string argv in
+  if quiet || on_log <> None then (
+    (* Capture output to avoid polluting TUI, or to feed on_log *)
+    let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
+    close_out oc ;
+    let log_lines = ref [] in
+    try
+      let rec loop () =
+        try
+          let line = input_line ic in
+          (match on_log with Some f -> f line | None -> ()) ;
+          log_lines := line :: !log_lines ;
+          loop ()
+        with End_of_file -> ()
+      in
+      loop () ;
+      (* Also read stderr *)
+      let rec loop_err () =
+        try
+          let line = input_line ec in
+          (match on_log with Some f -> f line | None -> ()) ;
+          log_lines := line :: !log_lines ;
+          loop_err ()
+        with End_of_file -> ()
+      in
+      loop_err () ;
+      match Unix.close_process_full (ic, oc, ec) with
+      | Unix.WEXITED 0 -> Ok ()
+      | _status ->
+          let msg =
+            Printf.sprintf
+              "Command failed: %s\nOutput:\n%s"
+              cmd_str
+              (String.concat "\n" (List.rev !log_lines))
+          in
+          append_debug_log ("RUN ERROR: " ^ msg) ;
+          Error (`Msg msg)
+    with e ->
+      ignore (Unix.close_process_full (ic, oc, ec)) ;
+      Error (`Msg (Printexc.to_string e)))
+  else
+    (* Stream command output to stdout/stderr (CLI-friendly) *)
+    let cmd = Bos.Cmd.of_list argv in
+    match Bos.OS.Cmd.run cmd with
+    | Ok () -> Ok ()
+    | Error (`Msg m) -> Error (`Msg m)
+
 let run ?(quiet = false) ?on_log argv =
   append_debug_log ("RUN " ^ (if quiet then "[Q] " else "") ^ cmd_to_string argv) ;
-  let cmd_str = cmd_to_string argv in
 
   (* Test mode hook: if OCTEZ_MANAGER_TEST_MODE is set and this is a systemctl
      command, delegate to the mock handler via environment variable response.
@@ -50,54 +133,9 @@ let run ?(quiet = false) ?on_log argv =
       append_debug_log "TEST_MODE: systemctl command intercepted" ;
       Ok ()
   | _ -> (
-      if
-        (* Normal execution path *)
-        quiet || on_log <> None
-      then (
-        (* Capture output to avoid polluting TUI, or to feed on_log *)
-        let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
-        close_out oc ;
-        let log_lines = ref [] in
-        try
-          let rec loop () =
-            try
-              let line = input_line ic in
-              (match on_log with Some f -> f line | None -> ()) ;
-              log_lines := line :: !log_lines ;
-              loop ()
-            with End_of_file -> ()
-          in
-          loop () ;
-          (* Also read stderr *)
-          let rec loop_err () =
-            try
-              let line = input_line ec in
-              (match on_log with Some f -> f line | None -> ()) ;
-              log_lines := line :: !log_lines ;
-              loop_err ()
-            with End_of_file -> ()
-          in
-          loop_err () ;
-          match Unix.close_process_full (ic, oc, ec) with
-          | Unix.WEXITED 0 -> Ok ()
-          | _status ->
-              let msg =
-                Printf.sprintf
-                  "Command failed: %s\nOutput:\n%s"
-                  cmd_str
-                  (String.concat "\n" (List.rev !log_lines))
-              in
-              append_debug_log ("RUN ERROR: " ^ msg) ;
-              Error (`Msg msg)
-        with e ->
-          ignore (Unix.close_process_full (ic, oc, ec)) ;
-          Error (`Msg (Printexc.to_string e)))
-      else
-        (* Stream command output to stdout/stderr (CLI-friendly) *)
-        let cmd = Bos.Cmd.of_list argv in
-        match Bos.OS.Cmd.run cmd with
-        | Ok () -> Ok ()
-        | Error (`Msg m) -> Error (`Msg m))
+      match Atomic.get run_hook with
+      | Some f -> f ~quiet ?on_log argv
+      | None -> run_blocking ~quiet ?on_log argv)
 
 let run_silent = run ~quiet:true
 
@@ -105,7 +143,7 @@ let run_silent = run ~quiet:true
    This ensures output is captured as it's produced, not blocked waiting for
    one stream to complete before reading the other. Handles both \n and \r
    as line delimiters to capture progress updates that use carriage returns. *)
-let run_streaming ~on_log argv =
+let run_streaming_blocking ~on_log argv =
   append_debug_log ("RUN_STREAMING " ^ cmd_to_string argv) ;
   let cmd_str = cmd_to_string argv in
   let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
@@ -189,17 +227,27 @@ let run_streaming ~on_log argv =
       append_debug_log ("RUN_STREAMING ERROR: " ^ msg) ;
       Error (`Msg msg)
 
+let run_streaming ~on_log argv =
+  append_debug_log ("RUN_STREAMING " ^ cmd_to_string argv) ;
+  match Atomic.get run_streaming_hook with
+  | Some f -> f ~on_log argv
+  | None -> run_streaming_blocking ~on_log argv
+
 let run_verbose = run ~quiet:false
 
-let run_out argv =
-  append_debug_log ("RUN_OUT " ^ cmd_to_string argv) ;
+let run_out_blocking argv =
   let cmd = Bos.Cmd.of_list argv in
   match Bos.OS.Cmd.(run_out cmd |> out_string ~trim:true) with
   | Ok (out, _) -> Ok out
   | Error (`Msg m) -> Error (`Msg m)
 
-let run_out_silent argv =
-  append_debug_log ("RUN_OUT_SILENT " ^ cmd_to_string argv) ;
+let run_out argv =
+  append_debug_log ("RUN_OUT " ^ cmd_to_string argv) ;
+  match Atomic.get run_out_hook with
+  | Some f -> f argv
+  | None -> run_out_blocking argv
+
+let run_out_silent_blocking argv =
   let cmd_str = cmd_to_string argv in
   let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
   close_out oc ;
@@ -229,6 +277,12 @@ let run_out_silent argv =
       in
       append_debug_log ("RUN_OUT_SILENT ERROR: " ^ msg) ;
       Error (`Msg msg)
+
+let run_out_silent argv =
+  append_debug_log ("RUN_OUT_SILENT " ^ cmd_to_string argv) ;
+  match Atomic.get run_out_silent_hook with
+  | Some f -> f argv
+  | None -> run_out_silent_blocking argv
 
 let run_as ?(quiet = false) ?on_log ~user argv =
   let trimmed = String.trim user in

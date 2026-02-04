@@ -50,7 +50,8 @@
   external_service_detector
   self_update_checker
   version_utils
-  check_prefs)
+  check_prefs
+  eio_process)
  (libraries
   octez_manager_common
   rresult

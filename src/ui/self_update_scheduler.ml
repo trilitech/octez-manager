@@ -81,33 +81,26 @@ let clear_cache () = Mutex.protect cache_lock (fun () -> cache := None)
 
 (** {1 Background scheduler} *)
 
-let domain = ref None
-
 let stop_flag = Atomic.make false
+
+let started = ref false
 
 let scheduler_loop () =
   while not (Atomic.get stop_flag) do
     refresh () ;
-    String_utils.interruptible_sleep stop_flag poll_interval
+    Eio_unix.sleep poll_interval
   done
 
 (** Start the background scheduler *)
 let start () =
-  match !domain with
-  | Some _ -> () (* Already running *)
-  | None ->
-      Atomic.set stop_flag false ;
-      (* Start background polling - don't block startup with initial check *)
-      domain := Some (Domain.spawn scheduler_loop)
+  if not !started then (
+    started := true ;
+    Atomic.set stop_flag false ;
+    (* Submit background polling to domain pool *)
+    Domain_pool.submit scheduler_loop)
 
 (** Stop the background scheduler *)
-let stop () =
-  Atomic.set stop_flag true ;
-  match !domain with
-  | None -> ()
-  | Some d ->
-      Domain.join d ;
-      domain := None
+let stop () = Atomic.set stop_flag true
 
 (** Run a single check immediately (for startup) *)
 let check_now () = refresh ~force:true ()

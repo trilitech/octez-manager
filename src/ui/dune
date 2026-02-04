@@ -14,7 +14,8 @@
   lambda-term
   eio
   eio_main
-  eio_posix)
+  eio_posix
+  eio.unix)
  (preprocess
   (pps ppx_deriving.show))
  (instrumentation
