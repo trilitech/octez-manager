@@ -534,6 +534,137 @@ All pull requests must include:
 - **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
 - **Never delete untracked files without confirmation** - user scripts, test data, and work-in-progress files must be preserved unless explicitly requested
 
+## Parallel Work with Worktrees
+
+Multiple agents (or an agent and a human) can work on the repository simultaneously using **git worktrees**. Each worktree is an independent working directory sharing the same `.git` history.
+
+### Setting Up a Worktree
+
+```bash
+# Create a worktree for a new branch (from the main repo directory)
+git worktree add ../octez-manager-feat-xyz -b feat/xyz
+
+# Or for an existing branch
+git worktree add ../octez-manager-fix-123 fix/issue-123
+
+# List active worktrees
+git worktree list
+
+# Remove a worktree when done
+git worktree remove ../octez-manager-feat-xyz
+```
+
+### Worktree Rules
+
+- **Each worktree must be on a different branch** — git enforces this
+- **Build artifacts are per-worktree** — each has its own `_build/` directory
+- **opam switch is shared** — no need to reinstall dependencies
+- **Never delete a worktree directory manually** — always use `git worktree remove`
+
+## Issue Tracking for Parallel Work
+
+When multiple agents may work concurrently, proper issue tracking prevents conflicts and duplicated effort.
+
+### Starting Work on an Issue
+
+1. **Assign the issue to yourself** before starting:
+   ```bash
+   gh issue edit <NUMBER> --add-assignee @me
+   ```
+2. **Create a branch** (in a worktree if working in parallel):
+   ```bash
+   git worktree add ../octez-manager-issue-<NUMBER> -b feat/issue-<NUMBER>
+   ```
+
+### Ending a Session
+
+If the issue is **fully resolved**: create the PR and let the PR reference close it (`fixes #NUMBER`).
+
+If work is **incomplete** (session ending, context limit, etc.):
+1. **Commit and push** all progress so far
+2. **Add a comment to the issue** summarizing:
+   - What was done
+   - What remains to be done
+   - Any blockers or decisions needed
+   - The branch name with the in-progress work
+3. **Unassign yourself** so another agent can pick it up:
+   ```bash
+   gh issue edit <NUMBER> --remove-assignee @me
+   ```
+
+### Example Issue Comment (Incomplete Work)
+
+```markdown
+### Progress update
+
+**Branch:** `feat/issue-42`
+
+**Done:**
+- Implemented the new RPC endpoint parser
+- Added unit tests for happy path
+
+**Remaining:**
+- Error handling for malformed JSON responses
+- Integration test
+
+**Notes:**
+- The parser needs to handle both v1 and v2 response formats (see `src/rpc_client.ml:180`)
+```
+
+## Interacting with GitHub Copilot Reviews
+
+When Copilot reviews a PR, follow these rules to avoid noise:
+
+### DO NOT reply individually to each Copilot comment
+
+Replying to individual Copilot review comments with `@copilot` triggers it to create a **separate PR for each reply**. This creates significant noise (we observed 11 spurious PRs from 10 individual replies).
+
+### DO use a single PR-level comment
+
+After fixing all Copilot feedback, post **one PR-level comment** summarizing all changes, then re-request review:
+
+```bash
+# Post a single summary comment
+gh pr comment <NUMBER> --body "## Copilot feedback addressed
+
+1. **file.ml:42** — Fixed X
+2. **file.ml:99** — Fixed Y
+...
+
+@copilot please re-review this PR."
+
+# Re-request copilot as reviewer
+gh pr edit <NUMBER> --add-reviewer "copilot-pull-request-reviewer[bot]"
+```
+
+### Resolving Copilot threads
+
+Copilot does **not** resolve its own threads, even after re-review. Resolve them via the GraphQL API:
+
+```bash
+# Get thread IDs
+gh api graphql -f query='{
+  repository(owner: "trilitech", name: "octez-manager") {
+    pullRequest(number: <NUMBER>) {
+      reviewThreads(first: 50) {
+        nodes { id isResolved }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | .id'
+
+# Resolve a thread
+gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
+```
+
+### Closing spurious Copilot PRs
+
+If Copilot creates unwanted sub-PRs, close them and delete their branches:
+
+```bash
+gh pr close <NUMBER> --comment "Closing: auto-created by copilot. Feedback addressed in #<ORIGINAL_PR>." --delete-branch
+```
+
 ## Bug Fix PRs
 
 **Every bug fix PR MUST include a test** that reproduces the bug and validates the fix. This applies to both unit tests and integration tests as appropriate.
