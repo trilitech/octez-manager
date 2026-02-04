@@ -898,4 +898,11 @@ let register () =
 (** For testing *)
 module For_tests = struct
   let filter_latest_n_major_versions = filter_latest_n_major_versions
+  let format_size = format_size
+  let build_items = build_items
+  let move_up = move_up
+  let move_down = move_down
+  let toggle_major_expansion = toggle_major_expansion
+  let toggle_managed_expansion = toggle_managed_expansion
+  let toggle_registered_expansion = toggle_registered_expansion
 end
