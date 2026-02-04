@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/trilitech/octez-manager/actions/workflows/coverage.yml"><img src="https://github.com/trilitech/octez-manager/actions/workflows/coverage.yml/badge.svg?branch=main" alt="CI"></a>
-  <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fmathiasbourgoin%2Fcb7983cb493dd84d7e444ac6efaec19c%2Fraw%2Foctez-manager-coverage.json" alt="Coverage">
+  <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fmathiasbourgoin%2Fd7e91c883186314cdbf0ea6844291bd0%2Fraw%2Foctez-manager-coverage.json" alt="Coverage">
 </p>
 
 <p align="center">
