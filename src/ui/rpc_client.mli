@@ -90,7 +90,8 @@ val clear_error : Service.t -> unit
 type monitor_handle = {stop : unit -> unit; alive : unit -> bool}
 
 (** Start streaming head updates from a node.
-    Spawns a dedicated domain for the curl process.
+    Runs as a fiber in the domain pool. Uses Eio.Process when available
+    (TUI mode) for non-blocking I/O, falls back to blocking Unix I/O.
 
     @param service The node to monitor
     @param on_head Callback for each new head (level, protocol, chain_id)
