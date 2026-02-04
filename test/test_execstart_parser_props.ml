@@ -85,8 +85,7 @@ let prop_parse_binary_path_consistency =
          (the converse is not guaranteed since extract uses a different strategy) *)
       match parsed.binary_path with
       | None -> true
-      | Some _ -> (
-          match extracted with None -> true | Some _ -> true))
+      | Some _ -> ( match extracted with None -> true | Some _ -> true))
 
 let prop_is_shell_unwrap_consistency =
   QCheck.Test.make
