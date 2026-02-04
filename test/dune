@@ -724,3 +724,10 @@
  (modules test_data_transformers_props)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_form_builder_pure)
+ (libraries alcotest qcheck-core qcheck-alcotest octez-manager.ui)
+ (modules test_form_builder_pure)
+ (instrumentation
+  (backend bisect_ppx)))
