@@ -754,3 +754,10 @@
  (modules test_rpc_browser_state_props)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_external_detector_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_external_detector_props)
+ (instrumentation
+  (backend bisect_ppx)))
