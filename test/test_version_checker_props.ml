@@ -40,8 +40,9 @@ let gen_version_string =
         let* rc = int_range 1 5 in
         return (Printf.sprintf "%d.%d-rc%d" major minor rc) );
       (* Simple numbers *)
-      (1, let* n = int_range 0 99 in
-          return (string_of_int n));
+      ( 1,
+        let* n = int_range 0 99 in
+        return (string_of_int n) );
       (* Random strings *)
       (2, string_size (int_range 0 20));
     ]
