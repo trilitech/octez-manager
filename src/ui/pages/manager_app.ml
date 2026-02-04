@@ -110,6 +110,7 @@ let run ?page ?(log = false) ?logfile () =
     External_services_scheduler.shutdown () ;
     Versions_scheduler.shutdown () ;
     Self_update_scheduler.stop () ;
+    Domain_pool.shutdown () ;
     (* Cleanup: kill any active download process *)
     Common.kill_active_download () ;
     Ok ()

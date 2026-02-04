@@ -5,6 +5,11 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Set the Eio process manager. Call at TUI startup. When set, all
+    process execution uses Eio.Process (non-blocking for fibers).
+    When not set, uses blocking Unix I/O (CLI mode). *)
+val set_process_mgr : _ Eio.Process.mgr -> unit
+
 val is_root : unit -> bool
 
 val home_dir : unit -> string

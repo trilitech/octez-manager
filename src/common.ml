@@ -9,6 +9,13 @@ open Rresult
 
 let ( let* ) = Result.bind
 
+(* Eio process manager, set at TUI startup for non-blocking process execution *)
+type any_proc_mgr = Mgr : _ Eio.Process.mgr -> any_proc_mgr
+
+let proc_mgr_ref : any_proc_mgr option Atomic.t = Atomic.make None
+
+let set_process_mgr mgr = Atomic.set proc_mgr_ref (Some (Mgr mgr))
+
 let is_root () = Unix.geteuid () = 0
 
 let home_dir () =
@@ -199,69 +206,280 @@ let sh_quote s =
 
 let cmd_to_string argv = String.concat " " (List.map sh_quote argv)
 
+(* --- Eio-based process execution (used when process_mgr is set) --- *)
+
+let read_lines_eio flow ~on_line =
+  let reader = Eio.Buf_read.of_flow ~max_size:(10 * 1024 * 1024) flow in
+  let rec loop () =
+    match Eio.Buf_read.line reader with
+    | line ->
+        on_line line ;
+        loop ()
+    | exception End_of_file -> ()
+  in
+  loop ()
+
+let run_eio (Mgr mgr) ~quiet ?on_log argv =
+  Eio.Switch.run @@ fun sw ->
+  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+  let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  Eio.Flow.close stdout_w ;
+  Eio.Flow.close stderr_w ;
+  let log_lines = ref [] in
+  let handle_line line =
+    (match on_log with Some f -> f line | None -> ()) ;
+    log_lines := line :: !log_lines
+  in
+  Eio.Fiber.both
+    (fun () ->
+      read_lines_eio (stdout_r :> _ Eio.Flow.source) ~on_line:handle_line)
+    (fun () ->
+      read_lines_eio (stderr_r :> _ Eio.Flow.source) ~on_line:handle_line) ;
+  ignore (quiet : bool) ;
+  match Eio.Process.await proc with
+  | `Exited 0 -> Ok ()
+  | _ ->
+      let msg =
+        Printf.sprintf
+          "Command failed: %s\nOutput:\n%s"
+          (cmd_to_string argv)
+          (String.concat "\n" (List.rev !log_lines))
+      in
+      append_debug_log ("RUN ERROR: " ^ msg) ;
+      Error (`Msg msg)
+
+let run_out_eio (Mgr mgr) argv =
+  Eio.Switch.run @@ fun sw ->
+  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w argv in
+  Eio.Flow.close stdout_w ;
+  let output =
+    Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stdout_r |> take_all)
+  in
+  match Eio.Process.await proc with
+  | `Exited 0 -> Ok (String.trim output)
+  | _ -> Error (`Msg (Printf.sprintf "Command failed: %s" (cmd_to_string argv)))
+
+let run_out_silent_eio (Mgr mgr) argv =
+  Eio.Switch.run @@ fun sw ->
+  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+  let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  Eio.Flow.close stdout_w ;
+  Eio.Flow.close stderr_w ;
+  let stdout_out = ref "" in
+  let stderr_out = ref "" in
+  Eio.Fiber.both
+    (fun () ->
+      stdout_out :=
+        Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stdout_r |> take_all))
+    (fun () ->
+      stderr_out :=
+        Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stderr_r |> take_all)) ;
+  match Eio.Process.await proc with
+  | `Exited 0 -> Ok (String.trim !stdout_out)
+  | _ ->
+      let stdout_lines = String.trim !stdout_out in
+      let stderr_lines = String.trim !stderr_out in
+      let msg =
+        Printf.sprintf
+          "Command failed: %s\nStdout:\n%s\nStderr:\n%s"
+          (cmd_to_string argv)
+          stdout_lines
+          stderr_lines
+      in
+      append_debug_log ("RUN_OUT_SILENT ERROR: " ^ msg) ;
+      Error (`Msg msg)
+
+(* Streaming run via Eio that handles \r and \n as line delimiters *)
+let run_streaming_eio (Mgr mgr) ~on_log argv =
+  Eio.Switch.run @@ fun sw ->
+  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+  let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  Eio.Flow.close stdout_w ;
+  Eio.Flow.close stderr_w ;
+  let log_lines = ref [] in
+  let read_streaming flow =
+    let buf = Buffer.create 256 in
+    let reader = Eio.Buf_read.of_flow ~max_size:(10 * 1024 * 1024) flow in
+    let rec loop () =
+      match Eio.Buf_read.any_char reader with
+      | c ->
+          if c = '\n' || c = '\r' then (
+            let line = Buffer.contents buf in
+            Buffer.clear buf ;
+            if String.length line > 0 then (
+              on_log (line ^ "\n") ;
+              log_lines := line :: !log_lines) ;
+            loop ())
+          else (
+            Buffer.add_char buf c ;
+            loop ())
+      | exception End_of_file ->
+          let remaining = Buffer.contents buf in
+          if remaining <> "" then (
+            on_log (remaining ^ "\n") ;
+            log_lines := remaining :: !log_lines)
+    in
+    loop ()
+  in
+  Eio.Fiber.both
+    (fun () -> read_streaming (stdout_r :> _ Eio.Flow.source))
+    (fun () -> read_streaming (stderr_r :> _ Eio.Flow.source)) ;
+  match Eio.Process.await proc with
+  | `Exited 0 -> Ok ()
+  | _ ->
+      let msg =
+        Printf.sprintf
+          "Command failed: %s\nOutput:\n%s"
+          (cmd_to_string argv)
+          (String.concat "\n" (List.rev !log_lines))
+      in
+      append_debug_log ("RUN_STREAMING ERROR: " ^ msg) ;
+      Error (`Msg msg)
+
+let download_file_with_progress_eio (Mgr mgr) ~url ~dest_path ~on_progress =
+  let cmd =
+    [
+      "curl";
+      "-fSL";
+      "--connect-timeout";
+      "30";
+      "--speed-limit";
+      "102400";
+      "--speed-time";
+      "60";
+      "--progress-meter";
+      url;
+      "-o";
+      dest_path;
+    ]
+  in
+  let parse_size_str s =
+    try
+      let len = String.length s in
+      if len = 0 then None
+      else
+        let suffix = s.[len - 1] in
+        let multiplier, num_str =
+          match suffix with
+          | 'k' | 'K' -> (1024L, String.sub s 0 (len - 1))
+          | 'm' | 'M' -> (Int64.mul 1024L 1024L, String.sub s 0 (len - 1))
+          | 'g' | 'G' ->
+              (Int64.mul (Int64.mul 1024L 1024L) 1024L, String.sub s 0 (len - 1))
+          | '0' .. '9' -> (1L, s)
+          | _ -> (1L, s)
+        in
+        match float_of_string_opt num_str with
+        | Some f -> Some (Int64.of_float (f *. Int64.to_float multiplier))
+        | None -> None
+    with _ -> None
+  in
+  Eio.Switch.run @@ fun sw ->
+  let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stderr:stderr_w cmd in
+  Eio.Flow.close stderr_w ;
+  let buffer = Buffer.create 128 in
+  let reader = Eio.Buf_read.of_flow ~max_size:(10 * 1024 * 1024) stderr_r in
+  let rec loop () =
+    match Eio.Buf_read.any_char reader with
+    | c ->
+        if c = '\r' || c = '\n' then (
+          let line = Buffer.contents buffer in
+          Buffer.clear buffer ;
+          (try
+             let trimmed = String.trim line in
+             if String.length trimmed > 0 then
+               let tokens = String.split_on_char ' ' trimmed in
+               let non_empty =
+                 List.filter (fun s -> String.trim s <> "") tokens
+               in
+               match non_empty with
+               | _ :: total_str :: _ :: received_str :: _ -> (
+                   match
+                     (parse_size_str total_str, parse_size_str received_str)
+                   with
+                   | Some total_bytes, Some received_bytes ->
+                       let total_int =
+                         Int64.to_int total_bytes |> max 0 |> min max_int
+                       in
+                       let received_int =
+                         Int64.to_int received_bytes |> max 0 |> min max_int
+                       in
+                       on_progress received_int (Some total_int)
+                   | _ -> ())
+               | _ -> ()
+           with _ -> ()) ;
+          loop ())
+        else (
+          Buffer.add_char buffer c ;
+          loop ())
+    | exception End_of_file -> ()
+  in
+  loop () ;
+  match Eio.Process.await proc with
+  | `Exited 0 -> Ok ()
+  | _ -> R.error_msgf "curl download failed for %s" url
+
+(* --- Blocking process execution (original Unix-based implementations) --- *)
+
+let run_blocking ~quiet ?on_log argv =
+  let cmd_str = cmd_to_string argv in
+  if quiet || on_log <> None then (
+    let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
+    close_out oc ;
+    let log_lines = ref [] in
+    try
+      let rec loop () =
+        try
+          let line = input_line ic in
+          (match on_log with Some f -> f line | None -> ()) ;
+          log_lines := line :: !log_lines ;
+          loop ()
+        with End_of_file -> ()
+      in
+      loop () ;
+      let rec loop_err () =
+        try
+          let line = input_line ec in
+          (match on_log with Some f -> f line | None -> ()) ;
+          log_lines := line :: !log_lines ;
+          loop_err ()
+        with End_of_file -> ()
+      in
+      loop_err () ;
+      match Unix.close_process_full (ic, oc, ec) with
+      | Unix.WEXITED 0 -> Ok ()
+      | _status ->
+          let msg =
+            Printf.sprintf
+              "Command failed: %s\nOutput:\n%s"
+              cmd_str
+              (String.concat "\n" (List.rev !log_lines))
+          in
+          append_debug_log ("RUN ERROR: " ^ msg) ;
+          Error (`Msg msg)
+    with e ->
+      ignore (Unix.close_process_full (ic, oc, ec)) ;
+      Error (`Msg (Printexc.to_string e)))
+  else
+    let cmd = Bos.Cmd.of_list argv in
+    match Bos.OS.Cmd.run cmd with
+    | Ok () -> Ok ()
+    | Error (`Msg m) -> Error (`Msg m)
+
 let run ?(quiet = false) ?on_log argv =
   append_debug_log ("RUN " ^ (if quiet then "[Q] " else "") ^ cmd_to_string argv) ;
-  let cmd_str = cmd_to_string argv in
-
-  (* Test mode hook: if OCTEZ_MANAGER_TEST_MODE is set and this is a systemctl
-     command, delegate to the mock handler via environment variable response.
-     This allows tests to intercept systemctl commands without tight coupling. *)
   match (Sys.getenv_opt "OCTEZ_MANAGER_TEST_MODE", argv) with
   | Some ("1" | "true"), "systemctl" :: _rest ->
-      (* In test mode with systemctl command - signal this to test framework.
-         Real integration happens in test code via run_hook. For now, just
-         return success to avoid breaking test infrastructure setup. *)
       append_debug_log "TEST_MODE: systemctl command intercepted" ;
       Ok ()
   | _ -> (
-      if
-        (* Normal execution path *)
-        quiet || on_log <> None
-      then (
-        (* Capture output to avoid polluting TUI, or to feed on_log *)
-        let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
-        close_out oc ;
-        let log_lines = ref [] in
-        try
-          let rec loop () =
-            try
-              let line = input_line ic in
-              (match on_log with Some f -> f line | None -> ()) ;
-              log_lines := line :: !log_lines ;
-              loop ()
-            with End_of_file -> ()
-          in
-          loop () ;
-          (* Also read stderr *)
-          let rec loop_err () =
-            try
-              let line = input_line ec in
-              (match on_log with Some f -> f line | None -> ()) ;
-              log_lines := line :: !log_lines ;
-              loop_err ()
-            with End_of_file -> ()
-          in
-          loop_err () ;
-          match Unix.close_process_full (ic, oc, ec) with
-          | Unix.WEXITED 0 -> Ok ()
-          | _status ->
-              let msg =
-                Printf.sprintf
-                  "Command failed: %s\nOutput:\n%s"
-                  cmd_str
-                  (String.concat "\n" (List.rev !log_lines))
-              in
-              append_debug_log ("RUN ERROR: " ^ msg) ;
-              Error (`Msg msg)
-        with e ->
-          ignore (Unix.close_process_full (ic, oc, ec)) ;
-          Error (`Msg (Printexc.to_string e)))
-      else
-        (* Stream command output to stdout/stderr (CLI-friendly) *)
-        let cmd = Bos.Cmd.of_list argv in
-        match Bos.OS.Cmd.run cmd with
-        | Ok () -> Ok ()
-        | Error (`Msg m) -> Error (`Msg m))
+      match Atomic.get proc_mgr_ref with
+      | Some mgr when quiet || on_log <> None -> run_eio mgr ~quiet ?on_log argv
+      | _ -> run_blocking ~quiet ?on_log argv)
 
 let run_silent = run ~quiet:true
 
@@ -269,8 +487,7 @@ let run_silent = run ~quiet:true
    This ensures output is captured as it's produced, not blocked waiting for
    one stream to complete before reading the other. Handles both \n and \r
    as line delimiters to capture progress updates that use carriage returns. *)
-let run_streaming ~on_log argv =
-  append_debug_log ("RUN_STREAMING " ^ cmd_to_string argv) ;
+let run_streaming_blocking ~on_log argv =
   let cmd_str = cmd_to_string argv in
   let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
   close_out oc ;
@@ -281,7 +498,6 @@ let run_streaming ~on_log argv =
   let ec_buf = Buffer.create 256 in
   let ic_open = ref true in
   let ec_open = ref true in
-  (* Find first occurrence of \n or \r *)
   let find_line_end s pos =
     let len = String.length s in
     let rec loop i =
@@ -297,7 +513,6 @@ let run_streaming ~on_log argv =
     if n = 0 then `Eof
     else (
       Buffer.add_subbytes buf tmp 0 n ;
-      (* Extract complete lines (delimited by \n or \r) *)
       let content = Buffer.contents buf in
       let rec extract_lines pos =
         match find_line_end content pos with
@@ -308,7 +523,6 @@ let run_streaming ~on_log argv =
               log_lines := line :: !log_lines) ;
             extract_lines (end_pos + 1)
         | None ->
-            (* Keep remaining partial line in buffer *)
             Buffer.clear buf ;
             if pos < String.length content then
               Buffer.add_substring buf content pos (String.length content - pos)
@@ -316,7 +530,6 @@ let run_streaming ~on_log argv =
       extract_lines 0 ;
       `Ok)
   in
-  (* Main loop using select *)
   while !ic_open || !ec_open do
     let read_fds =
       (if !ic_open then [ic_fd] else []) @ if !ec_open then [ec_fd] else []
@@ -332,7 +545,6 @@ let run_streaming ~on_log argv =
           | `Ok -> ())
         ready
   done ;
-  (* Flush any remaining partial lines *)
   let flush_buf buf =
     let remaining = Buffer.contents buf in
     if remaining <> "" then (
@@ -353,29 +565,35 @@ let run_streaming ~on_log argv =
       append_debug_log ("RUN_STREAMING ERROR: " ^ msg) ;
       Error (`Msg msg)
 
+let run_streaming ~on_log argv =
+  append_debug_log ("RUN_STREAMING " ^ cmd_to_string argv) ;
+  match Atomic.get proc_mgr_ref with
+  | Some mgr -> run_streaming_eio mgr ~on_log argv
+  | None -> run_streaming_blocking ~on_log argv
+
 let run_verbose = run ~quiet:false
 
 let run_out argv =
   append_debug_log ("RUN_OUT " ^ cmd_to_string argv) ;
-  let cmd = Bos.Cmd.of_list argv in
-  match Bos.OS.Cmd.(run_out cmd |> out_string ~trim:true) with
-  | Ok (out, _) -> Ok out
-  | Error (`Msg m) -> Error (`Msg m)
+  match Atomic.get proc_mgr_ref with
+  | Some mgr -> run_out_eio mgr argv
+  | None -> (
+      let cmd = Bos.Cmd.of_list argv in
+      match Bos.OS.Cmd.(run_out cmd |> out_string ~trim:true) with
+      | Ok (out, _) -> Ok out
+      | Error (`Msg m) -> Error (`Msg m))
 
-let run_out_silent argv =
-  append_debug_log ("RUN_OUT_SILENT " ^ cmd_to_string argv) ;
+let run_out_silent_blocking argv =
   let cmd_str = cmd_to_string argv in
   let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
   close_out oc ;
   let stdout_lines = ref [] in
   let stderr_lines = ref [] in
-  (* Read all stdout *)
   (try
      while true do
        stdout_lines := input_line ic :: !stdout_lines
      done
    with End_of_file -> ()) ;
-  (* Read all stderr (to prevent leakage) *)
   (try
      while true do
        stderr_lines := input_line ec :: !stderr_lines
@@ -393,6 +611,12 @@ let run_out_silent argv =
       in
       append_debug_log ("RUN_OUT_SILENT ERROR: " ^ msg) ;
       Error (`Msg msg)
+
+let run_out_silent argv =
+  append_debug_log ("RUN_OUT_SILENT " ^ cmd_to_string argv) ;
+  match Atomic.get proc_mgr_ref with
+  | Some mgr -> run_out_silent_eio mgr argv
+  | None -> run_out_silent_blocking argv
 
 let run_as ?(quiet = false) ?on_log ~user argv =
   let trimmed = String.trim user in
@@ -468,8 +692,7 @@ let kill_active_download () =
    - Column 2: Total size in bytes (may have K/M/G suffix)
    - Column 4: Bytes received (may have K/M/G suffix)
 *)
-let download_file_with_progress ~url ~dest_path ~on_progress =
-  append_debug_log (Printf.sprintf "DOWNLOAD_PROGRESS %s -> %s" url dest_path) ;
+let download_file_with_progress_blocking ~url ~dest_path ~on_progress =
   let cmd =
     [
       "curl";
@@ -486,7 +709,6 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
       dest_path;
     ]
   in
-  (* Parse curl size format: "123", "1.5k", "20.0M", etc. *)
   let parse_size_str s =
     try
       let len = String.length s in
@@ -502,7 +724,6 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
           | '0' .. '9' -> (1L, s)
           | _ -> (1L, s)
         in
-        (* Handle decimal numbers *)
         match float_of_string_opt num_str with
         | Some f -> Some (Int64.of_float (f *. Int64.to_float multiplier))
         | None -> None
@@ -523,10 +744,6 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
         if c = '\r' || c = '\n' then (
           let line = Buffer.contents buffer in
           Buffer.clear buffer ;
-          (* Parse curl progress lines:
-             Format: "pct_total total pct_recv bytes_recv pct_xfer bytes_xfer ..."
-             Example: "20 100M 20 20.0M 0 0 ..."
-             We extract tokens[1] (total) and tokens[3] (bytes_recv) *)
           (try
              let trimmed = String.trim line in
              if String.length trimmed > 0 then
@@ -536,12 +753,10 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
                in
                match non_empty with
                | _ :: total_str :: _ :: received_str :: _ -> (
-                   (* Try to parse as byte counts *)
                    match
                      (parse_size_str total_str, parse_size_str received_str)
                    with
                    | Some total_bytes, Some received_bytes ->
-                       (* Convert int64 to int (should be safe for reasonable file sizes) *)
                        let total_int =
                          Int64.to_int total_bytes |> max 0 |> min max_int
                        in
@@ -565,6 +780,12 @@ let download_file_with_progress ~url ~dest_path ~on_progress =
   | Unix.WEXITED 0 -> Ok ()
   | Unix.WEXITED _ | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
       R.error_msgf "curl download failed for %s" url
+
+let download_file_with_progress ~url ~dest_path ~on_progress =
+  append_debug_log (Printf.sprintf "DOWNLOAD_PROGRESS %s -> %s" url dest_path) ;
+  match Atomic.get proc_mgr_ref with
+  | Some mgr -> download_file_with_progress_eio mgr ~url ~dest_path ~on_progress
+  | None -> download_file_with_progress_blocking ~url ~dest_path ~on_progress
 
 let remove_path path =
   if Sys.file_exists path then try Sys.remove path with Sys_error _ -> ()

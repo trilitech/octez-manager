@@ -570,18 +570,17 @@ let start () =
     started := true ;
     (* Start the worker that processes poll requests *)
     Worker_queue.start worker ;
-    (* Fetch latest version in separate domain - don't block worker queue *)
-    ignore (Domain.spawn (fun () -> try fetch_latest_version () with _ -> ())) ;
-    (* Spawn scheduler domain that submits poll requests periodically.
+    (* Fetch latest version in pool fiber - don't block worker queue *)
+    Domain_pool.submit (fun () -> try fetch_latest_version () with _ -> ()) ;
+    (* Submit scheduler fiber to domain pool.
        Runs first tick immediately (no initial delay) to start populating
        metrics as early as possible. *)
-    ignore
-      (Domain.spawn (fun () ->
-           Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick ;
-           while not (Atomic.get shutdown_requested) do
-             Unix.sleepf 0.5 ;
-             Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick
-           done)))
+    Domain_pool.submit (fun () ->
+        Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick ;
+        while not (Atomic.get shutdown_requested) do
+          Eio_unix.sleep 0.5 ;
+          Metrics.record_scheduler_tick ~scheduler:"system_metrics" tick
+        done))
 
 (** Clear all state *)
 let clear () = with_lock (fun () -> Hashtbl.clear table)
