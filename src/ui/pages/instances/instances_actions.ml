@@ -1357,3 +1357,58 @@ let dismiss_failure s =
       Context.mark_instances_dirty () ;
       s
   | None -> s
+
+module For_tests = struct
+  (** Extract version string from binary --version output.
+      Parses patterns like "24.0 (hash)", "Octez 24.0", "v24.0.1" *)
+  let extract_version_string version_output =
+    let version_str = String.trim version_output in
+    try
+      let _ =
+        Str.search_forward
+          (Str.regexp "\\([0-9]+\\.[0-9]+\\(\\.[0-9]+\\)?\\)")
+          version_str
+          0
+      in
+      Some (Str.matched_group 1 version_str)
+    with Not_found -> None
+
+  (** Map a service role to its binary name *)
+  let role_to_binary_name = function
+    | "node" -> "octez-node"
+    | "baker" -> "octez-baker"
+    | "accuser" -> "octez-accuser"
+    | "dal-node" | "dal" -> "octez-dal-node"
+    | _ -> "octez-node"
+
+  (** BFS to collect all transitive dependents, parameterized on deps lookup.
+      Returns the accumulated dependent services (not the root). *)
+  let collect_dependents ~get_deps instance =
+    let rec collect_all visited queue acc =
+      match queue with
+      | [] -> List.rev acc
+      | inst :: rest ->
+          if List.mem inst visited then collect_all visited rest acc
+          else
+            let deps = get_deps inst in
+            let new_instances = List.map (fun s -> s.Service.instance) deps in
+            collect_all (inst :: visited) (rest @ new_instances) (deps @ acc)
+    in
+    collect_all [] [instance] []
+
+  (** Remove duplicate services while preserving order *)
+  let dedup_services services =
+    let seen = Hashtbl.create 16 in
+    List.filter
+      (fun svc ->
+        let inst = svc.Service.instance in
+        if Hashtbl.mem seen inst then false
+        else (
+          Hashtbl.add seen inst () ;
+          true))
+      services
+
+  let journalctl_args = journalctl_args
+
+  let current_external_service = current_external_service
+end
