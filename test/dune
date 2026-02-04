@@ -857,6 +857,13 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_log_export_pure)
+ (libraries alcotest octez_manager_lib unix)
+ (modules test_log_export_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
 ; Fuzz tests (adversarial generators, high iteration count)
 
 (test
