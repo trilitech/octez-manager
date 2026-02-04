@@ -17,7 +17,7 @@ val set_download_with_progress_hook :
   (url:string ->
   dest_path:string ->
   on_progress:(int -> int option -> unit) ->
-  (unit, [> `Msg of string]) result) ->
+  (unit, [`Msg of string]) result) ->
   unit
 
 (** {1 Downloads} *)

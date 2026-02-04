@@ -10,6 +10,11 @@ open Rresult
 (* Existential wrapper for the Eio process manager *)
 type any_proc_mgr = Mgr : _ Eio.Process.mgr -> any_proc_mgr
 
+(* Stored process manager, set by init *)
+let process_mgr_ref : any_proc_mgr option Atomic.t = Atomic.make None
+
+let get_process_mgr () = Atomic.get process_mgr_ref
+
 (* --- Eio-based process execution helpers --- *)
 
 let read_lines_eio flow ~on_line =
@@ -245,6 +250,7 @@ let download_file_with_progress_eio (Mgr mgr) ~url ~dest_path ~on_progress =
 
 let init proc_mgr =
   let mgr = Mgr proc_mgr in
+  Atomic.set process_mgr_ref (Some mgr) ;
   Cmd_runner.set_run_hook (run_eio mgr) ;
   Cmd_runner.set_run_out_hook (run_out_eio mgr) ;
   Cmd_runner.set_run_out_silent_hook (run_out_silent_eio mgr) ;

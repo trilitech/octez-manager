@@ -8,18 +8,19 @@
 open Rresult
 
 (* Pluggable hook for Eio-based download with progress.
-   Set by the TUI at startup via Eio_process.init. *)
+   Set by the TUI at startup via Eio_process.init.
+   Uses closed variant type internally to satisfy the value restriction
+   on mutable refs.  Dispatch coerces to open variant for callers. *)
 let download_with_progress_hook :
     (url:string ->
     dest_path:string ->
     on_progress:(int -> int option -> unit) ->
-    (unit, [> `Msg of string]) result)
+    (unit, [`Msg of string]) result)
     option
-    Atomic.t =
-  Atomic.make None
+    ref =
+  ref None
 
-let set_download_with_progress_hook f =
-  Atomic.set download_with_progress_hook (Some f)
+let set_download_with_progress_hook f = download_with_progress_hook := Some f
 
 let download_file ?(quiet = false) ~url ~dest_path () =
   Cmd_runner.append_debug_log (Printf.sprintf "DOWNLOAD %s -> %s" url dest_path) ;
@@ -179,8 +180,11 @@ let download_file_with_progress_blocking ~url ~dest_path ~on_progress =
 let download_file_with_progress ~url ~dest_path ~on_progress =
   Cmd_runner.append_debug_log
     (Printf.sprintf "DOWNLOAD_PROGRESS %s -> %s" url dest_path) ;
-  match Atomic.get download_with_progress_hook with
-  | Some f -> f ~url ~dest_path ~on_progress
+  match !download_with_progress_hook with
+  | Some f ->
+      (f ~url ~dest_path ~on_progress
+        : (unit, [`Msg of string]) result
+        :> (unit, [> `Msg of string]) result)
   | None -> download_file_with_progress_blocking ~url ~dest_path ~on_progress
 
 let get_remote_file_size url =

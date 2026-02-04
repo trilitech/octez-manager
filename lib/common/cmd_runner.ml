@@ -7,39 +7,41 @@
 
 (* Pluggable hooks for Eio-based process execution.
    When set, these override the default blocking implementations.
-   The TUI sets these at startup via Eio_process.init. *)
+   The TUI sets these at startup via Eio_process.init.
+
+   The hooks use closed variant type [`Msg of string] internally to
+   satisfy the value restriction on mutable refs.  Dispatch functions
+   coerce results to the open [> `Msg of string] expected by callers. *)
 let run_hook :
     (quiet:bool ->
     ?on_log:(string -> unit) ->
     string list ->
-    (unit, [> `Msg of string]) result)
+    (unit, [`Msg of string]) result)
     option
-    Atomic.t =
-  Atomic.make None
+    ref =
+  ref None
 
-let run_out_hook :
-    (string list -> (string, [> `Msg of string]) result) option Atomic.t =
-  Atomic.make None
+let run_out_hook : (string list -> (string, [`Msg of string]) result) option ref
+    =
+  ref None
 
 let run_out_silent_hook :
-    (string list -> (string, [> `Msg of string]) result) option Atomic.t =
-  Atomic.make None
+    (string list -> (string, [`Msg of string]) result) option ref =
+  ref None
 
 let run_streaming_hook :
-    (on_log:(string -> unit) ->
-    string list ->
-    (unit, [> `Msg of string]) result)
+    (on_log:(string -> unit) -> string list -> (unit, [`Msg of string]) result)
     option
-    Atomic.t =
-  Atomic.make None
+    ref =
+  ref None
 
-let set_run_hook f = Atomic.set run_hook (Some f)
+let set_run_hook f = run_hook := Some f
 
-let set_run_out_hook f = Atomic.set run_out_hook (Some f)
+let set_run_out_hook f = run_out_hook := Some f
 
-let set_run_out_silent_hook f = Atomic.set run_out_silent_hook (Some f)
+let set_run_out_silent_hook f = run_out_silent_hook := Some f
 
-let set_run_streaming_hook f = Atomic.set run_streaming_hook (Some f)
+let set_run_streaming_hook f = run_streaming_hook := Some f
 
 let append_debug_log line =
   try
@@ -133,8 +135,11 @@ let run ?(quiet = false) ?on_log argv =
       append_debug_log "TEST_MODE: systemctl command intercepted" ;
       Ok ()
   | _ -> (
-      match Atomic.get run_hook with
-      | Some f -> f ~quiet ?on_log argv
+      match !run_hook with
+      | Some f ->
+          (f ~quiet ?on_log argv
+            : (unit, [`Msg of string]) result
+            :> (unit, [> `Msg of string]) result)
       | None -> run_blocking ~quiet ?on_log argv)
 
 let run_silent = run ~quiet:true
@@ -229,8 +234,11 @@ let run_streaming_blocking ~on_log argv =
 
 let run_streaming ~on_log argv =
   append_debug_log ("RUN_STREAMING " ^ cmd_to_string argv) ;
-  match Atomic.get run_streaming_hook with
-  | Some f -> f ~on_log argv
+  match !run_streaming_hook with
+  | Some f ->
+      (f ~on_log argv
+        : (unit, [`Msg of string]) result
+        :> (unit, [> `Msg of string]) result)
   | None -> run_streaming_blocking ~on_log argv
 
 let run_verbose = run ~quiet:false
@@ -243,8 +251,11 @@ let run_out_blocking argv =
 
 let run_out argv =
   append_debug_log ("RUN_OUT " ^ cmd_to_string argv) ;
-  match Atomic.get run_out_hook with
-  | Some f -> f argv
+  match !run_out_hook with
+  | Some f ->
+      (f argv
+        : (string, [`Msg of string]) result
+        :> (string, [> `Msg of string]) result)
   | None -> run_out_blocking argv
 
 let run_out_silent_blocking argv =
@@ -280,8 +291,11 @@ let run_out_silent_blocking argv =
 
 let run_out_silent argv =
   append_debug_log ("RUN_OUT_SILENT " ^ cmd_to_string argv) ;
-  match Atomic.get run_out_silent_hook with
-  | Some f -> f argv
+  match !run_out_silent_hook with
+  | Some f ->
+      (f argv
+        : (string, [`Msg of string]) result
+        :> (string, [> `Msg of string]) result)
   | None -> run_out_silent_blocking argv
 
 let run_as ?(quiet = false) ?on_log ~user argv =
