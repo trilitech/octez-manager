@@ -215,3 +215,11 @@ let format_tez mutez_str =
     else if tez >= 1_000.0 then Printf.sprintf "%.1fK" (tez /. 1_000.0)
     else Printf.sprintf "%.0f" tez
   with _ -> mutez_str
+
+module For_tests = struct
+  let parse_participation = parse_participation
+
+  let parse_dal_participation = parse_dal_participation
+
+  let of_json = of_json
+end

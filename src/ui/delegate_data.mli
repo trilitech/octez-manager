@@ -80,3 +80,13 @@ val missed_slots_status : t -> missed_status
 
 (** Format mutez amount as tez with K/M suffix. *)
 val format_tez : string -> string
+
+(** {2 Testing} *)
+
+module For_tests : sig
+  val parse_participation : Yojson.Safe.t -> participation
+
+  val parse_dal_participation : Yojson.Safe.t -> dal_participation
+
+  val of_json : pkh:string -> Yojson.Safe.t -> t option
+end
