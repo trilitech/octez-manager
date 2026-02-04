@@ -197,6 +197,122 @@ let test_reset_clears_boot_at () =
   Alcotest.(check bool) "after reset: due" true (FT.is_due_for_poll 101.0 svc)
 
 (* ============================================================ *)
+(* normalize_endpoint Tests                                      *)
+(* ============================================================ *)
+
+let test_normalize_endpoint_with_http () =
+  Alcotest.(check string)
+    "http unchanged"
+    "http://localhost:8732"
+    (FT.normalize_endpoint "http://localhost:8732")
+
+let test_normalize_endpoint_with_https () =
+  Alcotest.(check string)
+    "https unchanged"
+    "https://mainnet.example.com"
+    (FT.normalize_endpoint "https://mainnet.example.com")
+
+let test_normalize_endpoint_bare () =
+  Alcotest.(check string)
+    "bare gets http://"
+    "http://127.0.0.1:8732"
+    (FT.normalize_endpoint "127.0.0.1:8732")
+
+let test_normalize_endpoint_hostname () =
+  Alcotest.(check string)
+    "hostname gets http://"
+    "http://mynode.local:8732"
+    (FT.normalize_endpoint "mynode.local:8732")
+
+(* ============================================================ *)
+(* compute_last_block_time Tests                                 *)
+(* ============================================================ *)
+
+let test_compute_lbt_head_changed () =
+  let result =
+    FT.compute_last_block_time
+      ~previous_head:(Some 100)
+      ~head_level:(Some 101)
+      ~now:1000.0
+      ~existing_block_time:(Some 900.0)
+  in
+  Alcotest.(check (option (float 0.01)))
+    "head changed -> now"
+    (Some 1000.0)
+    result
+
+let test_compute_lbt_first_head () =
+  let result =
+    FT.compute_last_block_time
+      ~previous_head:None
+      ~head_level:(Some 42)
+      ~now:1000.0
+      ~existing_block_time:None
+  in
+  Alcotest.(check (option (float 0.01)))
+    "first head -> now"
+    (Some 1000.0)
+    result
+
+let test_compute_lbt_head_unchanged () =
+  let result =
+    FT.compute_last_block_time
+      ~previous_head:(Some 100)
+      ~head_level:(Some 100)
+      ~now:1000.0
+      ~existing_block_time:(Some 900.0)
+  in
+  Alcotest.(check (option (float 0.01)))
+    "head same -> preserve"
+    (Some 900.0)
+    result
+
+let test_compute_lbt_no_head () =
+  let result =
+    FT.compute_last_block_time
+      ~previous_head:(Some 100)
+      ~head_level:None
+      ~now:1000.0
+      ~existing_block_time:(Some 900.0)
+  in
+  Alcotest.(check (option (float 0.01)))
+    "no head -> preserve"
+    (Some 900.0)
+    result
+
+let test_compute_lbt_no_head_no_existing () =
+  let result =
+    FT.compute_last_block_time
+      ~previous_head:None
+      ~head_level:None
+      ~now:1000.0
+      ~existing_block_time:None
+  in
+  Alcotest.(check (option (float 0.01))) "nothing -> None" None result
+
+(* ============================================================ *)
+(* PBT: normalize_endpoint never crashes                         *)
+(* ============================================================ *)
+
+let test_normalize_no_crash =
+  QCheck.Test.make
+    ~name:"normalize_endpoint never crashes"
+    ~count:500
+    QCheck.string
+    (fun s ->
+      let _ = FT.normalize_endpoint s in
+      true)
+
+let test_normalize_always_has_scheme =
+  QCheck.Test.make
+    ~name:"normalize_endpoint result always starts with http"
+    ~count:500
+    QCheck.string
+    (fun s ->
+      let result = FT.normalize_endpoint s in
+      String.starts_with ~prefix:"http" result)
+
+(* ============================================================ *)
 (* Test Runner                                                   *)
 (* ============================================================ *)
 
@@ -246,4 +362,32 @@ let () =
             test_reset_clears_boot_state;
           Alcotest.test_case "clears boot at" `Quick test_reset_clears_boot_at;
         ] );
+      ( "normalize_endpoint",
+        [
+          Alcotest.test_case "with http" `Quick test_normalize_endpoint_with_http;
+          Alcotest.test_case
+            "with https"
+            `Quick
+            test_normalize_endpoint_with_https;
+          Alcotest.test_case "bare" `Quick test_normalize_endpoint_bare;
+          Alcotest.test_case "hostname" `Quick test_normalize_endpoint_hostname;
+        ] );
+      ( "compute_last_block_time",
+        [
+          Alcotest.test_case "head changed" `Quick test_compute_lbt_head_changed;
+          Alcotest.test_case "first head" `Quick test_compute_lbt_first_head;
+          Alcotest.test_case
+            "head unchanged"
+            `Quick
+            test_compute_lbt_head_unchanged;
+          Alcotest.test_case "no head" `Quick test_compute_lbt_no_head;
+          Alcotest.test_case
+            "no head no existing"
+            `Quick
+            test_compute_lbt_no_head_no_existing;
+        ] );
+      ( "PBT",
+        List.map
+          QCheck_alcotest.to_alcotest
+          [test_normalize_no_crash; test_normalize_always_has_scheme] );
     ]

@@ -539,7 +539,12 @@
 
 (test
  (name test_rpc_browser_render_result)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
  (modules test_rpc_browser_render_result)
  (instrumentation
   (backend bisect_ppx)))
@@ -647,8 +652,26 @@
 
 (test
  (name test_rpc_scheduler)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
  (modules test_rpc_scheduler)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_node_selection)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  yojson)
+ (modules test_rpc_node_selection)
  (instrumentation
   (backend bisect_ppx)))
 

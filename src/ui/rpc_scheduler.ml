@@ -360,4 +360,18 @@ module For_tests = struct
     Hashtbl.replace last_boot_state instance state
 
   let set_boot_at instance time = Hashtbl.replace last_boot_at instance time
+
+  (** Normalize an endpoint URL: prepend "http://" if no scheme present. *)
+  let normalize_endpoint rpc_addr =
+    if String.starts_with ~prefix:"http" rpc_addr then rpc_addr
+    else "http://" ^ rpc_addr
+
+  (** Compute last_block_time from previous and current head levels.
+      Returns the new last_block_time value. *)
+  let compute_last_block_time ~previous_head ~head_level ~now
+      ~existing_block_time =
+    match (previous_head, head_level) with
+    | Some old_level, Some new_level when old_level <> new_level -> Some now
+    | None, Some _ -> Some now
+    | _ -> existing_block_time
 end

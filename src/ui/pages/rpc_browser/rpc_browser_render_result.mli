@@ -110,6 +110,24 @@ val get_visible_pagers :
 val render_pager_tabs :
   pagers:Rpc_browser_state.pager_slot list -> focused_id:int -> string
 
+(** {1 Testing} *)
+
+(** Functions exposed for testing. *)
+module For_tests : sig
+  (** Calculate visible length of a string excluding ANSI escapes, handling UTF-8. *)
+  val visible_length : string -> int
+
+  (** Truncate a string with ANSI codes to a visible width.
+      @param width Maximum visible width *)
+  val truncate_to_width : string -> width:int -> string
+
+  (** Split string into lines, padding/truncating to exact dimensions.
+      @param target_lines Number of lines to produce
+      @param width Width to pad/truncate each line to *)
+  val split_lines_padded :
+    string -> target_lines:int -> width:int -> string list
+end
+
 (** {1 Main Rendering} *)
 
 (** Render complete result view from state with multi-pager support.
