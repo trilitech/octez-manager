@@ -28,6 +28,7 @@
 
 - **Install and manage** Octez services as systemd units
 - **Terminal UI** with real-time monitoring and logs
+- **Web interface** for browser-based remote management
 - **RPC Browser** — Interactively explore and query RPC endpoints with syntax highlighting
 - **Snapshot import** from tzinit.org with automatic download
 - **Multiple instances** per service type
@@ -71,10 +72,14 @@ make build
 ### Launch the UI
 
 ```sh
+# Terminal UI
 octez-manager
+
+# Web interface (browser-based, for remote access)
+octez-manager web --port 8080
 ```
 
-The UI provides installation wizards, service monitoring, log viewing, and snapshot management.
+The UI provides installation wizards, service monitoring, log viewing, and snapshot management. The web interface offers the same features accessible from any browser.
 
 ### CLI Examples
 

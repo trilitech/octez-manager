@@ -32,6 +32,8 @@ export default defineConfig({
 						{ label: 'Node Setup', slug: 'guides/node-setup' },
 						{ label: 'DAL Node Setup', slug: 'guides/dal-node-setup' },
 						{ label: 'Baker Setup', slug: 'guides/baker-setup' },
+						{ label: 'Web Interface', slug: 'guides/web-interface' },
+						{ label: 'RPC Browser', slug: 'guides/rpc-browser' },
 					],
 				},
 				{
