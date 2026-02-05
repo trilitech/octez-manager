@@ -39,8 +39,8 @@ type state = {
 }
 
 and display_item =
-  | SectionHeader of string  (* "PUBLIC NODES" or "LOCAL INSTANCES" *)
-  | NetworkHeader of string  (* Network name like "Mainnet" *)
+  | SectionHeader of string (* "PUBLIC NODES" or "LOCAL INSTANCES" *)
+  | NetworkHeader of string (* Network name like "Mainnet" *)
   | NodeItem of node_item
 
 type msg = unit

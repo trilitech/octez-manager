@@ -55,17 +55,31 @@ let extract_network_from_url (url : string) : string option =
     if len_n = 0 then true else check 0
   in
   (* First check for known URLs that don't contain network in their name *)
-  let known_url_mappings = [
-    ("tzbeta.net", "mainnet");
-    (* Note: rpc.tzkt.io removed - it has network in path: rpc.tzkt.io/mainnet *)
-  ] in
-  match List.find_opt (fun (pattern, _) -> 
-    contains_substring lower_url pattern
-  ) known_url_mappings with
+  let known_url_mappings =
+    [
+      ("tzbeta.net", "mainnet");
+      (* Note: rpc.tzkt.io removed - it has network in path: rpc.tzkt.io/mainnet *)
+    ]
+  in
+  match
+    List.find_opt
+      (fun (pattern, _) -> contains_substring lower_url pattern)
+      known_url_mappings
+  with
   | Some (_, network) -> Some network
   | None ->
       (* Fall back to searching for network name in URL *)
-      let known_networks = ["mainnet"; "ghostnet"; "shadownet"; "tallinnnet"; "weeklynet"; "dailynet"; "mondaynet"] in
+      let known_networks =
+        [
+          "mainnet";
+          "ghostnet";
+          "shadownet";
+          "tallinnnet";
+          "weeklynet";
+          "dailynet";
+          "mondaynet";
+        ]
+      in
       List.find_opt (fun net -> contains_substring lower_url net) known_networks
 
 (** Parse Taquito JSON format to extract public nodes *)
@@ -79,17 +93,12 @@ let parse_taquito_json (txt : string) : node_info list =
               let rpc = get_rpc kv in
               if rpc = "" then None
               else
-                let network = 
+                let network =
                   match get_net kv with
-                  | Some _ as net -> net  (* Explicit network provided *)
-                  | None -> extract_network_from_url rpc  (* Extract from URL *)
+                  | Some _ as net -> net (* Explicit network provided *)
+                  | None -> extract_network_from_url rpc (* Extract from URL *)
                 in
-                Some
-                  {
-                    label = get_label kv rpc;
-                    rpc_addr = rpc;
-                    network;
-                  }
+                Some {label = get_label kv rpc; rpc_addr = rpc; network}
           | _ -> None)
         lst
     in
