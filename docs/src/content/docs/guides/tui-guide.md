@@ -9,6 +9,8 @@ This guide walks through common workflows using Shadownet as an example.
 
 > **Tip:** Press `?` at any time to see available actions for the current screen.
 
+> **Remote access:** For browser-based access, see [Web Interface](/guides/web-interface).
+
 ## Getting Started
 
 Launch the TUI:
