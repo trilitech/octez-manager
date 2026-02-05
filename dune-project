@@ -17,6 +17,7 @@
   (miaou-driver-term (>= 0.1.4))
   (miaou-driver-matrix (>= 0.1.4))
   (miaou-runner (>= 0.1.4))
+  (miaou-driver-web (>= 0.2.0))
   eio
   eio_main
   eio_posix

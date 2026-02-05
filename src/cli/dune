@@ -16,13 +16,25 @@
   cmd_binaries
   cmd_self_update
   cmd_utils
-  cmd_rpc)
+  cmd_rpc
+  cmd_web)
  (libraries
   octez_manager_lib
   octez-manager.ui
+  miaou-core.lib
+  miaou-driver-web.runner
+  miaou-driver-web.driver
+  miaou-core.helpers
   cmdliner
   rresult
   yojson
-  linenoise)
+  linenoise
+  eio_posix)
+ (preprocess
+  (pps ppx_blob))
+ (preprocessor_deps
+  (file ../web/static/index.html)
+  (file ../web/static/viewer.html)
+  (file ../../favicon.png))
  (instrumentation
   (backend bisect_ppx)))
