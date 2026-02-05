@@ -350,6 +350,47 @@ octez-manager [OPTIONS]
 
 > **Note**: When run without arguments, `octez-manager` launches the TUI. Use explicit subcommands for CLI operations.
 
+### `web`
+
+Start the web interface for browser-based remote management.
+
+```bash
+octez-manager web [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--port <PORT>`, `-p` | TCP port to listen on | 8080 |
+| `--password <PW>` | Controller password (full access) | none |
+| `--viewer-password <PW>` | Viewer password (read-only access) | same as --password |
+| `--page <NAME>` | Start on a specific page | instances |
+| `--ui-log` | Enable UI debug logs | false |
+| `--ui-logfile <FILE>` | Write UI logs to file | none |
+
+The web interface provides the same functionality as the TUI, accessible from any browser. It uses xterm.js for terminal emulation over WebSocket.
+
+**Authentication:**
+- Without passwords: Anyone can connect
+- With `--password`: Controller access requires authentication
+- With `--viewer-password`: Separate read-only access with different password
+
+Passwords can also be set via environment variables:
+- `MIAOU_WEB_PASSWORD` — Controller password
+- `MIAOU_WEB_VIEWER_PASSWORD` — Viewer password (falls back to controller password)
+
+**Examples:**
+
+```bash
+# Start on default port (8080), no authentication
+octez-manager web
+
+# Custom port with password protection
+octez-manager web --port 8443 --password mysecret
+
+# Separate passwords for controller and viewer
+octez-manager web --password admin123 --viewer-password viewer123
+```
+
 ### `list-available-networks`
 
 Show networks available from teztnets.com.
