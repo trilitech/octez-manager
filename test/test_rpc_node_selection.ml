@@ -71,9 +71,10 @@ let test_parse_taquito_format () =
   let nodes = Rpc_node_selection.parse_taquito_json json in
   Alcotest.(check int) "three nodes" 3 (List.length nodes) ;
   let n0 = List.nth nodes 0 in
+  (* Network is NOT included in label - it's stored separately to avoid duplication *)
   Alcotest.(check string)
-    "label with provider+net"
-    "ECAD Labs (mainnet)"
+    "label without network"
+    "ECAD Labs"
     n0.label ;
   Alcotest.(check string) "rpc" "https://mainnet.ecad.io" n0.rpc_addr ;
   Alcotest.(check (option string)) "network" (Some "mainnet") n0.network
@@ -90,9 +91,10 @@ let test_parse_taquito_format_unknown_provider () =
   let nodes = Rpc_node_selection.parse_taquito_json json in
   Alcotest.(check int) "one node" 1 (List.length nodes) ;
   (* provider_of falls back to the raw id when not in providers list *)
+  (* Network is NOT included in label *)
   Alcotest.(check string)
     "label uses raw provider id"
-    "unknown-prov (testnet)"
+    "unknown-prov"
     (List.nth nodes 0).label
 
 let test_parse_taquito_format_no_provider () =
@@ -106,9 +108,10 @@ let test_parse_taquito_format_no_provider () =
   in
   let nodes = Rpc_node_selection.parse_taquito_json json in
   Alcotest.(check int) "one node" 1 (List.length nodes) ;
+  (* When no provider, label falls back to URL, not network *)
   Alcotest.(check string)
-    "label from net only"
-    "testnet"
+    "label falls back to URL"
+    "https://example.com/rpc"
     (List.nth nodes 0).label
 
 let test_parse_taquito_format_no_net_no_provider () =
@@ -188,8 +191,11 @@ let test_parse_non_assoc_in_list () =
 (* ============================================================ *)
 
 let make_state ?(public_nodes = []) ?(local_instances = []) ?(cursor = 0) () =
+  let display_items =
+    Rpc_node_selection.build_display_items ~public_nodes ~local_instances
+  in
   Rpc_node_selection.
-    {public_nodes; local_instances; cursor; loading = false; error = None}
+    {public_nodes; local_instances; cursor; loading = false; error = None; display_items}
 
 let make_item ?(label = "test") ?(rpc_addr = "http://localhost")
     ?(is_public = true) ?(network = None) () =
@@ -201,13 +207,13 @@ let test_total_items_empty () =
 
 let test_total_items_public_only () =
   let s = make_state ~public_nodes:[make_item (); make_item ~label:"b" ()] () in
-  (* 1 header + 2 nodes = 3 *)
-  Alcotest.(check int) "public only" 3 (Rpc_node_selection.total_items s)
+  (* 1 section header + 1 network header + 2 nodes = 4 *)
+  Alcotest.(check int) "public only" 4 (Rpc_node_selection.total_items s)
 
 let test_total_items_local_only () =
   let s = make_state ~local_instances:[make_item ~is_public:false ()] () in
-  (* 1 header + 1 node = 2 *)
-  Alcotest.(check int) "local only" 2 (Rpc_node_selection.total_items s)
+  (* 1 section header + 1 network header + 1 node = 3 *)
+  Alcotest.(check int) "local only" 3 (Rpc_node_selection.total_items s)
 
 let test_total_items_both () =
   let s =
@@ -216,8 +222,10 @@ let test_total_items_both () =
       ~local_instances:[make_item ~is_public:false ()]
       ()
   in
-  (* 1 header + 1 public + 1 header + 1 local = 4 *)
-  Alcotest.(check int) "both" 4 (Rpc_node_selection.total_items s)
+  (* PUBLIC: 1 section header + 1 network header + 1 node = 3
+     LOCAL: 1 section header + 1 network header + 1 node = 3
+     Total = 6 *)
+  Alcotest.(check int) "both" 6 (Rpc_node_selection.total_items s)
 
 (* ============================================================ *)
 (* get_item_at_cursor Tests                                      *)
@@ -226,27 +234,29 @@ let test_total_items_both () =
 let test_get_item_public_header () =
   let s = make_state ~public_nodes:[make_item ()] ~cursor:0 () in
   match Rpc_node_selection.get_item_at_cursor s with
-  | `PublicHeader -> ()
-  | _ -> Alcotest.fail "expected PublicHeader"
+  | `SectionHeader -> ()
+  | _ -> Alcotest.fail "expected SectionHeader"
 
 let test_get_item_public_node () =
   let item = make_item ~label:"pub1" () in
-  let s = make_state ~public_nodes:[item] ~cursor:1 () in
+  let s = make_state ~public_nodes:[item] ~cursor:2 () in
+  (* cursor 0=PUBLIC NODES header, 1=network header, 2=first node *)
   match Rpc_node_selection.get_item_at_cursor s with
-  | `PublicNode n -> Alcotest.(check string) "correct item" "pub1" n.label
-  | _ -> Alcotest.fail "expected PublicNode"
+  | `Node n -> Alcotest.(check string) "correct item" "pub1" n.label
+  | _ -> Alcotest.fail "expected Node"
 
 let test_get_item_local_header () =
   let s =
     make_state
       ~public_nodes:[make_item ()]
       ~local_instances:[make_item ~is_public:false ()]
-      ~cursor:2
+      ~cursor:3
       ()
   in
+  (* 0=PUBLIC header, 1=network header, 2=pub node, 3=LOCAL header *)
   match Rpc_node_selection.get_item_at_cursor s with
-  | `LocalHeader -> ()
-  | _ -> Alcotest.fail "expected LocalHeader"
+  | `SectionHeader -> ()
+  | _ -> Alcotest.fail "expected SectionHeader"
 
 let test_get_item_local_node () =
   let local_item = make_item ~label:"local1" ~is_public:false () in
@@ -254,12 +264,13 @@ let test_get_item_local_node () =
     make_state
       ~public_nodes:[make_item ()]
       ~local_instances:[local_item]
-      ~cursor:3
+      ~cursor:5
       ()
   in
+  (* 0=PUBLIC header, 1=network, 2=pub node, 3=LOCAL header, 4=network, 5=local node *)
   match Rpc_node_selection.get_item_at_cursor s with
-  | `LocalNode n -> Alcotest.(check string) "correct item" "local1" n.label
-  | _ -> Alcotest.fail "expected LocalNode"
+  | `Node n -> Alcotest.(check string) "correct item" "local1" n.label
+  | _ -> Alcotest.fail "expected Node"
 
 let test_get_item_out_of_bounds () =
   let s = make_state ~public_nodes:[make_item ()] ~cursor:99 () in
@@ -280,34 +291,38 @@ let test_move_cursor_down () =
   let s =
     make_state
       ~public_nodes:[make_item ~label:"a" (); make_item ~label:"b" ()]
-      ~cursor:1
+      ~cursor:2
       ()
   in
+  (* cursor=2 is first node (0=section header, 1=network header, 2=first node) *)
   let s' = Rpc_node_selection.move_cursor 1 s in
-  Alcotest.(check int) "moves down" 2 s'.cursor
+  (* Should move to second node *)
+  Alcotest.(check int) "moves down" 3 s'.cursor
 
 let test_move_cursor_up () =
   let s =
     make_state
       ~public_nodes:[make_item ~label:"a" (); make_item ~label:"b" ()]
-      ~cursor:2
+      ~cursor:3
       ()
   in
+  (* cursor=3 is second node *)
   let s' = Rpc_node_selection.move_cursor (-1) s in
-  Alcotest.(check int) "moves up" 1 s'.cursor
+  (* Should move to first node (skipping headers) *)
+  Alcotest.(check int) "moves up" 2 s'.cursor
 
 let test_move_cursor_bounds_max () =
-  let s = make_state ~public_nodes:[make_item ()] ~cursor:1 () in
-  (* total_items = 2, max index = 1 *)
+  let s = make_state ~public_nodes:[make_item ()] ~cursor:2 () in
+  (* total_items = 3 (section header + network header + 1 node), max selectable index = 2 *)
   let s' = Rpc_node_selection.move_cursor 1 s in
-  (* Should not go past max *)
-  Alcotest.(check int) "clamped at max" 1 s'.cursor
+  (* Should stay at max selectable position *)
+  Alcotest.(check int) "clamped at max" 2 s'.cursor
 
 let test_move_cursor_bounds_min () =
-  let s = make_state ~public_nodes:[make_item ()] ~cursor:1 () in
+  let s = make_state ~public_nodes:[make_item ()] ~cursor:2 () in
   let s' = Rpc_node_selection.move_cursor (-5) s in
-  (* Cursor tries 0 (public header), delta < 0 so no skip, stays at 0 *)
-  Alcotest.(check int) "clamped at min" 0 s'.cursor
+  (* Cursor should go to first selectable item (index 2, the node) skipping headers *)
+  Alcotest.(check int) "wraps to first selectable" 2 s'.cursor
 
 let test_move_cursor_skips_header_down () =
   (* When moving down, header positions should be skipped *)
@@ -315,26 +330,27 @@ let test_move_cursor_skips_header_down () =
     make_state
       ~public_nodes:[make_item ()]
       ~local_instances:[make_item ~is_public:false ()]
-      ~cursor:1
+      ~cursor:2
       ()
   in
-  (* cursor at 1 (public node), local header at 2, moving down *)
+  (* cursor at 2 (public node: 0=public section, 1=network, 2=node)
+     local section starts at 3, network at 4, local node at 5 *)
   let s' = Rpc_node_selection.move_cursor 1 s in
-  (* Should skip local header (idx 2) and land on local node (idx 3) *)
-  Alcotest.(check int) "skips local header" 3 s'.cursor
+  (* Should skip section and network headers and land on local node (idx 5) *)
+  Alcotest.(check int) "skips headers to local node" 5 s'.cursor
 
 let test_move_cursor_skips_header_up () =
-  (* When moving up through local header, should skip to public node *)
+  (* When moving up through headers, should skip to previous selectable node *)
   let s =
     make_state
       ~public_nodes:[make_item ()]
       ~local_instances:[make_item ~is_public:false ()]
-      ~cursor:3
+      ~cursor:5
       ()
   in
+  (* cursor at 5 (local node), moving up should skip headers at 4,3 and land on public node at 2 *)
   let s' = Rpc_node_selection.move_cursor (-1) s in
-  (* local header is at idx 2, should skip to idx 1 *)
-  Alcotest.(check int) "skips local header up" 1 s'.cursor
+  Alcotest.(check int) "skips headers up to public node" 2 s'.cursor
 
 (* ============================================================ *)
 (* curated_defaults Tests                                        *)
