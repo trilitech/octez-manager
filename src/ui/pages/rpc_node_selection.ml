@@ -51,40 +51,43 @@ type pstate = state Navigation.t
     This function is kept for backward compatibility with tests. *)
 let parse_taquito_json (txt : string) : node_item list =
   let nodes = Public_nodes_cache.parse_taquito_json txt in
-  List.map (fun (info : Public_nodes_cache.node_info) ->
-    {
-      label = info.label;
-      rpc_addr = info.rpc_addr;
-      is_public = true;
-      network = info.network;
-    }
-  ) nodes
-
-(** Curated default public nodes.
-    This is exposed for tests and converts from Public_nodes_cache. *)
-let curated_defaults : node_item list =
-  List.map (fun (info : Public_nodes_cache.node_info) ->
-    {
-      label = info.label;
-      rpc_addr = info.rpc_addr;
-      is_public = true;
-      network = info.network;
-    }
-  ) Public_nodes_cache.curated_defaults
-
-(** Fetch public nodes using Public_nodes_cache *)
-let fetch_public_nodes () : node_item list * string option =
-  let nodes = Public_nodes_cache.get_nodes () in
-  (* Convert node_info to node_item by adding is_public field *)
-  let node_items = 
-    List.map (fun (info : Public_nodes_cache.node_info) ->
+  List.map
+    (fun (info : Public_nodes_cache.node_info) ->
       {
         label = info.label;
         rpc_addr = info.rpc_addr;
         is_public = true;
         network = info.network;
-      }
-    ) nodes
+      })
+    nodes
+
+(** Curated default public nodes.
+    This is exposed for tests and converts from Public_nodes_cache. *)
+let curated_defaults : node_item list =
+  List.map
+    (fun (info : Public_nodes_cache.node_info) ->
+      {
+        label = info.label;
+        rpc_addr = info.rpc_addr;
+        is_public = true;
+        network = info.network;
+      })
+    Public_nodes_cache.curated_defaults
+
+(** Fetch public nodes using Public_nodes_cache *)
+let fetch_public_nodes () : node_item list * string option =
+  let nodes = Public_nodes_cache.get_nodes () in
+  (* Convert node_info to node_item by adding is_public field *)
+  let node_items =
+    List.map
+      (fun (info : Public_nodes_cache.node_info) ->
+        {
+          label = info.label;
+          rpc_addr = info.rpc_addr;
+          is_public = true;
+          network = info.network;
+        })
+      nodes
   in
   (node_items, None)
 
@@ -118,11 +121,10 @@ let make_service_for_node (item : node_item) : Service.t =
     ~service_user:""
     ~app_bin_dir:""
     ~logging_mode:Logging_mode.default
-     ()
+    ()
 
 (** Group node items by network *)
-let group_by_network (items : node_item list) :
-    (string * node_item list) list =
+let group_by_network (items : node_item list) : (string * node_item list) list =
   (* Build a map of network -> items *)
   let network_map =
     List.fold_left
@@ -151,8 +153,7 @@ let build_display_items ~public_nodes ~local_instances : display_item list =
       SectionHeader section_header
       :: List.concat_map
            (fun (network, nodes) ->
-             NetworkHeader network
-             :: List.map (fun item -> NodeItem item) nodes)
+             NetworkHeader network :: List.map (fun item -> NodeItem item) nodes)
            grouped
   in
   build_section_items "PUBLIC NODES" public_nodes
@@ -163,7 +164,14 @@ let init () =
   let local_instances = load_local_instances () in
   let display_items = build_display_items ~public_nodes ~local_instances in
   Navigation.make
-    {public_nodes; local_instances; cursor = 0; loading = false; error; display_items}
+    {
+      public_nodes;
+      local_instances;
+      cursor = 0;
+      loading = false;
+      error;
+      display_items;
+    }
 
 let update ps _ = ps
 
@@ -270,7 +278,8 @@ let view ps ~focus:_ ~size =
             else "  " ^ Widgets.bold styled
         | NetworkHeader network ->
             let line = Printf.sprintf "%s• %s" prefix network in
-            if is_selected then Widgets.bold (Widgets.fg 14 line) else Widgets.fg 14 ("  • " ^ network)
+            if is_selected then Widgets.bold (Widgets.fg 14 line)
+            else Widgets.fg 14 ("  • " ^ network)
         | NodeItem item ->
             let line =
               Printf.sprintf
@@ -279,7 +288,8 @@ let view ps ~focus:_ ~size =
                 item.label
                 (Widgets.dim item.rpc_addr)
             in
-            if is_selected then Widgets.bold line else "      " ^ item.label ^ "  " ^ Widgets.dim item.rpc_addr)
+            if is_selected then Widgets.bold line
+            else "      " ^ item.label ^ "  " ^ Widgets.dim item.rpc_addr)
       s.display_items
   in
   let hint = Widgets.dim "↑/↓ navigate · Enter select · r refresh · Esc back" in
