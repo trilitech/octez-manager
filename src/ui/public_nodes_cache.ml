@@ -18,12 +18,12 @@ let cached_nodes : node_info list ref = ref []
 let curated_defaults : node_info list =
   [
     {
-      label = "ECAD Infra (mainnet)";
+      label = "ECAD Infra";
       rpc_addr = "https://mainnet.tezos.ecadinfra.com";
       network = Some "mainnet";
     };
     {
-      label = "Tezos Mainnet (ecadlabs)";
+      label = "ecadlabs";
       rpc_addr = "https://mainnet.api.tez.ie";
       network = Some "mainnet";
     };
@@ -33,7 +33,7 @@ let curated_defaults : node_info list =
       network = Some "ghostnet";
     };
     {
-      label = "Tezos Mainnet (SmartPy)";
+      label = "SmartPy";
       rpc_addr = "https://mainnet.smartpy.io";
       network = Some "mainnet";
     };
@@ -122,14 +122,9 @@ let parse_taquito_json (txt : string) : node_info list =
                   | Some n -> n
                   | None -> provider_id
                 in
-                let network =
-                  match List.assoc_opt "network" kv with
-                  | Some (`String s) -> s
-                  | _ -> "unknown"
-                in
-                if provider_name <> "" then
-                  Printf.sprintf "%s (%s)" provider_name network
-                else rpc)
+                (* Don't include network in label - it's stored separately and
+                   displayed when needed to avoid duplication *)
+                if provider_name <> "" then provider_name else rpc)
               ~get_net:(fun kv ->
                 match List.assoc_opt "network" kv with
                 | Some (`String s) -> Some s
