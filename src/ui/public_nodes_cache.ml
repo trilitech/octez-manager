@@ -42,9 +42,8 @@ let curated_defaults : node_info list =
 (** Extract network name from RPC URL when not explicitly provided.
     Looks for common patterns like "mainnet.domain.com" or "https://ghostnet.domain.com" *)
 let extract_network_from_url (url : string) : string option =
-  let known_networks = ["mainnet"; "ghostnet"; "shadownet"; "tallinnnet"; "weeklynet"; "dailynet"; "mondaynet"] in
   let lower_url = String.lowercase_ascii url in
-  (* Simple substring check without regex *)
+  (* Simple substring check *)
   let contains_substring haystack needle =
     let len_h = String.length haystack in
     let len_n = String.length needle in
@@ -55,7 +54,19 @@ let extract_network_from_url (url : string) : string option =
     in
     if len_n = 0 then true else check 0
   in
-  List.find_opt (fun net -> contains_substring lower_url net) known_networks
+  (* First check for known URLs that don't contain network in their name *)
+  let known_url_mappings = [
+    ("tzbeta.net", "mainnet");
+    ("rpc.tzkt.io", "mainnet");
+  ] in
+  match List.find_opt (fun (pattern, _) -> 
+    contains_substring lower_url pattern
+  ) known_url_mappings with
+  | Some (_, network) -> Some network
+  | None ->
+      (* Fall back to searching for network name in URL *)
+      let known_networks = ["mainnet"; "ghostnet"; "shadownet"; "tallinnnet"; "weeklynet"; "dailynet"; "mondaynet"] in
+      List.find_opt (fun net -> contains_substring lower_url net) known_networks
 
 (** Parse Taquito JSON format to extract public nodes *)
 let parse_taquito_json (txt : string) : node_info list =
