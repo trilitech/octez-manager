@@ -493,6 +493,89 @@ let keymap _ =
   ]
 ```
 
+### Direct_page: Simplified Page Development
+
+For simple pages, prefer `Direct_page` over the full `PAGE_SIG`. It requires only 3 functions instead of 13:
+
+```ocaml
+include Miaou.Core.Direct_page.Make (struct
+  include Miaou.Core.Direct_page.With_defaults (struct
+    type state = { items : string list; cursor : int }
+
+    let init () = { items = []; cursor = 0 }
+
+    let view s ~focus ~size =
+      (* Render your page *)
+      render_items s.items s.cursor
+
+    let on_key s key ~size =
+      match key with
+      | "q" -> Miaou.Core.Direct_page.quit () ; s
+      | "Esc" -> Miaou.Core.Direct_page.go_back () ; s
+      | "Enter" -> Miaou.Core.Direct_page.navigate "details" ; s
+      | "j" -> { s with cursor = s.cursor + 1 }
+      | _ -> s
+  end)
+end)
+```
+
+**When to use Direct_page:**
+- Simple pages with straightforward navigation
+- Pages without complex modal handling
+- New pages where you want minimal boilerplate
+
+**When to use full PAGE_SIG:**
+- Pages with custom modal key handling (`handle_modal_key`)
+- Pages that need fine-grained control over all lifecycle functions
+- Existing pages that already use PAGE_SIG
+
+### Recommended Miaou Widgets
+
+**Layout widgets** (`Miaou_widgets_layout`):
+
+| Widget | Use Case |
+|--------|----------|
+| `Box_widget` | Bordered containers with 5 styles (Single, Double, Rounded, Heavy, Ascii) |
+| `Flex_layout` | Row/column layouts with gap, padding, basis sizing (like CSS flexbox) |
+| `Grid_layout` | CSS-grid-like layouts with Fr/Px/Auto track sizing |
+| `Pane` | Split views (horizontal/vertical) |
+
+**Focus management** (`Miaou_internals`):
+
+| Widget | Use Case |
+|--------|----------|
+| `Focus_ring` | Named-slot focus for forms/toolbars with Tab/Shift-Tab navigation |
+| `Focus_container` | Type-safe heterogeneous widget containers (GADT-based) |
+
+**Display widgets** (`Miaou_widgets_display`):
+
+| Widget | Use Case |
+|--------|----------|
+| `Pager_widget` | Scrollable text with search (`/`), wrap toggle (`w`) |
+| `Sparkline_widget` | Inline charts for metrics |
+| `Description_list` | Key-value displays |
+
+**Example: Using Box_widget for status panels**
+
+```ocaml
+let render_status_box ~title ~content =
+  Miaou_widgets_layout.Box_widget.render
+    ~title
+    ~style:Single
+    ~width:40
+    content
+```
+
+**Example: Using Focus_ring for forms**
+
+```ocaml
+let focus = Focus_ring.create ["name"; "network"; "confirm"] in
+let focus, result = Focus_ring.handle_key focus key in
+match result with
+| `Handled -> (* key was Tab/Shift-Tab *) ...
+| `Bubble -> (* pass to focused widget *) ...
+```
+
 ---
 
 ## Commit Messages
