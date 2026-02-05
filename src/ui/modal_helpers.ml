@@ -15,6 +15,13 @@ module Navigation = Miaou.Core.Navigation
 let first_nonempty_line lines =
   List.find_opt (fun l -> String.trim l <> "") lines
 
+let extract_major version_str =
+  try
+    match String.split_on_char '.' version_str with
+    | major :: _ -> int_of_string major
+    | [] -> 0
+  with _ -> 0
+
 let set_markdown_hint ?short ?long () =
   Miaou.Core.Help_hint.clear () ;
   match (short, long) with
@@ -1167,13 +1174,6 @@ let select_app_bin_dir_modal ~on_select () =
               "Could not load available versions. Try again later."
         | Some versions ->
             (* Filter to only show 2 latest major versions *)
-            let extract_major version_str =
-              try
-                match String.split_on_char '.' version_str with
-                | major :: _ -> int_of_string major
-                | [] -> 0
-              with _ -> 0
-            in
             (* Group versions by major version *)
             let major_versions = Hashtbl.create 5 in
             List.iter
@@ -1414,4 +1414,6 @@ module For_tests = struct
   let first_nonempty_line = first_nonempty_line
 
   let wrap_text = wrap_text
+
+  let extract_major = extract_major
 end

@@ -104,4 +104,6 @@ module For_tests : sig
   val first_nonempty_line : string list -> string option
 
   val wrap_text : width:int -> string -> string list
+
+  val extract_major : string -> int
 end

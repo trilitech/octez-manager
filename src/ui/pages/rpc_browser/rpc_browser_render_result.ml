@@ -437,6 +437,14 @@ let render_pager_tabs ~pagers ~focused_id =
   String.concat "" tabs
 
 (** Render result mode with multi-pager support *)
+module For_tests = struct
+  let visible_length = visible_length
+
+  let truncate_to_width = truncate_to_width
+
+  let split_lines_padded = split_lines_padded
+end
+
 let render ~state ~cols ~rows ~focus =
   match state.State.mode with
   | State.List _ -> Widgets.dim "(list mode - use list renderer)"

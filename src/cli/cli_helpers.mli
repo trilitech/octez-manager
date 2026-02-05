@@ -92,3 +92,10 @@ val history_mode_choices : (string * History_mode.t) list
 
 (** Cmdliner term for optional history mode *)
 val history_mode_opt_term : History_mode.t option Term.t
+
+(** Internal functions exposed for testing only. Do not use outside tests. *)
+module For_tests : sig
+  val split_at_last_comma : string -> string * string
+
+  val compute_required_space : ratio:int64 -> int64 -> int64
+end

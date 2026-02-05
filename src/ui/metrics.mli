@@ -100,3 +100,12 @@ val get_recording_duration : unit -> int
 
 (** Clear all recorded snapshots *)
 val clear_snapshots : unit -> unit
+
+(** Exported for tests *)
+module For_tests : sig
+  val percentile : float array -> float -> float option
+
+  val metrics_text : unit -> string
+
+  val reset : unit -> unit
+end

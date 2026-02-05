@@ -168,6 +168,19 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_instances_actions_pure)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  str)
+ (modules test_instances_actions_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_node_env)
  (libraries alcotest octez_manager_lib unix)
  (modules test_node_env)
@@ -539,7 +552,12 @@
 
 (test
  (name test_rpc_browser_render_result)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
  (modules test_rpc_browser_render_result)
  (instrumentation
   (backend bisect_ppx)))
@@ -609,8 +627,25 @@
 
 (test
  (name test_binary_help_explorer)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
  (modules test_binary_help_explorer)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_binary_help_explorer_extended)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
+ (modules test_binary_help_explorer_extended)
  (instrumentation
   (backend bisect_ppx)))
 
@@ -630,8 +665,26 @@
 
 (test
  (name test_rpc_scheduler)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
  (modules test_rpc_scheduler)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_node_selection)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  yojson)
+ (modules test_rpc_node_selection)
  (instrumentation
   (backend bisect_ppx)))
 
@@ -762,11 +815,73 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_metrics)
+ (libraries alcotest qcheck-core qcheck-alcotest octez-manager.ui str unix)
+ (modules test_metrics)
+ (instrumentation
+  (backend bisect_ppx)))
+
+; Pure coverage tests for UI pages
+
+(test
+ (name test_flows_pure)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
+ (modules test_flows_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_snapshots_pure)
+ (libraries alcotest octez_manager_lib octez-manager.ui miaou-core.lib)
+ (modules test_snapshots_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_import_wizard_pure)
+ (libraries alcotest octez_manager_lib octez-manager.ui miaou-core.lib)
+ (modules test_import_wizard_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_log_viewer_page_pure)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_log_viewer_page_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_log_export_pure)
+ (libraries alcotest octez_manager_lib unix)
+ (modules test_log_export_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
 ; Fuzz tests (adversarial generators, high iteration count)
 
 (test
  (name test_fuzz)
  (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
  (modules test_fuzz)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_cli_helpers)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_cli
+  octez_manager_lib
+  str)
+ (modules test_cli_helpers)
  (instrumentation
   (backend bisect_ppx)))
