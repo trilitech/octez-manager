@@ -39,21 +39,11 @@ let find_page_or_default name default_name =
           Ok page
       | None -> Error (`Msg "Instances page missing from registry"))
 
-let run ?page ?(log = false) ?logfile () =
-  let quit_requested = ref false in
-  let handle_break _ =
-    quit_requested := true ;
-    raise_notrace Exit
-  in
-  Sys.catch_break true ;
-  Sys.set_signal Sys.sigint (Sys.Signal_handle handle_break) ;
-  Sys.set_signal Sys.sigterm (Sys.Signal_handle handle_break) ;
+let register_and_init ?(log = false) ?logfile () =
   Capabilities.register () ;
   register_pages () ;
   Runtime.initialize ~log ?logfile () ;
-  (* Cleanup stale temporary download directories from interrupted sessions *)
   Binary_downloader.cleanup_stale_temp_dirs () ;
-  (* Check for version updates in background *)
   Background_runner.enqueue (fun () ->
       match Version_checker.check_for_updates () with
       | Version_checker.UpdateAvailable
@@ -71,9 +61,7 @@ let run ?page ?(log = false) ?logfile () =
                latest_version
                current_str)
       | _ -> ()) ;
-  (* Start self-update scheduler to check for octez-manager updates *)
   Self_update_scheduler.start () ;
-  (* Check immediately for octez-manager updates and show notification *)
   Background_runner.enqueue (fun () ->
       Self_update_scheduler.check_now () ;
       if Self_update_scheduler.update_available () then
@@ -84,7 +72,28 @@ let run ?page ?(log = false) ?logfile () =
                  "octez-manager %s is available. Run 'octez-manager \
                   self-update' to upgrade."
                  version)
-        | None -> ()) ;
+        | None -> ())
+
+let shutdown () =
+  Background_runner.shutdown () ;
+  Rpc_scheduler.shutdown () ;
+  Delegate_scheduler.shutdown () ;
+  System_metrics_scheduler.shutdown () ;
+  External_services_scheduler.shutdown () ;
+  Versions_scheduler.shutdown () ;
+  Self_update_scheduler.stop () ;
+  Common.kill_active_download ()
+
+let run ?page ?(log = false) ?logfile () =
+  let quit_requested = ref false in
+  let handle_break _ =
+    quit_requested := true ;
+    raise_notrace Exit
+  in
+  Sys.catch_break true ;
+  Sys.set_signal Sys.sigint (Sys.Signal_handle handle_break) ;
+  Sys.set_signal Sys.sigterm (Sys.Signal_handle handle_break) ;
+  register_and_init ~log ?logfile () ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
     if !quit_requested then raise Exit
@@ -102,14 +111,5 @@ let run ?page ?(log = false) ?logfile () =
   in
   try loop [] start_name
   with Exit | Sys.Break ->
-    (* Cleanup: shutdown all background schedulers and workers *)
-    Background_runner.shutdown () ;
-    Rpc_scheduler.shutdown () ;
-    Delegate_scheduler.shutdown () ;
-    System_metrics_scheduler.shutdown () ;
-    External_services_scheduler.shutdown () ;
-    Versions_scheduler.shutdown () ;
-    Self_update_scheduler.stop () ;
-    (* Cleanup: kill any active download process *)
-    Common.kill_active_download () ;
+    shutdown () ;
     Ok ()
