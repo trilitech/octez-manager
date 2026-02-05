@@ -22,6 +22,7 @@ _octez-manager() {
     'self-update:Check for and install octez-manager updates'
     'ui:Launch the interactive terminal UI (same as running without arguments)'
     'version:Show version information and check for updates'
+    'web:Start the web interface (browser-based terminal over WebSocket)'
   )
 
   local -a instance_actions
@@ -244,6 +245,19 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
+  local -a opts_web
+  opts_web=(
+    '-p[TCP port to listen on]:PORT:'
+    '--port[TCP port to listen on]:PORT:'
+    '--page[Start on a registered page]:NAME:'
+    '--password[Controller password]:PASSWORD:'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--viewer-password[Viewer password (defaults to controller password if not set)]:PASSWORD:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
   _arguments -C \
     '1: :->command' \
     '*:: :->args'
@@ -354,6 +368,10 @@ _octez-manager() {
         version)
           _arguments \
             $opts_version
+          ;;
+        web)
+          _arguments \
+            $opts_web
           ;;
       esac
       ;;
