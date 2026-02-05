@@ -29,6 +29,43 @@ let get_shortcuts state =
       (fun i (path, desc) -> (string_of_int (i + 1), path, desc))
       default_shortcuts
 
+(** Group services by network, returning list of (network_name, services) *)
+let group_by_network services =
+  (* Build a map of network -> services *)
+  let network_map =
+    List.fold_left
+      (fun acc svc ->
+        let network = svc.Octez_manager_lib.Service.network in
+        let existing = try List.assoc network acc with Not_found -> [] in
+        (network, svc :: existing) :: List.remove_assoc network acc)
+      []
+      services
+  in
+  (* Sort by network name and reverse service lists (they were consed) *)
+  List.sort
+    (fun (n1, _) (n2, _) -> String.compare n1 n2)
+    (List.map (fun (net, svcs) -> (net, List.rev svcs)) network_map)
+
+(** Build modal items with local/public sections and network grouping *)
+let build_instance_items ~local ~public =
+  let build_network_items services =
+    let grouped = group_by_network services in
+    List.concat_map
+      (fun (network, svcs) ->
+        let header =
+          `Header (Printf.sprintf "  • %s" (String.capitalize_ascii network))
+        in
+        header :: List.map (fun s -> `Instance s) svcs)
+      grouped
+  in
+  (if local <> [] then
+     `Header "── Local Instances ──" :: build_network_items local
+   else [])
+  @
+  if public <> [] then
+    `Header "── Public Nodes ──" :: build_network_items public
+  else []
+
 let get_selected_entry state =
   match state.State.mode with
   | State.List {entries; cursor; _} -> List.nth_opt entries cursor
@@ -225,18 +262,8 @@ let handle_enter state on_update =
                 curr.Octez_manager_lib.Service.rpc_addr
                 = svc.Octez_manager_lib.Service.rpc_addr
           in
-          (* Build items with section headers *)
-          let items =
-            (if local <> [] then
-               `Header "── Local Instances ──"
-               :: List.map (fun s -> `Instance s) local
-             else [])
-            @
-            if public <> [] then
-              `Header "── Public Nodes ──"
-              :: List.map (fun s -> `Instance s) public
-            else []
-          in
+          (* Build items with section headers and network grouping *)
+          let items = build_instance_items ~local ~public in
           if items = [] then
             on_update (State.set_error "No instances available" state)
           else
@@ -247,11 +274,10 @@ let handle_enter state on_update =
                 | `Header h -> h
                 | `Instance svc ->
                     let name = svc.Octez_manager_lib.Service.instance in
-                    let network = svc.Octez_manager_lib.Service.network in
-                    let label = Printf.sprintf "%s (%s)" name network in
+                    (* Network is shown in group header, no need to repeat *)
                     if is_current svc then
-                      Miaou_widgets_display.Widgets.fg 14 ("✓ " ^ label)
-                    else "  " ^ label)
+                      Miaou_widgets_display.Widgets.fg 14 ("    ✓ " ^ name)
+                    else "      " ^ name)
               ~on_select:(function
                 | `Header _ -> () (* Headers not selectable *)
                 | `Instance svc ->
@@ -397,18 +423,8 @@ let handle_cached_enter state on_update =
                 curr.Octez_manager_lib.Service.rpc_addr
                 = svc.Octez_manager_lib.Service.rpc_addr
           in
-          (* Build items with section headers *)
-          let items =
-            (if local <> [] then
-               `Header "── Local Instances ──"
-               :: List.map (fun s -> `Instance s) local
-             else [])
-            @
-            if public <> [] then
-              `Header "── Public Nodes ──"
-              :: List.map (fun s -> `Instance s) public
-            else []
-          in
+          (* Build items with section headers and network grouping *)
+          let items = build_instance_items ~local ~public in
           if items = [] then
             on_update (State.set_error "No instances available" state)
           else
@@ -419,11 +435,10 @@ let handle_cached_enter state on_update =
                 | `Header h -> h
                 | `Instance svc ->
                     let name = svc.Octez_manager_lib.Service.instance in
-                    let network = svc.Octez_manager_lib.Service.network in
-                    let label = Printf.sprintf "%s (%s)" name network in
+                    (* Network is shown in group header, no need to repeat *)
                     if is_current svc then
-                      Miaou_widgets_display.Widgets.fg 14 ("✓ " ^ label)
-                    else "  " ^ label)
+                      Miaou_widgets_display.Widgets.fg 14 ("    ✓ " ^ name)
+                    else "      " ^ name)
               ~on_select:(function
                 | `Header _ -> () (* Headers not selectable *)
                 | `Instance svc ->
