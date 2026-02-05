@@ -49,9 +49,9 @@ let group_by_network services =
 (** Format a service for display in the modal.
     For public nodes, show both label and URL. For local nodes, show just the label. *)
 let format_service_label (svc : Octez_manager_lib.Service.t) ~is_current =
-  let is_public = 
-    svc.Octez_manager_lib.Service.data_dir = "" 
-    && svc.Octez_manager_lib.Service.app_bin_dir = "" 
+  let is_public =
+    svc.Octez_manager_lib.Service.data_dir = ""
+    && svc.Octez_manager_lib.Service.app_bin_dir = ""
   in
   let name = svc.Octez_manager_lib.Service.instance in
   let label = 
