@@ -108,7 +108,7 @@ jobs:
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-web "${MIAOU_GIT_URL}#fix/web-driver-package-deps" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix
 
@@ -303,7 +303,7 @@ jobs:
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-web "${MIAOU_GIT_URL}#fix/web-driver-package-deps" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix
 
