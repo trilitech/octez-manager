@@ -45,25 +45,28 @@ let group_by_network services =
     (fun (n1, _) (n2, _) -> String.compare n1 n2)
     (List.map (fun (net, svcs) -> (net, List.rev svcs)) network_map)
 
-(** Build modal items with local/public sections and network grouping *)
+(** Build modal items with local/public sections and network grouping.
+    Returns a flat list where each item carries its section, network, and service. *)
 let build_instance_items ~local ~public =
-  let build_network_items services =
+  (* Group services by network and add section/network labels to display *)
+  let build_labeled_items section_label services =
     let grouped = group_by_network services in
     List.concat_map
       (fun (network, svcs) ->
-        let header =
-          `Header (Printf.sprintf "  • %s" (String.capitalize_ascii network))
-        in
-        header :: List.map (fun s -> `Instance s) svcs)
+        List.map
+          (fun svc ->
+            (* Attach section and network labels for display *)
+            (section_label, String.capitalize_ascii network, svc))
+          svcs)
       grouped
   in
-  (if local <> [] then
-     `Header "── Local Instances ──" :: build_network_items local
-   else [])
-  @
-  if public <> [] then
-    `Header "── Public Nodes ──" :: build_network_items public
-  else []
+  let local_items =
+    if local <> [] then build_labeled_items "Local Instances" local else []
+  in
+  let public_items =
+    if public <> [] then build_labeled_items "Public Nodes" public else []
+  in
+  local_items @ public_items
 
 let update_state s =
   state_ref := Some s ;
@@ -548,18 +551,63 @@ let handle_key ps key ~size =
                   state_ref := Some new_state ;
                   Navigation.update (fun _ -> new_state) ps)
                 else (
+                  (* Expand items to include visual headers for display *)
+                  let display_items =
+                    let rec expand prev_section prev_network = function
+                      | [] -> []
+                      | (section, network, svc) :: rest ->
+                          let needs_section =
+                            match prev_section with
+                            | None -> true
+                            | Some s -> s <> section
+                          in
+                          let needs_network =
+                            not needs_section
+                            &&
+                            match prev_network with
+                            | None -> true
+                            | Some n -> n <> network
+                          in
+                          let items =
+                            (if needs_section then
+                               [
+                                 (section, network, svc, `SectionHeader);
+                                 (section, network, svc, `NetworkHeader);
+                                 (section, network, svc, `Service);
+                               ]
+                             else if needs_network then
+                               [
+                                 (section, network, svc, `NetworkHeader);
+                                 (section, network, svc, `Service);
+                               ]
+                             else [(section, network, svc, `Service)])
+                          in
+                          items @ expand (Some section) (Some network) rest
+                    in
+                    expand None None items
+                  in
                   Modal_helpers.open_choice_modal
                     ~title:"Select target instance for pager"
-                    ~items
-                    ~to_string:(function
-                      | `Header h -> h
-                      | `Instance svc ->
+                    ~items:display_items
+                    ~to_string:(fun (_section, network, svc, kind) ->
+                      match kind with
+                      | `SectionHeader ->
+                          let section =
+                            if svc.Octez_manager_lib.Service.data_dir <> ""
+                               || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+                            then "Local Instances"
+                            else "Public Nodes"
+                          in
+                          Miaou_widgets_display.Widgets.bold ("── " ^ section ^ " ──")
+                      | `NetworkHeader ->
+                          Miaou_widgets_display.Widgets.fg 14 ("  • " ^ network)
+                      | `Service ->
                           let name = svc.Octez_manager_lib.Service.instance in
-                          (* Network is shown in group header, no need to repeat *)
-                          "      " ^ name)
-                    ~on_select:(function
-                      | `Header _ -> ()
-                      | `Instance svc -> (
+                          "        " ^ name)
+                    ~on_select:(fun (_, _, svc, kind) ->
+                      (* Only react to service selections, ignore headers *)
+                      match kind with
+                      | `Service -> (
                           match !state_ref with
                           | Some current_state ->
                               let new_state =
@@ -567,7 +615,8 @@ let handle_key ps key ~size =
                               in
                               state_ref := Some new_state ;
                               update_state new_state
-                          | None -> ()))
+                          | None -> ())
+                      | `SectionHeader | `NetworkHeader -> ())
                     () ;
                   ps)
                 (* Handle shortcut keys 1-9, but not if pager is in input mode *)
