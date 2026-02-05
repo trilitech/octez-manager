@@ -46,6 +46,28 @@ let group_by_network services =
     (fun (n1, _) (n2, _) -> String.compare n1 n2)
     (List.map (fun (net, svcs) -> (net, List.rev svcs)) network_map)
 
+(** Format a service for display in the modal.
+    For public nodes, show both label and URL. For local nodes, show just the label. *)
+let format_service_label (svc : Octez_manager_lib.Service.t) ~is_current =
+  let is_public = 
+    svc.Octez_manager_lib.Service.data_dir = "" 
+    && svc.Octez_manager_lib.Service.app_bin_dir = "" 
+  in
+  let name = svc.Octez_manager_lib.Service.instance in
+  let label = 
+    if is_public then
+      (* Public nodes: show "Name https://..." *)
+      let url = svc.Octez_manager_lib.Service.rpc_addr in
+      Printf.sprintf "%s %s" name (Miaou_widgets_display.Widgets.dim url)
+    else
+      (* Local instances: just show name *)
+      name
+  in
+  if is_current then
+    Miaou_widgets_display.Widgets.fg 10 ("      ✓ " ^ label)
+  else
+    "        " ^ label
+
 (** Build modal items with local/public sections and network grouping.
     Returns a flat list where each item carries its section, network, and service. *)
 let build_instance_items ~local ~public =
@@ -322,10 +344,7 @@ let handle_enter state on_update =
                 | `NetworkHeader ->
                     Miaou_widgets_display.Widgets.fg 14 ("  • " ^ network)
                 | `Service ->
-                    let name = svc.Octez_manager_lib.Service.instance in
-                    if is_current svc then
-                      Miaou_widgets_display.Widgets.fg 10 ("      ✓ " ^ name)
-                    else "        " ^ name)
+                    format_service_label svc ~is_current:(is_current svc))
               ~on_select:(fun (_, _, svc, kind) ->
                 (* Only react to service selections, ignore headers *)
                 match kind with
@@ -529,10 +548,7 @@ let handle_cached_enter state on_update =
                 | `NetworkHeader ->
                     Miaou_widgets_display.Widgets.fg 14 ("  • " ^ network)
                 | `Service ->
-                    let name = svc.Octez_manager_lib.Service.instance in
-                    if is_current svc then
-                      Miaou_widgets_display.Widgets.fg 10 ("      ✓ " ^ name)
-                    else "        " ^ name)
+                    format_service_label svc ~is_current:(is_current svc))
               ~on_select:(fun (_, _, svc, kind) ->
                 (* Only react to service selections, ignore headers *)
                 match kind with
