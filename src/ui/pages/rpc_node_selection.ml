@@ -47,153 +47,46 @@ type msg = unit
 
 type pstate = state Navigation.t
 
-(** Curated default public nodes used as fallback *)
-let curated_defaults : node_item list =
-  [
-    {
-      label = "ecadlabs";
-      rpc_addr = "https://mainnet.api.tez.ie";
-      is_public = true;
-      network = Some "mainnet";
-    };
-    {
-      label = "Tezos Ghostnet";
-      rpc_addr = "https://rpc.ghostnet.teztnets.com";
-      is_public = true;
-      network = Some "ghostnet";
-    };
-    {
-      label = "SmartPy";
-      rpc_addr = "https://mainnet.smartpy.io";
-      is_public = true;
-      network = Some "mainnet";
-    };
-  ]
-
-(** Parse Taquito JSON format to extract public nodes *)
+(** Parse Taquito JSON using Public_nodes_cache and convert to node_item.
+    This function is kept for backward compatibility with tests. *)
 let parse_taquito_json (txt : string) : node_item list =
-  try
-    let j = Yojson.Safe.from_string txt in
-    let parse_assoc_list lst ~get_rpc ~get_label ~get_net =
-      List.filter_map
-        (function
-          | `Assoc kv ->
-              let rpc = get_rpc kv in
-              if rpc = "" then None
-              else
-                Some
-                  {
-                    label = get_label kv rpc;
-                    rpc_addr = rpc;
-                    is_public = true;
-                    network = get_net kv;
-                  }
-          | _ -> None)
-        lst
-    in
-    match j with
-    | `List lst ->
-        (* Old format: list of objects with rpc/rpc_url/name fields *)
-        parse_assoc_list
-          lst
-          ~get_rpc:(fun kv ->
-            match List.assoc_opt "rpc" kv with
-            | Some (`String s) -> s
-            | _ -> (
-                match List.assoc_opt "rpc_url" kv with
-                | Some (`String s) -> s
-                | _ -> ""))
-          ~get_label:(fun kv rpc ->
-            match List.assoc_opt "name" kv with
-            | Some (`String s) when s <> "" -> s
-            | _ -> rpc)
-          ~get_net:(fun kv ->
-            match List.assoc_opt "network" kv with
-            | Some (`String s) -> Some s
-            | _ -> None)
-    | `Assoc kvs -> (
-        (* Taquito format: providers map + rpc_endpoints list *)
-        let provider_names =
-          match List.assoc_opt "providers" kvs with
-          | Some (`List provs) ->
-              List.fold_left
-                (fun acc p ->
-                  match p with
-                  | `Assoc pkv ->
-                      let id =
-                        match List.assoc_opt "id" pkv with
-                        | Some (`String s) -> s
-                        | _ -> ""
-                      in
-                      let name =
-                        match List.assoc_opt "name" pkv with
-                        | Some (`String s) -> s
-                        | _ -> id
-                      in
-                      if id = "" then acc else (id, name) :: acc
-                  | _ -> acc)
-                []
-                provs
-          | _ -> []
-        in
-        let provider_of id =
-          match List.assoc_opt id provider_names with Some n -> n | None -> id
-        in
-        match List.assoc_opt "rpc_endpoints" kvs with
-        | Some (`List eps) ->
-            List.filter_map
-              (function
-                | `Assoc ekv ->
-                    let rpc =
-                      match List.assoc_opt "url" ekv with
-                      | Some (`String s) -> s
-                      | _ -> ""
-                    in
-                    if rpc = "" then None
-                    else
-                      let provider =
-                        match List.assoc_opt "provider" ekv with
-                        | Some (`String s) -> provider_of s
-                        | _ -> ""
-                      in
-                      let net =
-                        match List.assoc_opt "net" ekv with
-                        | Some (`String s) -> Some s
-                        | _ -> None
-                      in
-                      (* Don't include network in label - it's stored separately and
-                         displayed when needed to avoid duplication *)
-                      let label =
-                        if provider <> "" then provider
-                        else rpc
-                      in
-                      Some
-                        {label; rpc_addr = rpc; is_public = true; network = net}
-                | _ -> None)
-              eps
-        | _ -> [])
-    | _ -> []
-  with _ -> []
+  let nodes = Public_nodes_cache.parse_taquito_json txt in
+  List.map (fun (info : Public_nodes_cache.node_info) ->
+    {
+      label = info.label;
+      rpc_addr = info.rpc_addr;
+      is_public = true;
+      network = info.network;
+    }
+  ) nodes
 
-(** Fetch public nodes from Taquito with fallback *)
+(** Curated default public nodes.
+    This is exposed for tests and converts from Public_nodes_cache. *)
+let curated_defaults : node_item list =
+  List.map (fun (info : Public_nodes_cache.node_info) ->
+    {
+      label = info.label;
+      rpc_addr = info.rpc_addr;
+      is_public = true;
+      network = info.network;
+    }
+  ) Public_nodes_cache.curated_defaults
+
+(** Fetch public nodes using Public_nodes_cache *)
 let fetch_public_nodes () : node_item list * string option =
-  let urls =
-    [
-      "https://taquito.io/docs/rpc_nodes.json";
-      "https://taquito.io/rpc_nodes.json";
-      "https://www.taquito.io/docs/rpc_nodes.json";
-    ]
+  let nodes = Public_nodes_cache.get_nodes () in
+  (* Convert node_info to node_item by adding is_public field *)
+  let node_items = 
+    List.map (fun (info : Public_nodes_cache.node_info) ->
+      {
+        label = info.label;
+        rpc_addr = info.rpc_addr;
+        is_public = true;
+        network = info.network;
+      }
+    ) nodes
   in
-  let rec try_urls = function
-    | [] -> (curated_defaults, Some "Using fallback nodes (fetch failed)")
-    | url :: rest -> (
-        match Common.run_out ["curl"; "-fsSL"; "-m"; "5"; url] with
-        | Ok body ->
-            let nodes = parse_taquito_json body in
-            if nodes = [] then try_urls rest else (nodes, None)
-        | Error _ -> try_urls rest)
-  in
-  try_urls urls
+  (node_items, None)
 
 (** Load local node instances *)
 let load_local_instances () : node_item list =
