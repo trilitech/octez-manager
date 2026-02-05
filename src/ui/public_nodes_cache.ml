@@ -57,7 +57,7 @@ let extract_network_from_url (url : string) : string option =
   (* First check for known URLs that don't contain network in their name *)
   let known_url_mappings = [
     ("tzbeta.net", "mainnet");
-    ("rpc.tzkt.io", "mainnet");
+    (* Note: rpc.tzkt.io removed - it has network in path: rpc.tzkt.io/mainnet *)
   ] in
   match List.find_opt (fun (pattern, _) -> 
     contains_substring lower_url pattern
