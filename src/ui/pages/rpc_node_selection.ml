@@ -44,7 +44,7 @@ type pstate = state Navigation.t
 let curated_defaults : node_item list =
   [
     {
-      label = "Tezos Mainnet (ecadlabs)";
+      label = "ecadlabs";
       rpc_addr = "https://mainnet.api.tez.ie";
       is_public = true;
       network = Some "mainnet";
@@ -56,7 +56,7 @@ let curated_defaults : node_item list =
       network = Some "ghostnet";
     };
     {
-      label = "Tezos Mainnet (SmartPy)";
+      label = "SmartPy";
       rpc_addr = "https://mainnet.smartpy.io";
       is_public = true;
       network = Some "mainnet";
@@ -154,13 +154,11 @@ let parse_taquito_json (txt : string) : node_item list =
                         | Some (`String s) -> Some s
                         | _ -> None
                       in
+                      (* Don't include network in label - it's stored separately and
+                         displayed when needed to avoid duplication *)
                       let label =
-                        match net with
-                        | Some n when provider <> "" ->
-                            Printf.sprintf "%s (%s)" provider n
-                        | Some n -> n
-                        | None when provider <> "" -> provider
-                        | None -> rpc
+                        if provider <> "" then provider
+                        else rpc
                       in
                       Some
                         {label; rpc_addr = rpc; is_public = true; network = net}
