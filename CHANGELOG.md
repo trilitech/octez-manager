@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Renamed "linked directories" to "registered directories" (CLI commands: `binaries link` → `binaries register`, `binaries unlink` → `binaries unregister`)
+- Diagnostics page now uses Box_widget for section borders instead of Unicode separator headers, providing a cleaner visual layout
 
 ### Fixed
 
