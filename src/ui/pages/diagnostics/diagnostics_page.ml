@@ -7,6 +7,7 @@
 
 module Widgets = Miaou_widgets_display.Widgets
 module Sparkline = Miaou_widgets_display.Sparkline_widget
+module Box = Miaou_widgets_layout.Box_widget
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
@@ -195,26 +196,25 @@ let footer = []
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   Metrics.record_render ~page:name (fun () ->
-      let lines = ref [] in
-      let add line = lines := line :: !lines in
+      let sections = ref [] in
+      let add_section section = sections := section :: !sections in
+      let box_width = min 80 (size.LTerm_geom.cols - 2) in
 
       (* Service Status Section *)
-      add (Widgets.fg 14 (Widgets.bold "━━━ Service Status ━━━")) ;
-      add "" ;
-      if s.services = [] then add (Widgets.dim "  No services registered")
-      else
-        List.iter
-          (fun (st : Data.Service_state.t) ->
-            let svc = st.service in
-            let status_icon, status_color =
-              match st.status with
-              | Running -> ("●", 10)
-              | Stopped -> ("○", 8)
-              | Unknown _ -> ("?", 11)
-            in
-            let line =
+      let service_content =
+        if s.services = [] then Widgets.dim "No services registered"
+        else
+          s.services
+          |> List.map (fun (st : Data.Service_state.t) ->
+              let svc = st.service in
+              let status_icon, status_color =
+                match st.status with
+                | Running -> ("●", 10)
+                | Stopped -> ("○", 8)
+                | Unknown _ -> ("?", 11)
+              in
               Printf.sprintf
-                "  %s %-20s  %s  %s"
+                "%s %-20s  %s  %s"
                 (Widgets.fg status_color status_icon)
                 (Widgets.bold svc.Service.instance)
                 (Widgets.fg 8 svc.Service.role)
@@ -222,74 +222,101 @@ let view ps ~focus:_ ~size =
                    (Printf.sprintf
                       "net:%s mode:%s"
                       svc.Service.network
-                      (History_mode.to_string svc.Service.history_mode)))
-            in
-            add line)
-          s.services ;
+                      (History_mode.to_string svc.Service.history_mode))))
+          |> String.concat "\n"
+      in
+      add_section
+        (Box.render
+           ~title:"Service Status"
+           ~style:Heavy
+           ~color:14
+           ~width:box_width
+           service_content) ;
 
-      add "" ;
-      add (Widgets.fg 13 (Widgets.bold "━━━ Caches ━━━")) ;
-      add "" ;
+      (* Caches Section *)
       let cache_stats = Cache.get_stats () in
-      if cache_stats = [] then add (Widgets.dim "  No caches registered")
-      else
-        List.iter
-          (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
-            let age_str =
-              match age with
-              | None -> Widgets.dim "empty"
-              | Some a ->
-                  let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
-                  if expired then Widgets.red s else Widgets.green s
-            in
-            let stats_str =
-              if hits + misses > 0 then
-                Printf.sprintf " hits:%d misses:%d" hits misses
-              else ""
-            in
-            let count_str =
-              if sub_entries <> [] then
-                Printf.sprintf " (%d)" (List.length sub_entries)
-              else ""
-            in
-            add
-              (Printf.sprintf
-                 "  %-20s  %s%s%s"
-                 name
-                 age_str
-                 count_str
-                 (Widgets.dim stats_str)) ;
-            (* Show sub-entries for keyed caches *)
-            List.iter
-              (fun (entry : Cache.sub_entry) ->
-                let sub_age_str =
-                  let s = Printf.sprintf "%.1fs" entry.age in
-                  if entry.expired then Widgets.red s else Widgets.green s
-                in
-                add (Printf.sprintf "    └─ %-16s  %s" entry.key sub_age_str))
-              sub_entries)
-          cache_stats ;
-      add (Widgets.dim "  (press 'c' to clear all caches)") ;
+      let cache_content =
+        if cache_stats = [] then Widgets.dim "No caches registered"
+        else
+          let cache_lines =
+            cache_stats
+            |> List.concat_map
+                 (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
+                   let age_str =
+                     match age with
+                     | None -> Widgets.dim "empty"
+                     | Some a ->
+                         let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
+                         if expired then Widgets.red s else Widgets.green s
+                   in
+                   let stats_str =
+                     if hits + misses > 0 then
+                       Printf.sprintf " hits:%d misses:%d" hits misses
+                     else ""
+                   in
+                   let count_str =
+                     if sub_entries <> [] then
+                       Printf.sprintf " (%d)" (List.length sub_entries)
+                     else ""
+                   in
+                   let main_line =
+                     Printf.sprintf
+                       "%-20s  %s%s%s"
+                       name
+                       age_str
+                       count_str
+                       (Widgets.dim stats_str)
+                   in
+                   let sub_lines =
+                     List.map
+                       (fun (entry : Cache.sub_entry) ->
+                         let sub_age_str =
+                           let s = Printf.sprintf "%.1fs" entry.age in
+                           if entry.expired then Widgets.red s
+                           else Widgets.green s
+                         in
+                         Printf.sprintf "  └─ %-16s  %s" entry.key sub_age_str)
+                       sub_entries
+                   in
+                   main_line :: sub_lines)
+          in
+          String.concat "\n" cache_lines
+          ^ "\n"
+          ^ Widgets.dim "(press 'c' to clear all caches)"
+      in
+      add_section
+        (Box.render
+           ~title:"Caches"
+           ~style:Heavy
+           ~color:13
+           ~width:box_width
+           cache_content) ;
 
-      add "" ;
-      add (Widgets.fg 12 (Widgets.bold "━━━ Real-Time Metrics ━━━")) ;
-      add "" ;
-
-      (* Sparkline *)
+      (* Real-Time Metrics Section *)
       let bg_depth = Metrics.get_bg_queue_depth () in
       let bg_max = Metrics.get_bg_queue_max () in
-      add ("  " ^ Charts.render_bg_queue_sparkline s.bg_queue_spark) ;
-      add
-        (Printf.sprintf
-           "  Current: %d/%d  %s"
-           bg_depth
-           bg_max
-           (if bg_depth > 0 then Widgets.fg 11 "⚠ tasks pending"
-            else Widgets.fg 10 "✓ idle")) ;
+      let realtime_content =
+        String.concat
+          "\n"
+          [
+            Charts.render_bg_queue_sparkline s.bg_queue_spark;
+            Printf.sprintf
+              "Current: %d/%d  %s"
+              bg_depth
+              bg_max
+              (if bg_depth > 0 then Widgets.fg 11 "⚠ tasks pending"
+               else Widgets.fg 10 "✓ idle");
+          ]
+      in
+      add_section
+        (Box.render
+           ~title:"Real-Time Metrics"
+           ~style:Heavy
+           ~color:12
+           ~width:box_width
+           realtime_content) ;
 
-      add "" ;
-      add (Widgets.fg 11 (Widgets.bold "━━━ Metrics Recorder ━━━")) ;
-      add "" ;
+      (* Metrics Recorder Section *)
       let recorder_enabled = Metrics.is_recording () in
       let recorder_icon =
         if recorder_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
@@ -306,123 +333,128 @@ let view ps ~focus:_ ~size =
         | 180 -> "15m"
         | n -> Printf.sprintf "%ds" (n * 5)
       in
-      add
-        (Printf.sprintf
-           "  %s %s %s %s"
-           (Widgets.fg 12 "Status:")
-           recorder_icon
-           recorder_status
-           (Widgets.dim
-              (Printf.sprintf
-                 "(duration: %s, press 'd' to change)"
-                 duration_str))) ;
-      add (Widgets.dim "  (press 'R' to start/stop recording)") ;
+      let recorder_content =
+        String.concat
+          "\n"
+          [
+            Printf.sprintf
+              "%s %s %s %s"
+              (Widgets.fg 12 "Status:")
+              recorder_icon
+              recorder_status
+              (Widgets.dim
+                 (Printf.sprintf
+                    "(duration: %s, press 'd' to change)"
+                    duration_str));
+            Widgets.dim "(press 'R' to start/stop recording)";
+          ]
+      in
+      add_section
+        (Box.render
+           ~title:"Metrics Recorder"
+           ~style:Heavy
+           ~color:11
+           ~width:box_width
+           recorder_content) ;
 
       (* Historical Charts *)
-      if recorder_enabled || Metrics.get_snapshots () <> [] then (
-        add "" ;
-        add (Widgets.fg 13 (Widgets.bold "━━━ Historical Metrics ━━━")) ;
-        add "" ;
-        let samples = Metrics.get_snapshots () in
-
-        if samples = [] then (
-          add (Widgets.dim "  Collecting data... (wait ~5 seconds)") ;
-          add (Widgets.dim "  Charts will appear once samples are recorded"))
-        else
-          let chart_width = min 70 (size.LTerm_geom.cols - 4) in
-
-          (* BG Queue Chart *)
-          let bg_chart =
-            Charts.render_bg_queue_chart samples ~width:chart_width ~height:10
-          in
-          String.split_on_char '\n' bg_chart |> List.iter add ;
-          add "" ;
-
-          (* Service Status Chart *)
-          let svc_chart =
-            Charts.render_service_status_chart
-              samples
-              ~width:chart_width
-              ~height:10
-          in
-          String.split_on_char '\n' svc_chart |> List.iter add ;
-          add "" ;
-
-          (* Render Latency Chart *)
-          let render_chart =
-            Charts.render_latency_chart samples ~width:chart_width ~height:10
-          in
-          String.split_on_char '\n' render_chart |> List.iter add ;
-          add "" ;
-
-          (* Key-to-Render Chart *)
-          let key_chart =
-            Charts.render_key_to_render_chart
-              samples
-              ~width:chart_width
-              ~height:10
-          in
-          String.split_on_char '\n' key_chart |> List.iter add ;
-          add "" ;
-
-          (* Summary *)
-          let summary =
-            Charts.render_summary_bars samples ~width:chart_width ~height:8
-          in
-          String.split_on_char '\n' summary |> List.iter add) ;
+      (if recorder_enabled || Metrics.get_snapshots () <> [] then
+         let samples = Metrics.get_snapshots () in
+         let historical_content =
+           if samples = [] then
+             String.concat
+               "\n"
+               [
+                 Widgets.dim "Collecting data... (wait ~5 seconds)";
+                 Widgets.dim "Charts will appear once samples are recorded";
+               ]
+           else
+             let chart_width = min 70 (box_width - 4) in
+             String.concat
+               "\n\n"
+               [
+                 Charts.render_bg_queue_chart
+                   samples
+                   ~width:chart_width
+                   ~height:10;
+                 Charts.render_service_status_chart
+                   samples
+                   ~width:chart_width
+                   ~height:10;
+                 Charts.render_latency_chart
+                   samples
+                   ~width:chart_width
+                   ~height:10;
+                 Charts.render_key_to_render_chart
+                   samples
+                   ~width:chart_width
+                   ~height:10;
+                 Charts.render_summary_bars samples ~width:chart_width ~height:8;
+               ]
+         in
+         add_section
+           (Box.render
+              ~title:"Historical Metrics"
+              ~style:Heavy
+              ~color:13
+              ~width:box_width
+              historical_content)) ;
 
       (* Scheduler Metrics Section *)
-      add "" ;
-      add (Widgets.fg 11 (Widgets.bold "━━━ Scheduler Performance ━━━")) ;
-      add "" ;
       let scheduler_snapshots = Metrics.get_scheduler_snapshots () in
-      if scheduler_snapshots = [] then
-        add (Widgets.dim "  No scheduler metrics recorded yet")
-      else
-        List.iter
-          (fun (name, (snap : Metrics.snapshot)) ->
-            let avg =
-              if snap.count > 0 then snap.sum /. float_of_int snap.count else 0.
-            in
-            let p50_str =
-              match snap.p50 with
-              | Some v -> Printf.sprintf "%.1f" v
-              | None -> "-"
-            in
-            let p90_str =
-              match snap.p90 with
-              | Some v -> Printf.sprintf "%.1f" v
-              | None -> "-"
-            in
-            let p99_str =
-              match snap.p99 with
-              | Some v -> Printf.sprintf "%.1f" v
-              | None -> "-"
-            in
-            let color =
-              match snap.p90 with
-              | Some v when v > 100. -> 9 (* red if p90 > 100ms *)
-              | Some v when v > 50. -> 11 (* yellow if p90 > 50ms *)
-              | _ -> 10 (* green *)
-            in
-            add
-              (Printf.sprintf
-                 "  %s %-16s  %s avg:%.1fms  p50:%s  p90:%s  p99:%s  (n=%d)"
-                 (Widgets.fg color "●")
-                 name
-                 (Widgets.dim "|")
-                 avg
-                 p50_str
-                 p90_str
-                 p99_str
-                 snap.count))
-          scheduler_snapshots ;
+      let scheduler_content =
+        if scheduler_snapshots = [] then
+          Widgets.dim "No scheduler metrics recorded yet"
+        else
+          scheduler_snapshots
+          |> List.map (fun (name, (snap : Metrics.snapshot)) ->
+              let avg =
+                if snap.count > 0 then snap.sum /. float_of_int snap.count
+                else 0.
+              in
+              let p50_str =
+                match snap.p50 with
+                | Some v -> Printf.sprintf "%.1f" v
+                | None -> "-"
+              in
+              let p90_str =
+                match snap.p90 with
+                | Some v -> Printf.sprintf "%.1f" v
+                | None -> "-"
+              in
+              let p99_str =
+                match snap.p99 with
+                | Some v -> Printf.sprintf "%.1f" v
+                | None -> "-"
+              in
+              let color =
+                match snap.p90 with
+                | Some v when v > 100. -> 9 (* red if p90 > 100ms *)
+                | Some v when v > 50. -> 11 (* yellow if p90 > 50ms *)
+                | _ -> 10 (* green *)
+              in
+              Printf.sprintf
+                "%s %-16s  %s avg:%.1fms  p50:%s  p90:%s  p99:%s  (n=%d)"
+                (Widgets.fg color "●")
+                name
+                (Widgets.dim "|")
+                avg
+                p50_str
+                p90_str
+                p99_str
+                snap.count)
+          |> String.concat "\n"
+      in
+      add_section
+        (Box.render
+           ~title:"Scheduler Performance"
+           ~style:Heavy
+           ~color:11
+           ~width:box_width
+           scheduler_content) ;
 
       (* Worker Queue Stats Section *)
-      add "" ;
-      add (Widgets.fg 12 (Widgets.bold "━━━ Worker Queue Stats ━━━")) ;
-      add "" ;
-      let format_stats (stats : Worker_queue.stats) =
+      let format_worker_stats (stats : Worker_queue.stats) =
         let dedup_pct =
           if stats.requests_total > 0 then
             100.0
@@ -435,37 +467,48 @@ let view ps ~focus:_ ~size =
           else if stats.p90_ms > 50. then 11 (* yellow if p90 > 50ms *)
           else 10 (* green *)
         in
-        add
-          (Printf.sprintf
-             "  %s %-16s  %s reqs:%d dedup:%d(%.0f%%)  p50:%.1fms p90:%.1fms \
-              p95:%.1fms p99:%.1fms"
-             (Widgets.fg color "●")
-             stats.name
-             (Widgets.dim "|")
-             stats.requests_total
-             stats.requests_deduped
-             dedup_pct
-             stats.p50_ms
-             stats.p90_ms
-             stats.p95_ms
-             stats.p99_ms) ;
-        (* Show top deduped keys if any *)
+        let main_line =
+          Printf.sprintf
+            "%s %-16s  %s reqs:%d dedup:%d(%.0f%%)  p50:%.1fms p90:%.1fms \
+             p95:%.1fms p99:%.1fms"
+            (Widgets.fg color "●")
+            stats.name
+            (Widgets.dim "|")
+            stats.requests_total
+            stats.requests_deduped
+            dedup_pct
+            stats.p50_ms
+            stats.p90_ms
+            stats.p95_ms
+            stats.p99_ms
+        in
         let top_keys = List.filteri (fun i _ -> i < 5) stats.deduped_by_key in
-        List.iter
-          (fun (kd : Worker_queue.key_dedup) ->
-            add
-              (Printf.sprintf
-                 "      └─ %s %s"
-                 (Widgets.dim (Printf.sprintf "%5d×" kd.count))
-                 kd.key))
-          top_keys
+        let key_lines =
+          List.map
+            (fun (kd : Worker_queue.key_dedup) ->
+              Printf.sprintf
+                "    └─ %s %s"
+                (Widgets.dim (Printf.sprintf "%5d×" kd.count))
+                kd.key)
+            top_keys
+        in
+        main_line :: key_lines
       in
-      format_stats (System_metrics_scheduler.get_worker_stats ()) ;
-      format_stats (Rpc_scheduler.get_worker_stats ()) ;
+      let worker_content =
+        String.concat
+          "\n"
+          (format_worker_stats (System_metrics_scheduler.get_worker_stats ())
+          @ format_worker_stats (Rpc_scheduler.get_worker_stats ()))
+      in
+      add_section
+        (Box.render
+           ~title:"Worker Queue Stats"
+           ~style:Heavy
+           ~color:12
+           ~width:box_width
+           worker_content) ;
 
-      add "" ;
-      add (Widgets.fg 14 (Widgets.bold "━━━ Metrics Server Configuration ━━━")) ;
-      add "" ;
+      (* Metrics Server Configuration Section *)
       let metrics_enabled = Metrics.is_enabled () in
       let status_icon =
         if metrics_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
@@ -474,38 +517,59 @@ let view ps ~focus:_ ~size =
         if metrics_enabled then Widgets.fg 10 "enabled"
         else Widgets.fg 8 "disabled"
       in
-      add
-        (Printf.sprintf
-           "  %s %s %s"
-           (Widgets.fg 12 "Status:")
-           status_icon
-           status_text) ;
-      (match Metrics.get_server_info () with
-      | Some (addr, port) ->
-          add
-            (Printf.sprintf
-               "  %s %s"
-               (Widgets.fg 12 "Endpoint:")
-               (Widgets.fg 14 (Printf.sprintf "http://%s:%d/metrics" addr port))) ;
-          add (Widgets.dim "  (server is running)")
-      | None ->
-          add
-            (Printf.sprintf
-               "  %s %s"
-               (Widgets.fg 12 "Address:")
-               !metrics_addr_ref) ;
-          add (Widgets.dim "  (press 'm' to start, 'a' to edit address)")) ;
+      let server_lines =
+        [
+          Printf.sprintf
+            "%s %s %s"
+            (Widgets.fg 12 "Status:")
+            status_icon
+            status_text;
+        ]
+        @
+        match Metrics.get_server_info () with
+        | Some (addr, port) ->
+            [
+              Printf.sprintf
+                "%s %s"
+                (Widgets.fg 12 "Endpoint:")
+                (Widgets.fg
+                   14
+                   (Printf.sprintf "http://%s:%d/metrics" addr port));
+              Widgets.dim "(server is running)";
+            ]
+        | None ->
+            [
+              Printf.sprintf "%s %s" (Widgets.fg 12 "Address:") !metrics_addr_ref;
+              Widgets.dim "(press 'm' to start, 'a' to edit address)";
+            ]
+      in
+      add_section
+        (Box.render
+           ~title:"Metrics Server Configuration"
+           ~style:Heavy
+           ~color:14
+           ~width:box_width
+           (String.concat "\n" server_lines)) ;
 
-      add "" ;
-      add (Widgets.fg 12 (Widgets.bold "━━━ System Information ━━━")) ;
-      add "" ;
-      add
-        (Printf.sprintf
-           "  Privilege: %s"
-           (if Common.is_root () then Widgets.red "● SYSTEM"
-            else Widgets.green "● USER")) ;
+      (* System Information Section *)
+      let system_content =
+        Printf.sprintf
+          "Privilege: %s"
+          (if Common.is_root () then Widgets.red "● SYSTEM"
+           else Widgets.green "● USER")
+      in
+      add_section
+        (Box.render
+           ~title:"System Information"
+           ~style:Heavy
+           ~color:12
+           ~width:box_width
+           system_content) ;
 
-      let all_lines = List.rev !lines in
+      let all_sections = List.rev !sections in
+      let all_lines =
+        all_sections |> String.concat "\n" |> String.split_on_char '\n'
+      in
       let content_height = List.length all_lines in
       content_height_ref := content_height ;
 
