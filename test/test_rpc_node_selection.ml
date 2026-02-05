@@ -72,10 +72,7 @@ let test_parse_taquito_format () =
   Alcotest.(check int) "three nodes" 3 (List.length nodes) ;
   let n0 = List.nth nodes 0 in
   (* Network is NOT included in label - it's stored separately to avoid duplication *)
-  Alcotest.(check string)
-    "label without network"
-    "ECAD Labs"
-    n0.label ;
+  Alcotest.(check string) "label without network" "ECAD Labs" n0.label ;
   Alcotest.(check string) "rpc" "https://mainnet.ecad.io" n0.rpc_addr ;
   Alcotest.(check (option string)) "network" (Some "mainnet") n0.network
 
@@ -195,7 +192,14 @@ let make_state ?(public_nodes = []) ?(local_instances = []) ?(cursor = 0) () =
     Rpc_node_selection.build_display_items ~public_nodes ~local_instances
   in
   Rpc_node_selection.
-    {public_nodes; local_instances; cursor; loading = false; error = None; display_items}
+    {
+      public_nodes;
+      local_instances;
+      cursor;
+      loading = false;
+      error = None;
+      display_items;
+    }
 
 let make_item ?(label = "test") ?(rpc_addr = "http://localhost")
     ?(is_public = true) ?(network = None) () =
