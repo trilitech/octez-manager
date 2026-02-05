@@ -28,6 +28,43 @@ let state_ref : state option ref = ref None
 (* Chord state for C-x prefix *)
 let pending_chord : string option ref = ref None
 
+(** Group services by network, returning list of (network_name, services) *)
+let group_by_network services =
+  (* Build a map of network -> services *)
+  let network_map =
+    List.fold_left
+      (fun acc svc ->
+        let network = svc.Octez_manager_lib.Service.network in
+        let existing = try List.assoc network acc with Not_found -> [] in
+        (network, svc :: existing) :: List.remove_assoc network acc)
+      []
+      services
+  in
+  (* Sort by network name and reverse service lists (they were consed) *)
+  List.sort
+    (fun (n1, _) (n2, _) -> String.compare n1 n2)
+    (List.map (fun (net, svcs) -> (net, List.rev svcs)) network_map)
+
+(** Build modal items with local/public sections and network grouping *)
+let build_instance_items ~local ~public =
+  let build_network_items services =
+    let grouped = group_by_network services in
+    List.concat_map
+      (fun (network, svcs) ->
+        let header =
+          `Header (Printf.sprintf "  • %s" (String.capitalize_ascii network))
+        in
+        header :: List.map (fun s -> `Instance s) svcs)
+      grouped
+  in
+  (if local <> [] then
+     `Header "── Local Instances ──" :: build_network_items local
+   else [])
+  @
+  if public <> [] then
+    `Header "── Public Nodes ──" :: build_network_items public
+  else []
+
 let update_state s =
   state_ref := Some s ;
   Context.mark_instances_dirty ()
@@ -505,17 +542,7 @@ let handle_key ps key ~size =
                 in
                 let local = List.filter is_local all_instances in
                 let public = State.public_nodes () in
-                let items =
-                  (if local <> [] then
-                     `Header "── Local Instances ──"
-                     :: List.map (fun svc -> `Instance svc) local
-                   else [])
-                  @
-                  if public <> [] then
-                    `Header "── Public Nodes ──"
-                    :: List.map (fun svc -> `Instance svc) public
-                  else []
-                in
+                let items = build_instance_items ~local ~public in
                 if items = [] then (
                   let new_state = State.set_error "No instances available" s in
                   state_ref := Some new_state ;
@@ -528,8 +555,8 @@ let handle_key ps key ~size =
                       | `Header h -> h
                       | `Instance svc ->
                           let name = svc.Octez_manager_lib.Service.instance in
-                          let network = svc.Octez_manager_lib.Service.network in
-                          Printf.sprintf "  %s (%s)" name network)
+                          (* Network is shown in group header, no need to repeat *)
+                          "      " ^ name)
                     ~on_select:(function
                       | `Header _ -> ()
                       | `Instance svc -> (
