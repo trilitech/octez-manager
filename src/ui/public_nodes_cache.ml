@@ -172,7 +172,7 @@ let to_service (info : node_info) : Service.t =
   {
     Service.instance = info.label;
     role = "node";
-    network = Option.value ~default:"mainnet" info.network;
+    network = Option.value ~default:"unknown" info.network;
     history_mode = History_mode.Rolling;
     data_dir = "";
     rpc_addr = info.rpc_addr;

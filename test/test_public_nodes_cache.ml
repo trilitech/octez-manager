@@ -57,9 +57,10 @@ let test_parse_taquito_format () =
   let nodes = Public_nodes_cache.parse_taquito_json json in
   Alcotest.(check int) "two nodes" 2 (List.length nodes) ;
   let first = List.hd nodes in
+  (* Network is NOT included in label - stored separately *)
   Alcotest.(check string)
-    "provider name used"
-    "ECAD Infra (mainnet)"
+    "provider name used without network"
+    "ECAD Infra"
     first.label
 
 let test_parse_empty () =
@@ -117,8 +118,8 @@ let test_to_service_no_network () =
   in
   let svc = Public_nodes_cache.to_service info in
   Alcotest.(check string)
-    "defaults to mainnet"
-    "mainnet"
+    "defaults to unknown"
+    "unknown"
     svc.Octez_manager_lib.Service.network
 
 (* ============================================================ *)

@@ -34,7 +34,14 @@ type state = {
   cursor : int;
   loading : bool;
   error : string option;
+  (* Flat list of all items for cursor navigation, with metadata *)
+  display_items : display_item list;
 }
+
+and display_item =
+  | SectionHeader of string  (* "PUBLIC NODES" or "LOCAL INSTANCES" *)
+  | NetworkHeader of string  (* Network name like "Mainnet" *)
+  | NodeItem of node_item
 
 type msg = unit
 
@@ -218,13 +225,52 @@ let make_service_for_node (item : node_item) : Service.t =
     ~service_user:""
     ~app_bin_dir:""
     ~logging_mode:Logging_mode.default
-    ()
+     ()
+
+(** Group node items by network *)
+let group_by_network (items : node_item list) :
+    (string * node_item list) list =
+  (* Build a map of network -> items *)
+  let network_map =
+    List.fold_left
+      (fun acc item ->
+        let network =
+          match item.network with
+          | Some n -> String.capitalize_ascii n
+          | None -> "Unknown"
+        in
+        let existing = try List.assoc network acc with Not_found -> [] in
+        (network, item :: existing) :: List.remove_assoc network acc)
+      []
+      items
+  in
+  (* Sort by network name and reverse item lists (they were consed) *)
+  List.sort
+    (fun (n1, _) (n2, _) -> String.compare n1 n2)
+    (List.map (fun (net, its) -> (net, List.rev its)) network_map)
+
+(** Build flat display list with section headers, network headers, and nodes *)
+let build_display_items ~public_nodes ~local_instances : display_item list =
+  let build_section_items section_header items =
+    if items = [] then []
+    else
+      let grouped = group_by_network items in
+      SectionHeader section_header
+      :: List.concat_map
+           (fun (network, nodes) ->
+             NetworkHeader network
+             :: List.map (fun item -> NodeItem item) nodes)
+           grouped
+  in
+  build_section_items "PUBLIC NODES" public_nodes
+  @ build_section_items "LOCAL INSTANCES" local_instances
 
 let init () =
   let public_nodes, error = fetch_public_nodes () in
   let local_instances = load_local_instances () in
+  let display_items = build_display_items ~public_nodes ~local_instances in
   Navigation.make
-    {public_nodes; local_instances; cursor = 0; loading = false; error}
+    {public_nodes; local_instances; cursor = 0; loading = false; error; display_items}
 
 let update ps _ = ps
 
@@ -235,8 +281,9 @@ let refresh ps =
   | None ->
       let public_nodes, error = fetch_public_nodes () in
       let local_instances = load_local_instances () in
+      let display_items = build_display_items ~public_nodes ~local_instances in
       Navigation.update
-        (fun s -> {s with public_nodes; local_instances; error})
+        (fun s -> {s with public_nodes; local_instances; error; display_items})
         ps
 
 let move ps _ = ps
@@ -247,31 +294,14 @@ let service_cycle ps _ = ps
 
 let back ps = Navigation.back ps
 
-let total_items s =
-  (* PUBLIC NODES header + nodes + LOCAL INSTANCES header + instances *)
-  let public_count =
-    if s.public_nodes = [] then 0 else 1 + List.length s.public_nodes
-  in
-  let local_count =
-    if s.local_instances = [] then 0 else 1 + List.length s.local_instances
-  in
-  public_count + local_count
+let total_items s = List.length s.display_items
 
 let get_item_at_cursor s =
-  let public_header_idx = 0 in
-  let public_start = 1 in
-  let public_end = public_start + List.length s.public_nodes in
-  let local_header_idx = public_end in
-  let local_start = local_header_idx + 1 in
-  if s.cursor = public_header_idx then `PublicHeader
-  else if s.cursor >= public_start && s.cursor < public_end then
-    `PublicNode (List.nth s.public_nodes (s.cursor - public_start))
-  else if s.cursor = local_header_idx then `LocalHeader
-  else
-    let local_idx = s.cursor - local_start in
-    match List.nth_opt s.local_instances local_idx with
-    | Some item -> `LocalNode item
-    | None -> `None
+  match List.nth_opt s.display_items s.cursor with
+  | Some (SectionHeader _) -> `SectionHeader
+  | Some (NetworkHeader _) -> `NetworkHeader
+  | Some (NodeItem item) -> `Node item
+  | None -> `None
 
 let move_cursor delta s =
   let total = total_items s in
@@ -279,90 +309,85 @@ let move_cursor delta s =
   else
     let new_cursor = s.cursor + delta in
     let new_cursor = max 0 (min (total - 1) new_cursor) in
-    (* Skip headers when navigating *)
-    let public_header_idx = 0 in
-    let local_header_idx = 1 + List.length s.public_nodes in
+    (* Skip headers when navigating with arrow keys *)
+    let rec find_next_selectable cursor direction =
+      if cursor < 0 || cursor >= total then
+        (* Went out of bounds - find first/last selectable *)
+        if direction > 0 then
+          (* Find last selectable *)
+          find_first_selectable_backward (total - 1)
+        else
+          (* Find first selectable *)
+          find_first_selectable_forward 0
+      else
+        match List.nth_opt s.display_items cursor with
+        | Some (NodeItem _) -> cursor
+        | Some (SectionHeader _ | NetworkHeader _) ->
+            find_next_selectable (cursor + direction) direction
+        | None -> cursor
+    and find_first_selectable_forward start =
+      if start >= total then start
+      else
+        match List.nth_opt s.display_items start with
+        | Some (NodeItem _) -> start
+        | _ -> find_first_selectable_forward (start + 1)
+    and find_first_selectable_backward start =
+      if start < 0 then 0
+      else
+        match List.nth_opt s.display_items start with
+        | Some (NodeItem _) -> start
+        | _ -> find_first_selectable_backward (start - 1)
+    in
     let new_cursor =
-      if new_cursor = public_header_idx && delta > 0 then new_cursor + 1
-      else if new_cursor = local_header_idx && delta > 0 then new_cursor + 1
-      else if new_cursor = local_header_idx && delta < 0 then new_cursor - 1
-      else new_cursor
+      if delta > 0 then find_next_selectable new_cursor 1
+      else find_next_selectable new_cursor (-1)
     in
     let new_cursor = max 0 (min (total - 1) new_cursor) in
     {s with cursor = new_cursor}
 
 let activate_selection s =
   match get_item_at_cursor s with
-  | `PublicNode item | `LocalNode item ->
+  | `Node item ->
       (* Create service and navigate to RPC browser *)
       let service = make_service_for_node item in
       Rpc_browser_state.set_selected_instance (Some service) ;
       Context.navigate Rpc_browser.name ;
       s
-  | `PublicHeader | `LocalHeader | `None -> s
+  | `SectionHeader | `NetworkHeader | `None -> s
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
-  let public_header_idx = 0 in
-  let local_header_idx = 1 + List.length s.public_nodes in
   let lines =
     (* Error/warning *)
     (match s.error with Some e -> [Widgets.yellow e; ""] | None -> [])
-    (* PUBLIC NODES section *)
-    @ [
-        (if s.cursor = public_header_idx then
-           Widgets.bold (Widgets.cyan "> PUBLIC NODES")
-         else Widgets.bold (Widgets.cyan "  PUBLIC NODES"));
-      ]
-    @ List.mapi
-        (fun i item ->
-          let idx = 1 + i in
-          let prefix = if s.cursor = idx then "> " else "  " in
-          let network_str =
-            match item.network with
-            | Some n -> Printf.sprintf " [%s]" n
-            | None -> ""
-          in
-          let line =
-            Printf.sprintf
-              "%s%s%s  %s"
-              prefix
-              item.label
-              network_str
-              (Widgets.dim item.rpc_addr)
-          in
-          if s.cursor = idx then Widgets.bold line else line)
-        s.public_nodes
-    @ [""]
-    (* LOCAL INSTANCES section *)
-    @ [
-        (if s.cursor = local_header_idx then
-           Widgets.bold (Widgets.green "> LOCAL INSTANCES")
-         else Widgets.bold (Widgets.green "  LOCAL INSTANCES"));
-      ]
     @
-    if s.local_instances = [] then [Widgets.dim "  (no local nodes configured)"]
-    else
-      List.mapi
-        (fun i item ->
-          let idx = local_header_idx + 1 + i in
-          let prefix = if s.cursor = idx then "> " else "  " in
-          let network_str =
-            match item.network with
-            | Some n -> Printf.sprintf " [%s]" n
-            | None -> ""
-          in
-          let line =
-            Printf.sprintf
-              "%s%s%s  %s"
-              prefix
-              item.label
-              network_str
-              (Widgets.dim item.rpc_addr)
-          in
-          if s.cursor = idx then Widgets.bold line else line)
-        s.local_instances
+    (* Render display items with proper indentation *)
+    List.mapi
+      (fun i item ->
+        let is_selected = i = s.cursor in
+        let prefix = if is_selected then "> " else "  " in
+        match item with
+        | SectionHeader title ->
+            let styled =
+              if String.contains title 'P' then Widgets.cyan title
+              else Widgets.green title
+            in
+            if is_selected then Widgets.bold (prefix ^ styled)
+            else "  " ^ Widgets.bold styled
+        | NetworkHeader network ->
+            let line = Printf.sprintf "%s• %s" prefix network in
+            if is_selected then Widgets.bold (Widgets.fg 14 line) else Widgets.fg 14 ("  • " ^ network)
+        | NodeItem item ->
+            let line =
+              Printf.sprintf
+                "%s    %s  %s"
+                prefix
+                item.label
+                (Widgets.dim item.rpc_addr)
+            in
+            if is_selected then Widgets.bold line else "      " ^ item.label ^ "  " ^ Widgets.dim item.rpc_addr)
+      s.display_items
   in
   let hint = Widgets.dim "↑/↓ navigate · Enter select · r refresh · Esc back" in
   let header =
