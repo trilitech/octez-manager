@@ -535,7 +535,7 @@ let handle_key ps key ~size =
                     state_ref := Some new_state ;
                     Navigation.update (fun _ -> new_state) ps
                 (* Handle target instance selection *))
-              else if key = "@" || key = "t" then
+              else if key = "@" || key = "t" then (
                 (* Open modal to select target instance with sections *)
                 let all_instances = State.get_instances s in
                 (* Local instances have non-empty data_dir or app_bin_dir *)
@@ -550,7 +550,7 @@ let handle_key ps key ~size =
                   let new_state = State.set_error "No instances available" s in
                   state_ref := Some new_state ;
                   Navigation.update (fun _ -> new_state) ps)
-                else (
+                else
                   (* Expand items to include visual headers for display *)
                   let display_items =
                     let rec expand prev_section prev_network = function
@@ -562,25 +562,25 @@ let handle_key ps key ~size =
                             | Some s -> s <> section
                           in
                           let needs_network =
-                            not needs_section
+                            (not needs_section)
                             &&
                             match prev_network with
                             | None -> true
                             | Some n -> n <> network
                           in
                           let items =
-                            (if needs_section then
-                               [
-                                 (section, network, svc, `SectionHeader);
-                                 (section, network, svc, `NetworkHeader);
-                                 (section, network, svc, `Service);
-                               ]
-                             else if needs_network then
-                               [
-                                 (section, network, svc, `NetworkHeader);
-                                 (section, network, svc, `Service);
-                               ]
-                             else [(section, network, svc, `Service)])
+                            if needs_section then
+                              [
+                                (section, network, svc, `SectionHeader);
+                                (section, network, svc, `NetworkHeader);
+                                (section, network, svc, `Service);
+                              ]
+                            else if needs_network then
+                              [
+                                (section, network, svc, `NetworkHeader);
+                                (section, network, svc, `Service);
+                              ]
+                            else [(section, network, svc, `Service)]
                           in
                           items @ expand (Some section) (Some network) rest
                     in
@@ -593,12 +593,14 @@ let handle_key ps key ~size =
                       match kind with
                       | `SectionHeader ->
                           let section =
-                            if svc.Octez_manager_lib.Service.data_dir <> ""
-                               || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+                            if
+                              svc.Octez_manager_lib.Service.data_dir <> ""
+                              || svc.Octez_manager_lib.Service.app_bin_dir <> ""
                             then "Local Instances"
                             else "Public Nodes"
                           in
-                          Miaou_widgets_display.Widgets.bold ("── " ^ section ^ " ──")
+                          Miaou_widgets_display.Widgets.bold
+                            ("── " ^ section ^ " ──")
                       | `NetworkHeader ->
                           Miaou_widgets_display.Widgets.fg 14 ("  • " ^ network)
                       | `Service ->
@@ -618,8 +620,8 @@ let handle_key ps key ~size =
                           | None -> ())
                       | `SectionHeader | `NetworkHeader -> ())
                     () ;
-                  ps)
-                (* Handle shortcut keys 1-9, but not if pager is in input mode *)
+                  ps
+                (* Handle shortcut keys 1-9, but not if pager is in input mode *))
               else if String.length key = 1 && key.[0] >= '1' && key.[0] <= '9'
               then
                 (* Check if pager is in search/input mode - if so, pass to pager *)

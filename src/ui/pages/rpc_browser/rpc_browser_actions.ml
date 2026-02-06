@@ -54,7 +54,7 @@ let format_service_label (svc : Octez_manager_lib.Service.t) ~is_current =
     && svc.Octez_manager_lib.Service.app_bin_dir = ""
   in
   let name = svc.Octez_manager_lib.Service.instance in
-  let label = 
+  let label =
     if is_public then
       (* Public nodes: show "Name https://..." *)
       let url = svc.Octez_manager_lib.Service.rpc_addr in
@@ -63,10 +63,8 @@ let format_service_label (svc : Octez_manager_lib.Service.t) ~is_current =
       (* Local instances: just show name *)
       name
   in
-  if is_current then
-    Miaou_widgets_display.Widgets.fg 10 ("      ✓ " ^ label)
-  else
-    "        " ^ label
+  if is_current then Miaou_widgets_display.Widgets.fg 10 ("      ✓ " ^ label)
+  else "        " ^ label
 
 (** Build modal items with local/public sections and network grouping.
     Returns a flat list where each item carries its section, network, and service. *)
@@ -303,25 +301,25 @@ let handle_enter state on_update =
                       | Some s -> s <> section
                     in
                     let needs_network =
-                      not needs_section
+                      (not needs_section)
                       &&
                       match prev_network with
                       | None -> true
                       | Some n -> n <> network
                     in
                     let items =
-                      (if needs_section then
-                         [
-                           (section, network, svc, `SectionHeader);
-                           (section, network, svc, `NetworkHeader);
-                           (section, network, svc, `Service);
-                         ]
-                       else if needs_network then
-                         [
-                           (section, network, svc, `NetworkHeader);
-                           (section, network, svc, `Service);
-                         ]
-                       else [(section, network, svc, `Service)])
+                      if needs_section then
+                        [
+                          (section, network, svc, `SectionHeader);
+                          (section, network, svc, `NetworkHeader);
+                          (section, network, svc, `Service);
+                        ]
+                      else if needs_network then
+                        [
+                          (section, network, svc, `NetworkHeader);
+                          (section, network, svc, `Service);
+                        ]
+                      else [(section, network, svc, `Service)]
                     in
                     items @ expand (Some section) (Some network) rest
               in
@@ -335,8 +333,9 @@ let handle_enter state on_update =
                 | `SectionHeader ->
                     (* Section appears in title, but we need something here for the item *)
                     let section =
-                      if svc.Octez_manager_lib.Service.data_dir <> ""
-                         || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+                      if
+                        svc.Octez_manager_lib.Service.data_dir <> ""
+                        || svc.Octez_manager_lib.Service.app_bin_dir <> ""
                       then "Local Instances"
                       else "Public Nodes"
                     in
@@ -508,25 +507,25 @@ let handle_cached_enter state on_update =
                       | Some s -> s <> section
                     in
                     let needs_network =
-                      not needs_section
+                      (not needs_section)
                       &&
                       match prev_network with
                       | None -> true
                       | Some n -> n <> network
                     in
                     let items =
-                      (if needs_section then
-                         [
-                           (section, network, svc, `SectionHeader);
-                           (section, network, svc, `NetworkHeader);
-                           (section, network, svc, `Service);
-                         ]
-                       else if needs_network then
-                         [
-                           (section, network, svc, `NetworkHeader);
-                           (section, network, svc, `Service);
-                         ]
-                       else [(section, network, svc, `Service)])
+                      if needs_section then
+                        [
+                          (section, network, svc, `SectionHeader);
+                          (section, network, svc, `NetworkHeader);
+                          (section, network, svc, `Service);
+                        ]
+                      else if needs_network then
+                        [
+                          (section, network, svc, `NetworkHeader);
+                          (section, network, svc, `Service);
+                        ]
+                      else [(section, network, svc, `Service)]
                     in
                     items @ expand (Some section) (Some network) rest
               in
@@ -539,8 +538,9 @@ let handle_cached_enter state on_update =
                 match kind with
                 | `SectionHeader ->
                     let section =
-                      if svc.Octez_manager_lib.Service.data_dir <> ""
-                         || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+                      if
+                        svc.Octez_manager_lib.Service.data_dir <> ""
+                        || svc.Octez_manager_lib.Service.app_bin_dir <> ""
                       then "Local Instances"
                       else "Public Nodes"
                     in
