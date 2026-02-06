@@ -242,8 +242,10 @@ jobs:
 
       - name: Run integration tests (shard ${{ matrix.shard }})
         working-directory: test/integration
+        env:
+          PARALLEL_JOBS: 3
         run: |
-          docker compose exec -T cli-tester /run-tests.sh --shard ${{ matrix.shard }}
+          docker compose exec -T -e PARALLEL_JOBS cli-tester /run-tests.sh --shard ${{ matrix.shard }}
 
       - name: Output timing data
         if: always()
