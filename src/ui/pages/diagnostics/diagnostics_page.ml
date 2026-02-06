@@ -570,8 +570,7 @@ let handle_key ps key ~size =
     ps)
   else
     match Keys.of_string key with
-    | Some Keys.Escape | Some (Keys.Char "q") ->
-        Navigation.back ps
+    | Some Keys.Escape | Some (Keys.Char "q") -> Navigation.back ps
     | Some (Keys.Char "r") -> refresh ps
     | Some (Keys.Char "m") -> Navigation.update toggle_metrics ps
     | Some (Keys.Char "a") -> Navigation.update edit_metrics_addr ps
