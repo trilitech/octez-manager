@@ -94,9 +94,20 @@ jobs:
             opam switch create 5.3.0 ocaml.5.3.0 -y
             eval $(opam env)
           fi
+          # Verify the switch is functional — a cache hit can restore /root/.opam
+          # but the switch may be invalid, causing opam to recreate a bare switch
+          # without dune or project dependencies.
+          eval $(opam env)
+          if command -v dune > /dev/null 2>&1; then
+            echo "switch-valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "WARNING: opam switch exists but dune is not installed."
+            echo "Will reinstall dependencies."
+            echo "switch-valid=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Pin miaou packages
-        if: steps.cache-opam.outputs.cache-hit != 'true'
+        if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
         run: |
           if [ -z "$MIAOU_GIT_URL" ]; then
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
@@ -112,7 +123,7 @@ jobs:
           opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
 
       - name: Install project dependencies
-        if: steps.cache-opam.outputs.cache-hit != 'true'
+        if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
         run: |
           eval $(opam env)
           git config --global --add safe.directory "$PWD"
@@ -285,8 +296,10 @@ jobs:
 
       - name: Run integration tests (shard ${{ matrix.shard }})
         working-directory: test/integration
+        env:
+          PARALLEL_JOBS: 3
         run: |
-          docker compose exec -T cli-tester /run-tests.sh --shard ${{ matrix.shard }}
+          docker compose exec -T -e PARALLEL_JOBS cli-tester /run-tests.sh --shard ${{ matrix.shard }}
 
       - name: Output timing data
         if: always()

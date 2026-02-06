@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     netbase \
     procps \
     bc \
+    parallel \
     && rm -rf /var/lib/apt/lists/*
 
 # Remove unnecessary systemd units that cause issues in containers

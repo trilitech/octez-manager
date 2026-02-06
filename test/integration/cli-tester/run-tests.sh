@@ -117,14 +117,121 @@ run_tests() {
 		log "Found ${#tests[@]} tests in category $mode"
 	fi
 
-	# Run all collected tests
+	# Check if parallel execution is available and enabled
+	local parallel_jobs="${PARALLEL_JOBS:-0}"
+
+	if [ "$parallel_jobs" -gt 1 ] && command -v parallel >/dev/null 2>&1; then
+		log "Running tests in parallel (jobs: $parallel_jobs)"
+		run_tests_parallel "${tests[@]}"
+		return $?
+	else
+		# Run tests sequentially (default behavior)
+		for test in "${tests[@]}"; do
+			if run_test "$test"; then
+				passed=$((passed + 1))
+			else
+				failed=$((failed + 1))
+			fi
+		done
+
+		echo ""
+		log "Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+
+		if [ $failed -gt 0 ]; then
+			return 1
+		fi
+		return 0
+	fi
+}
+
+# Check if a test should run serially (not in parallel with others).
+# Serial tests are listed in serial-tests.json and run before the
+# parallel batch to avoid shared-state interference.
+is_serial_test() {
+	local test_file="$1"
+	local serial_manifest="$TESTS_DIR/serial-tests.json"
+
+	if [ ! -f "$serial_manifest" ]; then
+		return 1
+	fi
+
+	# Get the relative path (strip TESTS_DIR prefix)
+	local rel_path="${test_file#$TESTS_DIR/}"
+	jq -e --arg t "$rel_path" 'any(. == $t)' "$serial_manifest" >/dev/null 2>&1
+}
+
+# Run tests in parallel using GNU parallel, with serial tests first
+run_tests_parallel() {
+	local tests=("$@")
+	local passed=0
+	local failed=0
+	local serial_tests=()
+	local parallel_tests=()
+
+	# Split into serial and parallel groups
 	for test in "${tests[@]}"; do
-		if run_test "$test"; then
-			passed=$((passed + 1))
+		if is_serial_test "$test"; then
+			serial_tests+=("$test")
 		else
-			failed=$((failed + 1))
+			parallel_tests+=("$test")
 		fi
 	done
+
+	# Run serial tests first (one at a time, no parallelism)
+	if [ ${#serial_tests[@]} -gt 0 ]; then
+		log "Running ${#serial_tests[@]} serial test(s) before parallel batch..."
+		for test in "${serial_tests[@]}"; do
+			if run_test "$test"; then
+				passed=$((passed + 1))
+			else
+				failed=$((failed + 1))
+			fi
+		done
+	fi
+
+	# Run remaining tests in parallel
+	if [ ${#parallel_tests[@]} -gt 0 ]; then
+		log "Running ${#parallel_tests[@]} tests in parallel (jobs: $PARALLEL_JOBS)..."
+
+		local results_dir="/tmp/test-results-$$"
+		mkdir -p "$results_dir"
+
+		# Export functions and variables needed by parallel jobs
+		export -f run_test pass fail log
+		export RED GREEN YELLOW NC SANDBOX_URL NODE_RPC TESTS_DIR
+
+		# Run tests in parallel, capturing exit codes
+		printf '%s\n' "${parallel_tests[@]}" | parallel \
+			--jobs "$PARALLEL_JOBS" \
+			--halt soon,fail=1 \
+			--line-buffer \
+			--tagstring '[{#}]' \
+			'
+			test_file="{}"
+			result_file="'"$results_dir"'/$(basename "$test_file" .sh).result"
+			if run_test "$test_file"; then
+				echo "PASS" > "$result_file"
+				exit 0
+			else
+				echo "FAIL" > "$result_file"
+				exit 1
+			fi
+			'
+
+		# Count results
+		for result_file in "$results_dir"/*.result; do
+			if [ -f "$result_file" ]; then
+				if grep -q "PASS" "$result_file"; then
+					passed=$((passed + 1))
+				else
+					failed=$((failed + 1))
+				fi
+			fi
+		done
+
+		# Cleanup
+		rm -rf "$results_dir"
+	fi
 
 	echo ""
 	log "Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
