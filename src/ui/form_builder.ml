@@ -746,7 +746,7 @@ struct
       {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
     in
     [
-      kb "Tab" "Next field";
+      kb "Tab/S-Tab" "Next/prev field";
       kb "↑/↓" "Navigate";
       kb "Tab" "Navigate";
       kb "Enter" "Edit / Submit";
