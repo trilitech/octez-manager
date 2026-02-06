@@ -85,6 +85,9 @@ let registry_root () =
 
 let directories_file () = Filename.concat (registry_root ()) "directories.json"
 
+let directories_lock_file () =
+  Filename.concat (registry_root ()) "directories.json.lock"
+
 let old_base_dirs_file () = Filename.concat (registry_root ()) "base_dirs.json"
 
 let migrated_marker_file () =
@@ -246,29 +249,30 @@ let read_all () =
   Ok (sort_by_last_used entries)
 
 let add ~path ~dir_type ~registered_services =
-  let* existing = read_all () in
-  let timestamp = now () in
-  (* Check if path already exists *)
-  let existing_entry = List.find_opt (fun e -> e.path = path) existing in
-  let filtered = List.filter (fun e -> e.path <> path) existing in
-  let new_entry =
-    match existing_entry with
-    | Some e ->
-        (* Update existing: keep created_at, update last_used_at *)
-        {e with last_used_at = timestamp; registered_services; dir_type}
-    | None ->
-        (* New entry *)
-        {
-          path;
-          dir_type;
-          created_at = timestamp;
-          last_used_at = timestamp;
-          registered_services;
-        }
-  in
-  (* Add new entry at front, then limit per type *)
-  let all_entries = new_entry :: filtered in
-  write_all (limit_entries_per_type all_entries)
+  Common.with_file_lock (directories_lock_file ()) (fun () ->
+      let* existing = read_all () in
+      let timestamp = now () in
+      (* Check if path already exists *)
+      let existing_entry = List.find_opt (fun e -> e.path = path) existing in
+      let filtered = List.filter (fun e -> e.path <> path) existing in
+      let new_entry =
+        match existing_entry with
+        | Some e ->
+            (* Update existing: keep created_at, update last_used_at *)
+            {e with last_used_at = timestamp; registered_services; dir_type}
+        | None ->
+            (* New entry *)
+            {
+              path;
+              dir_type;
+              created_at = timestamp;
+              last_used_at = timestamp;
+              registered_services;
+            }
+      in
+      (* Add new entry at front, then limit per type *)
+      let all_entries = new_entry :: filtered in
+      write_all (limit_entries_per_type all_entries))
 
 let find_by_path path =
   let* all = read_all () in
@@ -281,20 +285,25 @@ let list ?dir_type () =
   | Some dt -> Ok (List.filter (fun e -> e.dir_type = dt) all)
 
 let remove path =
-  let* existing = read_all () in
-  let filtered = List.filter (fun e -> e.path <> path) existing in
-  write_all filtered
+  Common.with_file_lock (directories_lock_file ()) (fun () ->
+      let* existing = read_all () in
+      let filtered = List.filter (fun e -> e.path <> path) existing in
+      write_all filtered)
 
 let update_registered_services ~path ~registered_services =
-  let* existing = read_all () in
-  match List.find_opt (fun e -> e.path = path) existing with
-  | None -> Ok () (* Path not found, nothing to update *)
-  | Some entry ->
-      let updated = {entry with registered_services; last_used_at = now ()} in
-      let filtered = List.filter (fun e -> e.path <> path) existing in
-      write_all (limit_entries_per_type (updated :: filtered))
+  Common.with_file_lock (directories_lock_file ()) (fun () ->
+      let* existing = read_all () in
+      match List.find_opt (fun e -> e.path = path) existing with
+      | None -> Ok () (* Path not found, nothing to update *)
+      | Some entry ->
+          let updated =
+            {entry with registered_services; last_used_at = now ()}
+          in
+          let filtered = List.filter (fun e -> e.path <> path) existing in
+          write_all (limit_entries_per_type (updated :: filtered)))
 
-let clear_all () = write_all []
+let clear_all () =
+  Common.with_file_lock (directories_lock_file ()) (fun () -> write_all [])
 
 (** Expose internal functions for testing *)
 module For_test = struct
