@@ -106,6 +106,52 @@ CREATE TABLE IF NOT EXISTS gardening_log (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Types (record, variant, abstract, alias)
+CREATE TABLE IF NOT EXISTS types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,                     -- 'node_request'
+    kind TEXT NOT NULL,                     -- 'record', 'variant', 'abstract', 'alias', 'open'
+    line_start INTEGER,
+    line_end INTEGER,
+    exposed BOOLEAN DEFAULT 0,              -- appears in .mli
+    manifest TEXT,                          -- for aliases: the type it aliases
+    intent TEXT,                            -- human-written purpose description
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(module_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_types_module ON types(module_id);
+CREATE INDEX IF NOT EXISTS idx_types_kind ON types(kind);
+CREATE INDEX IF NOT EXISTS idx_types_exposed ON types(exposed);
+
+-- Record fields
+CREATE TABLE IF NOT EXISTS type_fields (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL REFERENCES types(id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,               -- 'instance'
+    field_type TEXT NOT NULL,               -- 'string'
+    position INTEGER NOT NULL DEFAULT 0,    -- order within the record
+    UNIQUE(type_id, field_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_type_fields_type ON type_fields(type_id);
+CREATE INDEX IF NOT EXISTS idx_type_fields_name ON type_fields(field_name);
+CREATE INDEX IF NOT EXISTS idx_type_fields_ftype ON type_fields(field_type);
+
+-- Variant constructors
+CREATE TABLE IF NOT EXISTS type_constructors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL REFERENCES types(id) ON DELETE CASCADE,
+    constructor_name TEXT NOT NULL,          -- 'Genesis'
+    position INTEGER NOT NULL DEFAULT 0,    -- order within the variant
+    arg_types TEXT,                         -- comma-separated: 'string, int' or NULL for constant
+    UNIQUE(type_id, constructor_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_type_constructors_type ON type_constructors(type_id);
+CREATE INDEX IF NOT EXISTS idx_type_constructors_name ON type_constructors(constructor_name);
+
 -- =============================================================================
 -- Useful Views
 -- =============================================================================
@@ -169,6 +215,30 @@ WHERE status = 'open'
 GROUP BY category
 ORDER BY count DESC;
 
+-- Types by field: find types containing a specific field name
+CREATE VIEW IF NOT EXISTS v_type_fields AS
+SELECT m.path, t.name as type_name, t.kind, tf.field_name, tf.field_type
+FROM type_fields tf
+JOIN types t ON tf.type_id = t.id
+JOIN modules m ON t.module_id = m.id
+ORDER BY m.path, t.name, tf.position;
+
+-- Types by field type: find all types that contain a field of a given type
+CREATE VIEW IF NOT EXISTS v_types_with_field_type AS
+SELECT m.path, t.name as type_name, tf.field_name, tf.field_type
+FROM type_fields tf
+JOIN types t ON tf.type_id = t.id
+JOIN modules m ON t.module_id = m.id
+ORDER BY tf.field_type, m.path, t.name;
+
+-- Variant constructors overview
+CREATE VIEW IF NOT EXISTS v_variant_constructors AS
+SELECT m.path, t.name as type_name, tc.constructor_name, tc.arg_types
+FROM type_constructors tc
+JOIN types t ON tc.type_id = t.id
+JOIN modules m ON t.module_id = m.id
+ORDER BY m.path, t.name, tc.position;
+
 -- =============================================================================
 -- Sample Queries (for reference)
 -- =============================================================================
@@ -191,3 +261,25 @@ ORDER BY count DESC;
 -- JOIN functions f ON f.module_id = m.id
 -- GROUP BY m.id
 -- HAVING undoc = func_count;
+
+-- Find types that have both a string field and an int field:
+-- SELECT DISTINCT t.name, m.path FROM types t
+-- JOIN type_fields tf1 ON t.id = tf1.type_id AND tf1.field_type = 'string'
+-- JOIN type_fields tf2 ON t.id = tf2.type_id AND tf2.field_type = 'int'
+-- JOIN modules m ON t.module_id = m.id;
+
+-- Find all types containing a field named 'instance':
+-- SELECT * FROM v_type_fields WHERE field_name = 'instance';
+
+-- Find all record types with a field of type 'baker_node_mode':
+-- SELECT * FROM v_types_with_field_type WHERE field_type LIKE '%baker_node_mode%';
+
+-- Find types that aggregate string, int, and some page type:
+-- SELECT t.name, m.path, GROUP_CONCAT(tf.field_name || ':' || tf.field_type, ', ') as fields
+-- FROM types t
+-- JOIN modules m ON t.module_id = m.id
+-- JOIN type_fields tf ON t.id = tf.type_id
+-- WHERE t.id IN (SELECT type_id FROM type_fields WHERE field_type = 'string')
+--   AND t.id IN (SELECT type_id FROM type_fields WHERE field_type = 'int')
+--   AND t.id IN (SELECT type_id FROM type_fields WHERE field_type LIKE '%page%')
+-- GROUP BY t.id;

@@ -1,0 +1,669 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Architecture index query tool.
+
+    Provides a CLI for querying [docs/architecture.db] with canned queries
+    and fuzzy intent search. *)
+
+let db_path = "docs/architecture.db"
+
+(* ========================================================================== *)
+(* Database helpers                                                           *)
+(* ========================================================================== *)
+
+let open_db () =
+  if not (Sys.file_exists db_path) then (
+    Printf.eprintf
+      "Error: %s not found.\nRun: dune exec -- tools/arch_index.exe\n"
+      db_path ;
+    exit 1) ;
+  let db = Sqlite3.db_open db_path in
+  ignore (Sqlite3.exec db "PRAGMA foreign_keys = ON") ;
+  db
+
+let print_table ~headers rows =
+  let col_widths =
+    List.mapi
+      (fun i h ->
+        List.fold_left
+          (fun acc row ->
+            let cell = List.nth row i in
+            max acc (String.length cell))
+          (String.length h)
+          rows)
+      headers
+  in
+  (* Header *)
+  List.iteri
+    (fun i h ->
+      let w = List.nth col_widths i in
+      Printf.printf "%-*s" (w + 2) h)
+    headers ;
+  print_newline () ;
+  List.iter (fun w -> Printf.printf "%s  " (String.make w '-')) col_widths ;
+  print_newline () ;
+  (* Rows *)
+  List.iter
+    (fun row ->
+      List.iteri
+        (fun i cell ->
+          let w = List.nth col_widths i in
+          Printf.printf "%-*s" (w + 2) cell)
+        row ;
+      print_newline ())
+    rows
+
+let query_rows db sql =
+  let rows = ref [] in
+  ignore
+    (Sqlite3.exec_not_null
+       db
+       ~cb:(fun row _h -> rows := Array.to_list row :: !rows)
+       sql) ;
+  List.rev !rows
+
+(* ========================================================================== *)
+(* Fuzzy text search                                                          *)
+(* ========================================================================== *)
+
+let stop_words =
+  [
+    "the";
+    "a";
+    "an";
+    "is";
+    "are";
+    "was";
+    "were";
+    "be";
+    "been";
+    "being";
+    "have";
+    "has";
+    "had";
+    "do";
+    "does";
+    "did";
+    "will";
+    "would";
+    "could";
+    "should";
+    "may";
+    "might";
+    "shall";
+    "can";
+    "to";
+    "of";
+    "in";
+    "for";
+    "on";
+    "with";
+    "at";
+    "by";
+    "from";
+    "as";
+    "into";
+    "through";
+    "during";
+    "before";
+    "after";
+    "and";
+    "but";
+    "or";
+    "nor";
+    "not";
+    "so";
+    "yet";
+    "it";
+    "its";
+    "this";
+    "that";
+    "these";
+    "those";
+  ]
+
+(** Normalize and tokenize text into a set of lowercase words,
+    excluding stop words and very short tokens. *)
+let tokenize text =
+  let buf = Buffer.create (String.length text) in
+  (* Replace non-alphanum with spaces *)
+  String.iter
+    (fun c ->
+      if
+        (c >= 'a' && c <= 'z')
+        || (c >= 'A' && c <= 'Z')
+        || (c >= '0' && c <= '9')
+      then Buffer.add_char buf (Char.lowercase_ascii c)
+      else Buffer.add_char buf ' ')
+    text ;
+  let words = String.split_on_char ' ' (Buffer.contents buf) in
+  let words =
+    List.filter
+      (fun w -> String.length w > 1 && not (List.mem w stop_words))
+      words
+  in
+  (* Deduplicate *)
+  List.sort_uniq String.compare words
+
+(** Jaccard similarity between two word sets: |intersection| / |union|. *)
+let jaccard_similarity words1 words2 =
+  let set1 = List.sort_uniq String.compare words1 in
+  let set2 = List.sort_uniq String.compare words2 in
+  let intersection =
+    List.filter (fun w -> List.mem w set2) set1 |> List.length
+  in
+  let union = List.sort_uniq String.compare (set1 @ set2) |> List.length in
+  if union = 0 then 0.0 else float_of_int intersection /. float_of_int union
+
+(** Check if all query words appear as substrings in target words.
+    Returns a bonus score based on substring coverage. *)
+let string_contains ~needle haystack =
+  try
+    ignore (Str.search_forward (Str.regexp_string needle) haystack 0) ;
+    true
+  with Not_found -> false
+
+let substring_score query_words target_words =
+  let matched =
+    List.filter
+      (fun qw ->
+        List.exists (fun tw -> string_contains ~needle:qw tw) target_words)
+      query_words
+  in
+  if List.length query_words = 0 then 0.0
+  else
+    float_of_int (List.length matched) /. float_of_int (List.length query_words)
+
+(** Combined similarity: max of Jaccard and substring matching. *)
+let text_similarity query_text target_text =
+  let q = tokenize query_text in
+  let t = tokenize target_text in
+  let jaccard = jaccard_similarity q t in
+  let substr = substring_score q t in
+  max jaccard substr
+
+(* ========================================================================== *)
+(* Commands                                                                   *)
+(* ========================================================================== *)
+
+let cmd_stats () =
+  let db = open_db () in
+  let get sql =
+    let r = ref "0" in
+    ignore (Sqlite3.exec_not_null db ~cb:(fun row _h -> r := row.(0)) sql) ;
+    !r
+  in
+  Printf.printf "Architecture Index Statistics\n" ;
+  Printf.printf "=============================\n" ;
+  Printf.printf
+    "Modules:             %5s\n"
+    (get "SELECT COUNT(*) FROM modules") ;
+  Printf.printf
+    "  with .mli:         %5s\n"
+    (get "SELECT COUNT(*) FROM modules WHERE has_mli = 1") ;
+  Printf.printf
+    "  large (>500 loc):  %5s\n"
+    (get "SELECT COUNT(*) FROM modules WHERE lines > 500") ;
+  Printf.printf
+    "Functions:           %5s\n"
+    (get "SELECT COUNT(*) FROM functions") ;
+  Printf.printf
+    "  exposed:           %5s\n"
+    (get "SELECT COUNT(*) FROM functions WHERE exposed = 1") ;
+  Printf.printf
+    "  documented:        %5s\n"
+    (get "SELECT COUNT(*) FROM functions WHERE intent IS NOT NULL") ;
+  Printf.printf
+    "  large (>50 loc):   %5s\n"
+    (get "SELECT COUNT(*) FROM functions WHERE line_end - line_start + 1 > 50") ;
+  Printf.printf "Types:               %5s\n" (get "SELECT COUNT(*) FROM types") ;
+  Printf.printf
+    "  record:            %5s\n"
+    (get "SELECT COUNT(*) FROM types WHERE kind = 'record'") ;
+  Printf.printf
+    "  variant:           %5s\n"
+    (get "SELECT COUNT(*) FROM types WHERE kind = 'variant'") ;
+  Printf.printf
+    "  documented:        %5s\n"
+    (get "SELECT COUNT(*) FROM types WHERE intent IS NOT NULL") ;
+  Printf.printf
+    "Record fields:       %5s\n"
+    (get "SELECT COUNT(*) FROM type_fields") ;
+  Printf.printf
+    "Variant constructors:%5s\n"
+    (get "SELECT COUNT(*) FROM type_constructors") ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_search ~threshold ~kind query =
+  let db = open_db () in
+  let results = ref [] in
+  let sql, label =
+    match kind with
+    | `Functions ->
+        ( "SELECT m.path, f.name, f.signature, COALESCE(f.intent, '') FROM \
+           functions f JOIN modules m ON f.module_id = m.id",
+          "function" )
+    | `Types ->
+        ( "SELECT m.path, t.name, t.kind || COALESCE(' = ' || t.manifest, ''), \
+           COALESCE(t.intent, '') FROM types t JOIN modules m ON t.module_id = \
+           m.id",
+          "type" )
+    | `All ->
+        ( "SELECT m.path, f.name, f.signature, COALESCE(f.intent, '') FROM \
+           functions f JOIN modules m ON f.module_id = m.id UNION ALL SELECT \
+           m.path, t.name, t.kind || COALESCE(' = ' || t.manifest, ''), \
+           COALESCE(t.intent, '') FROM types t JOIN modules m ON t.module_id = \
+           m.id",
+          "function/type" )
+  in
+  ignore
+    (Sqlite3.exec_not_null
+       db
+       ~cb:(fun row _h ->
+         let path = row.(0) in
+         let name = row.(1) in
+         let sig_or_kind = row.(2) in
+         let intent = row.(3) in
+         (* Score against intent, name, and signature *)
+         let intent_score = text_similarity query intent in
+         let name_score = text_similarity query name in
+         let sig_score = text_similarity query sig_or_kind in
+         let combined =
+           (* Weight intent highest, then name, then signature *)
+           max (max intent_score (name_score *. 0.8)) (sig_score *. 0.5)
+         in
+         if combined >= threshold then
+           results := (combined, path, name, sig_or_kind, intent) :: !results)
+       sql) ;
+  let sorted =
+    List.sort (fun (s1, _, _, _, _) (s2, _, _, _, _) -> compare s2 s1) !results
+  in
+  let top =
+    if List.length sorted > 30 then List.filteri (fun i _ -> i < 30) sorted
+    else sorted
+  in
+  if top = [] then
+    Printf.printf
+      "No %ss found matching \"%s\" (threshold: %.0f%%)\n"
+      label
+      query
+      (threshold *. 100.0)
+  else (
+    Printf.printf
+      "Found %d %ss matching \"%s\" (showing top %d, threshold: %.0f%%):\n\n"
+      (List.length sorted)
+      label
+      query
+      (List.length top)
+      (threshold *. 100.0) ;
+    List.iter
+      (fun (score, path, name, _sig, intent) ->
+        Printf.printf "  %3.0f%%  %s:%s\n" (score *. 100.0) path name ;
+        if intent <> "" then
+          let preview =
+            let line =
+              match String.index_opt intent '\n' with
+              | Some i -> String.sub intent 0 i
+              | None -> intent
+            in
+            if String.length line > 80 then String.sub line 0 77 ^ "..."
+            else line
+          in
+          Printf.printf "        %s\n" preview)
+      top) ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_search_types ~field_names ~field_types =
+  let db = open_db () in
+  let conditions = ref [] in
+  List.iter
+    (fun name ->
+      conditions :=
+        Printf.sprintf
+          "t.id IN (SELECT type_id FROM type_fields WHERE field_name LIKE \
+           '%%%s%%')"
+          name
+        :: !conditions)
+    field_names ;
+  List.iter
+    (fun typ ->
+      conditions :=
+        Printf.sprintf
+          "t.id IN (SELECT type_id FROM type_fields WHERE field_type LIKE \
+           '%%%s%%')"
+          typ
+        :: !conditions)
+    field_types ;
+  if !conditions = [] then (
+    Printf.eprintf "Error: provide at least --field or --field-type\n" ;
+    exit 1) ;
+  let where = String.concat " AND " !conditions in
+  let sql =
+    Printf.sprintf
+      "SELECT m.path, t.name, GROUP_CONCAT(tf.field_name || ': ' || \
+       tf.field_type, ', ') FROM types t JOIN modules m ON t.module_id = m.id \
+       JOIN type_fields tf ON t.id = tf.type_id WHERE %s GROUP BY t.id ORDER \
+       BY m.path"
+      where
+  in
+  let rows = query_rows db sql in
+  if rows = [] then Printf.printf "No types found matching the criteria.\n"
+  else (
+    Printf.printf "Found %d matching types:\n\n" (List.length rows) ;
+    List.iter
+      (fun row ->
+        match row with
+        | [path; name; fields] ->
+            Printf.printf "  %s.%s\n" path name ;
+            let field_list = String.split_on_char ',' fields in
+            List.iter
+              (fun f -> Printf.printf "    %s\n" (String.trim f))
+              field_list ;
+            print_newline ()
+        | _ -> ())
+      rows) ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_duplicates () =
+  let db = open_db () in
+  let sql =
+    "SELECT f.name, f.signature, COUNT(DISTINCT m.id) as cnt, \
+     GROUP_CONCAT(m.path, ', ') FROM functions f JOIN modules m ON f.module_id \
+     = m.id WHERE f.name NOT LIKE 'let*' AND f.signature NOT IN ('unit', \
+     'string', 'int', 'float', 'bool', 'Mutex.t') AND f.signature NOT LIKE \
+     '''a%' AND f.name NOT IN ('register', 'init', 'view', 'update', \
+     'refresh', 'move', 'back', 'noop', 'service_select', 'service_cycle', \
+     'keymap', 'has_modal', 'handled_keys', 'handle_modal_key', 'handle_key', \
+     'header', 'name', 'shutdown', 'start', 'clear', 'stop', 'tick', 'get', \
+     'clear_cache', 'started', 'shutdown_requested') GROUP BY f.name, \
+     f.signature HAVING cnt > 1 ORDER BY cnt DESC"
+  in
+  let rows = query_rows db sql in
+  Printf.printf "Found %d groups of duplicate functions:\n\n" (List.length rows) ;
+  List.iter
+    (fun row ->
+      match row with
+      | [name; signature; count; modules] ->
+          Printf.printf "  %s  (%sx)\n" name count ;
+          Printf.printf
+            "    sig: %s\n"
+            (if String.length signature > 70 then
+               String.sub signature 0 67 ^ "..."
+             else signature) ;
+          Printf.printf "    in:  %s\n\n" modules
+      | _ -> ())
+    rows ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_large_files ~min_lines =
+  let db = open_db () in
+  let sql =
+    Printf.sprintf
+      "SELECT m.path, m.lines, m.has_mli, (SELECT COUNT(*) FROM functions f \
+       WHERE f.module_id = m.id) as fns FROM modules m WHERE m.lines > %d \
+       ORDER BY m.lines DESC"
+      min_lines
+  in
+  let rows = query_rows db sql in
+  print_table ~headers:["Path"; "Lines"; "Has .mli"; "Functions"] rows ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_large_functions ~min_lines =
+  let db = open_db () in
+  let sql =
+    Printf.sprintf
+      "SELECT m.path || ':' || f.name, f.line_end - f.line_start + 1, \
+       COALESCE(SUBSTR(f.signature, 1, 60), '') FROM functions f JOIN modules \
+       m ON f.module_id = m.id WHERE f.name NOT LIKE 'let*' AND f.line_end - \
+       f.line_start + 1 > %d ORDER BY f.line_end - f.line_start + 1 DESC"
+      min_lines
+  in
+  let rows = query_rows db sql in
+  print_table ~headers:["Function"; "Lines"; "Signature"] rows ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_missing_docs () =
+  let db = open_db () in
+  Printf.printf "Exposed functions without documentation:\n\n" ;
+  let sql =
+    "SELECT m.path, COUNT(*) as cnt FROM functions f JOIN modules m ON \
+     f.module_id = m.id WHERE f.exposed = 1 AND f.intent IS NULL GROUP BY m.id \
+     ORDER BY cnt DESC"
+  in
+  let rows = query_rows db sql in
+  print_table ~headers:["Module"; "Missing docs"] rows ;
+  Printf.printf
+    "\nTotal: %d exposed functions without docs\n"
+    (List.fold_left
+       (fun acc row ->
+         match row with _ :: n :: _ -> acc + int_of_string n | _ -> acc)
+       0
+       rows) ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_missing_mli () =
+  let db = open_db () in
+  let sql =
+    "SELECT m.path, m.lines, (SELECT COUNT(*) FROM functions f WHERE \
+     f.module_id = m.id) as fns FROM modules m WHERE m.has_mli = 0 ORDER BY \
+     m.lines DESC"
+  in
+  let rows = query_rows db sql in
+  print_table ~headers:["Module"; "Lines"; "Functions"] rows ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_god_modules ~min_fns =
+  let db = open_db () in
+  let sql =
+    Printf.sprintf
+      "SELECT m.path, COUNT(*) as fns, m.lines FROM functions f JOIN modules m \
+       ON f.module_id = m.id GROUP BY m.id HAVING fns > %d ORDER BY fns DESC"
+      min_fns
+  in
+  let rows = query_rows db sql in
+  print_table ~headers:["Module"; "Functions"; "Lines"] rows ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_unsafe_strings () =
+  let db = open_db () in
+  Printf.printf "String-typed record fields that may need newtypes:\n\n" ;
+  let sql =
+    "SELECT tf.field_name, COUNT(*) as cnt, GROUP_CONCAT(DISTINCT m.path || \
+     '.' || t.name) FROM type_fields tf JOIN types t ON tf.type_id = t.id JOIN \
+     modules m ON t.module_id = m.id WHERE tf.field_type = 'string' GROUP BY \
+     tf.field_name HAVING cnt >= 3 ORDER BY cnt DESC"
+  in
+  let rows = query_rows db sql in
+  print_table ~headers:["Field name"; "Occurrences"; "Types"] rows ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_sql query =
+  let db = open_db () in
+  let first_row = ref true in
+  let rc =
+    Sqlite3.exec
+      db
+      ~cb:(fun row headers ->
+        if !first_row then (
+          Printf.printf "%s\n" (String.concat " | " (Array.to_list headers)) ;
+          Array.iter
+            (fun h -> Printf.printf "%s-+-" (String.make (String.length h) '-'))
+            headers ;
+          print_newline () ;
+          first_row := false) ;
+        let cells =
+          Array.map
+            (fun cell -> match cell with Some s -> s | None -> "NULL")
+            row
+        in
+        Printf.printf "%s\n" (String.concat " | " (Array.to_list cells)))
+      query
+  in
+  (match rc with
+  | Sqlite3.Rc.OK -> ()
+  | rc ->
+      Printf.eprintf
+        "SQL error (%s): %s\n"
+        (Sqlite3.Rc.to_string rc)
+        (Sqlite3.errmsg db)) ;
+  ignore (Sqlite3.db_close db)
+
+let cmd_refresh () =
+  let code = Sys.command "opam exec -- dune exec -- tools/arch_index.exe" in
+  exit code
+
+(* ========================================================================== *)
+(* Cmdliner CLI definition                                                    *)
+(* ========================================================================== *)
+
+open Cmdliner
+
+let threshold_opt =
+  Arg.(
+    value & opt float 0.3
+    & info
+        ["threshold"; "t"]
+        ~docv:"FLOAT"
+        ~doc:"Minimum similarity threshold (0.0-1.0, default 0.3)")
+
+let kind_opt =
+  let kinds =
+    Arg.enum [("all", `All); ("functions", `Functions); ("types", `Types)]
+  in
+  Arg.(
+    value & opt kinds `All
+    & info
+        ["kind"; "k"]
+        ~docv:"KIND"
+        ~doc:"Search kind: all, functions, or types")
+
+let search_query =
+  Arg.(value & pos_all string [] & info [] ~docv:"WORDS" ~doc:"Search terms")
+
+let min_lines_opt ~default ~doc =
+  Arg.(value & opt int default & info ["min"] ~docv:"N" ~doc)
+
+let field_names_opt =
+  Arg.(
+    value & opt_all string []
+    & info ["field"; "f"] ~docv:"NAME" ~doc:"Field name to search for")
+
+let field_types_opt =
+  Arg.(
+    value & opt_all string []
+    & info
+        ["field-type"; "T"]
+        ~docv:"TYPE"
+        ~doc:"Field type to search for (e.g. 'string', 'int')")
+
+let sql_query =
+  Arg.(
+    required & pos 0 (some string) None & info [] ~docv:"SQL" ~doc:"SQL query")
+
+(* -- Subcommands -- *)
+
+let search_cmd =
+  let doc = "Fuzzy search functions and types by intent, name, or signature" in
+  let run threshold kind words =
+    let query = String.concat " " words in
+    if query = "" then (
+      Printf.eprintf "Error: provide search terms\n" ;
+      exit 1) ;
+    cmd_search ~threshold ~kind query
+  in
+  Cmd.v
+    (Cmd.info "search" ~doc)
+    Term.(const run $ threshold_opt $ kind_opt $ search_query)
+
+let search_types_cmd =
+  let doc = "Find types by field names and/or field types" in
+  let run field_names field_types =
+    cmd_search_types ~field_names ~field_types
+  in
+  Cmd.v
+    (Cmd.info "type-search" ~doc)
+    Term.(const run $ field_names_opt $ field_types_opt)
+
+let duplicates_cmd =
+  let doc = "Find duplicate functions across modules" in
+  Cmd.v (Cmd.info "duplicates" ~doc) Term.(const cmd_duplicates $ const ())
+
+let large_files_cmd =
+  let doc = "Show large files" in
+  let run min = cmd_large_files ~min_lines:min in
+  Cmd.v
+    (Cmd.info "large-files" ~doc)
+    Term.(
+      const run
+      $ min_lines_opt ~default:500 ~doc:"Minimum line count (default: 500)")
+
+let large_functions_cmd =
+  let doc = "Show large functions" in
+  let run min = cmd_large_functions ~min_lines:min in
+  Cmd.v
+    (Cmd.info "large-functions" ~doc)
+    Term.(
+      const run
+      $ min_lines_opt ~default:50 ~doc:"Minimum line count (default: 50)")
+
+let missing_docs_cmd =
+  let doc = "Show exposed functions without documentation" in
+  Cmd.v (Cmd.info "missing-docs" ~doc) Term.(const cmd_missing_docs $ const ())
+
+let missing_mli_cmd =
+  let doc = "Show modules without .mli interface files" in
+  Cmd.v (Cmd.info "missing-mli" ~doc) Term.(const cmd_missing_mli $ const ())
+
+let god_modules_cmd =
+  let doc = "Show modules with too many functions" in
+  let run min = cmd_god_modules ~min_fns:min in
+  Cmd.v
+    (Cmd.info "god-modules" ~doc)
+    Term.(
+      const run
+      $ min_lines_opt ~default:30 ~doc:"Minimum function count (default: 30)")
+
+let unsafe_strings_cmd =
+  let doc = "Show string-typed fields that may need newtypes" in
+  Cmd.v
+    (Cmd.info "unsafe-strings" ~doc)
+    Term.(const cmd_unsafe_strings $ const ())
+
+let stats_cmd =
+  let doc = "Show architecture index statistics" in
+  Cmd.v (Cmd.info "stats" ~doc) Term.(const cmd_stats $ const ())
+
+let sql_cmd =
+  let doc = "Run raw SQL query against the architecture database" in
+  Cmd.v (Cmd.info "sql" ~doc) Term.(const cmd_sql $ sql_query)
+
+let refresh_cmd =
+  let doc = "Rebuild the architecture index from .cmt files" in
+  Cmd.v (Cmd.info "refresh" ~doc) Term.(const cmd_refresh $ const ())
+
+let main_cmd =
+  let doc = "Query the octez-manager architecture index" in
+  let info = Cmd.info "arch-query" ~doc ~version:"0.1.0" in
+  Cmd.group
+    info
+    [
+      search_cmd;
+      search_types_cmd;
+      duplicates_cmd;
+      large_files_cmd;
+      large_functions_cmd;
+      missing_docs_cmd;
+      missing_mli_cmd;
+      god_modules_cmd;
+      unsafe_strings_cmd;
+      stats_cmd;
+      sql_cmd;
+      refresh_cmd;
+    ]
+
+let () = exit (Cmd.eval main_cmd)
