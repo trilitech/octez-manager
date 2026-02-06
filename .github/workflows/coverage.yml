@@ -61,18 +61,13 @@ jobs:
             exit 1
           fi
           eval $(opam env)
-          # Only pin/install if not already present in cache
-          if ! opam list miaou-core 2>/dev/null | grep -q miaou-core; then
-            echo "Installing miaou packages..."
-            opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
-            opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-            opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-            opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
-            opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-            opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
-          else
-            echo "Miaou packages already present in cache"
-          fi
+          echo "Installing miaou packages..."
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
 
       - name: Install project dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true'
