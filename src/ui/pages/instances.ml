@@ -801,6 +801,16 @@ Press **Enter** to open instance menu.|}
       check_navigation ps
 
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
+
+  let on_key ps key ~size =
+    ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Bubble )
+
+  let on_modal_key ps key ~size =
+    ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Bubble )
+
+  let key_hints _ps = []
 end
 
 module Page =

@@ -726,6 +726,16 @@ struct
       };
     ]
 
+  let on_key ps key ~size =
+    ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Bubble )
+
+  let on_modal_key ps key ~size =
+    ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Bubble )
+
+  let key_hints _ps = []
+
   let handled_keys () =
     Miaou.Core.Keys.[Up; Down; Enter; Char "Esc"; Char "Escape"]
 end
