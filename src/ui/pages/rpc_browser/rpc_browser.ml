@@ -188,21 +188,16 @@ let cycle_instance ps =
 
 let keymap _ps =
   let noop ps = ps in
-  let kb key action help =
-    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
   [
-    kb "Esc" back "Back";
-    kb "↑/↓" noop "Navigate";
-    kb "r" refresh "Refresh";
-    kb "Tab" cycle_instance "Instance/Pager";
-    kb "@" noop "Target instance";
-    {
-      Miaou.Core.Tui_page.key = "?";
-      action = noop;
-      help = "Help";
-      display_only = true;
-    };
+    kb "Esc" "Back";
+    kb "↑/↓" "Navigate";
+    kb "r" "Refresh";
+    kb "Tab" "Instance/Pager";
+    kb "@" "Target instance";
+    kb "?" "Help";
   ]
 
 (* Minimum width for side-by-side layout *)
@@ -458,6 +453,7 @@ let handle_key ps key ~size =
                     Navigation.update (fun _ -> new_state) ps
                 | Some (Keys.Char "u") | Some Keys.Backspace -> back ps
                 | Some (Keys.Char "r") -> refresh ps
+                | Some Keys.Tab -> cycle_instance ps
                 | _ -> ps)
           | State.Result _ -> (
               let result_focus = State.get_result_focus s in
@@ -659,6 +655,7 @@ let handle_key ps key ~size =
                 let new_state = State.unfold_all_json s in
                 state_ref := Some new_state ;
                 Navigation.update (fun _ -> new_state) ps)
+              else if key = "Tab" then cycle_instance ps
               else if is_browser_focused then
                 (* Browser panel navigation in Result mode *)
                 match Keys.of_string key with
@@ -763,7 +760,16 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [
+        {key = "Esc"; help = "Back"};
+        {key = "↑/↓"; help = "Navigate"};
+        {key = "r"; help = "Refresh"};
+        {key = "Tab"; help = "Instance/Pager"};
+        {key = "@"; help = "Target instance"};
+        {key = "?"; help = "Help"};
+      ]
 
   let has_modal = has_modal
 end

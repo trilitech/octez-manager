@@ -160,29 +160,18 @@ struct
       [Enter; Char "b"; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
 
   let keymap _ps =
-    let activate ps = Navigation.update activate_selection ps in
-    let create ps = Navigation.update create_menu_modal ps in
-    let diag ps = Navigation.update go_to_diagnostics ps in
-    let binaries ps = Navigation.update go_to_binaries ps in
-    let rpc_browser ps = Navigation.update go_to_rpc_browser ps in
-    let dismiss ps = Navigation.update dismiss_failure ps in
     let noop ps = ps in
-    let kb key action help =
-      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    let kb key help =
+      {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
     in
     [
-      kb "Enter" activate "Open";
-      kb "c" create "Create";
-      kb "d" diag "Diagnostics";
-      kb "b" binaries "Binaries";
-      kb "r" rpc_browser "RPC Browser";
-      kb "x" dismiss "Clear failure";
-      {
-        Miaou.Core.Tui_page.key = "?";
-        action = noop;
-        help = "Help";
-        display_only = true;
-      };
+      kb "Enter" "Open";
+      kb "c" "Create";
+      kb "d" "Diagnostics";
+      kb "b" "Binaries";
+      kb "r" "RPC Browser";
+      kb "x" "Clear failure";
+      kb "?" "Help";
     ]
 
   let header s =
@@ -813,7 +802,17 @@ Press **Enter** to open instance menu.|}
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [
+        {key = "Enter"; help = "Open"};
+        {key = "c"; help = "Create"};
+        {key = "d"; help = "Diagnostics"};
+        {key = "b"; help = "Binaries"};
+        {key = "r"; help = "RPC Browser"};
+        {key = "x"; help = "Clear failure"};
+        {key = "?"; help = "Help"};
+      ]
 end
 
 module Page =

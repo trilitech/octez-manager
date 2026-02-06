@@ -6,6 +6,7 @@
  (libraries
   octez_manager_lib
   miaou-core.lib
+  miaou-core.interfaces
   miaou-core.internals
   miaou-core.widgets.display
   miaou-runner.tui

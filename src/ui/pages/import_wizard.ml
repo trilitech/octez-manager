@@ -176,10 +176,11 @@ and start_import ps =
 let handled_keys () = Miaou.Core.Keys.[Escape; Enter; Up; Down; Tab]
 
 let keymap _ =
-  let kb key action help =
-    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  let noop ps = ps in
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  [kb "Esc" back "Back / Previous"; kb "Enter" next_step "Select / Next"]
+  [kb "Esc" "Back / Previous"; kb "Enter" "Select / Next"]
 
 let move_selection ps delta =
   Navigation.update
@@ -498,7 +499,12 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [
+        {key = "Esc"; help = "Back / Previous"};
+        {key = "Enter"; help = "Select / Next"};
+      ]
 
   let has_modal = has_modal
 end
