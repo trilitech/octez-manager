@@ -103,12 +103,12 @@ let open_text_modal ~title ~lines =
     let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -195,12 +195,12 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
     let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -350,12 +350,12 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
     let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -431,12 +431,12 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
     let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -533,12 +533,12 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
     let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -641,12 +641,12 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
     let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -812,12 +812,12 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -1075,12 +1075,12 @@ let open_download_progress_modal ~version ~on_complete =
     let handle_key ps _key ~size:_ = ps
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
@@ -1473,12 +1473,12 @@ let show_spinner_modal ~title ~label ~work ~on_complete () =
     let handle_key ps _key ~size:_ = ps
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Bubble )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
