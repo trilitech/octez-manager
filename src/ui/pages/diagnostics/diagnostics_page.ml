@@ -9,6 +9,7 @@ module Widgets = Miaou_widgets_display.Widgets
 module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
+module Box = Miaou_widgets_layout.Box_widget
 open Octez_manager_lib
 
 let name = "diagnostics"
@@ -186,328 +187,321 @@ let header =
 
 let footer = []
 
+(* Section content renderers - each returns lines for that section *)
+let render_services_content services =
+  if services = [] then [Widgets.dim "No services registered"]
+  else
+    List.map
+      (fun (st : Data.Service_state.t) ->
+        let svc = st.service in
+        let status_icon, status_color =
+          match st.status with
+          | Running -> ("●", 10)
+          | Stopped -> ("○", 8)
+          | Unknown _ -> ("?", 11)
+        in
+        Printf.sprintf
+          "%s %-20s  %s  %s"
+          (Widgets.fg status_color status_icon)
+          (Widgets.bold svc.Service.instance)
+          (Widgets.fg 8 svc.Service.role)
+          (Widgets.dim
+             (Printf.sprintf
+                "net:%s mode:%s"
+                svc.Service.network
+                (History_mode.to_string svc.Service.history_mode))))
+      services
+
+let render_caches_content () =
+  let cache_stats = Cache.get_stats () in
+  if cache_stats = [] then [Widgets.dim "No caches registered"]
+  else
+    let lines = ref [] in
+    List.iter
+      (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
+        let age_str =
+          match age with
+          | None -> Widgets.dim "empty"
+          | Some a ->
+              let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
+              if expired then Widgets.red s else Widgets.green s
+        in
+        let stats_str =
+          if hits + misses > 0 then
+            Printf.sprintf " hits:%d misses:%d" hits misses
+          else ""
+        in
+        let count_str =
+          if sub_entries <> [] then
+            Printf.sprintf " (%d)" (List.length sub_entries)
+          else ""
+        in
+        lines :=
+          Printf.sprintf
+            "%-20s  %s%s%s"
+            name
+            age_str
+            count_str
+            (Widgets.dim stats_str)
+          :: !lines ;
+        List.iter
+          (fun (entry : Cache.sub_entry) ->
+            let sub_age_str =
+              let s = Printf.sprintf "%.1fs" entry.age in
+              if entry.expired then Widgets.red s else Widgets.green s
+            in
+            lines :=
+              Printf.sprintf "  └─ %-16s  %s" entry.key sub_age_str :: !lines)
+          sub_entries)
+      cache_stats ;
+    lines := Widgets.dim "(press 'c' to clear all)" :: !lines ;
+    List.rev !lines
+
+let render_realtime_content bg_queue_spark =
+  let bg_depth = Metrics.get_bg_queue_depth () in
+  let bg_max = Metrics.get_bg_queue_max () in
+  [
+    Charts.render_bg_queue_sparkline bg_queue_spark;
+    Printf.sprintf
+      "Current: %d/%d  %s"
+      bg_depth
+      bg_max
+      (if bg_depth > 0 then Widgets.fg 11 "⚠ tasks pending"
+       else Widgets.fg 10 "✓ idle");
+  ]
+
+let render_recorder_content () =
+  let recorder_enabled = Metrics.is_recording () in
+  let recorder_icon =
+    if recorder_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
+  in
+  let recorder_status =
+    if recorder_enabled then Widgets.fg 10 "recording"
+    else Widgets.fg 8 "stopped"
+  in
+  let duration_samples = Metrics.get_recording_duration () in
+  let duration_str =
+    match duration_samples with
+    | 12 -> "1m"
+    | 60 -> "5m"
+    | 180 -> "15m"
+    | n -> Printf.sprintf "%ds" (n * 5)
+  in
+  [
+    Printf.sprintf
+      "%s %s %s %s"
+      (Widgets.fg 12 "Status:")
+      recorder_icon
+      recorder_status
+      (Widgets.dim
+         (Printf.sprintf "(duration: %s, 'd' to change)" duration_str));
+    Widgets.dim "(press 'R' to start/stop)";
+  ]
+
+let render_historical_content ~chart_width =
+  let samples = Metrics.get_snapshots () in
+  if samples = [] then
+    [
+      Widgets.dim "Collecting data... (wait ~5 seconds)";
+      Widgets.dim "Charts will appear once samples are recorded";
+    ]
+  else
+    let charts =
+      [
+        Charts.render_bg_queue_chart samples ~width:chart_width ~height:10;
+        Charts.render_service_status_chart samples ~width:chart_width ~height:10;
+        Charts.render_latency_chart samples ~width:chart_width ~height:10;
+        Charts.render_key_to_render_chart samples ~width:chart_width ~height:10;
+        Charts.render_summary_bars samples ~width:chart_width ~height:8;
+      ]
+    in
+    List.concat_map (fun c -> String.split_on_char '\n' c @ [""]) charts
+
+let render_scheduler_content () =
+  let scheduler_snapshots = Metrics.get_scheduler_snapshots () in
+  if scheduler_snapshots = [] then [Widgets.dim "No scheduler metrics yet"]
+  else
+    List.map
+      (fun (name, (snap : Metrics.snapshot)) ->
+        let avg =
+          if snap.count > 0 then snap.sum /. float_of_int snap.count else 0.
+        in
+        let p50_str =
+          match snap.p50 with Some v -> Printf.sprintf "%.1f" v | None -> "-"
+        in
+        let p90_str =
+          match snap.p90 with Some v -> Printf.sprintf "%.1f" v | None -> "-"
+        in
+        let p99_str =
+          match snap.p99 with Some v -> Printf.sprintf "%.1f" v | None -> "-"
+        in
+        let color =
+          match snap.p90 with
+          | Some v when v > 100. -> 9
+          | Some v when v > 50. -> 11
+          | _ -> 10
+        in
+        Printf.sprintf
+          "%s %-16s  %s avg:%.1fms  p50:%s  p90:%s  p99:%s  (n=%d)"
+          (Widgets.fg color "●")
+          name
+          (Widgets.dim "|")
+          avg
+          p50_str
+          p90_str
+          p99_str
+          snap.count)
+      scheduler_snapshots
+
+let render_worker_stats_content () =
+  let format_stats (stats : Worker_queue.stats) =
+    let dedup_pct =
+      if stats.requests_total > 0 then
+        100.0
+        *. float_of_int stats.requests_deduped
+        /. float_of_int stats.requests_total
+      else 0.0
+    in
+    let color =
+      if stats.p90_ms > 100. then 9 else if stats.p90_ms > 50. then 11 else 10
+    in
+    let main_line =
+      Printf.sprintf
+        "%s %-16s  %s reqs:%d dedup:%d(%.0f%%)  p50:%.1fms p90:%.1fms \
+         p95:%.1fms p99:%.1fms"
+        (Widgets.fg color "●")
+        stats.name
+        (Widgets.dim "|")
+        stats.requests_total
+        stats.requests_deduped
+        dedup_pct
+        stats.p50_ms
+        stats.p90_ms
+        stats.p95_ms
+        stats.p99_ms
+    in
+    let top_keys = List.filteri (fun i _ -> i < 5) stats.deduped_by_key in
+    let key_lines =
+      List.map
+        (fun (kd : Worker_queue.key_dedup) ->
+          Printf.sprintf
+            "    └─ %s %s"
+            (Widgets.dim (Printf.sprintf "%5d×" kd.count))
+            kd.key)
+        top_keys
+    in
+    main_line :: key_lines
+  in
+  format_stats (System_metrics_scheduler.get_worker_stats ())
+  @ format_stats (Rpc_scheduler.get_worker_stats ())
+
+let render_metrics_server_content () =
+  let metrics_enabled = Metrics.is_enabled () in
+  let status_icon =
+    if metrics_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
+  in
+  let status_text =
+    if metrics_enabled then Widgets.fg 10 "enabled" else Widgets.fg 8 "disabled"
+  in
+  let status_line =
+    Printf.sprintf "%s %s %s" (Widgets.fg 12 "Status:") status_icon status_text
+  in
+  match Metrics.get_server_info () with
+  | Some (addr, port) ->
+      [
+        status_line;
+        Printf.sprintf
+          "%s %s"
+          (Widgets.fg 12 "Endpoint:")
+          (Widgets.fg 14 (Printf.sprintf "http://%s:%d/metrics" addr port));
+        Widgets.dim "(server is running)";
+      ]
+  | None ->
+      [
+        status_line;
+        Printf.sprintf "%s %s" (Widgets.fg 12 "Address:") !metrics_addr_ref;
+        Widgets.dim "('m' to start, 'a' to edit address)";
+      ]
+
+let render_system_info_content () =
+  [
+    Printf.sprintf
+      "Privilege: %s"
+      (if Common.is_root () then Widgets.red "● SYSTEM"
+       else Widgets.green "● USER");
+  ]
+
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   Metrics.record_render ~page:name (fun () ->
+      let box_width = min 78 (size.LTerm_geom.cols - 2) in
+      let chart_width = min 70 (box_width - 6) in
       let lines = ref [] in
-      let add line = lines := line :: !lines in
-
-      (* Service Status Section *)
-      add (Widgets.fg 14 (Widgets.bold "━━━ Service Status ━━━")) ;
-      add "" ;
-      if s.services = [] then add (Widgets.dim "  No services registered")
-      else
-        List.iter
-          (fun (st : Data.Service_state.t) ->
-            let svc = st.service in
-            let status_icon, status_color =
-              match st.status with
-              | Running -> ("●", 10)
-              | Stopped -> ("○", 8)
-              | Unknown _ -> ("?", 11)
-            in
-            let line =
-              Printf.sprintf
-                "  %s %-20s  %s  %s"
-                (Widgets.fg status_color status_icon)
-                (Widgets.bold svc.Service.instance)
-                (Widgets.fg 8 svc.Service.role)
-                (Widgets.dim
-                   (Printf.sprintf
-                      "net:%s mode:%s"
-                      svc.Service.network
-                      (History_mode.to_string svc.Service.history_mode)))
-            in
-            add line)
-          s.services ;
-
-      add "" ;
-      add (Widgets.fg 13 (Widgets.bold "━━━ Caches ━━━")) ;
-      add "" ;
-      let cache_stats = Cache.get_stats () in
-      if cache_stats = [] then add (Widgets.dim "  No caches registered")
-      else
-        List.iter
-          (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
-            let age_str =
-              match age with
-              | None -> Widgets.dim "empty"
-              | Some a ->
-                  let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
-                  if expired then Widgets.red s else Widgets.green s
-            in
-            let stats_str =
-              if hits + misses > 0 then
-                Printf.sprintf " hits:%d misses:%d" hits misses
-              else ""
-            in
-            let count_str =
-              if sub_entries <> [] then
-                Printf.sprintf " (%d)" (List.length sub_entries)
-              else ""
-            in
-            add
-              (Printf.sprintf
-                 "  %-20s  %s%s%s"
-                 name
-                 age_str
-                 count_str
-                 (Widgets.dim stats_str)) ;
-            (* Show sub-entries for keyed caches *)
-            List.iter
-              (fun (entry : Cache.sub_entry) ->
-                let sub_age_str =
-                  let s = Printf.sprintf "%.1fs" entry.age in
-                  if entry.expired then Widgets.red s else Widgets.green s
-                in
-                add (Printf.sprintf "    └─ %-16s  %s" entry.key sub_age_str))
-              sub_entries)
-          cache_stats ;
-      add (Widgets.dim "  (press 'c' to clear all caches)") ;
-
-      add "" ;
-      add (Widgets.fg 12 (Widgets.bold "━━━ Real-Time Metrics ━━━")) ;
-      add "" ;
-
-      (* Sparkline *)
-      let bg_depth = Metrics.get_bg_queue_depth () in
-      let bg_max = Metrics.get_bg_queue_max () in
-      add ("  " ^ Charts.render_bg_queue_sparkline s.bg_queue_spark) ;
-      add
-        (Printf.sprintf
-           "  Current: %d/%d  %s"
-           bg_depth
-           bg_max
-           (if bg_depth > 0 then Widgets.fg 11 "⚠ tasks pending"
-            else Widgets.fg 10 "✓ idle")) ;
-
-      add "" ;
-      add (Widgets.fg 11 (Widgets.bold "━━━ Metrics Recorder ━━━")) ;
-      add "" ;
-      let recorder_enabled = Metrics.is_recording () in
-      let recorder_icon =
-        if recorder_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
-      in
-      let recorder_status =
-        if recorder_enabled then Widgets.fg 10 "recording"
-        else Widgets.fg 8 "stopped"
-      in
-      let duration_samples = Metrics.get_recording_duration () in
-      let duration_str =
-        match duration_samples with
-        | 12 -> "1m"
-        | 60 -> "5m"
-        | 180 -> "15m"
-        | n -> Printf.sprintf "%ds" (n * 5)
-      in
-      add
-        (Printf.sprintf
-           "  %s %s %s %s"
-           (Widgets.fg 12 "Status:")
-           recorder_icon
-           recorder_status
-           (Widgets.dim
-              (Printf.sprintf
-                 "(duration: %s, press 'd' to change)"
-                 duration_str))) ;
-      add (Widgets.dim "  (press 'R' to start/stop recording)") ;
-
-      (* Historical Charts *)
-      if recorder_enabled || Metrics.get_snapshots () <> [] then (
-        add "" ;
-        add (Widgets.fg 13 (Widgets.bold "━━━ Historical Metrics ━━━")) ;
-        add "" ;
-        let samples = Metrics.get_snapshots () in
-
-        if samples = [] then (
-          add (Widgets.dim "  Collecting data... (wait ~5 seconds)") ;
-          add (Widgets.dim "  Charts will appear once samples are recorded"))
-        else
-          let chart_width = min 70 (size.LTerm_geom.cols - 4) in
-
-          (* BG Queue Chart *)
-          let bg_chart =
-            Charts.render_bg_queue_chart samples ~width:chart_width ~height:10
-          in
-          String.split_on_char '\n' bg_chart |> List.iter add ;
-          add "" ;
-
-          (* Service Status Chart *)
-          let svc_chart =
-            Charts.render_service_status_chart
-              samples
-              ~width:chart_width
-              ~height:10
-          in
-          String.split_on_char '\n' svc_chart |> List.iter add ;
-          add "" ;
-
-          (* Render Latency Chart *)
-          let render_chart =
-            Charts.render_latency_chart samples ~width:chart_width ~height:10
-          in
-          String.split_on_char '\n' render_chart |> List.iter add ;
-          add "" ;
-
-          (* Key-to-Render Chart *)
-          let key_chart =
-            Charts.render_key_to_render_chart
-              samples
-              ~width:chart_width
-              ~height:10
-          in
-          String.split_on_char '\n' key_chart |> List.iter add ;
-          add "" ;
-
-          (* Summary *)
-          let summary =
-            Charts.render_summary_bars samples ~width:chart_width ~height:8
-          in
-          String.split_on_char '\n' summary |> List.iter add) ;
-
-      (* Scheduler Metrics Section *)
-      add "" ;
-      add (Widgets.fg 11 (Widgets.bold "━━━ Scheduler Performance ━━━")) ;
-      add "" ;
-      let scheduler_snapshots = Metrics.get_scheduler_snapshots () in
-      if scheduler_snapshots = [] then
-        add (Widgets.dim "  No scheduler metrics recorded yet")
-      else
-        List.iter
-          (fun (name, (snap : Metrics.snapshot)) ->
-            let avg =
-              if snap.count > 0 then snap.sum /. float_of_int snap.count else 0.
-            in
-            let p50_str =
-              match snap.p50 with
-              | Some v -> Printf.sprintf "%.1f" v
-              | None -> "-"
-            in
-            let p90_str =
-              match snap.p90 with
-              | Some v -> Printf.sprintf "%.1f" v
-              | None -> "-"
-            in
-            let p99_str =
-              match snap.p99 with
-              | Some v -> Printf.sprintf "%.1f" v
-              | None -> "-"
-            in
-            let color =
-              match snap.p90 with
-              | Some v when v > 100. -> 9 (* red if p90 > 100ms *)
-              | Some v when v > 50. -> 11 (* yellow if p90 > 50ms *)
-              | _ -> 10 (* green *)
-            in
-            add
-              (Printf.sprintf
-                 "  %s %-16s  %s avg:%.1fms  p50:%s  p90:%s  p99:%s  (n=%d)"
-                 (Widgets.fg color "●")
-                 name
-                 (Widgets.dim "|")
-                 avg
-                 p50_str
-                 p90_str
-                 p99_str
-                 snap.count))
-          scheduler_snapshots ;
-
-      (* Worker Queue Stats Section *)
-      add "" ;
-      add (Widgets.fg 12 (Widgets.bold "━━━ Worker Queue Stats ━━━")) ;
-      add "" ;
-      let format_stats (stats : Worker_queue.stats) =
-        let dedup_pct =
-          if stats.requests_total > 0 then
-            100.0
-            *. float_of_int stats.requests_deduped
-            /. float_of_int stats.requests_total
-          else 0.0
+      let add_box ~title ~color content_lines =
+        let content = String.concat "\n" content_lines in
+        let box =
+          Box.render ~title ~style:Single ~color ~width:box_width content
         in
-        let color =
-          if stats.p90_ms > 100. then 9 (* red if p90 > 100ms *)
-          else if stats.p90_ms > 50. then 11 (* yellow if p90 > 50ms *)
-          else 10 (* green *)
-        in
-        add
-          (Printf.sprintf
-             "  %s %-16s  %s reqs:%d dedup:%d(%.0f%%)  p50:%.1fms p90:%.1fms \
-              p95:%.1fms p99:%.1fms"
-             (Widgets.fg color "●")
-             stats.name
-             (Widgets.dim "|")
-             stats.requests_total
-             stats.requests_deduped
-             dedup_pct
-             stats.p50_ms
-             stats.p90_ms
-             stats.p95_ms
-             stats.p99_ms) ;
-        (* Show top deduped keys if any *)
-        let top_keys = List.filteri (fun i _ -> i < 5) stats.deduped_by_key in
-        List.iter
-          (fun (kd : Worker_queue.key_dedup) ->
-            add
-              (Printf.sprintf
-                 "      └─ %s %s"
-                 (Widgets.dim (Printf.sprintf "%5d×" kd.count))
-                 kd.key))
-          top_keys
+        String.split_on_char '\n' box
+        |> List.iter (fun l -> lines := l :: !lines) ;
+        lines := "" :: !lines
       in
-      format_stats (System_metrics_scheduler.get_worker_stats ()) ;
-      format_stats (Rpc_scheduler.get_worker_stats ()) ;
 
-      add "" ;
-      add (Widgets.fg 14 (Widgets.bold "━━━ Metrics Server Configuration ━━━")) ;
-      add "" ;
-      let metrics_enabled = Metrics.is_enabled () in
-      let status_icon =
-        if metrics_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
-      in
-      let status_text =
-        if metrics_enabled then Widgets.fg 10 "enabled"
-        else Widgets.fg 8 "disabled"
-      in
-      add
-        (Printf.sprintf
-           "  %s %s %s"
-           (Widgets.fg 12 "Status:")
-           status_icon
-           status_text) ;
-      (match Metrics.get_server_info () with
-      | Some (addr, port) ->
-          add
-            (Printf.sprintf
-               "  %s %s"
-               (Widgets.fg 12 "Endpoint:")
-               (Widgets.fg 14 (Printf.sprintf "http://%s:%d/metrics" addr port))) ;
-          add (Widgets.dim "  (server is running)")
-      | None ->
-          add
-            (Printf.sprintf
-               "  %s %s"
-               (Widgets.fg 12 "Address:")
-               !metrics_addr_ref) ;
-          add (Widgets.dim "  (press 'm' to start, 'a' to edit address)")) ;
+      (* Service Status *)
+      add_box
+        ~title:"Service Status"
+        ~color:14
+        (render_services_content s.services) ;
 
-      add "" ;
-      add (Widgets.fg 12 (Widgets.bold "━━━ System Information ━━━")) ;
-      add "" ;
-      add
-        (Printf.sprintf
-           "  Privilege: %s"
-           (if Common.is_root () then Widgets.red "● SYSTEM"
-            else Widgets.green "● USER")) ;
+      (* Caches *)
+      add_box ~title:"Caches" ~color:13 (render_caches_content ()) ;
+
+      (* Real-Time Metrics *)
+      add_box
+        ~title:"Real-Time Metrics"
+        ~color:12
+        (render_realtime_content s.bg_queue_spark) ;
+
+      (* Metrics Recorder *)
+      add_box ~title:"Metrics Recorder" ~color:11 (render_recorder_content ()) ;
+
+      (* Historical Charts - only show if recording or has data *)
+      if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
+        add_box
+          ~title:"Historical Metrics"
+          ~color:13
+          (render_historical_content ~chart_width) ;
+
+      (* Scheduler Performance *)
+      add_box
+        ~title:"Scheduler Performance"
+        ~color:11
+        (render_scheduler_content ()) ;
+
+      (* Worker Queue Stats *)
+      add_box
+        ~title:"Worker Queue Stats"
+        ~color:12
+        (render_worker_stats_content ()) ;
+
+      (* Metrics Server Configuration *)
+      add_box
+        ~title:"Metrics Server"
+        ~color:14
+        (render_metrics_server_content ()) ;
+
+      (* System Information *)
+      add_box
+        ~title:"System Information"
+        ~color:12
+        (render_system_info_content ()) ;
 
       let all_lines = List.rev !lines in
       let content_height = List.length all_lines in
       content_height_ref := content_height ;
 
-      (* Store for next state update *)
-
       (* Apply scrolling *)
       let visible_height = size.LTerm_geom.rows - 4 in
-      (* account for header/footer *)
       let visible_lines =
         all_lines |> fun l ->
         if List.length l <= visible_height then l

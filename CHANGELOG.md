@@ -37,13 +37,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **CI optimization**: Build stage now ~80% faster (5 min → 1 min) through improved cache logic, pre-installed miaou packages in CI container, and parallel opam operations
 - **CI optimization**: Integration tests within each shard now run in parallel (3 jobs per shard), reducing per-shard time by ~40-50%
 - **CI optimization**: Docker layer caching for integration tests reduces container build time by 40-60% (2-3 min per run)
+- Diagnostics page now uses bordered boxes (Box_widget) for cleaner visual section separation
 
 ### Fixed
 
 - RPC Browser: Fixed duplicate network names in instance display when selecting target endpoints (fixes #599)
-
-### Fixed
-
 - System metrics (CPU, memory, disk) start populating without the previous startup delay
 - `make completions-check` no longer modifies the working directory when completions are out of date
 - Systemd service template warnings about unknown keys `StartLimitIntervalSec` and `StartLimitBurst` in [Service] section (moved to [Unit] section)
