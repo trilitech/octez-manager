@@ -50,6 +50,18 @@ struct
       | Global_shortcuts.Handled -> ps
       | Global_shortcuts.NotGlobal -> P.handle_key ps key ~size
 
+  let on_key ps key ~size =
+    if Miaou.Core.Modal_manager.has_active () then P.on_key ps key ~size
+    else
+      let key_str = Miaou.Core.Keys.to_string key in
+      match Global_shortcuts.handle key_str with
+      | Global_shortcuts.Handled -> (ps, Miaou_interfaces.Key_event.Handled)
+      | Global_shortcuts.NotGlobal -> P.on_key ps key ~size
+
+  let on_modal_key = P.on_modal_key
+
+  let key_hints = P.key_hints
+
   let keymap = P.keymap
 
   let handled_keys = P.handled_keys
