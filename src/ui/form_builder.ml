@@ -732,8 +732,7 @@ struct
 
   let key_hints _ps = []
 
-  let handled_keys () =
-    Miaou.Core.Keys.[Up; Down; Tab; Enter; Escape]
+  let handled_keys () = Miaou.Core.Keys.[Up; Down; Tab; Enter; Escape]
 end
 
 (*****************************************************************************)

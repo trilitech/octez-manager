@@ -128,8 +128,7 @@ let handle_key ps key ~size:_ =
     ps)
   else
     match Keys.of_string key with
-    | Some Keys.Escape | Some (Keys.Char "q") ->
-        Navigation.back ps
+    | Some Keys.Escape | Some (Keys.Char "q") -> Navigation.back ps
     | Some Keys.Up | Some (Keys.Char "k") -> move_selection ps (-1)
     | Some Keys.Down | Some (Keys.Char "j") -> move_selection ps 1
     | Some (Keys.Char "n") -> select_network ps
