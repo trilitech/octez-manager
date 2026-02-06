@@ -33,6 +33,7 @@ depends: [
   "lambda-term"
   "linenoise"
   "ppx_deriving" {build}
+  "sqlite3" {with-dev-setup}
   "alcotest" {with-test}
   "qcheck-alcotest" {with-test}
   "bisect_ppx" {with-test}

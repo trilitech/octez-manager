@@ -1,4 +1,4 @@
-.PHONY: all deps deps-ci build test clean coverage update-miaou
+.PHONY: all deps deps-ci build test clean coverage update-miaou arch-index arch-query
 
 OPAM_EXEC ?= opam exec --
 DUNE = $(OPAM_EXEC) dune
@@ -59,6 +59,12 @@ lint-sync-io:
 
 test: fmt-check completions-check lint-sync-io
 	$(DUNE) runtest
+
+arch-index:
+	$(DUNE) exec -- tools/arch_index.exe
+
+arch-query:
+	$(DUNE) exec tools/arch_query.exe -- $(ARGS)
 
 clean:
 	$(DUNE) clean
