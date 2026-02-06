@@ -775,6 +775,9 @@ Press **Enter** to open instance menu.|}
         | Some Keys.Tab -> Navigation.update toggle_fold ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
+        | Some (Keys.Char "b") -> Navigation.update go_to_binaries ps
+        | Some (Keys.Char "d") -> Navigation.update go_to_diagnostics ps
+        | Some (Keys.Char "r") -> Navigation.update go_to_rpc_browser ps
         | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
         | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
         | Some (Keys.Char "Esc")
@@ -803,12 +806,12 @@ Press **Enter** to open instance menu.|}
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
   let on_key ps key ~size =
-    ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-      Miaou_interfaces.Key_event.Bubble )
+    let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+    (ps', Miaou_interfaces.Key_event.Handled)
 
   let on_modal_key ps key ~size =
-    ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-      Miaou_interfaces.Key_event.Bubble )
+    let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+    (ps', Miaou_interfaces.Key_event.Handled)
 
   let key_hints _ps = []
 end
