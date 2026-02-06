@@ -87,18 +87,28 @@ jobs:
         run: |
           if opam switch list 2>&1 | grep -q "5.3.0"; then
             echo "Opam switch 5.3.0 exists, using it..."
-            echo "needs_miaou=false" >> $GITHUB_OUTPUT
             eval $(opam env)
           else
             echo "Initializing opam and creating switch 5.3.0..."
             opam init --disable-sandboxing --bare -y || true
             opam switch create 5.3.0 ocaml.5.3.0 -y
-            echo "needs_miaou=true" >> $GITHUB_OUTPUT
             eval $(opam env)
           fi
 
+      - name: Check if miaou is installed
+        id: check-miaou
+        run: |
+          eval $(opam env)
+          if opam list miaou-core 2>/dev/null | grep -q miaou-core; then
+            echo "miaou_installed=true" >> $GITHUB_OUTPUT
+            echo "Miaou packages already installed"
+          else
+            echo "miaou_installed=false" >> $GITHUB_OUTPUT
+            echo "Miaou packages need installation"
+          fi
+
       - name: Pin miaou packages
-        if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.needs_miaou == 'true'
+        if: steps.check-miaou.outputs.miaou_installed != 'true'
         run: |
           if [ -z "$MIAOU_GIT_URL" ]; then
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
@@ -110,21 +120,23 @@ jobs:
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix
+          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
 
       - name: Install project dependencies
+        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           eval $(opam env)
           git config --global --add safe.directory "$PWD"
-          opam install . --deps-only --with-test
+          opam install . --deps-only --with-test --jobs=4
           opam install ocamlformat
 
       - name: Cache dune build
         uses: actions/cache@v4
         with:
           path: _build
-          key: dune-${{ runner.os }}-${{ hashFiles('src/**', 'dune-project') }}
+          key: dune-${{ runner.os }}-${{ hashFiles('**/*.ml', '**/*.mli', 'dune-project', '**/dune') }}
           restore-keys: |
+            dune-${{ runner.os }}-${{ github.base_ref }}-
             dune-${{ runner.os }}-
 
       - name: Check copyright headers
