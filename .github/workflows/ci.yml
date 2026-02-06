@@ -95,32 +95,26 @@ jobs:
             eval $(opam env)
           fi
 
-      - name: Check if miaou is installed
-        id: check-miaou
-        run: |
-          eval $(opam env)
-          if opam list miaou-core 2>/dev/null | grep -q miaou-core; then
-            echo "miaou_installed=true" >> $GITHUB_OUTPUT
-            echo "Miaou packages already installed"
-          else
-            echo "miaou_installed=false" >> $GITHUB_OUTPUT
-            echo "Miaou packages need installation"
-          fi
-
       - name: Pin miaou packages
-        if: steps.check-miaou.outputs.miaou_installed != 'true'
+        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           if [ -z "$MIAOU_GIT_URL" ]; then
             echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
             exit 1
           fi
           eval $(opam env)
-          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
+          # Only pin/install if not already present in cache
+          if ! opam list miaou-core 2>/dev/null | grep -q miaou-core; then
+            echo "Installing miaou packages..."
+            opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+            opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+            opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+            opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
+            opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+            opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
+          else
+            echo "Miaou packages already present in cache"
+          fi
 
       - name: Install project dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true'
