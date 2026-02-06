@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -10,7 +10,10 @@
     Provides a CLI for querying [docs/architecture.db] with canned queries
     and fuzzy intent search. *)
 
-let db_path = "docs/architecture.db"
+let db_path =
+  match Sys.getenv_opt "ARCH_DB_PATH" with
+  | Some p -> p
+  | None -> "docs/architecture.db"
 
 (* ========================================================================== *)
 (* Database helpers                                                           *)
@@ -518,6 +521,234 @@ let cmd_refresh () =
   exit code
 
 (* ========================================================================== *)
+(* Metrics: machine-readable JSON output for CI                               *)
+(* ========================================================================== *)
+
+(** Metrics that get WORSE when they increase. *)
+let worse_when_higher =
+  [
+    "duplicate_groups";
+    "large_files";
+    "large_functions";
+    "missing_docs";
+    "missing_mli";
+    "god_modules";
+    "unsafe_string_fields";
+  ]
+
+(** Metrics that get WORSE when they decrease. *)
+let worse_when_lower = ["doc_coverage_pct"]
+
+let cmd_metrics output_file =
+  let db = open_db () in
+  let get sql =
+    let r = ref "0" in
+    ignore (Sqlite3.exec_not_null db ~cb:(fun row _h -> r := row.(0)) sql) ;
+    !r
+  in
+  let geti sql = int_of_string (get sql) in
+  let total_fns = geti "SELECT COUNT(*) FROM functions" in
+  let documented_fns =
+    geti "SELECT COUNT(*) FROM functions WHERE intent IS NOT NULL"
+  in
+  let doc_pct =
+    if total_fns > 0 then
+      let raw =
+        100.0 *. float_of_int documented_fns /. float_of_int total_fns
+      in
+      Float.round (raw *. 10.0) /. 10.0
+    else 0.0
+  in
+  let metrics =
+    [
+      ("modules", string_of_int (geti "SELECT COUNT(*) FROM modules"));
+      ("total_functions", string_of_int total_fns);
+      ( "exposed_functions",
+        string_of_int (geti "SELECT COUNT(*) FROM functions WHERE exposed = 1")
+      );
+      ("documented_functions", string_of_int documented_fns);
+      ("doc_coverage_pct", Printf.sprintf "%.1f" doc_pct);
+      ("total_types", string_of_int (geti "SELECT COUNT(*) FROM types"));
+      ("record_fields", string_of_int (geti "SELECT COUNT(*) FROM type_fields"));
+      ( "variant_constructors",
+        string_of_int (geti "SELECT COUNT(*) FROM type_constructors") );
+      ( "duplicate_groups",
+        string_of_int
+          (geti
+             "SELECT COUNT(*) FROM (SELECT f.name, f.signature FROM functions \
+              f JOIN modules m ON f.module_id = m.id WHERE f.name NOT LIKE \
+              'let*' AND f.signature NOT IN ('unit', 'string', 'int', 'float', \
+              'bool', 'Mutex.t') AND f.signature NOT LIKE '''a%' AND f.name \
+              NOT IN ('register', 'init', 'view', 'update', 'refresh', 'move', \
+              'back', 'noop', 'service_select', 'service_cycle', 'keymap', \
+              'has_modal', 'handled_keys', 'handle_modal_key', 'handle_key', \
+              'header', 'name', 'shutdown', 'start', 'clear', 'stop', 'tick', \
+              'get', 'clear_cache', 'started', 'shutdown_requested') GROUP BY \
+              f.name, f.signature HAVING COUNT(DISTINCT m.id) > 1)") );
+      ( "large_files",
+        string_of_int (geti "SELECT COUNT(*) FROM modules WHERE lines > 500") );
+      ( "large_functions",
+        string_of_int
+          (geti
+             "SELECT COUNT(*) FROM functions WHERE line_end - line_start + 1 > \
+              50") );
+      ( "missing_docs",
+        string_of_int
+          (geti
+             "SELECT COUNT(*) FROM functions WHERE exposed = 1 AND intent IS \
+              NULL") );
+      ( "missing_mli",
+        string_of_int (geti "SELECT COUNT(*) FROM modules WHERE has_mli = 0") );
+      ( "god_modules",
+        string_of_int
+          (geti
+             "SELECT COUNT(*) FROM (SELECT module_id FROM functions GROUP BY \
+              module_id HAVING COUNT(*) > 30)") );
+      ( "unsafe_string_fields",
+        string_of_int
+          (geti
+             "SELECT COUNT(*) FROM (SELECT field_name FROM type_fields WHERE \
+              field_type = 'string' GROUP BY field_name HAVING COUNT(*) >= 3)")
+      );
+    ]
+  in
+  ignore (Sqlite3.db_close db) ;
+  (* Output JSON *)
+  let json =
+    Printf.sprintf
+      "{\n%s\n}"
+      (String.concat
+         ",\n"
+         (List.map
+            (fun (k, v) ->
+              (* Detect if value is numeric *)
+              let json_val =
+                try
+                  ignore (float_of_string v) ;
+                  v
+                with _ -> Printf.sprintf "\"%s\"" v
+              in
+              Printf.sprintf "  \"%s\": %s" k json_val)
+            metrics))
+  in
+  match output_file with
+  | Some path ->
+      let oc = open_out path in
+      output_string oc json ;
+      output_char oc '\n' ;
+      close_out oc ;
+      Printf.printf "Metrics written to %s\n" path
+  | None -> print_endline json
+
+(* -------------------------------------------------------------------------- *)
+(* Compare two metrics JSON files                                             *)
+(* -------------------------------------------------------------------------- *)
+
+(** Simple JSON parser for flat { "key": number } objects. *)
+let parse_metrics_json path =
+  let ic = open_in path in
+  let n = in_channel_length ic in
+  let s = really_input_string ic n in
+  close_in ic ;
+  let tbl = Hashtbl.create 32 in
+  (* Match "key": value patterns *)
+  let re = Str.regexp "\"\\([^\"]+\\)\": *\\([0-9.]+\\)" in
+  let pos = ref 0 in
+  (try
+     while true do
+       let _ = Str.search_forward re s !pos in
+       let key = Str.matched_group 1 s in
+       let value = float_of_string (Str.matched_group 2 s) in
+       Hashtbl.replace tbl key value ;
+       pos := Str.match_end ()
+     done
+   with Not_found -> ()) ;
+  tbl
+
+type comparison_result = {
+  regressions : (string * float * float) list;
+  improvements : (string * float * float) list;
+  unchanged : (string * float) list;
+}
+
+let cmd_compare baseline_path current_path =
+  let baseline = parse_metrics_json baseline_path in
+  let current = parse_metrics_json current_path in
+  let regressions = ref [] in
+  let improvements = ref [] in
+  let unchanged = ref [] in
+  Hashtbl.iter
+    (fun key cur_val ->
+      match Hashtbl.find_opt baseline key with
+      | None -> () (* New metric, skip *)
+      | Some base_val ->
+          if cur_val = base_val then unchanged := (key, cur_val) :: !unchanged
+          else
+            let is_regression =
+              if List.mem key worse_when_higher then cur_val > base_val
+              else if List.mem key worse_when_lower then cur_val < base_val
+              else false
+            in
+            let is_improvement =
+              if List.mem key worse_when_higher then cur_val < base_val
+              else if List.mem key worse_when_lower then cur_val > base_val
+              else false
+            in
+            if is_regression then
+              regressions := (key, base_val, cur_val) :: !regressions
+            else if is_improvement then
+              improvements := (key, base_val, cur_val) :: !improvements
+            else unchanged := (key, cur_val) :: !unchanged)
+    current ;
+  let result =
+    {
+      regressions = List.sort compare !regressions;
+      improvements = List.sort compare !improvements;
+      unchanged = List.sort compare !unchanged;
+    }
+  in
+  (* Print report *)
+  if result.regressions <> [] then (
+    Printf.printf "REGRESSIONS (CI will fail):\n" ;
+    List.iter
+      (fun (key, base_val, cur_val) ->
+        let arrow = if cur_val > base_val then "+" else "" in
+        Printf.printf
+          "  %s: %.0f -> %.0f (%s%.0f)\n"
+          key
+          base_val
+          cur_val
+          arrow
+          (cur_val -. base_val))
+      result.regressions ;
+    print_newline ()) ;
+  if result.improvements <> [] then (
+    Printf.printf "Improvements:\n" ;
+    List.iter
+      (fun (key, base_val, cur_val) ->
+        let arrow = if cur_val > base_val then "+" else "" in
+        Printf.printf
+          "  %s: %.0f -> %.0f (%s%.0f)\n"
+          key
+          base_val
+          cur_val
+          arrow
+          (cur_val -. base_val))
+      result.improvements ;
+    print_newline ()) ;
+  (* Exit code: 1 if regressions *)
+  if result.regressions <> [] then (
+    Printf.printf
+      "FAILED: %d metric(s) regressed.\n"
+      (List.length result.regressions) ;
+    exit 1)
+  else
+    Printf.printf
+      "OK: No regressions (%d improvements, %d unchanged).\n"
+      (List.length result.improvements)
+      (List.length result.unchanged)
+
+(* ========================================================================== *)
 (* Cmdliner CLI definition                                                    *)
 (* ========================================================================== *)
 
@@ -646,6 +877,41 @@ let refresh_cmd =
   let doc = "Rebuild the architecture index from .cmt files" in
   Cmd.v (Cmd.info "refresh" ~doc) Term.(const cmd_refresh $ const ())
 
+let metrics_output_opt =
+  Arg.(
+    value
+    & opt (some string) None
+    & info
+        ["output"; "o"]
+        ~docv:"FILE"
+        ~doc:"Write JSON to FILE instead of stdout")
+
+let metrics_cmd =
+  let doc =
+    "Output code quality metrics as JSON (for CI comparison and badges)"
+  in
+  Cmd.v (Cmd.info "metrics" ~doc) Term.(const cmd_metrics $ metrics_output_opt)
+
+let baseline_arg =
+  Arg.(
+    required
+    & pos 0 (some string) None
+    & info [] ~docv:"BASELINE" ~doc:"Baseline metrics JSON file")
+
+let current_arg =
+  Arg.(
+    required
+    & pos 1 (some string) None
+    & info [] ~docv:"CURRENT" ~doc:"Current metrics JSON file")
+
+let compare_cmd =
+  let doc =
+    "Compare two metrics JSON files. Exits 1 if any metric regressed."
+  in
+  Cmd.v
+    (Cmd.info "compare" ~doc)
+    Term.(const cmd_compare $ baseline_arg $ current_arg)
+
 let main_cmd =
   let doc = "Query the octez-manager architecture index" in
   let info = Cmd.info "arch-query" ~doc ~version:"0.1.0" in
@@ -664,6 +930,8 @@ let main_cmd =
       stats_cmd;
       sql_cmd;
       refresh_cmd;
+      metrics_cmd;
+      compare_cmd;
     ]
 
 let () = exit (Cmd.eval main_cmd)
