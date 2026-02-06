@@ -219,13 +219,42 @@ jobs:
         with:
           driver: docker-container
 
-      - name: Build and start containers
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: docker-${{ runner.os }}-${{ hashFiles('test/integration/**/Dockerfile*') }}
+          restore-keys: |
+            docker-${{ runner.os }}-
+
+      - name: Build containers with cache
         working-directory: test/integration
         env:
           DOCKER_BUILDKIT: 1
         run: |
-          # Build with cache and start
-          docker compose up -d --build
+          # Build sandbox with cache
+          docker buildx build \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --load \
+            -t test-integration-sandbox:latest \
+            -f sandbox/Dockerfile \
+            .
+
+          # Build cli-tester with cache
+          docker buildx build \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --load \
+            -t test-integration-cli-tester:latest \
+            -f cli-tester/Dockerfile \
+            .
+
+      - name: Start containers
+        working-directory: test/integration
+        run: |
+          # docker-compose will use the pre-built cached images
+          docker compose up -d
 
           # Wait for sandbox to be healthy
           echo "Waiting for sandbox..."
@@ -268,6 +297,12 @@ jobs:
         working-directory: test/integration
         run: |
           docker compose down -v || true
+
+      - name: Move Docker cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
 
   release:
     name: Release
