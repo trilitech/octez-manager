@@ -207,8 +207,9 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
           TOTAL_SHARDS: 5
+          PARALLEL_JOBS: 3
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.coverage.yml exec -T -e SHARD -e TOTAL_SHARDS cli-tester /run-tests.sh
+          docker compose -f docker-compose.yml -f docker-compose.coverage.yml exec -T -e SHARD -e TOTAL_SHARDS -e PARALLEL_JOBS cli-tester /run-tests.sh
 
       - name: Extract coverage data from container
         working-directory: test/integration
