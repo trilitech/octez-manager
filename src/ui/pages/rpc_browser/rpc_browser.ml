@@ -10,6 +10,7 @@ module Navigation = Miaou.Core.Navigation
 module Vsection = Miaou_widgets_layout.Vsection
 module Widgets = Miaou_widgets_display.Widgets
 module Pager = Miaou_widgets_display.Pager_widget
+module Grid = Miaou_widgets_layout.Grid_layout
 module Service_state = Data.Service_state
 
 let name = "rpc_browser"
@@ -203,51 +204,28 @@ let keymap _ps =
 (* Minimum width for side-by-side layout *)
 let side_by_side_min_width = 140
 
-(* Render two columns side by side with focus-aware borders *)
+(* Render two columns side by side using Grid_layout with focus-aware separator *)
 let render_side_by_side ~left ~right ~left_width ~total_width ~rows
     ~left_focused ~right_focused =
-  let left_lines = String.split_on_char '\n' left in
-  let right_lines = String.split_on_char '\n' right in
-  (* Use Widgets.visible_chars_count for proper ANSI handling *)
-  let truncate_line line width =
-    let visible_len = Widgets.visible_chars_count line in
-    if visible_len <= width then line
-    else
-      (* Truncate to width visible chars - need to find byte position *)
-      let byte_idx = Widgets.visible_byte_index_of_pos line width in
-      String.sub line 0 byte_idx ^ "\027[0m"
-  in
-  let pad_line line width =
-    let visible_len = Widgets.visible_chars_count line in
-    if visible_len >= width then truncate_line line width
-    else line ^ String.make (width - visible_len) ' '
-  in
-  let right_width = total_width - left_width - 1 in
-  (* Vertical separator between browser and pagers - consistent character *)
+  (* Styled vertical separator based on focus *)
   let separator =
     if left_focused then Widgets.bold (Widgets.fg 14 "│")
     else if right_focused then Widgets.fg 14 "│"
     else Widgets.dim "│"
   in
-  (* No top border here - focus is shown in individual panel headers *)
-  let content_rows = rows in
-  let combined =
-    List.mapi
-      (fun i _ ->
-        let left_line =
-          match List.nth_opt left_lines i with Some l -> l | None -> ""
-        in
-        let right_line =
-          match List.nth_opt right_lines i with Some r -> r | None -> ""
-        in
-        Printf.sprintf
-          "%s%s%s"
-          (pad_line left_line left_width)
-          separator
-          (pad_line right_line right_width))
-      (List.init content_rows (fun i -> i))
+  let sep_column = String.concat "\n" (List.init rows (fun _ -> separator)) in
+  let right_width = total_width - left_width - 1 in
+  let grid =
+    Grid.create
+      ~rows:[Grid.Fr 1.]
+      ~cols:[Grid.Px left_width; Grid.Px 1; Grid.Px right_width]
+      [
+        Grid.cell ~row:0 ~col:0 (fun ~size:_ -> left);
+        Grid.cell ~row:0 ~col:1 (fun ~size:_ -> sep_column);
+        Grid.cell ~row:0 ~col:2 (fun ~size:_ -> right);
+      ]
   in
-  String.concat "\n" combined
+  Grid.render grid ~size:{LTerm_geom.rows; cols = total_width}
 
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
