@@ -48,11 +48,29 @@ assert_dir_exists() {
 	fi
 }
 
+# Ensure the tezos system user exists.
+# Purge operations delete the service user, which breaks parallel tests
+# that need --service-user tezos. Call this after any purge.
+ensure_tezos_user() {
+	if ! id tezos &>/dev/null; then
+		useradd --system --no-create-home tezos 2>/dev/null || true
+	fi
+}
+
 # Instance helpers
 instance_exists() {
 	local instance="$1"
-	# Capture both stdout and stderr to ensure we see all output
-	om list 2>&1 | grep -q "$instance"
+	# Primary check: ask octez-manager
+	if om list 2>&1 | grep -q "$instance"; then
+		return 0
+	fi
+	# Fallback: check the service registry file directly.
+	# This handles cases where om list fails due to a corrupt
+	# sibling file during parallel test execution.
+	if [ -f "/etc/octez_manager/services/${instance}.json" ]; then
+		return 0
+	fi
+	return 1
 }
 
 # Inject pre-generated identity to skip PoW during node start
@@ -189,6 +207,9 @@ cleanup_instance() {
 	# Remove and purge
 	om instance "$instance" remove 2>/dev/null || true
 	om instance "$instance" purge 2>/dev/null || true
+
+	# Purge may delete the service user; recreate for parallel tests
+	ensure_tezos_user
 }
 
 # RPC helpers
