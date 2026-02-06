@@ -1,11 +1,9 @@
 name: Coverage Report
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
+  workflow_dispatch:  # Allow manual trigger for debugging
 
 concurrency:
   group: coverage-${{ github.ref }}
@@ -13,7 +11,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   build-and-test-coverage:
@@ -150,14 +147,9 @@ jobs:
     name: Integration Tests Coverage (Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     needs: [build-and-test-coverage]
-    # Run instrumented integration tests (with coverage) when:
-    # 1. Pushing to main (always maintain coverage baseline), OR
-    # 2. PR without 'skip-coverage' label (default behavior)
-    # If PR has 'skip-coverage' label, fast tests run instead (see ci.yml)
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' && 
-       !contains(github.event.pull_request.labels.*.name, 'skip-coverage'))
+    # Only run on main branch pushes to maintain coverage baseline
+    # For PRs, fast non-instrumented tests run in ci.yml instead
+    if: github.event_name == 'push'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -404,152 +396,6 @@ jobs:
           valColorRange: ${{ env.COVERAGE_PCT }}
           minColorRange: 0
           maxColorRange: 100
-
-      - name: Download baseline coverage from main branch (for PRs)
-        if: github.event_name == 'pull_request'
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          workflow: coverage.yml
-          branch: main
-          name: coverage-baseline
-          path: baseline-coverage
-          if_no_artifact_found: ignore
-        continue-on-error: true
-
-      - name: Extract baseline coverage (for PRs)
-        if: github.event_name == 'pull_request'
-        run: |
-          if [ -f baseline-coverage/coverage-full.json ]; then
-            BASE_COVERAGE=$(jq -r '.__meta.overall // .overall // 0' baseline-coverage/coverage-full.json 2>/dev/null || echo "0")
-            echo "BASE_COVERAGE=$BASE_COVERAGE" >> $GITHUB_ENV
-            echo "Base coverage from main: $BASE_COVERAGE%"
-          else
-            echo "No baseline coverage found, using 0"
-            echo "BASE_COVERAGE=0" >> $GITHUB_ENV
-            mkdir -p baseline-coverage
-            echo "{}" > baseline-coverage/coverage-data.json
-          fi
-        continue-on-error: true
-
-      - name: Comment PR with coverage
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const coverage = process.env.COVERAGE_PCT || '0';
-            const baseCoverage = process.env.BASE_COVERAGE || '0';
-            const diff = (parseFloat(coverage) - parseFloat(baseCoverage)).toFixed(2);
-            
-            let emoji = '📊';
-            let diffText = '';
-            let diffColor = '';
-            
-            if (diff > 0) {
-              emoji = '📈';
-              diffText = `(+${diff}%)`;
-              diffColor = '🟢';
-            } else if (diff < 0) {
-              emoji = '📉';
-              diffText = `(${diff}%)`;
-              diffColor = '🔴';
-            } else {
-              diffText = '(no change)';
-              diffColor = '⚪';
-            }
-            
-            let summary = '';
-            try {
-              summary = fs.readFileSync('coverage-summary.md', 'utf8');
-            } catch (e) {
-              summary = 'Coverage report not available';
-            }
-            
-            // Calculate per-file diffs
-            let fileDiffs = '';
-            try {
-              const currentData = JSON.parse(fs.readFileSync('coverage-data.json', 'utf8'));
-              const baselineData = JSON.parse(fs.readFileSync('baseline-coverage/coverage-data.json', 'utf8'));
-              
-              const changes = [];
-              for (const [file, currentPct] of Object.entries(currentData)) {
-                if (file.startsWith('__')) continue; // Skip metadata
-                if (file.startsWith('test/')) continue; // Skip test files
-                const basePct = baselineData[file] || 0;
-                const fileDiff = (parseFloat(currentPct) - parseFloat(basePct)).toFixed(2);
-                if (Math.abs(fileDiff) >= 0.01) {
-                  changes.push({ file, current: currentPct, base: basePct, diff: fileDiff });
-                }
-              }
-              
-              if (changes.length > 0) {
-                // Sort by absolute diff (largest changes first)
-                changes.sort((a, b) => Math.abs(parseFloat(b.diff)) - Math.abs(parseFloat(a.diff)));
-                
-                fileDiffs = '\n\n<details>\n<summary>📊 Coverage Changes by File</summary>\n\n';
-                fileDiffs += '```diff\n';
-                
-                const topChanges = changes.slice(0, 20); // Show top 20 changes
-                for (const {file, current, base, diff} of topChanges) {
-                  const symbol = parseFloat(diff) > 0 ? '+' : '';
-                  const prefix = parseFloat(diff) > 0 ? '+ ' : '- ';
-                  fileDiffs += `${prefix}${file.padEnd(60)} ${base}% → ${current}% (${symbol}${diff}%)\n`;
-                }
-                
-                if (changes.length > 20) {
-                  fileDiffs += `\n... and ${changes.length - 20} more files changed\n`;
-                }
-                
-                fileDiffs += '```\n</details>';
-              }
-            } catch (e) {
-              console.log('Could not calculate per-file diffs:', e.message);
-            }
-            
-            const comment = `## ${emoji} Coverage Report
-            
-            **Overall Coverage:** ${coverage}% ${diffColor} ${diffText}
-            ${fileDiffs}
-            
-            ${summary}
-            
-            <details>
-            <summary>ℹ️ Coverage Details</summary>
-            
-            - **Unit Tests:** ✅ Instrumented with bisect_ppx
-            - **Integration Tests:** ✅ Instrumented with bisect_ppx
-            - **Report Type:** Combined coverage from both test suites
-            - **Base Coverage:** ${baseCoverage}% (from main branch)
-            
-            </details>
-            `;
-            
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-            });
-            
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && comment.body.includes('Coverage Report')
-            );
-            
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: comment
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body: comment
-              });
-            }
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
