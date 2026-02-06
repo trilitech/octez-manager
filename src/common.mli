@@ -49,6 +49,11 @@ val write_file :
 
 val append_debug_log : string -> unit
 
+(** Execute [f] while holding an exclusive file lock on [lock_path].
+    The lock is released when [f] returns or raises. Uses [Unix.lockf]
+    with [F_LOCK] (blocking). The lock file is created if it doesn't exist. *)
+val with_file_lock : string -> (unit -> 'a) -> 'a
+
 val run :
   ?quiet:bool ->
   ?on_log:(string -> unit) ->

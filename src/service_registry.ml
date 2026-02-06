@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -50,16 +50,21 @@ let list () =
     let services =
       files
       |> List.filter (fun f -> Filename.check_suffix f ".json")
-      |> List.map (fun f -> read_one (Filename.concat dir f))
+      |> List.filter_map (fun f ->
+          let path = Filename.concat dir f in
+          match read_one path with
+          | Ok svc -> Some svc
+          | Error (`Msg msg) ->
+              (* File was deleted between readdir and read_one, or is
+                 temporarily corrupt during a concurrent write — skip it
+                 with a warning rather than failing the entire listing. *)
+              Printf.eprintf
+                "Warning: skipping %s: %s\n%!"
+                (Filename.concat dir f)
+                msg ;
+              None)
     in
-    List.fold_left
-      (fun acc res ->
-        match acc with
-        | Error _ as e -> e
-        | Ok lst -> (
-            match res with Error _ as e -> e | Ok svc -> Ok (svc :: lst)))
-      (Ok [])
-      services
+    Ok services
 
 let find ~instance =
   let path = service_path instance in

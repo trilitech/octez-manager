@@ -2195,9 +2195,13 @@ let service_registry_list_invalid_json () =
         let oc = open_out broken in
         output_string oc "{ invalid" ;
         close_out oc ;
+        (* list() skips corrupt files with a warning rather than
+           failing the entire listing *)
         match Service_registry.list () with
-        | Error _ -> ()
-        | Ok _ -> Alcotest.fail "broken registry entry should fail")
+        | Ok svcs ->
+            Alcotest.(check int) "broken entry skipped" 0 (List.length svcs)
+        | Error (`Msg msg) ->
+            Alcotest.failf "list should skip broken entries, got error: %s" msg)
 
 let service_registry_remove_missing () =
   with_fake_xdg (fun _env ->

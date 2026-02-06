@@ -74,6 +74,11 @@ let registered_dirs_file () =
     (Common.xdg_data_home ())
     "octez-manager/registered-directories.json"
 
+let registered_dirs_lock_file () =
+  Filename.concat
+    (Common.xdg_data_home ())
+    "octez-manager/registered-directories.json.lock"
+
 (* Registered directories JSON operations *)
 
 let registered_dir_to_yojson ld =
@@ -144,35 +149,38 @@ let add_registered_dir ~alias ~path =
   else if not (Sys.is_directory path) then
     R.error_msgf "Path is not a directory: %s" path
   else
-    let* dirs = load_registered_dirs () in
-    if List.exists (fun ld -> ld.alias = alias) dirs then
-      R.error_msgf "Alias '%s' already exists" alias
-    else
-      let dirs = {alias; path} :: dirs in
-      save_registered_dirs dirs
+    Common.with_file_lock (registered_dirs_lock_file ()) (fun () ->
+        let* dirs = load_registered_dirs () in
+        if List.exists (fun ld -> ld.alias = alias) dirs then
+          R.error_msgf "Alias '%s' already exists" alias
+        else
+          let dirs = {alias; path} :: dirs in
+          save_registered_dirs dirs)
 
 let remove_registered_dir alias =
-  let* dirs = load_registered_dirs () in
-  if not (List.exists (fun ld -> ld.alias = alias) dirs) then
-    R.error_msgf "Alias '%s' not found" alias
-  else
-    let dirs = List.filter (fun ld -> ld.alias <> alias) dirs in
-    save_registered_dirs dirs
+  Common.with_file_lock (registered_dirs_lock_file ()) (fun () ->
+      let* dirs = load_registered_dirs () in
+      if not (List.exists (fun ld -> ld.alias = alias) dirs) then
+        R.error_msgf "Alias '%s' not found" alias
+      else
+        let dirs = List.filter (fun ld -> ld.alias <> alias) dirs in
+        save_registered_dirs dirs)
 
 let rename_registered_dir ~old_alias ~new_alias =
-  let* dirs = load_registered_dirs () in
-  if not (List.exists (fun ld -> ld.alias = old_alias) dirs) then
-    R.error_msgf "Alias '%s' not found" old_alias
-  else if List.exists (fun ld -> ld.alias = new_alias) dirs then
-    R.error_msgf "Alias '%s' already exists" new_alias
-  else
-    let dirs =
-      List.map
-        (fun ld ->
-          if ld.alias = old_alias then {ld with alias = new_alias} else ld)
-        dirs
-    in
-    save_registered_dirs dirs
+  Common.with_file_lock (registered_dirs_lock_file ()) (fun () ->
+      let* dirs = load_registered_dirs () in
+      if not (List.exists (fun ld -> ld.alias = old_alias) dirs) then
+        R.error_msgf "Alias '%s' not found" old_alias
+      else if List.exists (fun ld -> ld.alias = new_alias) dirs then
+        R.error_msgf "Alias '%s' already exists" new_alias
+      else
+        let dirs =
+          List.map
+            (fun ld ->
+              if ld.alias = old_alias then {ld with alias = new_alias} else ld)
+            dirs
+        in
+        save_registered_dirs dirs)
 
 (* Managed versions *)
 

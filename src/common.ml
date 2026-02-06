@@ -156,18 +156,37 @@ let ensure_dir_path ~owner ~group ~mode path =
 let write_file ~mode ~owner ~group path contents =
   let dir = Filename.dirname path in
   let* _ = ensure_dir_path ~owner ~group ~mode:0o755 dir in
-  let tmp = path ^ ".tmp" in
+  (* Use a PID-unique temp file to avoid rename races when multiple
+     processes write to the same path concurrently. *)
+  let tmp = Printf.sprintf "%s.%d.tmp" path (Unix.getpid ()) in
   let oc = open_out_bin tmp in
-  output_string oc contents ;
-  close_out oc ;
+  Fun.protect
+    ~finally:(fun () -> close_out_noerr oc)
+    (fun () -> output_string oc contents) ;
   (try Unix.chmod tmp mode with _ -> ()) ;
   (try
      let pw = Unix.getpwnam owner in
      let gr = Unix.getgrnam group in
      Unix.chown tmp pw.Unix.pw_uid gr.Unix.gr_gid
    with _ -> ()) ;
-  Sys.rename tmp path ;
-  Ok ()
+  try
+    Sys.rename tmp path ;
+    Ok ()
+  with Sys_error msg ->
+    (try Sys.remove tmp with Sys_error _ -> ()) ;
+    R.error_msgf "write_file: failed to rename %s -> %s: %s" tmp path msg
+
+let with_file_lock lock_path f =
+  let dir = Filename.dirname lock_path in
+  (try Unix.mkdir dir 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()) ;
+  let fd = Unix.openfile lock_path [Unix.O_WRONLY; Unix.O_CREAT] 0o644 in
+  Fun.protect
+    ~finally:(fun () ->
+      (try Unix.lockf fd Unix.F_ULOCK 0 with _ -> ()) ;
+      Unix.close fd)
+    (fun () ->
+      Unix.lockf fd Unix.F_LOCK 0 ;
+      f ())
 
 let append_debug_log line =
   try
