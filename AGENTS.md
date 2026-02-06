@@ -347,24 +347,31 @@ If any run fails, the test has dependencies or conflicts.
 - Stringly-typed code (use variants/records)
 - Partial functions
 
-### Code Duplication Prevention
+### Code Duplication Prevention (MANDATORY)
 
-**Search First Policy:** Before writing any new function, especially helpers or utilities:
+AI agents tend to duplicate code at 2-3x the rate of human developers. This is because agents optimize for the immediate task without long-term memory of what already exists elsewhere in the codebase. The architecture database compensates for this -- **use it.**
 
-1. **Use `arch-query`** (fast, searches intents and names with fuzzy matching):
+**Before writing any new function, you MUST complete this checklist:**
+
+1. **Search the architecture database** (mandatory, not optional):
    ```bash
-   dune exec tools/arch_query.exe -- search "your description"
-   dune exec tools/arch_query.exe -- duplicates   # check existing duplicates
+   dune exec tools/arch_query.exe -- search "what your function does"
    ```
+   If a similar function exists, **use it or extend it** instead of writing a new one.
 
-2. **Search the actual codebase** (always verify):
+2. **Search the actual codebase** (the DB may lag behind uncommitted changes):
    ```bash
    grep -rn "your_keyword" src/
    ```
 
-3. Check `src/common.ml` for general utilities
-4. Check scheduler modules for cached data accessors
-5. Refactor existing code to be more generic rather than duplicating
+3. **Check common locations:**
+   - `src/common.ml` for general utilities
+   - Scheduler modules for cached data accessors
+   - The module you're about to duplicate from -- can it be parameterized instead?
+
+4. **If you find a near-duplicate:** refactor the existing code to be more generic rather than creating a copy. Extract shared logic into a helper, functor, or shared module.
+
+**Skipping this checklist is not acceptable.** If you write a function that duplicates existing code because you didn't search first, the CI metrics gate will catch it and the PR will fail.
 
 ### Module Inclusion: `open` vs `include`
 
@@ -682,11 +689,33 @@ All pull requests must include:
 
 - **Always use pull requests** - never push directly to main
 - Keep diffs minimal and focused on the task
-- Don't opportunistically fix unrelated issues
 - Never commit secrets or credentials
 - Use `git mv` for renames to preserve history
 - **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
 - **Never delete untracked files without confirmation** - user scripts, test data, and work-in-progress files must be preserved unless explicitly requested
+
+### Opportunistic Code Quality Improvements
+
+Agents lack the long-term memory that lets human developers notice and fix code smells over time. To compensate, **small code quality improvements are encouraged inline** when you encounter them during normal work. Larger refactorings must be separate.
+
+**DO fix inline** (same PR, same commit or dedicated commit):
+- Extracting a duplicated helper (< 20 lines) to a shared module
+- Adding a missing doc comment to a function you're already modifying
+- Renaming a misleading variable or parameter in code you're touching
+- Replacing a stringly-typed parameter with a variant in code you're editing
+- Adding a missing `.mli` for a module you're already changing
+
+**DO NOT fix inline** (create a gardening issue instead):
+- Splitting a large file into multiple modules
+- Refactoring multiple pages/modules to share a base abstraction
+- Rewriting a function's core algorithm
+- Any change that touches files unrelated to your current task
+- Any improvement that would make the diff significantly harder to review
+
+**Rule of thumb:** If the improvement touches only files you're already modifying and adds fewer than ~30 lines to the diff, do it inline. Otherwise, create an issue:
+```bash
+gh issue create --label gardening --title "gardening: [category] description"
+```
 
 ## Parallel Work with Worktrees
 
@@ -898,7 +927,27 @@ dune exec tools/arch_query.exe -- sql "SELECT ..."
 
 # Rebuild the database
 dune exec tools/arch_query.exe -- refresh
+
+# Machine-readable metrics (for CI)
+dune exec tools/arch_query.exe -- metrics -o metrics.json
+
+# Compare against baseline (exits 1 on regression)
+dune exec tools/arch_query.exe -- compare baseline.json current.json
 ```
+
+#### CI Integration
+
+The CI pipeline runs `arch-query metrics` on every build and compares against the main branch baseline. **PRs that increase duplicates, large files/functions, missing docs, or other tracked metrics will fail CI.**
+
+Tracked metrics (regressions block merge):
+- `duplicate_groups` -- must not increase
+- `large_files` (>500 lines) -- must not increase
+- `large_functions` (>50 lines) -- must not increase
+- `missing_docs` (exposed without docs) -- must not increase
+- `missing_mli` -- must not increase
+- `god_modules` (>30 functions) -- must not increase
+- `unsafe_string_fields` -- must not increase
+- `doc_coverage_pct` -- must not decrease
 
 #### When Creating New Functions
 
@@ -924,12 +973,10 @@ When you notice code health issues during development:
 - Missing .mli files
 - Duplicated code
 
-Create a gardening issue:
+For small fixes in files you're already touching, fix them inline (see "Opportunistic Code Quality Improvements" above). For everything else, create a gardening issue:
 ```bash
 gh issue create --label gardening --title "gardening: [category] description"
 ```
-
-Don't fix unrelated issues opportunistically in the same PR - create an issue for later.
 
 ---
 

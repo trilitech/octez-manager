@@ -168,6 +168,47 @@ jobs:
           fi
           echo "Completion files are up to date."
 
+      - name: Architecture metrics
+        run: |
+          eval $(opam env)
+          opam install sqlite3 -y
+          dune exec -- tools/arch_index.exe
+          dune exec tools/arch_query.exe -- metrics -o architecture-metrics.json
+          dune exec tools/arch_query.exe -- stats
+          echo ""
+          echo "=== Metrics ==="
+          cat architecture-metrics.json
+
+      - name: Upload architecture metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-metrics
+          path: architecture-metrics.json
+          retention-days: 90
+
+      - name: Download baseline metrics (PRs only)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci.yml
+          branch: main
+          name: architecture-metrics
+          path: baseline-metrics
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: Compare architecture metrics (PRs only)
+        if: github.event_name == 'pull_request'
+        run: |
+          eval $(opam env)
+          if [ -f baseline-metrics/architecture-metrics.json ]; then
+            echo "Comparing against main branch baseline..."
+            dune exec tools/arch_query.exe -- compare baseline-metrics/architecture-metrics.json architecture-metrics.json
+          else
+            echo "No baseline found on main branch, skipping comparison."
+            echo "Metrics will be saved as baseline when this branch merges to main."
+          fi
+
       - name: Prepare binary artifacts
         run: |
           mkdir -p artifacts
