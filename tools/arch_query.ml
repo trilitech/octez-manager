@@ -671,7 +671,31 @@ type comparison_result = {
   unchanged : (string * float) list;
 }
 
+let load_accept_file () =
+  let path = ".metrics-accept" in
+  if Sys.file_exists path then (
+    let ic = open_in path in
+    let lines = ref [] in
+    (try
+       while true do
+         let line = String.trim (input_line ic) in
+         (* Skip empty lines and comments *)
+         if line <> "" && not (String.length line > 0 && line.[0] = '#') then
+           (* Take metric name before any whitespace/comment *)
+           let metric =
+             match String.index_opt line ' ' with
+             | Some i -> String.sub line 0 i
+             | None -> line
+           in
+           lines := metric :: !lines
+       done
+     with End_of_file -> ()) ;
+    close_in ic ;
+    !lines)
+  else []
+
 let cmd_compare baseline_path current_path =
+  let accepted = load_accept_file () in
   let baseline = parse_metrics_json baseline_path in
   let current = parse_metrics_json current_path in
   let regressions = ref [] in
@@ -707,46 +731,45 @@ let cmd_compare baseline_path current_path =
       unchanged = List.sort compare !unchanged;
     }
   in
+  (* Separate accepted regressions from blocking ones *)
+  let blocking, accepted_regressions =
+    List.partition
+      (fun (key, _, _) -> not (List.mem key accepted))
+      result.regressions
+  in
+  let print_metric_list (key, base_val, cur_val) =
+    let arrow = if cur_val > base_val then "+" else "" in
+    Printf.printf
+      "  %s: %.0f -> %.0f (%s%.0f)\n"
+      key
+      base_val
+      cur_val
+      arrow
+      (cur_val -. base_val)
+  in
   (* Print report *)
-  if result.regressions <> [] then (
+  if blocking <> [] then (
     Printf.printf "REGRESSIONS (CI will fail):\n" ;
-    List.iter
-      (fun (key, base_val, cur_val) ->
-        let arrow = if cur_val > base_val then "+" else "" in
-        Printf.printf
-          "  %s: %.0f -> %.0f (%s%.0f)\n"
-          key
-          base_val
-          cur_val
-          arrow
-          (cur_val -. base_val))
-      result.regressions ;
+    List.iter print_metric_list blocking ;
     print_newline ()) ;
   if result.improvements <> [] then (
     Printf.printf "Improvements:\n" ;
-    List.iter
-      (fun (key, base_val, cur_val) ->
-        let arrow = if cur_val > base_val then "+" else "" in
-        Printf.printf
-          "  %s: %.0f -> %.0f (%s%.0f)\n"
-          key
-          base_val
-          cur_val
-          arrow
-          (cur_val -. base_val))
-      result.improvements ;
+    List.iter print_metric_list result.improvements ;
     print_newline ()) ;
-  (* Exit code: 1 if regressions *)
-  if result.regressions <> [] then (
-    Printf.printf
-      "FAILED: %d metric(s) regressed.\n"
-      (List.length result.regressions) ;
+  if accepted_regressions <> [] then (
+    Printf.printf "Accepted regressions (via .metrics-accept):\n" ;
+    List.iter print_metric_list accepted_regressions ;
+    print_newline ()) ;
+  (* Exit code: 1 if blocking regressions *)
+  if blocking <> [] then (
+    Printf.printf "FAILED: %d metric(s) regressed.\n" (List.length blocking) ;
     exit 1)
   else
     Printf.printf
-      "OK: No regressions (%d improvements, %d unchanged).\n"
+      "OK: No blocking regressions (%d improvements, %d unchanged, %d accepted).\n"
       (List.length result.improvements)
       (List.length result.unchanged)
+      (List.length accepted_regressions)
 
 (* ========================================================================== *)
 (* Cmdliner CLI definition                                                    *)
