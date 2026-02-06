@@ -176,10 +176,36 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build coverage test containers
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: docker-${{ runner.os }}-${{ hashFiles('test/integration/**/Dockerfile*') }}
+          restore-keys: |
+            docker-${{ runner.os }}-
+
+      - name: Build coverage test containers with cache
         working-directory: test/integration
+        env:
+          DOCKER_BUILDKIT: 1
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.coverage.yml build
+          # Build sandbox with cache
+          docker buildx build \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --load \
+            -t test-integration-sandbox:latest \
+            -f sandbox/Dockerfile \
+            .
+
+          # Build cli-tester with cache (coverage variant)
+          docker buildx build \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --load \
+            -t test-integration-cli-tester:latest \
+            -f cli-tester/Dockerfile.coverage \
+            .
 
       - name: Start sandbox
         working-directory: test/integration
@@ -230,6 +256,12 @@ jobs:
         working-directory: test/integration
         run: |
           docker compose -f docker-compose.yml -f docker-compose.coverage.yml down -v || true
+
+      - name: Move Docker cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
 
   report:
     name: Generate and Post Coverage Report
