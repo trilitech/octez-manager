@@ -70,18 +70,10 @@ let handled_keys () = Miaou.Core.Keys.[Escape]
 
 let keymap _ =
   let noop ps = ps in
-  let kb key action help =
-    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  [
-    kb "Esc" back "Back";
-    {
-      Miaou.Core.Tui_page.key = "?";
-      action = noop;
-      help = "Help";
-      display_only = true;
-    };
-  ]
+  [kb "Esc" "Back"; kb "?" "Help"]
 
 let header s =
   [
@@ -365,7 +357,9 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [{key = "Esc"; help = "Back"}; {key = "?"; help = "Help"}]
 
   let has_modal = has_modal
 end
