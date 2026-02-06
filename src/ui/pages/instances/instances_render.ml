@@ -9,6 +9,7 @@
 
 module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
+module Grid = Miaou_widgets_layout.Grid_layout
 module Metrics = Rpc_metrics
 open Octez_manager_lib
 open Instances_state
@@ -476,10 +477,12 @@ let dim_inactive_column line =
   (* Wrap entire line in dim formatting *)
   Printf.sprintf "\027[2m%s\027[22m" line
 
-(** Merge multiple column renders into combined lines with per-column scrolling *)
+(** Merge multiple column renders into combined lines with per-column scrolling.
+    Uses Grid_layout for consistent column layout. *)
 let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
     ~columns_content =
   let empty_line = String.make col_width ' ' in
+  let num_columns = Array.length columns_content in
   (* Count non-empty columns for dimming decision *)
   let non_empty_cols =
     Array.fold_left
@@ -514,17 +517,33 @@ let merge_columns ~col_width ~visible_height ~column_scroll ~active_column
         else visible)
       columns_content
   in
-  (* Merge columns line by line *)
-  List.init visible_height (fun row_idx ->
-      let parts =
-        Array.to_list
-          (Array.map
-             (fun col ->
-               if row_idx < List.length col then List.nth col row_idx
-               else empty_line)
-             scrolled_columns)
-      in
-      String.concat column_separator parts)
+  (* Use Grid_layout to merge columns *)
+  let total_width =
+    (col_width * num_columns)
+    + (String.length column_separator * (num_columns - 1))
+  in
+  let cols_spec = List.init num_columns (fun _ -> Grid.Px col_width) in
+  let sep_width = String.length column_separator in
+  let grid_children =
+    Array.to_list
+      (Array.mapi
+         (fun col_idx col ->
+           Grid.cell ~row:0 ~col:col_idx (fun ~size:_ -> String.concat "\n" col))
+         scrolled_columns)
+  in
+  let grid =
+    Grid.create
+      ~rows:[Grid.Fr 1.]
+      ~cols:cols_spec
+      ~col_gap:sep_width
+      grid_children
+  in
+  let rendered =
+    Grid.render
+      grid
+      ~size:{LTerm_geom.rows = visible_height; cols = total_width}
+  in
+  String.split_on_char '\n' rendered
 
 (** Render external services section *)
 let render_external_service ~selected_idx ~current_idx ~folded
