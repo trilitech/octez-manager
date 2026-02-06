@@ -680,8 +680,7 @@ struct
       refresh ps)
     else
       match Miaou.Core.Keys.of_string key with
-      | Some (Miaou.Core.Keys.Char "Esc") | Some (Miaou.Core.Keys.Char "Escape")
-        ->
+      | Some Miaou.Core.Keys.Escape ->
           (* Go to instances page directly - Navigation.back would go to
              details page which may have stale/consumed context.
              Set skip_back_once to prevent loop when user presses Esc on instances. *)
@@ -691,6 +690,8 @@ struct
       | Some Miaou.Core.Keys.Up ->
           Navigation.update (fun s -> move_state s (-1)) ps
       | Some Miaou.Core.Keys.Down ->
+          Navigation.update (fun s -> move_state s 1) ps
+      | Some Miaou.Core.Keys.Tab ->
           Navigation.update (fun s -> move_state s 1) ps
       | Some Miaou.Core.Keys.Enter -> Navigation.update enter ps
       | _ -> ps
@@ -710,20 +711,15 @@ struct
 
   let keymap _ps =
     let noop ps = ps in
-    let kb key action help =
-      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    let kb key help =
+      {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
     in
     [
-      kb "Up" (fun ps -> move ps (-1)) "Move up";
-      kb "Down" (fun ps -> move ps 1) "Move down";
-      kb "Enter" (fun ps -> Navigation.update enter ps) "Edit / Submit";
-      kb "Esc" back "Back";
-      {
-        Miaou.Core.Tui_page.key = "?";
-        action = noop;
-        help = "Help";
-        display_only = true;
-      };
+      kb "↑/↓" "Navigate";
+      kb "Tab" "Navigate";
+      kb "Enter" "Edit / Submit";
+      kb "Esc" "Back";
+      kb "?" "Help";
     ]
 
   let on_key ps key ~size =
@@ -737,7 +733,7 @@ struct
   let key_hints _ps = []
 
   let handled_keys () =
-    Miaou.Core.Keys.[Up; Down; Enter; Char "Esc"; Char "Escape"]
+    Miaou.Core.Keys.[Up; Down; Tab; Enter; Escape]
 end
 
 (*****************************************************************************)
