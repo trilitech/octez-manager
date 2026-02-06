@@ -89,9 +89,30 @@ This modifies the working directory, leaving uncommitted changes if the check fa
 
 ## OCaml LSP Server
 
-Claude Code can use the OCaml LSP server for code intelligence features like go-to-definition, find-references, hover documentation, and workspace symbol search.
+AI coding agents can use the OCaml LSP server (`ocamllsp`) for code intelligence features like go-to-definition, find-references, hover documentation, and workspace symbol search.
 
-### Installation (Claude Code)
+### Setup by Tool
+
+#### OpenCode
+
+OpenCode has **built-in OCaml LSP support**. The project includes an `opencode.json` config that routes through `opam exec` to find `ocamllsp` in the project's local opam switch:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": {
+    "ocaml-lsp": {
+      "command": ["opam", "exec", "--", "ocamllsp"]
+    }
+  }
+}
+```
+
+This file is committed to the repo -- no manual setup needed. Just start OpenCode in the project directory. The LSP server starts automatically when `.ml`/`.mli` files are opened.
+
+**Note:** If you add or change the `opencode.json` config, you must restart the OpenCode session for changes to take effect.
+
+#### Claude Code
 
 The OCaml LSP plugin is available via the [claude-code-lsps](https://github.com/Piebald-AI/claude-code-lsps) marketplace:
 
@@ -104,6 +125,19 @@ claude
 /plugins  # Navigate to Marketplaces > claude-code-lsps > Browse plugins
 # Select ocaml-lsp with spacebar, press "i" to install
 # Restart Claude Code
+```
+
+#### Other Tools
+
+Any tool that supports LSP can use `ocamllsp`. Ensure the binary is reachable:
+
+```bash
+# The binary lives in the project's local opam switch
+opam exec -- which ocamllsp
+# → /home/<user>/dev/octez-manager/_opam/bin/ocamllsp
+
+# If your tool doesn't go through opam exec, add _opam/bin to PATH:
+eval $(opam env)
 ```
 
 ### Building the Index for Project-Wide References
@@ -154,6 +188,44 @@ Project-wide references require:
 - Merlin 5.1-502+ (we use 5.6-504)
 
 All requirements are satisfied by the project's opam switch.
+
+## OpenCode Configuration
+
+The project includes an `opencode.json` config that is committed to the repo. It provides:
+
+### Auto-Formatting
+
+OCaml files (`.ml`, `.mli`) are automatically formatted via `ocamlformat` when written or edited. The formatter runs through `opam exec` to use the project's local switch.
+
+### Custom Commands
+
+The following commands are available in the OpenCode TUI (type `/` to see them):
+
+| Command | Description |
+|---------|-------------|
+| `/build` | Run `dune build` and fix compilation errors |
+| `/test` | Run `dune runtest` and fix test failures |
+| `/fmt` | Format code with `dune fmt` |
+| `/copyright` | Fix and verify copyright headers |
+| `/pre-commit` | Full pre-commit sequence (fmt + copyright + build + test) |
+| `/index` | Rebuild OCaml LSP index for project-wide references |
+| `/archdb <query>` | Query the architecture database |
+
+### Pre-Allowed Commands
+
+To reduce permission prompts, the following are auto-allowed:
+
+- `opam exec -- dune *` and `opam exec -- ocaml*` (build/test/format)
+- Read-only git commands (`status`, `diff`, `log`, `branch`, `show`, `fetch`)
+- `gh pr` and `gh issue` (GitHub CLI)
+- `sqlite3 docs/architecture.db` (architecture queries)
+- `make *` (Makefile targets)
+
+Destructive operations (`gh api`, `git push`, `git rebase`, etc.) still require confirmation.
+
+### Instructions
+
+AGENTS.md is loaded as an instruction file, so its contents are available to the agent as context.
 
 ---
 
@@ -279,12 +351,13 @@ If any run fails, the test has dependencies or conflicts.
 
 **Search First Policy:** Before writing any new function, especially helpers or utilities:
 
-1. **Query the architecture database** (quick first check):
+1. **Use `arch-query`** (fast, searches intents and names with fuzzy matching):
    ```bash
-   sqlite3 docs/architecture.db "SELECT m.path, f.name, f.intent FROM functions f JOIN modules m ON f.module_id = m.id WHERE f.name LIKE '%your_keyword%'"
+   dune exec tools/arch_query.exe -- search "your description"
+   dune exec tools/arch_query.exe -- duplicates   # check existing duplicates
    ```
 
-2. **Search the actual codebase** (database may be incomplete):
+2. **Search the actual codebase** (always verify):
    ```bash
    grep -rn "your_keyword" src/
    ```
@@ -292,8 +365,6 @@ If any run fails, the test has dependencies or conflicts.
 3. Check `src/common.ml` for general utilities
 4. Check scheduler modules for cached data accessors
 5. Refactor existing code to be more generic rather than duplicating
-
-**Important:** The architecture database is a helpful tool but is NOT complete. It may be missing functions, have outdated information, or lack intent descriptions. Always verify by searching the actual code.
 
 ### Module Inclusion: `open` vs `include`
 
@@ -775,61 +846,74 @@ Ask for confirmation before proceeding.
 
 The project uses a "gardening" approach for ongoing code maintenance. See `GARDENING.md` for the full guide.
 
-### Architecture Database
+### Architecture Database & Query Tools
 
-An SQLite database at `docs/architecture.db` can index the codebase. The database is gitignored and must be generated locally from the schema:
+An SQLite database at `docs/architecture.db` indexes the entire codebase: modules, functions (with type signatures and doc comments), types (with record fields and variant constructors). It is gitignored and regenerated from `.cmt`/`.cmti` files produced by `dune build`.
 
-```bash
-# Generate the database (one-time setup)
-sqlite3 docs/architecture.db < docs/architecture-schema.sql
-```
-
-> **Note:** Full tooling to populate this database (#274) is not yet implemented.
-> Until then, the database serves as a schema reference and manual queries work
-> if you populate it yourself.
-
-Once populated, you can query it:
+#### Generating the Database
 
 ```bash
-# Check for similar functions before creating new ones
-sqlite3 docs/architecture.db "SELECT m.path, f.name, f.signature, f.intent
-  FROM functions f JOIN modules m ON f.module_id = m.id
-  WHERE f.name LIKE '%install%'"
+# Build the project first (produces .cmt/.cmti files)
+dune build
 
-# Find large files that may need splitting
-sqlite3 docs/architecture.db "SELECT * FROM v_large_files"
-
-# Find functions without documentation
-sqlite3 docs/architecture.db "SELECT * FROM v_undocumented"
+# Populate the database (~500ms, scans all .cmt/.cmti files)
+make arch-index
+# or: dune exec -- tools/arch_index.exe
 ```
 
-### CRITICAL: Database Limitations
+The indexer extracts:
+- **Modules**: path, line count, `.mli` presence
+- **Functions**: name, type signature, line range, exposed in `.mli`, doc comment
+- **Types**: name, kind (record/variant/abstract/alias), fields, constructors, doc comment
 
-**The database is NOT complete and may never be.** It is a helpful tool but does NOT replace searching the actual codebase.
+Doc comments from `.mli` files are preferred; `.ml` implementation comments are used as fallback. Hand-written intent fields set via `sqlite3 UPDATE` are preserved across re-indexing.
 
-When looking for existing functionality:
-1. Query the database first (fast initial check)
-2. **Always also search the actual code** with grep/ripgrep
-3. Read relevant files to understand context
+#### Querying with `arch-query`
 
-The database may be:
-- Missing recently added functions
-- Missing functions from modules not yet indexed
-- Lacking intent descriptions for many functions
-- Out of date with current signatures
+The `arch-query` CLI provides canned queries and fuzzy search without writing SQL:
 
-### When Creating New Functions
+```bash
+# Fuzzy search by intent, name, or signature
+dune exec tools/arch_query.exe -- search "network download"
+dune exec tools/arch_query.exe -- search -t 0.7 "snapshot bootstrap"    # 70% threshold
+dune exec tools/arch_query.exe -- search -k functions "port validation"  # functions only
+dune exec tools/arch_query.exe -- search -k types "binary source"        # types only
 
-If you create a new function, especially in a public module:
+# Find types by their shape (field names and/or field types)
+dune exec tools/arch_query.exe -- type-search -f instance -T string -T bool
+dune exec tools/arch_query.exe -- type-search -T string -T int
 
-1. **Check it doesn't already exist** (both database AND grep)
-2. Add it to the database if the module is already indexed:
+# Code health queries
+dune exec tools/arch_query.exe -- duplicates        # duplicate functions across modules
+dune exec tools/arch_query.exe -- large-files        # files > 500 lines (--min N)
+dune exec tools/arch_query.exe -- large-functions    # functions > 50 lines (--min N)
+dune exec tools/arch_query.exe -- missing-docs       # exposed functions without docs
+dune exec tools/arch_query.exe -- missing-mli        # modules without .mli
+dune exec tools/arch_query.exe -- god-modules        # modules with 30+ functions (--min N)
+dune exec tools/arch_query.exe -- unsafe-strings     # string fields appearing 3+ times
+
+# Summary and raw SQL
+dune exec tools/arch_query.exe -- stats
+dune exec tools/arch_query.exe -- sql "SELECT ..."
+
+# Rebuild the database
+dune exec tools/arch_query.exe -- refresh
+```
+
+#### When Creating New Functions
+
+Before writing a new function:
+
+1. **Search for existing implementations:**
    ```bash
-   sqlite3 docs/architecture.db "INSERT INTO functions (module_id, name, signature, line_start, line_end, exposed, intent)
-     SELECT id, 'my_new_function', '?quiet:bool -> string -> unit', 42, 55, 1, 'Brief description of purpose'
-     FROM modules WHERE path = 'src/mymodule.ml'"
+   dune exec tools/arch_query.exe -- search "what your function does"
+   dune exec tools/arch_query.exe -- duplicates
    ```
-3. If the function is a utility that others might need, consider adding it to `src/common.ml`
+2. **Also search the actual codebase** (the DB may lag behind uncommitted changes):
+   ```bash
+   grep -rn "your_keyword" src/
+   ```
+3. If the function is a utility that others might need, add it to `src/common.ml`
 
 ### Gardening Tasks
 

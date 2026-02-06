@@ -30,10 +30,11 @@
   uri
   lambda-term
   linenoise
-  (ppx_deriving :build)
-  (alcotest :with-test)
-  (qcheck-alcotest :with-test)
-  (bisect_ppx :with-test))
+   (ppx_deriving :build)
+   (sqlite3 :with-dev-setup)
+   (alcotest :with-test)
+   (qcheck-alcotest :with-test)
+   (bisect_ppx :with-test))
  (license MIT)
  (authors "Nomadic Labs <contact@nomadic-labs.com>")
  (maintainers "Nomadic Labs <contact@nomadic-labs.com>")
