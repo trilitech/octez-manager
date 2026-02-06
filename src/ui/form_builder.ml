@@ -710,20 +710,14 @@ struct
 
   let keymap _ps =
     let noop ps = ps in
-    let kb key action help =
-      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    let kb key help =
+      {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
     in
     [
-      kb "Up" (fun ps -> move ps (-1)) "Move up";
-      kb "Down" (fun ps -> move ps 1) "Move down";
-      kb "Enter" (fun ps -> Navigation.update enter ps) "Edit / Submit";
-      kb "Esc" back "Back";
-      {
-        Miaou.Core.Tui_page.key = "?";
-        action = noop;
-        help = "Help";
-        display_only = true;
-      };
+      kb "↑/↓" "Navigate";
+      kb "Enter" "Edit / Submit";
+      kb "Esc" "Back";
+      kb "?" "Help";
     ]
 
   let on_key ps key ~size =
@@ -734,7 +728,14 @@ struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [
+        {key = "↑/↓"; help = "Navigate"};
+        {key = "Enter"; help = "Edit / Submit"};
+        {key = "Esc"; help = "Back"};
+        {key = "?"; help = "Help"};
+      ]
 
   let handled_keys () =
     Miaou.Core.Keys.[Up; Down; Enter; Char "Esc"; Char "Escape"]

@@ -163,25 +163,19 @@ let handled_keys () =
 
 let keymap _ =
   let noop ps = ps in
-  let kb key action help =
-    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
   [
-    kb "Esc" back "Back";
-    kb "r" refresh "Refresh";
-    kb "m" (fun ps -> Navigation.update toggle_metrics ps) "Toggle metrics";
-    kb "a" (fun ps -> Navigation.update edit_metrics_addr ps) "Edit address";
-    kb "R" (fun ps -> Navigation.update toggle_recorder ps) "Toggle recorder";
-    kb "d" (fun ps -> Navigation.update change_duration ps) "Change duration";
-    kb "c" (fun ps -> Navigation.update clear_caches ps) "Clear caches";
-    kb "Up" (fun ps -> Navigation.update scroll_up ps) "Scroll up";
-    kb "Down" (fun ps -> Navigation.update scroll_down ps) "Scroll down";
-    {
-      Miaou.Core.Tui_page.key = "?";
-      action = noop;
-      help = "Help";
-      display_only = true;
-    };
+    kb "Esc" "Back";
+    kb "r" "Refresh";
+    kb "m" "Toggle metrics";
+    kb "a" "Edit address";
+    kb "R" "Toggle recorder";
+    kb "d" "Change duration";
+    kb "c" "Clear caches";
+    kb "↑/↓" "Navigate";
+    kb "?" "Help";
   ]
 
 let header =
@@ -570,8 +564,7 @@ let handle_key ps key ~size =
     ps)
   else
     match Keys.of_string key with
-    | Some Keys.Escape | Some (Keys.Char "q") ->
-        Navigation.back ps
+    | Some Keys.Escape | Some (Keys.Char "q") -> Navigation.back ps
     | Some (Keys.Char "r") -> refresh ps
     | Some (Keys.Char "m") -> Navigation.update toggle_metrics ps
     | Some (Keys.Char "a") -> Navigation.update edit_metrics_addr ps
@@ -627,7 +620,19 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [
+        {key = "Esc"; help = "Back"};
+        {key = "r"; help = "Refresh"};
+        {key = "m"; help = "Toggle metrics"};
+        {key = "a"; help = "Edit address"};
+        {key = "R"; help = "Toggle recorder"};
+        {key = "d"; help = "Change duration"};
+        {key = "c"; help = "Clear caches"};
+        {key = "↑/↓"; help = "Navigate"};
+        {key = "?"; help = "Help"};
+      ]
 
   let has_modal = has_modal
 end
