@@ -8,6 +8,7 @@
 open Octez_manager_lib
 module Widgets = Miaou_widgets_display.Widgets
 module Table_widget = Miaou_widgets_display.Table_widget
+module Focus_ring = Miaou_internals.Focus_ring
 
 (*****************************************************************************)
 (*                             TYPE DEFINITIONS                              *)
@@ -429,7 +430,7 @@ module Make (S : sig
   val spec : model spec
 end) =
 struct
-  type state = {model_ref : S.model ref; cursor : int}
+  type state = {model_ref : S.model ref; focus : Focus_ring.t}
 
   type msg = unit
 
@@ -437,10 +438,22 @@ struct
 
   type pstate = state Navigation.t
 
+  (** Build focus ring from current fields. Last slot is always "submit". *)
+  let build_focus_ring model =
+    let fields = S.spec.fields model in
+    let slot_ids = List.map (fun (Field f) -> f.label) fields @ ["submit"] in
+    Focus_ring.create slot_ids
+
+  (** Get cursor index from focus ring for table rendering. *)
+  let cursor_of_focus s =
+    match Focus_ring.current_index s.focus with Some i -> i | None -> 0
+
   let init () =
-    let s = {model_ref = ref (S.spec.initial_model ()); cursor = 0} in
+    let model_ref = ref (S.spec.initial_model ()) in
+    let focus = build_focus_ring !model_ref in
+    let s = {model_ref; focus} in
     (* Call on_init hook if provided *)
-    (match S.spec.on_init with Some f -> f !(s.model_ref) | None -> ()) ;
+    (match S.spec.on_init with Some f -> f !model_ref | None -> ()) ;
     Navigation.make s
 
   let update ps _ = ps
@@ -455,13 +468,25 @@ struct
     (* Call on_refresh hook if provided *)
     let s = ps.Navigation.s in
     (match S.spec.on_refresh with Some f -> f !(s.model_ref) | None -> ()) ;
-    ps
+    (* Rebuild focus ring if fields changed (preserves focus position if possible) *)
+    let new_ring = build_focus_ring !(s.model_ref) in
+    let new_focus =
+      match Focus_ring.current s.focus with
+      | Some id -> Focus_ring.focus new_ring id
+      | None -> new_ring
+    in
+    Navigation.update (fun s -> {s with focus = new_focus}) ps
 
   let move_state s delta =
-    let fields = S.spec.fields !(s.model_ref) in
-    let max_cursor = List.length fields in
-    let cursor = max 0 (min max_cursor (s.cursor + delta)) in
-    {s with cursor}
+    let direction = if delta > 0 then `Next else `Prev in
+    let steps = abs delta in
+    let focus =
+      List.fold_left
+        (fun f _ -> Focus_ring.move f direction)
+        s.focus
+        (List.init steps (fun i -> i))
+    in
+    {s with focus}
 
   let rec submit s =
     let model = !(s.model_ref) in
@@ -559,8 +584,9 @@ struct
 
   let enter s =
     let fields = S.spec.fields !(s.model_ref) in
-    if s.cursor < List.length fields then (
-      let (Field field) = List.nth fields s.cursor in
+    let cursor = cursor_of_focus s in
+    if cursor < List.length fields then (
+      let (Field field) = List.nth fields cursor in
       field.edit s.model_ref ;
       s)
     else submit s
@@ -642,7 +668,7 @@ struct
         ~rows:all_rows
         ()
     in
-    let table = Table_widget.Table.move_cursor table s.cursor in
+    let table = Table_widget.Table.move_cursor table (cursor_of_focus s) in
     let status_banner =
       if all_valid then
         Widgets.bg 22 (Widgets.fg 15 " ✓ Form is valid - ready to install! ")
@@ -650,9 +676,10 @@ struct
     in
     (* Get hint for current field and set it for Help_hint modal *)
     (* If field is invalid, show validation error instead of hint *)
+    let cursor = cursor_of_focus s in
     let current_hint =
-      if s.cursor < List.length fields then
-        let (Field f) = List.nth fields s.cursor in
+      if cursor < List.length fields then
+        let (Field f) = List.nth fields cursor in
         if f.validate model then f.hint
         else
           (* Show validation error message *)
@@ -679,21 +706,27 @@ struct
       Miaou.Core.Modal_manager.handle_key key ;
       refresh ps)
     else
-      match Miaou.Core.Keys.of_string key with
-      | Some (Miaou.Core.Keys.Char "Esc") | Some (Miaou.Core.Keys.Char "Escape")
-        ->
-          (* Go to instances page directly - Navigation.back would go to
-             details page which may have stale/consumed context.
-             Set skip_back_once to prevent loop when user presses Esc on instances. *)
-          Context.set_skip_back_once () ;
-          Context.navigate "instances" ;
-          ps
-      | Some Miaou.Core.Keys.Up ->
-          Navigation.update (fun s -> move_state s (-1)) ps
-      | Some Miaou.Core.Keys.Down ->
-          Navigation.update (fun s -> move_state s 1) ps
-      | Some Miaou.Core.Keys.Enter -> Navigation.update enter ps
-      | _ -> ps
+      (* Try Focus_ring key handling first (Tab/Shift+Tab) *)
+      let s = ps.Navigation.s in
+      let focus, result = Focus_ring.handle_key s.focus ~key in
+      match result with
+      | `Handled -> Navigation.update (fun s -> {s with focus}) ps
+      | `Bubble -> (
+          match Miaou.Core.Keys.of_string key with
+          | Some (Miaou.Core.Keys.Char "Esc")
+          | Some (Miaou.Core.Keys.Char "Escape") ->
+              (* Go to instances page directly - Navigation.back would go to
+                 details page which may have stale/consumed context.
+                 Set skip_back_once to prevent loop when user presses Esc on instances. *)
+              Context.set_skip_back_once () ;
+              Context.navigate "instances" ;
+              ps
+          | Some Miaou.Core.Keys.Up ->
+              Navigation.update (fun s -> move_state s (-1)) ps
+          | Some Miaou.Core.Keys.Down ->
+              Navigation.update (fun s -> move_state s 1) ps
+          | Some Miaou.Core.Keys.Enter -> Navigation.update enter ps
+          | _ -> ps)
 
   let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
@@ -714,6 +747,7 @@ struct
       {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
     in
     [
+      kb "Tab" "Next field";
       kb "↑/↓" "Navigate";
       kb "Enter" "Edit / Submit";
       kb "Esc" "Back";
@@ -738,7 +772,7 @@ struct
       ]
 
   let handled_keys () =
-    Miaou.Core.Keys.[Up; Down; Enter; Char "Esc"; Char "Escape"]
+    Miaou.Core.Keys.[Up; Down; Enter; Tab; Char "Esc"; Char "Escape"]
 end
 
 (*****************************************************************************)
