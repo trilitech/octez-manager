@@ -320,16 +320,11 @@ let handle_key ps key ~size:_ =
   | _ -> ps
 
 let keymap _ps =
-  let kb key action help =
-    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  let noop ps = ps in
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  let activate ps = Navigation.update activate_selection ps in
-  [
-    kb "Enter" activate "Select";
-    kb "↑/↓" (fun ps -> ps) "Navigate";
-    kb "r" refresh "Refresh";
-    kb "Esc" back "Back";
-  ]
+  [kb "Enter" "Select"; kb "↑/↓" "Navigate"; kb "r" "Refresh"; kb "Esc" "Back"]
 
 let handled_keys () =
   Keys.[Escape; Enter; Up; Down; Char "j"; Char "k"; Char "r"]
@@ -379,7 +374,14 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [
+        {key = "Enter"; help = "Select"};
+        {key = "↑/↓"; help = "Navigate"};
+        {key = "r"; help = "Refresh"};
+        {key = "Esc"; help = "Back"};
+      ]
 
   let has_modal = has_modal
 end

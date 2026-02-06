@@ -806,41 +806,19 @@ let handled_keys () = Miaou.Core.Keys.[Escape]
 
 let keymap _ =
   let noop ps = ps in
-  let kb key action help =
-    {Miaou.Core.Tui_page.key; action; help; display_only = false}
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
   [
-    kb "Esc" back "Back";
-    kb "r" refresh "Refresh";
-    kb
-      "d"
-      (fun ps ->
-        Navigation.update
-          (fun s ->
-            download_version (List.hd s.available_versions) ;
-            s)
-          ps)
-      "Download latest";
-    kb
-      "l"
-      (fun ps ->
-        register_directory () ;
-        ps)
-      "Register directory";
-    kb "p" (fun ps -> Navigation.update prune_unused ps) "Prune unused";
-    kb "Enter" (fun ps -> Navigation.update handle_action ps) "Action";
-    kb
-      "Tab"
-      (fun ps -> Navigation.update toggle_current_group ps)
-      "Expand/Collapse";
-    kb "Up" (fun ps -> move_selection ps `Up) "Move up";
-    kb "Down" (fun ps -> move_selection ps `Down) "Move down";
-    {
-      Miaou.Core.Tui_page.key = "?";
-      action = noop;
-      help = "Help";
-      display_only = true;
-    };
+    kb "Esc" "Back";
+    kb "r" "Refresh";
+    kb "d" "Download latest";
+    kb "l" "Register directory";
+    kb "p" "Prune unused";
+    kb "Enter" "Action";
+    kb "Tab" "Expand/Collapse";
+    kb "↑/↓" "Navigate";
+    kb "?" "Help";
   ]
 
 let header =
@@ -896,7 +874,19 @@ struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps = []
+  let key_hints _ps =
+    Miaou.Core.Tui_page.
+      [
+        {key = "Esc"; help = "Back"};
+        {key = "r"; help = "Refresh"};
+        {key = "d"; help = "Download latest"};
+        {key = "l"; help = "Register directory"};
+        {key = "p"; help = "Prune unused"};
+        {key = "Enter"; help = "Action"};
+        {key = "Tab"; help = "Expand/Collapse"};
+        {key = "↑/↓"; help = "Navigate"};
+        {key = "?"; help = "Help"};
+      ]
 end
 
 let page = (module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG)
