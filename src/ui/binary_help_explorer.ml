@@ -347,6 +347,16 @@ let open_modal ~title ~options ~initial_args ~on_apply =
 
         let handle_key = handle_modal_key
 
+        let on_key ps key ~size =
+          ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
+            Miaou_interfaces.Key_event.Bubble )
+
+        let on_modal_key ps key ~size =
+          ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
+            Miaou_interfaces.Key_event.Bubble )
+
+        let key_hints _ps = []
+
         let has_modal _ = true
       end in
       let ui : Miaou.Core.Modal_manager.ui =
@@ -622,6 +632,16 @@ let open_modal ~title ~options ~initial_args ~on_apply =
           display_only = true;
         };
       ]
+
+    let on_key ps key ~size =
+      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
+        Miaou_interfaces.Key_event.Bubble )
+
+    let on_modal_key ps key ~size =
+      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
+        Miaou_interfaces.Key_event.Bubble )
+
+    let key_hints _ps = []
 
     let has_modal _ = true
   end in

@@ -489,6 +489,16 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   let handle_modal_key = handle_modal_key
 
+  let on_key ps key ~size =
+    ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Bubble )
+
+  let on_modal_key ps key ~size =
+    ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Bubble )
+
+  let key_hints _ps = []
+
   let has_modal = has_modal
 end
 
