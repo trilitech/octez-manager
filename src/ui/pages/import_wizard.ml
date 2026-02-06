@@ -173,7 +173,7 @@ and start_import ps =
         import_task ;
       Navigation.update (fun s -> {s with step = Importing; error = None}) ps
 
-let handled_keys () = Miaou.Core.Keys.[Escape; Enter; Up; Down]
+let handled_keys () = Miaou.Core.Keys.[Escape; Enter; Up; Down; Tab]
 
 let keymap _ =
   let kb key action help =
@@ -442,6 +442,7 @@ let handle_key ps key ~size:_ =
     | _, Some (Keys.Char "r") -> refresh ps
     | SelectService, Some Keys.Up -> move_selection ps (-1)
     | SelectService, Some Keys.Down -> move_selection ps 1
+    | SelectService, Some Keys.Tab -> move_selection ps 1
     | SelectService, Some Keys.Enter -> next_step ps
     | SelectService, Some Keys.Escape -> Navigation.back ps
     | ConfigureImport, Some (Keys.Char " ") -> toggle_strategy ps
