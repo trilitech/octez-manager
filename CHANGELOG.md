@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Diagnostics page now uses bordered boxes (Box_widget) for cleaner visual section separation
 - RPC browser now uses Grid_layout for side-by-side panel rendering
 - Instances page now uses Grid_layout for multi-column layout merging
+- Form navigation now supports Tab/Shift+Tab cycling between fields via Miaou Focus_ring
 
 ### Fixed
 
