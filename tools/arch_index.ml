@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -15,9 +15,15 @@
 (* Database helpers                                                           *)
 (* -------------------------------------------------------------------------- *)
 
-let db_path = "docs/architecture.db"
+let db_path =
+  match Sys.getenv_opt "ARCH_DB_PATH" with
+  | Some p -> p
+  | None -> "docs/architecture.db"
 
-let schema_path = "docs/architecture-schema.sql"
+let schema_path =
+  match Sys.getenv_opt "ARCH_SCHEMA_PATH" with
+  | Some p -> p
+  | None -> "docs/architecture-schema.sql"
 
 let open_db () =
   let db = Sqlite3.db_open db_path in
@@ -44,8 +50,7 @@ let exec_stmt db stmt =
         "Statement error (%s): %s\n"
         (Sqlite3.Rc.to_string rc)
         (Sqlite3.errmsg db) ;
-      ignore (Sqlite3.reset stmt) ;
-      exit 1
+      ignore (Sqlite3.reset stmt)
 
 let last_insert_rowid db = Int64.to_int (Sqlite3.last_insert_rowid db)
 
@@ -159,29 +164,37 @@ let restore_intents db backup =
 (* Source-path mapping                                                        *)
 (* -------------------------------------------------------------------------- *)
 
+(** Project root, derived from the build directory.
+    E.g. if build_dir is [/foo/bar/_build/default/src], project_root is [/foo/bar]. *)
+let project_root = ref ""
+
 (** Map a .cmt source file path to a relative source path under [src/].
     Handles ppx-preprocessed files (e.g. [src/ui/data.pp.ml] -> [src/ui/data.ml]).
     Returns [None] if the file doesn't belong to the project sources. *)
 let source_path_of_cmt (info : Cmt_format.cmt_infos) =
+  let try_strip_pp p =
+    let dir = Filename.dirname p in
+    let base = Filename.basename p in
+    match String.split_on_char '.' base with
+    | name :: "pp" :: rest ->
+        let original = Filename.concat dir (String.concat "." (name :: rest)) in
+        if Sys.file_exists original then Some original else None
+    | _ -> None
+  in
+  let try_resolve p =
+    if Sys.file_exists p then Some p
+    else
+      match try_strip_pp p with
+      | Some _ as r -> r
+      | None ->
+          (* Try resolving relative to project root *)
+          if !project_root <> "" then
+            let abs = Filename.concat !project_root p in
+            if Sys.file_exists abs then Some abs else try_strip_pp abs
+          else None
+  in
   match info.cmt_sourcefile with
-  | Some path when String.length path > 0 ->
-      if Sys.file_exists path then Some path
-      else
-        (* Try stripping .pp from preprocessed file names:
-         src/ui/data.pp.ml -> src/ui/data.ml *)
-        let try_strip_pp p =
-          let dir = Filename.dirname p in
-          let base = Filename.basename p in
-          (* Match *.pp.ml or *.pp.mli *)
-          match String.split_on_char '.' base with
-          | name :: "pp" :: rest ->
-              let original =
-                Filename.concat dir (String.concat "." (name :: rest))
-              in
-              if Sys.file_exists original then Some original else None
-          | _ -> None
-        in
-        try_strip_pp path
+  | Some path when String.length path > 0 -> try_resolve path
   | _ -> None
 
 (* -------------------------------------------------------------------------- *)
@@ -254,34 +267,41 @@ let collect_exposed cmti_files =
   let doc_tbl = Hashtbl.create 256 in
   List.iter
     (fun path ->
-      match Cmt_format.read path with
-      | _, Some info -> (
-          let modname = info.cmt_modname in
-          match info.cmt_annots with
-          | Interface sg ->
-              List.iter
-                (fun (item : Typedtree.signature_item) ->
-                  match item.sig_desc with
-                  | Tsig_value vd -> (
-                      let name = Ident.name vd.val_id in
-                      Hashtbl.replace exposed_tbl (modname, name) true ;
-                      match extract_doc vd.val_attributes with
-                      | Some doc -> Hashtbl.replace doc_tbl (modname, name) doc
-                      | None -> ())
-                  | Tsig_type (_, tds) ->
-                      List.iter
-                        (fun (td : Typedtree.type_declaration) ->
-                          let name = Ident.name td.typ_id in
-                          Hashtbl.replace exposed_tbl (modname, name) true ;
-                          match extract_doc td.typ_attributes with
-                          | Some doc ->
-                              Hashtbl.replace doc_tbl (modname, name) doc
-                          | None -> ())
-                        tds
-                  | _ -> ())
-                sg.sig_items
-          | _ -> ())
-      | _ -> ())
+      try
+        match Cmt_format.read path with
+        | _, Some info -> (
+            let modname = info.cmt_modname in
+            match info.cmt_annots with
+            | Interface sg ->
+                List.iter
+                  (fun (item : Typedtree.signature_item) ->
+                    match item.sig_desc with
+                    | Tsig_value vd -> (
+                        let name = Ident.name vd.val_id in
+                        Hashtbl.replace exposed_tbl (modname, name) true ;
+                        match extract_doc vd.val_attributes with
+                        | Some doc ->
+                            Hashtbl.replace doc_tbl (modname, name) doc
+                        | None -> ())
+                    | Tsig_type (_, tds) ->
+                        List.iter
+                          (fun (td : Typedtree.type_declaration) ->
+                            let name = Ident.name td.typ_id in
+                            Hashtbl.replace exposed_tbl (modname, name) true ;
+                            match extract_doc td.typ_attributes with
+                            | Some doc ->
+                                Hashtbl.replace doc_tbl (modname, name) doc
+                            | None -> ())
+                          tds
+                    | _ -> ())
+                  sg.sig_items
+            | _ -> ())
+        | _ -> ()
+      with exn ->
+        Printf.eprintf
+          "Warning: failed to read cmti %s: %s\n"
+          path
+          (Printexc.to_string exn))
     cmti_files ;
   (exposed_tbl, doc_tbl)
 
@@ -369,6 +389,21 @@ let process_cmt db ~exposed_tbl ~doc_tbl ~stmt_mod ~stmt_fn ~stmt_ty ~stmt_fld
           | None -> ()
           | Some src_path ->
               let modname = info.cmt_modname in
+              (* Store path relative to project root if possible *)
+              let rel_path =
+                if !project_root <> "" then
+                  let prefix = !project_root ^ "/" in
+                  if
+                    String.length src_path >= String.length prefix
+                    && String.sub src_path 0 (String.length prefix) = prefix
+                  then
+                    String.sub
+                      src_path
+                      (String.length prefix)
+                      (String.length src_path - String.length prefix)
+                  else src_path
+                else src_path
+              in
               (* Count source lines *)
               let lines =
                 let ic = open_in src_path in
@@ -388,7 +423,7 @@ let process_cmt db ~exposed_tbl ~doc_tbl ~stmt_mod ~stmt_fn ~stmt_ty ~stmt_fld
                 Sys.file_exists mli
               in
               let module_id =
-                insert_module db stmt_mod ~path:src_path ~lines ~has_mli
+                insert_module db stmt_mod ~path:rel_path ~lines ~has_mli
               in
               (* Process structure items *)
               List.iter
@@ -530,6 +565,23 @@ let () =
   let build_dir =
     if Array.length Sys.argv > 1 then Sys.argv.(1) else "_build/default/src"
   in
+  (* Derive project root from build_dir: strip _build/default/... suffix *)
+  (let abs_build =
+     if Filename.is_relative build_dir then
+       Filename.concat (Sys.getcwd ()) build_dir
+     else build_dir
+   in
+   match
+     String.split_on_char '/' abs_build
+     |> List.to_seq
+     |> Seq.find_index (fun s -> s = "_build")
+   with
+   | Some idx ->
+       let parts = String.split_on_char '/' abs_build in
+       let root_parts = List.filteri (fun i _ -> i < idx) parts in
+       project_root := String.concat "/" root_parts
+   | None -> ()) ;
+  if !project_root <> "" then Printf.printf "Project root: %s\n%!" !project_root ;
   Printf.printf "Scanning %s for .cmt/.cmti files...\n%!" build_dir ;
   let all_files = find_cmt_files build_dir in
   let cmt_files =
@@ -593,14 +645,14 @@ let () =
   let stmt_fn =
     Sqlite3.prepare
       db
-      "INSERT INTO functions (module_id, name, signature, line_start, \
-       line_end, exposed, intent) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT OR REPLACE INTO functions (module_id, name, signature, \
+       line_start, line_end, exposed, intent) VALUES (?, ?, ?, ?, ?, ?, ?)"
   in
   let stmt_ty =
     Sqlite3.prepare
       db
-      "INSERT INTO types (module_id, name, kind, line_start, line_end, \
-       exposed, manifest, intent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT OR REPLACE INTO types (module_id, name, kind, line_start, \
+       line_end, exposed, manifest, intent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
   in
   let stmt_fld =
     Sqlite3.prepare
