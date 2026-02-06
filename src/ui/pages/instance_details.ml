@@ -319,8 +319,7 @@ let handle_key ps key ~size:_ =
     ps)
   else
     match Keys.of_string key with
-    | Some Keys.Escape | Some (Keys.Char "q") ->
-        Navigation.back ps
+    | Some Keys.Escape | Some (Keys.Char "q") -> Navigation.back ps
     | _ -> ps
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
