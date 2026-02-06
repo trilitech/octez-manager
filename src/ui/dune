@@ -9,6 +9,7 @@
   miaou-core.interfaces
   miaou-core.internals
   miaou-core.widgets.display
+  miaou-core.widgets.layout
   miaou-runner.tui
   lambda-term
   eio
