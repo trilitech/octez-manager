@@ -22,17 +22,7 @@ let strip_node_prefix inst =
     String.sub inst 5 (String.length inst - 5)
   else inst
 
-let require_package_manager () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Package_manager_capability.key
-  with
-  | Some cap ->
-      let module I =
-        (val (cap : Manager_interfaces.Package_manager_capability.t))
-      in
-      Ok (module I : Manager_interfaces.Package_manager)
-  | None -> Error (`Msg "Package manager capability not available")
+let require_package_manager = Form_builder_common.require_package_manager
 
 let create_node_flow ~on_success =
   let open Modal_helpers in

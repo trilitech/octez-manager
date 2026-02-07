@@ -172,6 +172,19 @@ let is_port_in_use port =
   | Some f -> f port
   | None -> Option.is_some (get_port_process port)
 
+(** Find the next free port starting from [start], skipping ports in [avoid]
+    and ports that are currently in use. *)
+let next_free_port ~start ~avoid =
+  let rec loop p =
+    if
+      p >= 1024 && p <= 65535
+      && (not (List.mem p avoid))
+      && not (is_port_in_use p)
+    then p
+    else loop (p + 1)
+  in
+  loop start
+
 type validation_error =
   | Invalid_format of string
   | Port_out_of_range

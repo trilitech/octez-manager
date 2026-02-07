@@ -145,30 +145,6 @@ let base_initial_model () =
 
 (** {1 Helper Functions} *)
 
-let require_package_manager () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Package_manager_capability.key
-  with
-  | Some cap ->
-      let module I =
-        (val (cap : Manager_interfaces.Package_manager_capability.t))
-      in
-      Ok (module I : Manager_interfaces.Package_manager)
-  | None -> Error (`Msg "Package manager capability not available")
-
-let has_octez_node_binary dir =
-  let trimmed = String.trim dir in
-  if trimmed = "" then false
-  else
-    let candidate = Filename.concat trimmed "octez-node" in
-    Sys.file_exists candidate
-    &&
-      try
-        Unix.access candidate [Unix.X_OK] ;
-        true
-      with Unix.Unix_error _ -> false
-
 (** {1 Snapshot Cache} *)
 
 let snapshot_cache = Cache.create_safe_keyed ~name:"snapshots" ~ttl:60.0 ()
@@ -376,95 +352,40 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir ~data_dir =
                     Cache.set_safe_keyed snapshot_size_cache url size)) ;
           Ok ())
 
-let parse_port addr =
-  match String.split_on_char ':' addr with
-  | [_; port_str] -> (
-      try Some (int_of_string (String.trim port_str)) with _ -> None)
-  | _ -> None
-
-let ports_from_states states =
-  let rpc_ports =
-    states
-    |> List.filter_map (fun (s : Data.Service_state.t) ->
-        match s.service.Service.role with
-        | "node" -> parse_port s.service.Service.rpc_addr
-        | _ -> None)
-  in
-  let p2p_ports =
-    states
-    |> List.filter_map (fun (s : Data.Service_state.t) ->
-        match s.service.Service.role with
-        | "node" -> parse_port s.service.Service.net_addr
-        | _ -> None)
-  in
-  (rpc_ports, p2p_ports)
-
-let is_port_in_use (port : int) : bool =
-  match
-    Miaou_interfaces.Capability.get Manager_interfaces.System_capability.key
-  with
-  | Some cap ->
-      let module Sys = (val cap : Manager_interfaces.System) in
-      Sys.is_port_in_use port
-  | None -> false
-
-let next_free_port ~start ~avoid =
-  let rec loop p =
-    if
-      p >= 1024 && p <= 65535
-      && (not (List.mem p avoid))
-      && not (is_port_in_use p)
-    then p
-    else loop (p + 1)
-  in
-  loop start
-
 let ensure_ports_initialized model_ref =
-  let states =
-    try Form_builder_common.cached_service_states () with _ -> []
-    (* In tests/early init, capability may be absent; default to empty. *)
-  in
-  let rpc_ports, p2p_ports = ports_from_states states in
-  let avoid = ref (rpc_ports @ p2p_ports) in
-  let ensure current ~default_host ~start_port setter =
-    let needs_new =
-      match Form_builder_common.parse_host_port current with
-      | Some (_host, port) ->
-          port < 1024 || port > 65535 || List.mem port !avoid
-          || is_port_in_use port
-      | None -> true
-    in
-    if needs_new then (
-      let port = next_free_port ~start:start_port ~avoid:!avoid in
-      setter (Printf.sprintf "%s:%d" default_host port) ;
-      avoid := port :: !avoid)
-    else
-      match Form_builder_common.parse_host_port current with
-      | Some (_host, port) -> avoid := port :: !avoid
-      | None -> ()
-  in
   let current = !model_ref in
-  ensure
-    current.node.rpc_addr
-    ~default_host:"127.0.0.1"
-    ~start_port:8732
-    (fun value ->
-      model_ref :=
+  Form_builder_common.ensure_ports
+    ~roles:["node"]
+    ~slots:
+      [
         {
-          current with
-          node = Form_builder_common.{current.node with rpc_addr = value};
-        }) ;
-  let current = !model_ref in
-  ensure
-    current.node.p2p_addr
-    ~default_host:"0.0.0.0"
-    ~start_port:9732
-    (fun value ->
-      model_ref :=
+          current = current.node.rpc_addr;
+          default_host = "127.0.0.1";
+          start_port = 8732;
+          setter =
+            (fun value ->
+              let c = !model_ref in
+              model_ref :=
+                {
+                  c with
+                  node = Form_builder_common.{c.node with rpc_addr = value};
+                });
+        };
         {
-          current with
-          node = Form_builder_common.{current.node with p2p_addr = value};
-        })
+          current = current.node.p2p_addr;
+          default_host = "0.0.0.0";
+          start_port = 9732;
+          setter =
+            (fun value ->
+              let c = !model_ref in
+              model_ref :=
+                {
+                  c with
+                  node = Form_builder_common.{c.node with p2p_addr = value};
+                });
+        };
+      ]
+    ()
 
 let make_initial_model () =
   match Context.take_pending_edit_service () with
@@ -861,7 +782,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"octez-node"
             ~subcommand:["run"]
-            ~binary_validator:has_octez_node_binary
+            ~binary_validator:Form_builder_common.has_octez_node_binary
             ~skip_instance_name:true
             ~skip_extra_args:true
             ~skip_service_fields:true
@@ -892,7 +813,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"octez-node"
             ~subcommand:["run"]
-            ~binary_validator:has_octez_node_binary
+            ~binary_validator:Form_builder_common.has_octez_node_binary
             ~skip_instance_name:true
             ~skip_app_bin_dir:true
             ~skip_service_fields:true
@@ -904,7 +825,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"octez-node"
             ~subcommand:["run"]
-            ~binary_validator:has_octez_node_binary
+            ~binary_validator:Form_builder_common.has_octez_node_binary
             ~skip_instance_name:true
             ~skip_app_bin_dir:true
             ~skip_extra_args:true
@@ -1114,7 +1035,7 @@ let spec =
               else Ok ()
             in
             append_log "Getting package manager...\n" ;
-            let* (module PM) = require_package_manager () in
+            let* (module PM) = Form_builder_common.require_package_manager () in
             append_log "Starting install_node...\n" ;
             let result = PM.install_node ~quiet:true ~on_log:append_log req in
             (match result with
