@@ -183,3 +183,20 @@ val compute_sha256 : string -> (string, [> `Msg of string]) result
 (** Get the size of a directory in bytes using [du -sb].
     Returns [None] if the path does not exist or the command fails. *)
 val get_dir_size : string -> int64 option
+
+(** {1 Size Formatting} *)
+
+(** Format a byte count as a human-readable string using integer
+    division (truncating).  Produces e.g. ["3 GB"], ["450 MB"],
+    ["12 KB"], ["800 bytes"]. *)
+val format_size : int64 -> string
+
+(** Format a byte count as a compact human-readable string with float
+    precision.  Produces e.g. ["1.2G"], ["450M"], ["12K"], ["800B"].
+    Handles values up to terabytes. *)
+val format_bytes : int64 -> string
+
+(** Format a byte count as a human-readable string with float precision
+    and spaced units.  Produces e.g. ["1.5 GB"], ["100 MB"], ["512 bytes"].
+    Best for disk-space messages shown to the user. *)
+val format_size_float : int64 -> string
