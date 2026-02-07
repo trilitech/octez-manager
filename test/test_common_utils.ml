@@ -132,6 +132,42 @@ let test_cmd_to_string_with_spaces () =
   check bool "contains hello" true (String.contains result 'h')
 
 (* ============================================================ *)
+(* Unquote Tests *)
+(* ============================================================ *)
+
+let test_unquote_double_quotes () =
+  check string "strips double quotes" "hello" (Common.unquote "\"hello\"")
+
+let test_unquote_single_quotes () =
+  check string "strips single quotes" "hello" (Common.unquote "'hello'")
+
+let test_unquote_backslash_escaped () =
+  check
+    string
+    "strips backslash-escaped quotes"
+    "hello"
+    (Common.unquote "\\\"hello\\\"")
+
+let test_unquote_no_quotes () =
+  check string "unquoted passthrough" "hello" (Common.unquote "hello")
+
+let test_unquote_empty_string () =
+  check string "empty passthrough" "" (Common.unquote "")
+
+let test_unquote_empty_double_quotes () =
+  check string "empty double quotes" "" (Common.unquote "\"\"")
+
+let test_unquote_empty_single_quotes () =
+  check string "empty single quotes" "" (Common.unquote "''")
+
+let test_unquote_mismatched_quotes () =
+  (* Mismatched quotes should be left unchanged *)
+  check string "mismatched unchanged" "\"hello'" (Common.unquote "\"hello'")
+
+let test_unquote_single_char () =
+  check string "single char passthrough" "x" (Common.unquote "x")
+
+(* ============================================================ *)
 (* Edge Cases *)
 (* ============================================================ *)
 
@@ -191,6 +227,19 @@ let path_utils_tests =
     ("cmd with spaces", `Quick, test_cmd_to_string_with_spaces);
   ]
 
+let unquote_tests =
+  [
+    ("double quotes", `Quick, test_unquote_double_quotes);
+    ("single quotes", `Quick, test_unquote_single_quotes);
+    ("backslash-escaped", `Quick, test_unquote_backslash_escaped);
+    ("no quotes", `Quick, test_unquote_no_quotes);
+    ("empty string", `Quick, test_unquote_empty_string);
+    ("empty double quotes", `Quick, test_unquote_empty_double_quotes);
+    ("empty single quotes", `Quick, test_unquote_empty_single_quotes);
+    ("mismatched quotes", `Quick, test_unquote_mismatched_quotes);
+    ("single char", `Quick, test_unquote_single_char);
+  ]
+
 let edge_case_tests =
   [
     ("quote newline", `Quick, test_sh_quote_newline);
@@ -206,5 +255,6 @@ let () =
       ("sh_quote", sh_quote_tests);
       ("make_absolute_path", make_absolute_tests);
       ("path_utils", path_utils_tests);
+      ("unquote", unquote_tests);
       ("edge_cases", edge_case_tests);
     ]
