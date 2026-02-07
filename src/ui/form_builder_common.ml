@@ -74,15 +74,7 @@ let user_valid_cache =
 let service_user_valid ~user =
   if Common.is_root () then true else Cache.get_keyed user_valid_cache user
 
-let parse_host_port (s : string) : (string * int) option =
-  match String.split_on_char ':' s with
-  | [host; port] -> (
-      try
-        let p = int_of_string (String.trim port) in
-        let h = String.trim host in
-        if p > 0 && p < 65536 && h <> "" then Some (h, p) else None
-      with _ -> None)
-  | _ -> None
+let parse_host_port = Port_validation.parse_host_port
 
 let default_service_user () =
   if Common.is_root () then "octez"

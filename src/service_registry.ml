@@ -9,9 +9,7 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-let registry_root () =
-  if Common.is_root () then "/etc/octez_manager"
-  else Filename.concat (Common.xdg_config_home ()) "octez-manager"
+let registry_root = Common.registry_root
 
 let services_dir () = Filename.concat (registry_root ()) "services"
 
