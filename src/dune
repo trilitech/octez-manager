@@ -47,7 +47,8 @@
   process_scanner
   external_service_detector
   self_update_checker
-  version_utils)
+  version_utils
+  check_prefs)
  (libraries
   rresult
   yojson

@@ -5,10 +5,6 @@
 (*                                                                            *)
 (******************************************************************************)
 
-open Rresult
-
-let ( let* ) = Result.bind
-
 type check_result =
   | UpdateAvailable of {
       latest_version : string;
@@ -24,65 +20,13 @@ let prefs_file () =
   let config_dir = Common.xdg_config_home () in
   Filename.concat config_dir "version-check.json"
 
-type prefs = {check_enabled : bool; dismissed_versions : string list}
-
-let default_prefs = {check_enabled = true; dismissed_versions = []}
-
-let load_prefs () =
-  let file = prefs_file () in
-  if not (Sys.file_exists file) then Ok default_prefs
-  else
-    try
-      let json = Yojson.Safe.from_file file in
-      let open Yojson.Safe.Util in
-      let check_enabled =
-        json |> member "check_enabled" |> to_bool_option
-        |> Option.value ~default:true
-      in
-      let dismissed_versions =
-        json |> member "dismissed_versions" |> to_list |> List.map to_string
-      in
-      Ok {check_enabled; dismissed_versions}
-    with e ->
-      Common.append_debug_log
-        (Printf.sprintf
-           "Failed to load version check prefs: %s"
-           (Printexc.to_string e)) ;
-      Ok default_prefs
-
-let save_prefs prefs =
-  let file = prefs_file () in
-  let dir = Filename.dirname file in
-  let owner, group = Common.current_user_group_names () in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
-  try
-    let json =
-      `Assoc
-        [
-          ("check_enabled", `Bool prefs.check_enabled);
-          ( "dismissed_versions",
-            `List (List.map (fun v -> `String v) prefs.dismissed_versions) );
-        ]
-    in
-    Yojson.Safe.to_file file json ;
-    Ok ()
-  with e ->
-    Error
-      (`Msg (Printf.sprintf "Failed to save prefs: %s" (Printexc.to_string e)))
-
-let is_check_enabled () =
-  match load_prefs () with Ok prefs -> prefs.check_enabled | Error _ -> true
+let is_check_enabled () = Check_prefs.is_check_enabled ~file:(prefs_file ())
 
 let set_check_enabled enabled =
-  let* prefs = load_prefs () in
-  save_prefs {prefs with check_enabled = enabled}
+  Check_prefs.set_check_enabled ~file:(prefs_file ()) enabled
 
 let dismiss_version version =
-  let* prefs = load_prefs () in
-  if List.mem version prefs.dismissed_versions then Ok ()
-  else
-    let dismissed_versions = version :: prefs.dismissed_versions in
-    save_prefs {prefs with dismissed_versions}
+  Check_prefs.dismiss_version ~file:(prefs_file ()) version
 
 (** Parse version string into components for comparison
     e.g., "24.1" -> [24; 1], "24.0-rc1" -> [24; 0] *)
@@ -105,43 +49,39 @@ let get_current_version () =
 let check_for_updates ?(force = false) () =
   let _ = force in
   (* force parameter kept for API compatibility but no longer used *)
-  (* Check if enabled *)
-  match load_prefs () with
-  | Error _ -> CheckFailed "Failed to load preferences"
-  | Ok prefs when not prefs.check_enabled -> CheckDisabled
-  | Ok prefs -> (
-      (* Get latest remote version *)
-      match Binary_downloader.fetch_versions ~include_rc:false () with
-      | Error (`Msg e) -> CheckFailed e
-      | Ok [] -> CheckFailed "No versions available"
-      | Ok (first :: rest) ->
-          (* Get latest version (should already be sorted, but ensure) *)
-          let latest =
-            List.fold_left
-              (fun acc (vi : Binary_downloader.version_info) ->
-                if compare_versions vi.version acc > 0 then vi.version else acc)
-              first.version
-              rest
-          in
-          let current = get_current_version () in
-          (* Check if update is needed *)
-          let needs_update =
-            match current with
-            | None -> true (* No version installed *)
-            | Some cur -> compare_versions latest cur > 0
-          in
-          if not needs_update then UpToDate current
-          else
-            (* Check if user dismissed this version *)
-            let should_notify =
-              not (List.mem latest prefs.dismissed_versions)
-            in
-            UpdateAvailable
-              {
-                latest_version = latest;
-                current_version = current;
-                should_notify;
-              })
+  (* Load prefs once to avoid redundant disk I/O *)
+  let prefs =
+    match Check_prefs.load ~file:(prefs_file ()) () with
+    | Ok (p, _) -> p
+    | Error _ -> Check_prefs.default
+  in
+  if not prefs.check_enabled then CheckDisabled
+  else
+    match Binary_downloader.fetch_versions ~include_rc:false () with
+    | Error (`Msg e) -> CheckFailed e
+    | Ok [] -> CheckFailed "No versions available"
+    | Ok (first :: rest) ->
+        (* Get latest version (should already be sorted, but ensure) *)
+        let latest =
+          List.fold_left
+            (fun acc (vi : Binary_downloader.version_info) ->
+              if compare_versions vi.version acc > 0 then vi.version else acc)
+            first.version
+            rest
+        in
+        let current = get_current_version () in
+        (* Check if update is needed *)
+        let needs_update =
+          match current with
+          | None -> true (* No version installed *)
+          | Some cur -> compare_versions latest cur > 0
+        in
+        if not needs_update then UpToDate current
+        else
+          (* Check if user dismissed this version *)
+          let should_notify = not (List.mem latest prefs.dismissed_versions) in
+          UpdateAvailable
+            {latest_version = latest; current_version = current; should_notify}
 
 (** Exported for tests *)
 module For_tests = struct
