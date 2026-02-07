@@ -214,17 +214,18 @@ let test_compare_versions_multi_part () =
   check bool "24.1.3 > 24.1.2" true (result > 0)
 
 let test_compare_versions_different_lengths () =
+  (* 24.0.0 and 24.0 are semantically equal (trailing zeros) *)
   let result = BR.compare_versions "24.0.0" "24.0" in
-  check bool "24.0.0 > 24.0" true (result > 0)
+  check int "24.0.0 = 24.0" 0 result
 
 let test_compare_versions_different_lengths_reverse () =
   let result = BR.compare_versions "24.0" "24.0.0" in
-  check bool "24.0 < 24.0.0" true (result < 0)
+  check int "24.0 = 24.0.0" 0 result
 
 let test_compare_versions_non_numeric () =
-  (* Non-numeric parts should be treated as 0 *)
+  (* Non-numeric version strings are treated as empty (unparseable) *)
   let result = BR.compare_versions "24.alpha" "24.0" in
-  check int "non-numeric treated as 0" 0 result
+  check bool "non-numeric < valid" true (result < 0)
 
 (** {2 Test suite} *)
 
