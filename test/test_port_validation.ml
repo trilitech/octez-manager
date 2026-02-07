@@ -246,6 +246,41 @@ let test_pp_error_port_in_use () =
   check bool "has content" true (String.length msg > 10)
 
 (* ============================================================ *)
+(* next_free_port Tests *)
+(* ============================================================ *)
+
+let test_next_free_port_skips_avoid () =
+  Port_validation.set_port_in_use_override (fun _ -> false) ;
+  let port = Port_validation.next_free_port ~start:8732 ~avoid:[8732; 8733] in
+  check int "skips avoided ports" 8734 port ;
+  Port_validation.clear_port_in_use_override ()
+
+let test_next_free_port_skips_in_use () =
+  Port_validation.set_port_in_use_override (fun p -> p = 8732 || p = 8733) ;
+  let port = Port_validation.next_free_port ~start:8732 ~avoid:[] in
+  check int "skips in-use ports" 8734 port ;
+  Port_validation.clear_port_in_use_override ()
+
+let test_next_free_port_terminates_at_boundary () =
+  (* All ports in use — should not hang, returns fallback *)
+  Port_validation.set_port_in_use_override (fun _ -> true) ;
+  let port = Port_validation.next_free_port ~start:65530 ~avoid:[] in
+  check int "terminates at boundary" 65530 port ;
+  Port_validation.clear_port_in_use_override ()
+
+let test_next_free_port_clamps_below_1024 () =
+  Port_validation.set_port_in_use_override (fun _ -> false) ;
+  let port = Port_validation.next_free_port ~start:80 ~avoid:[] in
+  check int "clamps to 1024" 1024 port ;
+  Port_validation.clear_port_in_use_override ()
+
+let test_next_free_port_first_free () =
+  Port_validation.set_port_in_use_override (fun _ -> false) ;
+  let port = Port_validation.next_free_port ~start:9000 ~avoid:[] in
+  check int "returns start when free" 9000 port ;
+  Port_validation.clear_port_in_use_override ()
+
+(* ============================================================ *)
 (* Edge Case Tests *)
 (* ============================================================ *)
 
@@ -359,6 +394,17 @@ let edge_case_tests =
     ("validate wildcard", `Quick, test_validate_addr_wildcard);
   ]
 
+let next_free_port_tests =
+  [
+    ("skips avoided ports", `Quick, test_next_free_port_skips_avoid);
+    ("skips in-use ports", `Quick, test_next_free_port_skips_in_use);
+    ( "terminates at boundary",
+      `Quick,
+      test_next_free_port_terminates_at_boundary );
+    ("clamps below 1024", `Quick, test_next_free_port_clamps_below_1024);
+    ("returns start when free", `Quick, test_next_free_port_first_free);
+  ]
+
 let () =
   Alcotest.run
     "Port_validation"
@@ -369,4 +415,5 @@ let () =
       ("validate_specific", validate_specific_tests);
       ("pp_error", pp_error_tests);
       ("edge_cases", edge_case_tests);
+      ("next_free_port", next_free_port_tests);
     ]

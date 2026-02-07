@@ -176,14 +176,12 @@ let is_port_in_use port =
     and ports that are currently in use. *)
 let next_free_port ~start ~avoid =
   let rec loop p =
-    if
-      p >= 1024 && p <= 65535
-      && (not (List.mem p avoid))
-      && not (is_port_in_use p)
-    then p
+    if p > 65535 then start (* fallback: wrap to start if no port found *)
+    else if p >= 1024 && (not (List.mem p avoid)) && not (is_port_in_use p) then
+      p
     else loop (p + 1)
   in
-  loop start
+  loop (max start 1024)
 
 type validation_error =
   | Invalid_format of string
