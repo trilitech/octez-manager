@@ -26,7 +26,8 @@ val port_owned_by_instance : instance:string -> int -> bool
 val is_port_in_use : int -> bool
 
 (** Find the next free port starting from [start], skipping ports in [avoid]
-    and ports that are currently in use. *)
+    and ports that are currently in use. Searches in [\[1024, 65535\]].
+    Returns [start] as fallback if no free port is found. *)
 val next_free_port : start:int -> avoid:int list -> int
 
 (** Override [is_port_in_use] with a custom function (for deterministic tests). *)
