@@ -25,14 +25,10 @@ create_external_service "node" "$INSTANCE" "$DATA_DIR" "$RPC_ADDR" "shadownet"
 systemctl enable "octez-node@${INSTANCE}.service"
 systemctl start "octez-node@${INSTANCE}.service"
 
-# Wait a bit for it to be detected
-sleep 2
-
-# Verify it's detected as external
+# Wait for it to be detected (retries to handle concurrent daemon-reload)
 echo "Checking if external service is detected..."
-if ! external_service_detected "$INSTANCE"; then
-	echo "ERROR: External service not detected"
-	om list 2>&1
+if ! wait_for_external_service "$INSTANCE"; then
+	om list --external 2>&1
 	exit 1
 fi
 
