@@ -29,45 +29,9 @@ let state_ref : state option ref = ref None
 (* Chord state for C-x prefix *)
 let pending_chord : string option ref = ref None
 
-(** Group services by network, returning list of (network_name, services) *)
-let group_by_network services =
-  (* Build a map of network -> services *)
-  let network_map =
-    List.fold_left
-      (fun acc svc ->
-        let network = svc.Octez_manager_lib.Service.network in
-        let existing = try List.assoc network acc with Not_found -> [] in
-        (network, svc :: existing) :: List.remove_assoc network acc)
-      []
-      services
-  in
-  (* Sort by network name and reverse service lists (they were consed) *)
-  List.sort
-    (fun (n1, _) (n2, _) -> String.compare n1 n2)
-    (List.map (fun (net, svcs) -> (net, List.rev svcs)) network_map)
+let group_by_network = Actions.group_by_network
 
-(** Build modal items with local/public sections and network grouping.
-    Returns a flat list where each item carries its section, network, and service. *)
-let build_instance_items ~local ~public =
-  (* Group services by network and add section/network labels to display *)
-  let build_labeled_items section_label services =
-    let grouped = group_by_network services in
-    List.concat_map
-      (fun (network, svcs) ->
-        List.map
-          (fun svc ->
-            (* Attach section and network labels for display *)
-            (section_label, String.capitalize_ascii network, svc))
-          svcs)
-      grouped
-  in
-  let local_items =
-    if local <> [] then build_labeled_items "Local Instances" local else []
-  in
-  let public_items =
-    if public <> [] then build_labeled_items "Public Nodes" public else []
-  in
-  local_items @ public_items
+let build_instance_items = Actions.build_instance_items
 
 let update_state s =
   state_ref := Some s ;

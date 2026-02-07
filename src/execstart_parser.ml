@@ -80,23 +80,7 @@ let unwrap_shell exec_start =
 (** {1 Binary Path Extraction} *)
 
 (** Remove quotes from a string, including escaped quotes *)
-let unquote s =
-  let len = String.length s in
-  (* Handle backslash-escaped double quotes in shell *)
-  if
-    len >= 4
-    && s.[0] = '\\'
-    && s.[1] = '"'
-    && s.[len - 2] = '\\'
-    && s.[len - 1] = '"'
-  then String.sub s 2 (len - 4)
-  else if
-    (* Handle regular quotes *)
-    len >= 2
-    && ((s.[0] = '"' && s.[len - 1] = '"')
-       || (s.[0] = '\'' && s.[len - 1] = '\''))
-  then String.sub s 1 (len - 2)
-  else s
+let unquote = Common.unquote
 
 let extract_binary_path exec_start =
   let unwrapped = unwrap_shell exec_start in

@@ -900,6 +900,28 @@ let format_bytes bytes =
   else if b >= 1024.0 then Printf.sprintf "%.0fK" (b /. 1024.0)
   else Printf.sprintf "%LdB" bytes
 
+(** Remove surrounding quotes from a string.
+    Handles backslash-escaped double quotes, regular double quotes,
+    and single quotes.
+    Returns the string unchanged if it is not quoted. *)
+let unquote s =
+  let len = String.length s in
+  (* Handle backslash-escaped double quotes in shell *)
+  if
+    len >= 4
+    && s.[0] = '\\'
+    && s.[1] = '"'
+    && s.[len - 2] = '\\'
+    && s.[len - 1] = '"'
+  then String.sub s 2 (len - 4)
+  else if
+    (* Handle regular quotes *)
+    len >= 2
+    && ((s.[0] = '"' && s.[len - 1] = '"')
+       || (s.[0] = '\'' && s.[len - 1] = '\''))
+  then String.sub s 1 (len - 2)
+  else s
+
 (** Format a byte count as a human-readable string with float precision
     and spaced units.  Produces e.g. ["1.5 GB"], ["100 MB"], ["512 bytes"].
     Best for disk-space messages shown to the user. *)
