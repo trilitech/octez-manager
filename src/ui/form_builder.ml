@@ -759,9 +759,38 @@ struct
       kb "?" "Help";
     ]
 
-  let on_key ps key ~size =
-    let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
-    (ps', Miaou_interfaces.Key_event.Handled)
+  let on_key ps key ~size:_ =
+    if Miaou.Core.Modal_manager.has_active () then (
+      Miaou.Core.Modal_manager.handle_key (Miaou.Core.Keys.to_string key) ;
+      (refresh ps, Miaou_interfaces.Key_event.Handled))
+    else
+      let key_str = Miaou.Core.Keys.to_string key in
+      (* Try global shortcuts first (?, m, etc.) *)
+      match Global_shortcuts.handle key_str with
+      | Global_shortcuts.Handled -> (ps, Miaou_interfaces.Key_event.Handled)
+      | Global_shortcuts.NotGlobal -> (
+          let s = ps.Navigation.s in
+          let focus, result = Focus_ring.handle_key s.focus ~key:key_str in
+          match result with
+          | `Handled ->
+              ( Navigation.update (fun s -> {s with focus}) ps,
+                Miaou_interfaces.Key_event.Handled )
+          | `Bubble -> (
+              match key with
+              | Miaou.Core.Keys.Escape ->
+                  Context.set_skip_back_once () ;
+                  Context.navigate "instances" ;
+                  (ps, Miaou_interfaces.Key_event.Handled)
+              | Miaou.Core.Keys.Up ->
+                  ( Navigation.update (fun s -> move_state s (-1)) ps,
+                    Miaou_interfaces.Key_event.Handled )
+              | Miaou.Core.Keys.Down ->
+                  ( Navigation.update (fun s -> move_state s 1) ps,
+                    Miaou_interfaces.Key_event.Handled )
+              | Miaou.Core.Keys.Enter ->
+                  ( Navigation.update enter ps,
+                    Miaou_interfaces.Key_event.Handled )
+              | _ -> (ps, Miaou_interfaces.Key_event.Bubble)))
 
   let on_modal_key ps key ~size =
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
