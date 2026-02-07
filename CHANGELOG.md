@@ -48,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - System metrics (CPU, memory, disk) start populating without the previous startup delay
 - `make completions-check` no longer modifies the working directory when completions are out of date
 - Systemd service template warnings about unknown keys `StartLimitIntervalSec` and `StartLimitBurst` in [Service] section (moved to [Unit] section)
+- Pressing or holding Esc on modals no longer accidentally quits the application (Miaou Esc cooldown after modal close)
 
 ### Removed
 
