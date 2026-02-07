@@ -377,14 +377,15 @@ let cmd_duplicates () =
   let sql =
     "SELECT f.name, f.signature, COUNT(DISTINCT m.id) as cnt, \
      GROUP_CONCAT(m.path, ', ') FROM functions f JOIN modules m ON f.module_id \
-     = m.id WHERE f.name NOT LIKE 'let*' AND f.signature NOT IN ('unit', \
-     'string', 'int', 'float', 'bool', 'Mutex.t') AND f.signature NOT LIKE \
-     '''a%' AND f.name NOT IN ('register', 'init', 'view', 'update', \
-     'refresh', 'move', 'back', 'noop', 'service_select', 'service_cycle', \
-     'keymap', 'has_modal', 'handled_keys', 'handle_modal_key', 'handle_key', \
-     'header', 'name', 'shutdown', 'start', 'clear', 'stop', 'tick', 'get', \
-     'clear_cache', 'started', 'shutdown_requested') GROUP BY f.name, \
-     f.signature HAVING cnt > 1 ORDER BY cnt DESC"
+     = m.id WHERE f.is_alias = 0 AND f.name NOT LIKE 'let*' AND f.signature \
+     NOT IN ('unit', 'string', 'int', 'float', 'bool', 'Mutex.t') AND \
+     f.signature NOT LIKE '''a%' AND f.name NOT IN ('register', 'init', \
+     'view', 'update', 'refresh', 'move', 'back', 'noop', 'service_select', \
+     'service_cycle', 'keymap', 'has_modal', 'handled_keys', \
+     'handle_modal_key', 'handle_key', 'header', 'name', 'shutdown', 'start', \
+     'clear', 'stop', 'tick', 'get', 'clear_cache', 'started', \
+     'shutdown_requested') GROUP BY f.name, f.signature HAVING cnt > 1 ORDER \
+     BY cnt DESC"
   in
   let rows = query_rows db sql in
   Printf.printf "Found %d groups of duplicate functions:\n\n" (List.length rows) ;
@@ -576,15 +577,16 @@ let cmd_metrics output_file =
         string_of_int
           (geti
              "SELECT COUNT(*) FROM (SELECT f.name, f.signature FROM functions \
-              f JOIN modules m ON f.module_id = m.id WHERE f.name NOT LIKE \
-              'let*' AND f.signature NOT IN ('unit', 'string', 'int', 'float', \
-              'bool', 'Mutex.t') AND f.signature NOT LIKE '''a%' AND f.name \
-              NOT IN ('register', 'init', 'view', 'update', 'refresh', 'move', \
-              'back', 'noop', 'service_select', 'service_cycle', 'keymap', \
-              'has_modal', 'handled_keys', 'handle_modal_key', 'handle_key', \
-              'header', 'name', 'shutdown', 'start', 'clear', 'stop', 'tick', \
-              'get', 'clear_cache', 'started', 'shutdown_requested') GROUP BY \
-              f.name, f.signature HAVING COUNT(DISTINCT m.id) > 1)") );
+              f JOIN modules m ON f.module_id = m.id WHERE f.is_alias = 0 AND \
+              f.name NOT LIKE 'let*' AND f.signature NOT IN ('unit', 'string', \
+              'int', 'float', 'bool', 'Mutex.t') AND f.signature NOT LIKE \
+              '''a%' AND f.name NOT IN ('register', 'init', 'view', 'update', \
+              'refresh', 'move', 'back', 'noop', 'service_select', \
+              'service_cycle', 'keymap', 'has_modal', 'handled_keys', \
+              'handle_modal_key', 'handle_key', 'header', 'name', 'shutdown', \
+              'start', 'clear', 'stop', 'tick', 'get', 'clear_cache', \
+              'started', 'shutdown_requested') GROUP BY f.name, f.signature \
+              HAVING COUNT(DISTINCT m.id) > 1)") );
       ( "large_files",
         string_of_int (geti "SELECT COUNT(*) FROM modules WHERE lines > 500") );
       ( "large_functions",

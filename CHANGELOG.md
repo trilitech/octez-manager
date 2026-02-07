@@ -41,11 +41,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - RPC browser now uses Grid_layout for side-by-side panel rendering
 - Instances page now uses Grid_layout for multi-column layout merging
 - Form navigation now supports Tab/Shift+Tab cycling between fields via Miaou Focus_ring
-- **Code deduplication**: Consolidated duplicate functions into canonical locations, reducing duplicate_groups metric from 63 to 38. Round 1 (PRs #652–#657): extracted shared utilities into Common, Service_registry, Systemd, Helpers, Config, Modal_helpers, Form_builder_bundles. Round 2: extracted Check_prefs module from self_update_checker/version_checker, removed dead Common.is_port_in_use code, replaced hand-rolled with_lock with stdlib Mutex.protect
+- **Code deduplication**: Consolidated duplicate functions into canonical locations, reducing duplicate_groups metric from 63 to 23. Round 1 (PRs #652–#657): extracted shared utilities into Common, Service_registry, Systemd, Helpers, Config, Modal_helpers, Form_builder_bundles. Round 2: extracted Check_prefs module from self_update_checker/version_checker, removed dead Common.is_port_in_use code, replaced hand-rolled with_lock with stdlib Mutex.protect. Architecture index now detects delegation aliases (`let f = Module.f`) via typed AST and excludes them from duplicate metrics
 
 ### Fixed
 
 - RPC Browser: Fixed duplicate network names in instance display when selecting target endpoints (fixes #599)
+- Architecture index: intent restoration no longer fails on doc comments containing special characters (used prepared statements instead of string interpolation)
 - System metrics (CPU, memory, disk) start populating without the previous startup delay
 - `make completions-check` no longer modifies the working directory when completions are out of date
 - Systemd service template warnings about unknown keys `StartLimitIntervalSec` and `StartLimitBurst` in [Service] section (moved to [Unit] section)
