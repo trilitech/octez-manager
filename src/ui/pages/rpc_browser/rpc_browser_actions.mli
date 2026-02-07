@@ -11,6 +11,27 @@
 
 open Octez_manager_lib
 
+(** {1 Service Grouping} *)
+
+(** Group services by network, returning list of (network_name, services). *)
+val group_by_network : Service.t list -> (string * Service.t list) list
+
+(** Build modal items with local/public sections and network grouping.
+    Returns a flat list where each item carries its section, network,
+    and service. *)
+val build_instance_items :
+  local:Service.t list ->
+  public:Service.t list ->
+  (string * string * Service.t) list
+
+(** {1 Service Formatting} *)
+
+(** Format a service for display in the instance picker modal.
+    For public nodes, shows both label and URL.
+    For local nodes, shows just the label.
+    @param is_current Whether this service is the currently selected one *)
+val format_service_label : Service.t -> is_current:bool -> string
+
 (** {1 Entry Selection} *)
 
 (** Get the currently selected entry (under cursor).

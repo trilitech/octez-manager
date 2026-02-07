@@ -7,14 +7,7 @@
 
 (** {1 Parsing} *)
 
-let unquote s =
-  let len = String.length s in
-  if
-    len >= 2
-    && ((s.[0] = '"' && s.[len - 1] = '"')
-       || (s.[0] = '\'' && s.[len - 1] = '\''))
-  then String.sub s 1 (len - 2)
-  else s
+let unquote = Common.unquote
 
 let parse_string content =
   let lines = String.split_on_char '\n' content in
