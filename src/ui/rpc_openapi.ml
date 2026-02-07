@@ -72,9 +72,6 @@ let download_file ~url ~dest =
 
 let download_sync () =
   let dir = openapi_dir () in
-  (* Create parent directories *)
-  let parent = Filename.dirname dir in
-  ensure_dir parent ;
   ensure_dir dir ;
   (* Download each file *)
   let results =
