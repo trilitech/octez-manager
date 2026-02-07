@@ -8,16 +8,6 @@
 open Cmdliner
 open Octez_manager_lib
 
-(** Helper to format file size *)
-let format_size bytes =
-  let kb = Int64.div bytes 1024L in
-  let mb = Int64.div kb 1024L in
-  let gb = Int64.div mb 1024L in
-  if gb > 0L then Printf.sprintf "%Ld GB" gb
-  else if mb > 0L then Printf.sprintf "%Ld MB" mb
-  else if kb > 0L then Printf.sprintf "%Ld KB" kb
-  else Printf.sprintf "%Ld bytes" bytes
-
 (** list-remote command *)
 let list_remote_cmd =
   let term =
@@ -87,7 +77,7 @@ let list_cmd =
                 let path = Binary_registry.managed_version_path version in
                 let size_str =
                   match Common.get_dir_size path with
-                  | Some size -> format_size size
+                  | Some size -> Common.format_size size
                   | None -> "unknown size"
                 in
                 let count =

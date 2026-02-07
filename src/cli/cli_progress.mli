@@ -68,9 +68,6 @@ val set_checksum_status : display_state -> string -> display_state
 (** Clear checksum status *)
 val clear_checksum_status : display_state -> display_state
 
-(** Format file size in human-readable format *)
-val format_size : int64 -> string
-
 (** Test-only functions *)
 module For_test : sig
   val render_progress_bar :

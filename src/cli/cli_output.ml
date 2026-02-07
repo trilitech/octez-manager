@@ -336,9 +336,4 @@ let slurp_file path =
     ~finally:(fun () -> close_in_noerr ic)
     (fun () -> really_input_string ic (in_channel_length ic))
 
-let format_bytes bytes =
-  let gb = Int64.to_float bytes /. (1024. *. 1024. *. 1024.) in
-  if gb >= 1.0 then Printf.sprintf "%.1f GB" gb
-  else
-    let mb = Int64.to_float bytes /. (1024. *. 1024.) in
-    Printf.sprintf "%.0f MB" mb
+let format_bytes = Common.format_size_float

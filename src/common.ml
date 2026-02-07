@@ -874,3 +874,40 @@ let get_dir_size path =
         | size_str :: _ -> Int64.of_string_opt (String.trim size_str)
         | _ -> None)
     | Error _ -> None
+
+(** {1 Size Formatting} *)
+
+(** Format a byte count as a human-readable string using integer
+    division (truncating).  Produces e.g. ["3 GB"], ["450 MB"],
+    ["12 KB"], ["800 bytes"]. *)
+let format_size bytes =
+  let kb = Int64.div bytes 1024L in
+  let mb = Int64.div kb 1024L in
+  let gb = Int64.div mb 1024L in
+  if gb > 0L then Printf.sprintf "%Ld GB" gb
+  else if mb > 0L then Printf.sprintf "%Ld MB" mb
+  else if kb > 0L then Printf.sprintf "%Ld KB" kb
+  else Printf.sprintf "%Ld bytes" bytes
+
+(** Format a byte count as a compact human-readable string with float
+    precision.  Produces e.g. ["1.2G"], ["450M"], ["12K"], ["800B"].
+    Handles values up to terabytes. *)
+let format_bytes bytes =
+  let b = Int64.to_float bytes in
+  if b >= 1099511627776.0 then Printf.sprintf "%.1fT" (b /. 1099511627776.0)
+  else if b >= 1073741824.0 then Printf.sprintf "%.1fG" (b /. 1073741824.0)
+  else if b >= 1048576.0 then Printf.sprintf "%.0fM" (b /. 1048576.0)
+  else if b >= 1024.0 then Printf.sprintf "%.0fK" (b /. 1024.0)
+  else Printf.sprintf "%LdB" bytes
+
+(** Format a byte count as a human-readable string with float precision
+    and spaced units.  Produces e.g. ["1.5 GB"], ["100 MB"], ["512 bytes"].
+    Best for disk-space messages shown to the user. *)
+let format_size_float bytes =
+  let b = Int64.to_float bytes in
+  let gb = b /. (1024. *. 1024. *. 1024.) in
+  if gb >= 1.0 then Printf.sprintf "%.1f GB" gb
+  else
+    let mb = b /. (1024. *. 1024.) in
+    if mb >= 1.0 then Printf.sprintf "%.0f MB" mb
+    else Printf.sprintf "%Ld bytes" bytes
