@@ -29,8 +29,6 @@ let state_ref : state option ref = ref None
 (* Chord state for C-x prefix *)
 let pending_chord : string option ref = ref None
 
-let group_by_network = Actions.group_by_network
-
 let build_instance_items = Actions.build_instance_items
 
 let update_state s =
