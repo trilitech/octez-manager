@@ -77,10 +77,6 @@ let check_version_toast_ref :
     (key:string -> instance:string -> version:string -> unit) ref =
   ref (fun ~key:_ ~instance:_ ~version:_ -> ())
 
-let with_lock f =
-  Mutex.lock lock ;
-  Fun.protect ~finally:(fun () -> Mutex.unlock lock) f
-
 (** Poll intervals *)
 let cpu_interval = 0.5 (* 500ms *)
 
@@ -126,7 +122,7 @@ let effective_interval ~key ~base_interval =
 
 (** Get or create instance state *)
 let get_state key =
-  with_lock (fun () ->
+  Mutex.protect lock (fun () ->
       match Hashtbl.find_opt table key with
       | Some s -> s
       | None ->
@@ -255,7 +251,7 @@ let poll ~role ~instance ~binary ~data_dir ?unit_name () =
 (** Render CPU line chart (multi-row braille) *)
 let render_cpu_chart ~role ~instance ~focus:_ =
   let key = Printf.sprintf "%s/%s" role instance in
-  with_lock (fun () ->
+  Mutex.protect lock (fun () ->
       match Hashtbl.find_opt table key with
       | None -> None
       | Some state ->
@@ -303,7 +299,7 @@ let render_cpu_chart ~role ~instance ~focus:_ =
 (** Render memory sparkline *)
 let render_mem_sparkline ~role ~instance ~focus =
   let key = Printf.sprintf "%s/%s" role instance in
-  with_lock (fun () ->
+  Mutex.protect lock (fun () ->
       match Hashtbl.find_opt table key with
       | None -> ""
       | Some state ->
@@ -323,7 +319,7 @@ let render_mem_sparkline ~role ~instance ~focus =
 (** Get current version *)
 let get_version ~role ~instance =
   let key = Printf.sprintf "%s/%s" role instance in
-  with_lock (fun () ->
+  Mutex.protect lock (fun () ->
       match Hashtbl.find_opt table key with
       | None -> None
       | Some state -> state.version)
@@ -331,7 +327,7 @@ let get_version ~role ~instance =
 (** Invalidate version cache - forces refresh on next poll *)
 let invalidate_version ~role ~instance =
   let key = Printf.sprintf "%s/%s" role instance in
-  with_lock (fun () ->
+  Mutex.protect lock (fun () ->
       match Hashtbl.find_opt table key with
       | None ->
           (* Not in cache yet, nothing to do *)
@@ -343,7 +339,7 @@ let invalidate_version ~role ~instance =
 (** Get disk size *)
 let get_disk_size ~role ~instance =
   let key = Printf.sprintf "%s/%s" role instance in
-  with_lock (fun () ->
+  Mutex.protect lock (fun () ->
       match Hashtbl.find_opt table key with
       | None -> None
       | Some state -> state.data_dir_size)
@@ -584,7 +580,7 @@ let start () =
            done)))
 
 (** Clear all state *)
-let clear () = with_lock (fun () -> Hashtbl.clear table)
+let clear () = Mutex.protect lock (fun () -> Hashtbl.clear table)
 
 let shutdown () =
   Atomic.set shutdown_requested true ;
@@ -619,7 +615,7 @@ module For_test = struct
 
   (** Clear all state for test isolation *)
   let clear_all () =
-    with_lock (fun () -> Hashtbl.clear table) ;
+    Mutex.protect lock (fun () -> Hashtbl.clear table) ;
     Mutex.lock visible_lock ;
     Fun.protect
       ~finally:(fun () -> Mutex.unlock visible_lock)
@@ -636,14 +632,14 @@ module For_test = struct
   (** Initialize an instance state for testing *)
   let init_instance ~role ~instance =
     let key = Printf.sprintf "%s/%s" role instance in
-    with_lock (fun () ->
+    Mutex.protect lock (fun () ->
         if not (Hashtbl.mem table key) then
           Hashtbl.replace table key (make_instance_state ()))
 
   (** Set version and last_pid_check for an instance (for testing) *)
   let set_instance_state ~role ~instance ~version ~last_pid_check =
     let key = Printf.sprintf "%s/%s" role instance in
-    with_lock (fun () ->
+    Mutex.protect lock (fun () ->
         match Hashtbl.find_opt table key with
         | None ->
             let state = make_instance_state () in
@@ -657,7 +653,7 @@ module For_test = struct
   (** Get last_pid_check timestamp for an instance *)
   let get_last_pid_check ~role ~instance =
     let key = Printf.sprintf "%s/%s" role instance in
-    with_lock (fun () ->
+    Mutex.protect lock (fun () ->
         match Hashtbl.find_opt table key with
         | None -> None
         | Some state -> Some state.last_pid_check)
