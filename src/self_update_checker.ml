@@ -335,9 +335,11 @@ let fetch_checksum ~version =
   | Error (`Msg e) -> R.error_msgf "Failed to fetch checksums: %s" e
 
 let verify_checksum ~filepath ~expected =
-  let* actual = Common.compute_sha256 filepath in
-  if String.equal actual expected then Ok ()
-  else R.error_msgf "Checksum mismatch: expected %s, got %s" expected actual
+  match Common.compute_sha256 filepath with
+  | Ok actual ->
+      if String.equal actual expected then Ok ()
+      else R.error_msgf "Checksum mismatch: expected %s, got %s" expected actual
+  | Error (`Msg e) -> R.error_msgf "Failed to compute checksum: %s" e
 
 let download_binary ~version ~dest ?on_progress () =
   let url = release_download_url ~version in
