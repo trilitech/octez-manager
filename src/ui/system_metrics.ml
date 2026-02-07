@@ -239,10 +239,4 @@ let get_version ~binary =
     | Error _ -> None
 
 (** Format bytes as human-readable string *)
-let format_bytes bytes =
-  let b = Int64.to_float bytes in
-  if b >= 1099511627776.0 then Printf.sprintf "%.1fT" (b /. 1099511627776.0)
-  else if b >= 1073741824.0 then Printf.sprintf "%.1fG" (b /. 1073741824.0)
-  else if b >= 1048576.0 then Printf.sprintf "%.0fM" (b /. 1048576.0)
-  else if b >= 1024.0 then Printf.sprintf "%.0fK" (b /. 1024.0)
-  else Printf.sprintf "%LdB" bytes
+let format_bytes = Common.format_bytes

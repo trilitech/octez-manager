@@ -10,6 +10,8 @@
     Provides multi-line progress display for tracking multiple concurrent
     or sequential downloads without requiring TUI framework dependencies. *)
 
+let format_size = Octez_manager_lib.Common.format_size
+
 (** Progress bar rendering style *)
 type style = ASCII | Unicode
 
@@ -58,16 +60,6 @@ let render_progress_bar ~width ~percentage ~style =
       in
       filled_str ^ empty_str
   | ASCII -> String.make filled '=' ^ String.make empty '-'
-
-(** Format file size in human-readable format *)
-let format_size bytes =
-  let kb = Int64.div bytes 1024L in
-  let mb = Int64.div kb 1024L in
-  let gb = Int64.div mb 1024L in
-  if gb > 0L then Printf.sprintf "%Ld GB" gb
-  else if mb > 0L then Printf.sprintf "%Ld MB" mb
-  else if kb > 0L then Printf.sprintf "%Ld KB" kb
-  else Printf.sprintf "%Ld bytes" bytes
 
 (** Render a single binary line
     

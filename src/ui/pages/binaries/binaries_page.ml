@@ -501,15 +501,6 @@ let toggle_current_group s =
 
 (** View *)
 
-let format_size bytes =
-  let kb = Int64.div bytes 1024L in
-  let mb = Int64.div kb 1024L in
-  let gb = Int64.div mb 1024L in
-  if gb > 0L then Printf.sprintf "%Ld GB" gb
-  else if mb > 0L then Printf.sprintf "%Ld MB" mb
-  else if kb > 0L then Printf.sprintf "%Ld KB" kb
-  else Printf.sprintf "%Ld B" bytes
-
 let view ps ~focus:_ ~size:_ =
   let s = ps.Navigation.s in
   let lines = ref [] in
@@ -567,7 +558,7 @@ let view ps ~focus:_ ~size:_ =
         in
         let prefix = if is_selected then "➤ " else "  " in
         let size_str =
-          match size with Some s -> format_size s | None -> "unknown"
+          match size with Some s -> Common.format_size s | None -> "unknown"
         in
         let usage =
           if count = 0 then Widgets.dim "unused"
@@ -869,7 +860,7 @@ let register () =
 module For_tests = struct
   let filter_latest_n_major_versions = filter_latest_n_major_versions
 
-  let format_size = format_size
+  let format_size = Common.format_size
 
   let build_items = build_items
 

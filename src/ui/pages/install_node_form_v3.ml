@@ -245,15 +245,7 @@ let snapshot_size_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
 let snapshot_size_inflight_lock = Mutex.create ()
 
-let format_bytes bytes =
-  let kb = 1024L in
-  let mb = Int64.mul kb 1024L in
-  let gb = Int64.mul mb 1024L in
-  if bytes >= gb then
-    Printf.sprintf "%.1f GB" (Int64.to_float bytes /. Int64.to_float gb)
-  else if bytes >= mb then
-    Printf.sprintf "%.0f MB" (Int64.to_float bytes /. Int64.to_float mb)
-  else Printf.sprintf "%Ld bytes" bytes
+let format_bytes = Common.format_size_float
 
 (** Get the download URL for a snapshot selection *)
 let get_snapshot_url ~network snapshot =

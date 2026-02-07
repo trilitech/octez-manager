@@ -283,17 +283,6 @@ let update_speed_tracker tracker ~downloaded =
   in
   {samples = new_samples; current_speed = new_speed}
 
-(* Helper: format file size *)
-let format_size bytes =
-  let open Int64 in
-  let kb = div bytes 1024L in
-  let mb = div kb 1024L in
-  let gb = div mb 1024L in
-  if gb > 0L then Printf.sprintf "%Ld GB" gb
-  else if mb > 0L then Printf.sprintf "%Ld MB" mb
-  else if kb > 0L then Printf.sprintf "%Ld KB" kb
-  else Printf.sprintf "%Ld bytes" bytes
-
 (* Helper: format binary name (15 chars, truncate with ellipsis if longer) *)
 let format_binary_name name =
   let max_len = 15 in
@@ -424,14 +413,23 @@ let render_multi_progress ~cols:_ =
                 | Some dl, Some t, Some speed ->
                     Printf.sprintf
                       " (%s / %s) @ %.1f MB/s"
-                      (format_size dl)
-                      (format_size t)
+                      (Octez_manager_lib.Common.format_size dl)
+                      (Octez_manager_lib.Common.format_size t)
                       speed
                 | Some dl, Some t, None ->
-                    Printf.sprintf " (%s / %s)" (format_size dl) (format_size t)
+                    Printf.sprintf
+                      " (%s / %s)"
+                      (Octez_manager_lib.Common.format_size dl)
+                      (Octez_manager_lib.Common.format_size t)
                 | Some dl, None, Some speed ->
-                    Printf.sprintf " (%s) @ %.1f MB/s" (format_size dl) speed
-                | Some dl, None, None -> Printf.sprintf " (%s)" (format_size dl)
+                    Printf.sprintf
+                      " (%s) @ %.1f MB/s"
+                      (Octez_manager_lib.Common.format_size dl)
+                      speed
+                | Some dl, None, None ->
+                    Printf.sprintf
+                      " (%s)"
+                      (Octez_manager_lib.Common.format_size dl)
                 | _ -> ""
               in
               let line = Printf.sprintf "%s %s %s%s" icon name bar size_info in

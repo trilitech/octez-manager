@@ -42,10 +42,10 @@ let mk_state ?(managed = []) ?(registered = []) ?(available = [])
 (* ── format_size ──────────────────────────────────────────────── *)
 
 let test_format_size_zero () =
-  check string "0B" "0 B" (BP.For_tests.format_size 0L)
+  check string "0B" "0 bytes" (BP.For_tests.format_size 0L)
 
 let test_format_size_small () =
-  check string "512B" "512 B" (BP.For_tests.format_size 512L)
+  check string "512B" "512 bytes" (BP.For_tests.format_size 512L)
 
 let test_format_size_kb () =
   check string "1KB" "1 KB" (BP.For_tests.format_size 1024L)
