@@ -25,9 +25,6 @@ val network_short : string -> string
 (** Render a single service line *)
 val line_for_service : int -> int -> folded:bool -> Service_state.t -> string
 
-(** Role header for grouping *)
-val role_header : string -> string
-
 (** Truncate string to visible width *)
 val truncate_visible : max_width:int -> string -> string
 

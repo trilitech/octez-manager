@@ -42,6 +42,10 @@ let env_instances_base_dir () =
   if is_root () then "/etc/octez/instances"
   else Filename.concat (xdg_config_home ()) "octez/instances"
 
+let registry_root () =
+  if is_root () then "/etc/octez_manager"
+  else Filename.concat (xdg_config_home ()) "octez-manager"
+
 let default_data_dir inst =
   if is_root () then Filename.concat "/var/lib/octez" inst
   else Filename.concat (Filename.concat (xdg_data_home ()) "octez") inst

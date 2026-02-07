@@ -394,15 +394,6 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     in
     String.concat "\n" ([first_line; second_line] @ extra_lines))
 
-(** Role section headers *)
-let role_header = function
-  | "node" -> "── Nodes ──"
-  | "baker" -> "── Bakers ──"
-  | "accuser" -> "── Accusers ──"
-  | "dal-node" -> "── DAL Nodes ──"
-  | "signer" -> "── Signers ──"
-  | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
-
 (** Truncate a string to max visible characters, preserving ANSI codes *)
 let truncate_visible ~max_width s =
   let len = String.length s in
