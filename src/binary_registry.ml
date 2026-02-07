@@ -203,22 +203,7 @@ let is_complete_installation version =
           Sys.file_exists path)
         binaries
 
-(* Compare version strings numerically (e.g., "24.0" > "9.0") *)
-let compare_versions a b =
-  let parse_version v =
-    String.split_on_char '.' v
-    |> List.map (fun s -> try int_of_string s with _ -> 0)
-  in
-  let rec cmp l1 l2 =
-    match (l1, l2) with
-    | [], [] -> 0
-    | [], _ -> -1
-    | _, [] -> 1
-    | h1 :: t1, h2 :: t2 ->
-        let c = compare h1 h2 in
-        if c <> 0 then c else cmp t1 t2
-  in
-  cmp (parse_version a) (parse_version b)
+let compare_versions = Version_utils.compare_versions
 
 let list_managed_versions () =
   let dir = binaries_dir () in
