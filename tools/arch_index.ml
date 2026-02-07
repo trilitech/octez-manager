@@ -125,40 +125,44 @@ let backup_intents db =
   }
 
 let restore_intents db backup =
+  let stmt_mod =
+    Sqlite3.prepare db "UPDATE modules SET intent = ? WHERE path = ?"
+  in
+  let stmt_fn =
+    Sqlite3.prepare
+      db
+      "UPDATE functions SET intent = ? WHERE name = ? AND module_id = (SELECT \
+       id FROM modules WHERE path = ?)"
+  in
+  let stmt_ty =
+    Sqlite3.prepare
+      db
+      "UPDATE types SET intent = ? WHERE name = ? AND module_id = (SELECT id \
+       FROM modules WHERE path = ?)"
+  in
   List.iter
     (fun (path, intent) ->
-      let sql =
-        Printf.sprintf
-          "UPDATE modules SET intent = %s WHERE path = %s"
-          (Sqlite3.Data.to_string_debug (TEXT intent))
-          (Sqlite3.Data.to_string_debug (TEXT path))
-      in
-      exec_exn db sql)
+      bind_text stmt_mod 1 intent ;
+      bind_text stmt_mod 2 path ;
+      exec_stmt db stmt_mod)
     backup.module_intents ;
   List.iter
     (fun (path, name, intent) ->
-      let sql =
-        Printf.sprintf
-          "UPDATE functions SET intent = %s WHERE name = %s AND module_id = \
-           (SELECT id FROM modules WHERE path = %s)"
-          (Sqlite3.Data.to_string_debug (TEXT intent))
-          (Sqlite3.Data.to_string_debug (TEXT name))
-          (Sqlite3.Data.to_string_debug (TEXT path))
-      in
-      exec_exn db sql)
+      bind_text stmt_fn 1 intent ;
+      bind_text stmt_fn 2 name ;
+      bind_text stmt_fn 3 path ;
+      exec_stmt db stmt_fn)
     backup.function_intents ;
   List.iter
     (fun (path, name, intent) ->
-      let sql =
-        Printf.sprintf
-          "UPDATE types SET intent = %s WHERE name = %s AND module_id = \
-           (SELECT id FROM modules WHERE path = %s)"
-          (Sqlite3.Data.to_string_debug (TEXT intent))
-          (Sqlite3.Data.to_string_debug (TEXT name))
-          (Sqlite3.Data.to_string_debug (TEXT path))
-      in
-      exec_exn db sql)
-    backup.type_intents
+      bind_text stmt_ty 1 intent ;
+      bind_text stmt_ty 2 name ;
+      bind_text stmt_ty 3 path ;
+      exec_stmt db stmt_ty)
+    backup.type_intents ;
+  ignore (Sqlite3.finalize stmt_mod) ;
+  ignore (Sqlite3.finalize stmt_fn) ;
+  ignore (Sqlite3.finalize stmt_ty)
 
 (* -------------------------------------------------------------------------- *)
 (* Source-path mapping                                                        *)
@@ -334,14 +338,15 @@ let insert_module db stmt_mod ~path ~lines ~has_mli =
   last_insert_rowid db
 
 let insert_function db stmt_fn ~module_id ~name ~signature ~line_start ~line_end
-    ~exposed ~intent =
+    ~exposed ~is_alias ~intent =
   bind_int stmt_fn 1 module_id ;
   bind_text stmt_fn 2 name ;
   bind_text_opt stmt_fn 3 signature ;
   bind_int stmt_fn 4 line_start ;
   bind_int stmt_fn 5 line_end ;
   bind_bool stmt_fn 6 exposed ;
-  bind_text_opt stmt_fn 7 intent ;
+  bind_bool stmt_fn 7 is_alias ;
+  bind_text_opt stmt_fn 8 intent ;
   exec_stmt db stmt_fn
 
 let insert_type db stmt_ty ~module_id ~name ~kind ~line_start ~line_end ~exposed
@@ -443,6 +448,12 @@ let process_cmt db ~exposed_tbl ~doc_tbl ~stmt_mod ~stmt_fn ~stmt_ty ~stmt_fld
                               let exposed =
                                 Hashtbl.mem exposed_tbl (modname, name)
                               in
+                              (* Detect delegation aliases: let f = Module.f *)
+                              let is_alias =
+                                match vb.vb_expr.exp_desc with
+                                | Texp_ident (Path.Pdot _, _, _) -> true
+                                | _ -> false
+                              in
                               (* Prefer .mli doc; fall back to .ml doc *)
                               let intent =
                                 match
@@ -460,6 +471,7 @@ let process_cmt db ~exposed_tbl ~doc_tbl ~stmt_mod ~stmt_fn ~stmt_ty ~stmt_fld
                                 ~line_start
                                 ~line_end
                                 ~exposed
+                                ~is_alias
                                 ~intent
                           | _ -> ())
                         vbs
@@ -646,7 +658,8 @@ let () =
     Sqlite3.prepare
       db
       "INSERT OR REPLACE INTO functions (module_id, name, signature, \
-       line_start, line_end, exposed, intent) VALUES (?, ?, ?, ?, ?, ?, ?)"
+       line_start, line_end, exposed, is_alias, intent) VALUES (?, ?, ?, ?, ?, \
+       ?, ?, ?)"
   in
   let stmt_ty =
     Sqlite3.prepare

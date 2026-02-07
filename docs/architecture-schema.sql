@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS functions (
     line_end INTEGER,
     line_count INTEGER GENERATED ALWAYS AS (line_end - line_start + 1) STORED,
     exposed BOOLEAN DEFAULT 0,              -- appears in .mli
+    is_alias BOOLEAN DEFAULT 0,             -- delegation alias (let f = Module.f)
     intent TEXT,                            -- human-written purpose description
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, name)
