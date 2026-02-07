@@ -7,8 +7,6 @@
 
 open Rresult
 
-let ( let* ) = Result.bind
-
 (** Current version - kept in sync with main.ml *)
 let current_version = "0.2.1"
 
@@ -81,84 +79,23 @@ let is_major_update ~current ~latest =
   | c_major :: _, l_major :: _ -> l_major > c_major
   | _ -> false
 
-(** {1 Preferences} *)
+(** {1 Preferences}
+
+    Preferences are stored in the shared {!Check_prefs} format. *)
 
 let prefs_file () =
   Filename.concat (Common.xdg_config_home ()) "octez-manager/self-update.json"
 
-type prefs = {
-  check_enabled : bool;
-  dismissed_versions : string list;
-  last_check_time : float;
-}
-
-let default_prefs =
-  {check_enabled = true; dismissed_versions = []; last_check_time = 0.0}
-
-let load_prefs () =
-  let file = prefs_file () in
-  if not (Sys.file_exists file) then Ok default_prefs
-  else
-    try
-      let json = Yojson.Safe.from_file file in
-      let open Yojson.Safe.Util in
-      let check_enabled =
-        json |> member "check_enabled" |> to_bool_option
-        |> Option.value ~default:true
-      in
-      let dismissed_versions =
-        json |> member "dismissed_versions" |> to_list |> List.map to_string
-      in
-      let last_check_time =
-        json |> member "last_check_time" |> to_float_option
-        |> Option.value ~default:0.0
-      in
-      Ok {check_enabled; dismissed_versions; last_check_time}
-    with e ->
-      Common.append_debug_log
-        (Printf.sprintf
-           "Failed to load self-update prefs: %s"
-           (Printexc.to_string e)) ;
-      Ok default_prefs
-
-let save_prefs prefs =
-  let file = prefs_file () in
-  let dir = Filename.dirname file in
-  let owner, group = Common.current_user_group_names () in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
-  try
-    let json =
-      `Assoc
-        [
-          ("check_enabled", `Bool prefs.check_enabled);
-          ( "dismissed_versions",
-            `List (List.map (fun v -> `String v) prefs.dismissed_versions) );
-          ("last_check_time", `Float prefs.last_check_time);
-        ]
-    in
-    Yojson.Safe.to_file file json ;
-    Ok ()
-  with e ->
-    R.error_msgf "Failed to save self-update prefs: %s" (Printexc.to_string e)
-
-let is_check_enabled () =
-  match load_prefs () with Ok prefs -> prefs.check_enabled | Error _ -> true
+let is_check_enabled () = Check_prefs.is_check_enabled ~file:(prefs_file ())
 
 let set_check_enabled enabled =
-  let* prefs = load_prefs () in
-  save_prefs {prefs with check_enabled = enabled}
+  Check_prefs.set_check_enabled ~file:(prefs_file ()) enabled
 
 let dismiss_version version =
-  let* prefs = load_prefs () in
-  if List.mem version prefs.dismissed_versions then Ok ()
-  else
-    let dismissed_versions = version :: prefs.dismissed_versions in
-    save_prefs {prefs with dismissed_versions}
+  Check_prefs.dismiss_version ~file:(prefs_file ()) version
 
 let is_version_dismissed version =
-  match load_prefs () with
-  | Ok prefs -> List.mem version prefs.dismissed_versions
-  | Error _ -> false
+  Check_prefs.is_version_dismissed ~file:(prefs_file ()) version
 
 (** {1 Version checking} *)
 
@@ -216,39 +153,37 @@ let fetch_latest_version () =
 
 let check_for_updates ?(force = false) () =
   (* Check if enabled *)
-  match load_prefs () with
-  | Error _ -> Check_failed "Failed to load preferences"
-  | Ok prefs when not prefs.check_enabled -> Check_disabled
-  | Ok _prefs -> (
-      (* Check cache *)
-      let now = Unix.gettimeofday () in
-      match !check_cache with
-      | Some (result, cached_at)
-        when (not force) && now -. cached_at < cache_ttl ->
-          result
-      | _ -> (
-          match fetch_latest_version () with
-          | Error (`Msg e) ->
-              let result = Check_failed e in
-              check_cache := Some (result, now) ;
-              result
-          | Ok latest ->
-              let result =
-                if compare_versions latest current_version > 0 then
-                  Update_available
-                    {
-                      latest_version = latest;
-                      current_version;
-                      is_major_update =
-                        is_major_update ~current:current_version ~latest;
-                      download_url = release_download_url ~version:latest;
-                      checksums_url = checksums_url ~version:latest;
-                      release_notes_url = release_notes_url ~version:latest;
-                    }
-                else Up_to_date
-              in
-              check_cache := Some (result, now) ;
-              result))
+  if not (is_check_enabled ()) then Check_disabled
+  else
+    (* Check cache *)
+    let now = Unix.gettimeofday () in
+    match !check_cache with
+    | Some (result, cached_at) when (not force) && now -. cached_at < cache_ttl
+      ->
+        result
+    | _ -> (
+        match fetch_latest_version () with
+        | Error (`Msg e) ->
+            let result = Check_failed e in
+            check_cache := Some (result, now) ;
+            result
+        | Ok latest ->
+            let result =
+              if compare_versions latest current_version > 0 then
+                Update_available
+                  {
+                    latest_version = latest;
+                    current_version;
+                    is_major_update =
+                      is_major_update ~current:current_version ~latest;
+                    download_url = release_download_url ~version:latest;
+                    checksums_url = checksums_url ~version:latest;
+                    release_notes_url = release_notes_url ~version:latest;
+                  }
+              else Up_to_date
+            in
+            check_cache := Some (result, now) ;
+            result)
 
 (** {1 Update operations} *)
 
