@@ -93,6 +93,72 @@ let default_service_user () =
 
 let default_base_dir ~role ~instance = Common.default_role_dir role instance
 
+(** {1 Port Initialization Helpers} *)
+
+(** A port slot for [ensure_ports]. Each slot describes one port field to
+    initialize with a free port. *)
+type port_slot = {
+  current : string;  (** Current value of the port field *)
+  default_host : string;
+      (** Default host for new address (e.g., "127.0.0.1") *)
+  start_port : int;  (** Starting port number for search *)
+  setter : string -> unit;  (** Callback to set the new address *)
+}
+
+(** Collect ports from service states for a given set of roles.
+    Returns (rpc_ports, p2p_ports) as int lists. *)
+let ports_from_states ~roles states =
+  let role_matches role = List.mem role roles in
+  let rpc_ports =
+    states
+    |> List.filter_map (fun (s : Data.Service_state.t) ->
+        if role_matches s.service.Service.role then
+          Port_validation.parse_port s.service.Service.rpc_addr
+        else None)
+  in
+  let p2p_ports =
+    states
+    |> List.filter_map (fun (s : Data.Service_state.t) ->
+        if role_matches s.service.Service.role then
+          Port_validation.parse_port s.service.Service.net_addr
+        else None)
+  in
+  (rpc_ports, p2p_ports)
+
+(** Initialize port fields with free ports. Scans existing services for
+    the given [roles] to find ports to avoid, then assigns free ports to
+    any slot whose current value is invalid or conflicting.
+
+    @param roles Service roles to scan for existing port usage
+    @param slots Port slots to initialize *)
+let ensure_ports ~roles ~slots () =
+  let states =
+    try cached_service_states () with _ -> []
+    (* In tests/early init, capability may be absent; default to empty. *)
+  in
+  let rpc_ports, p2p_ports = ports_from_states ~roles states in
+  let avoid = ref (rpc_ports @ p2p_ports) in
+  List.iter
+    (fun slot ->
+      let needs_new =
+        match parse_host_port slot.current with
+        | Some (_host, port) ->
+            port < 1024 || port > 65535 || List.mem port !avoid
+            || Port_validation.is_port_in_use port
+        | None -> true
+      in
+      if needs_new then (
+        let port =
+          Port_validation.next_free_port ~start:slot.start_port ~avoid:!avoid
+        in
+        slot.setter (Printf.sprintf "%s:%d" slot.default_host port) ;
+        avoid := port :: !avoid)
+      else
+        match parse_host_port slot.current with
+        | Some (_host, port) -> avoid := port :: !avoid
+        | None -> ())
+    slots
+
 (** Check if a binary exists in a directory and is executable. *)
 let has_binary binary_name dir =
   let trimmed = String.trim dir in
@@ -145,6 +211,18 @@ let binary_accessible_to_user ~user ~app_bin_dir ~binary_name =
     (* In root mode, verify service user can access *)
     let cache_key = Printf.sprintf "%s|%s|%s" user app_bin_dir binary_name in
     Cache.get_keyed binary_accessible_cache cache_key
+
+let require_package_manager () =
+  match
+    Miaou_interfaces.Capability.get
+      Manager_interfaces.Package_manager_capability.key
+  with
+  | Some cap ->
+      let module I =
+        (val (cap : Manager_interfaces.Package_manager_capability.t))
+      in
+      Ok (module I : Manager_interfaces.Package_manager)
+  | None -> Error (`Msg "Package manager capability not available")
 
 let endpoint_with_scheme rpc_addr =
   let trimmed = String.trim rpc_addr in

@@ -78,6 +78,26 @@ val default_service_user : unit -> string
 
 val default_base_dir : role:string -> instance:string -> string
 
+(** {1 Port Initialization Helpers} *)
+
+(** A port slot for {!ensure_ports}. *)
+type port_slot = {
+  current : string;
+  default_host : string;
+  start_port : int;
+  setter : string -> unit;
+}
+
+(** Collect ports from service states for services matching [roles].
+    @return (rpc_ports, p2p_ports) as int lists *)
+val ports_from_states :
+  roles:string list -> Data.Service_state.t list -> int list * int list
+
+(** Initialize port fields with free ports. Scans existing services for
+    the given [roles] to find ports to avoid, then assigns free ports to
+    any slot whose current value is invalid or conflicting. *)
+val ensure_ports : roles:string list -> slots:port_slot list -> unit -> unit
+
 (** [has_binary binary_name dir] checks if [binary_name] exists in [dir]
     and is executable. *)
 val has_binary : string -> string -> bool
@@ -102,6 +122,11 @@ val has_octez_dal_node_binary : string -> bool
     Uses caching (5s TTL) to avoid excessive subprocess calls. *)
 val binary_accessible_to_user :
   user:string -> app_bin_dir:string -> binary_name:string -> bool
+
+(** Get the package manager capability, returning an error if unavailable. *)
+val require_package_manager :
+  unit ->
+  ((module Manager_interfaces.Package_manager), [> `Msg of string]) result
 
 (** Add http:// scheme if missing, defaulting to localhost when empty. *)
 val endpoint_with_scheme : string -> string

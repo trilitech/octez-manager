@@ -141,29 +141,7 @@ let make_initial_model () =
 
 (** {1 Helper Functions} *)
 
-let require_package_manager () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Package_manager_capability.key
-  with
-  | Some cap ->
-      let module I =
-        (val (cap : Manager_interfaces.Package_manager_capability.t))
-      in
-      Ok (module I : Manager_interfaces.Package_manager)
-  | None -> Error (`Msg "Package manager capability not available")
-
-let has_octez_baker_binary dir =
-  let trimmed = String.trim dir in
-  if trimmed = "" then false
-  else
-    let candidate = Filename.concat trimmed "octez-baker" in
-    Sys.file_exists candidate
-    &&
-      try
-        Unix.access candidate [Unix.X_OK] ;
-        true
-      with Unix.Unix_error _ -> false
+let has_octez_baker_binary = Form_builder_common.has_octez_baker_binary
 
 let node_services states =
   states
@@ -190,14 +168,7 @@ let find_dal states inst =
         (Form_builder_common.normalize s.service.Service.instance)
         (Form_builder_common.normalize inst))
 
-let endpoint_with_scheme rpc_addr =
-  let trimmed = String.trim rpc_addr in
-  if trimmed = "" then "http://127.0.0.1:8732"
-  else if
-    String.starts_with ~prefix:"http://" (String.lowercase_ascii trimmed)
-    || String.starts_with ~prefix:"https://" (String.lowercase_ascii trimmed)
-  then trimmed
-  else "http://" ^ trimmed
+let endpoint_with_scheme = Form_builder_common.endpoint_with_scheme
 
 let node_endpoint_of_service (svc : Service.t) =
   endpoint_with_scheme svc.Service.rpc_addr
@@ -699,7 +670,7 @@ let spec =
               ()
           else Ok ()
         in
-        let* (module PM) = require_package_manager () in
+        let* (module PM) = Form_builder_common.require_package_manager () in
         let* _ = PM.install_baker ~quiet:true req in
         (* Handle rename: clean up old instance if name changed *)
         let* () =

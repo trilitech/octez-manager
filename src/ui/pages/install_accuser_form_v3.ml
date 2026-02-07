@@ -102,18 +102,6 @@ let make_initial_model () =
       }
   | _ -> base_initial_model ()
 
-let require_package_manager () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Package_manager_capability.key
-  with
-  | Some cap ->
-      let module I =
-        (val (cap : Manager_interfaces.Package_manager_capability.t))
-      in
-      Ok (module I : Manager_interfaces.Package_manager)
-  | None -> Error (`Msg "Package manager capability not available")
-
 (** Custom node selection field with auto-naming *)
 let node_selection_field =
   Form_builder.custom
@@ -482,7 +470,7 @@ let spec =
               ()
           else Ok ()
         in
-        let* (module PM) = require_package_manager () in
+        let* (module PM) = Form_builder_common.require_package_manager () in
         let* _service = PM.install_daemon ~quiet:true req in
         (* Handle rename: clean up old instance if name changed *)
         let* () =
