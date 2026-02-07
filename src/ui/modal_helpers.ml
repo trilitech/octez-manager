@@ -1371,15 +1371,22 @@ let select_app_bin_dir_modal ~on_select () =
     ()
 
 let show_help_modal () =
+  let hint_lines =
+    match Miaou.Core.Help_hint.get_active () with
+    | Some {long = Some text; _} -> [text; ""]
+    | Some {short = Some text; _} -> [text; ""]
+    | _ -> []
+  in
   let lines =
-    [
-      "Global shortcuts:";
-      "  m  - Menu";
-      "  ?  - Help";
-      "  Esc/q - Close modals";
-      "";
-      "Page-specific keys remain available when no modal is open.";
-    ]
+    hint_lines
+    @ [
+        "Global shortcuts:";
+        "  m  - Menu";
+        "  ?  - Help";
+        "  Esc/q - Close modals";
+        "";
+        "Page-specific keys remain available when no modal is open.";
+      ]
   in
   open_text_modal ~title:"Help" ~lines
 
