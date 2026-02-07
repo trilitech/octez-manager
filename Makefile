@@ -13,12 +13,12 @@ deps:
 	opam update -y
 	opam install --deps-only --with-test --reuse-build -y .
 
+MIAOU_GIT_URL ?= https://github.com/trilitech/miaou.git
+
 deps-ci:
-	@if [ -n "$$MIAOU_GIT_URL" ]; then \
-		echo "Pinning miaou from $$MIAOU_GIT_URL"; \
-		opam pin add -y miaou "$$MIAOU_GIT_URL" || { echo "ERROR: Failed to pin miaou package" >&2; exit 1; }; \
-		opam pin add -y miaou-driver-matrix "$$MIAOU_GIT_URL" || { echo "ERROR: Failed to pin miaou-driver-matrix package" >&2; exit 1; }; \
-	fi
+	@echo "Pinning miaou from $(MIAOU_GIT_URL)"
+	@opam pin add -y miaou "$(MIAOU_GIT_URL)" || { echo "ERROR: Failed to pin miaou package" >&2; exit 1; }
+	@opam pin add -y miaou-driver-matrix "$(MIAOU_GIT_URL)" || { echo "ERROR: Failed to pin miaou-driver-matrix package" >&2; exit 1; }
 	$(MAKE) deps
 
 build:
