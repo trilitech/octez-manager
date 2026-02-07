@@ -27,15 +27,16 @@ systemctl enable "octez-node@${INSTANCE}.service"
 
 # Start service briefly so it can be detected
 systemctl start "octez-node@${INSTANCE}.service"
-sleep 2
 
-# Debug: Check what external services are detected
-echo "DEBUG: External services detected:"
-om list --external 2>&1 || true
-echo "DEBUG: Systemd unit status:"
-systemctl status "octez-node@${INSTANCE}.service" --no-pager || true
-echo "DEBUG: List of octez unit files:"
-systemctl list-unit-files "octez-*.service" --no-legend || true
+# Wait for service to be detected (retries to handle concurrent daemon-reload)
+echo "Waiting for external service detection..."
+if ! wait_for_external_service "$INSTANCE"; then
+	echo "DEBUG: Systemd unit status:"
+	systemctl status "octez-node@${INSTANCE}.service" --no-pager || true
+	echo "DEBUG: List of octez unit files:"
+	systemctl list-unit-files "octez-*.service" --no-legend || true
+	exit 1
+fi
 
 # Import with takeover strategy
 echo "Importing with takeover strategy..."

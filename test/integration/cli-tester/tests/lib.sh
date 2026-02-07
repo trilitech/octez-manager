@@ -343,6 +343,25 @@ external_service_detected() {
 	om list --external 2>&1 | grep -q "$service_name"
 }
 
+# Wait for external service to be detected (with retries)
+# Usage: wait_for_external_service <instance> [max_attempts] [sleep_interval]
+wait_for_external_service() {
+	local service_name="$1"
+	local max_attempts="${2:-10}"
+	local interval="${3:-1}"
+	local attempt=1
+	while [ "$attempt" -le "$max_attempts" ]; do
+		if external_service_detected "$service_name"; then
+			return 0
+		fi
+		echo "  Waiting for external service detection (attempt $attempt/$max_attempts)..."
+		sleep "$interval"
+		attempt=$((attempt + 1))
+	done
+	echo "ERROR: External service '$service_name' not detected after $max_attempts attempts"
+	return 1
+}
+
 # Verify service is now managed
 service_is_managed() {
 	local instance="$1"
