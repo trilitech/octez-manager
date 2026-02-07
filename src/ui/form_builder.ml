@@ -691,10 +691,15 @@ struct
     Miaou.Core.Help_hint.set current_hint ;
     let title_line = Widgets.title_highlight S.spec.title in
     let header = [title_line; status_banner] in
+    let content_footer =
+      match current_hint with
+      | Some hint -> [Widgets.dim (Printf.sprintf "  %s" hint)]
+      | None -> []
+    in
     Miaou_widgets_layout.Vsection.render
       ~size
       ~header
-      ~content_footer:[]
+      ~content_footer
       ~child:(fun _ -> Table_widget.Table.render table)
 
   let handle_modal_key ps key ~size:_ =
