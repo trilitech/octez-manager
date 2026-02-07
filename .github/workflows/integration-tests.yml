@@ -25,7 +25,7 @@ jobs:
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
-      MIAOU_GIT_URL: ${{ secrets.MIAOU_GIT_URL }}
+      MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
 
     steps:
       - name: Checkout
@@ -43,10 +43,6 @@ jobs:
       - name: Pin miaou packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
-          if [ -z "$MIAOU_GIT_URL" ]; then
-            echo "ERROR: MIAOU_GIT_URL secret is not configured." >&2
-            exit 1
-          fi
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
