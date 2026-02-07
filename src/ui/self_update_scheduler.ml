@@ -85,20 +85,10 @@ let domain = ref None
 
 let stop_flag = Atomic.make false
 
-(** Interruptible sleep: waits up to [seconds] but checks [stop_flag]
-    every 0.5s so the domain can exit promptly on shutdown. *)
-let interruptible_sleep seconds =
-  let deadline = Unix.gettimeofday () +. seconds in
-  while (not (Atomic.get stop_flag)) && Unix.gettimeofday () < deadline do
-    let remaining = deadline -. Unix.gettimeofday () in
-    if remaining > 0.0 then
-      ignore (Unix.select [] [] [] (Float.min 0.5 remaining))
-  done
-
 let scheduler_loop () =
   while not (Atomic.get stop_flag) do
     refresh () ;
-    interruptible_sleep poll_interval
+    Common.interruptible_sleep stop_flag poll_interval
   done
 
 (** Start the background scheduler *)
