@@ -227,6 +227,22 @@ let test_compare_versions_non_numeric () =
   let result = BR.compare_versions "24.alpha" "24.0" in
   check bool "non-numeric < valid" true (result < 0)
 
+let test_compare_versions_rc_vs_release () =
+  let result = BR.compare_versions "24.0-rc1" "24.0" in
+  check bool "RC < release" true (result < 0)
+
+let test_compare_versions_release_vs_rc () =
+  let result = BR.compare_versions "24.0" "24.0-rc1" in
+  check bool "release > RC" true (result > 0)
+
+let test_compare_versions_rc_ordering () =
+  let result = BR.compare_versions "24.0-rc1" "24.0-rc2" in
+  check bool "rc1 < rc2" true (result < 0)
+
+let test_compare_versions_v_prefix () =
+  let result = BR.compare_versions "v24.0" "24.0" in
+  check int "v-prefix stripped" 0 result
+
 (** {2 Test suite} *)
 
 let () =
@@ -307,5 +323,9 @@ let () =
             `Quick
             test_compare_versions_different_lengths_reverse;
           test_case "non-numeric parts" `Quick test_compare_versions_non_numeric;
+          test_case "RC vs release" `Quick test_compare_versions_rc_vs_release;
+          test_case "release vs RC" `Quick test_compare_versions_release_vs_rc;
+          test_case "RC ordering" `Quick test_compare_versions_rc_ordering;
+          test_case "v-prefix" `Quick test_compare_versions_v_prefix;
         ] );
     ]
