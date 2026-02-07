@@ -32,10 +32,8 @@ type msg = unit
 
 type pstate = state Navigation.t
 
-let load_external_services () = External_services_scheduler.get ()
-
 let init () =
-  let external_services = load_external_services () in
+  let external_services = External_services_scheduler.get () in
   Navigation.make
     {
       step = SelectService;
@@ -63,7 +61,7 @@ let refresh ps =
   in
   Navigation.update
     (fun s ->
-      let external_services = load_external_services () in
+      let external_services = External_services_scheduler.get () in
       let selected_idx =
         min s.selected_idx (max 0 (List.length external_services - 1))
       in

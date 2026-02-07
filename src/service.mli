@@ -53,8 +53,6 @@ val make :
 (** Get the bin_source, falling back to Raw_path of app_bin_dir for legacy configs *)
 val get_bin_source : t -> Binary_registry.bin_source
 
-val now : unit -> string
-
 val to_yojson : t -> Yojson.Safe.t
 
 val of_yojson : Yojson.Safe.t -> (t, [> `Msg of string]) result

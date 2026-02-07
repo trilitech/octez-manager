@@ -818,3 +818,59 @@ let open_in_editor file_path =
       Error (`Msg (Printf.sprintf "Editor terminated by signal %d" signal))
   | _, Unix.WSTOPPED signal ->
       Error (`Msg (Printf.sprintf "Editor stopped by signal %d" signal))
+
+(** {1 String Utilities} *)
+
+(** Check whether [needle] is a substring of [haystack]. *)
+let string_contains ~needle haystack =
+  let nlen = String.length needle in
+  let hlen = String.length haystack in
+  let rec loop idx =
+    if idx + nlen > hlen then false
+    else if String.sub haystack idx nlen = needle then true
+    else loop (idx + 1)
+  in
+  if nlen = 0 then true else loop 0
+
+(** {1 Timestamp Utilities} *)
+
+(** Format the current local time as ["YYYY-MM-DD HH:MM:SS"]. *)
+let now () =
+  let tm = Unix.time () |> Unix.localtime in
+  Printf.sprintf
+    "%04d-%02d-%02d %02d:%02d:%02d"
+    (tm.tm_year + 1900)
+    (tm.tm_mon + 1)
+    tm.tm_mday
+    tm.tm_hour
+    tm.tm_min
+    tm.tm_sec
+
+(** {1 Checksum Utilities} *)
+
+(** Compute the SHA-256 hash of a file.
+
+    @return [Ok hash] with the hex-encoded hash, or [Error] on failure. *)
+let compute_sha256 filepath =
+  match run_out ["sha256sum"; filepath] with
+  | Ok output -> (
+      match String.split_on_char ' ' output with
+      | hash :: _ -> Ok (String.trim hash)
+      | _ -> R.error_msg "Unexpected sha256sum output")
+  | Error _ as e -> e
+
+(** {1 Directory Utilities} *)
+
+(** Get the size of a directory in bytes using [du -sb].
+    Returns [None] if the path does not exist or the command fails. *)
+let get_dir_size path =
+  if not (Sys.file_exists path) then None
+  else
+    match
+      run_out ["sh"; "-c"; "du -sb " ^ Filename.quote path ^ " 2>/dev/null"]
+    with
+    | Ok output -> (
+        match String.split_on_char '\t' output with
+        | size_str :: _ -> Int64.of_string_opt (String.trim size_str)
+        | _ -> None)
+    | Error _ -> None

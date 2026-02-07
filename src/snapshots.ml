@@ -18,11 +18,6 @@ type entry = {
   metadata : (string * string) list;
 }
 
-let is_http_url s =
-  let trimmed = String.trim s |> String.lowercase_ascii in
-  String.starts_with ~prefix:"http://" trimmed
-  || String.starts_with ~prefix:"https://" trimmed
-
 let slug_of_url u =
   let trimmed = String.trim u in
   let segments =
@@ -44,7 +39,7 @@ let slug_of_url u =
 let slug_of_network n =
   let trimmed = String.trim n in
   if trimmed = "" then None
-  else if is_http_url trimmed then slug_of_url trimmed
+  else if Helpers.is_http_url trimmed then slug_of_url trimmed
   else Some (String.lowercase_ascii trimmed)
 
 let sanitize_kind_input k =

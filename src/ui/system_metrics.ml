@@ -238,22 +238,6 @@ let get_version ~binary =
     | Ok output -> parse_version_output output
     | Error _ -> None
 
-(** Get directory size using du *)
-let get_dir_size ~path =
-  if not (Sys.file_exists path) then None
-  else
-    (* Redirect stderr to suppress permission errors and other noise *)
-    match
-      Common.run_out
-        ["sh"; "-c"; "du -sb " ^ Filename.quote path ^ " 2>/dev/null"]
-    with
-    | Ok output -> (
-        (* Output is "12345\t/path" *)
-        match String.split_on_char '\t' output with
-        | size_str :: _ -> Int64.of_string_opt (String.trim size_str)
-        | _ -> None)
-    | Error _ -> None
-
 (** Format bytes as human-readable string *)
 let format_bytes bytes =
   let b = Int64.to_float bytes in

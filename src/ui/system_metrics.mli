@@ -93,10 +93,6 @@ val get_version : binary:string -> string option
 
 (** {2 Disk Usage} *)
 
-(** Get directory size in bytes using du.
-    Returns [None] if path doesn't exist or du fails. *)
-val get_dir_size : path:string -> int64 option
-
 (** {2 Formatting} *)
 
 (** Format bytes as human-readable string (e.g., "1.2G", "450M"). *)

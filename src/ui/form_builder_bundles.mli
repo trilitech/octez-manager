@@ -10,6 +10,11 @@
     These bundles provide reusable field groups that can be composed
     together to build installer forms quickly and consistently. *)
 
+(** {1 Shared Helpers} *)
+
+(** Convert an [Rresult] to a plain [result] by extracting the error message. *)
+val of_rresult : ('a, [< `Msg of string]) result -> ('a, string) result
+
 (** {1 Core Service Bundle} *)
 
 (** Generate core service fields common to all Octez tools.

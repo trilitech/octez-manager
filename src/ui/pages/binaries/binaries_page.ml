@@ -43,39 +43,6 @@ type pstate = state Navigation.t
 
 (** Helper functions *)
 
-let get_dir_size path =
-  try
-    match Common.run_out ["du"; "-sb"; path] with
-    | Ok output -> (
-        match String.split_on_char '\t' output with
-        | size_str :: _ -> (
-            try Some (Int64.of_string (String.trim size_str)) with _ -> None)
-        | _ -> None)
-    | Error _ -> None
-  with _ -> None
-
-let count_instances_using bin_source =
-  match Service_registry.list () with
-  | Error _ -> 0
-  | Ok services ->
-      List.filter
-        (fun svc ->
-          let svc_bin_source = Service.get_bin_source svc in
-          svc_bin_source = bin_source)
-        services
-      |> List.length
-
-let get_instances_using bin_source =
-  match Service_registry.list () with
-  | Error _ -> []
-  | Ok services ->
-      List.filter_map
-        (fun svc ->
-          let svc_bin_source = Service.get_bin_source svc in
-          if svc_bin_source = bin_source then Some svc.Service.instance
-          else None)
-        services
-
 let load_managed_versions () =
   match Binary_registry.list_managed_versions () with
   | Error _ -> []
@@ -83,9 +50,10 @@ let load_managed_versions () =
       List.map
         (fun version ->
           let path = Binary_registry.managed_version_path version in
-          let size = get_dir_size path in
+          let size = Common.get_dir_size path in
           let count =
-            count_instances_using (Binary_registry.Managed_version version)
+            Service_registry.count_instances_using
+              (Binary_registry.Managed_version version)
           in
           (version, size, count))
         versions
@@ -97,7 +65,8 @@ let load_registered_dirs () =
       List.map
         (fun (ld : Binary_registry.registered_dir) ->
           let count =
-            count_instances_using (Binary_registry.Registered_alias ld.alias)
+            Service_registry.count_instances_using
+              (Binary_registry.Registered_alias ld.alias)
           in
           (ld, count))
         dirs
@@ -304,7 +273,7 @@ let back ps = Navigation.back ps
 
 let remove_version version =
   let bin_source = Binary_registry.Managed_version version in
-  let count = count_instances_using bin_source in
+  let count = Service_registry.count_instances_using bin_source in
   if count > 0 then
     Modal_helpers.show_error
       ~title:"Version In Use"
@@ -330,7 +299,7 @@ let remove_version version =
 
 let unregister_directory ld =
   let count =
-    count_instances_using
+    Service_registry.count_instances_using
       (Binary_registry.Registered_alias ld.Binary_registry.alias)
   in
   if count > 0 then
@@ -624,7 +593,8 @@ let view ps ~focus:_ ~size:_ =
         (* Render sub-items if expanded *)
         if List.mem version s.expanded_managed then
           let instances =
-            get_instances_using (Binary_registry.Managed_version version)
+            Service_registry.get_instances_using
+              (Binary_registry.Managed_version version)
           in
           List.iter
             (fun inst -> add (Widgets.dim (Printf.sprintf "      → %s" inst)))
@@ -675,7 +645,7 @@ let view ps ~focus:_ ~size:_ =
         (* Render sub-items if expanded *)
         if List.mem ld.Binary_registry.alias s.expanded_registered then
           let instances =
-            get_instances_using
+            Service_registry.get_instances_using
               (Binary_registry.Registered_alias ld.Binary_registry.alias)
           in
           List.iter

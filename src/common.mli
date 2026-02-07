@@ -160,3 +160,26 @@ val get_editor : unit -> string
     @param file_path Path to the file to edit
     @return Ok () if editor exited successfully, Error otherwise *)
 val open_in_editor : string -> (unit, Rresult.R.msg) result
+
+(** {1 String Utilities} *)
+
+(** Check whether [needle] is a substring of [haystack]. *)
+val string_contains : needle:string -> string -> bool
+
+(** {1 Timestamp Utilities} *)
+
+(** Format the current local time as ["YYYY-MM-DD HH:MM:SS"]. *)
+val now : unit -> string
+
+(** {1 Checksum Utilities} *)
+
+(** Compute the SHA-256 hash of a file.
+
+    @return [Ok hash] with the hex-encoded hash, or [Error] on failure. *)
+val compute_sha256 : string -> (string, [> `Msg of string]) result
+
+(** {1 Directory Utilities} *)
+
+(** Get the size of a directory in bytes using [du -sb].
+    Returns [None] if the path does not exist or the command fails. *)
+val get_dir_size : string -> int64 option

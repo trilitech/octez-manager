@@ -11,13 +11,6 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-let is_valid_instance_char c =
-  match c with
-  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> true
-  | _ -> false
-
-let instance_has_valid_chars name = String.for_all is_valid_instance_char name
-
 let invalid_instance_name_error_msg =
   "Instance name contains invalid characters. "
   ^ Helpers.invalid_instance_name_chars_msg
@@ -49,7 +42,7 @@ let create_node_flow ~on_success =
       let instance = String.trim instance in
       if instance = "" then
         show_error ~title:"Error" "Instance name cannot be empty"
-      else if not (instance_has_valid_chars instance) then
+      else if not (String.for_all Config.is_valid_instance_char instance) then
         show_error ~title:"Error" invalid_instance_name_error_msg
       else
         open_choice_modal
@@ -135,8 +128,8 @@ let create_baker_flow ~services ~on_success =
             let instance = String.trim instance in
             if instance = "" then
               show_error ~title:"Error" "Instance name cannot be empty"
-            else if not (instance_has_valid_chars instance) then
-              show_error ~title:"Error" invalid_instance_name_error_msg
+            else if not (String.for_all Config.is_valid_instance_char instance)
+            then show_error ~title:"Error" invalid_instance_name_error_msg
             else
               prompt_text_modal
                 ~title:"Delegates (comma separated)"
@@ -189,7 +182,7 @@ let create_accuser_flow ~on_success =
       let instance = String.trim instance in
       if instance = "" then
         show_error ~title:"Error" "Instance name cannot be empty"
-      else if not (instance_has_valid_chars instance) then
+      else if not (String.for_all Config.is_valid_instance_char instance) then
         show_error ~title:"Error" invalid_instance_name_error_msg
       else
         open_choice_modal
@@ -248,7 +241,7 @@ let create_dal_node_flow ~on_success =
       let instance = String.trim instance in
       if instance = "" then
         show_error ~title:"Error" "Instance name cannot be empty"
-      else if not (instance_has_valid_chars instance) then
+      else if not (String.for_all Config.is_valid_instance_char instance) then
         show_error ~title:"Error" invalid_instance_name_error_msg
       else
         open_choice_modal
