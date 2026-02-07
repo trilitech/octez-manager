@@ -58,85 +58,28 @@ let base_initial_model () =
     stopped_dependents = [];
   }
 
-let parse_port addr =
-  match String.split_on_char ':' addr with
-  | [_; port_str] -> (
-      try Some (int_of_string (String.trim port_str)) with _ -> None)
-  | _ -> None
-
-let ports_from_states states =
-  let rpc_ports =
-    states
-    |> List.filter_map (fun (s : Data.Service_state.t) ->
-        match s.service.Service.role with
-        | "dal-node" | "dal" -> parse_port s.service.Service.rpc_addr
-        | _ -> None)
-  in
-  let p2p_ports =
-    states
-    |> List.filter_map (fun (s : Data.Service_state.t) ->
-        match s.service.Service.role with
-        | "dal-node" | "dal" -> parse_port s.service.Service.net_addr
-        | _ -> None)
-  in
-  (rpc_ports, p2p_ports)
-
-let is_port_in_use (port : int) : bool =
-  match
-    Miaou_interfaces.Capability.get Manager_interfaces.System_capability.key
-  with
-  | Some cap ->
-      let module Sys = (val cap : Manager_interfaces.System) in
-      Sys.is_port_in_use port
-  | None -> false
-
-let next_free_port ~start ~avoid =
-  let rec loop p =
-    if
-      p >= 1024 && p <= 65535
-      && (not (List.mem p avoid))
-      && not (is_port_in_use p)
-    then p
-    else loop (p + 1)
-  in
-  loop start
-
 let ensure_ports_initialized model_ref =
-  let states =
-    try Form_builder_common.cached_service_states () with _ -> []
-    (* In tests/early init, capability may be absent; default to empty. *)
-  in
-  let rpc_ports, p2p_ports = ports_from_states states in
-  let avoid = ref (rpc_ports @ p2p_ports) in
-  let ensure current ~default_host ~start_port setter =
-    let needs_new =
-      match Form_builder_common.parse_host_port current with
-      | Some (_host, port) ->
-          port < 1024 || port > 65535 || List.mem port !avoid
-          || is_port_in_use port
-      | None -> true
-    in
-    if needs_new then (
-      let port = next_free_port ~start:start_port ~avoid:!avoid in
-      setter (Printf.sprintf "%s:%d" default_host port) ;
-      avoid := port :: !avoid)
-    else
-      match Form_builder_common.parse_host_port current with
-      | Some (_host, port) -> avoid := port :: !avoid
-      | None -> ()
-  in
   let current = !model_ref in
-  ensure
-    current.rpc_addr
-    ~default_host:"127.0.0.1"
-    ~start_port:10732
-    (fun value -> model_ref := {!model_ref with rpc_addr = value}) ;
-  let current = !model_ref in
-  ensure
-    current.net_addr
-    ~default_host:"0.0.0.0"
-    ~start_port:11732
-    (fun value -> model_ref := {!model_ref with net_addr = value})
+  Form_builder_common.ensure_ports
+    ~roles:["dal-node"; "dal"]
+    ~slots:
+      [
+        {
+          current = current.rpc_addr;
+          default_host = "127.0.0.1";
+          start_port = 10732;
+          setter =
+            (fun value -> model_ref := {!model_ref with rpc_addr = value});
+        };
+        {
+          current = current.net_addr;
+          default_host = "0.0.0.0";
+          start_port = 11732;
+          setter =
+            (fun value -> model_ref := {!model_ref with net_addr = value});
+        };
+      ]
+    ()
 
 let make_initial_model () =
   match Context.take_pending_edit_service () with
@@ -200,18 +143,6 @@ let make_initial_model () =
       let model_ref = ref (base_initial_model ()) in
       ensure_ports_initialized model_ref ;
       !model_ref
-
-let require_package_manager () =
-  match
-    Miaou_interfaces.Capability.get
-      Manager_interfaces.Package_manager_capability.key
-  with
-  | Some cap ->
-      let module I =
-        (val (cap : Manager_interfaces.Package_manager_capability.t))
-      in
-      Ok (module I : Manager_interfaces.Package_manager)
-  | None -> Error (`Msg "Package manager capability not available")
 
 let spec =
   let open Form_builder in
@@ -513,7 +444,7 @@ let spec =
               ()
           else Ok ()
         in
-        let* (module PM) = require_package_manager () in
+        let* (module PM) = Form_builder_common.require_package_manager () in
         let* _service = PM.install_daemon ~quiet:true req in
         (* Handle rename: clean up old instance if name changed *)
         let* () =
