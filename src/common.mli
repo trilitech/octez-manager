@@ -196,6 +196,12 @@ val format_size : int64 -> string
     Handles values up to terabytes. *)
 val format_bytes : int64 -> string
 
+(** Remove surrounding quotes from a string.
+    Handles backslash-escaped double quotes, regular double quotes,
+    and single quotes.
+    Returns the string unchanged if it is not quoted. *)
+val unquote : string -> string
+
 (** Format a byte count as a human-readable string with float precision
     and spaced units.  Produces e.g. ["1.5 GB"], ["100 MB"], ["512 bytes"].
     Best for disk-space messages shown to the user. *)
