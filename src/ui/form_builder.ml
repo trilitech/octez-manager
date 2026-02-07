@@ -551,9 +551,7 @@ struct
                 Context.mark_instances_dirty () ;
                 (* Reset form to fresh initial values for next use *)
                 s.model_ref := S.spec.initial_model () ;
-                (* Navigate back to instances page via Context.
-                   Set skip_back_once to prevent loop when user presses Esc on instances. *)
-                Context.set_skip_back_once () ;
+                (* Navigate back to instances page via Context. *)
                 Context.navigate "instances" ;
                 s
             | Error (`Msg msg) ->
@@ -573,9 +571,7 @@ struct
             Context.mark_instances_dirty () ;
             (* Reset form to fresh initial values for next use *)
             s.model_ref := S.spec.initial_model () ;
-            (* Navigate back to instances page via Context.
-               Set skip_back_once to prevent loop when user presses Esc on instances. *)
-            Context.set_skip_back_once () ;
+            (* Navigate back to instances page via Context. *)
             Context.navigate "instances" ;
             s
         | Error (`Msg msg) ->
@@ -720,9 +716,7 @@ struct
           match Miaou.Core.Keys.of_string key with
           | Some Miaou.Core.Keys.Escape ->
               (* Go to instances page directly - Navigation.back would go to
-                 details page which may have stale/consumed context.
-                 Set skip_back_once to prevent loop when user presses Esc on instances. *)
-              Context.set_skip_back_once () ;
+                 details page which may have stale/consumed context. *)
               Context.navigate "instances" ;
               ps
           | Some Miaou.Core.Keys.Up ->
@@ -739,7 +733,6 @@ struct
   let service_cycle ps _ = refresh ps
 
   let back ps =
-    Context.set_skip_back_once () ;
     Context.navigate "instances" ;
     ps
 
@@ -778,7 +771,6 @@ struct
           | `Bubble -> (
               match key with
               | Miaou.Core.Keys.Escape ->
-                  Context.set_skip_back_once () ;
                   Context.navigate "instances" ;
                   (ps, Miaou_interfaces.Key_event.Handled)
               | Miaou.Core.Keys.Up ->
