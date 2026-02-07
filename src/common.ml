@@ -909,5 +909,8 @@ let format_size_float bytes =
   if gb >= 1.0 then Printf.sprintf "%.1f GB" gb
   else
     let mb = b /. (1024. *. 1024.) in
-    if mb >= 1.0 then Printf.sprintf "%.0f MB" mb
+    if mb >= 1.0 then
+      let mb_rounded = Float.round mb in
+      if mb_rounded >= 1024.0 then Printf.sprintf "%.1f GB" gb
+      else Printf.sprintf "%.0f MB" mb
     else Printf.sprintf "%Ld bytes" bytes
