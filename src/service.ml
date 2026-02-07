@@ -27,17 +27,6 @@ type t = {
   dependents : string list;
 }
 
-let now () =
-  let tm = Unix.time () |> Unix.localtime in
-  Printf.sprintf
-    "%04d-%02d-%02d %02d:%02d:%02d"
-    (tm.tm_year + 1900)
-    (tm.tm_mon + 1)
-    tm.tm_mday
-    tm.tm_hour
-    tm.tm_min
-    tm.tm_sec
-
 let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     ~service_user ~app_bin_dir ?bin_source ~logging_mode
     ?(snapshot_auto = false) ?(snapshot_uri = None)
@@ -54,7 +43,7 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     service_user;
     app_bin_dir;
     bin_source;
-    created_at = now ();
+    created_at = Common.now ();
     logging_mode;
     snapshot_auto;
     snapshot_uri;

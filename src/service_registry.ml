@@ -79,3 +79,21 @@ let remove ~instance =
       Ok ()
     with Sys_error msg -> Error (`Msg msg)
   else Ok ()
+
+let count_instances_using bin_source =
+  match list () with
+  | Error _ -> 0
+  | Ok services ->
+      List.filter (fun svc -> Service.get_bin_source svc = bin_source) services
+      |> List.length
+
+let get_instances_using bin_source =
+  match list () with
+  | Error _ -> []
+  | Ok services ->
+      List.filter_map
+        (fun svc ->
+          if Service.get_bin_source svc = bin_source then
+            Some svc.Service.instance
+          else None)
+        services

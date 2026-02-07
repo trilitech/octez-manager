@@ -11,16 +11,6 @@ let ( let* ) = Result.bind
 
 (** {1 Helpers} *)
 
-let string_contains ~needle haystack =
-  let nlen = String.length needle in
-  let hlen = String.length haystack in
-  let rec loop idx =
-    if idx + nlen > hlen then false
-    else if String.sub haystack idx nlen = needle then true
-    else loop (idx + 1)
-  in
-  if nlen = 0 then true else loop 0
-
 (** {1 Cache} *)
 
 let cache : External_service.t list ref = ref []
@@ -65,15 +55,12 @@ let is_in_registry ~unit_name =
 
 (** {1 Systemd Queries} *)
 
-let systemctl_cmd () =
-  if Common.is_root () then ["systemctl"] else ["systemctl"; "--user"]
-
 let list_all_service_units () =
   (* List all service units from both loaded units and unit files.
      This ensures we detect both running services and newly created ones. *)
   let list_loaded_units () =
     let cmd =
-      systemctl_cmd ()
+      Systemd.systemctl_cmd ()
       @ ["list-units"; "--type=service"; "--all"; "--no-legend"; "--no-pager"]
     in
     match Common.run_out cmd with
@@ -101,7 +88,7 @@ let list_all_service_units () =
   in
   let list_unit_files () =
     let cmd =
-      systemctl_cmd ()
+      Systemd.systemctl_cmd ()
       @ [
           "list-unit-files";
           "--type=service";
@@ -146,7 +133,7 @@ let list_all_service_units () =
          to see if they have their own file vs using a template *)
       match
         Common.run_out
-          (systemctl_cmd () @ ["show"; unit_name; "-p"; "FragmentPath"])
+          (Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "FragmentPath"])
       with
       | Ok output ->
           let path = String.trim output in
@@ -202,7 +189,7 @@ let extract_command_from_systemd_format str =
 
 let get_exec_start ~unit_name =
   let cmd =
-    systemctl_cmd () @ ["show"; unit_name; "-p"; "ExecStart"; "--value"]
+    Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "ExecStart"; "--value"]
   in
   match Common.run_out cmd with
   | Ok output ->
@@ -218,7 +205,7 @@ let get_exec_start ~unit_name =
 
 let get_unit_properties ~unit_name ~props =
   (* Query all properties at once without -p flag to avoid parsing issues *)
-  let cmd = systemctl_cmd () @ ["show"; unit_name] in
+  let cmd = Systemd.systemctl_cmd () @ ["show"; unit_name] in
   match Common.run_out cmd with
   | Ok output ->
       let lines = String.split_on_char '\n' output in
@@ -237,12 +224,12 @@ let get_unit_properties ~unit_name ~props =
   | Error _ -> []
 
 let get_unit_content ~unit_name =
-  let cmd = systemctl_cmd () @ ["cat"; unit_name] in
+  let cmd = Systemd.systemctl_cmd () @ ["cat"; unit_name] in
   match Common.run_out cmd with
   | Ok content -> Ok content
   | Error (`Msg msg) ->
       let msg_lower = String.lowercase_ascii msg in
-      if string_contains ~needle:"permission denied" msg_lower then
+      if Common.string_contains ~needle:"permission denied" msg_lower then
         Error `Permission_denied
       else Error (`Error msg)
 
@@ -319,7 +306,7 @@ let read_proc_cmdline pid =
 let get_running_command ~unit_name =
   (* Get MainPID from systemctl show *)
   let cmd =
-    systemctl_cmd () @ ["show"; unit_name; "-p"; "MainPID"; "--value"]
+    Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "MainPID"; "--value"]
   in
   match Common.run_out cmd with
   | Ok output -> (
@@ -360,12 +347,12 @@ let detect_daily_logs_dir ~role ~data_dir ~base_dir =
 (** Check if ExecStart contains an octez binary *)
 let contains_octez_binary exec_start =
   let lower = String.lowercase_ascii exec_start in
-  string_contains ~needle:"octez-node" lower
-  || string_contains ~needle:"octez-baker" lower
-  || string_contains ~needle:"octez-accuser" lower
-  || string_contains ~needle:"octez-dal-node" lower
-  || string_contains ~needle:"tezos-baker" lower
-  || string_contains ~needle:"tezos-accuser" lower
+  Common.string_contains ~needle:"octez-node" lower
+  || Common.string_contains ~needle:"octez-baker" lower
+  || Common.string_contains ~needle:"octez-accuser" lower
+  || Common.string_contains ~needle:"octez-dal-node" lower
+  || Common.string_contains ~needle:"tezos-baker" lower
+  || Common.string_contains ~needle:"tezos-accuser" lower
 
 (** Build External_service.t from a unit name, ExecStart, and systemd properties.
     Parses ExecStart to extract configuration. *)
@@ -817,7 +804,7 @@ let detect () =
 (** {1 Testing Utilities} *)
 
 module For_tests = struct
-  let string_contains = string_contains
+  let string_contains = Common.string_contains
 
   let is_managed_unit_name = is_managed_unit_name
 
@@ -825,7 +812,7 @@ module For_tests = struct
 
   let chain_id_to_network = chain_id_to_network
 
-  let systemctl_cmd = systemctl_cmd
+  let systemctl_cmd = Systemd.systemctl_cmd
 
   let contains_octez_binary = contains_octez_binary
 end

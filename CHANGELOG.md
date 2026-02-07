@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - RPC browser now uses Grid_layout for side-by-side panel rendering
 - Instances page now uses Grid_layout for multi-column layout merging
 - Form navigation now supports Tab/Shift+Tab cycling between fields via Miaou Focus_ring
+- **Code deduplication**: Consolidated 12 groups of duplicate functions into canonical locations (Common, Service_registry, Systemd, Helpers, Config, Modal_helpers, Form_builder_bundles), reducing duplicate_groups metric from 63 to 51
 
 ### Fixed
 

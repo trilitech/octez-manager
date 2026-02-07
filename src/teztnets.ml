@@ -208,11 +208,6 @@ let list_networks ?(fetch = fetch_json) () :
 let fallback_pairs =
   List.map (fun n -> (n.human_name, n.network_url)) fallback_networks
 
-let is_http_url s =
-  let trimmed = String.trim s |> String.lowercase_ascii in
-  String.starts_with ~prefix:"http://" trimmed
-  || String.starts_with ~prefix:"https://" trimmed
-
 let is_builtin_network s =
   let lower = String.lowercase_ascii (String.trim s) in
   lower = "mainnet" || lower = "sandbox"
@@ -227,7 +222,7 @@ let resolve_network_for_octez_node :
      network ->
   let trimmed = String.trim network in
   if trimmed = "" then R.error_msg "Network cannot be empty"
-  else if is_http_url trimmed then Ok trimmed
+  else if Helpers.is_http_url trimmed then Ok trimmed
   else if is_builtin_network trimmed then Ok (String.lowercase_ascii trimmed)
   else if Sys.file_exists trimmed then Ok trimmed
   else

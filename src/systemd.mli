@@ -70,6 +70,11 @@ type logrotate_spec = {role : string; paths : string list}
 
 val sync_logrotate : logrotate_spec list -> (unit, [`Msg of string]) result
 
+(** Build the systemctl command prefix, accounting for root vs user mode.
+    Returns [["systemctl"]] when running as root,
+    [["systemctl"; "--user"]] otherwise. *)
+val systemctl_cmd : unit -> string list
+
 module For_tests : sig
   val role_binary : string -> string
 
