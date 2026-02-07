@@ -12,7 +12,8 @@
 
 (** Parse a version string into numeric components.
     Strips a leading ['v'] and any suffix after ['-'] (e.g., "-rc1").
-    @return list of integer components, e.g. ["24.1.3"] -> [[24; 1; 3]] *)
+    Returns [[]] for unparseable strings.
+    @return list of integer components, e.g. "24.1.3" -> [24; 1; 3] *)
 val parse_version : string -> int list
 
 (** [is_rc version] returns [true] if [version] contains a ['-'] suffix
