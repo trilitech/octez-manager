@@ -41,7 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - RPC browser now uses Grid_layout for side-by-side panel rendering
 - Instances page now uses Grid_layout for multi-column layout merging
 - Form navigation now supports Tab/Shift+Tab cycling between fields via Miaou Focus_ring
-- **Code deduplication**: Consolidated 12 groups of duplicate functions into canonical locations (Common, Service_registry, Systemd, Helpers, Config, Modal_helpers, Form_builder_bundles), reducing duplicate_groups metric from 63 to 51
+- **Code deduplication**: Consolidated duplicate functions into canonical locations, reducing duplicate_groups metric from 63 to 38. Round 1 (PRs #652–#657): extracted shared utilities into Common, Service_registry, Systemd, Helpers, Config, Modal_helpers, Form_builder_bundles. Round 2: extracted Check_prefs module from self_update_checker/version_checker, removed dead Common.is_port_in_use code, replaced hand-rolled with_lock with stdlib Mutex.protect
 
 ### Fixed
 
