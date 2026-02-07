@@ -101,7 +101,9 @@ val show_spinner_modal :
   unit
 
 (** Wrap a string to the given width, breaking at word boundaries.
-    Handles embedded newlines. *)
+    Handles embedded newlines.
+
+    @param width The maximum line width in characters. Must be [>= 1]. *)
 val wrap_text : width:int -> string -> string list
 
 module For_tests : sig
