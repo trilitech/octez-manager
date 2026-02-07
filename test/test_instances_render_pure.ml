@@ -14,6 +14,7 @@
 open Alcotest
 module Render = Octez_manager_ui.Instances_render
 module Actions = Octez_manager_ui.Instances_actions
+module Layout = Octez_manager_ui.Instances_layout
 module State = Octez_manager_ui.Instances_state
 
 let string_contains ~needle haystack =
@@ -33,14 +34,14 @@ let string_contains ~needle haystack =
 (* ================================================================== *)
 
 let test_role_header_known_roles () =
-  check string "node" "── Nodes ──" (Render.role_header "node") ;
-  check string "baker" "── Bakers ──" (Render.role_header "baker") ;
-  check string "accuser" "── Accusers ──" (Render.role_header "accuser") ;
-  check string "dal-node" "── DAL Nodes ──" (Render.role_header "dal-node") ;
-  check string "signer" "── Signers ──" (Render.role_header "signer")
+  check string "node" "── Nodes ──" (Layout.role_header "node") ;
+  check string "baker" "── Bakers ──" (Layout.role_header "baker") ;
+  check string "accuser" "── Accusers ──" (Layout.role_header "accuser") ;
+  check string "dal-node" "── DAL Nodes ──" (Layout.role_header "dal-node") ;
+  check string "signer" "── Signers ──" (Layout.role_header "signer")
 
 let test_role_header_unknown_capitalizes () =
-  let h = Render.role_header "foobar" in
+  let h = Layout.role_header "foobar" in
   (* Unknown roles get ── Capitalized ── format *)
   check bool "has dashes" true (string_contains ~needle:"──" h) ;
   check bool "has capitalized name" true (string_contains ~needle:"Foobar" h)

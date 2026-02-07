@@ -79,9 +79,7 @@ let directory_entry_of_yojson json =
 
 (* File paths *)
 
-let registry_root () =
-  if Common.is_root () then "/etc/octez_manager"
-  else Filename.concat (Common.xdg_config_home ()) "octez-manager"
+let registry_root = Common.registry_root
 
 let directories_file () = Filename.concat (registry_root ()) "directories.json"
 

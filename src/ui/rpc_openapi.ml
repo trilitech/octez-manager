@@ -52,9 +52,7 @@ let cached_endpoints : endpoint list ref = ref []
 
 let entries_cache : (string, string list) Hashtbl.t = Hashtbl.create 97
 
-let ensure_dir path =
-  if not (Sys.file_exists path) then
-    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
+let ensure_dir = Runtime.ensure_dir
 
 let download_file ~url ~dest =
   let cmd =

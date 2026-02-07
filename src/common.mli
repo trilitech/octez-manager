@@ -19,6 +19,11 @@ val current_user_group_names : unit -> string * string
 
 val env_instances_base_dir : unit -> string
 
+(** Root directory for octez-manager registries (services, directories).
+    Returns ["/etc/octez_manager"] when running as root,
+    otherwise ["$XDG_CONFIG_HOME/octez-manager"]. *)
+val registry_root : unit -> string
+
 val default_data_dir : string -> string
 
 val default_role_dir : string -> string -> string
