@@ -32,10 +32,6 @@ let cache : (string, t) Hashtbl.t = Hashtbl.create 17
 
 let lock = Mutex.create ()
 
-let with_lock f =
-  Mutex.lock lock ;
-  Fun.protect ~finally:(fun () -> Mutex.unlock lock) f
-
 (** Fetch health from DAL node RPC *)
 let fetch ~rpc_endpoint =
   let url = rpc_endpoint ^ "/health" in
@@ -74,15 +70,16 @@ let fetch ~rpc_endpoint =
       with _ -> None)
 
 (** Get cached health for an instance *)
-let get ~instance = with_lock (fun () -> Hashtbl.find_opt cache instance)
+let get ~instance =
+  Mutex.protect lock (fun () -> Hashtbl.find_opt cache instance)
 
 (** Set health for an instance *)
 let set ~instance data =
-  with_lock (fun () -> Hashtbl.replace cache instance data)
+  Mutex.protect lock (fun () -> Hashtbl.replace cache instance data)
 
 (** Clear cache for a specific instance *)
 let clear_instance ~instance =
-  with_lock (fun () -> Hashtbl.remove cache instance)
+  Mutex.protect lock (fun () -> Hashtbl.remove cache instance)
 
 (** Clear all cache *)
-let clear () = with_lock (fun () -> Hashtbl.clear cache)
+let clear () = Mutex.protect lock (fun () -> Hashtbl.clear cache)
