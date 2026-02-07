@@ -334,16 +334,8 @@ let fetch_checksum ~version =
   | Ok _ -> R.error_msg "Empty checksums file"
   | Error (`Msg e) -> R.error_msgf "Failed to fetch checksums: %s" e
 
-let compute_sha256 filepath =
-  match Common.run_out ["sha256sum"; filepath] with
-  | Ok output -> (
-      match String.split_on_char ' ' output with
-      | hash :: _ -> Ok (String.trim hash)
-      | _ -> R.error_msg "Unexpected sha256sum output")
-  | Error (`Msg e) -> R.error_msgf "Failed to compute checksum: %s" e
-
 let verify_checksum ~filepath ~expected =
-  let* actual = compute_sha256 filepath in
+  let* actual = Common.compute_sha256 filepath in
   if String.equal actual expected then Ok ()
   else R.error_msgf "Checksum mismatch: expected %s, got %s" expected actual
 

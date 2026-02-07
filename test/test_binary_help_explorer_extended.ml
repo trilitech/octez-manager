@@ -15,6 +15,7 @@
 
 open Alcotest
 module BHE = Octez_manager_ui.Binary_help_explorer
+module BHE_ft = BHE.For_tests
 module HP = Octez_manager_lib.Help_parser
 
 (* ── Helpers ───────────────────────────────────────────────── *)
@@ -69,23 +70,23 @@ let test_option_label_empty () =
 (* ── wrap_text ─────────────────────────────────────────────── *)
 
 let test_wrap_text_short () =
-  let result = BHE.wrap_text ~width:80 "short line" in
+  let result = BHE_ft.wrap_text ~width:80 "short line" in
   check (list string) "no wrap" ["short line"] result
 
 let test_wrap_text_long () =
   let input = "this is a line that is longer than the width" in
-  let result = BHE.wrap_text ~width:20 input in
+  let result = BHE_ft.wrap_text ~width:20 input in
   check bool "wrapped" true (List.length result > 1) ;
   List.iter
     (fun line -> check bool "within width" true (String.length line <= 20))
     result
 
 let test_wrap_text_preserves_newlines () =
-  let result = BHE.wrap_text ~width:80 "line one\nline two" in
+  let result = BHE_ft.wrap_text ~width:80 "line one\nline two" in
   check (list string) "two lines" ["line one"; "line two"] result
 
 let test_wrap_text_empty () =
-  let result = BHE.wrap_text ~width:80 "" in
+  let result = BHE_ft.wrap_text ~width:80 "" in
   check (list string) "empty" [""] result
 
 (* ── format_tokens ─────────────────────────────────────────── *)
@@ -312,7 +313,7 @@ let prop_wrap_text_no_crash =
     ~count:300
     QCheck.(pair (int_range 1 200) string)
     (fun (width, s) ->
-      ignore (BHE.wrap_text ~width s) ;
+      ignore (BHE_ft.wrap_text ~width s) ;
       true)
 
 let prop_wrap_text_preserves_content =
@@ -321,7 +322,7 @@ let prop_wrap_text_preserves_content =
     ~count:200
     QCheck.(pair (int_range 5 80) (string_size (Gen.int_range 0 200)))
     (fun (width, s) ->
-      let lines = BHE.wrap_text ~width s in
+      let lines = BHE_ft.wrap_text ~width s in
       let rejoined = String.concat " " lines in
       (* All non-whitespace chars from original should appear in result *)
       let orig_chars =

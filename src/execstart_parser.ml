@@ -7,16 +7,6 @@
 
 (** {1 Helpers} *)
 
-let string_contains ~needle haystack =
-  let nlen = String.length needle in
-  let hlen = String.length haystack in
-  let rec loop idx =
-    if idx + nlen > hlen then false
-    else if String.sub haystack idx nlen = needle then true
-    else loop (idx + 1)
-  in
-  if nlen = 0 then true else loop 0
-
 (** Check if word looks like an octez/tezos binary *)
 let is_octez_binary word =
   (* Extract basename to avoid matching directory paths like /var/lib/octez-external *)
@@ -42,8 +32,8 @@ let unwrap_shell exec_start =
     let trimmed = String.trim exec_start in
     (* Find -c or -lc flag *)
     let c_flag_pattern =
-      if string_contains ~needle:" -lc " trimmed then " -lc "
-      else if string_contains ~needle:" -c " trimmed then " -c "
+      if Common.string_contains ~needle:" -lc " trimmed then " -lc "
+      else if Common.string_contains ~needle:" -c " trimmed then " -c "
       else ""
     in
     if c_flag_pattern = "" then exec_start
@@ -152,7 +142,7 @@ let empty_args =
 
 (** Check if string contains unexpanded variable like ${VAR} or $VAR *)
 let contains_variable s =
-  string_contains ~needle:"${" s
+  Common.string_contains ~needle:"${" s
   || (String.contains s '$' && String.length s > 1)
 
 (** Helper to parse a flag with value *)

@@ -6,74 +6,72 @@
 (******************************************************************************)
 
 open Octez_manager_ui
+open Octez_manager_lib
 
 (* ============================================================ *)
 (* is_valid_instance_char Tests                                  *)
 (* ============================================================ *)
 
 let test_valid_lowercase () =
-  Alcotest.(check bool) "lowercase" true (Flows.is_valid_instance_char 'a') ;
-  Alcotest.(check bool) "lowercase z" true (Flows.is_valid_instance_char 'z')
+  Alcotest.(check bool) "lowercase" true (Config.is_valid_instance_char 'a') ;
+  Alcotest.(check bool) "lowercase z" true (Config.is_valid_instance_char 'z')
 
 let test_valid_uppercase () =
-  Alcotest.(check bool) "uppercase" true (Flows.is_valid_instance_char 'A') ;
-  Alcotest.(check bool) "uppercase Z" true (Flows.is_valid_instance_char 'Z')
+  Alcotest.(check bool) "uppercase" true (Config.is_valid_instance_char 'A') ;
+  Alcotest.(check bool) "uppercase Z" true (Config.is_valid_instance_char 'Z')
 
 let test_valid_digits () =
-  Alcotest.(check bool) "digit 0" true (Flows.is_valid_instance_char '0') ;
-  Alcotest.(check bool) "digit 9" true (Flows.is_valid_instance_char '9')
+  Alcotest.(check bool) "digit 0" true (Config.is_valid_instance_char '0') ;
+  Alcotest.(check bool) "digit 9" true (Config.is_valid_instance_char '9')
 
 let test_valid_special () =
-  Alcotest.(check bool) "dash" true (Flows.is_valid_instance_char '-') ;
-  Alcotest.(check bool) "underscore" true (Flows.is_valid_instance_char '_') ;
-  Alcotest.(check bool) "dot" true (Flows.is_valid_instance_char '.')
+  Alcotest.(check bool) "dash" true (Config.is_valid_instance_char '-') ;
+  Alcotest.(check bool) "underscore" true (Config.is_valid_instance_char '_') ;
+  Alcotest.(check bool) "dot" true (Config.is_valid_instance_char '.')
 
 let test_invalid_space () =
-  Alcotest.(check bool) "space" false (Flows.is_valid_instance_char ' ')
+  Alcotest.(check bool) "space" false (Config.is_valid_instance_char ' ')
 
 let test_invalid_special_chars () =
-  Alcotest.(check bool) "at" false (Flows.is_valid_instance_char '@') ;
-  Alcotest.(check bool) "hash" false (Flows.is_valid_instance_char '#') ;
-  Alcotest.(check bool) "slash" false (Flows.is_valid_instance_char '/') ;
-  Alcotest.(check bool) "colon" false (Flows.is_valid_instance_char ':') ;
-  Alcotest.(check bool) "bang" false (Flows.is_valid_instance_char '!')
+  Alcotest.(check bool) "at" false (Config.is_valid_instance_char '@') ;
+  Alcotest.(check bool) "hash" false (Config.is_valid_instance_char '#') ;
+  Alcotest.(check bool) "slash" false (Config.is_valid_instance_char '/') ;
+  Alcotest.(check bool) "colon" false (Config.is_valid_instance_char ':') ;
+  Alcotest.(check bool) "bang" false (Config.is_valid_instance_char '!')
 
 let test_invalid_null () =
-  Alcotest.(check bool) "null" false (Flows.is_valid_instance_char '\000')
+  Alcotest.(check bool) "null" false (Config.is_valid_instance_char '\000')
 
 (* ============================================================ *)
 (* instance_has_valid_chars Tests                                *)
 (* ============================================================ *)
 
+let instance_has_valid_chars name =
+  String.for_all Config.is_valid_instance_char name
+
 let test_valid_name_simple () =
-  Alcotest.(check bool) "simple" true (Flows.instance_has_valid_chars "my-node")
+  Alcotest.(check bool) "simple" true (instance_has_valid_chars "my-node")
 
 let test_valid_name_complex () =
   Alcotest.(check bool)
     "complex"
     true
-    (Flows.instance_has_valid_chars "node-01.mainnet_v2")
+    (instance_has_valid_chars "node-01.mainnet_v2")
 
 let test_valid_name_empty () =
-  Alcotest.(check bool) "empty" true (Flows.instance_has_valid_chars "")
+  Alcotest.(check bool) "empty" true (instance_has_valid_chars "")
 
 let test_valid_name_single_char () =
-  Alcotest.(check bool) "single" true (Flows.instance_has_valid_chars "a")
+  Alcotest.(check bool) "single" true (instance_has_valid_chars "a")
 
 let test_invalid_name_space () =
-  Alcotest.(check bool)
-    "with space"
-    false
-    (Flows.instance_has_valid_chars "my node")
+  Alcotest.(check bool) "with space" false (instance_has_valid_chars "my node")
 
 let test_invalid_name_special () =
-  Alcotest.(check bool) "with @" false (Flows.instance_has_valid_chars "node@1")
+  Alcotest.(check bool) "with @" false (instance_has_valid_chars "node@1")
 
 let test_invalid_name_unicode () =
-  Alcotest.(check bool)
-    "unicode"
-    false
-    (Flows.instance_has_valid_chars "n\xc3\xb6de")
+  Alcotest.(check bool) "unicode" false (instance_has_valid_chars "n\xc3\xb6de")
 
 (* ============================================================ *)
 (* strip_node_prefix Tests                                       *)
@@ -149,8 +147,8 @@ let test_valid_chars_consistency =
     ~count:500
     QCheck.string
     (fun s ->
-      let by_forall = String.for_all Flows.is_valid_instance_char s in
-      let by_fn = Flows.instance_has_valid_chars s in
+      let by_forall = String.for_all Config.is_valid_instance_char s in
+      let by_fn = instance_has_valid_chars s in
       by_forall = by_fn)
 
 let test_strip_prefix_no_crash =

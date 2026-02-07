@@ -93,19 +93,6 @@ let old_base_dirs_file () = Filename.concat (registry_root ()) "base_dirs.json"
 let migrated_marker_file () =
   Filename.concat (registry_root ()) ".directories_migrated"
 
-(* Timestamp *)
-
-let now () =
-  let tm = Unix.time () |> Unix.localtime in
-  Printf.sprintf
-    "%04d-%02d-%02d %02d:%02d:%02d"
-    (tm.tm_year + 1900)
-    (tm.tm_mon + 1)
-    tm.tm_mday
-    tm.tm_hour
-    tm.tm_min
-    tm.tm_sec
-
 (* I/O operations *)
 
 let write_all entries =
@@ -211,7 +198,12 @@ let migrate_from_base_dir_registry () =
             if Common.is_root () then ("root", "root")
             else Common.current_user_group_names ()
           in
-          Common.write_file ~mode:0o644 ~owner ~group migrated_marker (now ())
+          Common.write_file
+            ~mode:0o644
+            ~owner
+            ~group
+            migrated_marker
+            (Common.now ())
       | _ -> Error (`Msg "Invalid base_dirs.json format during migration")
     with
     | Sys_error msg -> Error (`Msg ("Migration error: " ^ msg))
@@ -251,7 +243,7 @@ let read_all () =
 let add ~path ~dir_type ~registered_services =
   Common.with_file_lock (directories_lock_file ()) (fun () ->
       let* existing = read_all () in
-      let timestamp = now () in
+      let timestamp = Common.now () in
       (* Check if path already exists *)
       let existing_entry = List.find_opt (fun e -> e.path = path) existing in
       let filtered = List.filter (fun e -> e.path <> path) existing in
@@ -297,7 +289,7 @@ let update_registered_services ~path ~registered_services =
       | None -> Ok () (* Path not found, nothing to update *)
       | Some entry ->
           let updated =
-            {entry with registered_services; last_used_at = now ()}
+            {entry with registered_services; last_used_at = Common.now ()}
           in
           let filtered = List.filter (fun e -> e.path <> path) existing in
           write_all (limit_entries_per_type (updated :: filtered)))

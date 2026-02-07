@@ -126,35 +126,6 @@ let option_hint_markdown (row : row) : string option * string option =
   in
   (short, long)
 
-let wrap_text ~width s =
-  let wrap_line s =
-    let len = String.length s in
-    if len <= width then [s]
-    else
-      let rec aux start acc =
-        if start >= len then List.rev acc
-        else
-          let remaining = len - start in
-          if remaining <= width then
-            List.rev (String.sub s start remaining :: acc)
-          else
-            let limit = start + width in
-            let end_ =
-              try
-                let last_space = String.rindex_from s limit ' ' in
-                if last_space > start then last_space else limit
-              with _ -> limit
-            in
-            let sub = String.sub s start (end_ - start) in
-            let next_start =
-              if end_ < len && s.[end_] = ' ' then end_ + 1 else end_
-            in
-            aux next_start (sub :: acc)
-      in
-      aux 0 []
-  in
-  String.split_on_char '\n' s |> List.concat_map wrap_line
-
 let format_tokens rows =
   rows
   |> List.filter (fun r -> r.selected)
@@ -255,7 +226,7 @@ let open_modal ~title ~options ~initial_args ~on_apply =
       if Array.length s.rows = 0 then None else Some s.rows.(s.cursor)
 
     let open_toggle_modal row =
-      let doc_lines = wrap_text ~width:68 row.opt.doc in
+      let doc_lines = Modal_helpers.wrap_text ~width:68 row.opt.doc in
       Modal_helpers.open_choice_modal_with_hint
         ~title:(option_label row.opt)
         ~items:[true; false]
@@ -271,7 +242,7 @@ let open_modal ~title ~options ~initial_args ~on_apply =
         ()
 
     let open_value_modal row placeholder =
-      let doc_lines = wrap_text ~width:68 row.opt.doc in
+      let doc_lines = Modal_helpers.wrap_text ~width:68 row.opt.doc in
       let title = option_label row.opt in
       let initial_value = match row.value with Some v -> v | None -> "" in
       let module Modal = struct
@@ -916,7 +887,7 @@ module For_tests = struct
 
   let truncate = truncate
 
-  let wrap_text = wrap_text
+  let wrap_text = Modal_helpers.wrap_text
 
   let option_label = option_label
 

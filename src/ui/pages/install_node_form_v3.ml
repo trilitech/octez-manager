@@ -16,8 +16,6 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-let of_rresult = function Ok v -> Ok v | Error (`Msg msg) -> Error msg
-
 let name = "install_node_form_v3"
 
 (** {1 Custom Types} *)
@@ -180,11 +178,13 @@ let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 let snapshot_inflight_lock = Mutex.create ()
 
 let fetch_snapshot_list slug =
-  let fallback () = of_rresult (Snapshots.list ~network_slug:slug) in
+  let fallback () =
+    Form_builder_bundles.of_rresult (Snapshots.list ~network_slug:slug)
+  in
   match snapshot_provider () with
   | Some cap -> (
       let module P = (val cap : Manager_interfaces.Snapshot_provider) in
-      match of_rresult (P.list ~network_slug:slug) with
+      match Form_builder_bundles.of_rresult (P.list ~network_slug:slug) with
       | Ok entries -> Ok entries
       | Error _ -> fallback ())
   | None -> fallback ()

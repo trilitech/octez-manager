@@ -8,31 +8,6 @@
 open Cmdliner
 open Octez_manager_lib
 
-(** Helper to count instances using a specific binary source *)
-let count_instances_using bin_source =
-  match Service_registry.list () with
-  | Error _ -> 0
-  | Ok services ->
-      List.filter
-        (fun svc ->
-          match Service.get_bin_source svc with
-          | bs when bs = bin_source -> true
-          | _ -> false)
-        services
-      |> List.length
-
-(** Helper to get instances using a specific binary source *)
-let get_instances_using bin_source =
-  match Service_registry.list () with
-  | Error _ -> []
-  | Ok services ->
-      List.filter_map
-        (fun svc ->
-          match Service.get_bin_source svc with
-          | bs when bs = bin_source -> Some svc.Service.instance
-          | _ -> None)
-        services
-
 (** Helper to format file size *)
 let format_size bytes =
   let kb = Int64.div bytes 1024L in
@@ -42,18 +17,6 @@ let format_size bytes =
   else if mb > 0L then Printf.sprintf "%Ld MB" mb
   else if kb > 0L then Printf.sprintf "%Ld KB" kb
   else Printf.sprintf "%Ld bytes" bytes
-
-(** Helper to get directory size *)
-let get_dir_size path =
-  try
-    match Common.run_out ["du"; "-sb"; path] with
-    | Ok output -> (
-        match String.split_on_char '\t' output with
-        | size_str :: _ -> (
-            try Some (Int64.of_string (String.trim size_str)) with _ -> None)
-        | _ -> None)
-    | Error _ -> None
-  with _ -> None
 
 (** list-remote command *)
 let list_remote_cmd =
@@ -123,12 +86,12 @@ let list_cmd =
               (fun version ->
                 let path = Binary_registry.managed_version_path version in
                 let size_str =
-                  match get_dir_size path with
+                  match Common.get_dir_size path with
                   | Some size -> format_size size
                   | None -> "unknown size"
                 in
                 let count =
-                  count_instances_using
+                  Service_registry.count_instances_using
                     (Binary_registry.Managed_version version)
                 in
                 let usage =
@@ -151,7 +114,7 @@ let list_cmd =
             List.iter
               (fun (ld : Binary_registry.registered_dir) ->
                 let count =
-                  count_instances_using
+                  Service_registry.count_instances_using
                     (Binary_registry.Registered_alias ld.alias)
                 in
                 let usage =
@@ -351,7 +314,7 @@ let remove_cmd =
   let term =
     let run version force =
       let bin_source = Binary_registry.Managed_version version in
-      let instances = get_instances_using bin_source in
+      let instances = Service_registry.get_instances_using bin_source in
       if instances <> [] && not force then (
         Printf.printf
           "Version v%s is currently used by the following instances:\n"
@@ -465,7 +428,7 @@ let unregister_cmd =
       in
 
       let bin_source = Binary_registry.Registered_alias alias in
-      let instances = get_instances_using bin_source in
+      let instances = Service_registry.get_instances_using bin_source in
       if instances <> [] && not force then (
         Printf.printf
           "Registered directory '%s' is currently used by the following \
@@ -520,7 +483,7 @@ let prune_cmd =
             List.filter
               (fun version ->
                 let bin_source = Binary_registry.Managed_version version in
-                count_instances_using bin_source = 0)
+                Service_registry.count_instances_using bin_source = 0)
               versions
           in
           if unused_versions = [] then (
