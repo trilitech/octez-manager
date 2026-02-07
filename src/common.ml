@@ -197,6 +197,14 @@ let append_debug_log line =
     close_out oc
   with _ -> ()
 
+let interruptible_sleep stop_flag seconds =
+  let deadline = Unix.gettimeofday () +. seconds in
+  while (not (Atomic.get stop_flag)) && Unix.gettimeofday () < deadline do
+    let remaining = deadline -. Unix.gettimeofday () in
+    if remaining > 0.0 then
+      ignore (Unix.select [] [] [] (Float.min 0.5 remaining))
+  done
+
 let sh_quote s =
   let needs =
     let n = String.length s in

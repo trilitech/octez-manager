@@ -54,6 +54,11 @@ val append_debug_log : string -> unit
     with [F_LOCK] (blocking). The lock file is created if it doesn't exist. *)
 val with_file_lock : string -> (unit -> 'a) -> 'a
 
+(** Sleep for up to [seconds], checking [stop_flag] every 0.5s.
+    Returns early when [stop_flag] becomes [true], allowing background
+    domains to shut down promptly instead of blocking for the full duration. *)
+val interruptible_sleep : bool Atomic.t -> float -> unit
+
 val run :
   ?quiet:bool ->
   ?on_log:(string -> unit) ->
