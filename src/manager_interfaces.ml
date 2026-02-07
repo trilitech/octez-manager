@@ -152,8 +152,6 @@ module type System = sig
   val remove_path : string -> unit
 
   val remove_tree : string -> (unit, [`Msg of string]) result
-
-  val is_port_in_use : int -> bool
 end
 
 module System_capability = struct
