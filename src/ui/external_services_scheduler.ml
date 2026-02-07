@@ -42,12 +42,22 @@ let refresh () =
 (** Background domain for polling *)
 let domain = ref None
 
-let stop_flag = ref false
+let stop_flag = Atomic.make false
+
+(** Interruptible sleep: waits up to [seconds] but checks [stop_flag]
+    every 0.5s so the domain can exit promptly on shutdown. *)
+let interruptible_sleep seconds =
+  let deadline = Unix.gettimeofday () +. seconds in
+  while (not (Atomic.get stop_flag)) && Unix.gettimeofday () < deadline do
+    let remaining = deadline -. Unix.gettimeofday () in
+    if remaining > 0.0 then
+      ignore (Unix.select [] [] [] (Float.min 0.5 remaining))
+  done
 
 let scheduler_loop () =
-  while not !stop_flag do
+  while not (Atomic.get stop_flag) do
     refresh () ;
-    Unix.sleepf poll_interval
+    interruptible_sleep poll_interval
   done
 
 (** Start the background scheduler *)
@@ -55,7 +65,7 @@ let start () =
   match !domain with
   | Some _ -> () (* Already running *)
   | None ->
-      stop_flag := false ;
+      Atomic.set stop_flag false ;
       (* Initial synchronous load for immediate display *)
       refresh () ;
       (* Start background polling *)
@@ -63,7 +73,7 @@ let start () =
 
 (** Stop the background scheduler *)
 let stop () =
-  stop_flag := true ;
+  Atomic.set stop_flag true ;
   match !domain with
   | None -> ()
   | Some d ->
