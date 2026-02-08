@@ -5,177 +5,28 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(** Binaries management page *)
+(** Binaries management page.
 
-module Widgets = Miaou_widgets_display.Widgets
+    State manipulation, key handling, PAGE_SIG implementation.
+    Data loading, actions, and rendering are delegated to
+    {!Binaries_data}, {!Binaries_actions}, and {!Binaries_view}. *)
+
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
-open Octez_manager_lib
+include Binaries_types
 
 let name = "binaries"
 
-type item_type =
-  | ManagedVersion of
-      string * int64 option * int (* version, size, instance_count *)
-  | RegisteredDir of
-      Binary_registry.registered_dir * int (* registered_dir, instance_count *)
-  | RegisterAction (* Button to register a new directory *)
-  | AvailableVersion of Binary_downloader.version_info
-  | AvailableMajorGroup of int * Binary_downloader.version_info list
-(* major version, list of minor versions *)
-
-type state = {
-  managed_versions : (string * int64 option * int) list;
-  registered_dirs : (Binary_registry.registered_dir * int) list;
-  available_versions : Binary_downloader.version_info list;
-  items : item_type list;
-  selected : int;
-  loading_remote : bool;
-  expanded_majors : int list; (* list of expanded major versions *)
-  expanded_managed : string list; (* list of expanded managed versions *)
-  expanded_registered : string list;
-      (* list of expanded registered directory aliases *)
-}
-
-type msg = unit
-
-type pstate = state Navigation.t
-
-(** Helper functions *)
-
-let load_managed_versions () =
-  match Binary_registry.list_managed_versions () with
-  | Error _ -> []
-  | Ok versions ->
-      List.map
-        (fun version ->
-          let path = Binary_registry.managed_version_path version in
-          let size = File_ops.get_dir_size path in
-          let count =
-            Service_registry.count_instances_using
-              (Binary_registry.Managed_version version)
-          in
-          (version, size, count))
-        versions
-
-let load_registered_dirs () =
-  match Binary_registry.load_registered_dirs () with
-  | Error _ -> []
-  | Ok dirs ->
-      List.map
-        (fun (ld : Binary_registry.registered_dir) ->
-          let count =
-            Service_registry.count_instances_using
-              (Binary_registry.Registered_alias ld.alias)
-          in
-          (ld, count))
-        dirs
-
-(** Filter versions to only keep the N latest major versions.
-    Returns versions from the N most recent major version families. *)
-let filter_latest_n_major_versions n versions =
-  let extract_major version_str =
-    try
-      match String.split_on_char '.' version_str with
-      | major :: _ -> int_of_string major
-      | [] -> 0
-    with _ -> 0
-  in
-  (* Group versions by major version *)
-  let major_versions = Hashtbl.create 5 in
-  List.iter
-    (fun (v : Binary_downloader.version_info) ->
-      let major = extract_major v.version in
-      let existing = Hashtbl.find_opt major_versions major in
-      Hashtbl.replace
-        major_versions
-        major
-        (v :: Option.value ~default:[] existing))
-    versions ;
-  (* Get the N latest major versions *)
-  let all_majors =
-    Hashtbl.to_seq_keys major_versions |> List.of_seq |> List.sort compare
-  in
-  let latest_n_majors =
-    List.rev all_majors |> fun l -> List.filteri (fun i _ -> i < n) l
-  in
-  List.concat_map
-    (fun major ->
-      Option.value ~default:[] (Hashtbl.find_opt major_versions major))
-    latest_n_majors
-
-let load_available_versions () =
-  match Versions_scheduler.get_cached () with
-  | None -> []
-  | Some versions ->
-      (* Filter to only the 2 latest major versions *)
-      let filtered_versions = filter_latest_n_major_versions 2 versions in
-      (* Filter out versions < 23.0 *)
-      let filtered_versions =
-        List.filter
-          (fun (v : Binary_downloader.version_info) ->
-            Binary_registry.compare_versions v.version "23.0" >= 0)
-          filtered_versions
-      in
-      (* Filter out already installed versions *)
-      let managed =
-        match Binary_registry.list_managed_versions () with
-        | Ok v -> v
-        | Error _ -> []
-      in
-      List.filter
-        (fun (v : Binary_downloader.version_info) ->
-          not (List.mem v.version managed))
-        filtered_versions
-
-let build_items _managed registered available expanded_majors =
-  let items = ref [] in
-  items := RegisterAction :: !items ;
-  List.iter (fun (ld, c) -> items := RegisteredDir (ld, c) :: !items) registered ;
-  items := RegisterAction :: !items ;
-
-  (* Group available versions by major version *)
-  let major_groups = Hashtbl.create 10 in
-  List.iter
-    (fun (v : Binary_downloader.version_info) ->
-      (* Parse major version from "24.0" or "23.1-rc1" *)
-      match String.split_on_char '.' v.version with
-      | major_str :: _ -> (
-          try
-            let major = int_of_string major_str in
-            let existing =
-              Hashtbl.find_opt major_groups major |> Option.value ~default:[]
-            in
-            Hashtbl.replace major_groups major (v :: existing)
-          with _ -> ())
-      | _ -> ())
-    available ;
-
-  (* Add major groups in descending order, with sub-items if expanded *)
-  let majors =
-    Hashtbl.to_seq_keys major_groups
-    |> List.of_seq
-    |> List.sort (fun a b -> compare b a)
-  in
-  List.iter
-    (fun major ->
-      let versions = Hashtbl.find major_groups major |> List.rev in
-      items := AvailableMajorGroup (major, versions) :: !items ;
-      (* If expanded, add individual version items *)
-      if List.mem major expanded_majors then
-        List.iter (fun v -> items := AvailableVersion v :: !items) versions)
-    majors ;
-
-  List.rev !items
-
 let init () =
-  let managed = load_managed_versions () in
-  let registered = load_registered_dirs () in
-  let available = load_available_versions () in
+  let managed = Binaries_data.load_managed_versions () in
+  let registered = Binaries_data.load_registered_dirs () in
+  let available = Binaries_data.load_available_versions () in
   let expanded_majors = [] in
   let expanded_managed = [] in
   let expanded_registered = [] in
-  let items = build_items managed registered available expanded_majors in
+  let items =
+    Binaries_data.build_items managed registered available expanded_majors
+  in
   Navigation.make
     {
       managed_versions = managed;
@@ -192,10 +43,12 @@ let init () =
 let update ps _ = ps
 
 let refresh_data s =
-  let managed = load_managed_versions () in
-  let registered = load_registered_dirs () in
-  let available = load_available_versions () in
-  let items = build_items managed registered available s.expanded_majors in
+  let managed = Binaries_data.load_managed_versions () in
+  let registered = Binaries_data.load_registered_dirs () in
+  let available = Binaries_data.load_available_versions () in
+  let items =
+    Binaries_data.build_items managed registered available s.expanded_majors
+  in
   {
     managed_versions = managed;
     registered_dirs = registered;
@@ -222,7 +75,7 @@ let toggle_major_expansion s major =
   in
   (* Rebuild items with new expansion state *)
   let items =
-    build_items
+    Binaries_data.build_items
       s.managed_versions
       s.registered_dirs
       s.available_versions
@@ -269,470 +122,7 @@ let service_cycle ps _ = refresh ps
 
 let back ps = Navigation.back ps
 
-(** Action handlers *)
-
-let remove_version version =
-  let bin_source = Binary_registry.Managed_version version in
-  let count = Service_registry.count_instances_using bin_source in
-  if count > 0 then
-    Modal_helpers.show_error
-      ~title:"Version In Use"
-      (Printf.sprintf
-         "Version v%s is used by %d instance(s). Cannot remove."
-         version
-         count)
-  else
-    Modal_helpers.confirm_modal
-      ~title:(Printf.sprintf "Remove managed version v%s?" version)
-      ~message:""
-      ~on_result:(fun confirmed ->
-        if confirmed then
-          (* Run removal in background to avoid blocking UI *)
-          Background_runner.enqueue (fun () ->
-              match Binary_downloader.remove_version version with
-              | Ok () ->
-                  Context.toast_success (Printf.sprintf "Removed v%s" version) ;
-                  Context.mark_instances_dirty ()
-              | Error (`Msg msg) ->
-                  Context.toast_error (Printf.sprintf "Remove failed: %s" msg)))
-      ()
-
-let unregister_directory ld =
-  let count =
-    Service_registry.count_instances_using
-      (Binary_registry.Registered_alias ld.Binary_registry.alias)
-  in
-  if count > 0 then
-    Modal_helpers.show_error
-      ~title:"Directory In Use"
-      (Printf.sprintf
-         "Registered directory '%s' is used by %d instance(s). Cannot \
-          unregister."
-         ld.alias
-         count)
-  else
-    Modal_helpers.confirm_modal
-      ~title:(Printf.sprintf "Unregister directory '%s'?" ld.alias)
-      ~message:""
-      ~on_result:(fun confirmed ->
-        if confirmed then
-          (* Run unregister in background to avoid blocking UI *)
-          Background_runner.enqueue (fun () ->
-              match Binary_registry.remove_registered_dir ld.alias with
-              | Ok () ->
-                  Context.toast_success
-                    (Printf.sprintf "Unregistered '%s'" ld.alias) ;
-                  Context.mark_instances_dirty ()
-              | Error (`Msg msg) ->
-                  Context.toast_error
-                    (Printf.sprintf "Unregister failed: %s" msg)))
-      ()
-
-let download_version (version_info : Binary_downloader.version_info) =
-  (* Start download in background *)
-  Background_runner.enqueue (fun () ->
-      let version = version_info.Binary_downloader.version in
-      Context.toast_info (Printf.sprintf "Downloading v%s..." version) ;
-
-      (* Initialize multi-progress with list of binaries *)
-      Context.multi_progress_start
-        ~version
-        ~binaries:
-          ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
-
-      (* Multi-progress callback *)
-      let multi_progress (mp : Binary_downloader.multi_progress_state) =
-        Context.multi_progress_update
-          ~binary:mp.current_file
-          ~downloaded:mp.downloaded
-          ~total:mp.total
-      in
-
-      let result =
-        Binary_downloader.download_version
-          ~version
-          ~verify_checksums:true
-          ~multi_progress
-          ()
-      in
-
-      (* Handle checksums *)
-      match result with
-      | Ok res ->
-          Context.multi_progress_checksum "Verifying checksums..." ;
-          Unix.sleepf 0.5 ;
-          (match res.Binary_downloader.checksum_status with
-          | Binary_downloader.Verified ->
-              Context.multi_progress_checksum
-                "\xe2\x9c\x93 All checksums verified"
-          | Binary_downloader.Skipped ->
-              Context.multi_progress_checksum
-                "\xe2\x9a\xa0 Checksum verification skipped"
-          | Binary_downloader.Failed reason ->
-              Context.multi_progress_checksum
-                (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
-          Unix.sleepf 2.0 ;
-          (* Linger to show final status *)
-          Context.multi_progress_finish () ;
-          Context.toast_success (Printf.sprintf "Downloaded v%s" version) ;
-          Context.mark_instances_dirty ()
-      | Error (`Msg msg) ->
-          Context.multi_progress_finish () ;
-          Context.toast_error (Printf.sprintf "Download failed: %s" msg))
-
-let register_directory () =
-  Modal_helpers.open_file_browser_modal
-    ~dirs_only:true
-    ~require_writable:false
-    ~on_select:(fun path ->
-      let alias = Filename.basename path in
-      match Binary_registry.add_registered_dir ~alias ~path with
-      | Ok () ->
-          Context.toast_success (Printf.sprintf "Registered '%s'" alias) ;
-          Context.mark_instances_dirty ()
-      | Error (`Msg msg) ->
-          Modal_helpers.show_error ~title:"Register Failed" msg)
-    ()
-
-let prune_unused s =
-  let unused =
-    List.filter (fun (_v, _s, count) -> count = 0) s.managed_versions
-  in
-  if unused = [] then (
-    Modal_helpers.show_error ~title:"Prune" "No unused versions to prune." ;
-    s)
-  else
-    (* Calculate total size and build detailed message *)
-    let version_details = ref [] in
-    let total_bytes = ref 0L in
-    List.iter
-      (fun (v, _, _) ->
-        match Binary_downloader.get_version_size v with
-        | Ok (bytes, formatted) ->
-            version_details := (v, formatted) :: !version_details ;
-            total_bytes := Int64.add !total_bytes bytes
-        | Error _ -> version_details := (v, "unknown size") :: !version_details)
-      unused ;
-    let details_lines =
-      List.map
-        (fun (v, size) -> Printf.sprintf "  • v%s (%s)" v size)
-        (List.rev !version_details)
-    in
-    let total_formatted = Binary_downloader.format_size_bytes !total_bytes in
-    let message =
-      String.concat
-        "\n"
-        (["The following versions will be removed:"; ""]
-        @ details_lines
-        @ [""; Printf.sprintf "Total space to free: %s" total_formatted])
-    in
-    Modal_helpers.confirm_modal
-      ~title:(Printf.sprintf "Prune %d unused version(s)?" (List.length unused))
-      ~message
-      ~on_result:(fun confirmed ->
-        if confirmed then (
-          let success_count = ref 0 in
-          let fail_count = ref 0 in
-          List.iter
-            (fun (v, _, _) ->
-              match Binary_downloader.remove_version v with
-              | Ok () -> incr success_count
-              | Error _ -> incr fail_count)
-            unused ;
-          if !fail_count = 0 then
-            Context.toast_info
-              (Printf.sprintf
-                 "Removed %d version(s), freed %s"
-                 !success_count
-                 total_formatted)
-          else
-            Context.toast_error
-              (Printf.sprintf
-                 "Removed %d version(s), %d failed"
-                 !success_count
-                 !fail_count) ;
-          Context.mark_instances_dirty ()))
-      () ;
-    s
-
-let handle_action s =
-  if s.items = [] then s
-  else
-    let item = List.nth s.items s.selected in
-    match item with
-    | ManagedVersion (version, _, count) ->
-        if count > 0 then
-          (* If has instances, toggle expansion *)
-          toggle_managed_expansion s version
-        else (
-          (* If unused, allow removal *)
-          remove_version version ;
-          s)
-    | RegisteredDir (ld, count) ->
-        if count > 0 then
-          (* If has instances, toggle expansion *)
-          toggle_registered_expansion s ld.Binary_registry.alias
-        else (
-          (* If unused, allow unregistering *)
-          unregister_directory ld ;
-          s)
-    | RegisterAction ->
-        register_directory () ;
-        s
-    | AvailableVersion vi ->
-        download_version vi ;
-        s
-    | AvailableMajorGroup (major, _) ->
-        (* Toggle expansion on Enter *)
-        toggle_major_expansion s major
-
-let toggle_current_group s =
-  if s.items = [] then s
-  else
-    let item = List.nth s.items s.selected in
-    match item with
-    | AvailableMajorGroup (major, _) -> toggle_major_expansion s major
-    | ManagedVersion (version, _, count) ->
-        if count > 0 then toggle_managed_expansion s version else s
-    | RegisteredDir (ld, count) ->
-        if count > 0 then toggle_registered_expansion s ld.Binary_registry.alias
-        else s
-    | _ -> s
-
-(** View *)
-
-let view ps ~focus:_ ~size:_ =
-  let s = ps.Navigation.s in
-  let lines = ref [] in
-  let add line = lines := line :: !lines in
-
-  (* Set help hint based on selected item *)
-  (match List.nth_opt s.items s.selected with
-  | Some RegisterAction ->
-      Miaou.Core.Help_hint.set
-        (Some
-           "Registered directories let you use Octez binaries from other \
-            locations (dev builds, system installs, custom versions). Press \
-            Enter to browse for a directory.")
-  | Some (RegisteredDir (_, count)) ->
-      if count > 0 then
-        Miaou.Core.Help_hint.set
-          (Some
-             "Press Enter to expand/collapse instances using this directory. \
-              Press ? for help.")
-      else
-        Miaou.Core.Help_hint.set
-          (Some "Press Enter to unregister this directory. Press ? for help.")
-  | Some (ManagedVersion (_, _, count)) ->
-      if count > 0 then
-        Miaou.Core.Help_hint.set
-          (Some
-             "Press Enter to expand/collapse instances using this version. \
-              Press ? for help.")
-      else
-        Miaou.Core.Help_hint.set
-          (Some "Press Enter to remove this version. Press ? for help.")
-  | Some (AvailableVersion _) ->
-      Miaou.Core.Help_hint.set
-        (Some "Press Enter to download this version. Press ? for help.")
-  | Some (AvailableMajorGroup _) ->
-      Miaou.Core.Help_hint.set
-        (Some
-           "Press Enter or Tab to expand/collapse version group. Press ? for \
-            help.")
-  | None -> Miaou.Core.Help_hint.clear ()) ;
-
-  (* Header *)
-  add (Widgets.fg 14 (Widgets.bold "━━━ Managed Versions ━━━")) ;
-  add "" ;
-
-  if s.managed_versions = [] then
-    add (Widgets.dim "  No managed versions installed")
-  else
-    List.iteri
-      (fun _idx (version, size, count) ->
-        let is_selected =
-          match List.nth_opt s.items s.selected with
-          | Some (ManagedVersion (v, _, _)) when v = version -> true
-          | _ -> false
-        in
-        let prefix = if is_selected then "➤ " else "  " in
-        let size_str =
-          match size with
-          | Some s -> String_utils.format_size s
-          | None -> "unknown"
-        in
-        let usage =
-          if count = 0 then Widgets.dim "unused"
-          else if count = 1 then "1 instance"
-          else Printf.sprintf "%d instances" count
-        in
-        (* Add expansion indicator *)
-        let expansion_indicator =
-          if count > 0 then
-            if List.mem version s.expanded_managed then " ▼" else " ▶"
-          else ""
-        in
-        let line =
-          Printf.sprintf
-            "%sv%-15s  %10s  %s%s"
-            prefix
-            version
-            size_str
-            usage
-            expansion_indicator
-        in
-        add (if is_selected then Widgets.bold line else line) ;
-        (* Render sub-items if expanded *)
-        if List.mem version s.expanded_managed then
-          let instances =
-            Service_registry.get_instances_using
-              (Binary_registry.Managed_version version)
-          in
-          List.iter
-            (fun inst -> add (Widgets.dim (Printf.sprintf "      → %s" inst)))
-            instances)
-      s.managed_versions ;
-
-  add "" ;
-  add (Widgets.fg 13 (Widgets.bold "━━━ Registered Directories ━━━")) ;
-  add
-    (Widgets.dim
-       "Register Octez binaries from development builds or custom locations") ;
-  add "" ;
-
-  if s.registered_dirs = [] then add (Widgets.dim "  No registered directories")
-  else
-    List.iter
-      (fun (ld, count) ->
-        let is_selected =
-          match List.nth_opt s.items s.selected with
-          | Some (RegisteredDir (ld2, _))
-            when ld.Binary_registry.alias = ld2.Binary_registry.alias ->
-              true
-          | _ -> false
-        in
-        let prefix = if is_selected then "➤ " else "  " in
-        let usage =
-          if count = 0 then Widgets.dim "unused"
-          else if count = 1 then "1 instance"
-          else Printf.sprintf "%d instances" count
-        in
-        (* Add expansion indicator *)
-        let expansion_indicator =
-          if count > 0 then
-            if List.mem ld.Binary_registry.alias s.expanded_registered then " ▼"
-            else " ▶"
-          else ""
-        in
-        let line =
-          Printf.sprintf
-            "%s%-20s  %s  %s%s"
-            prefix
-            ld.alias
-            (Widgets.dim ld.path)
-            usage
-            expansion_indicator
-        in
-        add (if is_selected then Widgets.bold line else line) ;
-        (* Render sub-items if expanded *)
-        if List.mem ld.Binary_registry.alias s.expanded_registered then
-          let instances =
-            Service_registry.get_instances_using
-              (Binary_registry.Registered_alias ld.Binary_registry.alias)
-          in
-          List.iter
-            (fun inst -> add (Widgets.dim (Printf.sprintf "      → %s" inst)))
-            instances)
-      s.registered_dirs ;
-
-  (* Add register directory button *)
-  let link_action_selected =
-    match List.nth_opt s.items s.selected with
-    | Some RegisterAction -> true
-    | _ -> false
-  in
-  let link_button =
-    let prefix = if link_action_selected then "➤ " else "  " in
-    Printf.sprintf "%s%s" prefix (Widgets.fg 10 "[+ Register a directory...]")
-  in
-  add (if link_action_selected then Widgets.bold link_button else link_button) ;
-
-  add "" ;
-  add (Widgets.fg 10 (Widgets.bold "━━━ Available for Download ━━━")) ;
-  add "" ;
-
-  if s.available_versions = [] then
-    add (Widgets.dim "  No versions available (or all installed)")
-  else
-    (* Render major version groups *)
-    List.iter
-      (fun item ->
-        match item with
-        | AvailableMajorGroup (major, versions) ->
-            let is_group_selected =
-              match List.nth_opt s.items s.selected with
-              | Some (AvailableMajorGroup (m, _)) when m = major -> true
-              | _ -> false
-            in
-            let is_expanded = List.mem major s.expanded_majors in
-            let expand_icon = if is_expanded then "−" else "+" in
-            let prefix = if is_group_selected then "➤ " else "  " in
-            let version_count = List.length versions in
-            let group_line =
-              Printf.sprintf
-                "%s%s v%d  (%d version%s)"
-                prefix
-                expand_icon
-                major
-                version_count
-                (if version_count = 1 then "" else "s")
-            in
-            add
-              (if is_group_selected then Widgets.bold group_line else group_line) ;
-            (* If expanded, show all minor versions *)
-            if is_expanded then
-              List.iter
-                (fun (vi : Binary_downloader.version_info) ->
-                  let is_version_selected =
-                    match List.nth_opt s.items s.selected with
-                    | Some (AvailableVersion vi2)
-                      when vi.Binary_downloader.version
-                           = vi2.Binary_downloader.version ->
-                        true
-                    | _ -> false
-                  in
-                  let v_prefix =
-                    if is_version_selected then "  ➤ " else "    "
-                  in
-                  let date_str =
-                    match vi.Binary_downloader.release_date with
-                    | Some d -> Printf.sprintf " - %s" d
-                    | None -> ""
-                  in
-                  let line =
-                    Printf.sprintf
-                      "  %sv%s%s"
-                      v_prefix
-                      vi.Binary_downloader.version
-                      date_str
-                  in
-                  add (if is_version_selected then Widgets.bold line else line))
-                versions
-        | _ -> ())
-      s.items ;
-
-  (* Add multi-progress display if active, fallback to single progress *)
-  let multi_progress_lines = Context.render_multi_progress ~cols:80 in
-  if String.trim multi_progress_lines <> "" then (
-    add "" ;
-    add multi_progress_lines)
-  else (
-    add "" ;
-    let progress_line = Context.render_progress ~cols:80 in
-    if String.trim progress_line <> "" then add progress_line) ;
-
-  String.concat "\n" (List.rev !lines)
+(** Key handling *)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
@@ -750,15 +140,27 @@ let handle_key ps key ~size:_ =
         Navigation.update
           (fun s ->
             if s.available_versions <> [] then
-              download_version (List.hd s.available_versions) ;
+              Binaries_actions.download_version (List.hd s.available_versions) ;
             s)
           ps
     | Some (Keys.Char "l") ->
-        register_directory () ;
+        Binaries_actions.register_directory () ;
         ps
-    | Some (Keys.Char "p") -> Navigation.update prune_unused ps
-    | Some Keys.Enter -> Navigation.update handle_action ps
-    | Some Keys.Tab -> Navigation.update toggle_current_group ps
+    | Some (Keys.Char "p") -> Navigation.update Binaries_actions.prune_unused ps
+    | Some Keys.Enter ->
+        Navigation.update
+          (Binaries_actions.handle_action
+             ~toggle_managed_expansion
+             ~toggle_registered_expansion
+             ~toggle_major_expansion)
+          ps
+    | Some Keys.Tab ->
+        Navigation.update
+          (Binaries_actions.toggle_current_group
+             ~toggle_managed_expansion
+             ~toggle_registered_expansion
+             ~toggle_major_expansion)
+          ps
     | Some Keys.Up -> move_selection ps `Up
     | Some Keys.Down -> move_selection ps `Down
     | _ -> ps
@@ -785,9 +187,10 @@ let keymap _ =
   ]
 
 let header =
+  let open Miaou_widgets_display.Widgets in
   [
-    Widgets.title_highlight " Binaries Management ";
-    Widgets.dim "Manage Octez binary versions and registered directories";
+    title_highlight " Binaries Management ";
+    dim "Manage Octez binary versions and registered directories";
   ]
 
 let footer = []
@@ -827,7 +230,7 @@ struct
 
   let has_modal = has_modal
 
-  let view = view
+  let view = Binaries_view.view
 
   let on_key ps key ~size =
     let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
@@ -860,11 +263,12 @@ let register () =
 
 (** For testing *)
 module For_tests = struct
-  let filter_latest_n_major_versions = filter_latest_n_major_versions
+  let filter_latest_n_major_versions =
+    Binaries_data.filter_latest_n_major_versions
 
   let format_size = String_utils.format_size
 
-  let build_items = build_items
+  let build_items = Binaries_data.build_items
 
   let move_up = move_up
 
