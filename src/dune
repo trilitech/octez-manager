@@ -52,6 +52,7 @@
   version_utils
   check_prefs)
  (libraries
+  octez_manager_common
   rresult
   yojson
   bos

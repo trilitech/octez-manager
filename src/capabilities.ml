@@ -27,7 +27,7 @@ module Logger = struct
         | Error -> "ERR"
       in
       let line = Printf.sprintf "[%s] %s" prefix msg in
-      Common.append_debug_log line
+      Cmd_runner.append_debug_log line
     in
     let set_enabled _ = () in
     let set_logfile _ = Ok () in
@@ -35,7 +35,33 @@ module Logger = struct
 end
 
 module System : System = struct
-  include Common
+  let is_root = Paths.is_root
+
+  let home_dir = Paths.home_dir
+
+  let xdg_config_home = Paths.xdg_config_home
+
+  let xdg_data_home = Paths.xdg_data_home
+
+  let xdg_state_home = Paths.xdg_state_home
+
+  let which = Paths.which
+
+  let ensure_dir_path = File_ops.ensure_dir_path
+
+  let write_file = File_ops.write_file
+
+  let run = Cmd_runner.run
+
+  let run_out = Cmd_runner.run_out
+
+  let run_as = Cmd_runner.run_as
+
+  let copy_file = File_ops.copy_file
+
+  let remove_path = File_ops.remove_path
+
+  let remove_tree = File_ops.remove_tree
 end
 
 module Service_manager : Service_manager = struct
