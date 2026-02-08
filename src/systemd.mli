@@ -21,9 +21,12 @@ type unit_state = {
 val get_unit_state :
   role:string -> instance:string -> (unit_state, [`Msg of string]) result
 
+(** Read the effective systemd unit file content for a service via [systemctl cat]. *)
 val cat_unit :
   role:string -> instance:string -> (string, [`Msg of string]) result
 
+(** Validate that [user] can execute the role binary in [app_bin_dir].
+    Returns [Error] if the binary is missing or not accessible. *)
 val validate_bin_dir :
   user:string ->
   app_bin_dir:string ->
@@ -35,6 +38,8 @@ val validate_bin_dir :
 val validate_binary_access :
   user:string -> binary_path:string -> (unit, [`Msg of string]) result
 
+(** Install the base systemd unit file for a role.
+    Creates the [.service] file under the system or user unit directory. *)
 val install_unit :
   ?quiet:bool ->
   role:string ->
@@ -43,6 +48,8 @@ val install_unit :
   unit ->
   (unit, [`Msg of string]) result
 
+(** Write a systemd drop-in override for an instance, configuring
+    data directory, logging mode, extra paths, and dependencies. *)
 val write_dropin :
   ?quiet:bool ->
   role:string ->
@@ -54,6 +61,7 @@ val write_dropin :
   unit ->
   (unit, [`Msg of string]) result
 
+(** Write a node-specific systemd drop-in (convenience wrapper around {!write_dropin}). *)
 val write_dropin_node :
   ?quiet:bool ->
   inst:string ->
@@ -62,8 +70,11 @@ val write_dropin_node :
   unit ->
   (unit, [`Msg of string]) result
 
+(** Remove the drop-in directory for a service instance. *)
 val remove_dropin : role:string -> instance:string -> unit
 
+(** Return the list of filesystem paths (unit file, drop-in, env file)
+    associated with a service instance as [(description, path)] pairs. *)
 val get_service_paths : role:string -> instance:string -> (string * string) list
 
 (** Build the systemctl command prefix, accounting for root vs user mode.
@@ -74,6 +85,8 @@ val systemctl_cmd : unit -> string list
 module For_tests : sig
   val role_binary : string -> string
 
+  (** Compute the systemd unit name for a role and instance
+    (e.g. ["octez-mynet-node.service"]). *)
   val unit_name : string -> string -> string
 
   val system_unit_path : string -> string

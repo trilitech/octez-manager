@@ -5,8 +5,14 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Open a read-only text modal showing [lines] with the given [title]. *)
 val open_text_modal : title:string -> lines:string list -> unit
 
+(** Open a single-select list modal.
+    @param items Choices to display.
+    @param to_string Render each item as a string.
+    @param on_tick Optional callback invoked on each render tick (e.g. to refresh items).
+    @param on_select Called when the user picks an item. *)
 val open_choice_modal :
   title:string ->
   items:'a list ->
@@ -16,6 +22,8 @@ val open_choice_modal :
   unit ->
   unit
 
+(** Like {!open_choice_modal} but with a hint panel and description lines
+    for the currently highlighted item. *)
 val open_choice_modal_with_hint :
   title:string ->
   items:'a list ->
@@ -26,6 +34,9 @@ val open_choice_modal_with_hint :
   unit ->
   unit
 
+(** Open a multi-select list modal.
+    [on_select] is called for each toggled item and returns
+    [`KeepOpen] to continue selecting or [`Close] to dismiss. *)
 val open_multiselect_modal :
   title:string ->
   items:(unit -> 'a list) ->
@@ -33,6 +44,10 @@ val open_multiselect_modal :
   on_select:('a -> [< `KeepOpen | `Close]) ->
   unit
 
+(** Open a text input prompt modal.
+    @param initial Pre-filled text.
+    @param placeholder Ghost text shown when input is empty.
+    @param on_submit Called with the entered text on Enter. *)
 val prompt_text_modal :
   ?title:string ->
   ?width:int ->
@@ -42,6 +57,9 @@ val prompt_text_modal :
   unit ->
   unit
 
+(** Like {!prompt_text_modal} but validates input before accepting.
+    The [validator] returns [Ok ()] to allow submission or [Error msg]
+    to show an inline error. *)
 val prompt_validated_text_modal :
   ?title:string ->
   ?width:int ->
@@ -52,17 +70,26 @@ val prompt_validated_text_modal :
   unit ->
   unit
 
+(** Show a success modal with a green-highlighted message. *)
 val show_success : title:string -> string -> unit
 
+(** Show an error modal with a red-highlighted message. *)
 val show_error : title:string -> string -> unit
 
+(** Show a yes/no confirmation dialog.
+    [on_result] receives [true] for yes, [false] for no/cancel. *)
 val confirm_modal :
   ?title:string -> message:string -> on_result:(bool -> unit) -> unit -> unit
 
+(** Show the global help overlay listing all keybindings. *)
 val show_help_modal : unit -> unit
 
+(** Show the global menu overlay with available actions. *)
 val show_menu_modal : unit -> unit
 
+(** Open a file-system browser modal for selecting files or directories.
+    @param dirs_only When [true], only directories are selectable.
+    @param require_writable Only show directories the user can write to. *)
 val open_file_browser_modal :
   ?initial_path:string ->
   dirs_only:bool ->
@@ -71,6 +98,7 @@ val open_file_browser_modal :
   unit ->
   unit
 
+(** Open a directory picker restricted to registered directories of [dir_type]. *)
 val select_directory_modal :
   title:string ->
   dir_type:Octez_manager_lib.Directory_registry.dir_type ->
@@ -78,10 +106,14 @@ val select_directory_modal :
   unit ->
   unit
 
+(** Shortcut to open a directory picker for node data directories. *)
 val select_node_data_dir_modal : on_select:(string -> unit) -> unit -> unit
 
+(** Shortcut to open a directory picker for client base directories. *)
 val select_client_base_dir_modal : on_select:(string -> unit) -> unit -> unit
 
+(** Open a directory picker for application binary directories,
+    returning both the path and the corresponding {!Binary_registry.bin_source}. *)
 val select_app_bin_dir_modal :
   on_select:(string * Octez_manager_lib.Binary_registry.bin_source -> unit) ->
   unit ->
@@ -107,9 +139,12 @@ val show_spinner_modal :
 val wrap_text : width:int -> string -> string list
 
 module For_tests : sig
+  (** Return the first non-empty line from a list, or [None]. *)
   val first_nonempty_line : string list -> string option
 
+  (** @see wrap_text *)
   val wrap_text : width:int -> string -> string list
 
+  (** Extract the major version number from a version string (e.g. ["v21.1" -> 21]). *)
   val extract_major : string -> int
 end

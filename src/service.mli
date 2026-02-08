@@ -28,6 +28,9 @@ type t = {
   dependents : string list;
 }
 
+(** Create a service configuration record.
+    Most optional parameters default to sensible values
+    (e.g. [snapshot_auto] defaults to [false], [dependents] to [[]]). *)
 val make :
   instance:string ->
   role:string ->
@@ -53,6 +56,8 @@ val make :
 (** Get the bin_source, falling back to Raw_path of app_bin_dir for legacy configs *)
 val get_bin_source : t -> Binary_registry.bin_source
 
+(** Serialize a service configuration to JSON. *)
 val to_yojson : t -> Yojson.Safe.t
 
+(** Deserialize a service configuration from JSON. *)
 val of_yojson : Yojson.Safe.t -> (t, [> `Msg of string]) result

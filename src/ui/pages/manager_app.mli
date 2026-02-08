@@ -5,12 +5,21 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Register all TUI pages with the page registry. *)
 val register_pages : unit -> unit
 
+(** Register pages and initialize the runtime (schedulers, logging, etc.).
+    @param log Enable Miaou debug logging (default [false]).
+    @param logfile Path to log file. *)
 val register_and_init : ?log:bool -> ?logfile:string -> unit -> unit
 
+(** Gracefully shut down background schedulers and clean up resources. *)
 val shutdown : unit -> unit
 
+(** Start the TUI application.
+    @param page Initial page to display (defaults to the instances page).
+    @param log Enable Miaou debug logging.
+    @param logfile Path to log file. *)
 val run :
   ?page:string ->
   ?log:bool ->
