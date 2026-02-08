@@ -5,24 +5,15 @@
 (*                                                                            *)
 (******************************************************************************)
 
-open Octez_manager_lib
 open Octez_manager_ui
 module State = Rpc_browser_state
 module Actions = Rpc_browser_actions
 
 (* Helper to create test services *)
 let make_service ?(rpc_addr = "127.0.0.1:8732") name =
-  Service.make
+  Mock_service_helpers_lib.Mock_service_helpers.mock_service
     ~instance:name
-    ~role:"node"
-    ~network:"mainnet"
-    ~history_mode:History_mode.Full
-    ~data_dir:"/tmp/test"
     ~rpc_addr
-    ~net_addr:"[::]:9732"
-    ~service_user:"tezos"
-    ~app_bin_dir:"/usr/bin"
-    ~logging_mode:Logging_mode.Journald
     ()
 
 (* ============================================================ *)
