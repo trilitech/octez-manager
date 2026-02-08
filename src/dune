@@ -4,7 +4,6 @@
  (name octez_manager_lib)
  (public_name octez-manager.lib)
  (modules
-  common
   history_mode
   system_user
   logging_mode
