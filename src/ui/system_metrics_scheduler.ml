@@ -417,32 +417,8 @@ let tick () =
 
 let started = ref false
 
-(** Latest stable Octez version from feed *)
-let latest_stable_version : (int * int) option ref = ref None
-
-(** Parse version string like "23.3" or "v23.3" into (major, minor) *)
-let parse_version s =
-  let s = String.trim s in
-  let s =
-    if String.length s > 0 && s.[0] = 'v' then
-      String.sub s 1 (String.length s - 1)
-    else s
-  in
-  match String.split_on_char '.' s with
-  | major :: minor :: _ -> (
-      match (int_of_string_opt major, int_of_string_opt minor) with
-      | Some maj, Some min -> Some (maj, min)
-      | _ -> None)
-  | [major] -> (
-      match int_of_string_opt major with
-      | Some maj -> Some (maj, 0)
-      | None -> None)
-  | _ -> None
-
-(** Check if version string contains RC or dev markers *)
-let is_rc_or_dev s =
-  let s = String.lowercase_ascii s in
-  String.contains s '-' (* -rc, -rc1, -dev, etc. *)
+(** Latest stable Octez version string from feed (e.g., "23.3") *)
+let latest_stable_version : string option ref = ref None
 
 (** Fetch and parse latest stable version from octez releases JSON *)
 let fetch_latest_version () =
@@ -482,7 +458,9 @@ let fetch_latest_version () =
                   |> Yojson.Safe.Util.to_int_option
                 in
                 match (major, minor) with
-                | Some maj, Some min -> latest_stable_version := Some (maj, min)
+                | Some maj, Some min ->
+                    latest_stable_version :=
+                      Some (Printf.sprintf "%d.%d" maj min)
                 | _ -> ())
             | None -> ())
         | _ -> ()
@@ -498,16 +476,29 @@ type version_status =
 
 (** Compare running version against latest stable *)
 let check_version_status ~running =
-  if is_rc_or_dev running then DevOrRC
+  if Version_utils.is_rc running then DevOrRC
   else
-    match (parse_version running, !latest_stable_version) with
-    | None, _ -> Unknown
-    | _, None -> Unknown
-    | Some (rmaj, rmin), Some (lmaj, lmin) ->
-        if rmaj = lmaj && rmin = lmin then Latest
-        else if rmaj = lmaj && rmin < lmin then MinorBehind
-        else if rmaj < lmaj then MajorBehind
-        else Latest (* Running newer than "latest" - treat as latest *)
+    match !latest_stable_version with
+    | None -> Unknown
+    | Some latest -> (
+        (* Check if the running version can be parsed at all *)
+        match Version_utils.parse_version running with
+        | [] -> Unknown
+        | _ ->
+            let cmp = Version_utils.compare_versions running latest in
+            if cmp >= 0 then Latest
+            else
+              (* Running is older; determine if major or minor behind *)
+              let running_parts = Version_utils.parse_version running in
+              let latest_parts = Version_utils.parse_version latest in
+              let running_major =
+                match running_parts with x :: _ -> Some x | [] -> None
+              in
+              let latest_major =
+                match latest_parts with x :: _ -> Some x | [] -> None
+              in
+              if running_major <> latest_major then MajorBehind else MinorBehind
+        )
 
 (** Get ANSI color for version status *)
 let version_color status =
@@ -533,7 +524,7 @@ let check_version_toast_for ~key ~instance ~version =
   (* Only check if we have latest version info *)
   match !latest_stable_version with
   | None -> ()
-  | Some (lmaj, lmin) -> (
+  | Some latest_ver -> (
       if Hashtbl.mem version_warned key then ()
       else
         let status = check_version_status ~running:version in
@@ -542,20 +533,18 @@ let check_version_toast_for ~key ~instance ~version =
             Hashtbl.replace version_warned key () ;
             Context.toast_warn
               (Printf.sprintf
-                 "%s: v%s is outdated (latest: %d.%d)"
+                 "%s: v%s is outdated (latest: %s)"
                  instance
                  version
-                 lmaj
-                 lmin)
+                 latest_ver)
         | MajorBehind ->
             Hashtbl.replace version_warned key () ;
             Context.toast_error
               (Printf.sprintf
-                 "%s: v%s is deprecated (latest: %d.%d)"
+                 "%s: v%s is deprecated (latest: %s)"
                  instance
                  version
-                 lmaj
-                 lmin)
+                 latest_ver)
         | _ -> ())
 
 (* Wire up the forward reference *)
@@ -599,9 +588,14 @@ module For_test = struct
     | DevOrRC
     | Unknown
 
-  let parse_version = parse_version
+  let parse_version s =
+    let s = String.trim s in
+    match Version_utils.parse_version s with
+    | maj :: min :: _ -> Some (maj, min)
+    | [maj] -> Some (maj, 0)
+    | [] -> None
 
-  let is_rc_or_dev = is_rc_or_dev
+  let is_rc_or_dev = Version_utils.is_rc
 
   let check_version_status = check_version_status
 
