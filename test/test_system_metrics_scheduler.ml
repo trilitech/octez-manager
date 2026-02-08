@@ -99,7 +99,7 @@ let test_is_rc_or_dev_stable () =
 
 let test_version_status_latest () =
   let open System_metrics_scheduler.For_test in
-  set_latest_version (Some (23, 3)) ;
+  set_latest_version (Some "23.3") ;
   Alcotest.(check version_status)
     "23.3 is latest"
     Latest
@@ -108,7 +108,7 @@ let test_version_status_latest () =
 
 let test_version_status_minor_behind () =
   let open System_metrics_scheduler.For_test in
-  set_latest_version (Some (23, 5)) ;
+  set_latest_version (Some "23.5") ;
   Alcotest.(check version_status)
     "23.3 is minor behind"
     MinorBehind
@@ -117,7 +117,7 @@ let test_version_status_minor_behind () =
 
 let test_version_status_major_behind () =
   let open System_metrics_scheduler.For_test in
-  set_latest_version (Some (24, 0)) ;
+  set_latest_version (Some "24.0") ;
   Alcotest.(check version_status)
     "23.3 is major behind"
     MajorBehind
@@ -126,7 +126,7 @@ let test_version_status_major_behind () =
 
 let test_version_status_ahead () =
   let open System_metrics_scheduler.For_test in
-  set_latest_version (Some (23, 3)) ;
+  set_latest_version (Some "23.3") ;
   (* Running newer than latest - treat as latest *)
   Alcotest.(check version_status)
     "24.0 is ahead (treated as latest)"
@@ -136,7 +136,7 @@ let test_version_status_ahead () =
 
 let test_version_status_rc_or_dev () =
   let open System_metrics_scheduler.For_test in
-  set_latest_version (Some (23, 3)) ;
+  set_latest_version (Some "23.3") ;
   Alcotest.(check version_status)
     "23.3-rc1 is RC"
     DevOrRC
@@ -158,7 +158,7 @@ let test_version_status_unknown_no_latest () =
 
 let test_version_status_unknown_invalid () =
   let open System_metrics_scheduler.For_test in
-  set_latest_version (Some (23, 3)) ;
+  set_latest_version (Some "23.3") ;
   Alcotest.(check version_status)
     "unknown for invalid version"
     Unknown
