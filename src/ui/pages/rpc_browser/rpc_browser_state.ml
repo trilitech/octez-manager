@@ -6,67 +6,11 @@
 (******************************************************************************)
 
 open Octez_manager_lib
+include Rpc_browser_types
 module Pager = Miaou_widgets_display.Pager_widget
-
-type entry_kind =
-  | Get
-  | Sub
-  | Dyn of string
-  | DynValue of (string * string)
-  | ChangeTarget  (** Button to change target instance *)
-
-type entry = {name : string; kind : entry_kind}
 
 (** Get public nodes from the shared cache (fetches from Taquito if needed) *)
 let public_nodes () : Service.t list = Public_nodes_cache.get_services ()
-
-type pager_slot = {
-  id : int;
-  request : string;
-  body : string;
-  raw_body : string;
-  pager : Pager.t option;
-  foldable : Foldable_json.t option;
-  response_time_ms : float option;
-  response_size : int option;
-  target_instance : Service.t option;  (** Target node for this pager *)
-}
-
-type result_focus = FocusBrowser | FocusPager of int
-
-(* Legacy type alias - kept for backwards compatibility with external code.
-   Note: This type's constructors FocusBrowser and FocusPager shadow the result_focus ones,
-   so we use explicit type annotations in code that uses result_focus. *)
-type focus = FocusBrowser | FocusPager
-
-type mode =
-  | List of {entries : entry list; cursor : int; loading : bool}
-  | Result of {
-      pagers : pager_slot list;
-      focus : result_focus;
-      last_pager_id : int; (* Last focused pager, used when browser is focused *)
-    }
-
-type openapi_status = Loading | Ready | Error of string | NotAvailable
-
-type dynamic_value = {segment_type : string; value : string; timestamp : float}
-
-type recent_path = {rp_path : string; rp_desc : string; rp_timestamp : float}
-
-type state = {
-  instances : Service.t list;
-  selected_idx : int;
-  path : string list;
-  mode : mode;
-  openapi_status : openapi_status;
-  error : string option;
-  dynamic_history : dynamic_value list;
-  recent_paths : recent_path list;
-  cached_entries : entry list;
-  cached_cursor : int;
-  target_override : Service.t option;
-      (** Global target override for RPC calls *)
-}
 
 (* Selected instance override - set by rpc_node_selection page *)
 let selected_instance_override : Service.t option ref = ref None
@@ -77,115 +21,14 @@ let get_selected_instance () = !selected_instance_override
 
 let clear_selected_instance () = selected_instance_override := None
 
-(* Dynamic history file path *)
-let history_file () =
-  Filename.concat
-    (Common.xdg_config_home ())
-    "octez-manager/rpc_dynamic_history.json"
+(* Persistence delegations *)
+let load_recent_paths = Rpc_browser_persistence.load_recent_paths
 
-(* Recent paths file path *)
-let recent_paths_file () =
-  Filename.concat
-    (Common.xdg_config_home ())
-    "octez-manager/rpc_recent_paths.json"
+let save_recent_paths = Rpc_browser_persistence.save_recent_paths
 
-let load_recent_paths () =
-  let path = recent_paths_file () in
-  if Sys.file_exists path then
-    try
-      let ic = open_in path in
-      let content = really_input_string ic (in_channel_length ic) in
-      close_in ic ;
-      match Yojson.Safe.from_string content with
-      | `List items ->
-          List.filter_map
-            (fun item ->
-              match item with
-              | `Assoc kvs -> (
-                  match
-                    ( List.assoc_opt "path" kvs,
-                      List.assoc_opt "desc" kvs,
-                      List.assoc_opt "timestamp" kvs )
-                  with
-                  | Some (`String p), Some (`String d), Some (`Float ts) ->
-                      Some {rp_path = p; rp_desc = d; rp_timestamp = ts}
-                  | _ -> None)
-              | _ -> None)
-            items
-      | _ -> []
-    with _ -> []
-  else []
+let load_dynamic_history = Rpc_browser_persistence.load_dynamic_history
 
-let save_recent_paths paths =
-  let path = recent_paths_file () in
-  let dir = Filename.dirname path in
-  (if not (Sys.file_exists dir) then try Unix.mkdir dir 0o755 with _ -> ()) ;
-  try
-    let json =
-      `List
-        (List.map
-           (fun rp ->
-             `Assoc
-               [
-                 ("path", `String rp.rp_path);
-                 ("desc", `String rp.rp_desc);
-                 ("timestamp", `Float rp.rp_timestamp);
-               ])
-           paths)
-    in
-    let oc = open_out path in
-    output_string oc (Yojson.Safe.pretty_to_string json) ;
-    close_out oc
-  with _ -> ()
-
-let load_dynamic_history () =
-  let path = history_file () in
-  if Sys.file_exists path then
-    try
-      let ic = open_in path in
-      let content = really_input_string ic (in_channel_length ic) in
-      close_in ic ;
-      match Yojson.Safe.from_string content with
-      | `List items ->
-          List.filter_map
-            (fun item ->
-              match item with
-              | `Assoc kvs -> (
-                  match
-                    ( List.assoc_opt "segment_type" kvs,
-                      List.assoc_opt "value" kvs,
-                      List.assoc_opt "timestamp" kvs )
-                  with
-                  | Some (`String st), Some (`String v), Some (`Float ts) ->
-                      Some {segment_type = st; value = v; timestamp = ts}
-                  | _ -> None)
-              | _ -> None)
-            items
-      | _ -> []
-    with _ -> []
-  else []
-
-let save_dynamic_history history =
-  let path = history_file () in
-  let dir = Filename.dirname path in
-  (if not (Sys.file_exists dir) then try Unix.mkdir dir 0o755 with _ -> ()) ;
-  try
-    let json =
-      `List
-        (List.map
-           (fun dv ->
-             `Assoc
-               [
-                 ("segment_type", `String dv.segment_type);
-                 ("value", `String dv.value);
-                 ("timestamp", `Float dv.timestamp);
-               ])
-           history)
-    in
-    let oc = open_out path in
-    output_string oc (Yojson.Safe.pretty_to_string json) ;
-    close_out oc
-  with _ -> ()
+let save_dynamic_history = Rpc_browser_persistence.save_dynamic_history
 
 let init ~instances =
   let dynamic_history = load_dynamic_history () in
@@ -287,291 +130,49 @@ let set_loading loading state =
   | List m -> {state with mode = List {m with loading}}
   | Result _ -> state
 
-(* Pager management functions *)
+(* Pager management delegations *)
 
-let create_empty_pager ?(target_instance = None) id =
-  {
-    id;
-    request = "";
-    body = "";
-    raw_body = "";
-    pager = None;
-    foldable = None;
-    response_time_ms = None;
-    response_size = None;
-    target_instance;
-  }
+let create_empty_pager = Rpc_browser_pagers.create_empty_pager
 
-let get_pager_ids state =
-  match state.mode with
-  | Result {pagers; _} -> List.map (fun p -> p.id) pagers
-  | List _ -> []
+let get_pager_ids = Rpc_browser_pagers.get_pager_ids
 
-let next_available_id state =
-  let used_ids = get_pager_ids state in
-  let rec find_id n =
-    if n > 9 then None
-    else if List.mem n used_ids then find_id (n + 1)
-    else Some n
-  in
-  find_id 0
+let next_available_id = Rpc_browser_pagers.next_available_id
 
-let is_result_mode state =
-  match state.mode with Result _ -> true | List _ -> false
+let is_result_mode = Rpc_browser_pagers.is_result_mode
 
-let get_result_focus state =
-  match state.mode with Result {focus; _} -> focus | List _ -> FocusBrowser
+let get_result_focus = Rpc_browser_pagers.get_result_focus
 
-let set_result_focus focus state =
-  match state.mode with
-  | Result r -> {state with mode = Result {r with focus}}
-  | List _ -> state
+let set_result_focus = Rpc_browser_pagers.set_result_focus
 
 let enter_result_mode state =
-  (* Use target_override if set, else current instance *)
-  let target =
-    match state.target_override with
-    | Some _ as t -> t
-    | None -> current_instance state
-  in
-  let pager0 = create_empty_pager ~target_instance:target 0 in
-  {
-    state with
-    mode = Result {pagers = [pager0]; focus = FocusPager 0; last_pager_id = 0};
-  }
-
-let add_pager state =
-  match state.mode with
-  | Result {pagers; _} -> (
-      if List.length pagers >= 10 then None
-      else
-        match next_available_id state with
-        | None -> None
-        | Some new_id ->
-            (* Use target_override if set, else current instance *)
-            let target =
-              match state.target_override with
-              | Some _ as t -> t
-              | None -> current_instance state
-            in
-            let new_pager = create_empty_pager ~target_instance:target new_id in
-            Some
-              {
-                state with
-                mode =
-                  Result
-                    {
-                      pagers = pagers @ [new_pager];
-                      focus = FocusPager new_id;
-                      last_pager_id = new_id;
-                    };
-              })
-  | List _ -> None
-
-let remove_pager id state =
-  match state.mode with
-  | Result {pagers; focus; last_pager_id} ->
-      if List.length pagers <= 1 then None
-      else
-        let new_pagers = List.filter (fun p -> p.id <> id) pagers in
-        if List.length new_pagers = List.length pagers then None
-          (* id not found *)
-        else
-          let new_focus : result_focus =
-            match (focus : result_focus) with
-            | FocusPager n when n = id -> (
-                (* Find the next pager to focus *)
-                match new_pagers with
-                | [] -> FocusBrowser
-                | first :: _ -> FocusPager first.id)
-            | _ -> focus
-          in
-          let new_last_pager_id =
-            if last_pager_id = id then
-              match new_pagers with [] -> 0 | first :: _ -> first.id
-            else last_pager_id
-          in
-          Some
-            {
-              state with
-              mode =
-                Result
-                  {
-                    pagers = new_pagers;
-                    focus = new_focus;
-                    last_pager_id = new_last_pager_id;
-                  };
-            }
-  | List _ -> None
-
-let focus_pager id state =
-  match state.mode with
-  | Result {pagers; _} ->
-      if List.exists (fun p -> p.id = id) pagers then
-        {
-          state with
-          mode =
-            Result
-              {
-                pagers;
-                focus = (FocusPager id : result_focus);
-                last_pager_id = id;
-              };
-        }
-      else state
-  | List _ -> state
-
-let focus_browser state =
-  match state.mode with
-  | Result r ->
-      {state with mode = Result {r with focus = (FocusBrowser : result_focus)}}
-  | List _ -> state
-
-let get_focused_pager state =
-  match state.mode with
-  | Result {pagers; focus = FocusPager id; _} ->
-      List.find_opt (fun p -> p.id = id) pagers
-  | Result {pagers; focus = FocusBrowser; last_pager_id; _} ->
-      (* When browser is focused, return last focused pager *)
-      List.find_opt (fun p -> p.id = last_pager_id) pagers
-  | List _ -> None
-
-let get_focused_pager_id state =
-  match state.mode with
-  | Result {focus = FocusPager id; _} -> id
-  | Result {focus = FocusBrowser; last_pager_id; _} -> last_pager_id
-  | List _ -> 0
-
-let get_pager_target state =
-  match state.mode with
-  | List _ -> state.target_override
-  | Result _ -> (
-      match get_focused_pager state with
-      | Some pager -> (
-          (* Pager target if set, else fall back to global target_override *)
-          match pager.target_instance with
-          | Some _ as t -> t
-          | None -> state.target_override)
-      | None -> state.target_override)
-
-let set_pager_target target state =
-  match state.mode with
-  | Result {pagers; focus; last_pager_id} ->
-      let pager_id = get_focused_pager_id state in
-      let new_pagers =
-        List.map
-          (fun p ->
-            if p.id = pager_id then {p with target_instance = target} else p)
-          pagers
-      in
-      {
-        state with
-        mode = Result {pagers = new_pagers; focus; last_pager_id};
-        target_override = target;
-      }
-  | List _ -> {state with target_override = target}
-
-let get_pagers state =
-  match state.mode with Result {pagers; _} -> pagers | List _ -> []
-
-let update_pager_slot id f state =
-  match state.mode with
-  | Result ({pagers; _} as r) ->
-      let new_pagers =
-        List.map (fun p -> if p.id = id then f p else p) pagers
-      in
-      {state with mode = Result {r with pagers = new_pagers}}
-  | List _ -> state
-
-let set_pager_result ~pager_id ~request ~body ~raw_body ?response_time_ms
-    ?response_size state =
-  (* Create foldable JSON from raw body *)
-  let foldable = Foldable_json.of_string raw_body in
-  (* Use foldable render if available, otherwise fall back to highlighted body *)
-  let display_body =
-    match foldable with Some f -> Foldable_json.render f | None -> body
-  in
-  (* Create pager from rendered content *)
-  let pager = Pager.open_text ~title:"Response" display_body in
-  (* Enable cursor mode when foldable JSON is available for fold/unfold *)
-  let pager =
-    match foldable with
-    | Some _ -> Pager.set_cursor_mode pager true
-    | None -> pager
-  in
-  update_pager_slot
-    pager_id
-    (fun slot ->
-      {
-        slot with
-        request;
-        body = display_body;
-        raw_body;
-        pager = Some pager;
-        foldable;
-        response_time_ms;
-        response_size;
-      })
+  Rpc_browser_pagers.enter_result_mode
+    ~current_instance:(current_instance state)
     state
 
-let execute_get ~url state =
-  match state.mode with
-  | Result {pagers; last_pager_id; _} ->
-      let pager_id = get_focused_pager_id state in
-      (* Update the focused pager to show loading state *)
-      let new_pagers =
-        List.map
-          (fun p ->
-            if p.id = pager_id then
-              {
-                p with
-                request = url;
-                body = "Loading...";
-                raw_body = "";
-                pager = None;
-                foldable = None;
-                response_time_ms = None;
-                response_size = None;
-              }
-            else p)
-          pagers
-      in
-      {
-        state with
-        mode =
-          Result
-            {pagers = new_pagers; focus = FocusPager pager_id; last_pager_id};
-        error = None;
-      }
-  | List _ ->
-      (* Enter result mode with a single pager *)
-      let pager0 =
-        {(create_empty_pager 0) with request = url; body = "Loading..."}
-      in
-      {
-        state with
-        mode =
-          Result {pagers = [pager0]; focus = FocusPager 0; last_pager_id = 0};
-        error = None;
-      }
+let add_pager state =
+  Rpc_browser_pagers.add_pager ~current_instance:(current_instance state) state
 
-let set_result ~body ~raw_body ?response_time_ms ?response_size state =
-  match state.mode with
-  | Result _ ->
-      let pager_id = get_focused_pager_id state in
-      let focused_pager = get_focused_pager state in
-      let request =
-        match focused_pager with Some p -> p.request | None -> ""
-      in
-      set_pager_result
-        ~pager_id
-        ~request
-        ~body
-        ~raw_body
-        ?response_time_ms
-        ?response_size
-        state
-  | List _ -> state
+let remove_pager = Rpc_browser_pagers.remove_pager
+
+let focus_pager = Rpc_browser_pagers.focus_pager
+
+let focus_browser = Rpc_browser_pagers.focus_browser
+
+let get_focused_pager = Rpc_browser_pagers.get_focused_pager
+
+let get_focused_pager_id = Rpc_browser_pagers.get_focused_pager_id
+
+let get_pager_target = Rpc_browser_pagers.get_pager_target
+
+let set_pager_target = Rpc_browser_pagers.set_pager_target
+
+let get_pagers = Rpc_browser_pagers.get_pagers
+
+let set_pager_result = Rpc_browser_pagers.set_pager_result
+
+let execute_get = Rpc_browser_pagers.execute_get
+
+let set_result = Rpc_browser_pagers.set_result
 
 let cursor_up state =
   match state.mode with
@@ -605,7 +206,6 @@ let clear_error state = {state with error = None}
 
 let set_openapi_status status state = {state with openapi_status = status}
 
-(* Focus functions *)
 let toggle_focus state =
   match state.mode with
   | Result ({focus; _} as r) ->
@@ -617,192 +217,36 @@ let toggle_focus state =
       {state with mode = Result {r with focus = new_focus}}
   | List _ -> state
 
-(* Pager functions - work with the focused pager *)
-let get_pager state =
-  match get_focused_pager state with Some slot -> slot.pager | None -> None
+let get_pager = Rpc_browser_pagers.get_pager
 
-let set_pager pager state =
-  match state.mode with
-  | Result _ ->
-      let pager_id = get_focused_pager_id state in
-      update_pager_slot
-        pager_id
-        (fun slot -> {slot with pager = Some pager})
-        state
-  | List _ -> state
+let set_pager = Rpc_browser_pagers.set_pager
 
-(* Dynamic value history functions *)
-let add_dynamic_value ~segment_type ~value state =
-  let now = Unix.gettimeofday () in
-  let new_entry = {segment_type; value; timestamp = now} in
-  (* Remove older entries for same type/value, keep max 50 entries *)
-  let filtered =
-    List.filter
-      (fun dv -> not (dv.segment_type = segment_type && dv.value = value))
-      state.dynamic_history
-  in
-  let new_history =
-    new_entry :: filtered |> fun lst ->
-    if List.length lst > 50 then List.filteri (fun i _ -> i < 50) lst else lst
-  in
-  save_dynamic_history new_history ;
-  {state with dynamic_history = new_history}
+(* Dynamic value history delegations *)
+let add_dynamic_value = Rpc_browser_history.add_dynamic_value
 
-let get_recent_values ~segment_type state =
-  state.dynamic_history
-  |> List.filter (fun dv -> dv.segment_type = segment_type)
-  |> List.sort (fun a b -> compare b.timestamp a.timestamp)
-  |> List.map (fun dv -> dv.value)
-  |> fun lst ->
-  (* Dedupe while preserving order *)
-  let seen = Hashtbl.create 16 in
-  List.filter
-    (fun v ->
-      if Hashtbl.mem seen v then false
-      else (
-        Hashtbl.add seen v () ;
-        true))
-    lst
-  |> fun lst ->
-  if List.length lst > 10 then List.filteri (fun i _ -> i < 10) lst else lst
+let get_recent_values = Rpc_browser_history.get_recent_values
 
-(* JSON Folding functions - work with the focused pager *)
-let update_focused_pager_from_foldable state =
-  match get_focused_pager state with
-  | Some slot -> (
-      match slot.foldable with
-      | Some f ->
-          let new_body = Foldable_json.render f in
-          let pager = Pager.open_text ~title:"Response" new_body in
-          (* Preserve cursor mode, position, and search from old pager *)
-          let pager =
-            match slot.pager with
-            | Some old_p ->
-                let pager =
-                  Pager.set_cursor_mode pager (Pager.cursor_mode old_p)
-                in
-                let pager =
-                  Pager.set_cursor pager (Pager.get_cursor_line old_p)
-                in
-                (* Preserve search query *)
-                Pager.set_search pager old_p.Pager.search
-            | None -> Pager.set_cursor_mode pager true
-          in
-          let pager_id = get_focused_pager_id state in
-          update_pager_slot
-            pager_id
-            (fun s -> {s with body = new_body; pager = Some pager})
-            state
-      | None -> state)
-  | None -> state
+(* JSON Folding delegations *)
+let toggle_fold = Rpc_browser_json_fold.toggle_fold
 
-let toggle_fold ~line state =
-  match get_focused_pager state with
-  | Some slot -> (
-      match slot.foldable with
-      | Some f ->
-          let f' = Foldable_json.toggle_fold_at_line f ~line in
-          let pager_id = get_focused_pager_id state in
-          let state' =
-            update_pager_slot
-              pager_id
-              (fun s -> {s with foldable = Some f'})
-              state
-          in
-          update_focused_pager_from_foldable state'
-      | None -> state)
-  | None -> state
+let unfold_all_json = Rpc_browser_json_fold.unfold_all
 
-let unfold_all_json state =
-  match get_focused_pager state with
-  | Some slot -> (
-      match slot.foldable with
-      | Some f ->
-          let f' = Foldable_json.unfold_all f in
-          let pager_id = get_focused_pager_id state in
-          let state' =
-            update_pager_slot
-              pager_id
-              (fun s -> {s with foldable = Some f'})
-              state
-          in
-          update_focused_pager_from_foldable state'
-      | None -> state)
-  | None -> state
+let fold_all_json = Rpc_browser_json_fold.fold_all
 
-let fold_all_json state =
-  match get_focused_pager state with
-  | Some slot -> (
-      match slot.foldable with
-      | Some f ->
-          let f' = Foldable_json.fold_all f in
-          let pager_id = get_focused_pager_id state in
-          let state' =
-            update_pager_slot
-              pager_id
-              (fun s -> {s with foldable = Some f'})
-              state
-          in
-          update_focused_pager_from_foldable state'
-      | None -> state)
-  | None -> state
+(* Cached cursor navigation delegations *)
+let cached_cursor_up = Rpc_browser_cached_nav.cursor_up
 
-(* Cached cursor navigation for Result mode browser panel *)
-let cached_cursor_up state =
-  if state.cached_cursor > 0 then
-    {state with cached_cursor = state.cached_cursor - 1}
-  else state
+let cached_cursor_down = Rpc_browser_cached_nav.cursor_down
 
-let cached_cursor_down state =
-  if state.cached_cursor < List.length state.cached_entries - 1 then
-    {state with cached_cursor = state.cached_cursor + 1}
-  else state
+let get_cached_entry = Rpc_browser_cached_nav.get_entry
 
-let get_cached_entry state =
-  List.nth_opt state.cached_entries state.cached_cursor
+let navigate_cached = Rpc_browser_cached_nav.navigate
 
-(* Navigate path while staying in Result mode (for browser panel navigation) *)
-let navigate_cached segment state =
-  {
-    state with
-    path = state.path @ [segment];
-    cached_entries = [];
-    cached_cursor = 0;
-  }
+let set_cached_entries = Rpc_browser_cached_nav.set_entries
 
-let set_cached_entries entries state =
-  {state with cached_entries = entries; cached_cursor = 0}
+let navigate_cached_up = Rpc_browser_cached_nav.navigate_up
 
-let navigate_cached_up state =
-  match state.path with
-  | [] -> state
-  | _ ->
-      let new_path = List.rev (List.tl (List.rev state.path)) in
-      {state with path = new_path; cached_entries = []; cached_cursor = 0}
+(* Recent paths LRU delegations *)
+let add_recent_path = Rpc_browser_history.add_recent_path
 
-(* Recent paths LRU functions *)
-let max_recent_paths = 5
-
-let add_recent_path ~path ~desc state =
-  let now = Unix.gettimeofday () in
-  let new_entry = {rp_path = path; rp_desc = desc; rp_timestamp = now} in
-  (* Remove existing entry for same path, then prepend *)
-  let filtered =
-    List.filter (fun rp -> rp.rp_path <> path) state.recent_paths
-  in
-  let new_paths =
-    new_entry :: filtered |> fun lst ->
-    if List.length lst > max_recent_paths then
-      List.filteri (fun i _ -> i < max_recent_paths) lst
-    else lst
-  in
-  save_recent_paths new_paths ;
-  {state with recent_paths = new_paths}
-
-let get_recent_paths state =
-  state.recent_paths
-  |> List.sort (fun a b -> compare b.rp_timestamp a.rp_timestamp)
-  |> fun lst ->
-  if List.length lst > max_recent_paths then
-    List.filteri (fun i _ -> i < max_recent_paths) lst
-  else lst
+let get_recent_paths = Rpc_browser_history.get_recent_paths
