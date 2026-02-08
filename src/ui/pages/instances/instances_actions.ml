@@ -143,7 +143,7 @@ let remove_modal state =
       state)
 
 let journalctl_args unit_name =
-  if Common.is_root () then
+  if Paths.is_root () then
     ["journalctl"; "-u"; unit_name; "--no-pager"; "-n"; "200"]
   else ["journalctl"; "--user"; "-u"; unit_name; "--no-pager"; "-n"; "200"]
 
@@ -220,7 +220,7 @@ let _view_logs_old state =
         | [] -> None
       in
       let tail_file path =
-        match Common.run_out ["tail"; "-n"; "200"; path] with
+        match Cmd_runner.run_out ["tail"; "-n"; "200"; path] with
         | Ok text ->
             Modal_helpers.open_text_modal
               ~title
@@ -232,7 +232,7 @@ let _view_logs_old state =
       in
       let show_journald () =
         let unit = Systemd.unit_name svc.Service.role svc.Service.instance in
-        match Common.run_out (journalctl_args unit) with
+        match Cmd_runner.run_out (journalctl_args unit) with
         | Ok text ->
             Modal_helpers.open_text_modal
               ~title
@@ -942,7 +942,7 @@ let update_version_modal svc =
         in
         let binary_path = Filename.concat svc.Service.app_bin_dir binary_name in
         if Sys.file_exists binary_path then
-          match Common.run_out [binary_path; "--version"] with
+          match Cmd_runner.run_out [binary_path; "--version"] with
           | Ok version_output -> (
               (* Parse "24.0 (hash)" or "Octez 24.0" to extract "24.0" *)
               let version_str = String.trim version_output in

@@ -79,7 +79,7 @@ let directory_entry_of_yojson json =
 
 (* File paths *)
 
-let registry_root = Common.registry_root
+let registry_root = Paths.registry_root
 
 let directories_file () = Filename.concat (registry_root ()) "directories.json"
 
@@ -95,17 +95,17 @@ let migrated_marker_file () =
 
 let write_all entries =
   let owner, group =
-    if Common.is_root () then ("root", "root")
-    else Common.current_user_group_names ()
+    if Paths.is_root () then ("root", "root")
+    else Paths.current_user_group_names ()
   in
   let json =
     `List (List.map directory_entry_to_yojson entries)
     |> Yojson.Safe.pretty_to_string
   in
   let* () =
-    Common.ensure_dir_path ~owner ~group ~mode:0o755 (registry_root ())
+    File_ops.ensure_dir_path ~owner ~group ~mode:0o755 (registry_root ())
   in
-  Common.write_file ~mode:0o644 ~owner ~group (directories_file ()) json
+  File_ops.write_file ~mode:0o644 ~owner ~group (directories_file ()) json
 
 let read_all_internal () =
   let path = directories_file () in
@@ -193,15 +193,15 @@ let migrate_from_base_dir_registry () =
 
           (* Create migration marker *)
           let owner, group =
-            if Common.is_root () then ("root", "root")
-            else Common.current_user_group_names ()
+            if Paths.is_root () then ("root", "root")
+            else Paths.current_user_group_names ()
           in
-          Common.write_file
+          File_ops.write_file
             ~mode:0o644
             ~owner
             ~group
             migrated_marker
-            (Common.now ())
+            (String_utils.now ())
       | _ -> Error (`Msg "Invalid base_dirs.json format during migration")
     with
     | Sys_error msg -> Error (`Msg ("Migration error: " ^ msg))
@@ -239,9 +239,9 @@ let read_all () =
   Ok (sort_by_last_used entries)
 
 let add ~path ~dir_type ~registered_services =
-  Common.with_file_lock (directories_lock_file ()) (fun () ->
+  File_ops.with_file_lock (directories_lock_file ()) (fun () ->
       let* existing = read_all () in
-      let timestamp = Common.now () in
+      let timestamp = String_utils.now () in
       (* Check if path already exists *)
       let existing_entry = List.find_opt (fun e -> e.path = path) existing in
       let filtered = List.filter (fun e -> e.path <> path) existing in
@@ -275,25 +275,25 @@ let list ?dir_type () =
   | Some dt -> Ok (List.filter (fun e -> e.dir_type = dt) all)
 
 let remove path =
-  Common.with_file_lock (directories_lock_file ()) (fun () ->
+  File_ops.with_file_lock (directories_lock_file ()) (fun () ->
       let* existing = read_all () in
       let filtered = List.filter (fun e -> e.path <> path) existing in
       write_all filtered)
 
 let update_registered_services ~path ~registered_services =
-  Common.with_file_lock (directories_lock_file ()) (fun () ->
+  File_ops.with_file_lock (directories_lock_file ()) (fun () ->
       let* existing = read_all () in
       match List.find_opt (fun e -> e.path = path) existing with
       | None -> Ok () (* Path not found, nothing to update *)
       | Some entry ->
           let updated =
-            {entry with registered_services; last_used_at = Common.now ()}
+            {entry with registered_services; last_used_at = String_utils.now ()}
           in
           let filtered = List.filter (fun e -> e.path <> path) existing in
           write_all (limit_entries_per_type (updated :: filtered)))
 
 let clear_all () =
-  Common.with_file_lock (directories_lock_file ()) (fun () -> write_all [])
+  File_ops.with_file_lock (directories_lock_file ()) (fun () -> write_all [])
 
 (** Expose internal functions for testing *)
 module For_test = struct

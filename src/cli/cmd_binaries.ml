@@ -76,8 +76,8 @@ let list_cmd =
               (fun version ->
                 let path = Binary_registry.managed_version_path version in
                 let size_str =
-                  match Common.get_dir_size path with
-                  | Some size -> Common.format_size size
+                  match File_ops.get_dir_size path with
+                  | Some size -> String_utils.format_size size
                   | None -> "unknown size"
                 in
                 let count =

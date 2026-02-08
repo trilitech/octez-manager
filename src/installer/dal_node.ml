@@ -27,7 +27,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
     System_user.ensure_service_account ~quiet ~name:request.service_user ()
   in
   let* () =
-    if Common.is_root () then
+    if Paths.is_root () then
       System_user.ensure_system_directories
         ~user:request.service_user
         ~group:request.service_user
@@ -39,8 +39,8 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
   in
   let* () = System_user.validate_user_for_service ~user:request.service_user in
   let owner, group =
-    if Common.is_root () then (request.service_user, request.service_user)
-    else Common.current_user_group_names ()
+    if Paths.is_root () then (request.service_user, request.service_user)
+    else Paths.current_user_group_names ()
   in
   let directories = request.data_dir :: request.extra_paths in
   let* () = ensure_directories ~owner ~group directories in

@@ -5,8 +5,6 @@
 (*                                                                            *)
 (******************************************************************************)
 
-open Octez_manager_lib
-
 type status = NotDownloaded | Downloading | Ready | Error of string
 
 (* placeholders kept for future use - dynamic segment type hints *)
@@ -24,7 +22,7 @@ let current_status = ref NotDownloaded
 let get_status () = !current_status
 
 let openapi_dir () =
-  Filename.concat (Common.xdg_data_home ()) "octez-manager/openapi"
+  Filename.concat (Paths.xdg_data_home ()) "octez-manager/openapi"
 
 let openapi_path () = Filename.concat (openapi_dir ()) "rpc-openapi.json"
 
@@ -68,7 +66,7 @@ let download_file ~url ~dest =
       url;
     ]
   in
-  Common.run cmd
+  Cmd_runner.run cmd
 
 let download_sync () =
   let dir = openapi_dir () in

@@ -63,7 +63,7 @@ let list_all_service_units () =
       Systemd.systemctl_cmd ()
       @ ["list-units"; "--type=service"; "--all"; "--no-legend"; "--no-pager"]
     in
-    match Common.run_out cmd with
+    match Cmd_runner.run_out cmd with
     | Ok output ->
         let lines = String.split_on_char '\n' output in
         List.filter_map
@@ -97,7 +97,7 @@ let list_all_service_units () =
           "--no-pager";
         ]
     in
-    match Common.run_out cmd with
+    match Cmd_runner.run_out cmd with
     | Ok output ->
         let lines = String.split_on_char '\n' output in
         List.filter_map
@@ -132,7 +132,7 @@ let list_all_service_units () =
       (* For services not matching octez-* pattern, check FragmentPath
          to see if they have their own file vs using a template *)
       match
-        Common.run_out
+        Cmd_runner.run_out
           (Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "FragmentPath"])
       with
       | Ok output ->
@@ -191,7 +191,7 @@ let get_exec_start ~unit_name =
   let cmd =
     Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "ExecStart"; "--value"]
   in
-  match Common.run_out cmd with
+  match Cmd_runner.run_out cmd with
   | Ok output ->
       let trimmed = String.trim output in
       if trimmed = "" || trimmed = "[not set]" then None
@@ -206,7 +206,7 @@ let get_exec_start ~unit_name =
 let get_unit_properties ~unit_name ~props =
   (* Query all properties at once without -p flag to avoid parsing issues *)
   let cmd = Systemd.systemctl_cmd () @ ["show"; unit_name] in
-  match Common.run_out cmd with
+  match Cmd_runner.run_out cmd with
   | Ok output ->
       let lines = String.split_on_char '\n' output in
       let all_props =
@@ -225,11 +225,11 @@ let get_unit_properties ~unit_name ~props =
 
 let get_unit_content ~unit_name =
   let cmd = Systemd.systemctl_cmd () @ ["cat"; unit_name] in
-  match Common.run_out cmd with
+  match Cmd_runner.run_out cmd with
   | Ok content -> Ok content
   | Error (`Msg msg) ->
       let msg_lower = String.lowercase_ascii msg in
-      if Common.string_contains ~needle:"permission denied" msg_lower then
+      if String_utils.string_contains ~needle:"permission denied" msg_lower then
         Error `Permission_denied
       else Error (`Error msg)
 
@@ -252,7 +252,7 @@ let probe_rpc_chain_id rpc_addr =
   let full_url = url ^ "/chains/main/chain_id" in
   (* Use curl with short timeout *)
   let cmd = ["curl"; "-s"; "--max-time"; "2"; full_url] in
-  match Common.run_out cmd with
+  match Cmd_runner.run_out cmd with
   | Ok output -> (
       try
         let trimmed = String.trim output in
@@ -308,7 +308,7 @@ let get_running_command ~unit_name =
   let cmd =
     Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "MainPID"; "--value"]
   in
-  match Common.run_out cmd with
+  match Cmd_runner.run_out cmd with
   | Ok output -> (
       let trimmed = String.trim output in
       match int_of_string_opt trimmed with
@@ -347,12 +347,12 @@ let detect_daily_logs_dir ~role ~data_dir ~base_dir =
 (** Check if ExecStart contains an octez binary *)
 let contains_octez_binary exec_start =
   let lower = String.lowercase_ascii exec_start in
-  Common.string_contains ~needle:"octez-node" lower
-  || Common.string_contains ~needle:"octez-baker" lower
-  || Common.string_contains ~needle:"octez-accuser" lower
-  || Common.string_contains ~needle:"octez-dal-node" lower
-  || Common.string_contains ~needle:"tezos-baker" lower
-  || Common.string_contains ~needle:"tezos-accuser" lower
+  String_utils.string_contains ~needle:"octez-node" lower
+  || String_utils.string_contains ~needle:"octez-baker" lower
+  || String_utils.string_contains ~needle:"octez-accuser" lower
+  || String_utils.string_contains ~needle:"octez-dal-node" lower
+  || String_utils.string_contains ~needle:"tezos-baker" lower
+  || String_utils.string_contains ~needle:"tezos-accuser" lower
 
 (** Build External_service.t from a unit name, ExecStart, and systemd properties.
     Parses ExecStart to extract configuration. *)
@@ -804,7 +804,7 @@ let detect () =
 (** {1 Testing Utilities} *)
 
 module For_tests = struct
-  let string_contains = Common.string_contains
+  let string_contains = String_utils.string_contains
 
   let is_managed_unit_name = is_managed_unit_name
 

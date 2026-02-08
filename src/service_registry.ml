@@ -9,7 +9,7 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-let registry_root = Common.registry_root
+let registry_root = Paths.registry_root
 
 let services_dir () = Filename.concat (registry_root ()) "services"
 
@@ -18,14 +18,14 @@ let service_path instance =
 
 let write service =
   let owner, group =
-    if Common.is_root () then ("root", "root")
-    else Common.current_user_group_names ()
+    if Paths.is_root () then ("root", "root")
+    else Paths.current_user_group_names ()
   in
   let json = Service.to_yojson service |> Yojson.Safe.pretty_to_string in
   let* () =
-    Common.ensure_dir_path ~owner ~group ~mode:0o755 (services_dir ())
+    File_ops.ensure_dir_path ~owner ~group ~mode:0o755 (services_dir ())
   in
-  Common.write_file
+  File_ops.write_file
     ~mode:0o644
     ~owner
     ~group

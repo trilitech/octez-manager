@@ -136,7 +136,7 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
             let user = (get_core m).service_user in
             (* First check if binary exists *)
             binary_validator app_bin_dir
-            && ((not (Common.is_root ()))
+            && ((not (Paths.is_root ()))
                || (not (is_nonempty user))
                ||
                (* In root mode with user, verify service user can access *)
@@ -152,7 +152,7 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
                    binary
                    app_bin_dir)
             else if
-              Common.is_root () && is_nonempty user
+              Paths.is_root () && is_nonempty user
               && not
                    (binary_accessible_to_user
                       ~user
@@ -341,7 +341,7 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
                   else inst
                 in
                 let new_name = Printf.sprintf "%s-%s" role dep_suffix in
-                let default_dir = Common.default_role_dir role new_name in
+                let default_dir = Paths.default_role_dir role new_name in
                 let core = get_core !model_ref in
                 let client = get_client !model_ref in
                 model_ref :=

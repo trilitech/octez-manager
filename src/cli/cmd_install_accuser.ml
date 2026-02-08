@@ -38,8 +38,8 @@ let install_accuser_cmd =
           ~docv:"ARG")
   in
   let default_user =
-    if Common.is_root () then "octez"
-    else fst (Common.current_user_group_names ())
+    if Paths.is_root () then "octez"
+    else fst (Paths.current_user_group_names ())
   in
   let service_user =
     Arg.(

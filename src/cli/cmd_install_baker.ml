@@ -60,8 +60,8 @@ let install_baker_cmd =
     Arg.(value & opt_all string [] & info ["extra-arg"] ~doc ~docv:"ARG")
   in
   let default_user =
-    if Common.is_root () then "octez"
-    else fst (Common.current_user_group_names ())
+    if Paths.is_root () then "octez"
+    else fst (Paths.current_user_group_names ())
   in
   let service_user =
     Arg.(

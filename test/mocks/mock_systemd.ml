@@ -383,7 +383,7 @@ let generate_list_output () =
 
 (** Parse and execute a systemctl command
     
-    This function should be called from a hook in Common.run when
+    This function should be called from a hook in Cmd_runner.run when
     OCTEZ_MANAGER_TEST_MODE is set.
     
     Returns: (exit_code, stdout, stderr)
@@ -440,7 +440,7 @@ let is_test_mode () =
   | Some "1" | Some "true" -> true
   | _ -> false
 
-(** Hook to be called from Common.run 
+(** Hook to be called from Cmd_runner.run 
     
     Add this to src/common.ml:
     

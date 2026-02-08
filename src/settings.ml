@@ -19,7 +19,7 @@ let default =
   {app_bin_dir = None; default_history_mode = None; default_logging_mode = None}
 
 let settings_path () =
-  Filename.concat (Common.xdg_config_home ()) "octez-manager/settings.json"
+  Filename.concat (Paths.xdg_config_home ()) "octez-manager/settings.json"
 
 let to_yojson t =
   `Assoc
@@ -81,8 +81,8 @@ let save t =
   let path = settings_path () in
   let dir = Filename.dirname path in
   let* () =
-    let owner, group = Common.current_user_group_names () in
-    Common.ensure_dir_path ~owner ~group ~mode:0o755 dir
+    let owner, group = Paths.current_user_group_names () in
+    File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir
   in
   try
     let json = to_yojson t in

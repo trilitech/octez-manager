@@ -204,7 +204,7 @@ let run_interactive service =
       else None) ;
   (* Load history *)
   let history_file =
-    Filename.concat (Common.xdg_config_home ()) "octez-manager/rpc_history"
+    Filename.concat (Paths.xdg_config_home ()) "octez-manager/rpc_history"
   in
   let history_dir = Filename.dirname history_file in
   (if not (Sys.file_exists history_dir) then

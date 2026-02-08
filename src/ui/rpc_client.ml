@@ -20,8 +20,8 @@ let rpc_get (s : Service.t) path =
   let argv =
     [octez_client_bin s; "--endpoint"; endpoint_of s; "rpc"; "get"; path]
   in
-  let cmd_s = Common.cmd_to_string argv ^ " 2>/dev/null" in
-  Common.run_out ["/bin/sh"; "-lc"; cmd_s]
+  let cmd_s = Cmd_runner.cmd_to_string argv ^ " 2>/dev/null" in
+  Cmd_runner.run_out ["/bin/sh"; "-lc"; cmd_s]
 
 (* Cache tool availability to avoid shell probes on each request. *)
 let has_curl_cached = lazy (Sys.command "command -v curl >/dev/null 2>&1" = 0)
@@ -93,7 +93,7 @@ let http_fetch_methods ~url ~rpc_path (s : Service.t) :
       Some
         (with_request_slot (fun () ->
              match
-               Common.run_out
+               Cmd_runner.run_out
                  ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
              with
              | Ok s -> Ok s
@@ -105,7 +105,8 @@ let http_fetch_methods ~url ~rpc_path (s : Service.t) :
       Some
         (with_request_slot (fun () ->
              match
-               Common.run_out ["wget"; "-qO-"; "--timeout=1"; "--tries=1"; url]
+               Cmd_runner.run_out
+                 ["wget"; "-qO-"; "--timeout=1"; "--tries=1"; url]
              with
              | Ok s -> Ok s
              | Error (`Msg m) -> Error m))
@@ -235,7 +236,7 @@ let node_version (s : Service.t) : string option =
   let key = s.Service.instance in
   Cache.get_safe_keyed version_cache key ~fetch:(fun () ->
       let bin = Filename.concat s.app_bin_dir "octez-node" in
-      match Common.run_out ["timeout"; "2s"; bin; "--version"] with
+      match Cmd_runner.run_out ["timeout"; "2s"; bin; "--version"] with
       | Ok out ->
           clear_error s ;
           Some (String.trim out)

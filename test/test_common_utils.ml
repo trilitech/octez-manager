@@ -15,46 +15,45 @@
 *)
 
 open Alcotest
-open Octez_manager_lib
 
 (* ============================================================ *)
 (* Shell Quoting Tests *)
 (* ============================================================ *)
 
 let test_sh_quote_simple () =
-  let result = Common.sh_quote "simple" in
+  let result = Cmd_runner.sh_quote "simple" in
   check string "simple unchanged" "simple" result
 
 let test_sh_quote_with_spaces () =
-  let result = Common.sh_quote "hello world" in
+  let result = Cmd_runner.sh_quote "hello world" in
   (* Should be quoted *)
   check bool "spaces cause quoting" true (String.contains result '\'')
 
 let test_sh_quote_with_single_quote () =
-  let result = Common.sh_quote "it's" in
+  let result = Cmd_runner.sh_quote "it's" in
   (* Single quotes need escaping *)
   check bool "handles single quote" true (String.length result > 4)
 
 let test_sh_quote_empty () =
-  let result = Common.sh_quote "" in
+  let result = Cmd_runner.sh_quote "" in
   (* Empty string might not be quoted or might be *)
   check bool "empty string handled" true (String.length result >= 0)
 
 let test_sh_quote_with_dollar () =
-  let result = Common.sh_quote "$VAR" in
+  let result = Cmd_runner.sh_quote "$VAR" in
   (* Dollar signs should be protected *)
   check bool "protects dollar" true (String.contains result '\'')
 
 let test_sh_quote_with_backtick () =
-  let result = Common.sh_quote "`command`" in
+  let result = Cmd_runner.sh_quote "`command`" in
   check bool "protects backtick" true (String.contains result '\'')
 
 let test_sh_quote_with_semicolon () =
-  let result = Common.sh_quote "cmd1; cmd2" in
+  let result = Cmd_runner.sh_quote "cmd1; cmd2" in
   check bool "protects semicolon" true (String.contains result '\'')
 
 let test_sh_quote_path () =
-  let result = Common.sh_quote "/path/to/file" in
+  let result = Cmd_runner.sh_quote "/path/to/file" in
   (* Simple paths might not need quoting *)
   check bool "handles path" true (String.length result > 0)
 
@@ -63,46 +62,46 @@ let test_sh_quote_path () =
 (* ============================================================ *)
 
 let test_absolute_path_already_absolute () =
-  let result = Common.make_absolute_path "/absolute/path" in
+  let result = Paths.make_absolute_path "/absolute/path" in
   match result with
   | Ok path -> check string "absolute unchanged" "/absolute/path" path
   | Error _ -> fail "should accept absolute path"
 
 let test_absolute_path_relative () =
-  let result = Common.make_absolute_path "relative/path" in
+  let result = Paths.make_absolute_path "relative/path" in
   match result with
   | Ok path ->
       check bool "made absolute" true (String.starts_with ~prefix:"/" path)
   | Error _ -> fail "should convert relative path"
 
 let test_absolute_path_dot () =
-  let result = Common.make_absolute_path "." in
+  let result = Paths.make_absolute_path "." in
   match result with
   | Ok path ->
       check bool "dot to absolute" true (String.starts_with ~prefix:"/" path)
   | Error _ -> fail "should handle dot"
 
 let test_absolute_path_dotdot () =
-  let result = Common.make_absolute_path ".." in
+  let result = Paths.make_absolute_path ".." in
   match result with
   | Ok path ->
       check bool "dotdot to absolute" true (String.starts_with ~prefix:"/" path)
   | Error _ -> fail "should handle dotdot"
 
 let test_absolute_path_empty () =
-  let result = Common.make_absolute_path "" in
+  let result = Paths.make_absolute_path "" in
   match result with
   | Error _ -> check bool "empty path fails" true true
   | Ok _ -> fail "should reject empty path"
 
 let test_absolute_path_whitespace () =
-  let result = Common.make_absolute_path "   " in
+  let result = Paths.make_absolute_path "   " in
   match result with
   | Error _ -> check bool "whitespace fails" true true
   | Ok _ -> fail "should reject whitespace-only"
 
 let test_absolute_path_tilde () =
-  let result = Common.make_absolute_path "~/file" in
+  let result = Paths.make_absolute_path "~/file" in
   match result with
   | Ok path ->
       (* Tilde might be expanded *)
@@ -114,20 +113,20 @@ let test_absolute_path_tilde () =
 (* ============================================================ *)
 
 let test_default_data_dir () =
-  let result = Common.default_data_dir "test-instance" in
+  let result = Paths.default_data_dir "test-instance" in
   check bool "has path" true (String.contains result '/')
 
 let test_default_role_dir () =
-  let result = Common.default_role_dir "node" "test-instance" in
+  let result = Paths.default_role_dir "node" "test-instance" in
   check bool "role dir has path" true (String.contains result '/')
 
 let test_cmd_to_string () =
-  let result = Common.cmd_to_string ["ls"; "-la"; "/tmp"] in
+  let result = Cmd_runner.cmd_to_string ["ls"; "-la"; "/tmp"] in
   check bool "has ls" true (String.contains result 'l') ;
   check bool "has tmp" true (String.contains result 't')
 
 let test_cmd_to_string_with_spaces () =
-  let result = Common.cmd_to_string ["echo"; "hello world"] in
+  let result = Cmd_runner.cmd_to_string ["echo"; "hello world"] in
   (* Should properly quote the argument with spaces *)
   check bool "contains hello" true (String.contains result 'h')
 
@@ -136,58 +135,62 @@ let test_cmd_to_string_with_spaces () =
 (* ============================================================ *)
 
 let test_unquote_double_quotes () =
-  check string "strips double quotes" "hello" (Common.unquote "\"hello\"")
+  check string "strips double quotes" "hello" (String_utils.unquote "\"hello\"")
 
 let test_unquote_single_quotes () =
-  check string "strips single quotes" "hello" (Common.unquote "'hello'")
+  check string "strips single quotes" "hello" (String_utils.unquote "'hello'")
 
 let test_unquote_backslash_escaped () =
   check
     string
     "strips backslash-escaped quotes"
     "hello"
-    (Common.unquote "\\\"hello\\\"")
+    (String_utils.unquote "\\\"hello\\\"")
 
 let test_unquote_no_quotes () =
-  check string "unquoted passthrough" "hello" (Common.unquote "hello")
+  check string "unquoted passthrough" "hello" (String_utils.unquote "hello")
 
 let test_unquote_empty_string () =
-  check string "empty passthrough" "" (Common.unquote "")
+  check string "empty passthrough" "" (String_utils.unquote "")
 
 let test_unquote_empty_double_quotes () =
-  check string "empty double quotes" "" (Common.unquote "\"\"")
+  check string "empty double quotes" "" (String_utils.unquote "\"\"")
 
 let test_unquote_empty_single_quotes () =
-  check string "empty single quotes" "" (Common.unquote "''")
+  check string "empty single quotes" "" (String_utils.unquote "''")
 
 let test_unquote_mismatched_quotes () =
   (* Mismatched quotes should be left unchanged *)
-  check string "mismatched unchanged" "\"hello'" (Common.unquote "\"hello'")
+  check
+    string
+    "mismatched unchanged"
+    "\"hello'"
+    (String_utils.unquote "\"hello'")
 
 let test_unquote_single_char () =
-  check string "single char passthrough" "x" (Common.unquote "x")
+  check string "single char passthrough" "x" (String_utils.unquote "x")
 
 (* ============================================================ *)
 (* Edge Cases *)
 (* ============================================================ *)
 
 let test_sh_quote_newline () =
-  let result = Common.sh_quote "line1\nline2" in
+  let result = Cmd_runner.sh_quote "line1\nline2" in
   check bool "handles newline" true (String.length result > 11)
 
 let test_sh_quote_special_chars () =
-  let result = Common.sh_quote "!@#$%^&*()" in
+  let result = Cmd_runner.sh_quote "!@#$%^&*()" in
   check bool "handles special chars" true (String.contains result '\'')
 
 let test_absolute_path_with_spaces () =
-  let result = Common.make_absolute_path "path with spaces" in
+  let result = Paths.make_absolute_path "path with spaces" in
   match result with
   | Ok path -> check bool "accepts spaces" true (String.contains path ' ')
   | Error _ -> fail "should handle spaces"
 
 let test_absolute_path_very_long () =
   let long_path = String.make 500 'x' in
-  let result = Common.make_absolute_path long_path in
+  let result = Paths.make_absolute_path long_path in
   match result with
   | Ok _ -> check bool "handles long path" true true
   | Error _ -> check bool "or rejects long path" true true

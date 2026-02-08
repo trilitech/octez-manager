@@ -72,18 +72,18 @@ let user_valid_cache =
       Result.is_ok (System_user.validate_user_for_service ~user))
 
 let service_user_valid ~user =
-  if Common.is_root () then true else Cache.get_keyed user_valid_cache user
+  if Paths.is_root () then true else Cache.get_keyed user_valid_cache user
 
 let parse_host_port = Port_validation.parse_host_port
 
 let default_service_user () =
-  if Common.is_root () then "octez"
+  if Paths.is_root () then "octez"
   else
     match Unix.getpwuid (Unix.geteuid ()) with
     | pw when String.trim pw.Unix.pw_name <> "" -> pw.Unix.pw_name
     | _ -> "octez"
 
-let default_base_dir ~role ~instance = Common.default_role_dir role instance
+let default_base_dir ~role ~instance = Paths.default_role_dir role instance
 
 (** {1 Port Initialization Helpers} *)
 
@@ -196,7 +196,7 @@ let binary_accessible_cache =
     Returns true if accessible, false otherwise.
     Uses caching to avoid excessive subprocess calls. *)
 let binary_accessible_to_user ~user ~app_bin_dir ~binary_name =
-  if not (Common.is_root ()) then
+  if not (Paths.is_root ()) then
     (* In user mode, just check if current user can access *)
     has_binary binary_name app_bin_dir
   else
@@ -309,7 +309,7 @@ let default_app_bin_dir ~binary_name =
       if has_binary binary_name version_path then version_path
       else
         (* Managed version exists but doesn't have this binary, try other sources *)
-        match Common.which binary_name with
+        match Paths.which binary_name with
         | Some path -> Filename.dirname path
         | None -> (
             match Service_registry.list () with
@@ -326,7 +326,7 @@ let default_app_bin_dir ~binary_name =
             | Error _ -> "/usr/bin"))
   | Ok [] | Error _ -> (
       (* 2. No managed versions, try `which` *)
-      match Common.which binary_name with
+      match Paths.which binary_name with
       | Some path -> Filename.dirname path
       | None -> (
           (* 3. Look in registered services for a directory with this binary *)

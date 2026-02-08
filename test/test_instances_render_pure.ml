@@ -202,7 +202,7 @@ let test_journalctl_args_structure () =
 let test_journalctl_args_user_flag () =
   let args = Actions.journalctl_args "test.service" in
   let has_user = List.mem "--user" args in
-  let is_root = Octez_manager_lib.Common.is_root () in
+  let is_root = Paths.is_root () in
   if is_root then check bool "root: no --user" false has_user
   else check bool "non-root: has --user" true has_user
 

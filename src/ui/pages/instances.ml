@@ -176,7 +176,7 @@ struct
 
   let header s =
     let privilege =
-      if Common.is_root () then Widgets.red "● SYSTEM"
+      if Paths.is_root () then Widgets.red "● SYSTEM"
       else Widgets.green "● USER"
     in
     let hint = "Hint: c create · b binaries · d diagnostics · r rpc · ? help" in

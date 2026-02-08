@@ -413,23 +413,21 @@ let render_multi_progress ~cols:_ =
                 | Some dl, Some t, Some speed ->
                     Printf.sprintf
                       " (%s / %s) @ %.1f MB/s"
-                      (Octez_manager_lib.Common.format_size dl)
-                      (Octez_manager_lib.Common.format_size t)
+                      (String_utils.format_size dl)
+                      (String_utils.format_size t)
                       speed
                 | Some dl, Some t, None ->
                     Printf.sprintf
                       " (%s / %s)"
-                      (Octez_manager_lib.Common.format_size dl)
-                      (Octez_manager_lib.Common.format_size t)
+                      (String_utils.format_size dl)
+                      (String_utils.format_size t)
                 | Some dl, None, Some speed ->
                     Printf.sprintf
                       " (%s) @ %.1f MB/s"
-                      (Octez_manager_lib.Common.format_size dl)
+                      (String_utils.format_size dl)
                       speed
                 | Some dl, None, None ->
-                    Printf.sprintf
-                      " (%s)"
-                      (Octez_manager_lib.Common.format_size dl)
+                    Printf.sprintf " (%s)" (String_utils.format_size dl)
                 | _ -> ""
               in
               let line = Printf.sprintf "%s %s %s%s" icon name bar size_info in

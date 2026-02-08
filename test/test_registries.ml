@@ -19,7 +19,7 @@ let with_temp_dir f =
   Unix.mkdir base 0o755 ;
   Fun.protect
     ~finally:(fun () ->
-      let (_ : (unit, [> Rresult.R.msg]) result) = Common.remove_tree base in
+      let (_ : (unit, [> Rresult.R.msg]) result) = File_ops.remove_tree base in
       ())
     (fun () -> f base)
 

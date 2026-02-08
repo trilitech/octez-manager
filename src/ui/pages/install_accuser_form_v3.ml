@@ -87,7 +87,7 @@ let make_initial_model () =
           {
             base_dir =
               (if base_dir = "" then
-                 Common.default_role_dir "accuser" svc.Service.instance
+                 Paths.default_role_dir "accuser" svc.Service.instance
                else base_dir);
             node =
               (match svc.Service.depends_on with
@@ -197,7 +197,7 @@ let node_selection_field =
                 else inst
               in
               let new_name = Printf.sprintf "accuser-%s" dep_name in
-              let default_dir = Common.default_role_dir "accuser" new_name in
+              let default_dir = Paths.default_role_dir "accuser" new_name in
               let new_core = {!model_ref.core with instance_name = new_name} in
               let new_client =
                 {!model_ref.client with base_dir = default_dir}
@@ -406,7 +406,7 @@ let spec =
         let base_dir =
           let trimmed = String.trim model.client.base_dir in
           if trimmed = "" then
-            Common.default_role_dir "accuser" model.core.instance_name
+            Paths.default_role_dir "accuser" model.core.instance_name
           else trimmed
         in
 
@@ -423,8 +423,7 @@ let spec =
             instance = model.core.instance_name;
             network = Option.value ~default:"shadownet" network;
             history_mode = History_mode.default;
-            data_dir =
-              Common.default_role_dir "accuser" model.core.instance_name;
+            data_dir = Paths.default_role_dir "accuser" model.core.instance_name;
             rpc_addr = node_endpoint;
             net_addr = "";
             service_user = model.core.service_user;
@@ -463,7 +462,7 @@ let spec =
         in
         (* Execute installation *)
         let* () =
-          if Common.is_root () then
+          if Paths.is_root () then
             System_user.ensure_service_account
               ~quiet:true
               ~name:model.core.service_user

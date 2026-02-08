@@ -49,7 +49,7 @@ let base_initial_model () =
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };
-    dal_data_dir = Common.default_role_dir "dal-node" "dal";
+    dal_data_dir = Paths.default_role_dir "dal-node" "dal";
     rpc_addr = "127.0.0.1:10732";
     net_addr = "0.0.0.0:11732";
     edit_mode = false;
@@ -118,7 +118,7 @@ let make_initial_model () =
           {
             base_dir =
               (if client_base_dir = "" then
-                 Common.default_role_dir "dal-node" svc.Service.instance
+                 Paths.default_role_dir "dal-node" svc.Service.instance
                else client_base_dir);
             node =
               (match svc.Service.depends_on with
@@ -129,7 +129,7 @@ let make_initial_model () =
           };
         dal_data_dir =
           (if dal_data_dir = "" then
-             Common.default_role_dir "dal-node" svc.Service.instance
+             Paths.default_role_dir "dal-node" svc.Service.instance
            else dal_data_dir);
         rpc_addr = (if dal_rpc = "" then "127.0.0.1:10732" else dal_rpc);
         net_addr = (if dal_net = "" then "0.0.0.0:11732" else dal_net);
@@ -377,7 +377,7 @@ let spec =
           else
             let trimmed = String.trim model.dal_data_dir in
             if trimmed = "" then
-              Common.default_role_dir "dal-node" model.core.instance_name
+              Paths.default_role_dir "dal-node" model.core.instance_name
             else trimmed
         in
 
@@ -437,7 +437,7 @@ let spec =
         in
         (* Execute installation *)
         let* () =
-          if Common.is_root () then
+          if Paths.is_root () then
             System_user.ensure_service_account
               ~quiet:true
               ~name:model.core.service_user
