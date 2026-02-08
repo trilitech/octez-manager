@@ -177,15 +177,14 @@ let init_rows_from_args options initial_args =
       | None -> {opt; value = None; selected = false})
     options
 
-let open_modal ~title ~options ~initial_args ~on_apply =
-  let rows = Array.of_list (init_rows_from_args options initial_args) in
-  let module Modal = struct
-    type state = {
-      rows : row array;
-      mutable cursor : int;
-      mutable scroll_offset : int;
-      mutable last_key : string;
-    }
+(** Open a text-input modal for editing a single option value.
+    [row] is mutated: on Enter, [row.selected] and [row.value] are set. *)
+let open_value_modal row placeholder =
+  let doc_lines = Modal_helpers.wrap_text ~width:68 row.opt.doc in
+  let title = option_label row.opt in
+  let initial_value = match row.value with Some v -> v | None -> "" in
+  let module Value_modal = struct
+    type state = {textbox : Textbox_widget.t; doc_lines : string list}
 
     type msg = unit
 
@@ -193,328 +192,30 @@ let open_modal ~title ~options ~initial_args ~on_apply =
 
     type pstate = state Navigation.t
 
-    let update_help_hint s =
-      match s.rows |> Array.to_list |> fun lst -> List.nth_opt lst s.cursor with
-      | None -> set_help_hint ()
-      | Some row ->
-          let short, long = option_hint_markdown row in
-          set_help_hint ?short ?long ()
-
     let init () =
-      Navigation.make {rows; cursor = 0; scroll_offset = 0; last_key = ""}
+      Navigation.make
+        {
+          textbox =
+            Textbox_widget.open_centered
+              ~title:placeholder
+              ~width:60
+              ~initial:initial_value
+              ();
+          doc_lines;
+        }
 
     let update ps _ = ps
 
+    let view ps ~focus ~size:_ =
+      let s = ps.Navigation.s in
+      let doc_block = String.concat "\n" s.doc_lines in
+      let input_block = Textbox_widget.render s.textbox ~focus in
+      let hint = Widgets.dim "Enter: confirm · Esc: cancel" in
+      doc_block ^ "\n\n" ^ input_block ^ "\n\n" ^ hint
+
+    let move ps _ = ps
+
     let refresh ps = ps
-
-    let adjust_scroll s ~visible_rows =
-      if s.cursor < s.scroll_offset then s.scroll_offset <- s.cursor
-      else if s.cursor > s.scroll_offset + visible_rows - 1 then
-        s.scroll_offset <- s.cursor - visible_rows + 1
-
-    let move_state s delta =
-      let len = Array.length s.rows in
-      let next = max 0 (min (len - 1) (s.cursor + delta)) in
-      s.cursor <- next ;
-      update_help_hint s ;
-      s
-
-    let move ps delta = Navigation.update (fun s -> move_state s delta) ps
-
-    let current_row s =
-      if Array.length s.rows = 0 then None else Some s.rows.(s.cursor)
-
-    let open_toggle_modal row =
-      let doc_lines = Modal_helpers.wrap_text ~width:68 row.opt.doc in
-      Modal_helpers.open_choice_modal_with_hint
-        ~title:(option_label row.opt)
-        ~items:[true; false]
-        ~to_string:(function true -> "Enable" | false -> "Disable")
-        ~describe:(fun _ -> doc_lines)
-        ~hint:(fun _ ->
-          Modal_helpers.open_text_modal
-            ~title:(option_label row.opt)
-            ~lines:doc_lines)
-        ~on_select:(fun v ->
-          row.selected <- v ;
-          if not v then row.value <- None)
-        ()
-
-    let open_value_modal row placeholder =
-      let doc_lines = Modal_helpers.wrap_text ~width:68 row.opt.doc in
-      let title = option_label row.opt in
-      let initial_value = match row.value with Some v -> v | None -> "" in
-      let module Modal = struct
-        type state = {textbox : Textbox_widget.t; doc_lines : string list}
-
-        type msg = unit
-
-        type key_binding = state Miaou.Core.Tui_page.key_binding_desc
-
-        type pstate = state Navigation.t
-
-        let init () =
-          Navigation.make
-            {
-              textbox =
-                Textbox_widget.open_centered
-                  ~title:placeholder
-                  ~width:60
-                  ~initial:initial_value
-                  ();
-              doc_lines;
-            }
-
-        let update ps _ = ps
-
-        let view ps ~focus ~size:_ =
-          let s = ps.Navigation.s in
-          let doc_block = String.concat "\n" s.doc_lines in
-          let input_block = Textbox_widget.render s.textbox ~focus in
-          let hint = Widgets.dim "Enter: confirm · Esc: cancel" in
-          doc_block ^ "\n\n" ^ input_block ^ "\n\n" ^ hint
-
-        let move ps _ = ps
-
-        let refresh ps = ps
-
-        let service_select ps _ = ps
-
-        let service_cycle ps _ = ps
-
-        let back ps = ps
-
-        let keymap _ = []
-
-        let handled_keys () = []
-
-        let handle_modal_key ps key ~size:_ =
-          let s = ps.Navigation.s in
-          let mapped =
-            match Keys.of_string key with
-            | Some Keys.Enter -> "Enter"
-            | Some Keys.Backspace -> "Backspace"
-            | Some (Keys.Char "Esc") | Some (Keys.Char "Escape") -> "Esc"
-            | _ -> key
-          in
-          if mapped = "Enter" then (
-            let value = Textbox_widget.get_text s.textbox in
-            if String.trim value <> "" then (
-              row.selected <- true ;
-              row.value <- Some value) ;
-            Miaou.Core.Modal_manager.set_consume_next_key () ;
-            Miaou.Core.Modal_manager.close_top `Commit ;
-            ps)
-          else if mapped = "Esc" then (
-            Miaou.Core.Modal_manager.set_consume_next_key () ;
-            Miaou.Core.Modal_manager.close_top `Cancel ;
-            ps)
-          else
-            Navigation.update
-              (fun s ->
-                {s with textbox = Textbox_widget.handle_key s.textbox ~key})
-              ps
-
-        let handle_key = handle_modal_key
-
-        let on_key ps key ~size =
-          let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
-          (ps', Miaou_interfaces.Key_event.Handled)
-
-        let on_modal_key ps key ~size =
-          let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
-          (ps', Miaou_interfaces.Key_event.Handled)
-
-        let key_hints _ps = []
-
-        let has_modal _ = true
-      end in
-      let ui : Miaou.Core.Modal_manager.ui =
-        {title; left = None; max_width = Some (Fixed 76); dim_background = true}
-      in
-      Miaou.Core.Modal_manager.push
-        (module Modal)
-        ~init:(Modal.init ())
-        ~ui
-        ~commit_on:[]
-        ~cancel_on:[]
-        ~on_close:(fun _ _ -> ())
-
-    let edit_value s =
-      s.last_key <- "edit_value called" ;
-      match current_row s with
-      | None -> s.last_key <- "edit_value: no row"
-      | Some row -> (
-          s.last_key <-
-            Printf.sprintf
-              "edit_value: %s kind=%s"
-              (option_label row.opt)
-              (match row.opt.kind with
-              | Toggle -> "toggle"
-              | Value _ -> "value") ;
-          match row.opt.kind with
-          | Toggle -> open_toggle_modal row
-          | Value _ -> (
-              match row.opt.arg with
-              | None -> open_value_modal row "value"
-              | Some placeholder -> open_value_modal row placeholder))
-
-    let show_hint s =
-      match current_row s with
-      | None -> ()
-      | Some row ->
-          let short, long = option_hint_markdown row in
-          (* Use Help_hint so pressing '?' shows the doc without opening a modal *)
-          set_help_hint ?short ?long ()
-
-    let apply_and_close s =
-      let tokens = s.rows |> Array.to_list |> format_tokens in
-      on_apply tokens ;
-      Miaou.Core.Modal_manager.close_top `Commit
-
-    let view ps ~focus:_ ~size =
-      let s = ps.Navigation.s in
-      update_help_hint s ;
-      let width = size.LTerm_geom.cols in
-      let height = size.LTerm_geom.rows in
-      (* Reserve space for header (3 lines) + footer (2 lines) + modal frame borders (4 lines) *)
-      let visible_rows = max 1 (height - 9) in
-      adjust_scroll s ~visible_rows ;
-      let opt_width = max 18 (min 40 (width / 2)) in
-      let arg_width = max 10 (min 24 (width / 3)) in
-      let value_width = max 8 (width - opt_width - arg_width - 12) in
-      let render_row idx row =
-        let marker = if idx = s.cursor then Widgets.bold "➤" else " " in
-        let checkbox = if row.selected then "●" else "○" in
-        let opt = truncate ~max_len:opt_width (option_label row.opt) in
-        let arg =
-          truncate ~max_len:arg_width (Option.value ~default:"" row.opt.arg)
-        in
-        let value =
-          match row.value with
-          | None -> ""
-          | Some v ->
-              let trimmed = truncate ~max_len:value_width v in
-              Printf.sprintf "[%s]" trimmed
-        in
-        let header =
-          Printf.sprintf
-            "%s %s %-*s %-*s %s"
-            marker
-            checkbox
-            opt_width
-            opt
-            arg_width
-            arg
-            value
-        in
-        let header = if row.selected then Widgets.fg 22 header else header in
-        header
-      in
-      let summary_tokens = format_tokens (Array.to_list s.rows) in
-      let summary_line =
-        match summary_tokens with
-        | [] -> Widgets.dim "No flags selected"
-        | ts -> Widgets.fg 22 (String.concat " " ts)
-      in
-      (* Only render visible rows *)
-      let all_rows = Array.to_list s.rows in
-      let visible =
-        all_rows
-        |> List.mapi (fun idx row -> (idx, row))
-        |> List.filter (fun (idx, _) ->
-            idx >= s.scroll_offset && idx < s.scroll_offset + visible_rows)
-        |> List.map (fun (idx, row) -> render_row idx row)
-      in
-      let total = Array.length s.rows in
-      let _scroll_indicator =
-        if total > visible_rows then
-          Printf.sprintf
-            " [off=%d cur=%d len=%d vis=%d]"
-            s.scroll_offset
-            s.cursor
-            total
-            visible_rows
-        else ""
-      in
-      let body = String.concat "\n" visible in
-      Miaou_widgets_layout.Vsection.render
-        ~size
-        ~header:
-          [
-            Widgets.title_highlight
-              (Printf.sprintf
-                 "%s [%s] off=%d cur=%d"
-                 title
-                 s.last_key
-                 s.scroll_offset
-                 s.cursor);
-            summary_line;
-            "";
-          ]
-        ~content_footer:[]
-        ~child:(fun _ -> body)
-
-    let handle_modal_key ps key ~size:_ =
-      let s = ps.Navigation.s in
-      (* Store key for debug display *)
-      s.last_key <- Printf.sprintf "%s(handler)" key ;
-      (* Check raw key strings first (as sent by Miaou), then try Keys.of_string *)
-      if key = "Enter" || key = "Return" then (
-        edit_value s ;
-        ps)
-      else if key = " " || key = "Space" then (
-        (match current_row s with
-        | None -> ()
-        | Some row -> (
-            match row.opt.kind with
-            | Toggle -> row.selected <- not row.selected
-            | Value _ ->
-                (* For value flags: if selected, toggle off; otherwise open value modal *)
-                if row.selected then (
-                  row.selected <- false ;
-                  row.value <- None)
-                else edit_value s)) ;
-        update_help_hint s ;
-        ps)
-      else if key = "Backspace" || key = "\b" then (
-        (match current_row s with
-        | None -> ()
-        | Some row ->
-            row.selected <- false ;
-            row.value <- None) ;
-        update_help_hint s ;
-        ps)
-      else if key = "s" || key = "S" then (
-        apply_and_close s ;
-        ps)
-      else if key = "?" then (
-        show_hint s ;
-        ps)
-      else if key = "Esc" || key = "Escape" || key = "q" || key = "Q" then (
-        Miaou.Core.Modal_manager.close_top `Cancel ;
-        ps)
-      else
-        (* Fall back to Keys.of_string for special keys *)
-        match Keys.of_string key with
-        | Some Keys.Up -> move ps (-1)
-        | Some Keys.Down -> move ps 1
-        | Some (Keys.Char "k") -> move ps (-1)
-        | Some (Keys.Char "j") -> move ps 1
-        | Some Keys.Enter ->
-            edit_value s ;
-            ps
-        | Some Keys.Backspace ->
-            (match current_row s with
-            | None -> ()
-            | Some row ->
-                row.selected <- false ;
-                row.value <- None) ;
-            update_help_hint s ;
-            ps
-        | _ -> ps
-
-    let handle_key = handle_modal_key
 
     let service_select ps _ = ps
 
@@ -522,99 +223,411 @@ let open_modal ~title ~options ~initial_args ~on_apply =
 
     let back ps = ps
 
-    let handled_keys () =
-      Miaou.Core.Keys.[Up; Down; Enter; Char " "; Backspace; Char "s"; Char "?"]
+    let keymap _ = []
 
-    let keymap ps =
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
       let s = ps.Navigation.s in
-      let kb key action help =
-        {Miaou.Core.Tui_page.key; action; help; display_only = false}
+      let mapped =
+        match Keys.of_string key with
+        | Some Keys.Enter -> "Enter"
+        | Some Keys.Backspace -> "Backspace"
+        | Some (Keys.Char "Esc") | Some (Keys.Char "Escape") -> "Esc"
+        | _ -> key
       in
-      [
-        kb
-          "Up"
-          (fun ps ->
-            s.last_key <- "Up(keymap)" ;
-            move ps (-1))
-          "Up";
-        kb
-          "Down"
-          (fun ps ->
-            s.last_key <- "Down(keymap)" ;
-            move ps 1)
-          "Down";
-        kb
-          "Enter"
-          (fun ps ->
-            s.last_key <- "Enter(keymap)" ;
-            edit_value s ;
-            ps)
-          "Edit/Select";
-        kb
-          "Return"
-          (fun ps ->
-            s.last_key <- "Return(keymap)" ;
-            edit_value s ;
-            ps)
-          "Edit/Select";
-        kb
-          "Space"
-          (fun ps ->
-            s.last_key <- "Space(keymap)" ;
-            (match current_row s with
-            | None -> ()
-            | Some row -> (
-                match row.opt.kind with
-                | Toggle -> row.selected <- not row.selected
-                | Value _ ->
-                    if row.selected then (
-                      row.selected <- false ;
-                      row.value <- None)
-                    else edit_value s)) ;
-            ps)
-          "Toggle/Edit";
-        kb
-          "Backspace"
-          (fun ps ->
-            s.last_key <- "Backspace(keymap)" ;
-            (match current_row s with
-            | None -> ()
-            | Some row ->
-                row.selected <- false ;
-                row.value <- None) ;
-            ps)
-          "Clear";
-        kb
-          "s"
-          (fun ps ->
-            s.last_key <- "s(keymap)" ;
-            apply_and_close s ;
-            ps)
-          "Apply";
-        {
-          Miaou.Core.Tui_page.key = "?";
-          action =
-            (fun ps ->
-              s.last_key <- "?(keymap)" ;
-              show_hint s ;
-              ps);
-          help = "Help";
-          display_only = true;
-        };
-      ]
+      if mapped = "Enter" then (
+        let value = Textbox_widget.get_text s.textbox in
+        if String.trim value <> "" then (
+          row.selected <- true ;
+          row.value <- Some value) ;
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if mapped = "Esc" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else
+        Navigation.update
+          (fun s -> {s with textbox = Textbox_widget.handle_key s.textbox ~key})
+          ps
+
+    let handle_key = handle_modal_key
 
     let on_key ps key ~size =
-      ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Handled )
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let on_modal_key ps key ~size =
-      ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
-        Miaou_interfaces.Key_event.Handled )
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
 
     let key_hints _ps = []
 
     let has_modal _ = true
   end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {title; left = None; max_width = Some (Fixed 76); dim_background = true}
+  in
+  Miaou.Core.Modal_manager.push
+    (module Value_modal)
+    ~init:(Value_modal.init ())
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun _ _ -> ())
+
+(** Open a toggle (enable/disable) modal for a boolean flag.
+    [row] is mutated: [row.selected] and [row.value] are set based on the choice. *)
+let open_toggle_modal row =
+  let doc_lines = Modal_helpers.wrap_text ~width:68 row.opt.doc in
+  Modal_helpers.open_choice_modal_with_hint
+    ~title:(option_label row.opt)
+    ~items:[true; false]
+    ~to_string:(function true -> "Enable" | false -> "Disable")
+    ~describe:(fun _ -> doc_lines)
+    ~hint:(fun _ ->
+      Modal_helpers.open_text_modal
+        ~title:(option_label row.opt)
+        ~lines:doc_lines)
+    ~on_select:(fun v ->
+      row.selected <- v ;
+      if not v then row.value <- None)
+    ()
+
+(** Open the edit modal for the given [row], dispatching on its kind. *)
+let edit_row_value row =
+  match row.opt.kind with
+  | Toggle -> open_toggle_modal row
+  | Value _ -> (
+      match row.opt.arg with
+      | None -> open_value_modal row "value"
+      | Some placeholder -> open_value_modal row placeholder)
+
+(** The flags-list modal: displays all parsed CLI options and lets the user
+    toggle/edit them. Extracted from [open_modal] to reduce nesting. *)
+module Flags_modal = struct
+  type state = {
+    rows : row array;
+    title : string;
+    on_apply : string list -> unit;
+    mutable cursor : int;
+    mutable scroll_offset : int;
+    mutable last_key : string;
+  }
+
+  type msg = unit
+
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+  type pstate = state Navigation.t
+
+  let update_help_hint s =
+    match s.rows |> Array.to_list |> fun lst -> List.nth_opt lst s.cursor with
+    | None -> set_help_hint ()
+    | Some row ->
+        let short, long = option_hint_markdown row in
+        set_help_hint ?short ?long ()
+
+  (** Create an initial pstate. Called from [open_modal], not from [PAGE_SIG.init]. *)
+  let make ~rows ~title ~on_apply =
+    Navigation.make
+      {rows; title; on_apply; cursor = 0; scroll_offset = 0; last_key = ""}
+
+  (** Satisfy [PAGE_SIG.init]. Not used in practice — [Modal_manager.push]
+      receives the pstate from [make] via its [~init] parameter. *)
+  let init () =
+    Navigation.make
+      {
+        rows = [||];
+        title = "";
+        on_apply = ignore;
+        cursor = 0;
+        scroll_offset = 0;
+        last_key = "";
+      }
+
+  let update ps _ = ps
+
+  let refresh ps = ps
+
+  let adjust_scroll s ~visible_rows =
+    if s.cursor < s.scroll_offset then s.scroll_offset <- s.cursor
+    else if s.cursor > s.scroll_offset + visible_rows - 1 then
+      s.scroll_offset <- s.cursor - visible_rows + 1
+
+  let move_state s delta =
+    let len = Array.length s.rows in
+    let next = max 0 (min (len - 1) (s.cursor + delta)) in
+    s.cursor <- next ;
+    update_help_hint s ;
+    s
+
+  let move ps delta = Navigation.update (fun s -> move_state s delta) ps
+
+  let current_row s =
+    if Array.length s.rows = 0 then None else Some s.rows.(s.cursor)
+
+  let edit_value s =
+    s.last_key <- "edit_value called" ;
+    match current_row s with
+    | None -> s.last_key <- "edit_value: no row"
+    | Some row ->
+        s.last_key <-
+          Printf.sprintf
+            "edit_value: %s kind=%s"
+            (option_label row.opt)
+            (match row.opt.kind with Toggle -> "toggle" | Value _ -> "value") ;
+        edit_row_value row
+
+  let show_hint s =
+    match current_row s with
+    | None -> ()
+    | Some row ->
+        let short, long = option_hint_markdown row in
+        set_help_hint ?short ?long ()
+
+  let apply_and_close s =
+    let tokens = s.rows |> Array.to_list |> format_tokens in
+    s.on_apply tokens ;
+    Miaou.Core.Modal_manager.close_top `Commit
+
+  let view ps ~focus:_ ~size =
+    let s = ps.Navigation.s in
+    update_help_hint s ;
+    let width = size.LTerm_geom.cols in
+    let height = size.LTerm_geom.rows in
+    (* Reserve space for header (3 lines) + footer (2 lines) + modal frame borders (4 lines) *)
+    let visible_rows = max 1 (height - 9) in
+    adjust_scroll s ~visible_rows ;
+    let opt_width = max 18 (min 40 (width / 2)) in
+    let arg_width = max 10 (min 24 (width / 3)) in
+    let value_width = max 8 (width - opt_width - arg_width - 12) in
+    let render_row idx row =
+      let marker = if idx = s.cursor then Widgets.bold "➤" else " " in
+      let checkbox = if row.selected then "●" else "○" in
+      let opt = truncate ~max_len:opt_width (option_label row.opt) in
+      let arg =
+        truncate ~max_len:arg_width (Option.value ~default:"" row.opt.arg)
+      in
+      let value =
+        match row.value with
+        | None -> ""
+        | Some v ->
+            let trimmed = truncate ~max_len:value_width v in
+            Printf.sprintf "[%s]" trimmed
+      in
+      let header =
+        Printf.sprintf
+          "%s %s %-*s %-*s %s"
+          marker
+          checkbox
+          opt_width
+          opt
+          arg_width
+          arg
+          value
+      in
+      let header = if row.selected then Widgets.fg 22 header else header in
+      header
+    in
+    let summary_tokens = format_tokens (Array.to_list s.rows) in
+    let summary_line =
+      match summary_tokens with
+      | [] -> Widgets.dim "No flags selected"
+      | ts -> Widgets.fg 22 (String.concat " " ts)
+    in
+    (* Only render visible rows *)
+    let all_rows = Array.to_list s.rows in
+    let visible =
+      all_rows
+      |> List.mapi (fun idx row -> (idx, row))
+      |> List.filter (fun (idx, _) ->
+          idx >= s.scroll_offset && idx < s.scroll_offset + visible_rows)
+      |> List.map (fun (idx, row) -> render_row idx row)
+    in
+    let body = String.concat "\n" visible in
+    Miaou_widgets_layout.Vsection.render
+      ~size
+      ~header:
+        [
+          Widgets.title_highlight
+            (Printf.sprintf
+               "%s [%s] off=%d cur=%d"
+               s.title
+               s.last_key
+               s.scroll_offset
+               s.cursor);
+          summary_line;
+          "";
+        ]
+      ~content_footer:[]
+      ~child:(fun _ -> body)
+
+  let handle_modal_key ps key ~size:_ =
+    let s = ps.Navigation.s in
+    (* Store key for debug display *)
+    s.last_key <- Printf.sprintf "%s(handler)" key ;
+    (* Check raw key strings first (as sent by Miaou), then try Keys.of_string *)
+    if key = "Enter" || key = "Return" then (
+      edit_value s ;
+      ps)
+    else if key = " " || key = "Space" then (
+      (match current_row s with
+      | None -> ()
+      | Some row -> (
+          match row.opt.kind with
+          | Toggle -> row.selected <- not row.selected
+          | Value _ ->
+              (* For value flags: if selected, toggle off; otherwise open value modal *)
+              if row.selected then (
+                row.selected <- false ;
+                row.value <- None)
+              else edit_value s)) ;
+      update_help_hint s ;
+      ps)
+    else if key = "Backspace" || key = "\b" then (
+      (match current_row s with
+      | None -> ()
+      | Some row ->
+          row.selected <- false ;
+          row.value <- None) ;
+      update_help_hint s ;
+      ps)
+    else if key = "s" || key = "S" then (
+      apply_and_close s ;
+      ps)
+    else if key = "?" then (
+      show_hint s ;
+      ps)
+    else if key = "Esc" || key = "Escape" || key = "q" || key = "Q" then (
+      Miaou.Core.Modal_manager.close_top `Cancel ;
+      ps)
+    else
+      (* Fall back to Keys.of_string for special keys *)
+      match Keys.of_string key with
+      | Some Keys.Up -> move ps (-1)
+      | Some Keys.Down -> move ps 1
+      | Some (Keys.Char "k") -> move ps (-1)
+      | Some (Keys.Char "j") -> move ps 1
+      | Some Keys.Enter ->
+          edit_value s ;
+          ps
+      | Some Keys.Backspace ->
+          (match current_row s with
+          | None -> ()
+          | Some row ->
+              row.selected <- false ;
+              row.value <- None) ;
+          update_help_hint s ;
+          ps
+      | _ -> ps
+
+  let handle_key = handle_modal_key
+
+  let service_select ps _ = ps
+
+  let service_cycle ps _ = ps
+
+  let back ps = ps
+
+  let handled_keys () =
+    Miaou.Core.Keys.[Up; Down; Enter; Char " "; Backspace; Char "s"; Char "?"]
+
+  let keymap ps =
+    let s = ps.Navigation.s in
+    let kb key action help =
+      {Miaou.Core.Tui_page.key; action; help; display_only = false}
+    in
+    [
+      kb
+        "Up"
+        (fun ps ->
+          s.last_key <- "Up(keymap)" ;
+          move ps (-1))
+        "Up";
+      kb
+        "Down"
+        (fun ps ->
+          s.last_key <- "Down(keymap)" ;
+          move ps 1)
+        "Down";
+      kb
+        "Enter"
+        (fun ps ->
+          s.last_key <- "Enter(keymap)" ;
+          edit_value s ;
+          ps)
+        "Edit/Select";
+      kb
+        "Return"
+        (fun ps ->
+          s.last_key <- "Return(keymap)" ;
+          edit_value s ;
+          ps)
+        "Edit/Select";
+      kb
+        "Space"
+        (fun ps ->
+          s.last_key <- "Space(keymap)" ;
+          (match current_row s with
+          | None -> ()
+          | Some row -> (
+              match row.opt.kind with
+              | Toggle -> row.selected <- not row.selected
+              | Value _ ->
+                  if row.selected then (
+                    row.selected <- false ;
+                    row.value <- None)
+                  else edit_value s)) ;
+          ps)
+        "Toggle/Edit";
+      kb
+        "Backspace"
+        (fun ps ->
+          s.last_key <- "Backspace(keymap)" ;
+          (match current_row s with
+          | None -> ()
+          | Some row ->
+              row.selected <- false ;
+              row.value <- None) ;
+          ps)
+        "Clear";
+      kb
+        "s"
+        (fun ps ->
+          s.last_key <- "s(keymap)" ;
+          apply_and_close s ;
+          ps)
+        "Apply";
+      {
+        Miaou.Core.Tui_page.key = "?";
+        action =
+          (fun ps ->
+            s.last_key <- "?(keymap)" ;
+            show_hint s ;
+            ps);
+        help = "Help";
+        display_only = true;
+      };
+    ]
+
+  let on_key ps key ~size =
+    ( handle_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Handled )
+
+  let on_modal_key ps key ~size =
+    ( handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size,
+      Miaou_interfaces.Key_event.Handled )
+
+  let key_hints _ps = []
+
+  let has_modal _ = true
+end
+
+let open_modal ~title ~options ~initial_args ~on_apply =
+  let rows = Array.of_list (init_rows_from_args options initial_args) in
   let ui : Miaou.Core.Modal_manager.ui =
     {title; left = None; max_width = Some (Fixed 96); dim_background = true}
   in
@@ -622,8 +635,8 @@ let open_modal ~title ~options ~initial_args ~on_apply =
      We handle Enter ourselves to open nested modals, so commit_on must be empty
      to prevent the parent modal from closing when Enter is pressed. *)
   Miaou.Core.Modal_manager.push
-    (module Modal)
-    ~init:(Modal.init ())
+    (module Flags_modal)
+    ~init:(Flags_modal.make ~rows ~title ~on_apply)
     ~ui
     ~commit_on:[]
     ~cancel_on:[]
