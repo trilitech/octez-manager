@@ -360,18 +360,8 @@ let spec =
               in
               match node with
               | Some n ->
-                  let addr =
-                    String.trim n.Data.Service_state.service.Service.rpc_addr
-                  in
-                  if
-                    String.starts_with
-                      ~prefix:"http://"
-                      (String.lowercase_ascii addr)
-                    || String.starts_with
-                         ~prefix:"https://"
-                         (String.lowercase_ascii addr)
-                  then addr
-                  else "http://" ^ addr
+                  Rpc_addr.to_endpoint
+                    n.Data.Service_state.service.Service.rpc_addr
               | None -> "http://127.0.0.1:8732")
           | `Endpoint ep -> ep
           | `None -> "http://127.0.0.1:8732"

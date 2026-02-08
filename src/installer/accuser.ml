@@ -36,7 +36,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
     match node_mode with
     | Remote endpoint -> endpoint_of_rpc endpoint
     | Local_unmanaged (endpoint, _) -> endpoint_of_rpc endpoint
-    | Local svc -> endpoint_of_rpc svc.Service.rpc_addr
+    | Local svc -> Rpc_addr.to_endpoint svc.Service.rpc_addr
   in
   let* network =
     match node_mode with

@@ -14,7 +14,10 @@ open Octez_manager_lib
 let test_service_from_url () =
   let url = "https://mainnet.tezos.ecadinfra.com" in
   let svc = Cmd_rpc.service_from_url url in
-  Alcotest.(check string) "rpc_addr" url svc.Service.rpc_addr ;
+  Alcotest.(check string)
+    "rpc_addr"
+    url
+    (Rpc_addr.to_string svc.Service.rpc_addr) ;
   Alcotest.(check string)
     "instance prefix"
     "url:"
@@ -25,7 +28,10 @@ let test_service_from_url () =
 let test_service_from_url_localhost () =
   let url = "http://127.0.0.1:8732" in
   let svc = Cmd_rpc.service_from_url url in
-  Alcotest.(check string) "rpc_addr" url svc.Service.rpc_addr
+  Alcotest.(check string)
+    "rpc_addr"
+    url
+    (Rpc_addr.to_string svc.Service.rpc_addr)
 
 (* ============================================================ *)
 (* Resolve Service Tests                                         *)
@@ -34,7 +40,11 @@ let test_service_from_url_localhost () =
 let test_resolve_service_url_only () =
   let url = "https://mainnet.smartpy.io" in
   match Cmd_rpc.resolve_service None (Some url) None with
-  | Ok svc -> Alcotest.(check string) "rpc_addr" url svc.Service.rpc_addr
+  | Ok svc ->
+      Alcotest.(check string)
+        "rpc_addr"
+        url
+        (Rpc_addr.to_string svc.Service.rpc_addr)
   | Error msg -> Alcotest.fail msg
 
 let test_resolve_service_multiple_error () =
@@ -54,7 +64,7 @@ let test_resolve_service_public () =
       Alcotest.(check bool)
         "has rpc_addr"
         true
-        (String.length svc.Service.rpc_addr > 0)
+        (String.length (Rpc_addr.to_string svc.Service.rpc_addr) > 0)
   | Error _ ->
       (* Public nodes fetch might fail in test environment, that's ok *)
       ()

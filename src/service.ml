@@ -11,7 +11,7 @@ type t = {
   network : string;
   history_mode : History_mode.t;
   data_dir : string;
-  rpc_addr : string;
+  rpc_addr : Rpc_addr.t;
   net_addr : string;
   service_user : string;
   app_bin_dir : string;
@@ -96,7 +96,7 @@ let to_yojson t =
       ("network", `String t.network);
       ("history_mode", `String (History_mode.to_string t.history_mode));
       ("data_dir", `String t.data_dir);
-      ("rpc_addr", `String t.rpc_addr);
+      ("rpc_addr", Rpc_addr.to_yojson t.rpc_addr);
       ("net_addr", `String t.net_addr);
       ("service_user", `String t.service_user);
       ("app_bin_dir", `String t.app_bin_dir);
@@ -136,7 +136,9 @@ let of_yojson json =
       | _ -> Error (`Msg "Invalid history_mode field")
     in
     let data_dir = json |> member "data_dir" |> to_string in
-    let rpc_addr = json |> member "rpc_addr" |> to_string in
+    let rpc_addr =
+      json |> member "rpc_addr" |> to_string |> Rpc_addr.of_string
+    in
     let net_addr = json |> member "net_addr" |> to_string in
     let service_user = json |> member "service_user" |> to_string in
     let app_bin_dir = json |> member "app_bin_dir" |> to_string in

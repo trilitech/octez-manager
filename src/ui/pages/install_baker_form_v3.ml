@@ -171,10 +171,10 @@ let find_dal states inst =
 let endpoint_with_scheme = Form_builder_common.endpoint_with_scheme
 
 let node_endpoint_of_service (svc : Service.t) =
-  endpoint_with_scheme svc.Service.rpc_addr
+  Rpc_addr.to_endpoint svc.Service.rpc_addr
 
 let dal_endpoint_of_service (svc : Service.t) =
-  endpoint_with_scheme svc.Service.rpc_addr
+  Rpc_addr.to_endpoint svc.Service.rpc_addr
 
 let endpoint_host_port ep =
   let ep = endpoint_with_scheme ep in

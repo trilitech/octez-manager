@@ -17,7 +17,7 @@ let make_test_service ?(rpc_addr = "127.0.0.1:8732") ?(app_bin_dir = "/usr/bin")
     ~network:"mainnet"
     ~history_mode:History_mode.Full
     ~data_dir:"/tmp/test"
-    ~rpc_addr
+    ~rpc_addr:(Rpc_addr.of_string rpc_addr)
     ~net_addr:"[::]:9732"
     ~service_user:"tezos"
     ~app_bin_dir

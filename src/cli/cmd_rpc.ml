@@ -23,7 +23,7 @@ let service_from_url url =
     ~network:"unknown"
     ~history_mode:History_mode.Rolling
     ~data_dir:""
-    ~rpc_addr:url
+    ~rpc_addr:(Rpc_addr.of_string url)
     ~net_addr:""
     ~service_user:""
     ~app_bin_dir:""
@@ -392,7 +392,7 @@ let public_nodes_cmd =
                   "  %2d. %-30s  %s\n"
                   (i + 1)
                   svc.Service.instance
-                  svc.Service.rpc_addr)
+                  (Rpc_addr.to_string svc.Service.rpc_addr))
               nodes) ;
           `Ok ())
       $ const ())

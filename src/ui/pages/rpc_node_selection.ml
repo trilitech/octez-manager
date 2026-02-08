@@ -97,11 +97,14 @@ let load_local_instances () : node_item list =
   List.filter_map
     (fun (st : Data.Service_state.t) ->
       let svc = st.service in
-      if svc.Service.role = "node" && svc.Service.rpc_addr <> "" then
+      if
+        svc.Service.role = "node"
+        && Rpc_addr.to_string svc.Service.rpc_addr <> ""
+      then
         Some
           {
             label = svc.Service.instance;
-            rpc_addr = svc.Service.rpc_addr;
+            rpc_addr = Rpc_addr.to_string svc.Service.rpc_addr;
             is_public = false;
             network = Some svc.Service.network;
           }
@@ -116,7 +119,7 @@ let make_service_for_node (item : node_item) : Service.t =
     ~network:(Option.value item.network ~default:"unknown")
     ~history_mode:History_mode.default
     ~data_dir:""
-    ~rpc_addr:item.rpc_addr
+    ~rpc_addr:(Rpc_addr.of_string item.rpc_addr)
     ~net_addr:""
     ~service_user:""
     ~app_bin_dir:""
