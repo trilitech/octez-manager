@@ -66,10 +66,6 @@ val remove_dropin : role:string -> instance:string -> unit
 
 val get_service_paths : role:string -> instance:string -> (string * string) list
 
-type logrotate_spec = {role : string; paths : string list}
-
-val sync_logrotate : logrotate_spec list -> (unit, [`Msg of string]) result
-
 (** Build the systemctl command prefix, accounting for root vs user mode.
     Returns [["systemctl"]] when running as root,
     [["systemctl"; "--user"]] otherwise. *)
@@ -93,14 +89,6 @@ module For_tests : sig
   val systemctl_cmd : unit -> string list
 
   val env_file_template : bool -> string
-
-  val system_logrotate_config_path : string -> string
-
-  val user_logrotate_root : unit -> string
-
-  val user_logrotate_include_dir : unit -> string
-
-  val user_logrotate_main_config : unit -> string
 
   val prestart_hooks_dir : unit -> string
 
