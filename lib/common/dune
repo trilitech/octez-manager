@@ -1,0 +1,7 @@
+(library
+ (name octez_manager_common)
+ (public_name octez-manager.common)
+ (wrapped false)
+ (libraries rresult bos unix)
+ (instrumentation
+  (backend bisect_ppx)))

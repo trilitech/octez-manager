@@ -1,0 +1,58 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Shell command execution utilities. *)
+
+(** Append a line to [/tmp/octez_manager_cmds.log] for debugging. *)
+val append_debug_log : string -> unit
+
+(** Shell-quote a string (POSIX single-quote style). *)
+val sh_quote : string -> string
+
+(** Join an argv list into a single shell command string. *)
+val cmd_to_string : string list -> string
+
+(** Run a command.  When [quiet] is true, stdout/stderr are captured
+    rather than streamed to the terminal.
+    @param on_log optional per-line callback *)
+val run :
+  ?quiet:bool ->
+  ?on_log:(string -> unit) ->
+  string list ->
+  (unit, [> `Msg of string]) result
+
+(** [run ~quiet:true]. *)
+val run_silent :
+  ?on_log:(string -> unit) -> string list -> (unit, [> `Msg of string]) result
+
+(** [run ~quiet:false]. *)
+val run_verbose :
+  ?on_log:(string -> unit) -> string list -> (unit, [> `Msg of string]) result
+
+(** Run command with streaming output.  Reads stdout and stderr
+    concurrently using [Unix.select], ensuring output is captured as
+    produced.  Use for long-running commands where real-time output is
+    needed. *)
+val run_streaming :
+  on_log:(string -> unit) -> string list -> (unit, [> `Msg of string]) result
+
+(** Run a command and return its stdout (trimmed). *)
+val run_out : string list -> (string, [> `Msg of string]) result
+
+(** Like {!run_out} but captures stderr to prevent it from leaking to
+    the terminal.  Returns only stdout.  Useful for HTTP operations in
+    the TUI where curl errors would corrupt the display. *)
+val run_out_silent : string list -> (string, [> `Msg of string]) result
+
+(** Run a command as another user via [su].  Falls back to direct
+    execution when not root or when [user] matches the current user. *)
+val run_as :
+  ?quiet:bool ->
+  ?on_log:(string -> unit) ->
+  user:string ->
+  string list ->
+  (unit, [> `Msg of string]) result
