@@ -48,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Test helper dedup**: Extracted 9 duplicate substring-search helpers (`contains_substring`, `string_contains`) into shared `test_string_helpers_lib` and replaced 4 duplicate `make_service` helpers in RPC browser tests with `Mock_service_helpers.mock_service`. Fixes an empty-needle bug in `test_cli_progress.ml`
 - **Version handling consolidation**: Replaced duplicate `parse_version` and `is_rc_or_dev` in `system_metrics_scheduler.ml` with canonical `Version_utils` functions. Version comparison now correctly considers patch versions (previously only compared major.minor)
 - **Binary help explorer refactor**: Extracted deeply-nested modal modules from `binary_help_explorer.ml` (3-level nesting → top-level). `Flags_modal` is now a standalone module, `open_value_modal`/`open_toggle_modal`/`edit_row_value` are top-level functions, and `open_modal` is a thin 19-line wrapper. Removed dead `_scroll_indicator` code
+- **Documentation coverage**: Added doc comments to 138 exposed functions across 25 `.mli` files, raising doc_coverage_pct from 54.8% to 62.7% and reducing missing_docs from 139 to 1
 
 ### Fixed
 
