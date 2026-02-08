@@ -17,17 +17,7 @@ module Actions = Octez_manager_ui.Instances_actions
 module Layout = Octez_manager_ui.Instances_layout
 module State = Octez_manager_ui.Instances_state
 
-let string_contains ~needle haystack =
-  let nlen = String.length needle in
-  let hlen = String.length haystack in
-  if nlen > hlen then false
-  else
-    let found = ref false in
-    for i = 0 to hlen - nlen do
-      if not !found then
-        if String.sub haystack i nlen = needle then found := true
-    done ;
-    !found
+let string_contains = Test_string_helpers.string_contains
 
 (* ================================================================== *)
 (* role_header tests                                                   *)

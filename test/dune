@@ -1,6 +1,10 @@
 (test
  (name unit_tests)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  test_string_helpers_lib)
  (modules unit_tests)
  (instrumentation
   (backend bisect_ppx)))
@@ -14,7 +18,7 @@
 
 (test
  (name test_cli_progress)
- (libraries alcotest octez_manager_cli)
+ (libraries alcotest octez_manager_cli test_string_helpers_lib)
  (modules test_cli_progress)
  (instrumentation
   (backend bisect_ppx)))
@@ -32,6 +36,11 @@
 ; Shared TUI test helpers library
 
 (library
+ (name test_string_helpers_lib)
+ (wrapped false)
+ (modules test_string_helpers))
+
+(library
  (name tui_test_helpers_lib)
  (libraries
   alcotest
@@ -39,7 +48,8 @@
   octez-manager.ui
   miaou-core.lib
   miaou-core.lib_miaou_internal
-  lambda-term)
+  lambda-term
+  test_string_helpers_lib)
  (modules tui_test_helpers)
  (instrumentation
   (backend bisect_ppx)))
@@ -405,7 +415,8 @@
   alcotest
   octez_manager_lib
   octez-manager.ui
-  mock_service_helpers_lib)
+  mock_service_helpers_lib
+  test_string_helpers_lib)
  (modules test_instances_render_pure)
  (instrumentation
   (backend bisect_ppx)))
@@ -538,14 +549,22 @@
 
 (test
  (name test_rpc_browser_state)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
  (modules test_rpc_browser_state)
  (instrumentation
   (backend bisect_ppx)))
 
 (test
  (name test_rpc_browser_render_list)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
  (modules test_rpc_browser_render_list)
  (instrumentation
   (backend bisect_ppx)))
@@ -564,7 +583,11 @@
 
 (test
  (name test_rpc_browser_actions)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
  (modules test_rpc_browser_actions)
  (instrumentation
   (backend bisect_ppx)))
@@ -803,7 +826,8 @@
   qcheck-core
   qcheck-alcotest
   octez_manager_lib
-  octez-manager.ui)
+  octez-manager.ui
+  mock_service_helpers_lib)
  (modules test_rpc_browser_state_props)
  (instrumentation
   (backend bisect_ppx)))
@@ -831,21 +855,32 @@
   qcheck-core
   qcheck-alcotest
   octez_manager_lib
-  octez-manager.ui)
+  octez-manager.ui
+  test_string_helpers_lib)
  (modules test_flows_pure)
  (instrumentation
   (backend bisect_ppx)))
 
 (test
  (name test_snapshots_pure)
- (libraries alcotest octez_manager_lib octez-manager.ui miaou-core.lib)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  test_string_helpers_lib)
  (modules test_snapshots_pure)
  (instrumentation
   (backend bisect_ppx)))
 
 (test
  (name test_import_wizard_pure)
- (libraries alcotest octez_manager_lib octez-manager.ui miaou-core.lib)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  test_string_helpers_lib)
  (modules test_import_wizard_pure)
  (instrumentation
   (backend bisect_ppx)))
@@ -859,7 +894,7 @@
 
 (test
  (name test_log_export_pure)
- (libraries alcotest octez_manager_lib unix)
+ (libraries alcotest octez_manager_lib unix test_string_helpers_lib)
  (modules test_log_export_pure)
  (instrumentation
   (backend bisect_ppx)))

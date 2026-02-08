@@ -25,15 +25,7 @@ let list_list_string = Alcotest.(list (list string))
 
 let sort_pairs l = List.sort (fun (a, _) (b, _) -> compare a b) l
 
-let string_contains ~needle haystack =
-  let nlen = String.length needle in
-  let hlen = String.length haystack in
-  let rec loop idx =
-    if idx + nlen > hlen then false
-    else if String.sub haystack idx nlen = needle then true
-    else loop (idx + 1)
-  in
-  if nlen = 0 then true else loop 0
+let string_contains = Test_string_helpers.string_contains
 
 let string_index_opt ~needle haystack =
   let nlen = String.length needle in

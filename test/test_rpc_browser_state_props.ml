@@ -10,7 +10,6 @@
     Generates random sequences of operations and verifies
     invariants hold after every step. *)
 
-open Octez_manager_lib
 module State = Octez_manager_ui.Rpc_browser_state
 
 (* ================================================================== *)
@@ -18,18 +17,7 @@ module State = Octez_manager_ui.Rpc_browser_state
 (* ================================================================== *)
 
 let make_service name =
-  Service.make
-    ~instance:name
-    ~role:"node"
-    ~network:"mainnet"
-    ~history_mode:History_mode.Full
-    ~data_dir:"/tmp/test"
-    ~rpc_addr:"127.0.0.1:8732"
-    ~net_addr:"[::]:9732"
-    ~service_user:"tezos"
-    ~app_bin_dir:"/usr/bin"
-    ~logging_mode:Logging_mode.Journald
-    ()
+  Mock_service_helpers_lib.Mock_service_helpers.mock_service ~instance:name ()
 
 let instances = [make_service "node-a"; make_service "node-b"]
 

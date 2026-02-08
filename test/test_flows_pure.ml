@@ -111,17 +111,7 @@ let test_strip_node_prefix_nested () =
 (* invalid_instance_name_error_msg Tests                         *)
 (* ============================================================ *)
 
-let contains_substring haystack needle =
-  let nlen = String.length needle in
-  let hlen = String.length haystack in
-  if nlen > hlen then false
-  else
-    let rec aux i =
-      if i > hlen - nlen then false
-      else if String.sub haystack i nlen = needle then true
-      else aux (i + 1)
-    in
-    aux 0
+let contains_substring = Test_string_helpers.contains_substring
 
 let test_error_msg_not_empty () =
   Alcotest.(check bool)

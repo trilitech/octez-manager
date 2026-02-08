@@ -183,19 +183,7 @@ let navigate_up ?(wait = true) n =
 (* Screen Content Helpers *)
 (* ============================================================ *)
 
-(** Check if string contains substring *)
-let contains_substring haystack needle =
-  let nlen = String.length needle in
-  let hlen = String.length haystack in
-  if nlen = 0 then true
-  else if nlen > hlen then false
-  else
-    let rec loop i =
-      if i + nlen > hlen then false
-      else if String.sub haystack i nlen = needle then true
-      else loop (i + 1)
-    in
-    loop 0
+include Test_string_helpers
 
 (** Strip ANSI escape codes from string *)
 let strip_ansi s =
