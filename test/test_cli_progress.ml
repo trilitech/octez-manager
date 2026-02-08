@@ -33,18 +33,7 @@ let with_env_vars vars f =
         saved)
     f
 
-let string_contains ~needle haystack =
-  try
-    let _ = String.index haystack (String.get needle 0) in
-    let len = String.length needle in
-    let hlen = String.length haystack in
-    let rec check i =
-      if i + len > hlen then false
-      else if String.sub haystack i len = needle then true
-      else check (i + 1)
-    in
-    check 0
-  with Not_found -> false
+let string_contains = Test_string_helpers.string_contains
 
 (* ========================================================================= *)
 (* Progress Bar Rendering Tests *)

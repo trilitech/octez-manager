@@ -40,16 +40,7 @@ let make_svc ?(instance = "my-node") ?(role = "node") ?(network = "mainnet")
     dependents;
   }
 
-let contains_substring s sub =
-  let len_s = String.length s in
-  let len_sub = String.length sub in
-  if len_sub > len_s then false
-  else
-    let found = ref false in
-    for i = 0 to len_s - len_sub do
-      if String.sub s i len_sub = sub then found := true
-    done ;
-    !found
+let contains_substring = Test_string_helpers.contains_substring
 
 (* ── get_instance_details ──────────────────────────────────── *)
 

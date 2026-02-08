@@ -54,18 +54,7 @@ let with_test_env f =
   Fun.protect ~finally:(fun () -> cleanup tmp_dir) (fun () -> f ())
 
 (** Helper to check if string contains substring *)
-let contains_substring haystack needle =
-  let nlen = String.length needle in
-  let hlen = String.length haystack in
-  if nlen = 0 then true
-  else if nlen > hlen then false
-  else
-    let rec loop i =
-      if i + nlen > hlen then false
-      else if String.sub haystack i nlen = needle then true
-      else loop (i + 1)
-    in
-    loop 0
+let contains_substring = Test_string_helpers.contains_substring
 
 (** Strip ANSI escape codes for easier text matching *)
 let strip_ansi s =
