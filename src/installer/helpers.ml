@@ -49,9 +49,6 @@ let normalize_optional_string = function
       if trimmed = "" then None else Some trimmed
   | None -> None
 
-(* Logging is via journald - no logrotate needed *)
-let logrotate_specs_of (_services : Service.t list) = []
-
 (** Well-known global options for octez-baker/octez-client.
     These must appear before the subcommand. Used as fallback when dynamic
     discovery from --help fails. *)

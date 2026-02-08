@@ -6,15 +6,15 @@
 (******************************************************************************)
 
 (** Extended tests for Systemd module
-    
+
     Tests cover:
     - Role to binary name mapping
     - Unit path generation (system vs user mode)
     - Unit name formatting
     - Drop-in directory paths
     - Systemctl command construction
-    - Unit state parsing
     - Environment file template generation
+    - Prestart script path generation
 *)
 
 open Alcotest
@@ -171,33 +171,6 @@ let test_env_file_template_different_modes () =
     check bool "user and system differ" true (user <> system)
 
 (* ============================================================ *)
-(* Logrotate Path Tests *)
-(* ============================================================ *)
-
-let test_system_logrotate_config_path () =
-  let result = ST.system_logrotate_config_path "node" in
-  check bool "contains logrotate.d" true (String.contains result 'l') ;
-  check bool "contains octez" true (String.contains result 'o')
-
-let test_system_logrotate_config_path_different_roles () =
-  let node = ST.system_logrotate_config_path "node" in
-  let baker = ST.system_logrotate_config_path "baker" in
-  check bool "different roles give different paths" true (node <> baker)
-
-let test_user_logrotate_root () =
-  let result = ST.user_logrotate_root () in
-  check bool "returns path" true (String.length result > 0) ;
-  check bool "is absolute" true (String.starts_with ~prefix:"/" result)
-
-let test_user_logrotate_include_dir () =
-  let result = ST.user_logrotate_include_dir () in
-  check bool "returns path" true (String.length result > 0)
-
-let test_user_logrotate_main_config () =
-  let result = ST.user_logrotate_main_config () in
-  check bool "ends with .conf" true (String.ends_with ~suffix:".conf" result)
-
-(* ============================================================ *)
 (* Prestart Script Path Tests *)
 (* ============================================================ *)
 
@@ -267,17 +240,6 @@ let env_file_tests =
       test_env_file_template_different_modes );
   ]
 
-let logrotate_tests =
-  [
-    ("system_logrotate_config_path", `Quick, test_system_logrotate_config_path);
-    ( "system_logrotate_config_path roles",
-      `Quick,
-      test_system_logrotate_config_path_different_roles );
-    ("user_logrotate_root", `Quick, test_user_logrotate_root);
-    ("user_logrotate_include_dir", `Quick, test_user_logrotate_include_dir);
-    ("user_logrotate_main_config", `Quick, test_user_logrotate_main_config);
-  ]
-
 let prestart_tests =
   [
     ("prestart_hooks_dir", `Quick, test_prestart_hooks_dir);
@@ -297,6 +259,5 @@ let () =
       ("dropin", dropin_tests);
       ("systemctl", systemctl_tests);
       ("env_file", env_file_tests);
-      ("logrotate", logrotate_tests);
       ("prestart", prestart_tests);
     ]
