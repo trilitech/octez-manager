@@ -10,20 +10,6 @@
 open Octez_manager_lib
 open Instances_state
 
-(** Helper to ensure a service is selected before executing handler *)
-val with_service : state -> (Service_state.t -> state) -> state
-
-(** Run a unit action (start/stop/restart) in the background *)
-val run_unit_action :
-  verb:string ->
-  instance:string ->
-  (unit -> (unit, Rresult.R.msg) result) ->
-  unit
-
-(** Get installer capability *)
-val require_installer :
-  unit -> ((module Manager_interfaces.Installer), Rresult.R.msg) result
-
 (** Remove a service *)
 val do_remove :
   instance:string ->
@@ -51,32 +37,6 @@ val journalctl_args : string -> string list
 (** Legacy log viewer (commented out) *)
 val _view_logs_old : state -> state
 
-(** Start a service *)
-val do_start_service :
-  instance:string -> role:string -> (unit, Rresult.R.msg) result
-
-(** Offer to start dependent services *)
-val offer_start_dependents : instance:string -> unit
-
-(** Start service with dependent cascade *)
-val start_with_cascade : instance:string -> role:string -> unit
-
-(** Restart a service *)
-val do_restart_service :
-  instance:string -> role:string -> (unit, Rresult.R.msg) result
-
-(** Offer to restart dependent services *)
-val offer_restart_dependents : instance:string -> unit
-
-(** Restart service with dependent cascade *)
-val restart_with_cascade : instance:string -> role:string -> unit
-
-(** Edit an instance configuration *)
-val do_edit_instance : Service.t -> unit
-
-(** Confirm edit modal *)
-val confirm_edit_modal : Service.t -> unit
-
 (** Show instance actions modal *)
 val instance_actions_modal : state -> state
 
@@ -100,19 +60,6 @@ val dismiss_failure : state -> state
 
 (** Functions exposed for testing. *)
 module For_tests : sig
-  (** Extract version string from binary --version output. *)
-  val extract_version_string : string -> string option
-
-  (** Map a service role to its binary name. *)
-  val role_to_binary_name : string -> string
-
-  (** BFS to collect all transitive dependents. *)
-  val collect_dependents :
-    get_deps:(string -> Service.t list) -> string -> Service.t list
-
-  (** Remove duplicate services preserving order. *)
-  val dedup_services : Service.t list -> Service.t list
-
   (** Build journalctl arguments for a unit. *)
   val journalctl_args : string -> string list
 
