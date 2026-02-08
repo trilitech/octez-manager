@@ -711,7 +711,7 @@ let excluded_baker_options =
     "--chain";
   ]
 
-type baker_mode = [`Local | `Remote]
+type _baker_mode = [`Local | `Remote]
 
 let load_baker_options ~binary ~mode =
   let cache_key =

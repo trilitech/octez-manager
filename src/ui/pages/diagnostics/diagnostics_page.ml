@@ -185,7 +185,7 @@ let header =
     Widgets.dim "Live system metrics and service status";
   ]
 
-let footer = []
+let _footer = []
 
 (* Section content renderers - each returns lines for that section *)
 let render_services_content services =
