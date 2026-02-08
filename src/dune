@@ -12,6 +12,8 @@
   log_export
   node_env
   systemd
+  systemd_unit_template
+  systemd_dropin
   binary_registry
   binary_downloader
   version_checker
