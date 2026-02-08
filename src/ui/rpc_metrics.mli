@@ -17,8 +17,11 @@ type rpc_metrics = {
   last_block_time : float option;
 }
 
+(** Store RPC metrics for [instance] in the cache (thread-safe). *)
 val set : instance:string -> rpc_metrics -> unit
 
+(** Retrieve cached RPC metrics for [instance], or [None] if not yet fetched. *)
 val get : instance:string -> rpc_metrics option
 
+(** Clear all cached RPC metrics. *)
 val clear : unit -> unit

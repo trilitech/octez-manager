@@ -5,4 +5,5 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Cmdliner command for the [om web] subcommand (web dashboard). *)
 val web_cmd : unit Cmdliner.Cmd.t

@@ -13,6 +13,7 @@ open Instances_state
 (** Layout configuration constants *)
 val min_column_width : int
 
+(** String used to visually separate columns. *)
 val column_separator : string
 
 (** Role ordering for grouping *)
@@ -27,6 +28,7 @@ val sort_services : Service_state.t list -> Service_state.t list
 (** Load services from Data module *)
 val load_services : unit -> Service_state.t list
 
+(** Load services from Data module, bypassing the cache. *)
 val load_services_fresh : unit -> Service_state.t list
 
 (** Calculate number of columns based on terminal width *)

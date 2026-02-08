@@ -14,10 +14,14 @@ module StringSet : Set.S with type elt = string
 (** Recent failure tracking *)
 val recent_failure_ttl : float
 
+(** Record an action failure for [instance] with the given [error] message.
+    The failure is displayed temporarily (see {!recent_failure_ttl}). *)
 val record_failure : instance:string -> error:string -> unit
 
+(** Clear the recorded failure for [instance]. *)
 val clear_failure : instance:string -> unit
 
+(** Get the most recent failure message for [instance], if still within TTL. *)
 val get_recent_failure : instance:string -> string option
 
 (** Layout constants *)

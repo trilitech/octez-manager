@@ -5,10 +5,12 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Page name for the page registry. *)
 val name : string
 
 module Page : Miaou.Core.Tui_page.PAGE_SIG
 
+(** Register this page with the global page registry. *)
 val register : unit -> unit
 
 (** Functions exposed for testing. *)

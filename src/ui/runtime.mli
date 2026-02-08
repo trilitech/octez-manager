@@ -10,4 +10,8 @@
     Behavior is unspecified if [path] exists but is not a directory. *)
 val ensure_dir : string -> unit
 
+(** Initialize the TUI runtime: create data directories, start background
+    schedulers, and optionally enable debug logging.
+    @param log Enable Miaou debug logging (default [false]).
+    @param logfile Path to write debug logs to. *)
 val initialize : ?log:bool -> ?logfile:string -> unit -> unit

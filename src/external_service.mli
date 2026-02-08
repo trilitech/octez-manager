@@ -16,8 +16,10 @@
 (** Service role detected from binary name. *)
 type role = Node | Baker | Accuser | Dal_node | Unknown of string
 
+(** Convert a role to its string representation (e.g. [Node -> "node"]). *)
 val role_to_string : role -> string
 
+(** Parse a string into a role (e.g. ["baker" -> Baker]). *)
 val role_of_string : string -> role
 
 (** Map binary name to role.
@@ -34,6 +36,7 @@ val role_of_binary_name : ?subcommand:string -> string -> role
     - [Unknown]: Could not determine *)
 type confidence = Detected | Inferred | Permission_denied | Unknown
 
+(** Convert a confidence level to its string representation. *)
 val confidence_to_string : confidence -> string
 
 (** A configuration field with confidence tracking.
@@ -124,8 +127,10 @@ type status =
   | Failed of string
   | Unknown of string
 
+(** Derive a display status from a systemd unit state. *)
 val status_of_unit_state : unit_state -> status
 
+(** Human-readable label for a status (e.g. ["Running"], ["Failed: exit-code"]). *)
 val status_label : status -> string
 
 (** {1 Constructors} *)
