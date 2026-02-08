@@ -171,7 +171,7 @@ let sample_node_request ?data_dir ?(bootstrap = Genesis)
     network = "https://teztnets.com/seoulnet";
     history_mode;
     data_dir;
-    rpc_addr = "127.0.0.1:8732";
+    rpc_addr = Rpc_addr.of_string "127.0.0.1:8732";
     net_addr = "0.0.0.0:9732";
     service_user = "octez";
     app_bin_dir = "/opt/octez";
@@ -353,7 +353,7 @@ let installer_build_run_args_journald () =
     Installer.For_tests.build_run_args
       ~network:"mainnet"
       ~history_mode:History_mode.Full
-      ~rpc_addr:"127.0.0.1:8732"
+      ~rpc_addr:(Rpc_addr.of_string "127.0.0.1:8732")
       ~net_addr:"0.0.0.0:9732"
       ~extra_args:["--peer"; "2"]
       ~logging_mode
@@ -4477,7 +4477,7 @@ let bug1_shell_expansion_build_run_args () =
     build_run_args
       ~network:"shadownet"
       ~history_mode:Rolling
-      ~rpc_addr:"localhost:8732"
+      ~rpc_addr:(Rpc_addr.of_string "localhost:8732")
       ~net_addr:"0.0.0.0:9732"
       ~extra_args:["--cors-origin=*"; "--metrics-addr=:9096"]
       ~logging_mode:Logging_mode.Journald
@@ -4530,7 +4530,7 @@ let bug1_shell_expansion_env_file_sourcing () =
           Config.build_run_args
             ~network:"mainnet"
             ~history_mode:Rolling
-            ~rpc_addr:"localhost:8732"
+            ~rpc_addr:(Rpc_addr.of_string "localhost:8732")
             ~net_addr:":9732"
             ~extra_args:["--cors-origin=*"; "--metrics-addr=:9096"]
             ~logging_mode:Logging_mode.Journald

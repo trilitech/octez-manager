@@ -48,7 +48,7 @@ module For_tests : sig
   val build_run_args :
     network:string ->
     history_mode:History_mode.t ->
-    rpc_addr:string ->
+    rpc_addr:Rpc_addr.t ->
     net_addr:string ->
     extra_args:string list ->
     logging_mode:Logging_mode.t ->

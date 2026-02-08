@@ -53,7 +53,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
     in
     [
       ("OCTEZ_DAL_DATA_DIR", request.data_dir);
-      ("OCTEZ_DAL_RPC_ADDR", request.rpc_addr);
+      ("OCTEZ_DAL_RPC_ADDR", Rpc_addr.to_string request.rpc_addr);
       ("OCTEZ_DAL_NET_ADDR", request.net_addr);
       ("OCTEZ_NETWORK", request.network);
     ]
@@ -108,7 +108,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~network:request.network
       ~history_mode:request.history_mode
       ~data_dir:request.data_dir
-      ~rpc_addr:(Rpc_addr.of_string request.rpc_addr)
+      ~rpc_addr:request.rpc_addr
       ~net_addr:request.net_addr
       ~service_user:request.service_user
       ~app_bin_dir:request.app_bin_dir

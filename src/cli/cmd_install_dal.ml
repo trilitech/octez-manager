@@ -171,7 +171,7 @@ let install_dal_node_cmd =
                                 network;
                                 history_mode = History_mode.default;
                                 data_dir;
-                                rpc_addr;
+                                rpc_addr = Rpc_addr.of_string rpc_addr;
                                 net_addr;
                                 service_user;
                                 app_bin_dir;

@@ -30,7 +30,7 @@ val lookup_node_service : string -> (Service.t, Rresult.R.msg) result
 val build_run_args :
   network:string ->
   history_mode:History_mode.t ->
-  rpc_addr:string ->
+  rpc_addr:Rpc_addr.t ->
   net_addr:string ->
   extra_args:string list ->
   logging_mode:Logging_mode.t ->
@@ -103,6 +103,6 @@ val resolve_from_data_dir :
 val update_dependent_endpoints :
   instance:string ->
   role:string ->
-  new_rpc_addr:string ->
+  new_rpc_addr:Rpc_addr.t ->
   unit ->
   (unit, Rresult.R.msg) result
