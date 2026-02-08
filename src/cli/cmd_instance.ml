@@ -360,7 +360,9 @@ let instance_term =
                         "  History mode: %s@."
                         (History_mode.to_string svc.history_mode) ;
                       Format.printf "  Data dir: %s@." svc.data_dir ;
-                      Format.printf "  RPC addr: %s@." svc.rpc_addr ;
+                      Format.printf
+                        "  RPC addr: %s@."
+                        (Rpc_addr.to_string svc.rpc_addr) ;
                       Format.printf "  P2P addr: %s@." svc.net_addr
                   | "baker" ->
                       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
@@ -434,9 +436,12 @@ let instance_term =
                         (* Node: edit RPC addr, P2P addr, extra args *)
                         let new_rpc =
                           Cli_helpers.prompt_input
-                            ~default:(svc.rpc_addr, svc.rpc_addr)
+                            ~default:
+                              ( Rpc_addr.to_string svc.rpc_addr,
+                                Rpc_addr.to_string svc.rpc_addr )
                             "RPC address"
-                          |> Option.value ~default:svc.rpc_addr
+                          |> Option.value
+                               ~default:(Rpc_addr.to_string svc.rpc_addr)
                         in
                         let new_net =
                           Cli_helpers.prompt_input
@@ -453,7 +458,7 @@ let instance_term =
                           Cli_helpers.validate_port_addr
                             ~label:"RPC address"
                             ~addr:new_rpc
-                            ~default:svc.rpc_addr
+                            ~default:(Rpc_addr.to_string svc.rpc_addr)
                             ~exclude_instance:inst
                             ()
                         in
@@ -598,7 +603,8 @@ let instance_term =
                                                 s.instance = current_dal)
                                               dal_services
                                           with
-                                         | Some s -> s.rpc_addr
+                                         | Some s ->
+                                             Rpc_addr.to_string s.rpc_addr
                                          | None -> "127.0.0.1:10732")),
                                     Some current_dal )
                                 else
@@ -622,7 +628,7 @@ let instance_term =
                                           s.instance = selected)
                                         dal_services
                                     with
-                                    | Some s -> s.rpc_addr
+                                    | Some s -> Rpc_addr.to_string s.rpc_addr
                                     | None -> "127.0.0.1:10732"
                                   in
                                   ( Installer_types.Dal_endpoint
@@ -696,7 +702,7 @@ let instance_term =
                               match
                                 Service_registry.find ~instance:new_node
                               with
-                              | Ok (Some s) -> Config.endpoint_of_rpc s.rpc_addr
+                              | Ok (Some s) -> Rpc_addr.to_endpoint s.rpc_addr
                               | _ -> "http://127.0.0.1:8732"
                             in
                             (Some new_node, ep)

@@ -9,9 +9,7 @@ open Octez_manager_lib
 module Bg = Background_runner
 
 (* Helper to compute endpoint URL for a service. *)
-let endpoint_of (s : Service.t) =
-  if String.starts_with ~prefix:"http" s.rpc_addr then s.rpc_addr
-  else "http://" ^ s.rpc_addr
+let endpoint_of (s : Service.t) = Rpc_addr.to_endpoint s.rpc_addr
 
 let octez_client_bin (s : Service.t) =
   Filename.concat s.app_bin_dir "octez-client"
@@ -152,16 +150,23 @@ let version_cache = Cache.create_safe_keyed ~name:"rpc_version" ~ttl:3600.0 ()
 let last_error_cache = Cache.create_safe_keyed ~name:"rpc_errors" ~ttl:60.0 ()
 
 let set_error (s : Service.t) msg =
-  Cache.set_safe_keyed last_error_cache s.rpc_addr (Some msg)
+  Cache.set_safe_keyed
+    last_error_cache
+    (Rpc_addr.to_string s.rpc_addr)
+    (Some msg)
 
 let clear_error (s : Service.t) =
-  Cache.remove_safe_keyed last_error_cache s.rpc_addr
+  Cache.remove_safe_keyed last_error_cache (Rpc_addr.to_string s.rpc_addr)
 
 let rpc_last_error (s : Service.t) =
-  Cache.get_safe_keyed_cached last_error_cache s.rpc_addr |> Option.join
+  Cache.get_safe_keyed_cached last_error_cache (Rpc_addr.to_string s.rpc_addr)
+  |> Option.join
 
 let rpc_head_header (s : Service.t) : int option =
-  Cache.get_safe_keyed head_level_cache s.rpc_addr ~fetch:(fun () ->
+  Cache.get_safe_keyed
+    head_level_cache
+    (Rpc_addr.to_string s.rpc_addr)
+    ~fetch:(fun () ->
       match http_get_string s "/chains/main/blocks/head/header" with
       | Ok out -> (
           clear_error s ;
@@ -175,10 +180,14 @@ let rpc_head_header (s : Service.t) : int option =
           None)
 
 let rpc_head_header_cached (s : Service.t) : int option =
-  Cache.get_safe_keyed_cached head_level_cache s.rpc_addr |> Option.join
+  Cache.get_safe_keyed_cached head_level_cache (Rpc_addr.to_string s.rpc_addr)
+  |> Option.join
 
 let rpc_chain_id (s : Service.t) : string option =
-  Cache.get_safe_keyed chain_id_cache s.rpc_addr ~fetch:(fun () ->
+  Cache.get_safe_keyed
+    chain_id_cache
+    (Rpc_addr.to_string s.rpc_addr)
+    ~fetch:(fun () ->
       match http_get_string s "/chains/main/chain_id" with
       | Ok out -> (
           clear_error s ;
@@ -192,7 +201,8 @@ let rpc_chain_id (s : Service.t) : string option =
           None)
 
 let rpc_chain_id_cached (s : Service.t) : string option =
-  Cache.get_safe_keyed_cached chain_id_cache s.rpc_addr |> Option.join
+  Cache.get_safe_keyed_cached chain_id_cache (Rpc_addr.to_string s.rpc_addr)
+  |> Option.join
 
 let rpc_protocol (s : Service.t) : string option =
   match http_get_string s "/chains/main/blocks/head/metadata" with
@@ -213,7 +223,10 @@ let rpc_protocol (s : Service.t) : string option =
       None
 
 let rpc_is_bootstrapped (s : Service.t) : bool option =
-  Cache.get_safe_keyed bootstrapped_cache s.rpc_addr ~fetch:(fun () ->
+  Cache.get_safe_keyed
+    bootstrapped_cache
+    (Rpc_addr.to_string s.rpc_addr)
+    ~fetch:(fun () ->
       match http_get_string s "/chains/main/is_bootstrapped" with
       | Ok out -> (
           clear_error s ;
@@ -245,7 +258,8 @@ let node_version (s : Service.t) : string option =
           None)
 
 let rpc_is_bootstrapped_cached (s : Service.t) : bool option =
-  Cache.get_safe_keyed_cached bootstrapped_cache s.rpc_addr |> Option.join
+  Cache.get_safe_keyed_cached bootstrapped_cache (Rpc_addr.to_string s.rpc_addr)
+  |> Option.join
 
 (* Head monitor stream: keep a single connection per node to reduce socket
   churn. We stream /monitor/heads/main and push level/protocol/chain updates

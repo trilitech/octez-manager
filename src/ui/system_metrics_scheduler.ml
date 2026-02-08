@@ -398,11 +398,7 @@ let tick () =
             ~data_dir:svc.Service.data_dir
             () ;
           (* Also submit DAL health check *)
-          let rpc_endpoint =
-            if String.starts_with ~prefix:"http" svc.Service.rpc_addr then
-              svc.Service.rpc_addr
-            else "http://" ^ svc.Service.rpc_addr
-          in
+          let rpc_endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
           submit_dal_health ~instance:svc.Service.instance ~rpc_endpoint
       | "accuser" ->
           (* Accuser runs via octez-baker run accuser *)

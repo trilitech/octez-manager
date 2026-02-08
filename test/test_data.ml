@@ -20,7 +20,7 @@ let make_service ?(instance = "my-node") ?(role = "node") ?(network = "mainnet")
     network;
     history_mode = Octez_manager_lib.History_mode.Rolling;
     data_dir = "/var/lib/octez/node";
-    rpc_addr = "127.0.0.1:8732";
+    rpc_addr = Octez_manager_lib.Rpc_addr.of_string "127.0.0.1:8732";
     net_addr = "0.0.0.0:9732";
     service_user = "tezos";
     app_bin_dir = "/usr/bin";

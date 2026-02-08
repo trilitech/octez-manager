@@ -311,18 +311,7 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
               let should_autoname =
                 current_name = "" || String.equal current_name role
               in
-              let endpoint =
-                let addr = String.trim svc.Service.rpc_addr in
-                if
-                  String.starts_with
-                    ~prefix:"http://"
-                    (String.lowercase_ascii addr)
-                  || String.starts_with
-                       ~prefix:"https://"
-                       (String.lowercase_ascii addr)
-                then addr
-                else "http://" ^ addr
-              in
+              let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
               let client = get_client !model_ref in
               model_ref :=
                 set_client

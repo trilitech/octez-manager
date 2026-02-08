@@ -102,7 +102,8 @@ let test_to_service () =
   Alcotest.(check string)
     "rpc_addr"
     "https://test.node"
-    svc.Octez_manager_lib.Service.rpc_addr ;
+    (Octez_manager_lib.Rpc_addr.to_string
+       svc.Octez_manager_lib.Service.rpc_addr) ;
   Alcotest.(check string)
     "data_dir empty"
     ""

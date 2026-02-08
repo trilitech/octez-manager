@@ -332,10 +332,8 @@ let spec =
               in
               match node with
               | Some n ->
-                  let addr =
-                    String.trim n.Data.Service_state.service.Service.rpc_addr
-                  in
-                  Config.endpoint_of_rpc addr
+                  Rpc_addr.to_endpoint
+                    n.Data.Service_state.service.Service.rpc_addr
               | None -> "http://127.0.0.1:8732")
           | `Endpoint ep -> Config.endpoint_of_rpc ep
           | `None -> "http://127.0.0.1:8732"

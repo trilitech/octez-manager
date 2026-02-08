@@ -123,7 +123,7 @@ let install_dal_node_cmd =
                   | `Instance inst -> (
                       match Service_registry.find ~instance:inst with
                       | Ok (Some svc) ->
-                          Config.endpoint_of_rpc svc.Service.rpc_addr
+                          Rpc_addr.to_endpoint svc.Service.rpc_addr
                       | _ -> Config.endpoint_of_rpc "127.0.0.1:8732")
                 in
                 let maybe_network =

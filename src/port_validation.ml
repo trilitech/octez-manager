@@ -46,7 +46,7 @@ let fetch_service_ports () =
       let rpc_ports =
         with_ports
         |> List.filter_map (fun s ->
-            parse_port s.Service.rpc_addr
+            parse_port (Rpc_addr.to_string s.Service.rpc_addr)
             |> Option.map (fun p -> (p, s.Service.instance)))
       in
       let p2p_ports =
@@ -87,7 +87,7 @@ let port_owned_by_instance ~instance port =
     when svc.Service.role = "node"
          || svc.Service.role = "dal-node"
          || svc.Service.role = "dal" ->
-      parse_port svc.Service.rpc_addr = Some port
+      parse_port (Rpc_addr.to_string svc.Service.rpc_addr) = Some port
       || parse_port svc.Service.net_addr = Some port
   | _ -> false
 

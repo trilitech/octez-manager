@@ -120,7 +120,7 @@ let service_equal a b =
   && String.equal a.network b.network
   && a.history_mode = b.history_mode
   && String.equal a.data_dir b.data_dir
-  && String.equal a.rpc_addr b.rpc_addr
+  && Rpc_addr.equal a.rpc_addr b.rpc_addr
   && String.equal a.net_addr b.net_addr
   && String.equal a.service_user b.service_user
   && String.equal a.app_bin_dir b.app_bin_dir
@@ -142,7 +142,7 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     network = "https://example/net.json";
     history_mode = History_mode.Full;
     data_dir = "/tmp/octez/alpha";
-    rpc_addr = "127.0.0.1:8732";
+    rpc_addr = Rpc_addr.of_string "127.0.0.1:8732";
     net_addr = "0.0.0.0:9732";
     service_user = "octez";
     app_bin_dir = "/opt/octez";
@@ -194,7 +194,7 @@ let service_make_populates_fields () =
       ~network:"https://example/beta.json"
       ~history_mode:History_mode.Full
       ~data_dir:"/tmp/octez/beta"
-      ~rpc_addr:"127.0.0.1:8732"
+      ~rpc_addr:(Rpc_addr.of_string "127.0.0.1:8732")
       ~net_addr:"0.0.0.0:9732"
       ~service_user:"octez"
       ~app_bin_dir:"/opt/octez"
@@ -4601,7 +4601,7 @@ let bug2_node_extra_args_preserved () =
       ~network:"mainnet"
       ~history_mode:Rolling
       ~data_dir:"/tmp/data"
-      ~rpc_addr:"localhost:8732"
+      ~rpc_addr:(Rpc_addr.of_string "localhost:8732")
       ~net_addr:":9732"
       ~service_user:"testuser"
       ~app_bin_dir:"/usr/bin"
@@ -4625,7 +4625,7 @@ let bug2_baker_extra_args_preserved () =
       ~network:"mainnet"
       ~history_mode:Rolling
       ~data_dir:"/tmp/node-data"
-      ~rpc_addr:"http://localhost:8732"
+      ~rpc_addr:(Rpc_addr.of_string "http://localhost:8732")
       ~net_addr:""
       ~service_user:"testuser"
       ~app_bin_dir:"/usr/bin"
@@ -4647,7 +4647,7 @@ let bug2_accuser_extra_args_preserved () =
       ~network:"mainnet"
       ~history_mode:Rolling
       ~data_dir:"/tmp/node-data"
-      ~rpc_addr:"http://localhost:8732"
+      ~rpc_addr:(Rpc_addr.of_string "http://localhost:8732")
       ~net_addr:""
       ~service_user:"testuser"
       ~app_bin_dir:"/usr/bin"
@@ -4669,7 +4669,7 @@ let bug2_dal_extra_args_preserved () =
       ~network:"mainnet"
       ~history_mode:Rolling
       ~data_dir:"/tmp/dal-data"
-      ~rpc_addr:"localhost:10732"
+      ~rpc_addr:(Rpc_addr.of_string "localhost:10732")
       ~net_addr:":11732"
       ~service_user:"testuser"
       ~app_bin_dir:"/usr/bin"

@@ -105,7 +105,8 @@ let ports_from_states ~roles states =
     states
     |> List.filter_map (fun (s : Data.Service_state.t) ->
         if role_matches s.service.Service.role then
-          Port_validation.parse_port s.service.Service.rpc_addr
+          Port_validation.parse_port
+            (Rpc_addr.to_string s.service.Service.rpc_addr)
         else None)
   in
   let p2p_ports =
@@ -226,7 +227,7 @@ let endpoint_with_scheme rpc_addr =
   else "http://" ^ trimmed
 
 let endpoint_of_service (svc : Service.t) =
-  endpoint_with_scheme svc.Service.rpc_addr
+  endpoint_with_scheme (Rpc_addr.to_string svc.Service.rpc_addr)
 
 (** {1 Helpers} *)
 

@@ -190,7 +190,7 @@ let install_baker_cmd =
                       let instance_map =
                         List.map
                           (fun (svc : Service.t) ->
-                            (svc.instance, svc.rpc_addr))
+                            (svc.instance, Rpc_addr.to_string svc.rpc_addr))
                           dal_services
                       in
                       Format.printf
@@ -219,8 +219,7 @@ let install_baker_cmd =
                           | Some svc ->
                               Ok
                                 ( Dal_endpoint
-                                    (Config.endpoint_of_rpc
-                                       svc.Service.rpc_addr),
+                                    (Rpc_addr.to_endpoint svc.Service.rpc_addr),
                                   Some svc.instance )
                           | None ->
                               Ok

@@ -276,7 +276,7 @@ let view_details svc =
           ("Role", svc.Service.role);
           ("Network", svc.Service.network);
           ("History Mode", History_mode.to_string svc.Service.history_mode);
-          ("RPC Addr", svc.Service.rpc_addr);
+          ("RPC Addr", Rpc_addr.to_string svc.Service.rpc_addr);
           ("P2P Addr", svc.Service.net_addr);
           ("Dependents", dependents);
           ("Service User", svc.Service.service_user);

@@ -21,7 +21,7 @@ let make_svc ?(instance = "test") ?(role = "node") ?(network = "mainnet") () =
     ~network
     ~history_mode:History_mode.default
     ~data_dir:"/tmp"
-    ~rpc_addr:""
+    ~rpc_addr:(Rpc_addr.of_string "")
     ~net_addr:""
     ~service_user:"tezos"
     ~app_bin_dir:"/usr/bin"
