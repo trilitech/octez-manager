@@ -83,7 +83,7 @@ let header s =
     | None -> "");
   ]
 
-let footer = []
+let _footer = []
 
 let view_details svc =
   let render_fields fields =

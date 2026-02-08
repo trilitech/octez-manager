@@ -194,7 +194,7 @@ let schedule_snapshot_fetch slug =
 let snapshot_entries_from_cache slug =
   Cache.get_safe_keyed_cached snapshot_cache slug
 
-let ensure_snapshot_entries slug =
+let _ensure_snapshot_entries slug =
   match snapshot_entries_from_cache slug with
   | Some entries -> Ok entries
   | None -> (
