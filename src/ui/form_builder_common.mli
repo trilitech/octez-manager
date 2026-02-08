@@ -76,6 +76,7 @@ val parse_host_port : string -> (string * int) option
 (** Get default service user (octez for root, current user otherwise) *)
 val default_service_user : unit -> string
 
+(** Default client base directory for a given role and instance name. *)
 val default_base_dir : role:string -> instance:string -> string
 
 (** {1 Port Initialization Helpers} *)
