@@ -22,6 +22,139 @@ type instance_action =
   | Edit
   | Export_logs
 
+(** Look up a service by instance name, or return a cmdliner error. *)
+let with_service ~instance f =
+  match Service_registry.find ~instance with
+  | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+  | Ok None ->
+      Cli_helpers.cmdliner_error
+        (Printf.sprintf "Unknown instance '%s'" instance)
+  | Ok (Some svc) -> f svc
+
+(** Start or restart an instance, handling stopped dependencies
+    and prompting to start/restart dependents.
+    [action_fn] is [Lifecycle.start_service] or [Lifecycle.restart_service].
+    [action_name] is ["Start"] or ["Restart"] (for prompts/messages). *)
+let start_or_restart_with_deps ~action_fn ~action_name ~instance () =
+  let dep_check = Lifecycle.get_stopped_dependencies ~instance () in
+  let past_tense = if action_name = "Start" then "Started" else "Restarted" in
+  let handle_dependents () =
+    match Lifecycle.get_stopped_dependents ~instance () with
+    | Ok [] -> `Ok ()
+    | Ok stopped_deps when Cli_helpers.is_interactive () ->
+        let names =
+          String.concat ", " (List.map (fun s -> s.S.instance) stopped_deps)
+        in
+        let should_act =
+          Cli_helpers.prompt_yes_no
+            (Printf.sprintf "%s dependents? (%s)" action_name names)
+            ~default:true
+        in
+        if should_act then
+          List.iter
+            (fun dep ->
+              match action_fn ~quiet:false ~instance:dep.S.instance () with
+              | Ok () -> Printf.printf "%s %s\n%!" past_tense dep.S.instance
+              | Error (`Msg e) ->
+                  Printf.eprintf
+                    "Failed to %s %s: %s\n%!"
+                    (String.lowercase_ascii action_name)
+                    dep.S.instance
+                    e)
+            stopped_deps ;
+        `Ok ()
+    | _ -> `Ok ()
+  in
+  let do_action () =
+    match action_fn ~quiet:false ~instance () with
+    | Ok () -> handle_dependents ()
+    | Error (`Msg e) -> `Error (false, e)
+  in
+  match dep_check with
+  | Error (`Msg e) ->
+      prerr_endline ("Error checking dependencies: " ^ e) ;
+      `Error (false, e)
+  | Ok [] -> do_action ()
+  | Ok stopped_deps ->
+      let names =
+        String.concat ", " (List.map (fun s -> s.S.instance) stopped_deps)
+      in
+      if Cli_helpers.is_interactive () then
+        let should_start_deps =
+          Cli_helpers.prompt_yes_no
+            (Printf.sprintf
+               "Dependencies not running (%s). Start them first?"
+               names)
+            ~default:true
+        in
+        if should_start_deps then (
+          (* Start dependencies in order (always start, even on restart) *)
+          let failed = ref false in
+          List.iter
+            (fun dep ->
+              if not !failed then
+                match
+                  Lifecycle.start_service
+                    ~quiet:false
+                    ~instance:dep.S.instance
+                    ()
+                with
+                | Ok () -> Printf.printf "Started %s\n%!" dep.S.instance
+                | Error (`Msg e) ->
+                    Printf.eprintf "Failed to start %s: %s\n%!" dep.S.instance e ;
+                    failed := true)
+            stopped_deps ;
+          if !failed then `Error (false, "Failed to start dependencies")
+          else do_action ())
+        else (
+          prerr_endline "Cancelled - dependencies must be running first." ;
+          `Ok ())
+      else Cli_helpers.run_result (action_fn ~quiet:false ~instance ())
+
+(** Prompt for a node instance with tab completion.
+    Returns the selected node name or endpoint. *)
+let prompt_node_selection ~svc ~lookup =
+  let current_node =
+    match svc.S.depends_on with
+    | Some inst -> inst
+    | None -> lookup "OCTEZ_NODE_ENDPOINT"
+  in
+  let node_services =
+    match Service_registry.list () with
+    | Ok svcs -> List.filter (fun (s : Service.t) -> s.role = "node") svcs
+    | Error _ -> []
+  in
+  let node_names = List.map (fun (s : Service.t) -> s.instance) node_services in
+  let new_node =
+    if node_names = [] then current_node
+    else (
+      Format.printf "  Available nodes: %s@." (String.concat ", " node_names) ;
+      match Cli_helpers.prompt_with_completion "Node instance" node_names with
+      | Some "" | None -> current_node
+      | Some v -> String.trim v)
+  in
+  (new_node, node_names)
+
+(** Resolve whether a node selection is a local instance or remote endpoint. *)
+let resolve_node_mode ~new_node ~node_names =
+  if List.mem new_node node_names then Installer_types.Local_instance new_node
+  else Installer_types.Remote_endpoint new_node
+
+(** Prompt for extra args and parse into a string list. *)
+let prompt_extra_args ~extra_args_str =
+  let new_extra =
+    Cli_helpers.prompt_input
+      ~default:(extra_args_str, extra_args_str)
+      "Extra args"
+    |> Option.value ~default:extra_args_str
+  in
+  String.split_on_char ' ' new_extra
+  |> List.map String.trim
+  |> List.filter (( <> ) "")
+
+(** Unwrap [(`Msg s)] to plain [string] for Result.map_error. *)
+let msg_to_string (`Msg s) = s
+
 let instance_term =
   let instance =
     Arg.(value & pos 0 (some string) None & info [] ~docv:"INSTANCE")
@@ -59,321 +192,25 @@ let instance_term =
            (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit)"
     | Some inst, Some action -> (
         match action with
-        | Start -> (
-            (* Check for stopped dependencies *)
-            let dep_check =
-              Lifecycle.get_stopped_dependencies ~instance:inst ()
-            in
-            match dep_check with
-            | Error (`Msg e) ->
-                prerr_endline ("Error checking dependencies: " ^ e) ;
-                `Error (false, e)
-            | Ok [] -> (
-                (* No stopped dependencies, start directly *)
-                let result =
-                  Lifecycle.start_service ~quiet:false ~instance:inst ()
-                in
-                match result with
-                | Ok () -> (
-                    (* Check for stopped dependents *)
-                    match
-                      Lifecycle.get_stopped_dependents ~instance:inst ()
-                    with
-                    | Ok [] -> `Ok ()
-                    | Ok stopped_deps when Cli_helpers.is_interactive () ->
-                        let names =
-                          String.concat
-                            ", "
-                            (List.map
-                               (fun s -> s.Service.instance)
-                               stopped_deps)
-                        in
-                        let should_start =
-                          Cli_helpers.prompt_yes_no
-                            (Printf.sprintf "Start dependents? (%s)" names)
-                            ~default:true
-                        in
-                        if should_start then
-                          List.iter
-                            (fun dep ->
-                              match
-                                Lifecycle.start_service
-                                  ~quiet:false
-                                  ~instance:dep.Service.instance
-                                  ()
-                              with
-                              | Ok () ->
-                                  Printf.printf
-                                    "Started %s\n%!"
-                                    dep.Service.instance
-                              | Error (`Msg e) ->
-                                  Printf.eprintf
-                                    "Failed to start %s: %s\n%!"
-                                    dep.Service.instance
-                                    e)
-                            stopped_deps ;
-                        `Ok ()
-                    | _ -> `Ok ())
-                | Error (`Msg e) -> `Error (false, e))
-            | Ok stopped_deps ->
-                let names =
-                  String.concat
-                    ", "
-                    (List.map (fun s -> s.Service.instance) stopped_deps)
-                in
-                if Cli_helpers.is_interactive () then
-                  let should_start_deps =
-                    Cli_helpers.prompt_yes_no
-                      (Printf.sprintf
-                         "Dependencies not running (%s). Start them first?"
-                         names)
-                      ~default:true
-                  in
-                  if should_start_deps then (
-                    (* Start dependencies in order *)
-                    let failed = ref false in
-                    List.iter
-                      (fun dep ->
-                        if not !failed then
-                          match
-                            Lifecycle.start_service
-                              ~quiet:false
-                              ~instance:dep.Service.instance
-                              ()
-                          with
-                          | Ok () ->
-                              Printf.printf
-                                "Started %s\n%!"
-                                dep.Service.instance
-                          | Error (`Msg e) ->
-                              Printf.eprintf
-                                "Failed to start %s: %s\n%!"
-                                dep.Service.instance
-                                e ;
-                              failed := true)
-                      stopped_deps ;
-                    if !failed then
-                      `Error (false, "Failed to start dependencies")
-                    else
-                      (* Now start the target instance *)
-                      let result =
-                        Lifecycle.start_service ~quiet:false ~instance:inst ()
-                      in
-                      match result with
-                      | Ok () -> (
-                          (* Check for stopped dependents *)
-                          match
-                            Lifecycle.get_stopped_dependents ~instance:inst ()
-                          with
-                          | Ok [] -> `Ok ()
-                          | Ok stopped_deps ->
-                              let names =
-                                String.concat
-                                  ", "
-                                  (List.map
-                                     (fun s -> s.Service.instance)
-                                     stopped_deps)
-                              in
-                              let should_start =
-                                Cli_helpers.prompt_yes_no
-                                  (Printf.sprintf
-                                     "Start dependents? (%s)"
-                                     names)
-                                  ~default:true
-                              in
-                              if should_start then
-                                List.iter
-                                  (fun dep ->
-                                    match
-                                      Lifecycle.start_service
-                                        ~quiet:false
-                                        ~instance:dep.Service.instance
-                                        ()
-                                    with
-                                    | Ok () ->
-                                        Printf.printf
-                                          "Started %s\n%!"
-                                          dep.Service.instance
-                                    | Error (`Msg e) ->
-                                        Printf.eprintf
-                                          "Failed to start %s: %s\n%!"
-                                          dep.Service.instance
-                                          e)
-                                  stopped_deps ;
-                              `Ok ()
-                          | _ -> `Ok ())
-                      | Error (`Msg e) -> `Error (false, e))
-                  else (
-                    prerr_endline
-                      "Cancelled - dependencies must be running first." ;
-                    `Ok ())
-                else
-                  (* Non-interactive mode - just fail like before *)
-                  Cli_helpers.run_result
-                    (Lifecycle.start_service ~quiet:false ~instance:inst ()))
+        | Start ->
+            start_or_restart_with_deps
+              ~action_fn:(fun ~quiet ~instance () ->
+                Lifecycle.start_service ~quiet ~instance ())
+              ~action_name:"Start"
+              ~instance:inst
+              ()
         | Stop ->
             Cli_helpers.run_result
               (Lifecycle.stop_service ~quiet:false ~instance:inst ())
-        | Restart -> (
-            (* Check for stopped dependencies *)
-            let dep_check =
-              Lifecycle.get_stopped_dependencies ~instance:inst ()
-            in
-            match dep_check with
-            | Error (`Msg e) ->
-                prerr_endline ("Error checking dependencies: " ^ e) ;
-                `Error (false, e)
-            | Ok [] -> (
-                (* No stopped dependencies, restart directly *)
-                let result =
-                  Lifecycle.restart_service ~quiet:false ~instance:inst ()
-                in
-                match result with
-                | Ok () -> (
-                    (* Check for stopped dependents *)
-                    match
-                      Lifecycle.get_stopped_dependents ~instance:inst ()
-                    with
-                    | Ok [] -> `Ok ()
-                    | Ok stopped_deps when Cli_helpers.is_interactive () ->
-                        let names =
-                          String.concat
-                            ", "
-                            (List.map
-                               (fun s -> s.Service.instance)
-                               stopped_deps)
-                        in
-                        let should_restart =
-                          Cli_helpers.prompt_yes_no
-                            (Printf.sprintf "Restart dependents? (%s)" names)
-                            ~default:true
-                        in
-                        if should_restart then
-                          List.iter
-                            (fun dep ->
-                              match
-                                Lifecycle.restart_service
-                                  ~quiet:false
-                                  ~instance:dep.Service.instance
-                                  ()
-                              with
-                              | Ok () ->
-                                  Printf.printf
-                                    "Restarted %s\n%!"
-                                    dep.Service.instance
-                              | Error (`Msg e) ->
-                                  Printf.eprintf
-                                    "Failed to restart %s: %s\n%!"
-                                    dep.Service.instance
-                                    e)
-                            stopped_deps ;
-                        `Ok ()
-                    | _ -> `Ok ())
-                | Error (`Msg e) -> `Error (false, e))
-            | Ok stopped_deps ->
-                let names =
-                  String.concat
-                    ", "
-                    (List.map (fun s -> s.Service.instance) stopped_deps)
-                in
-                if Cli_helpers.is_interactive () then
-                  let should_start_deps =
-                    Cli_helpers.prompt_yes_no
-                      (Printf.sprintf
-                         "Dependencies not running (%s). Start them first?"
-                         names)
-                      ~default:true
-                  in
-                  if should_start_deps then (
-                    (* Start dependencies in order *)
-                    let failed = ref false in
-                    List.iter
-                      (fun dep ->
-                        if not !failed then
-                          match
-                            Lifecycle.start_service
-                              ~quiet:false
-                              ~instance:dep.Service.instance
-                              ()
-                          with
-                          | Ok () ->
-                              Printf.printf
-                                "Started %s\n%!"
-                                dep.Service.instance
-                          | Error (`Msg e) ->
-                              Printf.eprintf
-                                "Failed to start %s: %s\n%!"
-                                dep.Service.instance
-                                e ;
-                              failed := true)
-                      stopped_deps ;
-                    if !failed then
-                      `Error (false, "Failed to start dependencies")
-                    else
-                      (* Now restart the target instance *)
-                      let result =
-                        Lifecycle.restart_service ~quiet:false ~instance:inst ()
-                      in
-                      match result with
-                      | Ok () -> (
-                          (* Check for stopped dependents *)
-                          match
-                            Lifecycle.get_stopped_dependents ~instance:inst ()
-                          with
-                          | Ok [] -> `Ok ()
-                          | Ok stopped_deps ->
-                              let names =
-                                String.concat
-                                  ", "
-                                  (List.map
-                                     (fun s -> s.Service.instance)
-                                     stopped_deps)
-                              in
-                              let should_restart =
-                                Cli_helpers.prompt_yes_no
-                                  (Printf.sprintf
-                                     "Restart dependents? (%s)"
-                                     names)
-                                  ~default:true
-                              in
-                              if should_restart then
-                                List.iter
-                                  (fun dep ->
-                                    match
-                                      Lifecycle.restart_service
-                                        ~quiet:false
-                                        ~instance:dep.Service.instance
-                                        ()
-                                    with
-                                    | Ok () ->
-                                        Printf.printf
-                                          "Restarted %s\n%!"
-                                          dep.Service.instance
-                                    | Error (`Msg e) ->
-                                        Printf.eprintf
-                                          "Failed to restart %s: %s\n%!"
-                                          dep.Service.instance
-                                          e)
-                                  stopped_deps ;
-                              `Ok ()
-                          | _ -> `Ok ())
-                      | Error (`Msg e) -> `Error (false, e))
-                  else (
-                    prerr_endline
-                      "Cancelled - dependencies must be running first." ;
-                    `Ok ())
-                else
-                  (* Non-interactive mode - just fail like before *)
-                  Cli_helpers.run_result
-                    (Lifecycle.restart_service ~quiet:false ~instance:inst ()))
-        | Remove -> (
-            (* Check for dependents and confirm if any *)
-            match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-            | Ok None ->
-                Cli_helpers.cmdliner_error
-                  (Printf.sprintf "Unknown instance '%s'" inst)
-            | Ok (Some svc) ->
+        | Restart ->
+            start_or_restart_with_deps
+              ~action_fn:(fun ~quiet ~instance () ->
+                Lifecycle.restart_service ~quiet ~instance ())
+              ~action_name:"Restart"
+              ~instance:inst
+              ()
+        | Remove ->
+            with_service ~instance:inst (fun svc ->
                 let proceed =
                   if svc.S.dependents = [] then true
                   else if Cli_helpers.is_interactive () then (
@@ -407,22 +244,12 @@ let instance_term =
                     else fun _ ~default:_ -> false)
                  ~instance:inst
                  ())
-        | Show -> (
-            match Service_registry.find ~instance:inst with
-            | Ok (Some svc) ->
+        | Show ->
+            with_service ~instance:inst (fun svc ->
                 Cli_output.print_service_details svc ;
-                `Ok ()
-            | Ok None ->
-                Cli_helpers.cmdliner_error
-                  (Printf.sprintf "Unknown instance '%s'" inst)
-            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
-        | Show_service -> (
-            match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-            | Ok None ->
-                Cli_helpers.cmdliner_error
-                  (Printf.sprintf "Unknown instance '%s'" inst)
-            | Ok (Some svc) ->
+                `Ok ())
+        | Show_service ->
+            with_service ~instance:inst (fun svc ->
                 let role = svc.S.role in
                 let unit = Systemd.unit_name role inst in
                 let print_dropin () =
@@ -462,13 +289,8 @@ let instance_term =
                       prerr_endline ("systemctl status failed: " ^ msg)
                 in
                 `Ok ())
-        | Logs -> (
-            match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-            | Ok None ->
-                Cli_helpers.cmdliner_error
-                  (Printf.sprintf "Unknown instance '%s'" inst)
-            | Ok (Some svc) ->
+        | Logs ->
+            with_service ~instance:inst (fun svc ->
                 let role = svc.S.role in
                 let user_flag = if Paths.is_root () then "" else "--user " in
                 let unit = Systemd.unit_name role inst in
@@ -483,13 +305,8 @@ let instance_term =
                 | Error _ -> ()) ;
 
                 `Ok ())
-        | Edit -> (
-            match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-            | Ok None ->
-                Cli_helpers.cmdliner_error
-                  (Printf.sprintf "Unknown instance '%s'" inst)
-            | Ok (Some svc) ->
+        | Edit ->
+            with_service ~instance:inst (fun svc ->
                 let role = svc.S.role in
                 (* List dependents that will be stopped *)
                 let () =
@@ -627,16 +444,8 @@ let instance_term =
                             "P2P address"
                           |> Option.value ~default:svc.net_addr
                         in
-                        let new_extra =
-                          Cli_helpers.prompt_input
-                            ~default:(extra_args_str, extra_args_str)
-                            "Extra args"
-                          |> Option.value ~default:extra_args_str
-                        in
                         let new_extra_args =
-                          String.split_on_char ' ' new_extra
-                          |> List.map String.trim
-                          |> List.filter (( <> ) "")
+                          prompt_extra_args ~extra_args_str
                         in
                         (* Validate ports *)
                         let ( let* ) = Result.bind in
@@ -677,9 +486,7 @@ let instance_term =
                             keep_snapshot = false;
                           }
                         in
-                        Result.map_error
-                          (fun (`Msg s) -> s)
-                          (Node.install_node req)
+                        Result.map_error msg_to_string (Node.install_node req)
                     | "baker" ->
                         (* Baker: edit delegates, LB vote, extra args *)
                         let delegates = lookup "OCTEZ_BAKER_DELEGATES_CSV" in
@@ -727,16 +534,8 @@ let instance_term =
                           | Some "" | None -> default_val
                           | Some v -> String.trim v
                         in
-                        let new_extra =
-                          Cli_helpers.prompt_input
-                            ~default:(extra_args_str, extra_args_str)
-                            "Extra args"
-                          |> Option.value ~default:extra_args_str
-                        in
                         let new_extra_args =
-                          String.split_on_char ' ' new_extra
-                          |> List.map String.trim
-                          |> List.filter (( <> ) "")
+                          prompt_extra_args ~extra_args_str
                         in
                         let delegates_list =
                           String.split_on_char ',' new_delegates
@@ -744,44 +543,12 @@ let instance_term =
                           |> List.filter (( <> ) "")
                         in
                         (* Node instance selection with completion *)
-                        let current_node =
-                          match svc.depends_on with
-                          | Some inst -> inst
-                          | None -> lookup "OCTEZ_NODE_ENDPOINT"
-                        in
-                        let node_services =
-                          match Service_registry.list () with
-                          | Ok svcs ->
-                              List.filter
-                                (fun (s : Service.t) -> s.role = "node")
-                                svcs
-                          | Error _ -> []
-                        in
-                        let node_names =
-                          List.map
-                            (fun (s : Service.t) -> s.instance)
-                            node_services
-                        in
-                        let new_node =
-                          if node_names = [] then current_node
-                          else (
-                            Format.printf
-                              "  Available nodes: %s@."
-                              (String.concat ", " node_names) ;
-                            match
-                              Cli_helpers.prompt_with_completion
-                                "Node instance"
-                                node_names
-                            with
-                            | Some "" | None -> current_node
-                            | Some v -> String.trim v)
+                        let new_node, node_names =
+                          prompt_node_selection ~svc ~lookup
                         in
                         let node_mode =
-                          if List.mem new_node node_names then
-                            Installer_types.Local_instance new_node
-                          else Installer_types.Remote_endpoint new_node
+                          resolve_node_mode ~new_node ~node_names
                         in
-                        (* DAL node selection with completion *)
                         let current_dal = lookup "OCTEZ_DAL_INSTANCE" in
                         let current_dal_config = lookup "OCTEZ_DAL_CONFIG" in
                         let dal_services =
@@ -886,59 +653,18 @@ let instance_term =
                             preserve_data = true;
                           }
                         in
-                        Result.map_error
-                          (fun (`Msg s) -> s)
-                          (Baker.install_baker req)
+                        Result.map_error msg_to_string (Baker.install_baker req)
                     | "accuser" ->
                         (* Accuser: edit node instance, extra args *)
                         (* Node instance selection with completion *)
-                        let current_node =
-                          match svc.depends_on with
-                          | Some inst -> inst
-                          | None -> lookup "OCTEZ_NODE_ENDPOINT"
-                        in
-                        let node_services =
-                          match Service_registry.list () with
-                          | Ok svcs ->
-                              List.filter
-                                (fun (s : Service.t) -> s.role = "node")
-                                svcs
-                          | Error _ -> []
-                        in
-                        let node_names =
-                          List.map
-                            (fun (s : Service.t) -> s.instance)
-                            node_services
-                        in
-                        let new_node =
-                          if node_names = [] then current_node
-                          else (
-                            Format.printf
-                              "  Available nodes: %s@."
-                              (String.concat ", " node_names) ;
-                            match
-                              Cli_helpers.prompt_with_completion
-                                "Node instance"
-                                node_names
-                            with
-                            | Some "" | None -> current_node
-                            | Some v -> String.trim v)
+                        let new_node, node_names =
+                          prompt_node_selection ~svc ~lookup
                         in
                         let node_mode =
-                          if List.mem new_node node_names then
-                            Installer_types.Local_instance new_node
-                          else Installer_types.Remote_endpoint new_node
-                        in
-                        let new_extra =
-                          Cli_helpers.prompt_input
-                            ~default:(extra_args_str, extra_args_str)
-                            "Extra args"
-                          |> Option.value ~default:extra_args_str
+                          resolve_node_mode ~new_node ~node_names
                         in
                         let new_extra_args =
-                          String.split_on_char ' ' new_extra
-                          |> List.map String.trim
-                          |> List.filter (( <> ) "")
+                          prompt_extra_args ~extra_args_str
                         in
                         let req : Installer_types.accuser_request =
                           {
@@ -955,55 +681,23 @@ let instance_term =
                           }
                         in
                         Result.map_error
-                          (fun (`Msg s) -> s)
+                          msg_to_string
                           (Accuser.install_accuser req)
                     | "dal-node" | "dal" ->
                         (* DAL node: edit node instance, RPC addr, P2P addr, extra args *)
                         (* Node instance selection with completion *)
-                        let current_node =
-                          match svc.depends_on with
-                          | Some inst -> inst
-                          | None -> lookup "OCTEZ_NODE_ENDPOINT"
-                        in
-                        let node_services =
-                          match Service_registry.list () with
-                          | Ok svcs ->
-                              List.filter
-                                (fun (s : Service.t) -> s.role = "node")
-                                svcs
-                          | Error _ -> []
-                        in
-                        let node_names =
-                          List.map
-                            (fun (s : Service.t) -> s.instance)
-                            node_services
-                        in
-                        let new_node =
-                          if node_names = [] then current_node
-                          else (
-                            Format.printf
-                              "  Available nodes: %s@."
-                              (String.concat ", " node_names) ;
-                            match
-                              Cli_helpers.prompt_with_completion
-                                "Node instance"
-                                node_names
-                            with
-                            | Some "" | None -> current_node
-                            | Some v -> String.trim v)
+                        let new_node, node_names =
+                          prompt_node_selection ~svc ~lookup
                         in
                         let new_depends_on, new_node_endpoint =
                           if List.mem new_node node_names then
                             (* Local node instance *)
-                            let node_svc =
-                              List.find_opt
-                                (fun (s : Service.t) -> s.instance = new_node)
-                                node_services
-                            in
                             let ep =
-                              match node_svc with
-                              | Some s -> Config.endpoint_of_rpc s.rpc_addr
-                              | None -> "http://127.0.0.1:8732"
+                              match
+                                Service_registry.find ~instance:new_node
+                              with
+                              | Ok (Some s) -> Config.endpoint_of_rpc s.rpc_addr
+                              | _ -> "http://127.0.0.1:8732"
                             in
                             (Some new_node, ep)
                           else
@@ -1024,16 +718,8 @@ let instance_term =
                             "DAL P2P address"
                           |> Option.value ~default:dal_net
                         in
-                        let new_extra =
-                          Cli_helpers.prompt_input
-                            ~default:(extra_args_str, extra_args_str)
-                            "Extra args"
-                          |> Option.value ~default:extra_args_str
-                        in
                         let new_extra_args =
-                          String.split_on_char ' ' new_extra
-                          |> List.map String.trim
-                          |> List.filter (( <> ) "")
+                          prompt_extra_args ~extra_args_str
                         in
                         (* Validate ports *)
                         let ( let* ) = Result.bind in
@@ -1082,7 +768,7 @@ let instance_term =
                           }
                         in
                         Result.map_error
-                          (fun (`Msg s) -> s)
+                          msg_to_string
                           (Dal_node.install_daemon req)
                     | _ ->
                         Error
@@ -1126,20 +812,15 @@ let instance_term =
                   | Error msg ->
                       Cli_helpers.cmdliner_error
                         (Printf.sprintf "Edit failed: %s" msg)))
-        | Export_logs -> (
-            match Service_registry.find ~instance:inst with
-            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-            | Ok None ->
-                Cli_helpers.cmdliner_error
-                  (Printf.sprintf "Unknown instance '%s'" inst)
-            | Ok (Some svc) -> (
+        | Export_logs ->
+            with_service ~instance:inst (fun svc ->
                 match Log_export.export_logs ~instance:inst ~svc with
                 | Ok archive_path ->
                     Format.printf "Logs exported to: %s@." archive_path ;
                     `Ok ()
                 | Error (`Msg msg) ->
                     Cli_helpers.cmdliner_error
-                      (Printf.sprintf "Export failed: %s" msg))))
+                      (Printf.sprintf "Export failed: %s" msg)))
   in
   Term.(ret (const run $ instance $ action $ delete_data_dir))
 
