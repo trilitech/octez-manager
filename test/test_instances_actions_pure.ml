@@ -8,6 +8,7 @@
 open Octez_manager_lib
 open Octez_manager_ui
 module FT = Instances_actions.For_tests
+module UFT = Instances_update.For_tests
 
 (* ============================================================ *)
 (* Helper: create minimal Service.t                              *)
@@ -35,71 +36,74 @@ let test_extract_version_simple () =
   Alcotest.(check (option string))
     "24.0"
     (Some "24.0")
-    (FT.extract_version_string "24.0 (abc123)")
+    (UFT.extract_version_string "24.0 (abc123)")
 
 let test_extract_version_with_prefix () =
   Alcotest.(check (option string))
     "Octez 24.0"
     (Some "24.0")
-    (FT.extract_version_string "Octez 24.0")
+    (UFT.extract_version_string "Octez 24.0")
 
 let test_extract_version_three_part () =
   Alcotest.(check (option string))
     "24.0.1"
     (Some "24.0.1")
-    (FT.extract_version_string "v24.0.1-beta")
+    (UFT.extract_version_string "v24.0.1-beta")
 
 let test_extract_version_no_match () =
   Alcotest.(check (option string))
     "no match"
     None
-    (FT.extract_version_string "no version here")
+    (UFT.extract_version_string "no version here")
 
 let test_extract_version_empty () =
-  Alcotest.(check (option string)) "empty" None (FT.extract_version_string "")
+  Alcotest.(check (option string)) "empty" None (UFT.extract_version_string "")
 
 let test_extract_version_just_number () =
   Alcotest.(check (option string))
     "just number"
     None
-    (FT.extract_version_string "42")
+    (UFT.extract_version_string "42")
 
 let test_extract_version_multi_line () =
   Alcotest.(check (option string))
     "multi line"
     (Some "24.0")
-    (FT.extract_version_string "Version\n24.0 (build abc)")
+    (UFT.extract_version_string "Version\n24.0 (build abc)")
 
 (* ============================================================ *)
 (* role_to_binary_name Tests                                     *)
 (* ============================================================ *)
 
 let test_role_node () =
-  Alcotest.(check string) "node" "octez-node" (FT.role_to_binary_name "node")
+  Alcotest.(check string) "node" "octez-node" (UFT.role_to_binary_name "node")
 
 let test_role_baker () =
-  Alcotest.(check string) "baker" "octez-baker" (FT.role_to_binary_name "baker")
+  Alcotest.(check string)
+    "baker"
+    "octez-baker"
+    (UFT.role_to_binary_name "baker")
 
 let test_role_accuser () =
   Alcotest.(check string)
     "accuser"
     "octez-accuser"
-    (FT.role_to_binary_name "accuser")
+    (UFT.role_to_binary_name "accuser")
 
 let test_role_dal_node () =
   Alcotest.(check string)
     "dal-node"
     "octez-dal-node"
-    (FT.role_to_binary_name "dal-node")
+    (UFT.role_to_binary_name "dal-node")
 
 let test_role_dal () =
-  Alcotest.(check string) "dal" "octez-dal-node" (FT.role_to_binary_name "dal")
+  Alcotest.(check string) "dal" "octez-dal-node" (UFT.role_to_binary_name "dal")
 
 let test_role_unknown () =
   Alcotest.(check string)
     "unknown defaults to node"
     "octez-node"
-    (FT.role_to_binary_name "signer")
+    (UFT.role_to_binary_name "signer")
 
 (* ============================================================ *)
 (* collect_dependents Tests                                      *)
@@ -119,7 +123,7 @@ let linear_deps =
     match List.assoc_opt inst graph with Some deps -> deps | None -> []
 
 let test_collect_linear () =
-  let deps = FT.collect_dependents ~get_deps:linear_deps "A" in
+  let deps = UFT.collect_dependents ~get_deps:linear_deps "A" in
   let names = List.map (fun s -> s.Service.instance) deps in
   Alcotest.(check int) "3 dependents" 3 (List.length names) ;
   Alcotest.(check bool) "has B" true (List.mem "B" names) ;
@@ -127,11 +131,11 @@ let test_collect_linear () =
   Alcotest.(check bool) "has D" true (List.mem "D" names)
 
 let test_collect_leaf () =
-  let deps = FT.collect_dependents ~get_deps:linear_deps "D" in
+  let deps = UFT.collect_dependents ~get_deps:linear_deps "D" in
   Alcotest.(check int) "leaf has no deps" 0 (List.length deps)
 
 let test_collect_no_such_node () =
-  let deps = FT.collect_dependents ~get_deps:linear_deps "NONEXISTENT" in
+  let deps = UFT.collect_dependents ~get_deps:linear_deps "NONEXISTENT" in
   Alcotest.(check int) "unknown node has no deps" 0 (List.length deps)
 
 (* Graph with cycle: X -> [Y], Y -> [X] *)
@@ -143,7 +147,7 @@ let cyclic_deps =
     match List.assoc_opt inst graph with Some deps -> deps | None -> []
 
 let test_collect_cycle () =
-  let deps = FT.collect_dependents ~get_deps:cyclic_deps "X" in
+  let deps = UFT.collect_dependents ~get_deps:cyclic_deps "X" in
   (* Should not loop forever; should find Y (and then stop since X is visited) *)
   let names = List.map (fun s -> s.Service.instance) deps in
   Alcotest.(check bool) "has Y" true (List.mem "Y" names) ;
@@ -164,7 +168,7 @@ let diamond_deps =
     match List.assoc_opt inst graph with Some deps -> deps | None -> []
 
 let test_collect_diamond () =
-  let deps = FT.collect_dependents ~get_deps:diamond_deps "root" in
+  let deps = UFT.collect_dependents ~get_deps:diamond_deps "root" in
   let names = List.map (fun s -> s.Service.instance) deps in
   Alcotest.(check bool) "has A" true (List.mem "A" names) ;
   Alcotest.(check bool) "has B" true (List.mem "B" names) ;
@@ -172,7 +176,7 @@ let test_collect_diamond () =
 
 let test_collect_empty_graph () =
   let get_deps _ = [] in
-  let deps = FT.collect_dependents ~get_deps "any" in
+  let deps = UFT.collect_dependents ~get_deps "any" in
   Alcotest.(check int) "empty graph" 0 (List.length deps)
 
 (* ============================================================ *)
@@ -181,7 +185,7 @@ let test_collect_empty_graph () =
 
 let test_dedup_no_duplicates () =
   let svcs = [make_svc ~instance:"A" (); make_svc ~instance:"B" ()] in
-  let result = FT.dedup_services svcs in
+  let result = UFT.dedup_services svcs in
   Alcotest.(check int) "no change" 2 (List.length result)
 
 let test_dedup_with_duplicates () =
@@ -194,17 +198,17 @@ let test_dedup_with_duplicates () =
       make_svc ~instance:"B" ();
     ]
   in
-  let result = FT.dedup_services svcs in
+  let result = UFT.dedup_services svcs in
   let names = List.map (fun s -> s.Service.instance) result in
   Alcotest.(check int) "deduped" 3 (List.length result) ;
   Alcotest.(check (list string)) "order preserved" ["A"; "B"; "C"] names
 
 let test_dedup_empty () =
-  let result = FT.dedup_services [] in
+  let result = UFT.dedup_services [] in
   Alcotest.(check int) "empty" 0 (List.length result)
 
 let test_dedup_single () =
-  let result = FT.dedup_services [make_svc ~instance:"X" ()] in
+  let result = UFT.dedup_services [make_svc ~instance:"X" ()] in
   Alcotest.(check int) "single" 1 (List.length result)
 
 let test_dedup_all_same () =
@@ -215,7 +219,7 @@ let test_dedup_all_same () =
       make_svc ~instance:"A" ();
     ]
   in
-  let result = FT.dedup_services svcs in
+  let result = UFT.dedup_services svcs in
   Alcotest.(check int) "all same -> 1" 1 (List.length result)
 
 (* ============================================================ *)
@@ -245,7 +249,7 @@ let test_extract_version_no_crash =
     ~count:500
     QCheck.string
     (fun s ->
-      let _ = FT.extract_version_string s in
+      let _ = UFT.extract_version_string s in
       true)
 
 (* PBT: collect_dependents terminates on any graph *)
@@ -285,7 +289,7 @@ let test_collect_terminates =
       let get_deps inst =
         match List.assoc_opt inst graph with Some d -> d | None -> []
       in
-      let _ = FT.collect_dependents ~get_deps root in
+      let _ = UFT.collect_dependents ~get_deps root in
       true)
 
 (* ============================================================ *)
