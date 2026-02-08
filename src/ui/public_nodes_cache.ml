@@ -189,7 +189,7 @@ let fetch_nodes () : node_info list =
     | [] -> []
     | url :: rest -> (
         let cmd = ["curl"; "-fsSL"; "--max-time"; "5"; url] in
-        match Common.run_out cmd with
+        match Cmd_runner.run_out cmd with
         | Ok body ->
             let nodes = parse_taquito_json body in
             if nodes <> [] then nodes else try_urls rest

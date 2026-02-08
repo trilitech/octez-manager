@@ -82,7 +82,7 @@ let shutdown () =
   External_services_scheduler.shutdown () ;
   Versions_scheduler.shutdown () ;
   Self_update_scheduler.stop () ;
-  Common.kill_active_download ()
+  Download.kill_active_download ()
 
 let run ?page ?(log = false) ?logfile () =
   let quit_requested = ref false in

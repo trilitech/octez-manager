@@ -49,8 +49,8 @@ let install_dal_node_cmd =
           ~docv:"ARG")
   in
   let default_user =
-    if Common.is_root () then "octez"
-    else fst (Common.current_user_group_names ())
+    if Paths.is_root () then "octez"
+    else fst (Paths.current_user_group_names ())
   in
   let service_user =
     Arg.(
@@ -110,7 +110,7 @@ let install_dal_node_cmd =
             let data_dir =
               match data_dir_opt with
               | Some dir when String.trim dir <> "" -> dir
-              | _ -> Common.default_role_dir "dal-node" instance
+              | _ -> Paths.default_role_dir "dal-node" instance
             in
             match
               Cli_helpers.resolve_node_instance_or_endpoint ~node_instance

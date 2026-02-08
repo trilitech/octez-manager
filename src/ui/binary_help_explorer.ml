@@ -6,7 +6,6 @@
 (******************************************************************************)
 
 open Rresult
-open Octez_manager_lib
 module Help_parser = Octez_manager_lib.Help_parser
 open Help_parser
 module Keys = Miaou.Core.Keys
@@ -36,7 +35,7 @@ let run_help binary =
   if not (Sys.file_exists binary) then
     Error (`Msg (Printf.sprintf "Binary not found at %s" binary))
   else
-    Common.run_out
+    Cmd_runner.run_out
       [
         "env";
         "MANPAGER=cat";
@@ -51,7 +50,7 @@ let run_help_cmd binary cmd =
   if not (Sys.file_exists binary) then
     Error (`Msg (Printf.sprintf "Binary not found at %s" binary))
   else
-    Common.run_out
+    Cmd_runner.run_out
       (["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ cmd)
 
 let load_options ~binary =

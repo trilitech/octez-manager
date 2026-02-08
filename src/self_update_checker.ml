@@ -49,7 +49,7 @@ type install_method = Deb_package | Binary_install | Manual_install
 
 let detect_install_method () =
   (* Check if installed via dpkg *)
-  match Common.run_out_silent ["dpkg"; "-s"; "octez-manager"] with
+  match Cmd_runner.run_out_silent ["dpkg"; "-s"; "octez-manager"] with
   | Ok _ -> Deb_package
   | Error _ ->
       (* Check if binary is in standard install location *)
@@ -84,7 +84,7 @@ let is_major_update ~current ~latest =
     Preferences are stored in the shared {!Check_prefs} format. *)
 
 let prefs_file () =
-  Filename.concat (Common.xdg_config_home ()) "octez-manager/self-update.json"
+  Filename.concat (Paths.xdg_config_home ()) "octez-manager/self-update.json"
 
 let is_check_enabled () = Check_prefs.is_check_enabled ~file:(prefs_file ())
 
@@ -121,7 +121,7 @@ let cache_ttl = 600.0 (* 10 minutes *)
 
 let fetch_latest_version () =
   match
-    Common.run_out_silent
+    Cmd_runner.run_out_silent
       [
         "curl";
         "-fsSL";
@@ -195,7 +195,7 @@ type upgrade_result =
 let fetch_checksum ~version =
   let url = checksums_url ~version in
   match
-    Common.run_out_silent
+    Cmd_runner.run_out_silent
       ["curl"; "-fsSL"; "--max-time"; "10"; "--connect-timeout"; "5"; url]
   with
   | Ok body when String.trim body <> "" ->
@@ -218,7 +218,7 @@ let fetch_checksum ~version =
   | Error (`Msg e) -> R.error_msgf "Failed to fetch checksums: %s" e
 
 let verify_checksum ~filepath ~expected =
-  match Common.compute_sha256 filepath with
+  match Download.compute_sha256 filepath with
   | Ok actual ->
       if String.equal actual expected then Ok ()
       else R.error_msgf "Checksum mismatch: expected %s, got %s" expected actual
@@ -233,9 +233,9 @@ let download_binary ~version ~dest ?on_progress () =
         let total_opt = Option.map Int64.of_int total in
         callback ~downloaded ~total:total_opt
       in
-      Common.download_file_with_progress ~url ~dest_path:dest ~on_progress
+      Download.download_file_with_progress ~url ~dest_path:dest ~on_progress
   | None ->
-      Common.run_silent
+      Cmd_runner.run_silent
         [
           "curl";
           "-fsSL";
@@ -255,11 +255,11 @@ let try_replace_binary ~src ~dest =
     Ok `Direct
   with Sys_error _ -> (
     (* Try with pkexec *)
-    match Common.run_silent ["pkexec"; "mv"; src; dest] with
+    match Cmd_runner.run_silent ["pkexec"; "mv"; src; dest] with
     | Ok () -> Ok `Pkexec
     | Error _ -> (
         (* Try with sudo *)
-        match Common.run_silent ["sudo"; "mv"; src; dest] with
+        match Cmd_runner.run_silent ["sudo"; "mv"; src; dest] with
         | Ok () -> Ok `Sudo
         | Error _ -> Error `Permission_denied))
 
@@ -323,5 +323,5 @@ let exec_restart () =
   let args = Array.to_list Sys.argv in
   try Unix.execv exe_path (Array.of_list args)
   with Unix.Unix_error (err, _, _) ->
-    Common.append_debug_log
+    Cmd_runner.append_debug_log
       (Printf.sprintf "exec_restart failed: %s" (Unix.error_message err))

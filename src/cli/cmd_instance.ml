@@ -470,7 +470,7 @@ let instance_term =
                   (Printf.sprintf "Unknown instance '%s'" inst)
             | Ok (Some svc) ->
                 let role = svc.S.role in
-                let user_flag = if Common.is_root () then "" else "--user " in
+                let user_flag = if Paths.is_root () then "" else "--user " in
                 let unit = Systemd.unit_name role inst in
 
                 Format.printf "# Monitor logs via journald:@." ;

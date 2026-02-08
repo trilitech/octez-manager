@@ -47,7 +47,7 @@ let install_baker ?(quiet = false) (request : baker_request) =
   let base_dir =
     match request.base_dir with
     | Some dir when String.trim dir <> "" -> dir
-    | _ -> Common.default_role_dir "baker" request.instance
+    | _ -> Paths.default_role_dir "baker" request.instance
   in
   let dal_config =
     match request.dal_config with

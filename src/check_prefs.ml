@@ -33,7 +33,7 @@ let load ~file ?extra_of_json () =
       in
       Ok ({check_enabled; dismissed_versions}, extra)
     with e ->
-      Common.append_debug_log
+      Cmd_runner.append_debug_log
         (Printf.sprintf
            "Failed to load prefs from %s: %s"
            file
@@ -42,8 +42,8 @@ let load ~file ?extra_of_json () =
 
 let save ~file ?(extra_to_json = []) prefs =
   let dir = Filename.dirname file in
-  let owner, group = Common.current_user_group_names () in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
+  let owner, group = Paths.current_user_group_names () in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir in
   try
     let json =
       `Assoc

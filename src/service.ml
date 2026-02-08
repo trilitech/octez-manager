@@ -43,7 +43,7 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     service_user;
     app_bin_dir;
     bin_source;
-    created_at = Common.now ();
+    created_at = String_utils.now ();
     logging_mode;
     snapshot_auto;
     snapshot_uri;

@@ -7,8 +7,6 @@
 
 (** DAL node health status polling and caching. *)
 
-open Octez_manager_lib
-
 type status = Up | Down | Degraded | Unknown
 
 type check = {name : string; status : status}
@@ -36,7 +34,7 @@ let lock = Mutex.create ()
 let fetch ~rpc_endpoint =
   let url = rpc_endpoint ^ "/health" in
   match
-    Common.run_out
+    Cmd_runner.run_out
       ["curl"; "-sf"; "--connect-timeout"; "2"; "--max-time"; "5"; url]
   with
   | Error _ -> None

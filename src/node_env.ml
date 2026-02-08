@@ -68,7 +68,7 @@ let escape_env_value v =
     "\"" ^ escaped ^ "\""
 
 let write_pairs ?(with_comments = false) ~inst pairs =
-  let base = Common.env_instances_base_dir () in
+  let base = Paths.env_instances_base_dir () in
   let path = Filename.concat (Filename.concat base inst) "node.env" in
   let env_lines =
     pairs
@@ -96,16 +96,16 @@ let write_pairs ?(with_comments = false) ~inst pairs =
   in
   let body = header ^ env_lines in
   let owner, group =
-    if Common.is_root () then ("root", "root")
-    else Common.current_user_group_names ()
+    if Paths.is_root () then ("root", "root")
+    else Paths.current_user_group_names ()
   in
   let* _ =
-    Common.ensure_dir_path ~owner ~group ~mode:0o755 (Filename.dirname path)
+    File_ops.ensure_dir_path ~owner ~group ~mode:0o755 (Filename.dirname path)
   in
-  Common.write_file ~mode:0o644 ~owner ~group path body
+  File_ops.write_file ~mode:0o644 ~owner ~group path body
 
 let read ~inst =
-  let base = Common.env_instances_base_dir () in
+  let base = Paths.env_instances_base_dir () in
   let path = Filename.concat (Filename.concat base inst) "node.env" in
   if not (Sys.file_exists path) then Ok []
   else

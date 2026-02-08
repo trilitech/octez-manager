@@ -164,7 +164,7 @@ let test_env_file_template_system_mode () =
 let test_env_file_template_different_modes () =
   (* Skip this test when running as root, since user mode returns the same
      path as system mode in that case (both use /etc/octez/instances) *)
-  if Common.is_root () then Alcotest.skip ()
+  if Paths.is_root () then Alcotest.skip ()
   else
     let user = ST.env_file_template true in
     let system = ST.env_file_template false in

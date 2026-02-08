@@ -10,8 +10,6 @@
     Fetches delegate participation data from node RPC and caches it
     for use by baker, DAL node, and other components. *)
 
-open Octez_manager_lib
-
 (** Participation info from RPC *)
 type participation = {
   expected_cycle_activity : int;
@@ -158,7 +156,7 @@ let fetch ~node_endpoint ~pkh =
       node_endpoint
       pkh
   in
-  match Common.run_out ["curl"; "-sfL"; "--max-time"; "10"; url] with
+  match Cmd_runner.run_out ["curl"; "-sfL"; "--max-time"; "10"; url] with
   | Error _ -> None
   | Ok body -> (
       try

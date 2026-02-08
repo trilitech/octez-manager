@@ -320,10 +320,10 @@ let snapshot_entry_to_json (entry : Snapshots.entry) =
 
 let dropin_path_for ~role ~instance =
   let dir =
-    if Common.is_root () then
+    if Paths.is_root () then
       Printf.sprintf "/etc/systemd/system/octez-%s@%s.service.d" role instance
     else
-      let base = Filename.concat (Common.xdg_config_home ()) "systemd/user" in
+      let base = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
       Filename.concat
         base
         (Printf.sprintf "octez-%s@%s.service.d" role instance)
@@ -336,4 +336,4 @@ let slurp_file path =
     ~finally:(fun () -> close_in_noerr ic)
     (fun () -> really_input_string ic (in_channel_length ic))
 
-let format_bytes = Common.format_size_float
+let format_bytes = String_utils.format_size_float

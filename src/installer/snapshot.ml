@@ -100,7 +100,7 @@ let download_snapshot ?(quiet = false) ?on_log ?progress ?tmp_dir src =
   let res =
     match (progress, on_log) with
     | Some {on_download_progress}, _ ->
-        Common.download_file_with_progress
+        Download.download_file_with_progress
           ~url:src
           ~dest_path:tmp
           ~on_progress:(fun downloaded total ->
@@ -116,7 +116,7 @@ let download_snapshot ?(quiet = false) ?on_log ?progress ?tmp_dir src =
             | None -> ())
     | None, Some log ->
         (* Use progress download and convert to log messages *)
-        Common.download_file_with_progress
+        Download.download_file_with_progress
           ~url:src
           ~dest_path:tmp
           ~on_progress:(fun downloaded total ->
@@ -131,12 +131,12 @@ let download_snapshot ?(quiet = false) ?on_log ?progress ?tmp_dir src =
             if now -. !last_log_time >= 5. then (
               last_log_time := now ;
               log (Printf.sprintf "Download progress: %d%%\n" pct)))
-    | None, None -> Common.download_file ~quiet ~url:src ~dest_path:tmp ()
+    | None, None -> Download.download_file ~quiet ~url:src ~dest_path:tmp ()
   in
   match res with
   | Ok () -> Ok {path = tmp; cleanup = true}
   | Error _ as e ->
-      Common.remove_path tmp ;
+      File_ops.remove_path tmp ;
       e
 
 let prepare_snapshot_source ?(quiet = false) ?on_log ?progress ?tmp_dir src =
@@ -222,8 +222,8 @@ let import_snapshot ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
              announce "Storing blocks") ;
         log line
       in
-      Common.run_streaming ~on_log:phase_log args
-  | None -> Common.run ~quiet args
+      Cmd_runner.run_streaming ~on_log:phase_log args
+  | None -> Cmd_runner.run ~quiet args
 
 let import_snapshot_file ?(quiet = false) ?on_log ~app_bin_dir ~data_dir
     ~snapshot_file ~no_check () =
@@ -254,7 +254,7 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ?tmp_dir
       Fun.protect
         ~finally:(fun () ->
           if should_cleanup snapshot_file then
-            Common.remove_path snapshot_file.path)
+            File_ops.remove_path snapshot_file.path)
         (fun () ->
           import_snapshot_file
             ~quiet
@@ -274,7 +274,7 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ?tmp_dir
       Fun.protect
         ~finally:(fun () ->
           if should_cleanup snapshot_file then
-            Common.remove_path snapshot_file.path)
+            File_ops.remove_path snapshot_file.path)
         (fun () ->
           import_snapshot_file
             ~quiet

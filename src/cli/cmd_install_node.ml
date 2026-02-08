@@ -36,8 +36,8 @@ let install_node_cmd =
   in
   let service_user =
     let default_user =
-      if Common.is_root () then "octez"
-      else fst (Common.current_user_group_names ())
+      if Paths.is_root () then "octez"
+      else fst (Paths.current_user_group_names ())
     in
     let doc = "System user owning the service." in
     Arg.(
@@ -307,7 +307,7 @@ let install_node_cmd =
           let actual_data_dir =
             match data_dir with
             | Some dir when String.trim dir <> "" -> dir
-            | _ -> Common.default_data_dir instance
+            | _ -> Paths.default_data_dir instance
           in
           (* Check snapshot size vs tmp space and data dir space *)
           let* tmp_dir =

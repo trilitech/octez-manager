@@ -128,7 +128,7 @@ let base_initial_model () =
       {
         network;
         history_mode;
-        data_dir = Common.default_role_dir "node" instance_name;
+        data_dir = Paths.default_role_dir "node" instance_name;
         rpc_addr = "127.0.0.1:8732";
         p2p_addr = "0.0.0.0:9732";
         (* All interfaces for peer reachability *)
@@ -188,7 +188,7 @@ let schedule_snapshot_fetch slug =
             match fetch_snapshot_list slug with
             | Ok entries -> cache_snapshot slug entries
             | Error msg ->
-                Common.append_debug_log
+                Cmd_runner.append_debug_log
                   (Printf.sprintf "Background snapshot fetch failed: %s" msg)))
 
 let snapshot_entries_from_cache slug =
@@ -221,7 +221,7 @@ let snapshot_size_inflight : (string, unit) Hashtbl.t = Hashtbl.create 7
 
 let snapshot_size_inflight_lock = Mutex.create ()
 
-let format_bytes = Common.format_size_float
+let format_bytes = String_utils.format_size_float
 
 (** Get the download URL for a snapshot selection *)
 let get_snapshot_url ~network snapshot =
@@ -284,7 +284,7 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir ~data_dir =
                 else Filename.dirname data_dir
               in
               let same_fs =
-                Common.same_filesystem tmp_path data_path
+                File_ops.same_filesystem tmp_path data_path
                 |> Option.value ~default:false
               in
               if same_fs then
@@ -292,7 +292,7 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir ~data_dir =
                 let total_required =
                   Int64.add download_required storage_required
                 in
-                match Common.get_available_space tmp_path with
+                match File_ops.get_available_space tmp_path with
                 | None -> Ok ()
                 | Some available ->
                     if available >= total_required then Ok ()
@@ -309,7 +309,7 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir ~data_dir =
               else
                 (* Different filesystems: check each separately *)
                 let* () =
-                  match Common.get_available_space tmp_path with
+                  match File_ops.get_available_space tmp_path with
                   | None -> Ok ()
                   | Some available ->
                       if available >= download_required then Ok ()
@@ -321,7 +321,7 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir ~data_dir =
                              tmp_path
                              (format_bytes available))
                 in
-                match Common.get_available_space data_path with
+                match File_ops.get_available_space data_path with
                 | None -> Ok ()
                 | Some available ->
                     if available >= storage_required then Ok ()
@@ -348,7 +348,7 @@ let check_snapshot_space ~network ~snapshot ~tmp_dir ~data_dir =
                     Mutex.protect snapshot_size_inflight_lock (fun () ->
                         Hashtbl.remove snapshot_size_inflight url))
                   (fun () ->
-                    let size = Common.get_remote_file_size url in
+                    let size = Download.get_remote_file_size url in
                     Cache.set_safe_keyed snapshot_size_cache url size)) ;
           Ok ())
 
@@ -678,8 +678,8 @@ let set_node_with_autoname node m =
     in
     (* Only auto-update if instance name matches the old generated name *)
     if String.equal m.core.instance_name old_name then
-      let new_data_dir = Common.default_role_dir "node" new_name in
-      let old_default_dir = Common.default_role_dir "node" old_name in
+      let new_data_dir = Paths.default_role_dir "node" new_name in
+      let old_default_dir = Paths.default_role_dir "node" old_name in
       let should_update_data_dir =
         String.equal (String.trim m.node.data_dir) old_default_dir
       in
@@ -843,14 +843,14 @@ let spec =
                 if m.edit_mode then {m with core = new_core}
                 else
                   let default_dir =
-                    Common.default_role_dir "node" instance_name
+                    Paths.default_role_dir "node" instance_name
                   in
                   let keep_data_dir =
                     String.trim m.node.data_dir <> ""
                     && not
                          (String.equal
                             m.node.data_dir
-                            (Common.default_role_dir "node" old))
+                            (Paths.default_role_dir "node" old))
                   in
                   let new_node =
                     {
@@ -895,7 +895,7 @@ let spec =
               let trimmed_dir = String.trim model.node.data_dir in
               let effective_dir =
                 if trimmed_dir = "" then
-                  Common.default_data_dir model.core.instance_name
+                  Paths.default_data_dir model.core.instance_name
                 else trimmed_dir
               in
               let data_exists = Sys.file_exists effective_dir in
@@ -947,7 +947,7 @@ let spec =
 
         let data_dir =
           let trimmed = String.trim model.node.data_dir in
-          if trimmed = "" then Common.default_data_dir model.core.instance_name
+          if trimmed = "" then Paths.default_data_dir model.core.instance_name
           else trimmed
         in
 
@@ -1027,7 +1027,7 @@ let spec =
             in
             append_log "Ensuring service account...\n" ;
             let* () =
-              if Common.is_root () then
+              if Paths.is_root () then
                 System_user.ensure_service_account
                   ~quiet:true
                   ~name:model.core.service_user
@@ -1093,7 +1093,7 @@ let spec =
                   | Some job -> String.concat "" (List.rev job.log)
                   | None -> "(no job log)"
                 in
-                Common.append_debug_log
+                Cmd_runner.append_debug_log
                   (Printf.sprintf
                      "Install failed: %s\nJob log:\n%s"
                      msg

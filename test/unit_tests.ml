@@ -62,7 +62,7 @@ let with_temp_dir f =
   Unix.mkdir base 0o755 ;
   Fun.protect
     ~finally:(fun () ->
-      let (_ : (unit, [> Rresult.R.msg]) result) = Common.remove_tree base in
+      let (_ : (unit, [> Rresult.R.msg]) result) = File_ops.remove_tree base in
       ())
     (fun () -> f base)
 
@@ -112,7 +112,7 @@ let read_file path =
 let is_ci () = match Sys.getenv_opt "CI" with Some "true" -> true | _ -> false
 
 let current_user_group () =
-  match Common.current_user_group_names () with
+  match Paths.current_user_group_names () with
   | "", "" ->
       let pw = Unix.getpwuid (Unix.geteuid ()) in
       let gr = Unix.getgrgid pw.Unix.pw_gid in
@@ -329,7 +329,7 @@ let installer_backup_restore_roundtrip () =
         | None -> Alcotest.fail "expected backup"
       in
       let (_ : (unit, [> Rresult.R.msg]) result) =
-        Common.remove_tree data_dir
+        File_ops.remove_tree data_dir
       in
       let () =
         expect_ok
@@ -1295,16 +1295,16 @@ let sh_quote_tests () =
   Alcotest.(check string)
     "needs quoting"
     "'hello world'"
-    (Common.sh_quote "hello world") ;
-  Alcotest.(check string) "no quoting" "simple" (Common.sh_quote "simple") ;
-  Alcotest.(check string) "apostrophe" "'a'\"'\"'b'" (Common.sh_quote "a'b")
+    (Cmd_runner.sh_quote "hello world") ;
+  Alcotest.(check string) "no quoting" "simple" (Cmd_runner.sh_quote "simple") ;
+  Alcotest.(check string) "apostrophe" "'a'\"'\"'b'" (Cmd_runner.sh_quote "a'b")
 
 let cmd_to_string_tests () =
   let argv = ["echo"; "hello world"; "a'b"] in
   Alcotest.(check string)
     "cmd_to_string"
     "echo 'hello world' 'a'\"'\"'b'"
-    (Common.cmd_to_string argv)
+    (Cmd_runner.cmd_to_string argv)
 
 let shellwords_parser_tests () =
   let module FB = Octez_manager_ui.Form_builder_common in
@@ -1494,7 +1494,7 @@ let home_dir_fallback () =
         Alcotest.(check string)
           "home_dir fallback"
           pw.Unix.pw_dir
-          (Common.home_dir ()))
+          (Paths.home_dir ()))
 
 let xdg_config_custom () =
   if is_ci () then Alcotest.skip ()
@@ -1505,9 +1505,9 @@ let xdg_config_custom () =
         with_env
           [("XDG_CONFIG_HOME", Some cfg)]
           (fun () ->
-            Alcotest.(check string) "xdg config" cfg (Common.xdg_config_home ()) ;
+            Alcotest.(check string) "xdg config" cfg (Paths.xdg_config_home ()) ;
             let expected = Filename.concat cfg "octez/instances" in
-            let actual = Common.env_instances_base_dir () in
+            let actual = Paths.env_instances_base_dir () in
             Alcotest.(check string) "instances dir" expected actual))
 
 let default_data_dir_custom () =
@@ -1523,7 +1523,7 @@ let default_data_dir_custom () =
             Alcotest.(check string)
               "default data dir"
               expected
-              (Common.default_data_dir "foo")))
+              (Paths.default_data_dir "foo")))
 
 let default_role_dir_custom () =
   if is_ci () then Alcotest.skip ()
@@ -1538,7 +1538,7 @@ let default_role_dir_custom () =
             Alcotest.(check string)
               "default role dir"
               expected
-              (Common.default_role_dir "Baker" "alpha")))
+              (Paths.default_role_dir "Baker" "alpha")))
 
 let default_role_dir_no_duplicate_prefix () =
   if is_ci () then Alcotest.skip ()
@@ -1554,7 +1554,7 @@ let default_role_dir_no_duplicate_prefix () =
             Alcotest.(check string)
               "node with existing prefix"
               expected_node
-              (Common.default_role_dir "node" "node-shadownet") ;
+              (Paths.default_role_dir "node" "node-shadownet") ;
             (* Test baker instance that already has "baker-" prefix *)
             let expected_baker =
               Filename.concat data "octez/baker-node-shadownet"
@@ -1562,7 +1562,7 @@ let default_role_dir_no_duplicate_prefix () =
             Alcotest.(check string)
               "baker with existing prefix"
               expected_baker
-              (Common.default_role_dir "baker" "baker-node-shadownet") ;
+              (Paths.default_role_dir "baker" "baker-node-shadownet") ;
             (* Test accuser instance that already has "accuser-" prefix *)
             let expected_accuser =
               Filename.concat data "octez/accuser-node-mainnet"
@@ -1570,19 +1570,19 @@ let default_role_dir_no_duplicate_prefix () =
             Alcotest.(check string)
               "accuser with existing prefix"
               expected_accuser
-              (Common.default_role_dir "accuser" "accuser-node-mainnet") ;
+              (Paths.default_role_dir "accuser" "accuser-node-mainnet") ;
             (* Test dal-node with default name (no prefix duplication expected) *)
             let expected_dal = Filename.concat data "octez/dal-node-dal" in
             Alcotest.(check string)
               "dal-node with default name"
               expected_dal
-              (Common.default_role_dir "dal-node" "dal")))
+              (Paths.default_role_dir "dal-node" "dal")))
 
 let ensure_dir_path_creates () =
   let owner, group = current_user_group () in
   with_temp_dir (fun base ->
       let nested = Filename.concat base "a/b/c" in
-      match Common.ensure_dir_path ~owner ~group ~mode:0o700 nested with
+      match File_ops.ensure_dir_path ~owner ~group ~mode:0o700 nested with
       | Ok () ->
           Alcotest.(check bool) "dir exists" true (Sys.is_directory nested)
       | Error (`Msg msg) -> Alcotest.failf "ensure_dir_path error: %s" msg)
@@ -1593,7 +1593,7 @@ let ensure_dir_path_missing_owner () =
     with_temp_dir (fun base ->
         let nested = Filename.concat base "missing" in
         match
-          Common.ensure_dir_path
+          File_ops.ensure_dir_path
             ~owner:"definitely_missing_user"
             ~group:"definitely_missing_group"
             ~mode:0o755
@@ -1609,7 +1609,7 @@ let write_file_creates_contents () =
   with_temp_dir (fun base ->
       let path = Filename.concat base "nested/file.txt" in
       let () =
-        expect_ok (Common.write_file ~mode:0o600 ~owner ~group path "payload")
+        expect_ok (File_ops.write_file ~mode:0o600 ~owner ~group path "payload")
       in
       Alcotest.(check string) "file contents" "payload" (read_file path))
 
@@ -1619,7 +1619,7 @@ let remove_tree_file () =
       let oc = open_out file in
       output_string oc "data" ;
       close_out oc ;
-      let () = expect_ok (Common.remove_tree file) in
+      let () = expect_ok (File_ops.remove_tree file) in
       Alcotest.(check bool) "file removed" false (Sys.file_exists file))
 
 let remove_tree_directory () =
@@ -1632,37 +1632,37 @@ let remove_tree_directory () =
       let oc = open_out file in
       output_string oc "data" ;
       close_out oc ;
-      let () = expect_ok (Common.remove_tree dir) in
+      let () = expect_ok (File_ops.remove_tree dir) in
       Alcotest.(check bool) "dir removed" false (Sys.file_exists dir))
 
 let remove_tree_missing () =
   with_temp_dir (fun base ->
       let missing = Filename.concat base "missing" in
-      let () = expect_ok (Common.remove_tree missing) in
+      let () = expect_ok (File_ops.remove_tree missing) in
       Alcotest.(check bool) "still missing" false (Sys.file_exists missing))
 
 let common_run_helpers () =
-  (match Common.run ["/bin/sh"; "-c"; "exit 0"] with
+  (match Cmd_runner.run ["/bin/sh"; "-c"; "exit 0"] with
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "run success error: %s" msg) ;
-  (match Common.run ["/bin/sh"; "-c"; "exit 1"] with
+  (match Cmd_runner.run ["/bin/sh"; "-c"; "exit 1"] with
   | Ok () -> Alcotest.fail "run should have failed"
   | Error _ -> ()) ;
-  match Common.run_out ["/bin/sh"; "-c"; "printf foo"] with
+  match Cmd_runner.run_out ["/bin/sh"; "-c"; "printf foo"] with
   | Ok out -> Alcotest.(check string) "run_out" "foo" out
   | Error (`Msg msg) -> Alcotest.failf "run_out error: %s" msg
 
 let common_run_as_self () =
   let user, _ = current_user_group () in
-  match Common.run_as ~user ["/bin/sh"; "-c"; "exit 0"] with
+  match Cmd_runner.run_as ~user ["/bin/sh"; "-c"; "exit 0"] with
   | Ok () -> ()
   | Error (`Msg msg) -> Alcotest.failf "run_as error: %s" msg
 
 let kill_active_download_noop () =
   (* Calling kill_active_download when no download is active should be safe *)
-  Common.kill_active_download () ;
+  Download.kill_active_download () ;
   (* Call twice to ensure idempotency *)
-  Common.kill_active_download () ;
+  Download.kill_active_download () ;
   ()
 
 let snapshot_root = snapshot_base ^ "/"
@@ -2520,7 +2520,7 @@ let systemd_install_dropin_and_service_commands () =
               let data_dir = Filename.concat env.data "octez/alpha" in
               let () =
                 expect_ok
-                  (Common.ensure_dir_path ~owner ~group ~mode:0o755 data_dir)
+                  (File_ops.ensure_dir_path ~owner ~group ~mode:0o755 data_dir)
               in
               (* Logging is via journald *)
               let logging_mode = Logging_mode.default in
@@ -2605,14 +2605,18 @@ let systemd_dropin_extra_paths () =
               let node_dir = Filename.concat env.data "octez/node-alpha" in
               let () =
                 expect_ok
-                  (Common.ensure_dir_path ~owner ~group ~mode:0o755 node_dir)
+                  (File_ops.ensure_dir_path ~owner ~group ~mode:0o755 node_dir)
               in
               let extra_path =
                 Filename.concat env.data "octez/baker-alpha-base"
               in
               let () =
                 expect_ok
-                  (Common.ensure_dir_path ~owner ~group ~mode:0o755 extra_path)
+                  (File_ops.ensure_dir_path
+                     ~owner
+                     ~group
+                     ~mode:0o755
+                     extra_path)
               in
               let logging_mode = Logging_mode.default in
               let () =
@@ -3088,12 +3092,12 @@ let background_runner_submit_on_complete () =
 (* RPC scheduler tests removed - now uses worker queue with dedup *)
 
 let make_absolute_path_absolute_stays_same () =
-  match Common.make_absolute_path "/usr/bin" with
+  match Paths.make_absolute_path "/usr/bin" with
   | Ok path -> Alcotest.(check string) "absolute unchanged" "/usr/bin" path
   | Error msg -> Alcotest.failf "unexpected error: %s" msg
 
 let make_absolute_path_relative_converted () =
-  let result = Common.make_absolute_path "bin" in
+  let result = Paths.make_absolute_path "bin" in
   match result with
   | Ok path ->
       Alcotest.(check bool)
@@ -3107,7 +3111,7 @@ let make_absolute_path_relative_converted () =
   | Error msg -> Alcotest.failf "unexpected error: %s" msg
 
 let make_absolute_path_dotdot_relative () =
-  let result = Common.make_absolute_path "../work/bin" in
+  let result = Paths.make_absolute_path "../work/bin" in
   match result with
   | Ok path ->
       Alcotest.(check bool)
@@ -3121,7 +3125,7 @@ let make_absolute_path_dotdot_relative () =
   | Error msg -> Alcotest.failf "unexpected error: %s" msg
 
 let make_absolute_path_empty_error () =
-  match Common.make_absolute_path "" with
+  match Paths.make_absolute_path "" with
   | Ok _ -> Alcotest.fail "empty path should fail"
   | Error msg ->
       Alcotest.(check bool)
@@ -3130,7 +3134,7 @@ let make_absolute_path_empty_error () =
         (String.contains msg ' ')
 
 let make_absolute_path_whitespace_error () =
-  match Common.make_absolute_path "   " with
+  match Paths.make_absolute_path "   " with
   | Ok _ -> Alcotest.fail "whitespace-only path should fail"
   | Error _ -> ()
 
@@ -3727,7 +3731,7 @@ let binary_registry_managed_versions () =
         (* Create some version directories with complete installations *)
         let bin_dir = Filename.concat xdg.data "octez-manager/binaries" in
         expect_ok
-          (Common.ensure_dir_path ~owner:"" ~group:"" ~mode:0o755 bin_dir) ;
+          (File_ops.ensure_dir_path ~owner:"" ~group:"" ~mode:0o755 bin_dir) ;
         let create_complete_version version_str =
           let version_dir = Filename.concat bin_dir ("v" ^ version_str) in
           Unix.mkdir version_dir 0o755 ;
@@ -3773,7 +3777,7 @@ let binary_registry_path_resolution () =
         (* Create test directories *)
         let bin_dir = Filename.concat xdg.data "octez-manager/binaries" in
         expect_ok
-          (Common.ensure_dir_path ~owner:"" ~group:"" ~mode:0o755 bin_dir) ;
+          (File_ops.ensure_dir_path ~owner:"" ~group:"" ~mode:0o755 bin_dir) ;
         let v24_dir = Filename.concat bin_dir "v24.0" in
         Unix.mkdir v24_dir 0o755 ;
         (* Test managed version resolution *)
@@ -4523,7 +4527,11 @@ let bug1_shell_expansion_env_file_sourcing () =
         in
         let env_file = Filename.concat test_dir "node.env" in
         (* Create instance directory *)
-        Common.ensure_dir_path ~owner:"root" ~group:"root" ~mode:0o755 test_dir
+        File_ops.ensure_dir_path
+          ~owner:"root"
+          ~group:"root"
+          ~mode:0o755
+          test_dir
         |> expect_ok ;
         (* Write env file with arguments containing glob pattern *)
         let run_args =

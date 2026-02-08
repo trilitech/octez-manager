@@ -52,7 +52,7 @@ let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
       Systemd.remove_dropin ~role:svc.role ~instance ;
       let* () =
         match delete_data_dir with
-        | true -> Common.remove_tree svc.data_dir
+        | true -> File_ops.remove_tree svc.data_dir
         | false -> Ok ()
       in
       Service_registry.remove ~instance
@@ -83,16 +83,16 @@ let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
               (Format.sprintf "Purge base-dir %S?" base_dir)
               ~default:false
           in
-          if remove_base_dir then Common.remove_tree base_dir else Ok ()
+          if remove_base_dir then File_ops.remove_tree base_dir else Ok ()
         else Ok ()
       in
       (* Also remove per-instance env files under XDG_CONFIG_HOME or /etc when purging *)
       let env_dir =
-        Filename.concat (Common.env_instances_base_dir ()) instance
+        Filename.concat (Paths.env_instances_base_dir ()) instance
       in
       let _ =
         (* Best-effort: don't fail purge if env removal fails *)
-        match Common.remove_tree env_dir with
+        match File_ops.remove_tree env_dir with
         | Ok () -> ()
         | Error _ -> ()
       in
@@ -232,9 +232,9 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
       let* () = Service_registry.remove ~instance:old_instance in
       (* Remove old env files directory *)
       let old_env_dir =
-        Filename.concat (Common.env_instances_base_dir ()) old_instance
+        Filename.concat (Paths.env_instances_base_dir ()) old_instance
       in
-      let _ = Common.remove_tree old_env_dir in
+      let _ = File_ops.remove_tree old_env_dir in
       Ok ()
 
 let cleanup_dependencies () =
@@ -280,12 +280,12 @@ let find_orphan_directories () =
   in
   (* Base directories to scan for orphans *)
   let octez_data_base =
-    if Common.is_root () then "/var/lib/octez"
-    else Filename.concat (Common.xdg_data_home ()) "octez"
+    if Paths.is_root () then "/var/lib/octez"
+    else Filename.concat (Paths.xdg_data_home ()) "octez"
   in
   let octez_log_base =
-    if Common.is_root () then "/var/log/octez"
-    else Filename.concat (Common.xdg_state_home ()) "octez/logs"
+    if Paths.is_root () then "/var/log/octez"
+    else Filename.concat (Paths.xdg_state_home ()) "octez/logs"
   in
   let list_subdirs dir =
     if Sys.file_exists dir && Sys.is_directory dir then
@@ -317,7 +317,7 @@ let cleanup_orphans ~dry_run =
   let process_path path =
     if dry_run then removed := path :: !removed
     else
-      match Common.remove_tree path with
+      match File_ops.remove_tree path with
       | Ok () -> removed := path :: !removed
       | Error (`Msg msg) -> errors := (path, msg) :: !errors
   in

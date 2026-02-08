@@ -117,5 +117,5 @@ val assert_service_failed : string -> string -> unit
 (** Check if OCTEZ_MANAGER_TEST_MODE is set *)
 val is_test_mode : unit -> bool
 
-(** Hook to be called from Common.run for systemctl commands *)
+(** Hook to be called from Cmd_runner.run for systemctl commands *)
 val run_hook : ?quiet:bool -> string -> (string, string) result

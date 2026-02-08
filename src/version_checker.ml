@@ -17,7 +17,7 @@ type check_result =
 
 (** Settings file for version checker preferences *)
 let prefs_file () =
-  let config_dir = Common.xdg_config_home () in
+  let config_dir = Paths.xdg_config_home () in
   Filename.concat config_dir "version-check.json"
 
 let is_check_enabled () = Check_prefs.is_check_enabled ~file:(prefs_file ())

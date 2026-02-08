@@ -427,7 +427,7 @@ let render_system_info_content () =
   [
     Printf.sprintf
       "Privilege: %s"
-      (if Common.is_root () then Widgets.red "● SYSTEM"
+      (if Paths.is_root () then Widgets.red "● SYSTEM"
        else Widgets.green "● USER");
   ]
 
