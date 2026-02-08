@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Instances page now uses Grid_layout for multi-column layout merging
 - Form navigation now supports Tab/Shift+Tab cycling between fields via Miaou Focus_ring
 - **Code deduplication**: Consolidated duplicate functions into canonical locations, reducing duplicate_groups metric from 63 to 23. Round 1 (PRs #652–#657): extracted shared utilities into Common, Service_registry, Systemd, Helpers, Config, Modal_helpers, Form_builder_bundles. Round 2: extracted Check_prefs module from self_update_checker/version_checker, removed dead Common.is_port_in_use code, replaced hand-rolled with_lock with stdlib Mutex.protect. Architecture index now detects delegation aliases (`let f = Module.f`) via typed AST and excludes them from duplicate metrics
+- **God module split**: Split `common.ml` (916 lines, ~50 functions) into 5 focused submodules in `lib/common/`: `Paths` (filesystem paths, XDG dirs), `Cmd_runner` (shell execution), `File_ops` (file/directory operations), `Download` (HTTP downloads, checksums), `String_utils` (formatting, editor, string helpers). All 436 call sites across 79 files migrated from `Common.*` to direct submodule calls
 
 ### Fixed
 
