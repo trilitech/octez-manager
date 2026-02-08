@@ -115,10 +115,13 @@ module For_test : sig
     | DevOrRC  (** Running dev or RC version *)
     | Unknown  (** Can't determine *)
 
-  (** Parse version string like "23.3" or "v23.3" into (major, minor) *)
+  (** Parse version string like "23.3" or "v23.3" into (major, minor).
+      Thin wrapper around {!Version_utils.parse_version} for backward
+      compatibility with existing tests. *)
   val parse_version : string -> (int * int) option
 
-  (** Check if version string contains RC or dev markers *)
+  (** Check if version string contains RC or dev markers.
+      Delegates to {!Version_utils.is_rc}. *)
   val is_rc_or_dev : string -> bool
 
   (** Compare running version against latest stable *)
@@ -128,10 +131,10 @@ module For_test : sig
   val version_color : version_status_t -> string
 
   (** Set the latest stable version for testing *)
-  val set_latest_version : (int * int) option -> unit
+  val set_latest_version : string option -> unit
 
   (** Get the current latest stable version *)
-  val get_latest_version : unit -> (int * int) option
+  val get_latest_version : unit -> string option
 
   (** Clear all state (instances, visibility, warnings) for test isolation *)
   val clear_all : unit -> unit
