@@ -76,7 +76,7 @@ let init () =
       let display_name = ext.External_service.suggested_instance_name in
       (* Try journalctl first, fall back to daily logs if available *)
       let cmd =
-        if Common.is_root () then
+        if Paths.is_root () then
           Printf.sprintf
             "journalctl -u %s -f -n 1000 -o cat"
             (Filename.quote unit_name)
@@ -302,7 +302,7 @@ let view ps ~focus ~size =
     | Log_viewer.DailyLogs -> "daily logs"
   in
   let privilege =
-    if Common.is_root () then Widgets.red "@ SYSTEM" else Widgets.green "@ USER"
+    if Paths.is_root () then Widgets.red "@ SYSTEM" else Widgets.green "@ USER"
   in
   let title =
     Printf.sprintf

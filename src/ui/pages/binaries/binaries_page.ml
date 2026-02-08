@@ -50,7 +50,7 @@ let load_managed_versions () =
       List.map
         (fun version ->
           let path = Binary_registry.managed_version_path version in
-          let size = Common.get_dir_size path in
+          let size = File_ops.get_dir_size path in
           let count =
             Service_registry.count_instances_using
               (Binary_registry.Managed_version version)
@@ -558,7 +558,9 @@ let view ps ~focus:_ ~size:_ =
         in
         let prefix = if is_selected then "➤ " else "  " in
         let size_str =
-          match size with Some s -> Common.format_size s | None -> "unknown"
+          match size with
+          | Some s -> String_utils.format_size s
+          | None -> "unknown"
         in
         let usage =
           if count = 0 then Widgets.dim "unused"
@@ -860,7 +862,7 @@ let register () =
 module For_tests = struct
   let filter_latest_n_major_versions = filter_latest_n_major_versions
 
-  let format_size = Common.format_size
+  let format_size = String_utils.format_size
 
   let build_items = build_items
 

@@ -9,7 +9,7 @@
 
 open Cli_progress
 
-let format_size = Octez_manager_lib.Common.format_size
+let format_size = String_utils.format_size
 
 (* Expose internal functions via For_test *)
 let render_progress_bar = For_test.render_progress_bar

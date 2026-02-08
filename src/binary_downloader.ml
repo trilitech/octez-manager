@@ -63,7 +63,7 @@ type download_result = {
 (** Architecture detection *)
 
 let detect_arch () =
-  match Common.run_out ["uname"; "-m"] with
+  match Cmd_runner.run_out ["uname"; "-m"] with
   | Ok output -> (
       let machine = String.trim output in
       match machine with
@@ -141,7 +141,7 @@ let parse_version_json json =
 
 let fetch_versions_json () =
   match
-    Common.run_out_silent
+    Cmd_runner.run_out_silent
       [
         "curl";
         "-fsL";
@@ -185,9 +185,9 @@ let binaries_for_version _version =
 let check_disk_space () =
   let dir = Binary_registry.binaries_dir () in
   (* Ensure directory exists before running df *)
-  let owner, group = Common.current_user_group_names () in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
-  match Common.run_out ["df"; "-B1"; dir] with
+  let owner, group = Paths.current_user_group_names () in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir in
+  match Cmd_runner.run_out ["df"; "-B1"; dir] with
   | Ok output -> (
       (* Parse df output: lines like:
          Filesystem           1B-blocks        Used   Available Use% Mounted on
@@ -217,7 +217,7 @@ let estimate_download_size _version =
 let fetch_checksums ~version ~arch =
   let url = checksums_url ~version ~arch in
   match
-    Common.run_out_silent
+    Cmd_runner.run_out_silent
       ["curl"; "-fsL"; "--max-time"; "10"; "--connect-timeout"; "5"; url]
   with
   | Ok body when String.trim body <> "" ->
@@ -233,7 +233,7 @@ let fetch_checksums ~version ~arch =
   | Error _ as e -> e
 
 let verify_checksum ~filepath ~expected_hash =
-  let* actual_hash = Common.compute_sha256 filepath in
+  let* actual_hash = Download.compute_sha256 filepath in
   if String.equal actual_hash expected_hash then Ok ()
   else
     R.error_msgf
@@ -250,7 +250,7 @@ let verify_checksum ~filepath ~expected_hash =
     Failures are logged but not treated as errors - download will proceed without size info. *)
 let get_file_size ~url =
   match
-    Common.run_out_silent
+    Cmd_runner.run_out_silent
       ["curl"; "-sI"; "--max-time"; "5"; "--connect-timeout"; "3"; url]
   with
   | Ok headers ->
@@ -283,7 +283,7 @@ let download_file_curl ~url ~dest ?progress () =
         let total_opt = Option.map Int64.of_int total in
         callback ~downloaded ~total:total_opt
       in
-      Common.download_file_with_progress ~url ~dest_path:dest ~on_progress
+      Download.download_file_with_progress ~url ~dest_path:dest ~on_progress
   | None ->
       (* Fallback to simple curl without progress *)
       let cmd =
@@ -299,14 +299,14 @@ let download_file_curl ~url ~dest ?progress () =
           url;
         ]
       in
-      Common.run cmd
+      Cmd_runner.run cmd
 
 let download_binary ~version ~arch ~binary ~dest_dir ?progress () =
   let url = binary_url ~version ~arch ~binary in
   let dest = Filename.concat dest_dir binary in
   let* () = download_file_curl ~url ~dest ?progress () in
   (* Make executable *)
-  let* () = Common.run ["chmod"; "+x"; dest] in
+  let* () = Cmd_runner.run ["chmod"; "+x"; dest] in
   Ok dest
 
 (** Atomic installation helpers *)
@@ -338,7 +338,7 @@ let cleanup_stale_temp_dirs ?(max_age_seconds = 3600) () =
             let age = now -. stat.Unix.st_mtime in
             if age > float_of_int max_age_seconds then
               (* Stale temp directory, remove it *)
-              ignore (Common.run_out ["rm"; "-rf"; full_path])
+              ignore (Cmd_runner.run_out ["rm"; "-rf"; full_path])
           with _ -> ())
         temp_dirs
     with _ -> ()
@@ -353,8 +353,8 @@ let download_version ~version ?(verify_checksums = true) ?progress
 
   (* Ensure parent binaries directory exists *)
   let binaries_dir = Binary_registry.binaries_dir () in
-  let owner, group = Common.current_user_group_names () in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 binaries_dir in
+  let owner, group = Paths.current_user_group_names () in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 binaries_dir in
 
   (* Check if already exists and is complete *)
   let* () =
@@ -363,7 +363,7 @@ let download_version ~version ?(verify_checksums = true) ?progress
         R.error_msgf "Version v%s is already installed" version
       else (
         (* Incomplete installation - remove it *)
-        (try ignore (Common.run_out ["rm"; "-rf"; final_dir]) with _ -> ()) ;
+        (try ignore (Cmd_runner.run_out ["rm"; "-rf"; final_dir]) with _ -> ()) ;
         Ok ())
     else Ok ()
   in
@@ -374,7 +374,7 @@ let download_version ~version ?(verify_checksums = true) ?progress
   (* Remove temp directory if it exists from a previous failed attempt *)
   (try
      if Sys.file_exists temp_dir then
-       ignore (Common.run_out ["rm"; "-rf"; temp_dir])
+       ignore (Cmd_runner.run_out ["rm"; "-rf"; temp_dir])
    with _ -> ()) ;
 
   (* Use temp_dir for download, rename to final_dir on success *)
@@ -389,8 +389,8 @@ let download_version ~version ?(verify_checksums = true) ?progress
       available
   else
     (* Create version directory *)
-    let owner, group = Common.current_user_group_names () in
-    let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dest_dir in
+    let owner, group = Paths.current_user_group_names () in
+    let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dest_dir in
 
     (* Get list of binaries to download *)
     let* binary_list = binaries_for_version version in
@@ -469,7 +469,7 @@ let download_version ~version ?(verify_checksums = true) ?progress
                 collect_results (binary :: acc) rest
             | Error _ as e ->
                 (* Cleanup on failure *)
-                (try Common.run_out ["rm"; "-rf"; dest_dir] |> ignore
+                (try Cmd_runner.run_out ["rm"; "-rf"; dest_dir] |> ignore
                  with _ -> ()) ;
                 e)
       in
@@ -527,11 +527,12 @@ let download_version ~version ?(verify_checksums = true) ?progress
 
     (* Atomic rename: move from temp to final location *)
     let* () =
-      match Common.run ["mv"; temp_dir; final_dir] with
+      match Cmd_runner.run ["mv"; temp_dir; final_dir] with
       | Ok () -> Ok ()
       | Error _ as e ->
           (* Cleanup temp on rename failure *)
-          (try ignore (Common.run_out ["rm"; "-rf"; temp_dir]) with _ -> ()) ;
+          (try ignore (Cmd_runner.run_out ["rm"; "-rf"; temp_dir])
+           with _ -> ()) ;
           e
     in
 
@@ -550,7 +551,7 @@ let calculate_directory_size path =
   else
     try
       (* Use du command to calculate directory size *)
-      let output = Common.run_out ["du"; "-sb"; path] in
+      let output = Cmd_runner.run_out ["du"; "-sb"; path] in
       match output with
       | Ok out -> (
           (* du -sb outputs: "SIZE\tPATH" *)
@@ -590,7 +591,7 @@ let remove_version version =
   if not (Sys.file_exists dest_dir) then
     R.error_msgf "Version v%s is not installed" version
   else
-    match Common.run ["rm"; "-rf"; dest_dir] with
+    match Cmd_runner.run ["rm"; "-rf"; dest_dir] with
     | Ok () -> Ok ()
     | Error _ as e -> e
 

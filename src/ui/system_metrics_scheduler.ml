@@ -173,7 +173,7 @@ let update_pids_and_version ~key ~role ~instance ~binary ~data_dir ?unit_name
         !check_version_toast_ref ~key ~instance ~version:v
     | _ -> ()) ;
     (* Update disk size on PID check *)
-    state.data_dir_size <- Common.get_dir_size data_dir ;
+    state.data_dir_size <- File_ops.get_dir_size data_dir ;
     (* Update timestamp at completion to spread load across instances *)
     state.last_pid_check <- Unix.gettimeofday ()
 
@@ -226,7 +226,7 @@ let poll_disk ~key ~data_dir state now =
   let interval = effective_interval ~key ~base_interval:disk_interval in
   if now -. state.last_disk_poll < interval then ()
   else (
-    state.data_dir_size <- Common.get_dir_size data_dir ;
+    state.data_dir_size <- File_ops.get_dir_size data_dir ;
     (* Update timestamp at completion to spread load across instances *)
     state.last_disk_poll <- Unix.gettimeofday ())
 
@@ -447,7 +447,7 @@ let is_rc_or_dev s =
 (** Fetch and parse latest stable version from octez releases JSON *)
 let fetch_latest_version () =
   let url = "https://octez.tezos.com/releases/versions.json" in
-  match Common.run_out ["curl"; "-sfL"; "--max-time"; "10"; url] with
+  match Cmd_runner.run_out ["curl"; "-sfL"; "--max-time"; "10"; url] with
   | Error _ -> ()
   | Ok json -> (
       try

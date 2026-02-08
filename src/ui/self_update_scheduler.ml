@@ -88,7 +88,7 @@ let stop_flag = Atomic.make false
 let scheduler_loop () =
   while not (Atomic.get stop_flag) do
     refresh () ;
-    Common.interruptible_sleep stop_flag poll_interval
+    String_utils.interruptible_sleep stop_flag poll_interval
   done
 
 (** Start the background scheduler *)

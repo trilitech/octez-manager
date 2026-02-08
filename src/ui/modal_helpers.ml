@@ -5,7 +5,6 @@
 (*                                                                            *)
 (******************************************************************************)
 
-open Octez_manager_lib
 module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
@@ -716,7 +715,7 @@ let show_error ~title message =
 let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
     ~on_select () =
   let module File_browser = Miaou_widgets_layout.File_browser_widget in
-  let default_path = if Common.is_root () then "/" else Common.home_dir () in
+  let default_path = if Paths.is_root () then "/" else Paths.home_dir () in
   let start_path = Option.value initial_path ~default:default_path in
   let module Modal = struct
     type state = File_browser.t
@@ -908,15 +907,9 @@ let select_directory_modal ~title ~dir_type ~on_select () =
                   true
                 with Unix.Unix_error _ -> false
               in
-              let user, group =
-                Octez_manager_lib.Common.current_user_group_names ()
-              in
+              let user, group = Paths.current_user_group_names () in
               let ensure_dir () =
-                Octez_manager_lib.Common.ensure_dir_path
-                  ~owner:user
-                  ~group
-                  ~mode:0o755
-                  trimmed
+                File_ops.ensure_dir_path ~owner:user ~group ~mode:0o755 trimmed
               in
               let proceed () =
                 (match
@@ -927,8 +920,7 @@ let select_directory_modal ~title ~dir_type ~on_select () =
                  with
                 | Ok () -> ()
                 | Error (`Msg msg) ->
-                    Octez_manager_lib.Common.append_debug_log
-                      ("Registry add failed: " ^ msg)) ;
+                    Cmd_runner.append_debug_log ("Registry add failed: " ^ msg)) ;
                 on_select trimmed
               in
               if Sys.file_exists trimmed then

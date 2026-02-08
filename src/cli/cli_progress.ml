@@ -10,7 +10,7 @@
     Provides multi-line progress display for tracking multiple concurrent
     or sequential downloads without requiring TUI framework dependencies. *)
 
-let format_size = Octez_manager_lib.Common.format_size
+let format_size = String_utils.format_size
 
 (** Progress bar rendering style *)
 type style = ASCII | Unicode

@@ -96,7 +96,7 @@ let colorize_cmd =
 let get_log_cmd ~role ~instance ~source =
   match source with
   | Journald ->
-      let user_flag = if Common.is_root () then "" else "--user " in
+      let user_flag = if Paths.is_root () then "" else "--user " in
       let unit = unit_name ~role ~instance in
       let cmd =
         Printf.sprintf

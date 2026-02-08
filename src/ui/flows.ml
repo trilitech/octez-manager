@@ -180,7 +180,7 @@ let create_accuser_flow ~on_success =
           ~items:["mainnet"; "weeklynet"]
           ~to_string:(fun x -> x)
           ~on_select:(fun network ->
-            let base_dir = Common.default_role_dir "accuser" instance in
+            let base_dir = Paths.default_role_dir "accuser" instance in
             let node_endpoint = "http://127.0.0.1:8732" in
             let request =
               {
@@ -239,8 +239,8 @@ let create_dal_node_flow ~on_success =
           ~items:["mainnet"; "weeklynet"]
           ~to_string:(fun x -> x)
           ~on_select:(fun network ->
-            let client_base_dir = Common.default_role_dir "dal-node" instance in
-            let dal_data_dir = Common.default_role_dir "dal-node" instance in
+            let client_base_dir = Paths.default_role_dir "dal-node" instance in
+            let dal_data_dir = Paths.default_role_dir "dal-node" instance in
             let node_endpoint = "http://127.0.0.1:8732" in
             let request =
               {

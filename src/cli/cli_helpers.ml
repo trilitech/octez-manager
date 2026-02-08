@@ -184,12 +184,12 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
       | Error (`Msg e) -> Error e)
   | None, None, Some dir when String.trim dir <> "" -> (
       (* Use raw path *)
-      match Common.make_absolute_path dir with
+      match Paths.make_absolute_path dir with
       | Ok abs_path -> Ok (abs_path, Binary_registry.Raw_path abs_path)
       | Error msg -> Error msg)
   | None, None, _ -> (
       (* Auto-detect from PATH *)
-      match Common.which "octez-node" with
+      match Paths.which "octez-node" with
       | Some path ->
           let dir = Filename.dirname path in
           Ok (dir, Binary_registry.Raw_path dir)
@@ -374,13 +374,13 @@ let resolve_tmp_dir_for_snapshot ~snapshot_url ~tmp_dir =
   | Some dir -> Ok (Some dir)
   | None -> (
       (* Check snapshot size vs /tmp space *)
-      match Common.get_remote_file_size snapshot_url with
+      match Download.get_remote_file_size snapshot_url with
       | None ->
           (* Can't determine size, proceed with default /tmp *)
           Ok None
       | Some size -> (
           let tmp_path = Filename.get_temp_dir_name () in
-          match Common.get_available_space tmp_path with
+          match File_ops.get_available_space tmp_path with
           | None ->
               (* Can't determine space, proceed with default *)
               Ok None
@@ -400,7 +400,7 @@ let resolve_tmp_dir_for_snapshot ~snapshot_url ~tmp_dir =
                       "Enter a directory with enough space for the download"
                   in
                   if Sys.file_exists dir && Sys.is_directory dir then (
-                    match Common.get_available_space dir with
+                    match File_ops.get_available_space dir with
                     | Some space when space >= required -> Some dir
                     | Some space ->
                         Printf.printf
@@ -428,7 +428,7 @@ let resolve_tmp_dir_for_snapshot ~snapshot_url ~tmp_dir =
 
 let check_data_dir_space ~snapshot_url ~data_dir =
   (* Check if data directory has enough space for imported snapshot data *)
-  match Common.get_remote_file_size snapshot_url with
+  match Download.get_remote_file_size snapshot_url with
   | None -> Ok () (* Can't determine size, proceed *)
   | Some snapshot_size -> (
       (* Storage needs ~1.2x snapshot size (imported data with buffer) *)
@@ -437,7 +437,7 @@ let check_data_dir_space ~snapshot_url ~data_dir =
       let check_path =
         if Sys.file_exists data_dir then data_dir else Filename.dirname data_dir
       in
-      match Common.get_available_space check_path with
+      match File_ops.get_available_space check_path with
       | None -> Ok () (* Can't determine space, proceed *)
       | Some available ->
           if available >= required then Ok ()

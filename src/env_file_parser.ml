@@ -7,7 +7,7 @@
 
 (** {1 Parsing} *)
 
-let unquote = Common.unquote
+let unquote = String_utils.unquote
 
 let parse_string content =
   let lines = String.split_on_char '\n' content in

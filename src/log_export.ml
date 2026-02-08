@@ -13,7 +13,7 @@ let ( let* ) = Result.bind
 let get_binary_version ~app_bin_dir ~binary =
   let binary_path = Filename.concat app_bin_dir binary in
   if Sys.file_exists binary_path then
-    match Common.run_out [binary_path; "--version"] with
+    match Cmd_runner.run_out [binary_path; "--version"] with
     | Ok version -> Some (String.trim version)
     | Error _ -> None
   else None
@@ -85,7 +85,7 @@ let collect_daily_logs ~role ~instance ~days =
 
 (** Export journald logs for the last N days *)
 let export_journald_logs ~role ~instance ~days ~output_file =
-  let user_flag = if Common.is_root () then "" else "--user " in
+  let user_flag = if Paths.is_root () then "" else "--user " in
   let unit = Printf.sprintf "octez-%s@%s" role instance in
   let since = Printf.sprintf "--since='%d days ago'" days in
   let cmd =
@@ -240,15 +240,15 @@ let get_system_info () =
   add "\nSystem Information\n" ;
   add "==================\n\n" ;
   (* Hostname *)
-  (match Common.run_out ["hostname"] with
+  (match Cmd_runner.run_out ["hostname"] with
   | Ok h -> add "Hostname: %s\n" (String.trim h)
   | Error _ -> ()) ;
   (* Kernel version *)
-  (match Common.run_out ["uname"; "-r"] with
+  (match Cmd_runner.run_out ["uname"; "-r"] with
   | Ok k -> add "Kernel: %s\n" (String.trim k)
   | Error _ -> ()) ;
   (* Date *)
-  (match Common.run_out ["date"; "-Iseconds"] with
+  (match Cmd_runner.run_out ["date"; "-Iseconds"] with
   | Ok d -> add "Export date: %s\n" (String.trim d)
   | Error _ -> ()) ;
   (* Disk usage for data dir - handled per-instance *)
@@ -294,7 +294,7 @@ let export_logs ~instance ~svc =
     List.iter
       (fun src ->
         let dst = Filename.concat logs_dir (Filename.basename src) in
-        ignore (Common.copy_file src dst))
+        ignore (File_ops.copy_file src dst))
       daily_logs) ;
   (* Export journald logs *)
   let journald_file = Filename.concat export_dir "journald.log" in
@@ -319,18 +319,18 @@ let export_logs ~instance ~svc =
   (* Copy env file *)
   let env_src =
     Filename.concat
-      (Filename.concat (Common.env_instances_base_dir ()) instance)
+      (Filename.concat (Paths.env_instances_base_dir ()) instance)
       "node.env"
   in
   if Sys.file_exists env_src then
-    ignore (Common.copy_file env_src (Filename.concat export_dir "node.env")) ;
+    ignore (File_ops.copy_file env_src (Filename.concat export_dir "node.env")) ;
   (* Copy service registry entry *)
   let registry_src =
     Filename.concat (Service_registry.services_dir ()) (instance ^ ".json")
   in
   if Sys.file_exists registry_src then
     ignore
-      (Common.copy_file
+      (File_ops.copy_file
          registry_src
          (Filename.concat export_dir "service.json")) ;
   (* Create tar.gz archive *)
@@ -347,5 +347,5 @@ let export_logs ~instance ~svc =
     | code -> Error (`Msg (Printf.sprintf "tar failed with code %d" code))
   in
   (* Clean up temp directory *)
-  let _ = Common.remove_tree export_dir in
+  let _ = File_ops.remove_tree export_dir in
   Ok archive_path

@@ -11,8 +11,6 @@
     services managed by systemd. Designed to be reusable across
     different service types (node, baker, accuser, dal, signer). *)
 
-open Octez_manager_lib
-
 (** Per-process resource statistics *)
 type process_stats = {
   pid : int;
@@ -63,11 +61,11 @@ let get_main_pid_by_unit ~unit_name =
   else
     (* Regular systemd unit - query MainPID *)
     let cmd =
-      if Common.is_root () then
+      if Paths.is_root () then
         ["systemctl"; "show"; "--property=MainPID"; unit_name]
       else ["systemctl"; "--user"; "show"; "--property=MainPID"; unit_name]
     in
-    match Common.run_out cmd with
+    match Cmd_runner.run_out cmd with
     | Ok output -> (
         (* Output is "MainPID=12345" *)
         match String.split_on_char '=' output with
@@ -223,7 +221,7 @@ let parse_version_output output =
 let get_version ~binary =
   let full_path =
     if Filename.is_relative binary then
-      match Common.which binary with Some p -> p | None -> binary
+      match Paths.which binary with Some p -> p | None -> binary
     else binary
   in
   if not (Sys.file_exists full_path) then None
@@ -232,11 +230,11 @@ let get_version ~binary =
     let cmd =
       Printf.sprintf
         "timeout 2s %s --version 2>/dev/null"
-        (Common.sh_quote full_path)
+        (Cmd_runner.sh_quote full_path)
     in
-    match Common.run_out ["sh"; "-c"; cmd] with
+    match Cmd_runner.run_out ["sh"; "-c"; cmd] with
     | Ok output -> parse_version_output output
     | Error _ -> None
 
 (** Format bytes as human-readable string *)
-let format_bytes = Common.format_bytes
+let format_bytes = String_utils.format_bytes

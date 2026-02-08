@@ -6,7 +6,6 @@
 (******************************************************************************)
 
 open Rresult
-open Octez_manager_lib
 
 let rec ensure_dir path =
   let dir = Filename.dirname path in
@@ -90,11 +89,12 @@ let run_command argv cwd =
   match argv with
   | [] -> Error "empty command"
   | _ -> (
-      let base = Common.cmd_to_string argv in
+      let base = Cmd_runner.cmd_to_string argv in
       let command =
         match cwd with
         | None -> base
-        | Some dir -> Printf.sprintf "cd %s && %s" (Common.sh_quote dir) base
+        | Some dir ->
+            Printf.sprintf "cd %s && %s" (Cmd_runner.sh_quote dir) base
       in
       let ic, oc, ec = Unix.open_process_full command (Unix.environment ()) in
       close_out_noerr oc ;

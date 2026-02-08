@@ -231,7 +231,7 @@ let test_write_with_comments () =
   Node_env.write_pairs ~with_comments:true ~inst pairs |> ok_or_fail ;
 
   (* Read file content to verify comments exist *)
-  let base = Common.env_instances_base_dir () in
+  let base = Paths.env_instances_base_dir () in
   let env_file = Filename.concat (Filename.concat base inst) "node.env" in
   let ic = open_in env_file in
   let content = really_input_string ic (in_channel_length ic) in
@@ -285,7 +285,7 @@ let test_read_invalid_format () =
   Unix.putenv "HOME" temp_dir ;
 
   (* Write malformed file manually to the correct location *)
-  let base = Common.env_instances_base_dir () in
+  let base = Paths.env_instances_base_dir () in
   let inst_path = Filename.concat base inst in
   (* Ensure all parent directories exist *)
   let rec mkdir_p path =
@@ -360,7 +360,7 @@ let test_write_node_env_with_comments () =
     ()
   |> ok_or_fail ;
 
-  let base = Common.env_instances_base_dir () in
+  let base = Paths.env_instances_base_dir () in
   let env_file = Filename.concat (Filename.concat base inst) "node.env" in
   let ic = open_in env_file in
   let content = really_input_string ic (in_channel_length ic) in

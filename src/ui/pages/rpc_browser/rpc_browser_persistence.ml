@@ -10,19 +10,18 @@
     Handles loading and saving dynamic segment history and recent path
     shortcuts to disk as JSON files. *)
 
-open Octez_manager_lib
 open Rpc_browser_types
 
 (** Return the file path for dynamic history storage. *)
 let history_file () =
   Filename.concat
-    (Common.xdg_config_home ())
+    (Paths.xdg_config_home ())
     "octez-manager/rpc_dynamic_history.json"
 
 (** Return the file path for recent paths storage. *)
 let recent_paths_file () =
   Filename.concat
-    (Common.xdg_config_home ())
+    (Paths.xdg_config_home ())
     "octez-manager/rpc_recent_paths.json"
 
 (** Load recent paths from disk. Returns empty list on failure. *)

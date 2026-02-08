@@ -19,10 +19,10 @@ let backup_file_if_exists path =
   if normalized = "" then Ok None
   else if Sys.file_exists normalized then (
     let tmp = Filename.temp_file "octez-manager.backup" ".tmp" in
-    match Common.copy_file normalized tmp with
+    match File_ops.copy_file normalized tmp with
     | Ok () -> Ok (Some {tmp_path = tmp; original_path = normalized})
     | Error _ as e ->
-        Common.remove_path tmp ;
+        File_ops.remove_path tmp ;
         e)
   else Ok None
 
@@ -30,16 +30,16 @@ let ensure_backup_parent ~owner ~group path =
   let dir = Filename.dirname path in
   if dir = "" || dir = "." then Ok ()
   else if Sys.file_exists dir then Ok ()
-  else Common.ensure_dir_path ~owner ~group ~mode:0o755 dir
+  else File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir
 
 let restore_backup ~owner ~group backup_opt =
   match backup_opt with
   | None -> Ok ()
   | Some backup -> (
       let* () = ensure_backup_parent ~owner ~group backup.original_path in
-      match Common.copy_file backup.tmp_path backup.original_path with
+      match File_ops.copy_file backup.tmp_path backup.original_path with
       | Ok () ->
-          Common.remove_path backup.tmp_path ;
+          File_ops.remove_path backup.tmp_path ;
           Ok ()
       | Error _ as e -> e)
 
@@ -81,7 +81,7 @@ let split_baker_extra_args ~app_bin_dir extra_args =
       let binary = Filename.concat app_bin_dir "octez-baker" in
       if not (Sys.file_exists binary) then known_baker_global_options
       else
-        match Common.run_out [binary; "--help"] with
+        match Cmd_runner.run_out [binary; "--help"] with
         | Error _ -> known_baker_global_options
         | Ok output ->
             let discovered =

@@ -54,7 +54,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   in
   log "Ensuring system directories...\n" ;
   let* () =
-    if Common.is_root () then
+    if Paths.is_root () then
       System_user.ensure_system_directories
         ~user:request.service_user
         ~group:request.service_user
@@ -77,14 +77,14 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   log "Validating user for service...\n" ;
   let* () = System_user.validate_user_for_service ~user:request.service_user in
   let owner, group =
-    if Common.is_root () then (request.service_user, request.service_user)
-    else Common.current_user_group_names ()
+    if Paths.is_root () then (request.service_user, request.service_user)
+    else Paths.current_user_group_names ()
   in
   log (Printf.sprintf "Owner: %s, Group: %s\n" owner group) ;
   let* () =
     if data_dir_nonempty && not request.preserve_data then (
       log "Removing existing data directory...\n" ;
-      Common.remove_tree data_dir)
+      File_ops.remove_tree data_dir)
     else Ok ()
   in
   log "Ensuring directories...\n" ;

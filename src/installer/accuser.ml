@@ -47,7 +47,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
   let base_dir =
     match request.base_dir with
     | Some dir when String.trim dir <> "" -> dir
-    | _ -> Common.default_role_dir "accuser" request.instance
+    | _ -> Paths.default_role_dir "accuser" request.instance
   in
   (* Split extra args into global (before subcommand) and command (after) *)
   let global_args, command_args =

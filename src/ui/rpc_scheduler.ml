@@ -196,7 +196,7 @@ let poll_external_node (ext : External_service.t) now =
         try
           let url = endpoint ^ "/chains/main/blocks/head/header" in
           match
-            Common.run_out
+            Cmd_runner.run_out
               ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
           with
           | Ok json_str -> (
@@ -213,7 +213,7 @@ let poll_external_node (ext : External_service.t) now =
         try
           let url = endpoint ^ "/monitor/bootstrapped" in
           match
-            Common.run_out
+            Cmd_runner.run_out
               ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
           with
           | Ok json_str -> (

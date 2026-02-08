@@ -30,7 +30,7 @@ let unique_non_empty paths =
 
 let read_write_paths_for ~data_dir ~logging_paths ~extra_paths =
   let base =
-    if Common.is_root () then [data_dir; "/var/log/octez"] else [data_dir]
+    if Paths.is_root () then [data_dir; "/var/log/octez"] else [data_dir]
   in
   unique_non_empty (base @ logging_paths @ extra_paths)
 
@@ -58,7 +58,7 @@ let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?depends_on ()
   in
   let header =
     let base = ref ["[Service]"] in
-    if Common.is_root () then base := !base @ ["PermissionsStartOnly=true"] ;
+    if Paths.is_root () then base := !base @ ["PermissionsStartOnly=true"] ;
     !base @ resources.extra_lines
   in
   unit_section
@@ -74,14 +74,14 @@ let write_dropin ?(quiet = false) ~dropin_dir ~dropin_path ~daemon_reload ~role
   let dir = dropin_dir role inst in
   let path = dropin_path role inst in
   let owner, group =
-    if Common.is_root () then ("root", "root")
-    else Common.current_user_group_names ()
+    if Paths.is_root () then ("root", "root")
+    else Paths.current_user_group_names ()
   in
-  let* () = Common.ensure_dir_path ~owner ~group ~mode:0o755 dir in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir in
   let body =
     write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?depends_on ()
   in
-  let* () = Common.write_file ~mode:0o644 ~owner ~group path body in
+  let* () = File_ops.write_file ~mode:0o644 ~owner ~group path body in
   daemon_reload ~quiet
 
 let write_dropin_node ?quiet ~dropin_dir ~dropin_path ~daemon_reload ~inst

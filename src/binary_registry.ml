@@ -64,19 +64,19 @@ let bin_source_of_legacy path = Raw_path path
 (* XDG paths *)
 
 let binaries_dir () =
-  Filename.concat (Common.xdg_data_home ()) "octez-manager/binaries"
+  Filename.concat (Paths.xdg_data_home ()) "octez-manager/binaries"
 
 let managed_version_path version =
   Filename.concat (binaries_dir ()) ("v" ^ version)
 
 let registered_dirs_file () =
   Filename.concat
-    (Common.xdg_data_home ())
+    (Paths.xdg_data_home ())
     "octez-manager/registered-directories.json"
 
 let registered_dirs_lock_file () =
   Filename.concat
-    (Common.xdg_data_home ())
+    (Paths.xdg_data_home ())
     "octez-manager/registered-directories.json.lock"
 
 (* Registered directories JSON operations *)
@@ -113,8 +113,8 @@ let registered_dirs_of_yojson json =
 
 let ensure_parent_dir path =
   let dir = Filename.dirname path in
-  let owner, group = Common.current_user_group_names () in
-  Common.ensure_dir_path ~owner ~group ~mode:0o755 dir
+  let owner, group = Paths.current_user_group_names () in
+  File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir
 
 let load_registered_dirs () =
   let path = registered_dirs_file () in
@@ -149,7 +149,7 @@ let add_registered_dir ~alias ~path =
   else if not (Sys.is_directory path) then
     R.error_msgf "Path is not a directory: %s" path
   else
-    Common.with_file_lock (registered_dirs_lock_file ()) (fun () ->
+    File_ops.with_file_lock (registered_dirs_lock_file ()) (fun () ->
         let* dirs = load_registered_dirs () in
         if List.exists (fun ld -> ld.alias = alias) dirs then
           R.error_msgf "Alias '%s' already exists" alias
@@ -158,7 +158,7 @@ let add_registered_dir ~alias ~path =
           save_registered_dirs dirs)
 
 let remove_registered_dir alias =
-  Common.with_file_lock (registered_dirs_lock_file ()) (fun () ->
+  File_ops.with_file_lock (registered_dirs_lock_file ()) (fun () ->
       let* dirs = load_registered_dirs () in
       if not (List.exists (fun ld -> ld.alias = alias) dirs) then
         R.error_msgf "Alias '%s' not found" alias
@@ -167,7 +167,7 @@ let remove_registered_dir alias =
         save_registered_dirs dirs)
 
 let rename_registered_dir ~old_alias ~new_alias =
-  Common.with_file_lock (registered_dirs_lock_file ()) (fun () ->
+  File_ops.with_file_lock (registered_dirs_lock_file ()) (fun () ->
       let* dirs = load_registered_dirs () in
       if not (List.exists (fun ld -> ld.alias = old_alias) dirs) then
         R.error_msgf "Alias '%s' not found" old_alias

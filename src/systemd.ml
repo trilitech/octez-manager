@@ -9,17 +9,17 @@ let system_unit_path role =
   Printf.sprintf "/etc/systemd/system/octez-%s@.service" role
 
 let user_unit_path role =
-  let dir = Filename.concat (Common.xdg_config_home ()) "systemd/user" in
+  let dir = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
   Filename.concat dir (Printf.sprintf "octez-%s@.service" role)
 
 let unit_path role =
-  if Common.is_root () then system_unit_path role else user_unit_path role
+  if Paths.is_root () then system_unit_path role else user_unit_path role
 
 let dropin_dir role inst =
-  if Common.is_root () then
+  if Paths.is_root () then
     Printf.sprintf "/etc/systemd/system/octez-%s@%s.service.d" role inst
   else
-    let base = Filename.concat (Common.xdg_config_home ()) "systemd/user" in
+    let base = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
     Filename.concat base (Printf.sprintf "octez-%s@%s.service.d" role inst)
 
 let dropin_path role inst =
@@ -28,17 +28,17 @@ let dropin_path role inst =
 let unit_name role inst = Printf.sprintf "octez-%s@%s" role inst
 
 let systemctl_cmd () =
-  if Common.is_root () then ["systemctl"] else ["systemctl"; "--user"]
+  if Paths.is_root () then ["systemctl"] else ["systemctl"; "--user"]
 
 let run_systemctl_timeout ?quiet ?(duration = "2s") args =
   (* Keep systemctl calls bounded to avoid UI stalls. *)
-  Common.run ?quiet (("timeout" :: duration :: systemctl_cmd ()) @ args)
+  Cmd_runner.run ?quiet (("timeout" :: duration :: systemctl_cmd ()) @ args)
 
 let run_systemctl_out_timeout args =
   (* Keep systemctl calls bounded to avoid UI stalls. Shorten to 2s. *)
-  Common.run_out (("timeout" :: "2s" :: systemctl_cmd ()) @ args)
+  Cmd_runner.run_out (("timeout" :: "2s" :: systemctl_cmd ()) @ args)
 
-let run_systemctl_out args = Common.run_out (systemctl_cmd () @ args)
+let run_systemctl_out args = Cmd_runner.run_out (systemctl_cmd () @ args)
 
 let cat_unit ~role ~instance =
   run_systemctl_out ["cat"; unit_name role instance]
@@ -209,7 +209,7 @@ let restart ?quiet:_ ~role ~instance () =
 
 let remove_dropin ~role ~instance =
   let path = dropin_dir role instance in
-  let _ = Common.remove_tree path in
+  let _ = File_ops.remove_tree path in
   ()
 
 module For_tests = struct
@@ -237,7 +237,7 @@ module For_tests = struct
 
   let unit_template ~role ~app_bin_dir ~user ?prestart () =
     Systemd_unit_template.unit_template
-      ~user_mode:(not (Common.is_root ()))
+      ~user_mode:(not (Paths.is_root ()))
       ~role
       ~app_bin_dir
       ~user
@@ -297,7 +297,7 @@ let get_service_paths ~role ~instance =
   let dropin = dropin_path role instance in
   let env_file =
     let tmpl =
-      Systemd_unit_template.env_file_template (not (Common.is_root ()))
+      Systemd_unit_template.env_file_template (not (Paths.is_root ()))
     in
     (* Replace %i with instance name *)
     let len = String.length tmpl in

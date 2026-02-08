@@ -62,9 +62,9 @@ let fetch_html_curl url =
     Printf.sprintf
       "curl -fsL --max-time 10 --connect-timeout 5 -w '\n\
        %%{http_code}' %s 2>/dev/null"
-      (Common.sh_quote url)
+      (Cmd_runner.sh_quote url)
   in
-  match Common.run_out ["/bin/sh"; "-c"; cmd] with
+  match Cmd_runner.run_out ["/bin/sh"; "-c"; cmd] with
   | Ok out -> (
       let lines = String.split_on_char '\n' out |> List.rev in
       match lines with
@@ -267,7 +267,7 @@ let list_with_impl ~fetch ~network_slug =
             gather acc rest
         | Error (`Msg e) ->
             (* Log error but continue with other candidates *)
-            Common.append_debug_log
+            Cmd_runner.append_debug_log
               (Printf.sprintf
                  "Failed to fetch snapshot metadata for %s/%s: %s"
                  network_slug

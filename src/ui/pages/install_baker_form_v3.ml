@@ -56,7 +56,7 @@ let base_initial_model () =
       };
     client =
       {
-        base_dir = Common.default_role_dir "baker" "baker";
+        base_dir = Paths.default_role_dir "baker" "baker";
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };
@@ -118,7 +118,7 @@ let make_initial_model () =
           {
             base_dir =
               (if base_dir = "" then
-                 Common.default_role_dir "baker" svc.Service.instance
+                 Paths.default_role_dir "baker" svc.Service.instance
                else base_dir);
             node =
               (match svc.Service.depends_on with
@@ -269,7 +269,7 @@ let parent_node_field =
                 else inst
               in
               let new_name = Printf.sprintf "baker-%s" dep_name in
-              let default_dir = Common.default_role_dir "baker" new_name in
+              let default_dir = Paths.default_role_dir "baker" new_name in
               let new_core = {!model_ref.core with instance_name = new_name} in
               let new_client =
                 {!model_ref.client with base_dir = default_dir}
@@ -558,14 +558,14 @@ let spec =
                 if m.edit_mode then {m with core = new_core}
                 else
                   let default_dir =
-                    Common.default_role_dir "baker" instance_name
+                    Paths.default_role_dir "baker" instance_name
                   in
                   let keep_base_dir =
                     String.trim m.client.base_dir <> ""
                     && not
                          (String.equal
                             m.client.base_dir
-                            (Common.default_role_dir "baker" old))
+                            (Paths.default_role_dir "baker" old))
                   in
                   let new_client =
                     {
@@ -611,7 +611,7 @@ let spec =
         let base_dir =
           let trimmed = String.trim model.client.base_dir in
           if trimmed = "" then
-            Common.default_role_dir "baker" model.core.instance_name
+            Paths.default_role_dir "baker" model.core.instance_name
           else trimmed
         in
 
@@ -663,7 +663,7 @@ let spec =
           else Ok ()
         in
         let* () =
-          if Common.is_root () then
+          if Paths.is_root () then
             System_user.ensure_service_account
               ~quiet:true
               ~name:model.core.service_user

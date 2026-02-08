@@ -191,7 +191,7 @@ let get_service_user external_svc =
   | Some user -> user
   | None ->
       (* Fallback to current user if not detected *)
-      let current_user, _ = Common.current_user_group_names () in
+      let current_user, _ = Paths.current_user_group_names () in
       current_user
 
 let create_node_from_external ~instance ~external_svc ~network ~data_dir
@@ -947,7 +947,7 @@ let interactive_review_file ~log ~prompt_yes_no ~file_label ~file_path ~content
   close_out oc ;
 
   (* Open in editor *)
-  match Common.open_in_editor tmp_path with
+  match String_utils.open_in_editor tmp_path with
   | Error (`Msg msg) ->
       Sys.remove tmp_path ;
       Error (`Msg (Printf.sprintf "Failed to open editor: %s" msg))
@@ -1202,7 +1202,7 @@ let import_service ?(on_log = fun _ -> ())
           (* Path to environment file *)
           let env_file_path =
             Filename.concat
-              (Filename.concat (Common.env_instances_base_dir ()) instance_name)
+              (Filename.concat (Paths.env_instances_base_dir ()) instance_name)
               "node.env"
           in
 
@@ -1271,7 +1271,7 @@ let import_service ?(on_log = fun _ -> ())
 
                 (* Reload systemd daemon after editing drop-in *)
                 log "Reloading systemd daemon..." ;
-                Common.run ["systemctl"; "daemon-reload"])
+                Cmd_runner.run ["systemctl"; "daemon-reload"])
           else (
             log
               (Printf.sprintf

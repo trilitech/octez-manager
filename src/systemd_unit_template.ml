@@ -26,7 +26,7 @@ let role_binary role =
 
 let env_file_template user_mode =
   let base =
-    if user_mode then Common.env_instances_base_dir ()
+    if user_mode then Paths.env_instances_base_dir ()
     else "/etc/octez/instances"
   in
   Filename.concat base "%i/node.env"
@@ -72,8 +72,8 @@ let exec_line role =
 
 let prestart_hooks_dir () =
   let base =
-    if Common.is_root () then "/usr/lib/octez-manager"
-    else Filename.concat (Common.xdg_data_home ()) "octez-manager"
+    if Paths.is_root () then "/usr/lib/octez-manager"
+    else Filename.concat (Paths.xdg_data_home ()) "octez-manager"
   in
   Filename.concat base "hooks"
 
@@ -153,11 +153,11 @@ let write_prestart_script role =
   | "node" ->
       let path = prestart_script_path role in
       let owner, group =
-        if Common.is_root () then ("root", "root")
-        else Common.current_user_group_names ()
+        if Paths.is_root () then ("root", "root")
+        else Paths.current_user_group_names ()
       in
       let* () =
-        Common.write_file
+        File_ops.write_file
           ~mode:0o755
           ~owner
           ~group
@@ -218,12 +218,12 @@ let validate_bin_dir ~user ~app_bin_dir ~role =
   let binary = Filename.concat bin_dir (role_binary role) in
   if not (Sys.file_exists binary) then
     R.error_msgf "Binary not found: %s" binary
-  else if Common.is_root () then
-    match Common.run ["sudo"; "-n"; "-u"; user; "test"; "-x"; binary] with
+  else if Paths.is_root () then
+    match Cmd_runner.run ["sudo"; "-n"; "-u"; user; "test"; "-x"; binary] with
     | Ok () -> Ok ()
     | Error _ -> (
-        let cmd = Printf.sprintf "test -x %s" (Common.sh_quote binary) in
-        match Common.run ["su"; "-s"; "/bin/sh"; "-c"; cmd; user] with
+        let cmd = Printf.sprintf "test -x %s" (Cmd_runner.sh_quote binary) in
+        match Cmd_runner.run ["su"; "-s"; "/bin/sh"; "-c"; cmd; user] with
         | Ok () -> Ok ()
         | Error (`Msg m) ->
             R.error_msgf
@@ -233,7 +233,7 @@ let validate_bin_dir ~user ~app_bin_dir ~role =
               binary
               m)
   else
-    match Common.run ["test"; "-x"; binary] with
+    match Cmd_runner.run ["test"; "-x"; binary] with
     | Ok () -> Ok ()
     | Error (`Msg m) -> R.error_msgf "Cannot execute %s: %s" binary m
 
@@ -243,12 +243,16 @@ let validate_bin_dir ~user ~app_bin_dir ~role =
 let validate_binary_access ~user ~binary_path =
   if not (Sys.file_exists binary_path) then
     R.error_msgf "Binary not found: %s" binary_path
-  else if Common.is_root () then
-    match Common.run ["sudo"; "-n"; "-u"; user; "test"; "-x"; binary_path] with
+  else if Paths.is_root () then
+    match
+      Cmd_runner.run ["sudo"; "-n"; "-u"; user; "test"; "-x"; binary_path]
+    with
     | Ok () -> Ok ()
     | Error _ -> (
-        let cmd = Printf.sprintf "test -x %s" (Common.sh_quote binary_path) in
-        match Common.run ["su"; "-s"; "/bin/sh"; "-c"; cmd; user] with
+        let cmd =
+          Printf.sprintf "test -x %s" (Cmd_runner.sh_quote binary_path)
+        in
+        match Cmd_runner.run ["su"; "-s"; "/bin/sh"; "-c"; cmd; user] with
         | Ok () -> Ok ()
         | Error (`Msg m) ->
             R.error_msgf
@@ -258,7 +262,7 @@ let validate_binary_access ~user ~binary_path =
               binary_path
               m)
   else
-    match Common.run ["test"; "-x"; binary_path] with
+    match Cmd_runner.run ["test"; "-x"; binary_path] with
     | Ok () -> Ok ()
     | Error (`Msg m) -> R.error_msgf "Cannot execute %s: %s" binary_path m
 
@@ -266,23 +270,23 @@ let install_unit ?(quiet = false) ~unit_path ~daemon_reload ~role ~app_bin_dir
     ~user () =
   let path = unit_path role in
   let owner, group =
-    if Common.is_root () then ("root", "root")
-    else Common.current_user_group_names ()
+    if Paths.is_root () then ("root", "root")
+    else Paths.current_user_group_names ()
   in
   let* () =
-    Common.ensure_dir_path ~owner ~group ~mode:0o755 (Filename.dirname path)
+    File_ops.ensure_dir_path ~owner ~group ~mode:0o755 (Filename.dirname path)
   in
   let* () = validate_bin_dir ~user ~app_bin_dir ~role in
   let* prestart = write_prestart_script role in
   let body =
     unit_template
-      ~user_mode:(not (Common.is_root ()))
+      ~user_mode:(not (Paths.is_root ()))
       ~role
       ~app_bin_dir
       ~user
       ?prestart
       ()
   in
-  let* () = Common.write_file ~mode:0o644 ~owner ~group path body in
+  let* () = File_ops.write_file ~mode:0o644 ~owner ~group path body in
   let* () = daemon_reload ~quiet in
   Ok ()

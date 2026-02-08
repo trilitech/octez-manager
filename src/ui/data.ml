@@ -79,7 +79,7 @@ let classify_unit_state result =
               (Some false, Service_state.Stopped)
           | Some code when code <> 0 ->
               (* Actual failure - use Octez-specific exit code descriptions *)
-              let msg = Common.octez_exit_code_description code in
+              let msg = String_utils.octez_exit_code_description code in
               (Some false, Service_state.Unknown msg)
           | _ -> (
               match failure_reason with

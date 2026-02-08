@@ -22,9 +22,9 @@ let default_group_exists name =
   with Not_found -> false
 
 module Hooks = struct
-  let is_root = ref Common.is_root
+  let is_root = ref Paths.is_root
 
-  let run = ref Common.run
+  let run = ref Cmd_runner.run
 
   let user_exists = ref default_user_exists
 
@@ -87,7 +87,7 @@ let ensure_system_directories ~user ~group () =
         match acc with
         | Error _ as e -> e
         | Ok () -> (
-            match Common.ensure_dir_path ~owner:user ~group ~mode path with
+            match File_ops.ensure_dir_path ~owner:user ~group ~mode path with
             | Ok () -> Ok ()
             | Error (`Msg e) ->
                 R.error_msgf "Failed to create/chown %s: %s" path e))
@@ -123,8 +123,8 @@ let remove_service_account ?(quiet = false) ~name () =
 
 module For_tests = struct
   let reset () =
-    Hooks.is_root := Common.is_root ;
-    Hooks.run := Common.run ;
+    Hooks.is_root := Paths.is_root ;
+    Hooks.run := Cmd_runner.run ;
     Hooks.user_exists := default_user_exists ;
     Hooks.group_exists := default_group_exists
 

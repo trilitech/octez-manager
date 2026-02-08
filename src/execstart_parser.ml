@@ -32,8 +32,8 @@ let unwrap_shell exec_start =
     let trimmed = String.trim exec_start in
     (* Find -c or -lc flag *)
     let c_flag_pattern =
-      if Common.string_contains ~needle:" -lc " trimmed then " -lc "
-      else if Common.string_contains ~needle:" -c " trimmed then " -c "
+      if String_utils.string_contains ~needle:" -lc " trimmed then " -lc "
+      else if String_utils.string_contains ~needle:" -c " trimmed then " -c "
       else ""
     in
     if c_flag_pattern = "" then exec_start
@@ -80,7 +80,7 @@ let unwrap_shell exec_start =
 (** {1 Binary Path Extraction} *)
 
 (** Remove quotes from a string, including escaped quotes *)
-let unquote = Common.unquote
+let unquote = String_utils.unquote
 
 let extract_binary_path exec_start =
   let unwrapped = unwrap_shell exec_start in
@@ -126,7 +126,7 @@ let empty_args =
 
 (** Check if string contains unexpanded variable like ${VAR} or $VAR *)
 let contains_variable s =
-  Common.string_contains ~needle:"${" s
+  String_utils.string_contains ~needle:"${" s
   || (String.contains s '$' && String.length s > 1)
 
 (** Helper to parse a flag with value *)

@@ -11,7 +11,7 @@ let teztnets_url = "https://teztnets.com/teztnets.json"
 
 let fetch_via_curl () : (string, [> R.msg]) result =
   match
-    Common.run_out
+    Cmd_runner.run_out
       ["curl"; "-fsLm"; "5"; "--connect-timeout"; "2"; teztnets_url]
   with
   | Ok body when String.trim body <> "" -> Ok body
@@ -260,7 +260,7 @@ let resolve_octez_node_chain ~endpoint =
     let ( let* ) = Result.bind in
     let* network_identifier =
       match
-        Common.run_out
+        Cmd_runner.run_out
           ["curl"; "-sf"; "--connect-timeout"; "2"; endpoint ^ "/config"]
       with
       | Ok out -> (

@@ -15,7 +15,7 @@ let ensure_node_config ?(quiet = false) ~app_bin_dir ~data_dir ~network
   if Sys.file_exists config_path then Ok ()
   else
     let octez_node = Filename.concat app_bin_dir "octez-node" in
-    Common.run
+    Cmd_runner.run
       ~quiet
       [
         octez_node;
@@ -31,7 +31,7 @@ let ensure_node_config ?(quiet = false) ~app_bin_dir ~data_dir ~network
 
 let normalize_data_dir instance = function
   | Some dir when dir <> "" -> dir
-  | _ -> Common.default_data_dir instance
+  | _ -> Paths.default_data_dir instance
 
 let endpoint_of_rpc rpc_addr =
   let trimmed = String.trim rpc_addr in
@@ -67,7 +67,7 @@ let build_run_args ~network ~history_mode ~rpc_addr ~net_addr ~extra_args
   in
   (* Logging is via journald - octez binaries handle their own file logging *)
   (* Shell-quote all arguments to prevent glob expansion when env file is sourced *)
-  Common.cmd_to_string (base @ extra_args)
+  Cmd_runner.cmd_to_string (base @ extra_args)
 
 let prepare_logging ~instance:_ ~role:_ ~logging_mode:_ =
   (* Always use journald *)
@@ -102,7 +102,7 @@ let ensure_directories ~owner ~group paths =
   List.fold_left
     (fun acc dir ->
       let* () = acc in
-      Common.ensure_dir_path ~owner ~group ~mode:0o755 dir)
+      File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir)
     (Ok ())
     filtered
 
@@ -116,7 +116,7 @@ let reown_runtime_paths ~owner ~group ~paths ~logging_mode:_ =
   List.fold_left
     (fun acc dir ->
       let* () = acc in
-      Common.ensure_tree_owner ~owner ~group dir)
+      File_ops.ensure_tree_owner ~owner ~group dir)
     (Ok ())
     normalize
 
