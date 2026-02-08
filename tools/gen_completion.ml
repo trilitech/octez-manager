@@ -6,7 +6,6 @@
 (******************************************************************************)
 
 open Rresult
-open Octez_manager_lib
 module HP = Octez_manager_lib.Help_parser
 module String_map = Map.Make (String)
 
@@ -28,7 +27,7 @@ let write_file path contents =
 
 let run_help binary args =
   let argv = ["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ args in
-  match Common.run_out argv with
+  match Cmd_runner.run_out argv with
   | Ok out -> Ok (HP.strip_ansi out)
   | Error (`Msg msg) -> Error (`Msg msg)
 
@@ -38,7 +37,7 @@ let resolve_binary explicit =
   | None -> (
       if Sys.file_exists "./octez-manager" then Ok "./octez-manager"
       else
-        match Common.which "octez-manager" with
+        match Paths.which "octez-manager" with
         | Some path -> Ok path
         | None -> Error (`Msg "octez-manager binary not found"))
 
@@ -56,7 +55,7 @@ let load_instance_actions binary =
   let placeholder = "__invalid_action_placeholder__" in
   let cmd = Printf.sprintf "%s instance _ %s 2>&1" binary placeholder in
   let argv = ["sh"; "-c"; cmd] in
-  match Common.run_out argv with
+  match Cmd_runner.run_out argv with
   | Ok output | Error (`Msg output) ->
       (* Parse: "expected one of 'start', 'stop', ... or 'logs'" *)
       let extract_actions s =
