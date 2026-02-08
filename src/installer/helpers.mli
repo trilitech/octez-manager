@@ -32,9 +32,6 @@ val restore_backup :
 (** Normalize optional string by trimming and converting empty to None *)
 val normalize_optional_string : string option -> string option
 
-(** Generate logrotate specs for services (currently returns empty list) *)
-val logrotate_specs_of : Service.t list -> 'a list
-
 (** Well-known global options for octez-baker/octez-client *)
 val known_baker_global_options : string list
 
