@@ -100,7 +100,7 @@ let execute_get service path =
       flush stderr
 
 (** Get completions for a path prefix *)
-let get_completions service prefix =
+let _get_completions service prefix =
   (* Split prefix into path segments *)
   let segments =
     String.split_on_char '/' prefix |> List.filter (fun s -> s <> "")

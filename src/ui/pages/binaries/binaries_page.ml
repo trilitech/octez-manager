@@ -186,14 +186,14 @@ let keymap _ =
     kb "?" "Help";
   ]
 
-let header =
+let _header =
   let open Miaou_widgets_display.Widgets in
   [
     title_highlight " Binaries Management ";
     dim "Manage Octez binary versions and registered directories";
   ]
 
-let footer = []
+let _footer = []
 
 module Page_Impl :
   Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg =
