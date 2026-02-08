@@ -221,7 +221,7 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
       network;
       history_mode;
       data_dir = Some data_dir;
-      rpc_addr;
+      rpc_addr = Rpc_addr.of_string rpc_addr;
       net_addr;
       service_user;
       app_bin_dir = bin_dir;
@@ -488,7 +488,7 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       network;
       history_mode = Rolling;
       data_dir;
-      rpc_addr;
+      rpc_addr = Rpc_addr.of_string rpc_addr;
       net_addr;
       service_user;
       app_bin_dir = bin_dir;

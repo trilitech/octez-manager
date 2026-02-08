@@ -10,7 +10,7 @@ type bootstrap = Genesis | Snapshot of {src : string option}
 type resolved_data_dir_config = {
   network : string;
   history_mode : History_mode.t;
-  rpc_addr : string;
+  rpc_addr : Rpc_addr.t;
   net_addr : string;
 }
 
@@ -21,7 +21,7 @@ let pp_resolved_data_dir_config fmt {network; history_mode; rpc_addr; net_addr}
     "Network: %s, History-mode: %s, Rpc-addr: %s, Net-addr: %s"
     network
     (History_mode.to_string history_mode)
-    rpc_addr
+    (Rpc_addr.to_string rpc_addr)
     net_addr
 
 type node_request = {
@@ -29,7 +29,7 @@ type node_request = {
   network : string;
   history_mode : History_mode.t;
   data_dir : string option;
-  rpc_addr : string;
+  rpc_addr : Rpc_addr.t;
   net_addr : string;
   service_user : string;
   app_bin_dir : string;
@@ -50,7 +50,7 @@ type daemon_request = {
   network : string;
   history_mode : History_mode.t;
   data_dir : string;
-  rpc_addr : string;
+  rpc_addr : Rpc_addr.t;
   net_addr : string;
   service_user : string;
   app_bin_dir : string;

@@ -100,7 +100,7 @@ let install_baker ?(quiet = false) (request : baker_request) =
         network;
         history_mode;
         data_dir = node_data_dir;
-        rpc_addr = node_endpoint;
+        rpc_addr = Rpc_addr.of_string node_endpoint;
         net_addr = "";
         service_user = request.service_user;
         app_bin_dir = request.app_bin_dir;

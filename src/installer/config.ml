@@ -34,13 +34,7 @@ let normalize_data_dir instance = function
   | _ -> Paths.default_data_dir instance
 
 let endpoint_of_rpc rpc_addr =
-  let trimmed = String.trim rpc_addr in
-  if trimmed = "" then "http://127.0.0.1:8732"
-  else if
-    String.starts_with ~prefix:"http://" (String.lowercase_ascii trimmed)
-    || String.starts_with ~prefix:"https://" (String.lowercase_ascii trimmed)
-  then trimmed
-  else "http://" ^ trimmed
+  Rpc_addr.to_endpoint (Rpc_addr.of_string rpc_addr)
 
 let lookup_node_service instance =
   let* svc_opt = Service_registry.find ~instance in
@@ -61,7 +55,7 @@ let build_run_args ~network ~history_mode ~rpc_addr ~net_addr ~extra_args
     [
       "--network=" ^ network;
       "--history-mode=" ^ History_mode.to_string history_mode;
-      "--rpc-addr=" ^ rpc_addr;
+      "--rpc-addr=" ^ Rpc_addr.to_string rpc_addr;
       "--net-addr=" ^ net_addr;
     ]
   in
@@ -205,13 +199,20 @@ let resolve_from_data_dir data_dir =
       | `String s -> s
       | _ -> "0.0.0.0:9732"
     in
-    Ok (`Data_dir {network; history_mode; rpc_addr; net_addr})
+    Ok
+      (`Data_dir
+         {
+           network;
+           history_mode;
+           rpc_addr = Rpc_addr.of_string rpc_addr;
+           net_addr;
+         })
 
 (** Update endpoint references in dependent services when a service's RPC address changes.
     For nodes: updates OCTEZ_NODE_ENDPOINT in baker/accuser/dal-node env files.
     For DAL nodes: updates OCTEZ_DAL_CONFIG in baker env files. *)
 let update_dependent_endpoints ~instance ~role ~new_rpc_addr () =
-  let new_endpoint = endpoint_of_rpc new_rpc_addr in
+  let new_endpoint = Rpc_addr.to_endpoint new_rpc_addr in
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | None -> Ok ()

@@ -142,7 +142,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~network:request.network
       ~history_mode:request.history_mode
       ~data_dir
-      ~rpc_addr:(Rpc_addr.of_string request.rpc_addr)
+      ~rpc_addr:request.rpc_addr
       ~net_addr:request.net_addr
       ~service_user:request.service_user
       ~app_bin_dir:request.app_bin_dir

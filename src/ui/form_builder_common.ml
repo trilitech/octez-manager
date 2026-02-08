@@ -218,16 +218,10 @@ let require_package_manager () =
   | None -> Error (`Msg "Package manager capability not available")
 
 let endpoint_with_scheme rpc_addr =
-  let trimmed = String.trim rpc_addr in
-  if trimmed = "" then "http://127.0.0.1:8732"
-  else if
-    String.starts_with ~prefix:"http://" (String.lowercase_ascii trimmed)
-    || String.starts_with ~prefix:"https://" (String.lowercase_ascii trimmed)
-  then trimmed
-  else "http://" ^ trimmed
+  Rpc_addr.to_endpoint (Rpc_addr.of_string rpc_addr)
 
 let endpoint_of_service (svc : Service.t) =
-  endpoint_with_scheme (Rpc_addr.to_string svc.Service.rpc_addr)
+  Rpc_addr.to_endpoint svc.Service.rpc_addr
 
 (** {1 Helpers} *)
 
