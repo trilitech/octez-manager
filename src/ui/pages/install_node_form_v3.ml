@@ -965,7 +965,7 @@ let spec =
             network = model.node.network;
             history_mode;
             data_dir = Some data_dir;
-            rpc_addr = model.node.rpc_addr;
+            rpc_addr = Rpc_addr.of_string model.node.rpc_addr;
             net_addr = model.node.p2p_addr;
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;

@@ -63,7 +63,7 @@ let create_node_flow ~on_success =
                         network;
                         history_mode;
                         data_dir = None;
-                        rpc_addr = "127.0.0.1:8732";
+                        rpc_addr = Rpc_addr.default;
                         net_addr = "0.0.0.0:9732";
                         service_user = "octez";
                         app_bin_dir =
@@ -189,7 +189,7 @@ let create_accuser_flow ~on_success =
                 network;
                 history_mode = History_mode.default;
                 data_dir = base_dir;
-                rpc_addr = node_endpoint;
+                rpc_addr = Rpc_addr.of_string node_endpoint;
                 net_addr = "";
                 service_user = "octez";
                 app_bin_dir =
@@ -249,7 +249,7 @@ let create_dal_node_flow ~on_success =
                 network;
                 history_mode = History_mode.default;
                 data_dir = dal_data_dir;
-                rpc_addr = "127.0.0.1:10732";
+                rpc_addr = Rpc_addr.default_dal;
                 net_addr = "0.0.0.0:11732";
                 service_user = "octez";
                 app_bin_dir =

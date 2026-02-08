@@ -393,7 +393,7 @@ let spec =
             network = Option.value ~default:"shadownet" network;
             history_mode = History_mode.default;
             data_dir = dal_data_dir;
-            rpc_addr = model.rpc_addr;
+            rpc_addr = Rpc_addr.of_string model.rpc_addr;
             (* DAL's own RPC address *)
             net_addr = model.net_addr;
             (* DAL's P2P address *)

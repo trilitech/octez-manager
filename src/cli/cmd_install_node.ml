@@ -204,7 +204,8 @@ let install_node_cmd =
             | _ -> Ok ()
           in
           let rpc_addr =
-            if rpc_addr <> "127.0.0.1:8732" then rpc_addr else config_rpc_addr
+            if rpc_addr <> "127.0.0.1:8732" then rpc_addr
+            else Rpc_addr.to_string config_rpc_addr
           in
           let net_addr =
             if net_addr <> "0.0.0.0:9732" then net_addr else config_net_addr
@@ -237,7 +238,7 @@ let install_node_cmd =
               network;
               history_mode;
               data_dir;
-              rpc_addr;
+              rpc_addr = Rpc_addr.of_string rpc_addr;
               net_addr;
               service_user;
               app_bin_dir;
@@ -367,7 +368,7 @@ let install_node_cmd =
               network;
               history_mode;
               data_dir;
-              rpc_addr;
+              rpc_addr = Rpc_addr.of_string rpc_addr;
               net_addr;
               service_user;
               app_bin_dir;
