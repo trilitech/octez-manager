@@ -24,7 +24,7 @@ let make_svc ?(instance = "my-node") ?(role = "node") ?(network = "mainnet")
     network;
     history_mode;
     data_dir;
-    rpc_addr;
+    rpc_addr = Octez_manager_lib.Rpc_addr.of_string rpc_addr;
     net_addr;
     service_user;
     app_bin_dir;

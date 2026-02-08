@@ -57,7 +57,10 @@ let format_service_label (svc : Octez_manager_lib.Service.t) ~is_current =
   let label =
     if is_public then
       (* Public nodes: show "Name https://..." *)
-      let url = svc.Octez_manager_lib.Service.rpc_addr in
+      let url =
+        Octez_manager_lib.Rpc_addr.to_string
+          svc.Octez_manager_lib.Service.rpc_addr
+      in
       Printf.sprintf "%s %s" name (Miaou_widgets_display.Widgets.dim url)
     else
       (* Local instances: just show name *)

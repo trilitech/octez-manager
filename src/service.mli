@@ -11,7 +11,7 @@ type t = {
   network : string;
   history_mode : History_mode.t;
   data_dir : string;
-  rpc_addr : string;
+  rpc_addr : Rpc_addr.t;
   net_addr : string;
   service_user : string;
   app_bin_dir : string;
@@ -34,7 +34,7 @@ val make :
   network:string ->
   history_mode:History_mode.t ->
   data_dir:string ->
-  rpc_addr:string ->
+  rpc_addr:Rpc_addr.t ->
   net_addr:string ->
   service_user:string ->
   app_bin_dir:string ->

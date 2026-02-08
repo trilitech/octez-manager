@@ -25,7 +25,7 @@ let mock_service ?(instance = "test-node") ?(role = "node")
     ~network
     ~history_mode
     ~data_dir
-    ~rpc_addr
+    ~rpc_addr:(Rpc_addr.of_string rpc_addr)
     ~net_addr
     ~service_user
     ~app_bin_dir

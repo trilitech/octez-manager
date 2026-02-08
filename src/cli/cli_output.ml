@@ -149,7 +149,7 @@ let print_service_details svc =
             | s :: rest ->
                 if
                   List.exists (fun r -> String.equal s.role r) roles
-                  && String.equal (Config.endpoint_of_rpc s.rpc_addr) ep
+                  && String.equal (Rpc_addr.to_endpoint s.rpc_addr) ep
                 then Some s.instance
                 else find_match rest
           in
@@ -163,7 +163,7 @@ let print_service_details svc =
       let node_ep = lookup "OCTEZ_NODE_ENDPOINT" in
       Format.printf
         "Node endpoint : %s@."
-        (if node_ep = "" then svc.rpc_addr else node_ep)
+        (if node_ep = "" then Rpc_addr.to_string svc.rpc_addr else node_ep)
   in
   (* Common fields *)
   Format.printf "Instance      : %s@." svc.S.instance ;
@@ -178,7 +178,7 @@ let print_service_details svc =
         "History mode  : %s@."
         (History_mode.to_string svc.history_mode) ;
       Format.printf "Data dir      : %s@." svc.data_dir ;
-      Format.printf "RPC addr      : %s@." svc.rpc_addr ;
+      Format.printf "RPC addr      : %s@." (Rpc_addr.to_string svc.rpc_addr) ;
       Format.printf "P2P addr      : %s@." svc.net_addr ;
       if extra_args <> "" then Format.printf "Extra args    : %s@." extra_args
   | "baker" ->
@@ -212,15 +212,15 @@ let print_service_details svc =
       let extra_args = lookup "OCTEZ_SERVICE_ARGS" in
       Format.printf "DAL data dir  : %s@." dal_data_dir ;
       print_node_endpoint () ;
-      if svc.rpc_addr <> "" then
-        Format.printf "DAL RPC addr  : %s@." svc.rpc_addr ;
+      if Rpc_addr.to_string svc.rpc_addr <> "" then
+        Format.printf "DAL RPC addr  : %s@." (Rpc_addr.to_string svc.rpc_addr) ;
       if svc.net_addr <> "" then
         Format.printf "DAL P2P addr  : %s@." svc.net_addr ;
       if extra_args <> "" then Format.printf "Extra args    : %s@." extra_args
   | _ ->
       (* Fallback for unknown roles *)
       Format.printf "Data dir      : %s@." svc.data_dir ;
-      Format.printf "RPC addr      : %s@." svc.rpc_addr ;
+      Format.printf "RPC addr      : %s@." (Rpc_addr.to_string svc.rpc_addr) ;
       Format.printf "P2P addr      : %s@." svc.net_addr) ;
   (* Common footer *)
   Format.printf "Service user  : %s@." svc.service_user ;

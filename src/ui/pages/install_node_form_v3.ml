@@ -408,7 +408,7 @@ let make_initial_model () =
             network = svc.Service.network;
             history_mode = History_mode.to_string svc.Service.history_mode;
             data_dir = svc.Service.data_dir;
-            rpc_addr = svc.Service.rpc_addr;
+            rpc_addr = Rpc_addr.to_string svc.Service.rpc_addr;
             p2p_addr = svc.Service.net_addr;
           };
         snapshot = `None;

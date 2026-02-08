@@ -110,7 +110,7 @@ let get_instance_details ~svc =
   add "Network       : %s\n" svc.Service.network ;
   add "History mode  : %s\n" (History_mode.to_string svc.Service.history_mode) ;
   add "Data dir      : %s\n" svc.Service.data_dir ;
-  add "RPC addr      : %s\n" svc.Service.rpc_addr ;
+  add "RPC addr      : %s\n" (Rpc_addr.to_string svc.Service.rpc_addr) ;
   add "P2P addr      : %s\n" svc.Service.net_addr ;
   add "Service user  : %s\n" svc.Service.service_user ;
   add "App bin dir   : %s\n" svc.Service.app_bin_dir ;
