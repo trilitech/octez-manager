@@ -191,6 +191,54 @@ let text_similarity query_text target_text =
   max jaccard substr
 
 (* ========================================================================== *)
+(* Shared SQL fragments                                                       *)
+(* ========================================================================== *)
+
+(** Names excluded from duplicate detection.
+
+    These are common interface names (e.g. PAGE_SIG callbacks, scheduler
+    lifecycle) that legitimately appear in many modules with the same
+    signature. *)
+let duplicate_excluded_names =
+  [
+    "register";
+    "init";
+    "view";
+    "update";
+    "refresh";
+    "move";
+    "back";
+    "noop";
+    "service_select";
+    "service_cycle";
+    "keymap";
+    "has_modal";
+    "handled_keys";
+    "handle_modal_key";
+    "handle_key";
+    "header";
+    "name";
+    "shutdown";
+    "start";
+    "clear";
+    "stop";
+    "tick";
+    "get";
+    "clear_cache";
+    "started";
+    "shutdown_requested";
+  ]
+
+(** SQL WHERE clause fragment that filters out trivial/interface duplicates. *)
+let duplicate_where_clause =
+  let quoted = List.map (Printf.sprintf "'%s'") duplicate_excluded_names in
+  Printf.sprintf
+    "f.is_alias = 0 AND f.name NOT LIKE 'let*' AND f.signature NOT IN ('unit', \
+     'string', 'int', 'float', 'bool', 'Mutex.t') AND f.signature NOT LIKE \
+     '''a%%' AND f.name NOT IN (%s)"
+    (String.concat ", " quoted)
+
+(* ========================================================================== *)
 (* Commands                                                                   *)
 (* ========================================================================== *)
 
@@ -375,17 +423,12 @@ let cmd_search_types ~field_names ~field_types =
 let cmd_duplicates () =
   let db = open_db () in
   let sql =
-    "SELECT f.name, f.signature, COUNT(DISTINCT m.id) as cnt, \
-     GROUP_CONCAT(m.path, ', ') FROM functions f JOIN modules m ON f.module_id \
-     = m.id WHERE f.is_alias = 0 AND f.name NOT LIKE 'let*' AND f.signature \
-     NOT IN ('unit', 'string', 'int', 'float', 'bool', 'Mutex.t') AND \
-     f.signature NOT LIKE '''a%' AND f.name NOT IN ('register', 'init', \
-     'view', 'update', 'refresh', 'move', 'back', 'noop', 'service_select', \
-     'service_cycle', 'keymap', 'has_modal', 'handled_keys', \
-     'handle_modal_key', 'handle_key', 'header', 'name', 'shutdown', 'start', \
-     'clear', 'stop', 'tick', 'get', 'clear_cache', 'started', \
-     'shutdown_requested') GROUP BY f.name, f.signature HAVING cnt > 1 ORDER \
-     BY cnt DESC"
+    Printf.sprintf
+      "SELECT f.name, f.signature, COUNT(DISTINCT m.id) as cnt, \
+       GROUP_CONCAT(m.path, ', ') FROM functions f JOIN modules m ON \
+       f.module_id = m.id WHERE %s GROUP BY f.name, f.signature HAVING cnt > 1 \
+       ORDER BY cnt DESC"
+      duplicate_where_clause
   in
   let rows = query_rows db sql in
   Printf.printf "Found %d groups of duplicate functions:\n\n" (List.length rows) ;
@@ -576,17 +619,11 @@ let cmd_metrics output_file =
       ( "duplicate_groups",
         string_of_int
           (geti
-             "SELECT COUNT(*) FROM (SELECT f.name, f.signature FROM functions \
-              f JOIN modules m ON f.module_id = m.id WHERE f.is_alias = 0 AND \
-              f.name NOT LIKE 'let*' AND f.signature NOT IN ('unit', 'string', \
-              'int', 'float', 'bool', 'Mutex.t') AND f.signature NOT LIKE \
-              '''a%' AND f.name NOT IN ('register', 'init', 'view', 'update', \
-              'refresh', 'move', 'back', 'noop', 'service_select', \
-              'service_cycle', 'keymap', 'has_modal', 'handled_keys', \
-              'handle_modal_key', 'handle_key', 'header', 'name', 'shutdown', \
-              'start', 'clear', 'stop', 'tick', 'get', 'clear_cache', \
-              'started', 'shutdown_requested') GROUP BY f.name, f.signature \
-              HAVING COUNT(DISTINCT m.id) > 1)") );
+             (Printf.sprintf
+                "SELECT COUNT(*) FROM (SELECT f.name, f.signature FROM \
+                 functions f JOIN modules m ON f.module_id = m.id WHERE %s \
+                 GROUP BY f.name, f.signature HAVING COUNT(DISTINCT m.id) > 1)"
+                duplicate_where_clause)) );
       ( "large_files",
         string_of_int (geti "SELECT COUNT(*) FROM modules WHERE lines > 500") );
       ( "large_functions",
@@ -696,6 +733,135 @@ let load_accept_file () =
     !lines)
   else []
 
+(* -------------------------------------------------------------------------- *)
+(* Per-item detail queries for regression diagnostics                         *)
+(* -------------------------------------------------------------------------- *)
+
+(** Return per-item detail lines for a regressing metric.
+
+    Each function queries the current architecture DB and returns a list of
+    short human-readable strings describing individual items that contribute
+    to the metric count. The [max] parameter limits output to the N largest
+    or most relevant items. *)
+
+let detail_large_functions db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT m.path || ':' || f.name, f.line_end - f.line_start + 1 as lc \
+       FROM functions f JOIN modules m ON f.module_id = m.id WHERE f.name NOT \
+       LIKE 'let*' AND lc > 50 ORDER BY lc DESC LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row ->
+      match row with
+      | [loc; lines] -> Printf.sprintf "%s (%s lines)" loc lines
+      | _ -> "?")
+
+let detail_large_files db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT m.path, m.lines FROM modules m WHERE m.lines > 500 ORDER BY \
+       m.lines DESC LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row ->
+      match row with
+      | [path; lines] -> Printf.sprintf "%s (%s lines)" path lines
+      | _ -> "?")
+
+let detail_duplicate_groups db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT f.name, f.signature, COUNT(DISTINCT m.id) as cnt, \
+       GROUP_CONCAT(m.path, ', ') FROM functions f JOIN modules m ON \
+       f.module_id = m.id WHERE %s GROUP BY f.name, f.signature HAVING cnt > 1 \
+       ORDER BY cnt DESC LIMIT %d"
+      duplicate_where_clause
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row ->
+      match row with
+      | [name; _sig; cnt; modules] ->
+          Printf.sprintf "%s (%sx) in: %s" name cnt modules
+      | _ -> "?")
+
+let detail_missing_docs db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT m.path || ':' || f.name FROM functions f JOIN modules m ON \
+       f.module_id = m.id WHERE f.exposed = 1 AND f.intent IS NULL ORDER BY \
+       m.path, f.name LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row -> match row with [loc] -> loc | _ -> "?")
+
+let detail_missing_mli db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT m.path, m.lines FROM modules m WHERE m.has_mli = 0 ORDER BY \
+       m.lines DESC LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row ->
+      match row with
+      | [path; lines] -> Printf.sprintf "%s (%s lines)" path lines
+      | _ -> "?")
+
+let detail_god_modules db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT m.path, COUNT(*) as fns FROM functions f JOIN modules m ON \
+       f.module_id = m.id GROUP BY m.id HAVING fns > 30 ORDER BY fns DESC \
+       LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row ->
+      match row with
+      | [path; fns] -> Printf.sprintf "%s (%s functions)" path fns
+      | _ -> "?")
+
+let detail_unsafe_string_fields db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT tf.field_name, COUNT(*) as cnt FROM type_fields tf WHERE \
+       tf.field_type = 'string' GROUP BY tf.field_name HAVING cnt >= 3 ORDER \
+       BY cnt DESC LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row ->
+      match row with
+      | [field; cnt] -> Printf.sprintf "%s (%sx)" field cnt
+      | _ -> "?")
+
+(** Look up the detail function for a given metric name.
+
+    Returns [None] for metrics that are not tracked per-item (e.g.
+    [doc_coverage_pct] which is a derived percentage). *)
+let detail_for_metric metric db ~max =
+  match metric with
+  | "large_functions" -> Some (detail_large_functions db ~max)
+  | "large_files" -> Some (detail_large_files db ~max)
+  | "duplicate_groups" -> Some (detail_duplicate_groups db ~max)
+  | "missing_docs" -> Some (detail_missing_docs db ~max)
+  | "missing_mli" -> Some (detail_missing_mli db ~max)
+  | "god_modules" -> Some (detail_god_modules db ~max)
+  | "unsafe_string_fields" -> Some (detail_unsafe_string_fields db ~max)
+  | _ -> None
+
+let try_open_db () =
+  if Sys.file_exists db_path then (
+    let db = Sqlite3.db_open db_path in
+    ignore (Sqlite3.exec db "PRAGMA foreign_keys = ON") ;
+    Some db)
+  else None
+
 let cmd_compare baseline_path current_path =
   let accepted = load_accept_file () in
   let baseline = parse_metrics_json baseline_path in
@@ -739,6 +905,17 @@ let cmd_compare baseline_path current_path =
       (fun (key, _, _) -> not (List.mem key accepted))
       result.regressions
   in
+  (* Open architecture DB for per-item detail (optional) *)
+  let db_opt = try_open_db () in
+  let print_metric_detail key =
+    match db_opt with
+    | None -> ()
+    | Some db -> (
+        match detail_for_metric key db ~max:10 with
+        | None | Some [] -> ()
+        | Some items ->
+            List.iter (fun item -> Printf.printf "    - %s\n" item) items)
+  in
   let print_metric_list (key, base_val, cur_val) =
     let arrow = if cur_val > base_val then "+" else "" in
     Printf.printf
@@ -747,7 +924,8 @@ let cmd_compare baseline_path current_path =
       base_val
       cur_val
       arrow
-      (cur_val -. base_val)
+      (cur_val -. base_val) ;
+    print_metric_detail key
   in
   (* Print report *)
   if blocking <> [] then (
@@ -762,6 +940,8 @@ let cmd_compare baseline_path current_path =
     Printf.printf "Accepted regressions (via .metrics-accept):\n" ;
     List.iter print_metric_list accepted_regressions ;
     print_newline ()) ;
+  (* Close the DB if opened *)
+  Option.iter (fun db -> ignore (Sqlite3.db_close db)) db_opt ;
   (* Exit code: 1 if blocking regressions *)
   if blocking <> [] then (
     Printf.printf "FAILED: %d metric(s) regressed.\n" (List.length blocking) ;
