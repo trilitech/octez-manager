@@ -432,14 +432,19 @@ test_init() {
 	_HARNESS_DATA_DIRS=()
 	_HARNESS_PROCESSES=()
 
-	# Compute a stable port base from the test script filename.
+	# Compute a stable port base from the test script path (dir/name).
 	# Each test gets a range of 10 ports starting at its base.
-	# Range: 19000-19990 (100 possible test slots × 10 ports each)
-	local script_name
-	script_name="$(basename "${BASH_SOURCE[-1]}" .sh)"
+	# Range: 19000-48990 (3000 possible test slots × 10 ports each)
+	# Using the full relative path (e.g. "node/01-install") avoids
+	# collisions between tests in different directories.
+	local script_path
+	script_path="${BASH_SOURCE[-1]}"
+	# Extract "dir/name" from e.g. "/tests/node/01-install.sh"
+	script_path="${script_path##*/tests/}"
+	script_path="${script_path%.sh}"
 	local hash
-	hash=$(echo -n "$script_name" | cksum | awk '{print $1}')
-	_HARNESS_PORT_BASE=$((19000 + (hash % 100) * 10))
+	hash=$(echo -n "$script_path" | cksum | awk '{print $1}')
+	_HARNESS_PORT_BASE=$((19000 + (hash % 3000) * 10))
 	_HARNESS_PORT_COUNTER=0
 
 	echo "Test: $description"
