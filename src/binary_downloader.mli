@@ -126,6 +126,11 @@ val checksums_url : version:string -> arch:arch -> string
     at TUI startup for pooled execution. *)
 val set_parallel_submit : ((unit -> unit) -> unit) -> unit
 
+(** Set the yield function used while waiting for downloads to complete.
+    Defaults to [Thread.yield]. In TUI mode, set to [fun () -> Eio_unix.sleep 0.01]
+    so the Eio event loop can run other fibers while polling. *)
+val set_yield_hook : (unit -> unit) -> unit
+
 (** {2 For tests} *)
 
 module For_tests : sig

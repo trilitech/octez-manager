@@ -255,4 +255,5 @@ let init proc_mgr =
   Cmd_runner.set_run_out_hook (run_out_eio mgr) ;
   Cmd_runner.set_run_out_silent_hook (run_out_silent_eio mgr) ;
   Cmd_runner.set_run_streaming_hook (run_streaming_eio mgr) ;
-  Download.set_download_with_progress_hook (download_file_with_progress_eio mgr)
+  Download.set_download_with_progress_hook (download_file_with_progress_eio mgr) ;
+  Binary_downloader.set_yield_hook (fun () -> Eio_unix.sleep 0.01)
