@@ -63,7 +63,7 @@ let test_node_role_fields () =
         Mock.mock_service
           ~instance:"node-fields-test"
           ~role:"node"
-          ~network:"ghostnet"
+          ~network:"shadownet"
           ~rpc_addr:"127.0.0.1:8733"
           ()
       in
@@ -75,7 +75,7 @@ let test_node_role_fields () =
         bool
         "shows role or network"
         true
-        (TH.contains_substring screen "ghostnet"
+        (TH.contains_substring screen "shadownet"
         || TH.contains_substring screen "Role"
         || TH.contains_substring screen "Network"))
 
