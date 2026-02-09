@@ -133,7 +133,16 @@ let parse_networks (json_s : string) : (network_info list, [> R.msg]) result =
             category = pick_string ["category"; "type"] it;
           }
     in
-    let infos = items |> List.filter_map to_info in
+    let infos =
+      items |> List.filter_map to_info
+      (* Filter out deprecated networks *)
+      |> List.filter (fun n ->
+          let alias_lower = String.lowercase_ascii n.alias in
+          let name_lower = String.lowercase_ascii n.human_name in
+          not
+            (String.equal alias_lower "ghostnet"
+            || String.equal name_lower "ghostnet"))
+    in
     match infos with
     | [] -> R.error_msg "No networks found in teztnets.json"
     | _ -> Ok infos
