@@ -179,13 +179,31 @@ let fetch_nodes () : node_info list =
       "https://www.taquito.io/docs/rpc_nodes.json";
     ]
   in
+  let is_ghostnet_node node =
+    match node.network with
+    | Some n ->
+        let n_lower = String.lowercase_ascii n in
+        n_lower = "ghostnet"
+    | None ->
+        let url_lower = String.lowercase_ascii node.rpc_addr in
+        let contains s substring =
+          try
+            let _ = Str.search_forward (Str.regexp_string substring) s 0 in
+            true
+          with Not_found -> false
+        in
+        contains url_lower "ghostnet"
+  in
   let rec try_urls = function
     | [] -> []
     | url :: rest -> (
         let cmd = ["curl"; "-fsSL"; "--max-time"; "5"; url] in
         match Cmd_runner.run_out cmd with
         | Ok body ->
-            let nodes = parse_taquito_json body in
+            let nodes =
+              parse_taquito_json body
+              |> List.filter (fun n -> not (is_ghostnet_node n))
+            in
             if nodes <> [] then nodes else try_urls rest
         | Error _ -> try_urls rest)
   in
