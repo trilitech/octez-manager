@@ -15,8 +15,7 @@ let process_mgr_ref : any_proc_mgr option Atomic.t = Atomic.make None
 
 let get_process_mgr () = Atomic.get process_mgr_ref
 
-(* --- Eio-based process execution helpers --- *)
-
+(** Read lines from an Eio flow, calling [on_line] for each line read. *)
 let read_lines_eio flow ~on_line =
   let reader = Eio.Buf_read.of_flow ~max_size:(10 * 1024 * 1024) flow in
   let rec loop () =
@@ -28,8 +27,10 @@ let read_lines_eio flow ~on_line =
   in
   loop ()
 
-(* In TUI mode stdout/stderr are always captured via pipes -- there is no
-   terminal to inherit -- so the [quiet] flag has no effect on the Eio path. *)
+(** Run a command via Eio, capturing stdout and stderr.
+
+    In TUI mode stdout/stderr are always captured via pipes -- there is no
+    terminal to inherit -- so the [quiet] flag has no effect on the Eio path. *)
 let run_eio (Mgr mgr) ~quiet:_ ?on_log argv =
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
@@ -59,8 +60,10 @@ let run_eio (Mgr mgr) ~quiet:_ ?on_log argv =
       Cmd_runner.append_debug_log ("RUN ERROR: " ^ msg) ;
       Error (`Msg msg)
 
-(* Drain stderr in parallel with stdout to prevent the process from blocking
-   if the stderr pipe buffer fills up. *)
+(** Run a command via Eio and return its stdout as a trimmed string.
+
+    Drains stderr in parallel with stdout to prevent the process from blocking
+    if the stderr pipe buffer fills up. *)
 let run_out_eio (Mgr mgr) argv =
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
@@ -84,6 +87,7 @@ let run_out_eio (Mgr mgr) argv =
         (`Msg
            (Printf.sprintf "Command failed: %s" (Cmd_runner.cmd_to_string argv)))
 
+(** Run a command via Eio and return stdout, including stderr in error messages. *)
 let run_out_silent_eio (Mgr mgr) argv =
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
@@ -115,7 +119,8 @@ let run_out_silent_eio (Mgr mgr) argv =
       Cmd_runner.append_debug_log ("RUN_OUT_SILENT ERROR: " ^ msg) ;
       Error (`Msg msg)
 
-(* Streaming run via Eio that handles \r and \n as line delimiters *)
+(** Run a command via Eio with streaming output, handling [\\r] and [\\n] as
+    line delimiters for progress-style output. *)
 let run_streaming_eio (Mgr mgr) ~on_log argv =
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
@@ -163,6 +168,7 @@ let run_streaming_eio (Mgr mgr) ~on_log argv =
       Cmd_runner.append_debug_log ("RUN_STREAMING ERROR: " ^ msg) ;
       Error (`Msg msg)
 
+(** Download a file via curl using Eio, parsing progress from stderr. *)
 let download_file_with_progress_eio (Mgr mgr) ~url ~dest_path ~on_progress =
   let cmd =
     [
