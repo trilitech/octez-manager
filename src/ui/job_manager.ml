@@ -18,13 +18,15 @@ type job = {
   mutable finished_at : float option;
   mutable log : string list;
   mutable phase : string;
+  timeout : float option;
 }
 
 let jobs : job list ref = ref []
 
 let next_id = ref 1
 
-let submit ?(on_complete = fun _ -> ()) ~description action =
+let submit ?(on_complete = fun _ -> ()) ?(timeout = Some 120.0) ~description
+    action =
   let id = !next_id in
   incr next_id ;
   let job =
@@ -36,6 +38,7 @@ let submit ?(on_complete = fun _ -> ()) ~description action =
       finished_at = None;
       log = [];
       phase = "";
+      timeout;
     }
   in
   jobs := job :: !jobs ;
@@ -76,22 +79,24 @@ let get_running_job () = List.find_opt (fun j -> j.status = Running) !jobs
 
 let get_latest_job () = match !jobs with [] -> None | job :: _ -> Some job
 
-let stuck_timeout_secs = 120.0
-
 let check_stuck_jobs () =
   let now = Unix.gettimeofday () in
   List.iter
     (fun job ->
-      match job.status with
-      | Running when now -. job.started_at > stuck_timeout_secs ->
+      match (job.status, job.timeout) with
+      | Running, Some timeout when now -. job.started_at > timeout ->
           job.status <- Failed "Operation timed out" ;
           job.finished_at <- Some now ;
           Context.toast_error
             (Printf.sprintf
                "Job \"%s\" timed out after %.0fs"
                job.description
-               stuck_timeout_secs)
+               timeout)
       | _ -> ())
     !jobs
 
 let tick () = check_stuck_jobs ()
+
+module For_tests = struct
+  let inject_job job = jobs := job :: !jobs
+end

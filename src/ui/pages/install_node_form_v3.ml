@@ -987,6 +987,7 @@ let spec =
           else Printf.sprintf "Install node %s" model.core.instance_name
         in
         Job_manager.submit
+          ~timeout:None
           ~description
           (fun ~append_log () ->
             (* In edit mode, stop the service and dependents before applying changes *)
