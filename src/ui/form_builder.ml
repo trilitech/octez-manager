@@ -549,9 +549,6 @@ struct
             match S.spec.on_submit model with
             | Ok () ->
                 Context.mark_instances_dirty () ;
-                (* Reset form to fresh initial values for next use *)
-                s.model_ref := S.spec.initial_model () ;
-                (* Navigate back to instances page via Context. *)
                 Context.navigate "instances" ;
                 s
             | Error (`Msg msg) ->
@@ -569,9 +566,6 @@ struct
         match S.spec.on_submit model with
         | Ok () ->
             Context.mark_instances_dirty () ;
-            (* Reset form to fresh initial values for next use *)
-            s.model_ref := S.spec.initial_model () ;
-            (* Navigate back to instances page via Context. *)
             Context.navigate "instances" ;
             s
         | Error (`Msg msg) ->

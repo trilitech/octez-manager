@@ -69,6 +69,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pressing or holding Esc on modals no longer accidentally quits the application (Miaou Esc cooldown after modal close)
 - Application shutdown could hang for up to 10 minutes when background schedulers were sleeping; now exits within ~0.5s
 - Install-node and import-service jobs no longer time out after 120 seconds; long-running operations like snapshot downloads now run without a timeout (fixes #676)
+- Install/edit forms no longer flash with default values when submitting
 
 ### Removed
 
