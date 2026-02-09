@@ -35,8 +35,8 @@ let update_state s =
   state_ref := Some s ;
   Context.mark_instances_dirty ()
 
-let init () =
-  (* Trigger OpenAPI download if needed (for public nodes without /describe) *)
+(** Trigger OpenAPI download modal if specs are needed. *)
+let maybe_download_openapi () =
   if Rpc_openapi.needs_download () then
     Modal_helpers.show_spinner_modal
       ~title:"Fetching OpenAPI"
@@ -48,7 +48,6 @@ let init () =
       ~on_complete:(fun status ->
         match status with
         | `Succeeded ->
-            (* Clear rpc_describe cache so new OpenAPI entries are used *)
             Rpc_describe.clear_cache () ;
             Context.toast_info
               "OpenAPI specs ready - public nodes now browsable"
@@ -56,7 +55,10 @@ let init () =
             Context.toast_warn
               (Printf.sprintf "OpenAPI download failed: %s" msg)
         | `Cancelled -> ())
-      () ;
+      ()
+
+let init () =
+  maybe_download_openapi () ;
   (* Load local node instances *)
   let local_nodes =
     let service_states = Data.load_service_states () in
