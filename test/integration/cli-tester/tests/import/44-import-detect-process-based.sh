@@ -3,7 +3,7 @@
 set -euo pipefail
 source /tests/lib.sh
 
-echo "Test: Detect process-based instances"
+test_init "Detect process-based instances"
 
 # NOTE: Process-based detection is not yet implemented in the import feature.
 # This test is a placeholder for future functionality.

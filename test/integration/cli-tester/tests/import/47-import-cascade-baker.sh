@@ -3,26 +3,22 @@
 set -euo pipefail
 source /tests/lib.sh
 
+test_init "Cascade import - baker with node dependency"
+
 NODE_INSTANCE="cascade-node"
 BAKER_INSTANCE="cascade-baker"
 NODE_DATA="/var/lib/octez-external/$NODE_INSTANCE"
 BAKER_DATA="/var/lib/octez-external/$BAKER_INSTANCE"
-NODE_RPC="127.0.0.1:18747"
+NODE_RPC="127.0.0.1:$(alloc_port)"
 
-echo "Test: Cascade import - baker with node dependency"
-
-# Cleanup
-cleanup_instance "$NODE_INSTANCE" || true
-cleanup_instance "$BAKER_INSTANCE" || true
-rm -rf "$NODE_DATA" "$BAKER_DATA" || true
-for inst in "$NODE_INSTANCE" "$BAKER_INSTANCE"; do
-	for role in node baker; do
-		systemctl stop "octez-${role}@${inst}.service" 2>/dev/null || true
-		systemctl disable "octez-${role}@${inst}.service" 2>/dev/null || true
-		rm -f "/etc/systemd/system/octez-${role}@${inst}.service" || true
-	done
-done
-systemctl daemon-reload
+register_instance "$NODE_INSTANCE"
+register_instance "$BAKER_INSTANCE"
+register_external_service "node" "$NODE_INSTANCE"
+register_external_service "baker" "$BAKER_INSTANCE"
+register_external_service "node" "$BAKER_INSTANCE"
+register_external_service "baker" "$NODE_INSTANCE"
+register_data_dir "$NODE_DATA"
+register_data_dir "$BAKER_DATA"
 
 # Create external node service
 echo "Creating external node service..."
@@ -66,12 +62,5 @@ if ! service_is_managed "$BAKER_INSTANCE"; then
 	om list 2>&1
 	exit 1
 fi
-
-echo "Cascade import successful"
-
-# Cleanup
-cleanup_instance "$BAKER_INSTANCE"
-cleanup_instance "$NODE_INSTANCE"
-rm -rf "$NODE_DATA" "$BAKER_DATA"
 
 echo "Cascade import test passed"

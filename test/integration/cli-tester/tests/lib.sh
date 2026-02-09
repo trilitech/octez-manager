@@ -386,3 +386,192 @@ start_unmanaged_process() {
 	su -s /bin/sh tezos -c "$octez_bin_path/$binary $args" &
 	echo $!
 }
+
+# ==========================================================================
+# Test isolation harness
+#
+# Provides automatic resource cleanup via trap handlers so tests never leak
+# systemd services, data directories, or background processes — even on
+# failure or early exit.
+#
+# Usage:
+#   source /tests/lib.sh
+#   test_init "My test description"
+#
+#   register_instance "my-node"
+#   register_external_service "node" "ext-node"
+#   register_data_dir "/var/lib/octez-external/ext-node"
+#   register_process "$pid"
+#
+#   # ... test logic ...
+#   # Cleanup happens automatically on exit (pass or fail)
+# ==========================================================================
+
+# Resource tracking arrays (initialized by test_init)
+_HARNESS_INSTANCES=()
+_HARNESS_EXTERNAL_SERVICES=()
+_HARNESS_DATA_DIRS=()
+_HARNESS_PROCESSES=()
+_HARNESS_INITIALIZED=0
+_HARNESS_TEST_NAME=""
+
+# Port allocation state
+_HARNESS_PORT_COUNTER=0
+_HARNESS_PORT_BASE=0
+
+# Initialize the test harness. Must be called before any register_* calls.
+# Sets up a trap handler that cleans all registered resources on EXIT.
+#
+# Usage: test_init "Test description"
+test_init() {
+	local description="${1:-unnamed test}"
+	_HARNESS_TEST_NAME="$description"
+	_HARNESS_INITIALIZED=1
+	_HARNESS_INSTANCES=()
+	_HARNESS_EXTERNAL_SERVICES=()
+	_HARNESS_DATA_DIRS=()
+	_HARNESS_PROCESSES=()
+
+	# Compute a stable port base from the test script filename.
+	# Each test gets a range of 10 ports starting at its base.
+	# Range: 19000-19990 (100 possible test slots × 10 ports each)
+	local script_name
+	script_name="$(basename "${BASH_SOURCE[-1]}" .sh)"
+	local hash
+	hash=$(echo -n "$script_name" | cksum | awk '{print $1}')
+	_HARNESS_PORT_BASE=$((19000 + (hash % 100) * 10))
+	_HARNESS_PORT_COUNTER=0
+
+	echo "Test: $description"
+
+	# Install trap handler for cleanup on exit
+	trap _harness_cleanup EXIT
+}
+
+# Allocate a unique port for this test. Returns a port number via stdout.
+# Each test gets a deterministic base port derived from its filename,
+# with sequential offsets for multiple ports within the same test.
+#
+# Usage: local port=$(alloc_port)
+alloc_port() {
+	if [ "$_HARNESS_INITIALIZED" -ne 1 ]; then
+		echo "ERROR: alloc_port called before test_init" >&2
+		return 1
+	fi
+	local port=$((_HARNESS_PORT_BASE + _HARNESS_PORT_COUNTER))
+	_HARNESS_PORT_COUNTER=$((_HARNESS_PORT_COUNTER + 1))
+	if [ "$_HARNESS_PORT_COUNTER" -gt 9 ]; then
+		echo "WARNING: test allocated more than 10 ports" >&2
+	fi
+	echo "$port"
+}
+
+# Register a managed instance for automatic cleanup.
+# Also runs pre-cleanup to remove leftovers from previous failed runs.
+#
+# Usage: register_instance "my-node"
+register_instance() {
+	local instance="$1"
+	if [ "$_HARNESS_INITIALIZED" -ne 1 ]; then
+		echo "ERROR: register_instance called before test_init" >&2
+		return 1
+	fi
+	_HARNESS_INSTANCES+=("$instance")
+	# Pre-cleanup: remove leftovers from previous failed runs
+	cleanup_instance "$instance" || true
+}
+
+# Register an external systemd service for automatic cleanup.
+# Also runs pre-cleanup to stop/disable/remove leftovers.
+#
+# Usage: register_external_service "node" "ext-instance"
+register_external_service() {
+	local role="$1"
+	local instance="$2"
+	if [ "$_HARNESS_INITIALIZED" -ne 1 ]; then
+		echo "ERROR: register_external_service called before test_init" >&2
+		return 1
+	fi
+	_HARNESS_EXTERNAL_SERVICES+=("${role}:${instance}")
+	# Pre-cleanup: remove leftovers from previous failed runs
+	local unit="octez-${role}@${instance}.service"
+	systemctl stop "$unit" 2>/dev/null || true
+	systemctl disable "$unit" 2>/dev/null || true
+	rm -f "/etc/systemd/system/$unit" || true
+}
+
+# Register a data directory for automatic cleanup.
+# Also removes leftovers from previous failed runs.
+#
+# Usage: register_data_dir "/var/lib/octez-external/my-node"
+register_data_dir() {
+	local dir="$1"
+	if [ "$_HARNESS_INITIALIZED" -ne 1 ]; then
+		echo "ERROR: register_data_dir called before test_init" >&2
+		return 1
+	fi
+	_HARNESS_DATA_DIRS+=("$dir")
+	# Pre-cleanup
+	rm -rf "$dir" || true
+}
+
+# Register a background process for automatic cleanup.
+#
+# Usage: local pid=$(start_unmanaged_process ...); register_process "$pid"
+register_process() {
+	local pid="$1"
+	if [ "$_HARNESS_INITIALIZED" -ne 1 ]; then
+		echo "ERROR: register_process called before test_init" >&2
+		return 1
+	fi
+	_HARNESS_PROCESSES+=("$pid")
+}
+
+# Internal: cleanup handler called automatically on EXIT.
+# Cleans resources in reverse order: processes, external services,
+# managed instances, data directories. All errors are suppressed.
+_harness_cleanup() {
+	local exit_code=$?
+
+	# Skip if harness was never initialized (backward compatibility)
+	if [ "$_HARNESS_INITIALIZED" -ne 1 ]; then
+		return "$exit_code"
+	fi
+
+	# Kill registered background processes
+	for pid in "${_HARNESS_PROCESSES[@]}"; do
+		if kill -0 "$pid" 2>/dev/null; then
+			kill "$pid" 2>/dev/null || true
+			wait "$pid" 2>/dev/null || true
+		fi
+	done
+
+	# Stop and remove external systemd services
+	local need_reload=0
+	for entry in "${_HARNESS_EXTERNAL_SERVICES[@]}"; do
+		local role="${entry%%:*}"
+		local instance="${entry#*:}"
+		local unit="octez-${role}@${instance}.service"
+		systemctl stop "$unit" 2>/dev/null || true
+		systemctl disable "$unit" 2>/dev/null || true
+		if [ -f "/etc/systemd/system/$unit" ]; then
+			rm -f "/etc/systemd/system/$unit" || true
+			need_reload=1
+		fi
+	done
+	if [ "$need_reload" -eq 1 ]; then
+		systemctl daemon-reload 2>/dev/null || true
+	fi
+
+	# Cleanup managed instances (stop, remove, purge)
+	for instance in "${_HARNESS_INSTANCES[@]}"; do
+		cleanup_instance "$instance" || true
+	done
+
+	# Remove data directories
+	for dir in "${_HARNESS_DATA_DIRS[@]}"; do
+		rm -rf "$dir" || true
+	done
+
+	return "$exit_code"
+}

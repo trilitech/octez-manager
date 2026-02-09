@@ -3,13 +3,15 @@
 set -euo pipefail
 source /tests/lib.sh
 
-echo "Test: Show node instance"
+test_init "Show node instance"
 
 # Use unique instance name for this test
 TEST_INSTANCE="test-show"
 
-# Cleanup any previous state
-cleanup_instance "$TEST_INSTANCE" || true
+# Register instance for auto cleanup (also does pre-cleanup)
+register_instance "$TEST_INSTANCE"
+
+RPC_PORT=$(alloc_port)
 
 # Install node for this test
 echo "Installing node '$TEST_INSTANCE'..."
@@ -19,7 +21,7 @@ om install-node \
 	--snapshot \
 	--snapshot-no-check \
 	--snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
-	--rpc-addr "127.0.0.1:18732" \
+	--rpc-addr "127.0.0.1:$RPC_PORT" \
 	--service-user tezos \
 	--no-enable 2>&1 || true
 
@@ -37,8 +39,5 @@ SHOW_OUTPUT=$(om_instance "$TEST_INSTANCE" show 2>&1)
 assert_contains "$SHOW_OUTPUT" "$TEST_INSTANCE" "Should show instance name"
 assert_contains "$SHOW_OUTPUT" "node" "Should show role"
 assert_contains "$SHOW_OUTPUT" "shadownet" "Should show network"
-
-# Cleanup
-cleanup_instance "$TEST_INSTANCE" || true
 
 echo "Show instance test passed"

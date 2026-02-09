@@ -3,19 +3,15 @@
 set -euo pipefail
 source /tests/lib.sh
 
+test_init "Import node with takeover strategy"
+
 INSTANCE="takeover-node"
 DATA_DIR="/var/lib/octez-external/$INSTANCE"
-RPC_ADDR="127.0.0.1:18745"
+RPC_ADDR="127.0.0.1:$(alloc_port)"
 
-echo "Test: Import node with takeover strategy"
-
-# Cleanup
-cleanup_instance "$INSTANCE" || true
-rm -rf "$DATA_DIR" || true
-systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
-systemctl disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
-systemctl daemon-reload
+register_instance "$INSTANCE"
+register_external_service "node" "$INSTANCE"
+register_data_dir "$DATA_DIR"
 
 # Create external service with pre-generated identity
 echo "Creating external systemd service..."
@@ -64,11 +60,5 @@ if [ ! -d "$DATA_DIR" ]; then
 	echo "ERROR: Data directory should be preserved"
 	exit 1
 fi
-
-echo "Service successfully imported with takeover"
-
-# Cleanup
-cleanup_instance "$INSTANCE"
-rm -rf "$DATA_DIR"
 
 echo "Takeover import test passed"
