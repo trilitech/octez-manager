@@ -28,11 +28,6 @@ let curated_defaults : node_info list =
       network = Some "mainnet";
     };
     {
-      label = "Tezos Ghostnet";
-      rpc_addr = "https://rpc.ghostnet.teztnets.com";
-      network = Some "ghostnet";
-    };
-    {
       label = "SmartPy";
       rpc_addr = "https://mainnet.smartpy.io";
       network = Some "mainnet";
@@ -40,7 +35,7 @@ let curated_defaults : node_info list =
   ]
 
 (** Extract network name from RPC URL when not explicitly provided.
-    Looks for common patterns like "mainnet.domain.com" or "https://ghostnet.domain.com" *)
+    Looks for common patterns like "mainnet.domain.com" or "https://shadownet.domain.com" *)
 let extract_network_from_url (url : string) : string option =
   let lower_url = String.lowercase_ascii url in
   (* Simple substring check *)
@@ -72,7 +67,6 @@ let extract_network_from_url (url : string) : string option =
       let known_networks =
         [
           "mainnet";
-          "ghostnet";
           "shadownet";
           "tallinnnet";
           "weeklynet";

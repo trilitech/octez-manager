@@ -15,7 +15,7 @@ let test_parse_old_format () =
   let json =
     {|[
       {"name": "Mainnet Node", "rpc": "https://mainnet.example.com", "network": "mainnet"},
-      {"name": "Ghostnet Node", "rpc_url": "https://ghostnet.example.com", "network": "ghostnet"}
+      {"name": "Shadownet Node", "rpc_url": "https://shadownet.example.com", "network": "shadownet"}
     ]|}
   in
   let nodes = Rpc_node_selection.parse_taquito_json json in
@@ -26,10 +26,10 @@ let test_parse_old_format () =
   Alcotest.(check bool) "first is_public" true n0.is_public ;
   Alcotest.(check (option string)) "first network" (Some "mainnet") n0.network ;
   let n1 = List.nth nodes 1 in
-  Alcotest.(check string) "second label" "Ghostnet Node" n1.label ;
+  Alcotest.(check string) "second label" "Shadownet Node" n1.label ;
   Alcotest.(check string)
     "second rpc (rpc_url)"
-    "https://ghostnet.example.com"
+    "https://shadownet.example.com"
     n1.rpc_addr
 
 let test_parse_old_format_no_name () =
@@ -64,7 +64,7 @@ let test_parse_taquito_format () =
       "rpc_endpoints": [
         {"url": "https://mainnet.ecad.io", "provider": "ecad", "net": "mainnet"},
         {"url": "https://mainnet.smartpy.io", "provider": "smart", "net": "mainnet"},
-        {"url": "https://ghostnet.ecad.io", "provider": "ecad", "net": "ghostnet"}
+        {"url": "https://shadownet.ecad.io", "provider": "ecad", "net": "shadownet"}
       ]
     }|}
   in
