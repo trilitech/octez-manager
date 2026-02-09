@@ -99,10 +99,15 @@ let load_available_versions () =
           not (List.mem v.version managed))
         filtered_versions
 
-let build_items _managed registered available expanded_majors =
+let build_items managed registered available expanded_majors =
   let items = ref [] in
-  items := RegisterAction :: !items ;
+  (* Managed versions first (matches render order in view) *)
+  List.iter
+    (fun (v, s, c) -> items := ManagedVersion (v, s, c) :: !items)
+    managed ;
+  (* Registered directories *)
   List.iter (fun (ld, c) -> items := RegisteredDir (ld, c) :: !items) registered ;
+  (* Register action button *)
   items := RegisterAction :: !items ;
 
   (* Group available versions by major version *)
