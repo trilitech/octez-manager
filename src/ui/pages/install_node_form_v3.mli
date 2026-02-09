@@ -49,4 +49,8 @@ module For_tests : sig
       history mode for the given [network]. Returns [true] on conflict. *)
   val history_snapshot_conflict :
     history_mode:string -> snapshot:snapshot_selection -> network:string -> bool
+
+  (** Generate instance name from network and history mode.
+      Format: node-{network} for rolling, node-{network}-{history_mode} for full/archive *)
+  val generate_instance_name : network:string -> history_mode:string -> string
 end

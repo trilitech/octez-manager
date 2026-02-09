@@ -10,6 +10,7 @@ module Help_parser = Octez_manager_lib.Help_parser
 open Installer_types
 module Binary_help_explorer = Octez_manager_ui.Binary_help_explorer
 module Install_node_form_v3 = Octez_manager_ui.Install_node_form_v3
+module Install_node_form = Octez_manager_ui.Install_node_form_v3
 module Install_baker_form_v3 = Octez_manager_ui.Install_baker_form_v3
 module Cache = Octez_manager_ui.Cache
 
@@ -5127,6 +5128,59 @@ let atomic_downloads_cleanup_stale_temps () =
         true
         (Sys.file_exists fresh_temp))
 
+(* ============================================================ *)
+(* Generate Instance Name *)
+(* ============================================================ *)
+
+let generate_instance_name_weeklynet_with_date () =
+  let name =
+    Install_node_form.For_tests.generate_instance_name
+      ~network:"https://teztnets.com/weeklynet-2026-02-04"
+      ~history_mode:"rolling"
+  in
+  Alcotest.(check string)
+    "weeklynet with full date"
+    "node-weeklynet-2026-02-04"
+    name
+
+let generate_instance_name_mainnet () =
+  let name =
+    Install_node_form.For_tests.generate_instance_name
+      ~network:"mainnet"
+      ~history_mode:"rolling"
+  in
+  Alcotest.(check string) "mainnet rolling" "node-mainnet" name
+
+let generate_instance_name_with_history_mode () =
+  let name =
+    Install_node_form.For_tests.generate_instance_name
+      ~network:"shadownet"
+      ~history_mode:"full"
+  in
+  Alcotest.(check string) "shadownet full" "node-shadownet-full" name
+
+let generate_instance_name_from_url () =
+  let name =
+    Install_node_form.For_tests.generate_instance_name
+      ~network:"https://teztnets.com/shadownet"
+      ~history_mode:"archive"
+  in
+  Alcotest.(check string)
+    "extracts network from URL"
+    "node-shadownet-archive"
+    name
+
+let generate_instance_name_long_network () =
+  let name =
+    Install_node_form.For_tests.generate_instance_name
+      ~network:"very-long-network-name-that-exceeds-thirty-characters"
+      ~history_mode:"rolling"
+  in
+  Alcotest.(check string)
+    "truncates to 30 chars"
+    "node-very-long-network-name-that-ex"
+    name
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -5927,5 +5981,22 @@ let () =
             "cleanup_stale_temp_dirs"
             `Quick
             atomic_downloads_cleanup_stale_temps;
+        ] );
+      ( "generate_instance_name",
+        [
+          Alcotest.test_case
+            "weeklynet_with_date"
+            `Quick
+            generate_instance_name_weeklynet_with_date;
+          Alcotest.test_case "mainnet" `Quick generate_instance_name_mainnet;
+          Alcotest.test_case
+            "with_history_mode"
+            `Quick
+            generate_instance_name_with_history_mode;
+          Alcotest.test_case "from_url" `Quick generate_instance_name_from_url;
+          Alcotest.test_case
+            "long_network"
+            `Quick
+            generate_instance_name_long_network;
         ] );
     ]
