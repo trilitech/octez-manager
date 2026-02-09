@@ -83,19 +83,28 @@ let init () =
   in
   let state = State.init ~instances:nodes in
   state_ref := Some state ;
+  (* Kick off initial async entry fetch *)
+  Actions.fetch_entries_async state ~on_done:update_state ;
   Navigation.make state
 
 let update ps _ = ps
 
 let refresh ps =
   match !state_ref with
-  | Some s ->
-      let new_state = Actions.fetch_entries_sync s in
-      state_ref := Some new_state ;
-      Navigation.update (fun _ -> new_state) ps
+  | Some s -> Navigation.update (fun _ -> s) ps
   | None -> ps
 
 let move _ps _n = refresh _ps
+
+(** Trigger an async refresh of entries for the current path. *)
+let manual_refresh ps =
+  match !state_ref with
+  | Some s ->
+      let loading_state = State.set_loading true s in
+      update_state loading_state ;
+      Actions.fetch_entries_async loading_state ~on_done:update_state ;
+      Navigation.update (fun _ -> loading_state) ps
+  | None -> ps
 
 let service_select ps _idx = ps
 
@@ -111,15 +120,15 @@ let back ps =
           State.mode = State.List {entries = []; cursor = 0; loading = true};
         }
       in
-      let new_state = Actions.fetch_entries_sync new_state in
-      state_ref := Some new_state ;
+      update_state new_state ;
+      Actions.fetch_entries_async new_state ~on_done:update_state ;
       Navigation.update (fun _ -> new_state) ps
   | State.List _ ->
       if s.State.path = [] then Navigation.back ps
       else
         let new_state = State.navigate_up s in
-        let new_state = Actions.fetch_entries_sync new_state in
-        state_ref := Some new_state ;
+        update_state new_state ;
+        Actions.fetch_entries_async new_state ~on_done:update_state ;
         Navigation.update (fun _ -> new_state) ps
 
 let handled_keys () =
@@ -132,8 +141,8 @@ let cycle_instance ps =
   match s.State.mode with
   | State.List _ ->
       let new_state = Actions.cycle_instance ~delta:1 s in
-      let new_state = Actions.fetch_entries_sync new_state in
-      state_ref := Some new_state ;
+      update_state new_state ;
+      Actions.fetch_entries_async new_state ~on_done:update_state ;
       Navigation.update (fun _ -> new_state) ps
   | State.Result _ ->
       (* Cycle through pagers in Result mode *)
@@ -392,7 +401,7 @@ let handle_key ps key ~size =
                     state_ref := Some new_state ;
                     Navigation.update (fun _ -> new_state) ps
                 | Some (Keys.Char "u") | Some Keys.Backspace -> back ps
-                | Some (Keys.Char "r") -> refresh ps
+                | Some (Keys.Char "r") -> manual_refresh ps
                 | Some Keys.Tab -> cycle_instance ps
                 | _ -> ps)
           | State.Result _ -> (

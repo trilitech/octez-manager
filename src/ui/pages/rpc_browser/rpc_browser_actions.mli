@@ -55,12 +55,6 @@ val handle_enter :
     @param path Path segments *)
 val build_rpc_url : Service.t -> string list -> string
 
-(** Execute GET request for current path.
-    @param state Current state
-    @param on_update Callback to update state *)
-val execute_get :
-  Rpc_browser_state.state -> (Rpc_browser_state.state -> unit) -> unit
-
 (** {1 Dynamic Value Prompts} *)
 
 (** Get smart default for dynamic segment.
@@ -100,9 +94,12 @@ val cycle_instance :
 (** Fetch entries for current path synchronously. *)
 val fetch_entries_sync : Rpc_browser_state.state -> Rpc_browser_state.state
 
-(** Fetch entries for current path and call update callback. *)
-val fetch_entries :
-  Rpc_browser_state.state -> (Rpc_browser_state.state -> unit) -> unit
+(** Fetch entries for current path asynchronously.
+    Submits the blocking RPC describe call to the background worker pool.
+    When complete, calls [on_done] with the updated state.
+    The caller should set [loading = true] before calling this. *)
+val fetch_entries_async :
+  Rpc_browser_state.state -> on_done:(Rpc_browser_state.state -> unit) -> unit
 
 (** {1 Quick Access Shortcuts} *)
 
