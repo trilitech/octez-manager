@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     libgmp-dev \
+    libsqlite3-dev \
     m4 \
     pkg-config \
     curl \
@@ -42,7 +43,8 @@ RUN eval $(opam env) && \
     linenoise \
     ppx_deriving \
     alcotest \
-    bisect_ppx
+    bisect_ppx \
+    sqlite3
 
 # Install miaou packages (pre-pinned to avoid git cloning on every CI run)
 # This saves ~2 minutes per build by having miaou already available
