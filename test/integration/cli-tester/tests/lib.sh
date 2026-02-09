@@ -416,8 +416,8 @@ _HARNESS_INITIALIZED=0
 _HARNESS_TEST_NAME=""
 
 # Port allocation state
-_HARNESS_PORT_COUNTER=0
 _HARNESS_PORT_BASE=0
+_HARNESS_PORT_FILE=""
 
 # Initialize the test harness. Must be called before any register_* calls.
 # Sets up a trap handler that cleans all registered resources on EXIT.
@@ -445,7 +445,8 @@ test_init() {
 	local hash
 	hash=$(echo -n "$script_path" | cksum | awk '{print $1}')
 	_HARNESS_PORT_BASE=$((19000 + (hash % 3000) * 10))
-	_HARNESS_PORT_COUNTER=0
+	_HARNESS_PORT_FILE=$(mktemp /tmp/harness-port-XXXXXX)
+	echo "0" >"$_HARNESS_PORT_FILE"
 
 	echo "Test: $description"
 
@@ -463,9 +464,12 @@ alloc_port() {
 		echo "ERROR: alloc_port called before test_init" >&2
 		return 1
 	fi
-	local port=$((_HARNESS_PORT_BASE + _HARNESS_PORT_COUNTER))
-	_HARNESS_PORT_COUNTER=$((_HARNESS_PORT_COUNTER + 1))
-	if [ "$_HARNESS_PORT_COUNTER" -gt 9 ]; then
+	# Read and increment counter from file to survive $() subshells
+	local counter
+	counter=$(cat "$_HARNESS_PORT_FILE")
+	echo $((counter + 1)) >"$_HARNESS_PORT_FILE"
+	local port=$((_HARNESS_PORT_BASE + counter))
+	if [ "$counter" -ge 10 ]; then
 		echo "WARNING: test allocated more than 10 ports" >&2
 	fi
 	echo "$port"
@@ -577,6 +581,9 @@ _harness_cleanup() {
 	for dir in "${_HARNESS_DATA_DIRS[@]}"; do
 		rm -rf "$dir" || true
 	done
+
+	# Clean up port counter file
+	rm -f "$_HARNESS_PORT_FILE" || true
 
 	return "$exit_code"
 }
