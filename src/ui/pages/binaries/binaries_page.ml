@@ -167,7 +167,7 @@ let handle_key ps key ~size:_ =
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
-let handled_keys () = Miaou.Core.Keys.[Escape]
+let handled_keys () = Miaou.Core.Keys.[Escape; Up; Down]
 
 let keymap _ =
   let noop ps = ps in
