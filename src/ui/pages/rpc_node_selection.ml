@@ -91,6 +91,43 @@ let fetch_public_nodes () : node_item list * string option =
   in
   (node_items, None)
 
+(** Extract simple network name from network URL or alias.
+    E.g., "https://teztnets.com/shadownet" -> "shadownet", "mainnet" -> "mainnet" *)
+let extract_network_name (network_str : string) : string =
+  let lower = String.lowercase_ascii network_str in
+  (* Check if it's already a simple alias *)
+  if
+    List.mem
+      lower
+      [
+        "mainnet";
+        "shadownet";
+        "tallinnnet";
+        "weeklynet";
+        "dailynet";
+        "mondaynet";
+      ]
+  then network_str
+  else
+    (* Try to extract from URL - look for network patterns *)
+    let known_networks =
+      [
+        "mainnet";
+        "shadownet";
+        "tallinnnet";
+        "weeklynet";
+        "dailynet";
+        "mondaynet";
+      ]
+    in
+    match
+      List.find_opt
+        (fun net -> Str.string_match (Str.regexp (".*" ^ net)) lower 0)
+        known_networks
+    with
+    | Some name -> name
+    | None -> network_str
+
 (** Load local node instances *)
 let load_local_instances () : node_item list =
   let service_states = Data.load_service_states () in
@@ -106,7 +143,7 @@ let load_local_instances () : node_item list =
             label = svc.Service.instance;
             rpc_addr = Rpc_addr.to_string svc.Service.rpc_addr;
             is_public = false;
-            network = Some svc.Service.network;
+            network = Some (extract_network_name svc.Service.network);
           }
       else None)
     service_states
