@@ -137,7 +137,7 @@ let install_unit ?(quiet = false) ~role ~app_bin_dir ~user () =
     ()
 
 let write_dropin ?quiet ~role ~inst ~data_dir ~logging_mode ?extra_paths
-    ?depends_on () =
+    ?app_bin_dir ?depends_on () =
   Systemd_dropin.write_dropin
     ?quiet
     ~dropin_dir
@@ -149,10 +149,11 @@ let write_dropin ?quiet ~role ~inst ~data_dir ~logging_mode ?extra_paths
     ~data_dir
     ~logging_mode
     ?extra_paths
+    ?app_bin_dir
     ?depends_on
     ()
 
-let write_dropin_node ?quiet ~inst ~data_dir ~logging_mode () =
+let write_dropin_node ?quiet ~inst ~data_dir ~logging_mode ?app_bin_dir () =
   Systemd_dropin.write_dropin_node
     ?quiet
     ~dropin_dir
@@ -162,6 +163,7 @@ let write_dropin_node ?quiet ~inst ~data_dir ~logging_mode () =
     ~inst
     ~data_dir
     ~logging_mode
+    ?app_bin_dir
     ()
 
 let render_logging_lines = Systemd_dropin.render_logging_lines

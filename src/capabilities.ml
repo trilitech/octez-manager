@@ -105,11 +105,12 @@ module Service_lifecycle_impl = struct
     Systemd.install_unit ~role ~app_bin_dir ~user ()
     |> Result.map_error (function `Msg m -> m)
 
-  let write_dropin_node ~inst ~data_dir ~app_bin_dir:_ =
+  let write_dropin_node ~inst ~data_dir ~app_bin_dir =
     Systemd.write_dropin_node
       ~inst
       ~data_dir
       ~logging_mode:Logging_mode.default
+      ?app_bin_dir
       ()
     |> Result.map_error (function `Msg m -> m)
 

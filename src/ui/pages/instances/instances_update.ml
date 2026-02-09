@@ -158,6 +158,18 @@ and do_update_single_service ~svc ~old_bin_source ~new_bin_source () =
           ()
       in
 
+      (* Update the per-instance dropin to override APP_BIN_DIR *)
+      let* () =
+        Systemd.write_dropin
+          ~quiet:true
+          ~role
+          ~inst:instance
+          ~data_dir:svc.Service.data_dir
+          ~logging_mode:svc.Service.logging_mode
+          ~app_bin_dir:new_path
+          ()
+      in
+
       (* Try to start the service *)
       let cap = Miaou_interfaces.Service_lifecycle.require () in
       match
@@ -243,6 +255,18 @@ and do_rollback ~svc ~old_bin_source () =
       ~role
       ~app_bin_dir:old_path
       ~user:svc.Service.service_user
+      ()
+  in
+
+  (* Update the per-instance dropin to override APP_BIN_DIR *)
+  let* () =
+    Systemd.write_dropin
+      ~quiet:true
+      ~role
+      ~inst:instance
+      ~data_dir:svc.Service.data_dir
+      ~logging_mode:svc.Service.logging_mode
+      ~app_bin_dir:old_path
       ()
   in
 
@@ -374,6 +398,16 @@ and do_cascade_update ~services ~new_bin_source () =
                              ~role:updated_svc.Service.role
                              ~app_bin_dir:old_path
                              ~user:updated_svc.Service.service_user
+                             ()) ;
+                        (* Update per-instance dropin with restored APP_BIN_DIR *)
+                        ignore
+                          (Systemd.write_dropin
+                             ~quiet:true
+                             ~role:updated_svc.Service.role
+                             ~inst
+                             ~data_dir:updated_svc.Service.data_dir
+                             ~logging_mode:updated_svc.Service.logging_mode
+                             ~app_bin_dir:old_path
                              ()))
               acc_updated ;
             e)
@@ -390,14 +424,7 @@ let update_version_modal svc =
     | Binary_registry.Managed_version v -> Some v
     | Binary_registry.Registered_alias _ | Binary_registry.Raw_path _ ->
         (* Try to get version from the actual binary *)
-        let binary_name =
-          match svc.Service.role with
-          | "node" -> "octez-node"
-          | "baker" -> "octez-baker"
-          | "accuser" -> "octez-accuser"
-          | "dal-node" | "dal" -> "octez-dal-node"
-          | _ -> "octez-node" (* fallback *)
-        in
+        let binary_name = Systemd_unit_template.role_binary svc.Service.role in
         let binary_path = Filename.concat svc.Service.app_bin_dir binary_name in
         if Sys.file_exists binary_path then
           match Cmd_runner.run_out [binary_path; "--version"] with
@@ -540,12 +567,7 @@ module For_tests = struct
     with Not_found -> None
 
   (** Map a service role to its binary name *)
-  let role_to_binary_name = function
-    | "node" -> "octez-node"
-    | "baker" -> "octez-baker"
-    | "accuser" -> "octez-accuser"
-    | "dal-node" | "dal" -> "octez-dal-node"
-    | _ -> "octez-node"
+  let role_to_binary_name = Systemd_unit_template.role_binary
 
   (** BFS to collect all transitive dependents, parameterized on deps lookup.
       Returns the accumulated dependent services (not the root). *)

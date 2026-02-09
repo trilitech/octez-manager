@@ -86,6 +86,7 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~data_dir:request.data_dir
       ~logging_mode
       ~extra_paths:request.extra_paths
+      ~app_bin_dir:request.app_bin_dir
       ?depends_on:depends_on_for_systemd
       ()
   in

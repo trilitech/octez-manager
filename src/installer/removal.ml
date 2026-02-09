@@ -169,6 +169,7 @@ let cleanup_renamed_instance ?(quiet = false) ~old_instance ~new_instance () =
                   ~data_dir:dep_svc.Service.data_dir
                   ~logging_mode:dep_svc.Service.logging_mode
                   ~extra_paths:[]
+                  ~app_bin_dir:dep_svc.Service.app_bin_dir
                   ~depends_on:(old_svc.role, new_instance)
                   ()
             | _ -> Ok ())
