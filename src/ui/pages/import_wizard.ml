@@ -167,6 +167,7 @@ and start_import ps =
           | Job_manager.Failed msg ->
               Context.toast_error (Printf.sprintf "Import failed: %s" msg)
           | Job_manager.Pending | Job_manager.Running -> ())
+        ~timeout:None
         ~description:"Import external service"
         import_task ;
       Navigation.update (fun s -> {s with step = Importing; error = None}) ps
