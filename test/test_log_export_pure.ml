@@ -55,9 +55,9 @@ let test_details_contains_role () =
   check bool "contains role" true (contains_substring result "baker")
 
 let test_details_contains_network () =
-  let svc = make_svc ~network:"ghostnet" () in
+  let svc = make_svc ~network:"shadownet" () in
   let result = LE.For_tests.get_instance_details ~svc in
-  check bool "contains network" true (contains_substring result "ghostnet")
+  check bool "contains network" true (contains_substring result "shadownet")
 
 let test_details_contains_history_mode () =
   let svc = make_svc ~history_mode:Octez_manager_lib.History_mode.Full () in

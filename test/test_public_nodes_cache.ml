@@ -15,7 +15,7 @@ let test_parse_simple_list () =
   let json =
     {|[
       {"rpc": "https://mainnet.ecadinfra.com", "name": "ECAD Infra", "network": "mainnet"},
-      {"rpc": "https://ghostnet.tezos.com", "name": "Ghostnet", "network": "ghostnet"}
+      {"rpc": "https://shadownet.tezos.com", "name": "Shadownet", "network": "shadownet"}
     ]|}
   in
   let nodes = Public_nodes_cache.parse_taquito_json json in
