@@ -18,6 +18,15 @@ let parallel_submit_ref : ((unit -> unit) -> unit) Atomic.t =
 
 let set_parallel_submit f = Atomic.set parallel_submit_ref f
 
+(** Yield hook for cooperative scheduling.
+    In CLI mode (Domain.spawn), Thread.yield is sufficient.
+    In TUI mode (Eio domain pool), this must be set to Eio_unix.sleep
+    so that the Eio event loop can run other fibers while we poll. *)
+let yield_hook : (unit -> unit) Atomic.t =
+  Atomic.make (fun () -> Thread.yield ())
+
+let set_yield_hook f = Atomic.set yield_hook f
+
 (** Utilities *)
 
 let iso8601_now () =
@@ -453,18 +462,14 @@ let download_version ~version ?(verify_checksums = true) ?progress
       let n = List.length download_tasks in
       let results = Array.make n (Error (`Msg "not started")) in
       let remaining = Atomic.make n in
-      let mu = Mutex.create () in
-      let cond = Condition.create () in
       let submit_fn = Atomic.get parallel_submit_ref in
+      let yield_fn = Atomic.get yield_hook in
       List.iteri
         (fun i (binary, _index, progress_for_file) ->
           submit_fn (fun () ->
               Fun.protect
                 ~finally:(fun () ->
-                  if Atomic.fetch_and_add remaining (-1) = 1 then (
-                    Mutex.lock mu ;
-                    Condition.broadcast cond ;
-                    Mutex.unlock mu))
+                  ignore (Atomic.fetch_and_add remaining (-1)))
                 (fun () ->
                   let r =
                     download_binary
@@ -477,12 +482,14 @@ let download_version ~version ?(verify_checksums = true) ?progress
                   in
                   results.(i) <- Result.map (fun _ -> binary) r)))
         download_tasks ;
-      (* Wait for all downloads to complete *)
-      Mutex.lock mu ;
+      (* Wait for all downloads to complete.
+         We use a cooperative polling loop instead of Mutex/Condition
+         because the latter blocks the OS thread, which would freeze
+         the Eio event loop on the current domain and deadlock any
+         download task that was scheduled on the same domain. *)
       while Atomic.get remaining > 0 do
-        Condition.wait cond mu
+        yield_fn ()
       done ;
-      Mutex.unlock mu ;
       (* Collect: first error wins, or all binaries *)
       let rec collect acc i =
         if i >= n then Ok (List.rev acc)
