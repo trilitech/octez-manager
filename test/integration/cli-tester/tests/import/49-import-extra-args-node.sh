@@ -3,19 +3,15 @@
 set -euo pipefail
 source /tests/lib.sh
 
+test_init "Import node with extra args"
+
 INSTANCE="extraargs-node"
 DATA_DIR="/var/lib/octez-external/$INSTANCE"
-RPC_ADDR="127.0.0.1:18749"
+RPC_ADDR="127.0.0.1:$(alloc_port)"
 
-echo "Test: Import node with extra args"
-
-# Cleanup
-cleanup_instance "$INSTANCE" || true
-rm -rf "$DATA_DIR" || true
-systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
-systemctl disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
-systemctl daemon-reload
+register_instance "$INSTANCE"
+register_external_service "node" "$INSTANCE"
+register_data_dir "$DATA_DIR"
 
 # Create external service with custom flags
 echo "Creating external service with extra args..."
@@ -68,11 +64,5 @@ fi
 # TODO: Verify extra_args are preserved in metadata
 # This would require checking the service JSON or testing that the service
 # can be started with all its original flags
-
-echo "Extra args import test completed"
-
-# Cleanup
-cleanup_instance "$INSTANCE"
-rm -rf "$DATA_DIR"
 
 echo "Extra args node test passed"

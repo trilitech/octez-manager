@@ -7,15 +7,18 @@ INSTANCE="test-purge"
 DATA_DIR="/var/lib/octez/$INSTANCE"
 ENV_DIR="/etc/octez/instances/$INSTANCE"
 
-echo "Test: Purge removes instance and data directory"
+test_init "Purge removes instance and data directory"
 
-cleanup_instance "$INSTANCE" || true
+register_instance "$INSTANCE"
+
+RPC_PORT=$(alloc_port)
+NET_PORT=$(alloc_port)
 
 # Install node
 om install-node \
 	--instance "$INSTANCE" \
 	--network shadownet \
-	--rpc-addr "127.0.0.1:8739" --net-addr "0.0.0.0:9739" \
+	--rpc-addr "127.0.0.1:$RPC_PORT" --net-addr "0.0.0.0:$NET_PORT" \
 	--service-user tezos \
 	--no-enable 2>&1
 

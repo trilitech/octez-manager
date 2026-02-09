@@ -4,28 +4,30 @@
 set -euo pipefail
 source /tests/lib.sh
 
+test_init "Accuser start/stop lifecycle"
+
 NODE_INSTANCE="test-accuser-lifecycle-node"
 ACCUSER_INSTANCE="test-accuser-lifecycle"
-NODE_RPC="127.0.0.1:18771"
-NODE_NET="0.0.0.0:19791"
+RPC_PORT=$(alloc_port)
+NET_PORT=$(alloc_port)
+NODE_RPC="127.0.0.1:$RPC_PORT"
+NODE_NET="0.0.0.0:$NET_PORT"
 
-echo "Test: Accuser start/stop lifecycle"
-
-cleanup_instance "$ACCUSER_INSTANCE" || true
-cleanup_instance "$NODE_INSTANCE" || true
+register_instance "$ACCUSER_INSTANCE"
+register_instance "$NODE_INSTANCE"
 
 # Install node with snapshot
 echo "Installing node with snapshot..."
 om install-node \
-    --instance "$NODE_INSTANCE" \
-    --network shadownet \
-    --snapshot \
-    --snapshot-no-check \
-    --snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
-    --rpc-addr "$NODE_RPC" \
-    --net-addr "$NODE_NET" \
-    --service-user tezos \
-    --no-enable 2>&1
+	--instance "$NODE_INSTANCE" \
+	--network shadownet \
+	--snapshot \
+	--snapshot-no-check \
+	--snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
+	--rpc-addr "$NODE_RPC" \
+	--net-addr "$NODE_NET" \
+	--service-user tezos \
+	--no-enable 2>&1
 
 # Inject pre-generated identity to skip PoW
 inject_identity "$NODE_INSTANCE"
@@ -36,26 +38,26 @@ om instance "$NODE_INSTANCE" start
 
 # Wait for node to be ready
 if ! wait_for_service_active "node" "$NODE_INSTANCE" 30; then
-    echo "ERROR: Node service did not start"
-    show_service_logs "node" "$NODE_INSTANCE" 50
-    exit 1
+	echo "ERROR: Node service did not start"
+	show_service_logs "node" "$NODE_INSTANCE" 50
+	exit 1
 fi
 
 # Wait for node RPC
 if ! wait_for_node_ready "$NODE_RPC" 60; then
-    echo "ERROR: Node RPC not ready"
-    show_service_logs "node" "$NODE_INSTANCE" 50
-    exit 1
+	echo "ERROR: Node RPC not ready"
+	show_service_logs "node" "$NODE_INSTANCE" 50
+	exit 1
 fi
 echo "Node is ready"
 
 # Install accuser
 echo "Installing accuser..."
 om install-accuser \
-    --instance "$ACCUSER_INSTANCE" \
-    --node-instance "$NODE_INSTANCE" \
-    --service-user tezos \
-    --no-enable 2>&1
+	--instance "$ACCUSER_INSTANCE" \
+	--node-instance "$NODE_INSTANCE" \
+	--service-user tezos \
+	--no-enable 2>&1
 
 # Get the base dir from env file
 ENV_FILE="/etc/octez/instances/$ACCUSER_INSTANCE/node.env"
@@ -68,9 +70,9 @@ om instance "$ACCUSER_INSTANCE" start
 
 # Wait for accuser service to be active
 if ! wait_for_service_active "accuser" "$ACCUSER_INSTANCE" 30; then
-    echo "ERROR: Accuser service did not start"
-    show_service_logs "accuser" "$ACCUSER_INSTANCE" 50
-    exit 1
+	echo "ERROR: Accuser service did not start"
+	show_service_logs "accuser" "$ACCUSER_INSTANCE" 50
+	exit 1
 fi
 echo "Accuser service is active"
 
@@ -79,9 +81,9 @@ sleep 10
 
 # Check accuser is still running (didn't crash immediately)
 if ! service_is_active "accuser" "$ACCUSER_INSTANCE"; then
-    echo "ERROR: Accuser service crashed after startup"
-    show_service_logs "accuser" "$ACCUSER_INSTANCE" 50
-    exit 1
+	echo "ERROR: Accuser service crashed after startup"
+	show_service_logs "accuser" "$ACCUSER_INSTANCE" 50
+	exit 1
 fi
 echo "Accuser service stable"
 
@@ -89,22 +91,22 @@ echo "Accuser service stable"
 echo "=== Log directory discovery ==="
 echo "Checking $BASE_DIR/logs/ ..."
 if [ -d "$BASE_DIR/logs" ]; then
-    echo "Contents of $BASE_DIR/logs/:"
-    ls -la "$BASE_DIR/logs/" || true
+	echo "Contents of $BASE_DIR/logs/:"
+	ls -la "$BASE_DIR/logs/" || true
 
-    # Check for octez-accuser
-    if [ -d "$BASE_DIR/logs/octez-accuser" ]; then
-        echo "FOUND: $BASE_DIR/logs/octez-accuser/"
-        ls -la "$BASE_DIR/logs/octez-accuser/" || true
-    fi
+	# Check for octez-accuser
+	if [ -d "$BASE_DIR/logs/octez-accuser" ]; then
+		echo "FOUND: $BASE_DIR/logs/octez-accuser/"
+		ls -la "$BASE_DIR/logs/octez-accuser/" || true
+	fi
 
-    # Check for octez-baker
-    if [ -d "$BASE_DIR/logs/octez-baker" ]; then
-        echo "FOUND: $BASE_DIR/logs/octez-baker/"
-        ls -la "$BASE_DIR/logs/octez-baker/" || true
-    fi
+	# Check for octez-baker
+	if [ -d "$BASE_DIR/logs/octez-baker" ]; then
+		echo "FOUND: $BASE_DIR/logs/octez-baker/"
+		ls -la "$BASE_DIR/logs/octez-baker/" || true
+	fi
 else
-    echo "No logs directory at $BASE_DIR/logs/"
+	echo "No logs directory at $BASE_DIR/logs/"
 fi
 
 # Also check base_dir directly
@@ -118,8 +120,8 @@ echo "Stopping accuser..."
 om instance "$ACCUSER_INSTANCE" stop
 
 if ! wait_for_service_stopped "accuser" "$ACCUSER_INSTANCE" 30; then
-    echo "ERROR: Accuser service did not stop"
-    exit 1
+	echo "ERROR: Accuser service did not stop"
+	exit 1
 fi
 echo "Accuser service stopped"
 
@@ -127,9 +129,5 @@ echo "Accuser service stopped"
 echo "Stopping node..."
 om instance "$NODE_INSTANCE" stop
 wait_for_service_stopped "node" "$NODE_INSTANCE" 30
-
-# Cleanup
-cleanup_instance "$ACCUSER_INSTANCE"
-cleanup_instance "$NODE_INSTANCE"
 
 echo "Accuser start/stop lifecycle test passed"

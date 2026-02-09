@@ -5,7 +5,7 @@
 set -euo pipefail
 source /tests/lib.sh
 
-echo "Test: Validate remote version list has multiple major versions"
+test_init "Validate remote version list has multiple major versions"
 
 # Fetch available versions
 echo "Fetching available versions..."
