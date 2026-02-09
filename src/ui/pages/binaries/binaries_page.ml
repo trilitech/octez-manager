@@ -255,7 +255,15 @@ struct
       ]
 end
 
-let page = (module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG)
+module Page =
+  Monitored_page.Make
+    (Page_Impl)
+    (struct
+      let page_name = "binaries"
+    end)
+
+let page : Miaou.Core.Registry.page =
+  (module Page : Miaou.Core.Tui_page.PAGE_SIG)
 
 let register () =
   if not (Miaou.Core.Registry.exists name) then

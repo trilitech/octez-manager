@@ -75,15 +75,17 @@ let is_register_action = function BP.RegisterAction -> true | _ -> false
 
 let is_registered_dir = function BP.RegisteredDir _ -> true | _ -> false
 
+let is_managed_version = function BP.ManagedVersion _ -> true | _ -> false
+
 let is_major_group = function BP.AvailableMajorGroup _ -> true | _ -> false
 
 let is_available_version = function BP.AvailableVersion _ -> true | _ -> false
 
 let test_build_items_empty () =
   let items = BP.For_tests.build_items [] [] [] [] in
-  (* Two RegisterAction entries, nothing else *)
-  check int "two register actions" 2 (count_item_type items is_register_action) ;
-  check int "total items" 2 (List.length items)
+  (* One RegisterAction entry, nothing else *)
+  check int "one register action" 1 (count_item_type items is_register_action) ;
+  check int "total items" 1 (List.length items)
 
 let test_build_items_with_registered () =
   let reg =
@@ -91,7 +93,16 @@ let test_build_items_with_registered () =
   in
   let items = BP.For_tests.build_items [] reg [] [] in
   check int "two registered dirs" 2 (count_item_type items is_registered_dir) ;
-  check int "two register actions" 2 (count_item_type items is_register_action)
+  check int "one register action" 1 (count_item_type items is_register_action)
+
+let test_build_items_with_managed () =
+  let managed = [("24.0", Some 1000L, 2); ("23.0", Some 500L, 0)] in
+  let items = BP.For_tests.build_items managed [] [] [] in
+  check int "two managed versions" 2 (count_item_type items is_managed_version) ;
+  check int "one register action" 1 (count_item_type items is_register_action) ;
+  (* Managed versions appear before RegisterAction *)
+  let first = List.hd items in
+  check bool "first is managed" true (is_managed_version first)
 
 let test_build_items_with_available () =
   let available = [mk_version "24.0"; mk_version "24.1"; mk_version "23.0"] in
@@ -140,14 +151,14 @@ let test_move_up_from_nonzero () =
 let test_move_down_from_zero () =
   let s = mk_state () in
   let s' = BP.For_tests.move_down s in
-  (* items has 2 RegisterAction items, max_idx = 1 *)
-  check int "moves to 1" 1 s'.selected
+  (* items has 1 RegisterAction item, max_idx = 0 *)
+  check int "stays at 0" 0 s'.selected
 
 let test_move_down_at_end () =
-  let s = mk_state ~selected:1 () in
-  (* items = [RegisterAction; RegisterAction], max_idx = 1 *)
+  let s = mk_state ~selected:0 () in
+  (* items = [RegisterAction], max_idx = 0 *)
   let s' = BP.For_tests.move_down s in
-  check int "stays at end" 1 s'.selected
+  check int "stays at end" 0 s'.selected
 
 let test_move_down_with_versions () =
   let available = [mk_version "24.0"] in
@@ -272,6 +283,7 @@ let () =
       ( "build_items",
         [
           test_case "empty" `Quick test_build_items_empty;
+          test_case "with managed" `Quick test_build_items_with_managed;
           test_case "with registered" `Quick test_build_items_with_registered;
           test_case "with available" `Quick test_build_items_with_available;
           test_case "expanded major" `Quick test_build_items_expanded_major;
