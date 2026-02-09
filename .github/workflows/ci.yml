@@ -179,6 +179,11 @@ jobs:
       - name: Architecture metrics
         run: |
           eval $(opam env)
+          # Install sqlite3 if not pre-installed in Docker image
+          if ! ocamlfind query sqlite3 > /dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq libsqlite3-dev > /dev/null
+            opam install sqlite3 -y
+          fi
           # Ensure all .cmt/.cmti files exist (the cached _build may be stale)
           dune build @check
           dune exec -- tools/arch_index.exe
