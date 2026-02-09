@@ -58,6 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - RPC Browser: toggling focus in side-by-side result mode now always targets an existing pager ID (avoids invalid focus state after pager removal)
 - Multi-column layout: pressing Up from the first instance now correctly navigates to "Browse RPCs" instead of jumping to "Install new instance"
+- Weeklynet instance names now include the full date (e.g., `node-weeklynet-2026-02-04`) instead of being truncated to `node-weeklynet-2026-0` (fixes #640)
 - Ghostnet network can no longer be selected despite deprecation (removed from all network selection code paths)
 - RPC Browser: Ghostnet URLs no longer appear in public nodes list (previously showed as "Unknown" network)
 - RPC Browser: Local instances now display network name (e.g., "Shadownet") instead of full URL (e.g., "https://teztnets.com/shadownet")
