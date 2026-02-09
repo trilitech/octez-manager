@@ -191,6 +191,17 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_instances_navigation_pure)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
+ (modules test_instances_navigation_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_node_env)
  (libraries alcotest octez_manager_lib unix)
  (modules test_node_env)
