@@ -67,6 +67,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
       OPAMYES: "true"
+      OPAMROOT: /root/.opam
       MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
     steps:
       - name: Checkout
@@ -177,9 +178,7 @@ jobs:
 
       - name: Architecture metrics
         run: |
-          apt-get update -qq && apt-get install -y -qq libsqlite3-dev > /dev/null
           eval $(opam env)
-          opam install sqlite3 -y
           # Ensure all .cmt/.cmti files exist (the cached _build may be stale)
           dune build @check
           dune exec -- tools/arch_index.exe

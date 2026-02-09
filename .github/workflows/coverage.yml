@@ -25,6 +25,7 @@ jobs:
       options: --tty  # Allocate a pseudo-TTY for UI tests
     env:
       OPAMYES: "true"
+      OPAMROOT: /root/.opam
       MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
 
     steps:

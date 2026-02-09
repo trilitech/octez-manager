@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **CI fix**: Fixed opam cache never being used due to HOME directory mismatch between Docker image (`/root/.opam`) and GitHub Actions (`/github/home/.opam`). Set explicit `OPAMROOT=/root/.opam` so the pre-built switch from the Docker image is found. Expected to reduce Build and Test job from ~13 min to ~2-3 min
 - Updated Miaou TUI library to 0.2.6 with new `Key_event.result` API (`on_key`, `on_modal_key`, `key_hints`)
 - Migrated all background I/O from per-task OS domains to a fixed-size Eio fiber pool (head monitors, background runner, binary downloads, and schedulers now share 4 pooled domains)
 - Renamed "linked directories" to "registered directories" (CLI commands: `binaries link` → `binaries register`, `binaries unlink` → `binaries unregister`)
