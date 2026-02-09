@@ -126,6 +126,112 @@ include Instances_render
 (* Action handlers extracted to instances/instances_actions.ml *)
 open Instances_actions
 
+(** Single-column navigation: linear up/down with separator skipping. *)
+let move_selection_single_column s delta =
+  let raw = s.selected + delta in
+  let selected = clamp_selection s.services s.external_services raw in
+  (* Skip separator during navigation *)
+  let selected =
+    if selected = menu_item_count then selected + delta else selected
+  in
+  let selected = clamp_selection s.services s.external_services selected in
+  {s with selected}
+
+(** Multi-column: navigate within the menu area (indices 0..menu_item_count-1).
+    When pressing Down past the last menu item, jump to first service in
+    column 0. *)
+let move_selection_menu s delta =
+  let selected = max 0 (min menu_item_count (s.selected + delta)) in
+  if selected >= menu_item_count && delta > 0 then
+    let first_svc =
+      first_service_in_column ~num_columns:s.num_columns ~services:s.services 0
+    in
+    {s with selected = first_svc + services_start_idx; active_column = 0}
+  else {s with selected}
+
+(** Multi-column: navigate within the external services section
+    (below all column-distributed managed services). *)
+let move_selection_external s delta =
+  let first_external = services_start_idx + List.length s.services in
+  if s.selected = first_external && delta < 0 then
+    (* Moving up from first external service *)
+    if List.length s.services > 0 && s.num_columns > 1 then
+      let col_indices =
+        services_in_column ~num_columns:s.num_columns ~services:s.services 0
+      in
+      match List.rev col_indices with
+      | [] -> {s with selected = menu_item_count - 1; active_column = 0}
+      | last_idx :: _ ->
+          {s with selected = last_idx + services_start_idx; active_column = 0}
+    else if List.length s.services > 0 then
+      let last_managed = services_start_idx + List.length s.services - 1 in
+      {s with selected = last_managed}
+    else {s with selected = menu_item_count - 1}
+  else
+    let raw = s.selected + delta in
+    let selected = clamp_selection s.services s.external_services raw in
+    {s with selected}
+
+(** Multi-column: navigate within managed services, constrained to the
+    active column.  Moving up past the first service goes to the last menu
+    item; moving down past the last service goes to external services. *)
+let move_selection_managed s delta =
+  let current_idx = s.selected - services_start_idx in
+  let col_indices =
+    services_in_column
+      ~num_columns:s.num_columns
+      ~services:s.services
+      s.active_column
+  in
+  let current_pos =
+    List.find_mapi
+      (fun i idx -> if idx = current_idx then Some i else None)
+      col_indices
+    |> Option.value ~default:0
+  in
+  let new_pos = current_pos + delta in
+  if new_pos < 0 then (
+    s.column_scroll.(s.active_column) <- 0 ;
+    {s with selected = menu_item_count - 1})
+  else if new_pos >= List.length col_indices then
+    if List.length s.external_services > 0 then
+      let first_external = services_start_idx + List.length s.services in
+      {s with selected = first_external}
+    else s
+  else
+    let new_idx = List.nth col_indices new_pos in
+    let line_start, line_count =
+      service_line_position
+        ~num_columns:s.num_columns
+        ~services:s.services
+        ~folded:s.folded
+        new_idx
+        s.active_column
+    in
+    adjust_column_scroll
+      ~column_scroll:s.column_scroll
+      ~col:s.active_column
+      ~line_start
+      ~line_count
+      ~visible_height:!last_visible_height_ref ;
+    {s with selected = new_idx + services_start_idx}
+
+(** Move selection up or down by [delta] steps, handling menu items,
+    separator skipping, and multi-column navigation. *)
+let move_selection s delta =
+  if s.services = [] && s.external_services = [] then {s with selected = 0}
+  else if s.num_columns <= 1 then move_selection_single_column s delta
+  else if s.selected < services_start_idx then move_selection_menu s delta
+  else
+    let current_idx = s.selected - services_start_idx in
+    let in_external = current_idx >= List.length s.services in
+    if in_external then move_selection_external s delta
+    else move_selection_managed s delta
+
+module For_tests = struct
+  let move_selection = move_selection
+end
+
 module Page_Impl :
   Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg =
 struct
@@ -540,129 +646,7 @@ Press **Enter** to open instance menu.|}
     lower = "esc" || lower = "escape" || lower = "c-c" || lower = "ctrl+c"
     || lower = "^c" || String.equal key "\003"
 
-  let move_selection s delta =
-    if s.services = [] && s.external_services = [] then
-      (* Only Install button (0) when no services at all - ignore navigation *)
-      {s with selected = 0}
-    else if s.num_columns <= 1 then
-      (* Single column mode: simple linear navigation *)
-      let raw = s.selected + delta in
-      let selected = clamp_selection s.services s.external_services raw in
-      (* Skip separator during navigation *)
-      let selected =
-        if selected = menu_item_count then selected + delta else selected
-      in
-      let selected = clamp_selection s.services s.external_services selected in
-      {s with selected}
-    else if
-      (* Multi-column mode: navigate within current column *)
-      s.selected < services_start_idx
-    then
-      (* In menu area, simple navigation *)
-      let selected = max 0 (min menu_item_count (s.selected + delta)) in
-      (* Jump from menu to first service in first column (column 0) *)
-      if selected >= menu_item_count && delta > 0 then
-        let first_svc =
-          first_service_in_column
-            ~num_columns:s.num_columns
-            ~services:s.services
-            0
-        in
-        {s with selected = first_svc + services_start_idx; active_column = 0}
-      else {s with selected}
-    else
-      (* In services area: stay within column *)
-      let current_idx = s.selected - services_start_idx in
-      (* Check if we're in external services area *)
-      let external_start_idx = List.length s.services in
-      let in_external = current_idx >= external_start_idx in
-      if in_external then
-        (* External services: linear navigation below all columns *)
-        (* Check if moving up from first external service *)
-        let first_external = services_start_idx + List.length s.services in
-        if s.selected = first_external && delta < 0 then
-          (* Move to last service in first column (column 0), or menu if none *)
-          if List.length s.services > 0 && s.num_columns > 1 then
-            (* Multi-column: jump to last service in first column *)
-            let col_indices =
-              services_in_column
-                ~num_columns:s.num_columns
-                ~services:s.services
-                0
-            in
-            match List.rev col_indices with
-            | [] ->
-                (* First column is empty, go to menu *)
-                {s with selected = 0; active_column = 0}
-            | last_idx :: _ ->
-                {
-                  s with
-                  selected = last_idx + services_start_idx;
-                  active_column = 0;
-                }
-          else if List.length s.services > 0 then
-            (* Single-column: jump to last managed service *)
-            let last_managed =
-              services_start_idx + List.length s.services - 1
-            in
-            {s with selected = last_managed}
-          else
-            (* No managed services, jump to menu *)
-            {s with selected = 0}
-        else
-          (* Normal external service navigation *)
-          let raw = s.selected + delta in
-          let selected = clamp_selection s.services s.external_services raw in
-          {s with selected}
-      else
-        (* Managed services: column-based navigation *)
-        let col_indices =
-          services_in_column
-            ~num_columns:s.num_columns
-            ~services:s.services
-            s.active_column
-        in
-        let current_pos =
-          List.find_mapi
-            (fun i idx -> if idx = current_idx then Some i else None)
-            col_indices
-          |> Option.value ~default:0
-        in
-        let new_pos = current_pos + delta in
-        if new_pos < 0 then (
-          (* Moving up from first service goes to Install button *)
-          (* Scroll to top of column *)
-          s.column_scroll.(s.active_column) <- 0 ;
-          {s with selected = 0})
-        else if new_pos >= List.length col_indices then
-          if
-            (* At bottom of managed services column *)
-            List.length s.external_services > 0
-          then
-            (* Jump to first external service *)
-            let first_external = services_start_idx + List.length s.services in
-            {s with selected = first_external}
-          else
-            (* No external services, stay put *)
-            s
-        else
-          let new_idx = List.nth col_indices new_pos in
-          (* Adjust scroll to keep selection visible *)
-          let line_start, line_count =
-            service_line_position
-              ~num_columns:s.num_columns
-              ~services:s.services
-              ~folded:s.folded
-              new_idx
-              s.active_column
-          in
-          adjust_column_scroll
-            ~column_scroll:s.column_scroll
-            ~col:s.active_column
-            ~line_start
-            ~line_count
-            ~visible_height:!last_visible_height_ref ;
-          {s with selected = new_idx + services_start_idx}
+  let move_selection s delta = move_selection s delta
 
   let force_refresh_cmd s = force_refresh s
 

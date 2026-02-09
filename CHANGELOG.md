@@ -53,6 +53,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Multi-column layout: pressing Up from the first instance now correctly navigates to "Browse RPCs" instead of jumping to "Install new instance"
 - Ghostnet network can no longer be selected despite deprecation (removed from all network selection code paths)
 - RPC Browser: Ghostnet URLs no longer appear in public nodes list (previously showed as "Unknown" network)
 - RPC Browser: Local instances now display network name (e.g., "Shadownet") instead of full URL (e.g., "https://teztnets.com/shadownet")
