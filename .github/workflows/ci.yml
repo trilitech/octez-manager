@@ -180,6 +180,8 @@ jobs:
           apt-get update -qq && apt-get install -y -qq libsqlite3-dev > /dev/null
           eval $(opam env)
           opam install sqlite3 -y
+          # Ensure all .cmt/.cmti files exist (the cached _build may be stale)
+          dune build @check
           dune exec -- tools/arch_index.exe
           dune exec tools/arch_query.exe -- metrics -o architecture-metrics.json
           dune exec tools/arch_query.exe -- stats
