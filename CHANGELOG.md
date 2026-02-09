@@ -50,6 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Binaries page: Arrow key navigation now works correctly (Up/Down keys are now properly declared in handled_keys)
 - RPC Browser: Fixed duplicate network names in instance display when selecting target endpoints (fixes #599)
 - Architecture index: intent restoration no longer fails on doc comments containing special characters (used prepared statements instead of string interpolation)
 - System metrics (CPU, memory, disk) start populating without the previous startup delay
