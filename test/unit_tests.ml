@@ -3063,6 +3063,56 @@ let job_manager_submit_and_list () =
   (* But we verified submission works. *)
   ()
 
+let job_manager_timeout_kills_expired_job () =
+  let open Octez_manager_ui in
+  Job_manager.clear_finished () ;
+  (* Create a job that "started" 200 seconds ago with a 120s timeout *)
+  let fake_job : Job_manager.job =
+    {
+      id = 9999;
+      description = "should-timeout";
+      status = Running;
+      started_at = Unix.gettimeofday () -. 200.0;
+      finished_at = None;
+      log = [];
+      phase = "";
+      timeout = Some 120.0;
+    }
+  in
+  Job_manager.For_tests.inject_job fake_job ;
+  Job_manager.tick () ;
+  (match fake_job.status with
+  | Failed msg ->
+      Alcotest.(check bool) "timed out message" true (String.length msg > 0)
+  | _ -> Alcotest.fail "expected job to be Failed after timeout") ;
+  Job_manager.clear_finished ()
+
+let job_manager_no_timeout_keeps_running () =
+  let open Octez_manager_ui in
+  Job_manager.clear_finished () ;
+  (* Create a job that "started" 1000 seconds ago with no timeout *)
+  let fake_job : Job_manager.job =
+    {
+      id = 9998;
+      description = "no-timeout-job";
+      status = Running;
+      started_at = Unix.gettimeofday () -. 1000.0;
+      finished_at = None;
+      log = [];
+      phase = "";
+      timeout = None;
+    }
+  in
+  Job_manager.For_tests.inject_job fake_job ;
+  Job_manager.tick () ;
+  (match fake_job.status with
+  | Running -> ()
+  | Failed _ -> Alcotest.fail "job with timeout=None should not be timed out"
+  | _ -> Alcotest.fail "unexpected status") ;
+  (* Cleanup: manually mark it done so clear_finished works *)
+  fake_job.status <- Succeeded ;
+  Job_manager.clear_finished ()
+
 let background_runner_enqueue_sync () =
   let module BR = Octez_manager_ui.Background_runner in
   let did_run = ref false in
@@ -5090,6 +5140,14 @@ let () =
       ( "job_manager",
         [
           Alcotest.test_case "submit" `Quick job_manager_submit_and_list;
+          Alcotest.test_case
+            "timeout kills expired job"
+            `Quick
+            job_manager_timeout_kills_expired_job;
+          Alcotest.test_case
+            "no timeout keeps running"
+            `Quick
+            job_manager_no_timeout_keeps_running;
           Alcotest.test_case
             "enqueue sync"
             `Quick
