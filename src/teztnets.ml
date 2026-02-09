@@ -190,19 +190,6 @@ let fallback_networks =
       last_updated = None;
       category = Some "Testnet";
     };
-    {
-      alias = "weeklynet";
-      network_url = "https://teztnets.com/weeklynet";
-      chain_name = "TEZOS-WEEKLYNET-2025-12-10T00:00:00.000Z";
-      human_name = "Weeklynet";
-      description = Some "Weekly ephemeral testnet";
-      faucet_url = None;
-      rpc_url = None;
-      docker_build = None;
-      git_ref = None;
-      last_updated = None;
-      category = Some "Testnet";
-    };
   ]
 
 let list_networks ?(fetch = fetch_json) () :
