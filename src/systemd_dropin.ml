@@ -34,8 +34,8 @@ let read_write_paths_for ~data_dir ~logging_paths ~extra_paths =
   in
   unique_non_empty (base @ logging_paths @ extra_paths)
 
-let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?depends_on ()
-    =
+let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?app_bin_dir
+    ?depends_on () =
   let resources = logging_resources ~role ~logging_mode in
   let rw_paths =
     read_write_paths_for
@@ -61,16 +61,23 @@ let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?depends_on ()
     if Paths.is_root () then base := !base @ ["PermissionsStartOnly=true"] ;
     !base @ resources.extra_lines
   in
+  let env_lines =
+    [Printf.sprintf "Environment=OCTEZ_DATA_DIR=%s" data_dir]
+    @
+    match app_bin_dir with
+    | Some dir -> [Printf.sprintf "Environment=APP_BIN_DIR=%s" dir]
+    | None -> []
+  in
   unit_section
   ^ String.concat
       "\n"
-      (header
-      @ [Printf.sprintf "Environment=OCTEZ_DATA_DIR=%s" data_dir]
+      (header @ env_lines
       @ List.map (fun p -> Printf.sprintf "ReadWritePaths=%s" p) rw_paths)
   ^ "\n"
 
 let write_dropin ?(quiet = false) ~dropin_dir ~dropin_path ~daemon_reload ~role
-    ~inst ~data_dir ~logging_mode ?(extra_paths = []) ?depends_on () =
+    ~inst ~data_dir ~logging_mode ?(extra_paths = []) ?app_bin_dir ?depends_on
+    () =
   let dir = dropin_dir role inst in
   let path = dropin_path role inst in
   let owner, group =
@@ -79,13 +86,20 @@ let write_dropin ?(quiet = false) ~dropin_dir ~dropin_path ~daemon_reload ~role
   in
   let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir in
   let body =
-    write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?depends_on ()
+    write_dropin_body
+      ~role
+      ~data_dir
+      ~logging_mode
+      ~extra_paths
+      ?app_bin_dir
+      ?depends_on
+      ()
   in
   let* () = File_ops.write_file ~mode:0o644 ~owner ~group path body in
   daemon_reload ~quiet
 
 let write_dropin_node ?quiet ~dropin_dir ~dropin_path ~daemon_reload ~inst
-    ~data_dir ~logging_mode () =
+    ~data_dir ~logging_mode ?app_bin_dir () =
   write_dropin
     ?quiet
     ~dropin_dir
@@ -95,6 +109,7 @@ let write_dropin_node ?quiet ~dropin_dir ~dropin_path ~daemon_reload ~inst
     ~inst
     ~data_dir
     ~logging_mode
+    ?app_bin_dir
     ()
 
 let render_logging_lines logging_mode =
