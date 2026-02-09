@@ -28,12 +28,15 @@ val read_write_paths_for :
   extra_paths:string list ->
   string list
 
-(** Generate the textual content of a systemd drop-in override file. *)
+(** Generate the textual content of a systemd drop-in override file.
+    When [~app_bin_dir] is provided, an [Environment=APP_BIN_DIR=...] line
+    is emitted so the per-instance dropin overrides the shared template. *)
 val write_dropin_body :
   role:string ->
   data_dir:string ->
   logging_mode:Logging_mode.t ->
   extra_paths:string list ->
+  ?app_bin_dir:string ->
   ?depends_on:string * string ->
   unit ->
   string
@@ -42,7 +45,11 @@ val write_dropin_body :
 
     The [~dropin_dir], [~dropin_path], and [~daemon_reload] callbacks are
     injected by the caller (typically {!Systemd}) to avoid a circular
-    dependency. *)
+    dependency.
+
+    When [~app_bin_dir] is provided, the dropin includes
+    [Environment=APP_BIN_DIR=...] to override the shared template's value
+    on a per-instance basis. *)
 val write_dropin :
   ?quiet:bool ->
   dropin_dir:(string -> string -> string) ->
@@ -53,6 +60,7 @@ val write_dropin :
   data_dir:string ->
   logging_mode:Logging_mode.t ->
   ?extra_paths:string list ->
+  ?app_bin_dir:string ->
   ?depends_on:string * string ->
   unit ->
   (unit, [`Msg of string]) result
@@ -66,6 +74,7 @@ val write_dropin_node :
   inst:string ->
   data_dir:string ->
   logging_mode:Logging_mode.t ->
+  ?app_bin_dir:string ->
   unit ->
   (unit, [`Msg of string]) result
 

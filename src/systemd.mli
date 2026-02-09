@@ -49,7 +49,9 @@ val install_unit :
   (unit, [`Msg of string]) result
 
 (** Write a systemd drop-in override for an instance, configuring
-    data directory, logging mode, extra paths, and dependencies. *)
+    data directory, logging mode, extra paths, and dependencies.
+    When [~app_bin_dir] is provided, the dropin includes
+    [Environment=APP_BIN_DIR=...] to override the shared template value. *)
 val write_dropin :
   ?quiet:bool ->
   role:string ->
@@ -57,6 +59,7 @@ val write_dropin :
   data_dir:string ->
   logging_mode:Logging_mode.t ->
   ?extra_paths:string list ->
+  ?app_bin_dir:string ->
   ?depends_on:string * string ->
   unit ->
   (unit, [`Msg of string]) result
@@ -67,6 +70,7 @@ val write_dropin_node :
   inst:string ->
   data_dir:string ->
   logging_mode:Logging_mode.t ->
+  ?app_bin_dir:string ->
   unit ->
   (unit, [`Msg of string]) result
 

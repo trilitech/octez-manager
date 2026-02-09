@@ -195,6 +195,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~inst:request.instance
       ~data_dir
       ~logging_mode
+      ~app_bin_dir:request.app_bin_dir
       ()
   in
   log "Writing service registry...\n" ;
