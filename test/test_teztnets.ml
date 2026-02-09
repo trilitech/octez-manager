@@ -78,6 +78,47 @@ let test_parse_malformed_network () =
     true
     (Result.is_ok result || Result.is_error result)
 
+let test_parse_filters_ghostnet () =
+  let json =
+    {|[
+    {
+      "alias": "ghostnet",
+      "network_url": "https://teztnets.com/ghostnet",
+      "chain_name": "NetXnofnLBXBoxo",
+      "human_name": "Ghostnet",
+      "description": "Deprecated testnet"
+    },
+    {
+      "alias": "shadownet",
+      "network_url": "https://teztnets.com/shadownet",
+      "chain_name": "NetXnHfVqm9iesp",
+      "human_name": "Shadownet",
+      "description": "Shadow testnet"
+    }
+  ]|}
+  in
+  let result = Teztnets.parse_networks json in
+  match result with
+  | Ok networks ->
+      check int "parsed 1 network (ghostnet filtered)" 1 (List.length networks) ;
+      let first = List.hd networks in
+      (* alias comes from "slug" or falls back to human_name, so it's "Shadownet" *)
+      check
+        string
+        "is Shadownet"
+        "Shadownet"
+        (first : Teztnets.network_info).alias ;
+      check
+        bool
+        "ghostnet not present"
+        false
+        (List.exists
+           (fun (n : Teztnets.network_info) ->
+             let alias_lower = String.lowercase_ascii n.alias in
+             String.equal alias_lower "ghostnet")
+           networks)
+  | Error _ -> fail "should parse and filter ghostnet"
+
 (* ============================================================ *)
 (* List Networks Tests *)
 (* ============================================================ *)
@@ -216,6 +257,7 @@ let parse_tests =
     ("parse empty array", `Quick, test_parse_empty_array);
     ("parse invalid JSON", `Quick, test_parse_invalid_json);
     ("parse malformed network", `Quick, test_parse_malformed_network);
+    ("parse filters ghostnet", `Quick, test_parse_filters_ghostnet);
   ]
 
 let list_tests =
