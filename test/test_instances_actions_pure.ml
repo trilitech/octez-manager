@@ -87,7 +87,7 @@ let test_role_baker () =
 let test_role_accuser () =
   Alcotest.(check string)
     "accuser"
-    "octez-accuser"
+    "octez-baker"
     (UFT.role_to_binary_name "accuser")
 
 let test_role_dal_node () =
@@ -101,8 +101,8 @@ let test_role_dal () =
 
 let test_role_unknown () =
   Alcotest.(check string)
-    "unknown defaults to node"
-    "octez-node"
+    "unknown prefixes with octez-"
+    "octez-signer"
     (UFT.role_to_binary_name "signer")
 
 (* ============================================================ *)
