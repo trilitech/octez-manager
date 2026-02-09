@@ -53,6 +53,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Ghostnet network can no longer be selected despite deprecation (removed from all network selection code paths)
+- RPC Browser: Ghostnet URLs no longer appear in public nodes list (previously showed as "Unknown" network)
+- RPC Browser: Local instances now display network name (e.g., "Shadownet") instead of full URL (e.g., "https://teztnets.com/shadownet")
 - RPC Browser: Fixed duplicate network names in instance display when selecting target endpoints (fixes #599)
 - Architecture index: intent restoration no longer fails on doc comments containing special characters (used prepared statements instead of string interpolation)
 - System metrics (CPU, memory, disk) start populating without the previous startup delay
