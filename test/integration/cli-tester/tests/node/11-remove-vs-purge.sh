@@ -6,16 +6,19 @@ source /tests/lib.sh
 INSTANCE="test-remove-purge"
 DATA_DIR="/var/lib/octez/$INSTANCE"
 
-echo "Test: Remove keeps data, purge deletes it"
+test_init "Remove keeps data, purge deletes it"
 
-cleanup_instance "$INSTANCE" || true
+register_instance "$INSTANCE"
 rm -rf "$DATA_DIR"
+
+RPC_PORT=$(alloc_port)
+NET_PORT=$(alloc_port)
 
 # Install node
 om install-node \
 	--instance "$INSTANCE" \
 	--network shadownet \
-	--rpc-addr "127.0.0.1:8740" --net-addr "0.0.0.0:9740" \
+	--rpc-addr "127.0.0.1:$RPC_PORT" --net-addr "0.0.0.0:$NET_PORT" \
 	--service-user tezos \
 	--no-enable 2>&1
 
@@ -44,7 +47,7 @@ echo "Data preserved after remove"
 om install-node \
 	--instance "$INSTANCE" \
 	--data-dir "$DATA_DIR" \
-	--rpc-addr "127.0.0.1:8740" --net-addr "0.0.0.0:9740" \
+	--rpc-addr "127.0.0.1:$RPC_PORT" --net-addr "0.0.0.0:$NET_PORT" \
 	--service-user tezos \
 	--preserve-data \
 	--no-enable 2>&1

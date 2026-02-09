@@ -6,17 +6,22 @@ source /tests/lib.sh
 INSTANCE1="test-multi-1"
 INSTANCE2="test-multi-2"
 
-echo "Test: Multiple instances can coexist"
+test_init "Multiple instances can coexist"
 
-cleanup_instance "$INSTANCE1" || true
-cleanup_instance "$INSTANCE2" || true
+register_instance "$INSTANCE1"
+register_instance "$INSTANCE2"
+
+RPC1=$(alloc_port)
+NET1=$(alloc_port)
+RPC2=$(alloc_port)
+NET2=$(alloc_port)
 
 # Install first instance
 echo "Installing first instance..."
 om install-node \
 	--instance "$INSTANCE1" \
 	--network shadownet \
-	--rpc-addr "127.0.0.1:8744" --net-addr "0.0.0.0:9744" \
+	--rpc-addr "127.0.0.1:$RPC1" --net-addr "0.0.0.0:$NET1" \
 	--service-user tezos \
 	--no-enable 2>&1
 
@@ -25,7 +30,7 @@ echo "Installing second instance..."
 om install-node \
 	--instance "$INSTANCE2" \
 	--network shadownet \
-	--rpc-addr "127.0.0.1:8745" --net-addr "0.0.0.0:9745" \
+	--rpc-addr "127.0.0.1:$RPC2" --net-addr "0.0.0.0:$NET2" \
 	--service-user tezos \
 	--no-enable 2>&1
 
@@ -52,11 +57,11 @@ fi
 echo "Separate data directories exist"
 
 # Verify separate env files with different ports
-if ! grep -q "8744" "/etc/octez/instances/$INSTANCE1/node.env"; then
+if ! grep -q "$RPC1" "/etc/octez/instances/$INSTANCE1/node.env"; then
 	echo "ERROR: First instance wrong port"
 	exit 1
 fi
-if ! grep -q "8745" "/etc/octez/instances/$INSTANCE2/node.env"; then
+if ! grep -q "$RPC2" "/etc/octez/instances/$INSTANCE2/node.env"; then
 	echo "ERROR: Second instance wrong port"
 	exit 1
 fi
@@ -76,8 +81,5 @@ if ! instance_exists "$INSTANCE2"; then
 	exit 1
 fi
 echo "Instances are independent"
-
-# Cleanup
-cleanup_instance "$INSTANCE2"
 
 echo "Multiple instances test passed"

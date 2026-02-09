@@ -3,19 +3,15 @@
 set -euo pipefail
 source /tests/lib.sh
 
+test_init "Import dry-run preview"
+
 INSTANCE="dryrun-node"
 DATA_DIR="/var/lib/octez-external/$INSTANCE"
-RPC_ADDR="127.0.0.1:18748"
+RPC_ADDR="127.0.0.1:$(alloc_port)"
 
-echo "Test: Import dry-run preview"
-
-# Cleanup
-cleanup_instance "$INSTANCE" || true
-rm -rf "$DATA_DIR" || true
-systemctl stop "octez-node@${INSTANCE}.service" 2>/dev/null || true
-systemctl disable "octez-node@${INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
-systemctl daemon-reload
+register_instance "$INSTANCE"
+register_external_service "node" "$INSTANCE"
+register_data_dir "$DATA_DIR"
 
 # Create external service
 echo "Creating external systemd service..."
@@ -48,14 +44,5 @@ if ! systemctl is-enabled "octez-node@${INSTANCE}.service" >/dev/null 2>&1; then
 	echo "ERROR: External service should still be enabled after dry-run"
 	exit 1
 fi
-
-echo "Dry-run correctly showed plan without making changes"
-
-# Cleanup
-systemctl stop "octez-node@${INSTANCE}.service" || true
-systemctl disable "octez-node@${INSTANCE}.service" || true
-rm -f "/etc/systemd/system/octez-node@${INSTANCE}.service" || true
-systemctl daemon-reload
-rm -rf "$DATA_DIR"
 
 echo "Dry-run test passed"

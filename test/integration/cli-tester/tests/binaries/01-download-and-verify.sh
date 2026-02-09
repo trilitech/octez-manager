@@ -4,7 +4,7 @@
 set -euo pipefail
 source /tests/lib.sh
 
-echo "Test: Download and verify managed binaries"
+test_init "Download and verify managed binaries"
 
 # Get the latest available version
 echo "Fetching latest version..."

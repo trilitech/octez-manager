@@ -3,21 +3,17 @@
 set -euo pipefail
 source /tests/lib.sh
 
+test_init "Import with field overrides"
+
 EXTERNAL_INSTANCE="override-source"
 CUSTOM_INSTANCE="my-custom-node"
 DATA_DIR="/var/lib/octez-external/$EXTERNAL_INSTANCE"
-RPC_ADDR="127.0.0.1:18750"
+RPC_ADDR="127.0.0.1:$(alloc_port)"
 
-echo "Test: Import with field overrides"
-
-# Cleanup
-cleanup_instance "$EXTERNAL_INSTANCE" || true
-cleanup_instance "$CUSTOM_INSTANCE" || true
-rm -rf "$DATA_DIR" || true
-systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
-systemctl daemon-reload
+register_instance "$EXTERNAL_INSTANCE"
+register_instance "$CUSTOM_INSTANCE"
+register_external_service "node" "$EXTERNAL_INSTANCE"
+register_data_dir "$DATA_DIR"
 
 # Create external service on shadownet
 echo "Creating external service..."
@@ -49,11 +45,5 @@ fi
 if om list 2>&1 | grep -v "external" | grep -q "$EXTERNAL_INSTANCE"; then
 	echo "WARNING: Original name found in managed instances"
 fi
-
-echo "Field overrides test completed"
-
-# Cleanup
-cleanup_instance "$CUSTOM_INSTANCE"
-rm -rf "$DATA_DIR"
 
 echo "Field overrides test passed"

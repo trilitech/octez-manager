@@ -2,7 +2,7 @@
 set -euo pipefail
 source /tests/lib.sh
 
-echo "Test: Golden Path - Declarative TUI command runner"
+test_init "Golden Path - Declarative TUI command runner"
 
 # Verify test binary is available (new v2 version)
 if [ ! -f /usr/local/bin/test_golden_path_tui_v2 ]; then

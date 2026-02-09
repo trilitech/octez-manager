@@ -3,34 +3,17 @@
 set -euo pipefail
 source /tests/lib.sh
 
+test_init "Import node with clone strategy"
+
 EXTERNAL_INSTANCE="clone-source"
 CLONED_INSTANCE="clone-dest"
 EXTERNAL_DATA="/var/lib/octez-external/$EXTERNAL_INSTANCE"
-RPC_ADDR="127.0.0.1:18746"
+RPC_ADDR="127.0.0.1:$(alloc_port)"
 
-# Cleanup function
-cleanup_test() {
-	systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-	systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-	rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
-	cleanup_instance "$EXTERNAL_INSTANCE" || true
-	cleanup_instance "$CLONED_INSTANCE" || true
-	rm -rf "$EXTERNAL_DATA" || true
-	systemctl daemon-reload || true
-}
-
-# Ensure cleanup on exit
-trap cleanup_test EXIT
-
-echo "Test: Import node with clone strategy"
-
-# Initial cleanup
-cleanup_test
-rm -rf "$EXTERNAL_DATA" || true
-systemctl stop "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-systemctl disable "octez-node@${EXTERNAL_INSTANCE}.service" 2>/dev/null || true
-rm -f "/etc/systemd/system/octez-node@${EXTERNAL_INSTANCE}.service" || true
-systemctl daemon-reload
+register_instance "$EXTERNAL_INSTANCE"
+register_instance "$CLONED_INSTANCE"
+register_external_service "node" "$EXTERNAL_INSTANCE"
+register_data_dir "$EXTERNAL_DATA"
 
 # Create external service
 echo "Creating external systemd service..."
@@ -69,7 +52,5 @@ fi
 # Note: We don't check if services are active because clone with same data-dir/port will conflict
 # The clone strategy correctly preserves the original service and creates a managed copy
 # Users would need to adjust data-dir/rpc-addr in the cloned instance before starting it
-
-echo "Service successfully cloned"
 
 echo "Clone import test passed"
