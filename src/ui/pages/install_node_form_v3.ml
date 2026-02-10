@@ -59,11 +59,8 @@ let generate_instance_name ~network ~history_mode =
       | Some i -> String.sub n (i + 1) (String.length n - i - 1)
       | None -> n
     in
-    (* Keep weeklynet-YYYY-MM-DD intact; otherwise preserve legacy 15-char cap. *)
-    let max_len =
-      if String.starts_with ~prefix:"weeklynet-" base then 30 else 15
-    in
-    if String.length base > max_len then String.sub base 0 max_len else base
+    (* Truncate excessively long names (but allow weeklynet-YYYY-MM-DD which is 21 chars) *)
+    if String.length base > 30 then String.sub base 0 30 else base
   in
   match String.lowercase_ascii history_mode with
   | "rolling" -> Printf.sprintf "node-%s" network_short
