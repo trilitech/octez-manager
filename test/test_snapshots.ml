@@ -230,6 +230,28 @@ let test_slug_special_characters () =
   let result = Snapshots.slug_of_network "test-net_123" in
   check bool "handles special chars" true (result = None || result <> None)
 
+let test_slug_weeklynet_dated_url () =
+  let result =
+    Snapshots.slug_of_network "https://teztnets.com/weeklynet-2026-02-04"
+  in
+  check_string_opt "weeklynet dated URL strips date" (Some "weeklynet") result
+
+let test_slug_weeklynet_undated_url () =
+  let result = Snapshots.slug_of_network "https://teztnets.com/weeklynet" in
+  check_string_opt "weeklynet undated URL unchanged" (Some "weeklynet") result
+
+let test_slug_weeklynet_bare_alias () =
+  let result = Snapshots.slug_of_network "weeklynet-2026-02-04" in
+  check_string_opt "weeklynet bare alias strips date" (Some "weeklynet") result
+
+let test_slug_mainnet_no_strip () =
+  let result = Snapshots.slug_of_network "mainnet" in
+  check_string_opt "mainnet unchanged" (Some "mainnet") result
+
+let test_slug_shadownet_no_strip () =
+  let result = Snapshots.slug_of_network "https://teztnets.com/shadownet" in
+  check_string_opt "shadownet unchanged" (Some "shadownet") result
+
 (* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
@@ -275,6 +297,11 @@ let edge_case_tests =
     ("sanitize case insensitive", `Quick, test_sanitize_case_insensitive);
     ("sanitize whitespace", `Quick, test_sanitize_whitespace);
     ("slug special characters", `Quick, test_slug_special_characters);
+    ("slug weeklynet dated URL", `Quick, test_slug_weeklynet_dated_url);
+    ("slug weeklynet undated URL", `Quick, test_slug_weeklynet_undated_url);
+    ("slug weeklynet bare alias", `Quick, test_slug_weeklynet_bare_alias);
+    ("slug mainnet no strip", `Quick, test_slug_mainnet_no_strip);
+    ("slug shadownet no strip", `Quick, test_slug_shadownet_no_strip);
   ]
 
 let () =

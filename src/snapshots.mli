@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -13,6 +13,11 @@ type entry = {
   history_mode : string option;
   metadata : (string * string) list;
 }
+
+(** Strip a trailing [-YYYY-MM-DD] date suffix from a slug.  Teztnets encodes
+    the rotation date in the URL (e.g. [weeklynet-2026-02-04]) but the
+    tzinit.org snapshot mirror uses the bare alias ([weeklynet]). *)
+val strip_date_suffix : string -> string
 
 (** Extract a tzinit network slug from either an alias ("mainnet") or a
     teztnets JSON URL. *)

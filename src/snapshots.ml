@@ -18,6 +18,31 @@ type entry = {
   metadata : (string * string) list;
 }
 
+(** Strip a trailing [-YYYY-MM-DD] date suffix from a slug.  Teztnets encodes
+    the rotation date in the URL (e.g. [weeklynet-2026-02-04]) but the
+    tzinit.org snapshot mirror uses the bare alias ([weeklynet]). *)
+let strip_date_suffix slug =
+  let len = String.length slug in
+  (* Pattern: "-NNNN-NN-NN" = 11 characters *)
+  if len > 11 then
+    let suffix = String.sub slug (len - 11) 11 in
+    let is_digit c = c >= '0' && c <= '9' in
+    if
+      suffix.[0] = '-'
+      && is_digit suffix.[1]
+      && is_digit suffix.[2]
+      && is_digit suffix.[3]
+      && is_digit suffix.[4]
+      && suffix.[5] = '-'
+      && is_digit suffix.[6]
+      && is_digit suffix.[7]
+      && suffix.[8] = '-'
+      && is_digit suffix.[9]
+      && is_digit suffix.[10]
+    then String.sub slug 0 (len - 11)
+    else slug
+  else slug
+
 let slug_of_url u =
   let trimmed = String.trim u in
   let segments =
@@ -33,14 +58,14 @@ let slug_of_url u =
       let seg =
         match String.split_on_char '?' seg with hd :: _ -> hd | [] -> seg
       in
-      Some (String.lowercase_ascii seg)
+      Some (String.lowercase_ascii seg |> strip_date_suffix)
   | [] -> None
 
 let slug_of_network n =
   let trimmed = String.trim n in
   if trimmed = "" then None
   else if Helpers.is_http_url trimmed then slug_of_url trimmed
-  else Some (String.lowercase_ascii trimmed)
+  else Some (String.lowercase_ascii trimmed |> strip_date_suffix)
 
 let sanitize_kind_input k =
   let trimmed = String.trim k in
@@ -255,7 +280,7 @@ let list_with_impl ~fetch ~network_slug =
     | Ok (_, html) ->
         let entries = parse_anchors html ~network_slug in
         if entries = [] then default_candidates else entries
-    | Error _ -> default_candidates
+    | Error (`Msg _) -> default_candidates
   in
   let rec gather acc = function
     | [] -> Ok (List.rev acc)
