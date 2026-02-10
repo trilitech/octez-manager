@@ -66,6 +66,8 @@ let pending_navigation : pending_navigation option ref = ref None
 
 let navigate page = pending_navigation := Some (Goto page)
 
+let navigate_instances () = navigate "instances"
+
 let navigate_back () = pending_navigation := Some Back
 
 let navigate_quit () = pending_navigation := Some Quit
