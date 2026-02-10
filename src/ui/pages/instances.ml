@@ -265,7 +265,16 @@ struct
 
   let handled_keys () =
     Miaou.Core.Keys.
-      [Enter; Char "b"; Char "c"; Char "r"; Char "R"; Char "d"; Char "x"]
+      [
+        Enter;
+        Char "b";
+        Char "c";
+        Char "r";
+        Char "R";
+        Char "d";
+        Char "t";
+        Char "x";
+      ]
 
   let keymap _ps =
     let noop ps = ps in
@@ -287,7 +296,10 @@ struct
       if Paths.is_root () then Widgets.red "● SYSTEM"
       else Widgets.green "● USER"
     in
-    let hint = "Hint: c create · b binaries · d diagnostics · r rpc · ? help" in
+    let hint =
+      "Hint: c create · b binaries · d diagnostics · t topology · r rpc · ? \
+       help"
+    in
     [
       Printf.sprintf
         "%s   %s    %s"
@@ -754,6 +766,7 @@ Press **Enter** to open instance menu.|}
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
         | Some (Keys.Char "b") -> Navigation.update go_to_binaries ps
         | Some (Keys.Char "d") -> Navigation.update go_to_diagnostics ps
+        | Some (Keys.Char "t") -> Navigation.update go_to_topology ps
         | Some (Keys.Char "r") -> Navigation.update go_to_rpc_browser ps
         | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
         | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
@@ -796,6 +809,7 @@ Press **Enter** to open instance menu.|}
         {key = "Enter"; help = "Open"};
         {key = "c"; help = "Create"};
         {key = "d"; help = "Diagnostics"};
+        {key = "t"; help = "Topology"};
         {key = "b"; help = "Binaries"};
         {key = "r"; help = "RPC Browser"};
         {key = "x"; help = "Clear failure"};
