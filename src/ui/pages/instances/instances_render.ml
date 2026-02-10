@@ -10,6 +10,7 @@
 module Widgets = Miaou_widgets_display.Widgets
 module Vsection = Miaou_widgets_layout.Vsection
 module Grid = Miaou_widgets_layout.Grid_layout
+module Box = Miaou_widgets_layout.Box_widget
 module Metrics = Rpc_metrics
 open Octez_manager_lib
 open Instances_state
@@ -434,37 +435,74 @@ let pad_line ~col_width line =
     truncate_visible ~max_width:col_width line
   else line
 
+let role_color = function
+  | "node" | "── Nodes ──" -> 14
+  | "baker" | "── Bakers ──" -> 12
+  | "accuser" | "── Accusers ──" -> 6
+  | "dal-node" | "── DAL Nodes ──" -> 13
+  | _ -> 8
+
 (** Render a single column's content - returns list of lines *)
 let render_column ~col_width ~state ~column_groups =
   let items = column_items ~column_groups ~global_services:state.services in
   let empty_line = String.make col_width ' ' in
-  let _, lines =
-    List.fold_left
-      (fun (is_first, acc) item ->
+  (* Group items into (header, instances) pairs *)
+  let groups =
+    let current_header = ref None in
+    let current_instances = ref [] in
+    let result = ref [] in
+    List.iter
+      (fun item ->
         match item with
         | Header role_name ->
-            let header = Widgets.bold role_name in
-            let header_line = pad_line ~col_width header in
-            (* Add empty line before header unless it's the first item *)
-            let new_lines =
-              if is_first then [header_line] else [empty_line; header_line]
-            in
-            (false, acc @ new_lines)
+            (match !current_header with
+            | Some hdr ->
+                result := (hdr, List.rev !current_instances) :: !result
+            | None -> ()) ;
+            current_header := Some role_name ;
+            current_instances := []
         | Instance (idx, svc) ->
-            let is_folded =
-              StringSet.mem svc.service.Service.instance state.folded
-            in
-            (* Render instance line(s) *)
-            let line =
-              line_for_service idx state.selected ~folded:is_folded svc
-            in
-            (* Split into individual lines and pad each *)
-            let instance_lines =
-              String.split_on_char '\n' line |> List.map (pad_line ~col_width)
-            in
-            (false, acc @ instance_lines))
-      (true, [])
-      items
+            current_instances := (idx, svc) :: !current_instances)
+      items ;
+    (match !current_header with
+    | Some hdr -> result := (hdr, List.rev !current_instances) :: !result
+    | None -> ()) ;
+    List.rev !result
+  in
+  (* Render each group as a Box containing its instances *)
+  let is_first = ref true in
+  let lines =
+    List.concat_map
+      (fun (role_name, instances) ->
+        let color = role_color role_name in
+        let instance_lines =
+          List.concat_map
+            (fun (idx, (svc : Service_state.t)) ->
+              let is_folded =
+                StringSet.mem svc.service.Service.instance state.folded
+              in
+              let line =
+                line_for_service idx state.selected ~folded:is_folded svc
+              in
+              String.split_on_char '\n' line)
+            instances
+        in
+        let content = String.concat "\n" instance_lines in
+        let box =
+          Box.render
+            ~title:role_name
+            ~style:Rounded
+            ~color
+            ~width:col_width
+            content
+        in
+        let box_lines =
+          String.split_on_char '\n' box |> List.map (pad_line ~col_width)
+        in
+        let result = if !is_first then box_lines else empty_line :: box_lines in
+        is_first := false ;
+        result)
+      groups
   in
   lines
 
@@ -741,26 +779,59 @@ let table_lines_single state =
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
     else
-      (* Services are already sorted by role then instance name *)
-      (* Group by role and add headers - use prepend + reverse for O(n) *)
-      let rec build_rows idx prev_role acc = function
-        | [] -> List.rev acc
-        | (svc : Service_state.t) :: rest ->
-            let role = svc.service.Service.role in
-            let acc =
+      (* Group services by role, preserving order *)
+      let groups =
+        let rec collect prev_role current_group acc = function
+          | [] ->
+              let groups =
+                match prev_role with
+                | Some r -> List.rev ((r, List.rev current_group) :: acc)
+                | None -> List.rev acc
+              in
+              groups
+          | (svc : Service_state.t) :: rest ->
+              let role = svc.service.Service.role in
               if Some role <> prev_role then
-                Widgets.bold (role_header role) :: "" :: acc
-              else acc
-            in
-            let is_folded =
-              StringSet.mem svc.service.Service.instance state.folded
-            in
-            let row =
-              line_for_service idx state.selected ~folded:is_folded svc
-            in
-            build_rows (idx + 1) (Some role) (row :: acc) rest
+                let acc =
+                  match prev_role with
+                  | Some r -> (r, List.rev current_group) :: acc
+                  | None -> acc
+                in
+                collect (Some role) [svc] acc rest
+              else collect prev_role (svc :: current_group) acc rest
+        in
+        collect None [] [] state.services
       in
-      build_rows 0 None [] state.services
+      (* Render each role group as a Box *)
+      let idx = ref 0 in
+      let is_first = ref true in
+      List.concat_map
+        (fun (role, svcs) ->
+          let hdr = role_header role in
+          let color = role_color role in
+          let instance_lines =
+            List.concat_map
+              (fun (svc : Service_state.t) ->
+                let i = !idx in
+                incr idx ;
+                let is_folded =
+                  StringSet.mem svc.service.Service.instance state.folded
+                in
+                let row =
+                  line_for_service i state.selected ~folded:is_folded svc
+                in
+                String.split_on_char '\n' row)
+              svcs
+          in
+          let content = String.concat "\n" instance_lines in
+          let box =
+            Box.render ~title:hdr ~style:Rounded ~color ~width:78 content
+          in
+          let box_lines = String.split_on_char '\n' box in
+          let result = if !is_first then box_lines else "" :: box_lines in
+          is_first := false ;
+          result)
+        groups
   in
   let external_rows = render_external_services_section state in
   let external_rows =
