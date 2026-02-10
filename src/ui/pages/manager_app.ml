@@ -22,7 +22,8 @@ let register_pages () =
   Diagnostics.register () ;
   Log_viewer_page.register () ;
   Rpc_node_selection.register () ;
-  Rpc_browser.register ()
+  Rpc_browser.register () ;
+  Topology_page.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in
