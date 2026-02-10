@@ -11,6 +11,7 @@
     registered directories, available versions, and download progress. *)
 
 module Widgets = Miaou_widgets_display.Widgets
+module Box = Miaou_widgets_layout.Box_widget
 module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
 open Binaries_types
@@ -53,16 +54,11 @@ let set_help_hint s =
   | None -> Miaou.Core.Help_hint.clear ()
 
 (** Render the managed versions section. *)
-let render_managed_versions s add =
-  add
-    (Widgets.fg
-       14
-       (Widgets.bold
-          "\xe2\x94\x81\xe2\x94\x81\xe2\x94\x81 Managed Versions \
-           \xe2\x94\x81\xe2\x94\x81\xe2\x94\x81")) ;
-  add "" ;
+let render_managed_versions s =
+  let lines = ref [] in
+  let add line = lines := line :: !lines in
   if s.managed_versions = [] then
-    add (Widgets.dim "  No managed versions installed")
+    add (Widgets.dim "No managed versions installed")
   else
     List.iteri
       (fun _idx (version, size, count) ->
@@ -107,22 +103,18 @@ let render_managed_versions s add =
             (fun inst ->
               add (Widgets.dim (Printf.sprintf "      \xe2\x86\x92 %s" inst)))
             instances)
-      s.managed_versions
+      s.managed_versions ;
+  String.concat "\n" (List.rev !lines)
 
 (** Render the registered directories section. *)
-let render_registered_dirs s add =
-  add "" ;
-  add
-    (Widgets.fg
-       13
-       (Widgets.bold
-          "\xe2\x94\x81\xe2\x94\x81\xe2\x94\x81 Registered Directories \
-           \xe2\x94\x81\xe2\x94\x81\xe2\x94\x81")) ;
+let render_registered_dirs s =
+  let lines = ref [] in
+  let add line = lines := line :: !lines in
   add
     (Widgets.dim
        "Register Octez binaries from development builds or custom locations") ;
   add "" ;
-  if s.registered_dirs = [] then add (Widgets.dim "  No registered directories")
+  if s.registered_dirs = [] then add (Widgets.dim "No registered directories")
   else
     List.iter
       (fun (ld, count) ->
@@ -176,20 +168,15 @@ let render_registered_dirs s add =
     let prefix = if link_action_selected then "\xe2\x9e\xa4 " else "  " in
     Printf.sprintf "%s%s" prefix (Widgets.fg 10 "[+ Register a directory...]")
   in
-  add (if link_action_selected then Widgets.bold link_button else link_button)
+  add (if link_action_selected then Widgets.bold link_button else link_button) ;
+  String.concat "\n" (List.rev !lines)
 
 (** Render the available-for-download versions section. *)
-let render_available_versions s add =
-  add "" ;
-  add
-    (Widgets.fg
-       10
-       (Widgets.bold
-          "\xe2\x94\x81\xe2\x94\x81\xe2\x94\x81 Available for Download \
-           \xe2\x94\x81\xe2\x94\x81\xe2\x94\x81")) ;
-  add "" ;
+let render_available_versions s =
+  let lines = ref [] in
+  let add line = lines := line :: !lines in
   if s.available_versions = [] then
-    add (Widgets.dim "  No versions available (or all installed)")
+    add (Widgets.dim "No versions available (or all installed)")
   else
     List.iter
       (fun item ->
@@ -244,30 +231,44 @@ let render_available_versions s add =
                   add (if is_version_selected then Widgets.bold line else line))
                 versions
         | _ -> ())
-      s.items
+      s.items ;
+  String.concat "\n" (List.rev !lines)
 
 (** Render download progress indicators. *)
-let render_progress add =
+let render_progress () =
   let multi_progress_lines = Context.render_multi_progress ~cols:80 in
-  if String.trim multi_progress_lines <> "" then (
-    add "" ;
-    add multi_progress_lines)
-  else (
-    add "" ;
+  if String.trim multi_progress_lines <> "" then multi_progress_lines
+  else
     let progress_line = Context.render_progress ~cols:80 in
-    if String.trim progress_line <> "" then add progress_line)
+    if String.trim progress_line <> "" then progress_line else ""
 
 (** Main view function for the binaries page. Assembles all sections. *)
-let view ps ~focus:_ ~size:_ =
+let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
-  let buf = Buffer.create 2048 in
-  let add line =
-    if Buffer.length buf > 0 then Buffer.add_char buf '\n' ;
-    Buffer.add_string buf line
-  in
+  let box_width = min 78 (size.LTerm_geom.cols - 2) in
   set_help_hint s ;
-  render_managed_versions s add ;
-  render_registered_dirs s add ;
-  render_available_versions s add ;
-  render_progress add ;
-  Buffer.contents buf
+  let sections =
+    [
+      Box.render
+        ~title:"Managed Versions"
+        ~style:Rounded
+        ~color:14
+        ~width:box_width
+        (render_managed_versions s);
+      Box.render
+        ~title:"Registered Directories"
+        ~style:Rounded
+        ~color:13
+        ~width:box_width
+        (render_registered_dirs s);
+      Box.render
+        ~title:"Available for Download"
+        ~style:Rounded
+        ~color:10
+        ~width:box_width
+        (render_available_versions s);
+    ]
+  in
+  let progress = render_progress () in
+  let sections = if progress = "" then sections else sections @ [progress] in
+  String.concat "\n" sections

@@ -51,6 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **CI optimization**: Integration tests within each shard now run in parallel (3 jobs per shard), reducing per-shard time by ~40-50%
 - **CI optimization**: Docker layer caching for integration tests reduces container build time by 40-60% (2-3 min per run)
 - Diagnostics page now uses bordered boxes (Box_widget) for cleaner visual section separation
+- Binaries page sections (Managed Versions, Registered Directories, Available for Download) now render with Box_widget Rounded borders in distinct colors instead of manual ASCII art
 - RPC browser now uses Grid_layout for side-by-side panel rendering
 - Instances page now uses Grid_layout for multi-column layout merging
 - Form navigation now supports Tab/Shift+Tab cycling between fields via Miaou Focus_ring
