@@ -105,7 +105,7 @@ let run ?page ?(log = false) ?logfile () =
       in
       match result with
       | `Quit -> raise Exit
-      | `SwitchTo "__BACK__" -> (
+      | `Back | `SwitchTo "__BACK__" -> (
           match history with [] -> raise Exit | prev :: rest -> loop rest prev)
       | `SwitchTo next_page -> loop (current_name :: history) next_page
   in
