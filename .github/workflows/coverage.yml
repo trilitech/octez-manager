@@ -34,6 +34,9 @@ jobs:
         with:
           fetch-depth: 0  # Need full history for coverage comparison
 
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Cache opam packages
         id: cache-opam
         uses: actions/cache@v4
@@ -81,7 +84,6 @@ jobs:
         if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
         run: |
           eval $(opam env)
-          git config --global --add safe.directory "$PWD"
           opam install . --deps-only --with-test --jobs=4
 
       - name: Build instrumented static binary
