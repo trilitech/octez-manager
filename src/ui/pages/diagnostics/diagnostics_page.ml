@@ -10,6 +10,7 @@ module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 module Box = Miaou_widgets_layout.Box_widget
+module Flex = Miaou_widgets_layout.Flex_layout
 module C = Miaou_canvas.Canvas
 open Octez_manager_lib
 
@@ -546,6 +547,120 @@ let view ps ~focus:_ ~size =
               ~title:"System Information"
               ~color:12
               (render_system_info_content ());
+          ]
+      in
+
+      (* Helper to render a flex row and convert to lines *)
+      let render_flex_row items =
+        let row = Flex.create ~direction:Row ~gap:{h = 2; v = 0} items in
+        let rendered =
+          Flex.render row ~size:{LTerm_geom.rows = 8; cols = box_width}
+        in
+        String.split_on_char '\n' rendered @ [""]
+      in
+
+      (* Build all boxes using functional approach *)
+      let boxes =
+        [
+          render_box
+            ~title:"Service Status"
+            ~color:14
+            (render_services_content s.services);
+          render_box ~title:"Caches" ~color:13 (render_caches_content ());
+        ]
+        @ [
+            (* Real-Time Metrics + Metrics Recorder side-by-side *)
+            render_flex_row
+              [
+                {
+                  render =
+                    (fun ~size ->
+                      let content =
+                        String.concat
+                          "\n"
+                          (render_realtime_content s.bg_queue_spark)
+                      in
+                      Box.render
+                        ~title:"Real-Time Metrics"
+                        ~style:Single
+                        ~color:12
+                        ~width:size.LTerm_geom.cols
+                        content);
+                  basis = Fill;
+                  cross = None;
+                };
+                {
+                  render =
+                    (fun ~size ->
+                      let content =
+                        String.concat "\n" (render_recorder_content ())
+                      in
+                      Box.render
+                        ~title:"Metrics Recorder"
+                        ~style:Single
+                        ~color:11
+                        ~width:size.LTerm_geom.cols
+                        content);
+                  basis = Fill;
+                  cross = None;
+                };
+              ]
+            |> List.concat;
+          ]
+        @ (if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
+             [
+               render_box
+                 ~title:"Historical Metrics"
+                 ~color:13
+                 (render_historical_content ~chart_width);
+             ]
+           else [])
+        @ [
+            render_box
+              ~title:"Scheduler Performance"
+              ~color:11
+              (render_scheduler_content ());
+            render_box
+              ~title:"Worker Queue Stats"
+              ~color:12
+              (render_worker_stats_content ());
+          ]
+        @ [
+            (* Metrics Server + System Information side-by-side *)
+            render_flex_row
+              [
+                {
+                  render =
+                    (fun ~size ->
+                      let content =
+                        String.concat "\n" (render_metrics_server_content ())
+                      in
+                      Box.render
+                        ~title:"Metrics Server"
+                        ~style:Single
+                        ~color:14
+                        ~width:size.LTerm_geom.cols
+                        content);
+                  basis = Fill;
+                  cross = None;
+                };
+                {
+                  render =
+                    (fun ~size ->
+                      let content =
+                        String.concat "\n" (render_system_info_content ())
+                      in
+                      Box.render
+                        ~title:"System Information"
+                        ~style:Single
+                        ~color:12
+                        ~width:size.LTerm_geom.cols
+                        content);
+                  basis = Fill;
+                  cross = None;
+                };
+              ]
+            |> List.concat;
           ]
       in
 
