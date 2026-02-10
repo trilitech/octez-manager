@@ -134,6 +134,9 @@ let wait_for_condition conditions =
 
 let handle_nav_result = function
   | `Continue -> ()
+  | `Back ->
+      Printf.eprintf "  <- Back navigation\n%!" ;
+      ()
   | `Quit -> failwith "Unexpected Quit during test"
   | `SwitchTo page ->
       Printf.eprintf "  → Switched to page: %s\n%!" page ;
