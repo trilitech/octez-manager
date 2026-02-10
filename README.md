@@ -81,6 +81,25 @@ octez-manager web --port 8080
 
 The UI provides installation wizards, service monitoring, log viewing, and snapshot management. The web interface offers the same features accessible from any browser.
 
+### Matrix driver tuning (Miaou 0.3)
+
+When running in matrix mode (`MIAOU_DRIVER=matrix`), you can tune responsiveness and redraw behavior:
+
+```sh
+# Tick/render rate caps (defaults are 60)
+export MIAOU_MATRIX_TPS=60
+export MIAOU_MATRIX_FPS=60
+
+# Full-screen scrub cadence (default 30 frames, 0 disables)
+export MIAOU_MATRIX_SCRUB_FRAMES=30
+```
+
+Useful presets:
+
+- Lower CPU on constrained hosts: `MIAOU_MATRIX_TPS=30 MIAOU_MATRIX_FPS=30`
+- Maximum smoothness on fast terminals: keep defaults at `60/60`
+- Investigating redraw artifacts: lower `MIAOU_MATRIX_SCRUB_FRAMES` (or disable with `0`)
+
 ### CLI Examples
 
 ```sh
