@@ -13,11 +13,11 @@
   rresult
   yojson
   bos
-  (miaou-core (>= 0.1.4))
-  (miaou-driver-term (>= 0.1.4))
-  (miaou-driver-matrix (>= 0.1.4))
-  (miaou-runner (>= 0.1.4))
-  (miaou-driver-web (>= 0.2.0))
+  (miaou-core (>= 0.3.0))
+  (miaou-driver-term (>= 0.3.0))
+  (miaou-driver-matrix (>= 0.3.0))
+  (miaou-runner (>= 0.3.0))
+  (miaou-driver-web (>= 0.3.0))
   eio
   eio_main
   eio_posix
