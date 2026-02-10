@@ -49,6 +49,9 @@ val consume_instances_dirty : unit -> bool
 (** Request navigation to the named page on the next tick. *)
 val navigate : string -> unit
 
+(** Request navigation to the instances home page on the next tick. *)
+val navigate_instances : unit -> unit
+
 (** Request back navigation on the next tick. *)
 val navigate_back : unit -> unit
 
