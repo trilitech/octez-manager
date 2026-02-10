@@ -309,6 +309,10 @@ let go_to_diagnostics state =
   Context.navigate Diagnostics.name ;
   state
 
+let go_to_topology state =
+  Context.navigate Topology_page.name ;
+  state
+
 let go_to_binaries state =
   Context.navigate Binaries.name ;
   state
