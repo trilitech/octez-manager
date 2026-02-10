@@ -10,6 +10,7 @@ module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 module Box = Miaou_widgets_layout.Box_widget
+module Flex = Miaou_widgets_layout.Flex_layout
 module C = Miaou_canvas.Canvas
 open Octez_manager_lib
 
@@ -514,14 +515,52 @@ let view ps ~focus:_ ~size =
       (* Caches *)
       add_box ~title:"Caches" ~color:13 (render_caches_content ()) ;
 
-      (* Real-Time Metrics *)
-      add_box
-        ~title:"Real-Time Metrics"
-        ~color:12
-        (render_realtime_content s.bg_queue_spark) ;
-
-      (* Metrics Recorder *)
-      add_box ~title:"Metrics Recorder" ~color:11 (render_recorder_content ()) ;
+      (* Real-Time Metrics + Metrics Recorder side-by-side *)
+      let row_1 =
+        Flex.create
+          ~direction:Row
+          ~gap:{h = 2; v = 0}
+          [
+            {
+              render =
+                (fun ~size ->
+                  let content =
+                    String.concat
+                      "\n"
+                      (render_realtime_content s.bg_queue_spark)
+                  in
+                  Box.render
+                    ~title:"Real-Time Metrics"
+                    ~style:Single
+                    ~color:12
+                    ~width:size.LTerm_geom.cols
+                    content);
+              basis = Fill;
+              cross = None;
+            };
+            {
+              render =
+                (fun ~size ->
+                  let content =
+                    String.concat "\n" (render_recorder_content ())
+                  in
+                  Box.render
+                    ~title:"Metrics Recorder"
+                    ~style:Single
+                    ~color:11
+                    ~width:size.LTerm_geom.cols
+                    content);
+              basis = Fill;
+              cross = None;
+            };
+          ]
+      in
+      let row_1_rendered =
+        Flex.render row_1 ~size:{LTerm_geom.rows = 8; cols = box_width}
+      in
+      String.split_on_char '\n' row_1_rendered
+      |> List.iter (fun l -> lines := l :: !lines) ;
+      lines := "" :: !lines ;
 
       (* Historical Charts - only show if recording or has data *)
       if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
@@ -542,17 +581,50 @@ let view ps ~focus:_ ~size =
         ~color:12
         (render_worker_stats_content ()) ;
 
-      (* Metrics Server Configuration *)
-      add_box
-        ~title:"Metrics Server"
-        ~color:14
-        (render_metrics_server_content ()) ;
-
-      (* System Information *)
-      add_box
-        ~title:"System Information"
-        ~color:12
-        (render_system_info_content ()) ;
+      (* Metrics Server + System Information side-by-side *)
+      let row_2 =
+        Flex.create
+          ~direction:Row
+          ~gap:{h = 2; v = 0}
+          [
+            {
+              render =
+                (fun ~size ->
+                  let content =
+                    String.concat "\n" (render_metrics_server_content ())
+                  in
+                  Box.render
+                    ~title:"Metrics Server"
+                    ~style:Single
+                    ~color:14
+                    ~width:size.LTerm_geom.cols
+                    content);
+              basis = Fill;
+              cross = None;
+            };
+            {
+              render =
+                (fun ~size ->
+                  let content =
+                    String.concat "\n" (render_system_info_content ())
+                  in
+                  Box.render
+                    ~title:"System Information"
+                    ~style:Single
+                    ~color:12
+                    ~width:size.LTerm_geom.cols
+                    content);
+              basis = Fill;
+              cross = None;
+            };
+          ]
+      in
+      let row_2_rendered =
+        Flex.render row_2 ~size:{LTerm_geom.rows = 8; cols = box_width}
+      in
+      String.split_on_char '\n' row_2_rendered
+      |> List.iter (fun l -> lines := l :: !lines) ;
+      lines := "" :: !lines ;
 
       let all_lines = List.rev !lines in
       let content_height = List.length all_lines in
