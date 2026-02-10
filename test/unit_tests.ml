@@ -5177,8 +5177,8 @@ let generate_instance_name_long_network () =
       ~history_mode:"rolling"
   in
   Alcotest.(check string)
-    "truncates non-weeklynet to 15 chars"
-    "node-very-long-netwo"
+    "truncates to 30 chars"
+    "node-very-long-network-name-that-ex"
     name
 
 let () =
