@@ -55,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- RPC Browser: toggling focus in side-by-side result mode now always targets an existing pager ID (avoids invalid focus state after pager removal)
 - Multi-column layout: pressing Up from the first instance now correctly navigates to "Browse RPCs" instead of jumping to "Install new instance"
 - Ghostnet network can no longer be selected despite deprecation (removed from all network selection code paths)
 - RPC Browser: Ghostnet URLs no longer appear in public nodes list (previously showed as "Unknown" network)

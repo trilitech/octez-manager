@@ -211,7 +211,13 @@ let toggle_focus state =
   | Result ({focus; _} as r) ->
       let new_focus : result_focus =
         match (focus : result_focus) with
-        | FocusBrowser -> FocusPager 0
+        | FocusBrowser -> (
+            if List.exists (fun p -> p.id = r.last_pager_id) r.pagers then
+              FocusPager r.last_pager_id
+            else
+              match r.pagers with
+              | first :: _ -> FocusPager first.id
+              | [] -> FocusBrowser)
         | FocusPager _ -> FocusBrowser
       in
       {state with mode = Result {r with focus = new_focus}}
