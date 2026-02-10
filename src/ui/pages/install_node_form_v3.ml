@@ -59,7 +59,9 @@ let generate_instance_name ~network ~history_mode =
       | Some i -> String.sub n (i + 1) (String.length n - i - 1)
       | None -> n
     in
-    (* Truncate excessively long names (but allow weeklynet-YYYY-MM-DD which is 21 chars) *)
+    (* Strip date suffix before truncating — e.g. weeklynet-2026-02-04 -> weeklynet *)
+    let base = Snapshots.strip_date_suffix base in
+    (* Truncate excessively long names *)
     if String.length base > 30 then String.sub base 0 30 else base
   in
   match String.lowercase_ascii history_mode with
