@@ -60,9 +60,15 @@ let mark_instances_dirty () = Atomic.set instances_dirty true
 
 let consume_instances_dirty () = Atomic.exchange instances_dirty false
 
-let pending_navigation : string option ref = ref None
+type pending_navigation = Goto of string | Back | Quit
 
-let navigate page = pending_navigation := Some page
+let pending_navigation : pending_navigation option ref = ref None
+
+let navigate page = pending_navigation := Some (Goto page)
+
+let navigate_back () = pending_navigation := Some Back
+
+let navigate_quit () = pending_navigation := Some Quit
 
 let consume_navigation () =
   let value = !pending_navigation in
