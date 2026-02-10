@@ -170,6 +170,26 @@ let test_set_result () =
       Alcotest.(check string) "raw_body" "{}" slot.State.raw_body
   | None -> Alcotest.fail "expected focused pager"
 
+let test_toggle_focus_uses_existing_pager () =
+  let state = State.init ~instances:[] |> State.enter_result_mode in
+  let state =
+    match State.add_pager state with
+    | Some s -> s
+    | None -> Alcotest.fail "expected add_pager to succeed"
+  in
+  let state =
+    match State.remove_pager 0 state with
+    | Some s -> s
+    | None -> Alcotest.fail "expected remove_pager to succeed"
+  in
+  let state = State.focus_browser state |> State.toggle_focus in
+  match state.mode with
+  | State.Result {focus = State.FocusPager id; _} ->
+      Alcotest.(check int) "focus existing pager" 1 id
+  | State.Result {focus = State.FocusBrowser; _} ->
+      Alcotest.fail "expected pager focus"
+  | State.List _ -> Alcotest.fail "expected Result mode"
+
 (* ============================================================ *)
 (* Cursor Tests                                                  *)
 (* ============================================================ *)
@@ -327,6 +347,10 @@ let () =
         [
           Alcotest.test_case "execute get" `Quick test_execute_get;
           Alcotest.test_case "set result" `Quick test_set_result;
+          Alcotest.test_case
+            "toggle focus uses existing pager"
+            `Quick
+            test_toggle_focus_uses_existing_pager;
         ] );
       ( "cursor",
         [
