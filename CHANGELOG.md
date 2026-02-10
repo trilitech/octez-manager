@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Mutable pattern detection**: Architecture index now tracks usage of `ref`, `:=`, `!`, `Atomic`, and mutable record fields. New `arch_query mutables` command shows summary of mutable patterns across the codebase. CI blocks PRs that increase `mutable_fields` or `functions_with_mutables` metrics.
 
+### Changed
+
+- Instance details page now renders service details and file paths sections in Box_widget Rounded borders with distinct colors (service details in color 12, file paths in color 14)
+
 ## [0.3.0] - 2026-02-11
 
 ### Added
