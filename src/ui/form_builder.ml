@@ -551,7 +551,10 @@ struct
             match S.spec.on_submit model with
             | Ok () ->
                 Context.mark_instances_dirty () ;
-                Context.navigate "instances" ;
+                (* Reset form to fresh initial values for next use *)
+                s.model_ref := S.spec.initial_model () ;
+                (* Navigate back to instances page via Context. *)
+                Context.navigate_instances () ;
                 s
             | Error (`Msg msg) ->
                 Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -568,7 +571,10 @@ struct
         match S.spec.on_submit model with
         | Ok () ->
             Context.mark_instances_dirty () ;
-            Context.navigate "instances" ;
+            (* Reset form to fresh initial values for next use *)
+            s.model_ref := S.spec.initial_model () ;
+            (* Navigate back to instances page via Context. *)
+            Context.navigate_instances () ;
             s
         | Error (`Msg msg) ->
             Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -713,7 +719,7 @@ struct
           | Some Miaou.Core.Keys.Escape ->
               (* Go to instances page directly - Navigation.back would go to
                  details page which may have stale/consumed context. *)
-              Context.navigate "instances" ;
+              Context.navigate_instances () ;
               ps
           | Some Miaou.Core.Keys.Up ->
               Navigation.update (fun s -> move_state s (-1)) ps
@@ -729,7 +735,7 @@ struct
   let service_cycle ps _ = refresh ps
 
   let back ps =
-    Context.navigate "instances" ;
+    Context.navigate_instances () ;
     ps
 
   let move ps delta = Navigation.update (fun s -> move_state s delta) ps
@@ -767,7 +773,7 @@ struct
           | `Bubble -> (
               match key with
               | Miaou.Core.Keys.Escape ->
-                  Context.navigate "instances" ;
+                  Context.navigate_instances () ;
                   (ps, Miaou_interfaces.Key_event.Handled)
               | Miaou.Core.Keys.Up ->
                   ( Navigation.update (fun s -> move_state s (-1)) ps,
