@@ -7,6 +7,7 @@
 
 module Widgets = Miaou_widgets_display.Widgets
 module Box = Miaou_widgets_layout.Box_widget
+module Desc_list = Miaou_widgets_display.Description_list
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
@@ -88,18 +89,10 @@ let header s =
 
 let _footer = []
 
-let view_details svc =
-  let render_fields fields =
-    let width =
-      fields
-      |> List.fold_left (fun acc (label, _) -> max acc (String.length label)) 0
-    in
-    fields
-    |> List.map (fun (label, value) ->
-        Printf.sprintf
-          "%s %s"
-          (Widgets.dim (Printf.sprintf "%-*s" width label))
-          value)
+let view_details ~box_width svc =
+  let render_fields items =
+    Desc_list.create ~key_width:18 ~items ()
+    |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
   in
   let env =
     match Node_env.read ~inst:svc.Service.instance with
@@ -300,14 +293,9 @@ let view ps ~focus:_ ~size =
     | Some err, _ -> Widgets.red ("Error: " ^ err)
     | None, None -> "Loading..."
     | None, Some svc ->
-        let title, details, paths = view_details svc in
+        let title, details, paths = view_details ~box_width svc in
         let details_box =
-          Box.render
-            ~title
-            ~style:Rounded
-            ~color:12
-            ~width:box_width
-            (String.concat "\n" details)
+          Box.render ~title ~style:Rounded ~color:12 ~width:box_width details
         in
         let paths_box =
           Box.render
@@ -315,7 +303,7 @@ let view ps ~focus:_ ~size =
             ~style:Rounded
             ~color:14
             ~width:box_width
-            (String.concat "\n" paths)
+            paths
         in
         details_box ^ "\n" ^ paths_box
   in
