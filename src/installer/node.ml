@@ -109,14 +109,35 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       log "Skipping bootstrap (preserve_data=true)\n" ;
       Ok ())
     else
-      perform_bootstrap
-        ~quiet
-        ?on_log
-        ?tmp_dir:request.tmp_dir
-        ~plan:snapshot_plan
-        ~request
-        ~data_dir
-        ()
+      match
+        perform_bootstrap
+          ~quiet
+          ?on_log
+          ?tmp_dir:request.tmp_dir
+          ~plan:snapshot_plan
+          ~request
+          ~data_dir
+          ()
+      with
+      | Ok () -> Ok ()
+      | Error (`Msg msg) when is_snapshot_chain_mismatch msg ->
+          log
+            "\n\
+             WARNING: Snapshot is from a different chain (likely a previous \
+             weeklynet rotation).\n\
+             The node will sync from genesis instead. This is normal for \
+             ephemeral testnets.\n" ;
+          (* Clean data directory left by failed import and re-initialize config *)
+          let* () = File_ops.remove_tree data_dir in
+          let* () = ensure_directories ~owner ~group [data_dir] in
+          ensure_node_config
+            ~quiet
+            ~app_bin_dir:request.app_bin_dir
+            ~data_dir
+            ~network:resolved_network
+            ~history_mode:request.history_mode
+            ()
+      | Error _ as e -> e
   in
   log "Reowning runtime paths...\n" ;
   let* () =
