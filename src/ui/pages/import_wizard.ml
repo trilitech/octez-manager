@@ -49,14 +49,18 @@ let init () =
 let update ps _ =
   (* Check for pending navigation (e.g., from job completion callback) *)
   match Context.consume_navigation () with
-  | Some page -> Navigation.goto page ps
+  | Some (Context.Goto page) -> Navigation.goto page ps
+  | Some Context.Back -> Navigation.back ps
+  | Some Context.Quit -> Navigation.quit ps
   | None -> ps
 
 let refresh ps =
   (* Check for pending navigation (e.g., from job completion callback) *)
   let ps =
     match Context.consume_navigation () with
-    | Some page -> Navigation.goto page ps
+    | Some (Context.Goto page) -> Navigation.goto page ps
+    | Some Context.Back -> Navigation.back ps
+    | Some Context.Quit -> Navigation.quit ps
     | None -> ps
   in
   Navigation.update
