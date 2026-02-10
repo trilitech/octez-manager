@@ -9,6 +9,28 @@ open Rresult
 open Installer_types
 open Helpers
 
+let string_contains_sub haystack needle =
+  let hlen = String.length haystack and nlen = String.length needle in
+  if nlen = 0 then true
+  else
+    let limit = hlen - nlen in
+    let rec loop i =
+      if i > limit then false
+      else if String.sub haystack i nlen = needle then true
+      else loop (i + 1)
+    in
+    loop 0
+
+let is_snapshot_chain_mismatch msg =
+  (* octez-node snapshot import emits:
+     "The chain name contained in the snapshot file (...) is not consistent
+      with the network configured in the targeted data directory (...)."
+     The error from Cmd_runner wraps this as "Command failed: ...\nOutput:\n..."
+     so we search the whole message for the distinctive phrase. *)
+  let lower = String.lowercase_ascii msg in
+  string_contains_sub lower "not consistent"
+  && string_contains_sub lower "chain name"
+
 let history_mode_matches ~requested ~snapshot_mode =
   let requested_str = History_mode.to_string requested in
   let requested_lower = String.lowercase_ascii requested_str in
@@ -150,7 +172,7 @@ let prepare_snapshot_source ?(quiet = false) ?on_log ?progress ?tmp_dir src =
         else R.error_msgf "Snapshot file %s does not exist" trimmed
     | _ -> download_snapshot ~quiet ?on_log ?progress ?tmp_dir trimmed
 
-let snapshot_plan_of_request request =
+let snapshot_plan_of_request (request : node_request) =
   match request.bootstrap with
   | Genesis -> Ok No_snapshot
   | Snapshot {src} -> (
