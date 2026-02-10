@@ -1255,6 +1255,10 @@ let snapshots_slug_of_network () =
       ("  Shadownet  ", Some "shadownet");
       ("https://snapshots.tzinit.org/networks/Seoulnet.json", Some "seoulnet");
       ("", None);
+      (* Weeklynet dated URLs: date suffix must be stripped *)
+      ("https://teztnets.com/weeklynet-2026-02-04", Some "weeklynet");
+      ("https://teztnets.com/weeklynet", Some "weeklynet");
+      ("weeklynet-2026-02-04", Some "weeklynet");
     ]
   in
   List.iter
