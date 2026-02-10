@@ -45,7 +45,9 @@ let update ps _ = ps
 
 let refresh ps =
   match Context.consume_navigation () with
-  | Some p -> Navigation.goto p ps
+  | Some (Context.Goto p) -> Navigation.goto p ps
+  | Some Context.Back -> Navigation.back ps
+  | Some Context.Quit -> Navigation.quit ps
   | None ->
       (* Reload service data in case it was updated *)
       if Context.consume_instances_dirty () then

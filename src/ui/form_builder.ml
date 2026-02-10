@@ -462,7 +462,9 @@ struct
     (* Check for pending navigation from Context (set by modal callbacks) *)
     let ps =
       match Context.consume_navigation () with
-      | Some p -> Navigation.goto p ps
+      | Some (Context.Goto p) -> Navigation.goto p ps
+      | Some Context.Back -> Navigation.back ps
+      | Some Context.Quit -> Navigation.quit ps
       | None -> ps
     in
     (* Call on_refresh hook if provided *)
