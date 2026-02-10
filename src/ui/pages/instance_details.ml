@@ -6,6 +6,7 @@
 (******************************************************************************)
 
 module Widgets = Miaou_widgets_display.Widgets
+module Box = Miaou_widgets_layout.Box_widget
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
@@ -288,20 +289,38 @@ let view_details svc =
           ("Extra Args", String.concat " " svc.Service.extra_args);
         ]
   in
-  render_fields details
-  @ [""; Widgets.bold "Files & Paths"]
-  @ render_fields paths
+  let role_title = String.capitalize_ascii svc.Service.role ^ " Details" in
+  (role_title, render_fields details, render_fields paths)
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
+  let box_width = min 78 (size.LTerm_geom.cols - 2) in
   let body =
     match (s.error, s.service) with
-    | Some err, _ -> [Widgets.red ("Error: " ^ err)]
-    | None, Some svc -> view_details svc
-    | None, None -> ["Loading..."]
+    | Some err, _ -> Widgets.red ("Error: " ^ err)
+    | None, None -> "Loading..."
+    | None, Some svc ->
+        let title, details, paths = view_details svc in
+        let details_box =
+          Box.render
+            ~title
+            ~style:Rounded
+            ~color:12
+            ~width:box_width
+            (String.concat "\n" details)
+        in
+        let paths_box =
+          Box.render
+            ~title:"Files & Paths"
+            ~style:Rounded
+            ~color:14
+            ~width:box_width
+            (String.concat "\n" paths)
+        in
+        details_box ^ "\n" ^ paths_box
   in
   Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
-      String.concat "\n" body)
+      body)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
