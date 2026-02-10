@@ -1,19 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
-
-  "lsp": {
-    "ocaml-lsp": {
-      "command": ["opam", "exec", "--", "ocamllsp"]
-    }
-  },
-
+  "lsp": { "ocaml-lsp": { "command": [ "opam", "exec", "--", "ocamllsp" ] } },
   "formatter": {
     "ocamlformat": {
-      "command": ["opam", "exec", "--", "ocamlformat", "--inplace", "$FILE"],
-      "extensions": [".ml", ".mli"]
+      "command": [
+        "opam", "exec", "--", "ocamlformat", "--inplace", "$FILE"
+      ],
+      "extensions": [ ".ml", ".mli" ]
     }
   },
-
   "command": {
     "build": {
       "template": "Run `opam exec -- dune build` and fix any compilation errors.",
@@ -44,7 +39,6 @@
       "description": "Query the architecture database"
     }
   },
-
   "permission": {
     "bash": {
       "*": "ask",
@@ -70,6 +64,20 @@
       "*.env.example": "allow"
     }
   },
-
-  "instructions": ["AGENTS.md"]
+  "instructions": [ "AGENTS.md" ],
+  "mcp": {
+    "crucible": {
+      "type": "local",
+      "command": [
+        "crucible-mcp-server", "--db-path",
+        "/home/mathias/dev/octez-manager/.crucible/crucible.db",
+        "--arch-db-path",
+        "/home/mathias/dev/octez-manager/.crucible/architecture.db",
+        "--project-dir", "/home/mathias/dev/octez-manager", "--log-file",
+        "/home/mathias/dev/octez-manager/.crucible/mcp-server.log"
+      ],
+      "enabled": true,
+      "environment": {}
+    }
+  }
 }
