@@ -13,6 +13,10 @@ open Installer_types
 val history_mode_matches :
   requested:History_mode.t -> snapshot_mode:string -> bool
 
+(** Check if an error message indicates a chain name mismatch during
+    snapshot import (e.g. stale snapshot from a previous weeklynet rotation) *)
+val is_snapshot_chain_mismatch : string -> bool
+
 (** Resolve automatic snapshot download details from tzinit service *)
 val resolve_snapshot_download :
   network:string ->
