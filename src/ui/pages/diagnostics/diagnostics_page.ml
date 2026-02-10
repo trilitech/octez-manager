@@ -10,6 +10,7 @@ module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 module Box = Miaou_widgets_layout.Box_widget
+module C = Miaou_canvas.Canvas
 open Octez_manager_lib
 
 let name = "diagnostics"
@@ -179,11 +180,68 @@ let keymap _ =
     kb "?" "Help";
   ]
 
-let header =
-  [
-    Widgets.title_highlight " Diagnostics & Metrics ";
-    Widgets.dim "Live system metrics and service status";
-  ]
+let render_canvas_header ~width =
+  let style_of fg = {C.default_style with fg} in
+  let bold_of fg = {C.default_style with fg; bold = true} in
+  let rows = 5 in
+  let c = C.create ~rows ~cols:width in
+  (* Background fill *)
+  C.fill_rect
+    c
+    ~row:0
+    ~col:0
+    ~width
+    ~height:rows
+    ~char:" "
+    ~style:{C.default_style with bg = 236} ;
+  (* Rounded border *)
+  C.draw_box
+    c
+    ~row:0
+    ~col:0
+    ~width
+    ~height:rows
+    ~border:Rounded
+    ~style:(style_of 69) ;
+  (* Title centered *)
+  let title = " Diagnostics & Metrics " in
+  let title_col = max 2 ((width - String.length title) / 2) in
+  C.draw_text c ~row:1 ~col:title_col ~style:(bold_of 147) title ;
+  (* Status indicators on row 3 *)
+  let metrics_on = Metrics.is_enabled () in
+  let recorder_on = Metrics.is_recording () in
+  let is_root = Paths.is_root () in
+  let indicators =
+    [
+      ( (if metrics_on then "●" else "○"),
+        (if metrics_on then 10 else 8),
+        "metrics" );
+      ( (if recorder_on then "●" else "○"),
+        (if recorder_on then 10 else 8),
+        "recorder" );
+      ( (if is_root then "●" else "●"),
+        (if is_root then 196 else 10),
+        if is_root then "root" else "user" );
+    ]
+  in
+  let total_len =
+    List.fold_left
+      (fun acc (icon, _, label) ->
+        acc + String.length icon + 1 + String.length label + 3)
+      0
+      indicators
+  in
+  let start_col = max 2 ((width - total_len) / 2) in
+  let _col =
+    List.fold_left
+      (fun col (icon, color, label) ->
+        C.draw_text c ~row:3 ~col ~style:(bold_of color) icon ;
+        C.draw_text c ~row:3 ~col:(col + 2) ~style:(style_of 252) label ;
+        col + String.length icon + 1 + String.length label + 3)
+      start_col
+      indicators
+  in
+  C.to_ansi c
 
 let _footer = []
 
@@ -517,6 +575,8 @@ let view ps ~focus:_ ~size =
           drop start l |> take visible_height []
       in
 
+      let canvas_header = render_canvas_header ~width:box_width in
+
       let body = String.concat "\n" visible_lines in
 
       (* Add scroll indicator *)
@@ -529,11 +589,11 @@ let view ps ~focus:_ ~size =
             (100 * visible_height / content_height)
         else ""
       in
-      let header_with_scroll = header @ [Widgets.dim scroll_indicator] in
+      let header = [canvas_header; Widgets.dim scroll_indicator] in
 
       Miaou_widgets_layout.Vsection.render
         ~size
-        ~header:header_with_scroll
+        ~header
         ~content_footer:[]
         ~child:(fun _ -> body))
 
