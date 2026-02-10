@@ -111,7 +111,11 @@ let maybe_refresh ps =
   let now = Unix.gettimeofday () in
   let pending_nav = Context.consume_navigation () in
   let ps =
-    match pending_nav with Some p -> Navigation.goto p ps | None -> ps
+    match pending_nav with
+    | Some (Context.Goto p) -> Navigation.goto p ps
+    | Some Context.Back -> Navigation.back ps
+    | Some Context.Quit -> Navigation.quit ps
+    | None -> ps
   in
   (* Check for pending restart dependents after edit *)
   let pending_restart = Context.take_pending_restart_dependents () in
@@ -632,7 +636,9 @@ Press **Enter** to open instance menu.|}
 
   let check_navigation ps =
     match Context.consume_navigation () with
-    | Some p -> Navigation.goto p ps
+    | Some (Context.Goto p) -> Navigation.goto p ps
+    | Some Context.Back -> Navigation.back ps
+    | Some Context.Quit -> Navigation.quit ps
     | None -> ps
 
   let handle_modal_key ps key ~size:_ =

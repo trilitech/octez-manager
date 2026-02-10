@@ -49,8 +49,17 @@ val consume_instances_dirty : unit -> bool
 (** Request navigation to the named page on the next tick. *)
 val navigate : string -> unit
 
+(** Request back navigation on the next tick. *)
+val navigate_back : unit -> unit
+
+(** Request app quit on the next tick. *)
+val navigate_quit : unit -> unit
+
+(** Typed pending navigation request consumed by pages. *)
+type pending_navigation = Goto of string | Back | Quit
+
 (** Consume the pending navigation target (returns [Some] once, then [None]). *)
-val consume_navigation : unit -> string option
+val consume_navigation : unit -> pending_navigation option
 
 (** Toast notifications *)
 val toast_info : string -> unit
