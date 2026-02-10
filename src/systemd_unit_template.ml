@@ -139,14 +139,31 @@ let node_prestart_script_body =
   ^ "    SNAPSHOT_KIND=\"${OCTEZ_HISTORY_MODE:-rolling}\"\n" ^ "  fi\n"
   ^ "  curl -fSL \
      \"https://snapshots.tzinit.org/$SNAPSHOT_NETWORK/$SNAPSHOT_KIND\" -o \
-     \"$TMP\"\n" ^ "}\n\n" ^ "if fetch_snapshot; then\n" ^ "  ensure_config\n"
-  ^ "  EXTRA=\"${OCTEZ_SNAPSHOT_NO_CHECK:-0}\"\n"
-  ^ "  if [ \"$EXTRA\" = \"1\" ]; then\n"
-  ^ "    \"$NODE_BIN\" snapshot import --no-check --force --data-dir \
-     \"$DATA_DIR\" \"$TMP\"\n" ^ "  else\n"
-  ^ "    \"$NODE_BIN\" snapshot import --force --data-dir \"$DATA_DIR\" \"$TMP\"\n"
-  ^ "  fi\n" ^ "else\n"
-  ^ "  echo \"octez-manager prestart: snapshot fetch skipped\" >&2\n" ^ "fi\n"
+     \"$TMP\"\n" ^ "}\n\n" ^ "import_snapshot() {\n"
+  ^ "  EXTRA=\"${OCTEZ_SNAPSHOT_NO_CHECK:-0}\"\n" ^ "  IMPORT_OUTPUT=$(\n"
+  ^ "    if [ \"$EXTRA\" = \"1\" ]; then\n"
+  ^ "      \"$NODE_BIN\" snapshot import --no-check --force --data-dir \
+     \"$DATA_DIR\" \"$TMP\" 2>&1\n" ^ "    else\n"
+  ^ "      \"$NODE_BIN\" snapshot import --force --data-dir \"$DATA_DIR\" \
+     \"$TMP\" 2>&1\n" ^ "    fi\n" ^ "  ) && return 0\n"
+  ^ "  # Check if the failure is a chain name mismatch (stale snapshot from\n"
+  ^ "  # a previous weeklynet rotation). If so, wipe and let the node sync\n"
+  ^ "  # from genesis instead of failing the service start.\n"
+  ^ "  LOWER=$(echo \"$IMPORT_OUTPUT\" | tr '[:upper:]' '[:lower:]')\n"
+  ^ "  case \"$LOWER\" in\n"
+  ^ "    *\"not consistent\"*\"chain name\"*|*\"chain name\"*\"not \
+     consistent\"*)\n"
+  ^ "      echo \"octez-manager prestart: snapshot is from a different chain \
+     (stale weeklynet?), syncing from genesis\" >&2\n"
+  ^ "      rm -rf \"$STORE_DIR\" \"$DATA_DIR/context\" \"$VERSION_FILE\" \
+     \"$LOCK_FILE\"\n"
+  ^ "      # Re-create config since data dir may be in a bad state\n"
+  ^ "      rm -f \"$CONFIG\"\n" ^ "      ensure_config\n" ^ "      return 0\n"
+  ^ "      ;;\n" ^ "    *)\n" ^ "      echo \"$IMPORT_OUTPUT\" >&2\n"
+  ^ "      return 1\n" ^ "      ;;\n" ^ "  esac\n" ^ "}\n\n"
+  ^ "if fetch_snapshot; then\n" ^ "  ensure_config\n" ^ "  import_snapshot\n"
+  ^ "else\n" ^ "  echo \"octez-manager prestart: snapshot fetch skipped\" >&2\n"
+  ^ "fi\n"
 
 let write_prestart_script role =
   match String.lowercase_ascii role with
