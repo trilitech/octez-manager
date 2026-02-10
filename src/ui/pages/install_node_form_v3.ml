@@ -59,8 +59,8 @@ let generate_instance_name ~network ~history_mode =
       | Some i -> String.sub n (i + 1) (String.length n - i - 1)
       | None -> n
     in
-    (* Truncate long names *)
-    if String.length base > 15 then String.sub base 0 15 else base
+    (* Truncate excessively long names (but allow weeklynet-YYYY-MM-DD which is 21 chars) *)
+    if String.length base > 30 then String.sub base 0 30 else base
   in
   match String.lowercase_ascii history_mode with
   | "rolling" -> Printf.sprintf "node-%s" network_short
@@ -1128,6 +1128,8 @@ module For_tests = struct
   let snapshot_entry_matches_history_mode = snapshot_entry_matches_history_mode
 
   let history_snapshot_conflict = history_snapshot_conflict
+
+  let generate_instance_name = generate_instance_name
 end
 
 let page : Miaou.Core.Registry.page = (module Page)
