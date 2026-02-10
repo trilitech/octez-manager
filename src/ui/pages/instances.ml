@@ -256,10 +256,8 @@ struct
   let service_cycle ps _ = refresh ps
 
   let back ps =
-    (* Instances is the home page - back/Esc should quit the TUI.
-       Navigate to special __EXIT__ page to signal quit to the framework. *)
-    Context.navigate "__EXIT__" ;
-    ps
+    (* Instances is the home page - back/Esc should quit the TUI. *)
+    Navigation.quit ps
 
   let handled_keys () =
     Miaou.Core.Keys.
