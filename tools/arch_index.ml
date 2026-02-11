@@ -574,7 +574,10 @@ let process_cmt db ~exposed_tbl ~doc_tbl ~stmt_mod ~stmt_fn ~stmt_ty ~stmt_fld
                               let signature =
                                 Some (type_to_string vb.vb_pat.pat_type)
                               in
-                              let line_start = vb.vb_loc.loc_start.pos_lnum in
+                              (* Use pattern location for start to exclude doc comments *)
+                              let line_start =
+                                vb.vb_pat.pat_loc.loc_start.pos_lnum
+                              in
                               let line_end = vb.vb_loc.loc_end.pos_lnum in
                               let exposed =
                                 Hashtbl.mem exposed_tbl (modname, name)
@@ -625,7 +628,8 @@ let process_cmt db ~exposed_tbl ~doc_tbl ~stmt_mod ~stmt_fn ~stmt_ty ~stmt_fld
                       List.iter
                         (fun (td : Typedtree.type_declaration) ->
                           let name = Ident.name td.typ_id in
-                          let line_start = td.typ_loc.loc_start.pos_lnum in
+                          (* Use name location for start to exclude doc comments *)
+                          let line_start = td.typ_name.loc.loc_start.pos_lnum in
                           let line_end = td.typ_loc.loc_end.pos_lnum in
                           let exposed =
                             Hashtbl.mem exposed_tbl (modname, name)
