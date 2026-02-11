@@ -104,6 +104,22 @@ val start_head_monitor :
   on_disconnect:(unit -> unit) ->
   monitor_handle
 
+(** Start a generic RPC stream (for any streaming endpoint).
+    Runs curl in the domain pool, calling [on_line] for each line received.
+    Works for /monitor/*, /chains/*/mempool/*, etc.
+
+    @param service The node to stream from
+    @param path RPC path (e.g., "/monitor/heads/main")
+    @param on_line Callback for each raw line received
+    @param on_disconnect Callback when stream disconnects
+    @return Handle to stop the stream *)
+val start_rpc_stream :
+  Service.t ->
+  path:string ->
+  on_line:(string -> unit) ->
+  on_disconnect:(unit -> unit) ->
+  monitor_handle
+
 module For_tests : sig
   val try_fetch_methods :
     string option ->

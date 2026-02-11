@@ -262,3 +262,30 @@ val load_recent_paths : unit -> recent_path list
 
 (** Save recent paths to disk. *)
 val save_recent_paths : recent_path list -> unit
+
+(** {1 Streaming} *)
+
+(** Stop streaming on a specific pager slot by ID. *)
+val stop_streaming_pager : int -> state -> state
+
+(** Stop all active streaming connections across all pagers. *)
+val stop_all_streaming : state -> state
+
+(** Check if the focused pager has an active streaming connection. *)
+val is_streaming : state -> bool
+
+(** Set up a streaming pager: create pager in streaming mode, start RPC stream,
+    wire on_line to feed JSON streamer and append to pager.
+    @param pager_id Target pager ID
+    @param request The request URL for display
+    @param service The target service to stream from
+    @param rpc_path The RPC path to stream
+    @param on_state_update Callback to update global state ref and trigger re-render *)
+val start_streaming_pager :
+  pager_id:int ->
+  request:string ->
+  service:Service.t ->
+  rpc_path:string ->
+  on_state_update:(state -> unit) ->
+  state ->
+  state

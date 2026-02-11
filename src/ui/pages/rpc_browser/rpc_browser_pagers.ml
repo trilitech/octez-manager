@@ -28,6 +28,7 @@ let create_empty_pager ?(target_instance = None) id =
     response_time_ms = None;
     response_size = None;
     target_instance;
+    streaming_handle = None;
   }
 
 (** Get the list of all pager IDs in the current state. *)
@@ -107,12 +108,20 @@ let add_pager ~current_instance state =
   | List _ -> None
 
 (** Remove a pager by ID. Returns None if only 1 pager remains or ID not
-    found. *)
+    found. Stops any active streaming connection on the removed pager. *)
 let remove_pager id state =
   match state.mode with
   | Result {pagers; focus; last_pager_id} ->
       if List.length pagers <= 1 then None
-      else
+      else (
+        (* Stop streaming on the pager being removed *)
+        List.iter
+          (fun p ->
+            if p.id = id then
+              match p.streaming_handle with
+              | Some h -> h.Rpc_client.stop ()
+              | None -> ())
+          pagers ;
         let new_pagers = List.filter (fun p -> p.id <> id) pagers in
         if List.length new_pagers = List.length pagers then None
           (* id not found *)
@@ -141,7 +150,7 @@ let remove_pager id state =
                     focus = new_focus;
                     last_pager_id = new_last_pager_id;
                   };
-            }
+            })
   | List _ -> None
 
 (** Focus a pager by ID. Returns unchanged state if ID not found. *)
@@ -271,11 +280,21 @@ let set_pager_result ~pager_id ~request ~body ~raw_body ?response_time_ms
     state
 
 (** Execute a GET request on the focused pager (sets loading state).
+    Stops any active streaming on the pager before starting.
     @param url Full URL being requested *)
 let execute_get ~url state =
   match state.mode with
   | Result {pagers; last_pager_id; _} ->
       let pager_id = get_focused_pager_id state in
+      (* Stop any active streaming on this pager *)
+      List.iter
+        (fun p ->
+          if p.id = pager_id then (
+            (match p.streaming_handle with
+            | Some h -> h.Rpc_client.stop ()
+            | None -> ()) ;
+            match p.pager with Some pg -> Pager.stop_streaming pg | None -> ()))
+        pagers ;
       (* Update the focused pager to show loading state *)
       let new_pagers =
         List.map
@@ -290,6 +309,7 @@ let execute_get ~url state =
                 foldable = None;
                 response_time_ms = None;
                 response_size = None;
+                streaming_handle = None;
               }
             else p)
           pagers
@@ -347,3 +367,105 @@ let set_pager pager state =
         (fun slot -> {slot with pager = Some pager})
         state
   | List _ -> state
+
+(** Stop streaming on a specific pager slot by ID. *)
+let stop_streaming_pager pager_id state =
+  update_pager_slot
+    pager_id
+    (fun slot ->
+      (match slot.streaming_handle with
+      | Some h -> h.Rpc_client.stop ()
+      | None -> ()) ;
+      (match slot.pager with Some p -> Pager.stop_streaming p | None -> ()) ;
+      {slot with streaming_handle = None})
+    state
+
+(** Stop all active streaming connections across all pagers. *)
+let stop_all_streaming state =
+  match state.mode with
+  | Result {pagers; _} -> (
+      List.iter
+        (fun p ->
+          (match p.streaming_handle with
+          | Some h -> h.Rpc_client.stop ()
+          | None -> ()) ;
+          match p.pager with Some pg -> Pager.stop_streaming pg | None -> ())
+        pagers ;
+      let new_pagers =
+        List.map (fun p -> {p with streaming_handle = None}) pagers
+      in
+      match state.mode with
+      | Result r -> {state with mode = Result {r with pagers = new_pagers}}
+      | List _ -> state)
+  | List _ -> state
+
+(** Check if the focused pager has an active streaming connection. *)
+let is_streaming state =
+  match get_focused_pager state with
+  | Some slot -> (
+      match slot.streaming_handle with
+      | Some h -> h.Rpc_client.alive ()
+      | None -> false)
+  | None -> false
+
+(** Set up a streaming pager: create pager in streaming mode, start RPC stream,
+    wire on_line to feed JSON streamer and append to pager.
+    @param pager_id Target pager ID
+    @param request The request URL for display
+    @param service The target service to stream from
+    @param rpc_path The RPC path to stream
+    @param on_state_update Callback to update global state ref and trigger re-render *)
+let start_streaming_pager ~pager_id ~request ~service ~rpc_path ~on_state_update
+    state =
+  (* Create pager in streaming mode with notify_render callback *)
+  let pager =
+    Pager.open_text
+      ~title:"Streaming"
+      ~notify_render:(fun () -> Context.mark_instances_dirty ())
+      ""
+  in
+  Pager.start_streaming pager ;
+  (* Create JSON streamer for syntax highlighting *)
+  let streamer = Pager.json_streamer_create () in
+  (* Update state with the new streaming pager *)
+  let state =
+    update_pager_slot
+      pager_id
+      (fun slot ->
+        {
+          slot with
+          request;
+          body = "Streaming...";
+          raw_body = "";
+          pager = Some pager;
+          foldable = None;
+          response_time_ms = None;
+          response_size = None;
+        })
+      state
+  in
+  (* Start the RPC stream *)
+  let handle =
+    Rpc_client.start_rpc_stream
+      service
+      ~path:rpc_path
+      ~on_line:(fun line ->
+        (* Feed through JSON streamer for syntax highlighting *)
+        let highlighted_lines = Pager.json_streamer_feed streamer line in
+        (* Also feed a newline to flush partial lines between JSON objects *)
+        let newline_lines = Pager.json_streamer_feed streamer "\n" in
+        let all_lines = highlighted_lines @ newline_lines in
+        if all_lines <> [] then Pager.append_lines_batched pager all_lines)
+      ~on_disconnect:(fun () ->
+        Pager.stop_streaming pager ;
+        Context.mark_instances_dirty ())
+  in
+  (* Store the handle *)
+  let state =
+    update_pager_slot
+      pager_id
+      (fun slot -> {slot with streaming_handle = Some handle})
+      state
+  in
+  on_state_update state ;
+  state
