@@ -130,27 +130,31 @@ let ensure_ports ~roles ~slots () =
     (* In tests/early init, capability may be absent; default to empty. *)
   in
   let rpc_ports, p2p_ports = ports_from_states ~roles states in
-  let avoid = ref (rpc_ports @ p2p_ports) in
-  List.iter
-    (fun slot ->
-      let needs_new =
-        match parse_host_port slot.current with
-        | Some (_host, port) ->
-            port < 1024 || port > 65535 || List.mem port !avoid
-            || Port_validation.is_port_in_use port
-        | None -> true
-      in
-      if needs_new then (
-        let port =
-          Port_validation.next_free_port ~start:slot.start_port ~avoid:!avoid
+  let initial_avoid = rpc_ports @ p2p_ports in
+  let _final_avoid =
+    List.fold_left
+      (fun avoid slot ->
+        let needs_new =
+          match parse_host_port slot.current with
+          | Some (_host, port) ->
+              port < 1024 || port > 65535 || List.mem port avoid
+              || Port_validation.is_port_in_use port
+          | None -> true
         in
-        slot.setter (Printf.sprintf "%s:%d" slot.default_host port) ;
-        avoid := port :: !avoid)
-      else
-        match parse_host_port slot.current with
-        | Some (_host, port) -> avoid := port :: !avoid
-        | None -> ())
-    slots
+        if needs_new then (
+          let port =
+            Port_validation.next_free_port ~start:slot.start_port ~avoid
+          in
+          slot.setter (Printf.sprintf "%s:%d" slot.default_host port) ;
+          port :: avoid)
+        else
+          match parse_host_port slot.current with
+          | Some (_host, port) -> port :: avoid
+          | None -> avoid)
+      initial_avoid
+      slots
+  in
+  ()
 
 (** Check if a binary exists in a directory and is executable. *)
 let has_binary binary_name dir =

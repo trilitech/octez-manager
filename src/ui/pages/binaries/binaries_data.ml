@@ -100,16 +100,6 @@ let load_available_versions () =
         filtered_versions
 
 let build_items managed registered available expanded_majors =
-  let items = ref [] in
-  (* Managed versions first (matches render order in view) *)
-  List.iter
-    (fun (v, s, c) -> items := ManagedVersion (v, s, c) :: !items)
-    managed ;
-  (* Registered directories *)
-  List.iter (fun (ld, c) -> items := RegisteredDir (ld, c) :: !items) registered ;
-  (* Register action button *)
-  items := RegisterAction :: !items ;
-
   (* Group available versions by major version *)
   let major_groups = Hashtbl.create 10 in
   List.iter
@@ -127,19 +117,25 @@ let build_items managed registered available expanded_majors =
       | _ -> ())
     available ;
 
-  (* Add major groups in descending order, with sub-items if expanded *)
+  (* Build major groups in descending order, with sub-items if expanded *)
   let majors =
     Hashtbl.to_seq_keys major_groups
     |> List.of_seq
     |> List.sort (fun a b -> compare b a)
   in
-  List.iter
-    (fun major ->
-      let versions = Hashtbl.find major_groups major |> List.rev in
-      items := AvailableMajorGroup (major, versions) :: !items ;
-      (* If expanded, add individual version items *)
-      if List.mem major expanded_majors then
-        List.iter (fun v -> items := AvailableVersion v :: !items) versions)
-    majors ;
+  let major_items =
+    List.concat_map
+      (fun major ->
+        let versions = Hashtbl.find major_groups major |> List.rev in
+        let group = AvailableMajorGroup (major, versions) in
+        (* If expanded, add individual version items *)
+        if List.mem major expanded_majors then
+          group :: List.map (fun v -> AvailableVersion v) versions
+        else [group])
+      majors
+  in
 
-  List.rev !items
+  (* Build items list: managed, registered, register action, then available *)
+  List.map (fun (v, s, c) -> ManagedVersion (v, s, c)) managed
+  @ List.map (fun (ld, c) -> RegisteredDir (ld, c)) registered
+  @ [RegisterAction] @ major_items

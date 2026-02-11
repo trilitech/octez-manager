@@ -313,15 +313,13 @@ let find_orphan_directories () =
 
 let cleanup_orphans ~dry_run =
   let* orphan_dirs, orphan_logs = find_orphan_directories () in
-  let removed = ref [] in
-  let errors = ref [] in
-  let process_path path =
-    if dry_run then removed := path :: !removed
+  let process_path (removed, errors) path =
+    if dry_run then (path :: removed, errors)
     else
       match File_ops.remove_tree path with
-      | Ok () -> removed := path :: !removed
-      | Error (`Msg msg) -> errors := (path, msg) :: !errors
+      | Ok () -> (path :: removed, errors)
+      | Error (`Msg msg) -> (removed, (path, msg) :: errors)
   in
-  List.iter process_path orphan_dirs ;
-  List.iter process_path orphan_logs ;
-  Ok (List.rev !removed, List.rev !errors)
+  let all_paths = orphan_dirs @ orphan_logs in
+  let removed, errors = List.fold_left process_path ([], []) all_paths in
+  Ok (List.rev removed, List.rev errors)

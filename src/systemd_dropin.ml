@@ -57,9 +57,11 @@ let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?app_bin_dir
     | None -> ""
   in
   let header =
-    let base = ref ["[Service]"] in
-    if Paths.is_root () then base := !base @ ["PermissionsStartOnly=true"] ;
-    !base @ resources.extra_lines
+    let base = ["[Service]"] in
+    let base =
+      if Paths.is_root () then base @ ["PermissionsStartOnly=true"] else base
+    in
+    base @ resources.extra_lines
   in
   let env_lines =
     [Printf.sprintf "Environment=OCTEZ_DATA_DIR=%s" data_dir]
