@@ -131,6 +131,8 @@ The pager header shows **"Streaming..."** while data is being received.
 
 The RPC browser supports up to 10 simultaneous result panes (numbered 0-9), useful for comparing responses across instances or monitoring multiple endpoints at once.
 
+![Multi-Pager Mode](/gifs/rpc_browser_wide.gif)
+
 ### Creating Pagers
 
 Press `S` (capital S) to **split** and create a new pager. The new pager appears next to existing ones, and you can execute a different query in each.
