@@ -105,6 +105,8 @@ let back ps =
   let s = ps.Navigation.s in
   match s.State.mode with
   | State.Result _ ->
+      (* Stop all active streaming connections before leaving Result mode *)
+      let s = State.stop_all_streaming s in
       let new_state =
         {
           s with

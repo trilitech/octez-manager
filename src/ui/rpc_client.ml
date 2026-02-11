@@ -7,6 +7,8 @@
 
 open Octez_manager_lib
 
+let log msg = Cmd_runner.append_debug_log ("RPC_CLIENT " ^ msg)
+
 (* Helper to compute endpoint URL for a service. *)
 let endpoint_of (s : Service.t) = Rpc_addr.to_endpoint s.rpc_addr
 
@@ -18,7 +20,16 @@ let rpc_get (s : Service.t) path =
     [octez_client_bin s; "--endpoint"; endpoint_of s; "rpc"; "get"; path]
   in
   let cmd_s = Cmd_runner.cmd_to_string argv ^ " 2>/dev/null" in
-  Cmd_runner.run_out ["/bin/sh"; "-lc"; cmd_s]
+  log (Printf.sprintf "octez-client rpc get: %s (instance=%s)" cmd_s s.instance) ;
+  let result = Cmd_runner.run_out ["/bin/sh"; "-lc"; cmd_s] in
+  (match result with
+  | Ok body ->
+      log
+        (Printf.sprintf
+           "octez-client rpc get OK: %d bytes"
+           (String.length body))
+  | Error (`Msg m) -> log (Printf.sprintf "octez-client rpc get FAILED: %s" m)) ;
+  result
 
 (* Cache tool availability to avoid shell probes on each request. *)
 let has_curl_cached = lazy (Sys.command "command -v curl >/dev/null 2>&1" = 0)
@@ -31,14 +42,24 @@ let wget_available () = Lazy.force has_wget_cached
 
 let rec try_fetch_methods last_err = function
   | [] -> (
+      log
+        (Printf.sprintf
+           "try_fetch_methods: all methods exhausted, last_err=%s"
+           (match last_err with Some e -> e | None -> "<none>")) ;
       match last_err with
       | Some e -> Error e
       | None -> Error "no HTTP methods available")
   | m :: rest -> (
       match m () with
-      | None -> try_fetch_methods last_err rest
-      | Some (Ok _ as ok) -> ok
-      | Some (Error e) -> try_fetch_methods (Some e) rest)
+      | None ->
+          log "try_fetch_methods: method not available, trying next" ;
+          try_fetch_methods last_err rest
+      | Some (Ok _ as ok) ->
+          log "try_fetch_methods: method succeeded" ;
+          ok
+      | Some (Error e) ->
+          log (Printf.sprintf "try_fetch_methods: method failed: %s" e) ;
+          try_fetch_methods (Some e) rest)
 
 (* Simple concurrency limiter for external HTTP commands (curl/wget/rpc_get). *)
 let max_concurrent_requests =
@@ -86,30 +107,51 @@ let absolutize_url (s : Service.t) (path : string) : string =
 let http_fetch_methods ~url ~rpc_path (s : Service.t) :
     (unit -> (string, string) result option) list =
   let via_curl () =
-    if curl_available () then
+    if curl_available () then (
+      log (Printf.sprintf "via_curl: attempting url=%s" url) ;
       Some
         (with_request_slot (fun () ->
              match
                Cmd_runner.run_out
                  ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
              with
-             | Ok s -> Ok s
-             | Error (`Msg m) -> Error m))
-    else None
+             | Ok s ->
+                 log
+                   (Printf.sprintf "via_curl: OK (%d bytes)" (String.length s)) ;
+                 Ok s
+             | Error (`Msg m) ->
+                 log (Printf.sprintf "via_curl: FAILED: %s" m) ;
+                 Error m)))
+    else (
+      log "via_curl: curl not available" ;
+      None)
   in
   let via_wget () =
-    if wget_available () then
+    if wget_available () then (
+      log (Printf.sprintf "via_wget: attempting url=%s" url) ;
       Some
         (with_request_slot (fun () ->
              match
                Cmd_runner.run_out
                  ["wget"; "-qO-"; "--timeout=1"; "--tries=1"; url]
              with
-             | Ok s -> Ok s
-             | Error (`Msg m) -> Error m))
-    else None
+             | Ok s ->
+                 log
+                   (Printf.sprintf "via_wget: OK (%d bytes)" (String.length s)) ;
+                 Ok s
+             | Error (`Msg m) ->
+                 log (Printf.sprintf "via_wget: FAILED: %s" m) ;
+                 Error m)))
+    else (
+      log "via_wget: wget not available" ;
+      None)
   in
   let via_rpc_get () =
+    log
+      (Printf.sprintf
+         "via_rpc_get: attempting path=%s instance=%s"
+         rpc_path
+         s.instance) ;
     Some
       (with_request_slot (fun () ->
            match rpc_get s rpc_path with
@@ -123,7 +165,21 @@ let http_get_string (s : Service.t) (path : string) =
   let rpc_path =
     if String.length path > 0 && path.[0] = '/' then path else "/" ^ path
   in
-  try_fetch_methods None (http_fetch_methods ~url ~rpc_path s)
+  log
+    (Printf.sprintf
+       "http_get_string: path=%s url=%s instance=%s"
+       path
+       url
+       s.instance) ;
+  let result = try_fetch_methods None (http_fetch_methods ~url ~rpc_path s) in
+  (match result with
+  | Ok body ->
+      log
+        (Printf.sprintf
+           "http_get_string: DONE OK (%d bytes)"
+           (String.length body))
+  | Error msg -> log (Printf.sprintf "http_get_string: DONE ERROR: %s" msg)) ;
+  result
 
 let http_get_url (s : Service.t) (path : string) =
   let url =
@@ -133,7 +189,19 @@ let http_get_url (s : Service.t) (path : string) =
   let rpc_path =
     if String.length path > 0 && path.[0] = '/' then path else "/" ^ path
   in
-  try_fetch_methods None (http_fetch_methods ~url ~rpc_path s)
+  log
+    (Printf.sprintf
+       "http_get_url: path=%s url=%s instance=%s"
+       path
+       url
+       s.instance) ;
+  let result = try_fetch_methods None (http_fetch_methods ~url ~rpc_path s) in
+  (match result with
+  | Ok body ->
+      log
+        (Printf.sprintf "http_get_url: DONE OK (%d bytes)" (String.length body))
+  | Error msg -> log (Printf.sprintf "http_get_url: DONE ERROR: %s" msg)) ;
+  result
 
 (* RPC caches with per-key TTL *)
 let head_level_cache =
@@ -359,6 +427,94 @@ let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
             url
         in
         run_head_monitor_blocking ~stopped ~cmd ~on_head) ;
+    Atomic.set running false ;
+    on_disconnect ()
+  in
+  Domain_pool.submit (fun () -> try run () with _ -> ()) ;
+  let stop () = Atomic.set stopped true in
+  let alive () = Atomic.get running in
+  {stop; alive}
+
+(* Generic RPC stream: open a long-lived curl connection and feed each line
+   to the caller. Works for any streaming endpoint (monitor/*, etc.). *)
+
+let run_rpc_stream_eio (Eio_process.Mgr mgr) ~stopped ~url ~on_line =
+  Eio.Switch.run @@ fun sw ->
+  let argv =
+    [
+      "curl";
+      "-sN";
+      "--connect-timeout";
+      "2";
+      "--max-time";
+      "86400";
+      "--no-buffer";
+      url;
+    ]
+  in
+  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w argv in
+  Eio.Flow.close stdout_w ;
+  let reader =
+    Eio.Buf_read.of_flow
+      ~max_size:(10 * 1024 * 1024)
+      (stdout_r :> _ Eio.Flow.source)
+  in
+  let rec loop () =
+    match
+      Eio.Fiber.first
+        (fun () ->
+          match Eio.Buf_read.line reader with
+          | line -> `Line line
+          | exception End_of_file -> `Eof)
+        (fun () ->
+          let rec wait () =
+            if Atomic.get stopped then `Stopped
+            else (
+              Eio_unix.sleep 0.5 ;
+              wait ())
+          in
+          wait ())
+    with
+    | `Line line ->
+        on_line line ;
+        loop ()
+    | `Eof -> ()
+    | `Stopped -> ( try Eio.Process.signal proc Sys.sigterm with _ -> ())
+  in
+  loop () ;
+  try ignore (Eio.Process.await proc) with _ -> ()
+
+let run_rpc_stream_blocking ~stopped ~cmd ~on_line =
+  let ic = Unix.open_process_in cmd in
+  let rec loop () =
+    if Atomic.get stopped then ()
+    else
+      match input_line ic with
+      | exception End_of_file -> ()
+      | exception Sys_error _ -> ()
+      | line ->
+          on_line line ;
+          loop ()
+  in
+  loop () ;
+  try ignore (Unix.close_process_in ic) with _ -> ()
+
+let start_rpc_stream (s : Service.t) ~path ~on_line ~on_disconnect :
+    monitor_handle =
+  let stopped = Atomic.make false in
+  let running = Atomic.make true in
+  let url = absolutize_url s path in
+  let run () =
+    (match Eio_process.get_process_mgr () with
+    | Some mgr -> run_rpc_stream_eio mgr ~stopped ~url ~on_line
+    | None ->
+        let cmd =
+          Printf.sprintf
+            "curl -sN --connect-timeout 2 --max-time 86400 --no-buffer %s"
+            url
+        in
+        run_rpc_stream_blocking ~stopped ~cmd ~on_line) ;
     Atomic.set running false ;
     on_disconnect ()
   in
