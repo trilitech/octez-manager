@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **RPC Browser streaming**: Monitor/streaming RPC endpoints (e.g., `/monitor/heads/main`) now display live-updating content instead of timing out. Streaming is detected automatically and uses the pager's streaming mode with incremental JSON syntax highlighting.
 - **Web interface**: `octez-manager web` starts an HTTP server with browser-based terminal access via xterm.js over WebSocket. Supports controller/viewer roles with optional password authentication (`--password`, `--viewer-password`).
 - Coverage badge on README, updated automatically from CI via dynamic gist-based shield
 - Fuzz testing with adversarial generators for core parsers (Env_file_parser, Execstart_parser, Teztnets, Snapshots) — 13 properties at 10k iterations each
