@@ -36,6 +36,8 @@ type pager_slot = {
   response_time_ms : float option;
   response_size : int option;
   target_instance : Service.t option;  (** Target node for this pager *)
+  streaming_handle : Rpc_client.monitor_handle option;
+      (** Active streaming connection, if any *)
 }
 
 (** Focus for side-by-side mode. *)

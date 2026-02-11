@@ -256,3 +256,12 @@ let navigate_cached_up = Rpc_browser_cached_nav.navigate_up
 let add_recent_path = Rpc_browser_history.add_recent_path
 
 let get_recent_paths = Rpc_browser_history.get_recent_paths
+
+(* Streaming delegations *)
+let stop_streaming_pager = Rpc_browser_pagers.stop_streaming_pager
+
+let stop_all_streaming = Rpc_browser_pagers.stop_all_streaming
+
+let is_streaming = Rpc_browser_pagers.is_streaming
+
+let start_streaming_pager = Rpc_browser_pagers.start_streaming_pager
