@@ -1,11 +1,11 @@
 # RPC Browser Demo Scenario
 # 
-# Demonstrates the RPC browser feature
+# Demonstrates the RPC browser feature with manual navigation and multi-pager
 
 name: RPC Browser Demo
 description: Interactive RPC endpoint exploration
-cols: 120
-rows: 35
+cols: 160
+rows: 40
 title: "octez-manager — RPC Browser"
 output: rpc_browser
 init_wait: 3.0
@@ -20,38 +20,36 @@ actions:
   - key: r
   - wait: 1.5
   
-  # Navigate down to first actual node (skip headers)
-  # The list starts with PUBLIC NODES header, then network headers
-  # Need to go down to reach an actual selectable node
+  # Navigate down to first local node instance (15 downs to reach local nodes)
   - comment: "Navigate to a local node instance"
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
-  - wait: 0.3
+  - wait: 0.15
   - key: Down
   - wait: 0.5
   
@@ -60,20 +58,116 @@ actions:
   - key: Enter
   - wait: 2.0
   
-  # Now we should be in the RPC browser - use shortcut 1 for /version
+  # === First query: /version using shortcut ===
   - comment: "Query /version using shortcut 1"
   - key: "1"
-  - wait: 3.0
+  - wait: 2.0
   
   # Go back to endpoint list
   - comment: "Return to endpoint list"
   - key: Escape
   - wait: 1.0
   
-  # Use shortcut 3 for bootstrap status
-  - comment: "Query bootstrap status"
-  - key: "3"
+  # === Navigate to /chains/main/blocks/head/metadata ===
+  
+  # Go to /chains (down once from root, enter)
+  - comment: "Navigate to /chains"
+  - key: Down
+  - wait: 0.3
+  - key: Enter
+  - wait: 1.0
+  
+  # Select "main" (down once, enter)
+  - comment: "Select main chain"
+  - key: Down
+  - wait: 0.3
+  - key: Enter
+  - wait: 1.0
+  
+  # Go to /blocks (down twice, enter)
+  - comment: "Navigate to /blocks"
+  - key: Down
+  - wait: 0.2
+  - key: Down
+  - wait: 0.3
+  - key: Enter
+  - wait: 1.0
+  
+  # Select "head" (down once, enter)
+  - comment: "Select head block"
+  - key: Down
+  - wait: 0.3
+  - key: Enter
+  - wait: 1.0
+  
+  # Navigate down 6 times to metadata, then enter
+  - comment: "Navigate to metadata"
+  - key: Down
+  - wait: 0.2
+  - key: Down
+  - wait: 0.2
+  - key: Down
+  - wait: 0.2
+  - key: Down
+  - wait: 0.2
+  - key: Down
+  - wait: 0.2
+  - key: Down
+  - wait: 0.3
+  - key: Enter
+  - wait: 1.0
+  
+  # Navigate to GET endpoint (down once, enter)
+  - comment: "Select GET endpoint"
+  - key: Down
+  - wait: 0.3
+  - key: Enter
   - wait: 3.0
   
-  # Final pause
+  # === Show folding feature ===
+  # Scroll down 3 times
+  - comment: "Scroll down in response"
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.5
+  
+  # Toggle fold
+  - comment: "Fold with Space"
+  - key: Space
+  - wait: 1.5
+  
+  # Toggle fold again
+  - comment: "Unfold with Space"
+  - key: Space
+  - wait: 1.5
+  
+  # === Create second pager with S ===
+  - comment: "Split to create second pager"
+  - key: S
+  - wait: 1.0
+  
+  # Go back to browser
+  - key: Escape
+  - wait: 0.5
+  
+  # Go up to root (4 backspaces)
+  - key: Backspace
+  - wait: 0.3
+  - key: Backspace
+  - wait: 0.3
+  - key: Backspace
+  - wait: 0.3
+  - key: Backspace
+  - wait: 0.5
+  
+  # Query /version again to show both pagers
+  - comment: "Query /version in second pager"
+  - key: "1"
   - wait: 2.0
+  
+  # Final pause to show both pagers side by side
+  - comment: "Show both pagers"
+  - wait: 3.0
