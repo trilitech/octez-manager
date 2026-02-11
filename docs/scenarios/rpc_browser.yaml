@@ -1,0 +1,79 @@
+# RPC Browser Demo Scenario
+# 
+# Demonstrates the RPC browser feature
+
+name: RPC Browser Demo
+description: Interactive RPC endpoint exploration
+cols: 120
+rows: 35
+title: "octez-manager — RPC Browser"
+output: rpc_browser
+init_wait: 3.0
+
+actions:
+  # Wait for main screen to fully render
+  - comment: "Wait for instances page to load"
+  - wait: 2.0
+  
+  # Open RPC browser
+  - comment: "Open RPC browser with 'r' key"
+  - key: r
+  - wait: 1.5
+  
+  # Navigate down to first actual node (skip headers)
+  # The list starts with PUBLIC NODES header, then network headers
+  # Need to go down to reach an actual selectable node
+  - comment: "Navigate to a local node instance"
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.3
+  - key: Down
+  - wait: 0.5
+  
+  # Select the node
+  - comment: "Select node instance"
+  - key: Enter
+  - wait: 2.0
+  
+  # Now we should be in the RPC browser - use shortcut 1 for /version
+  - comment: "Query /version using shortcut 1"
+  - key: "1"
+  - wait: 3.0
+  
+  # Go back to endpoint list
+  - comment: "Return to endpoint list"
+  - key: Escape
+  - wait: 1.0
+  
+  # Use shortcut 3 for bootstrap status
+  - comment: "Query bootstrap status"
+  - key: "3"
+  - wait: 3.0
+  
+  # Final pause
+  - wait: 2.0

@@ -391,6 +391,96 @@ octez-manager web --port 8443 --password mysecret
 octez-manager web --password admin123 --viewer-password viewer123
 ```
 
+### `rpc`
+
+Query RPC endpoints on node instances. Provides both scripted and interactive access to Tezos node RPCs.
+
+#### `rpc get`
+
+Execute a GET request to an RPC endpoint.
+
+```bash
+octez-manager rpc get [OPTIONS] <PATH>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--instance <NAME>`, `-i` | Target a local node instance |
+| `--public <NODE>` | Target a public node (from `rpc public-nodes`) |
+| `--url <URL>` | Target a custom RPC URL |
+
+**Examples:**
+
+```bash
+# Query version on a local instance
+octez-manager rpc get --instance shadownet /version
+
+# Query bootstrap status on a public node  
+octez-manager rpc get --public mainnet /chains/main/is_bootstrapped
+
+# Query a custom endpoint
+octez-manager rpc get --url http://localhost:8732 /chains/main/blocks/head/header
+```
+
+#### `rpc list`
+
+List available RPC endpoints at a path.
+
+```bash
+octez-manager rpc list [OPTIONS] [PATH]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--instance <NAME>`, `-i` | Target a local node instance |
+| `--public <NODE>` | Target a public node |
+| `--url <URL>` | Target a custom RPC URL |
+
+**Examples:**
+
+```bash
+# List root endpoints
+octez-manager rpc list --instance shadownet
+
+# List endpoints under /chains/main
+octez-manager rpc list --instance shadownet /chains/main
+```
+
+#### `rpc interactive`
+
+Start interactive RPC mode with tab completion.
+
+```bash
+octez-manager rpc interactive [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--instance <NAME>`, `-i` | Target a local node instance |
+| `--public <NODE>` | Target a public node |
+| `--url <URL>` | Target a custom RPC URL |
+
+In interactive mode:
+- Use `Tab` for path completion
+- Type paths and press `Enter` to execute
+- Type `exit` or press `Ctrl-D` to quit
+
+#### `rpc instances`
+
+List available node instances that can be queried.
+
+```bash
+octez-manager rpc instances
+```
+
+#### `rpc public-nodes`
+
+List available public RPC nodes from Taquito.
+
+```bash
+octez-manager rpc public-nodes
+```
+
 ### `list-available-networks`
 
 Show networks available from teztnets.com.
