@@ -58,7 +58,7 @@ jobs:
   build-and-test:
     name: Build and Test
     needs: changes
-    if: needs.changes.outputs.has-source == 'true'
+    if: needs.changes.outputs.has-source == 'true' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}-ci-debian:latest
@@ -248,8 +248,8 @@ jobs:
     # 1. Pull requests (fast iteration - coverage runs only on main branch)
     # 2. Release tags (fast validation before release)
     if: |
-      needs.changes.outputs.needs-integration == 'true' && 
-      (github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/'))
+      (needs.changes.outputs.needs-integration == 'true' && github.event_name == 'pull_request') ||
+      startsWith(github.ref, 'refs/tags/')
     timeout-minutes: 20
     strategy:
       fail-fast: false
