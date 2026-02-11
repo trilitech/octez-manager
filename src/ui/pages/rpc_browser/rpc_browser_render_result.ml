@@ -212,32 +212,34 @@ let calculate_layout ~cols ~rows ~num_pagers =
     (* Maximum grid dimensions based on minimum pager sizes *)
     let max_grid_cols = max 1 (cols / min_pager_cols) in
     let max_grid_rows = max 1 (rows / min_pager_rows) in
-    (* Try all viable grid configurations and pick the best one *)
-    let best_layout = ref {grid_cols = 1; grid_rows = num_pagers} in
-    let best_area = ref 0 in
-    let best_visible = ref (min num_pagers max_grid_rows) in
-    for gc = 1 to max_grid_cols do
-      for gr = 1 to max_grid_rows do
-        let capacity = gc * gr in
-        if capacity >= num_pagers || capacity >= !best_visible then begin
-          let visible = min num_pagers capacity in
-          let pager_width = cols / gc in
-          let pager_height = rows / gr in
-          let area = pager_width * pager_height in
-          (* Prefer layouts that show all pagers, then maximize area *)
-          let dominated =
-            visible < !best_visible
-            || (visible = !best_visible && area <= !best_area)
-          in
-          if not dominated then begin
-            best_layout := {grid_cols = gc; grid_rows = gr} ;
-            best_area := area ;
-            best_visible := visible
-          end
-        end
-      done
-    done ;
-    (!best_layout, !best_visible)
+    (* Generate all (gc, gr) pairs to try *)
+    let grid_configs =
+      List.concat_map
+        (fun gc -> List.init max_grid_rows (fun gr -> (gc, gr + 1)))
+        (List.init max_grid_cols (fun gc -> gc + 1))
+    in
+    (* Initial best: single column with all pagers *)
+    let init_visible = min num_pagers max_grid_rows in
+    let init = ({grid_cols = 1; grid_rows = num_pagers}, 0, init_visible) in
+    (* Find best configuration *)
+    let best_layout, _, best_visible =
+      List.fold_left
+        (fun ((_, best_area, best_vis) as best) (gc, gr) ->
+          let capacity = gc * gr in
+          if capacity >= num_pagers || capacity >= best_vis then
+            let visible = min num_pagers capacity in
+            let pager_width = cols / gc in
+            let pager_height = rows / gr in
+            let area = pager_width * pager_height in
+            (* Prefer layouts that show all pagers, then maximize area *)
+            if visible > best_vis || (visible = best_vis && area > best_area)
+            then ({grid_cols = gc; grid_rows = gr}, area, visible)
+            else best
+          else best)
+        init
+        grid_configs
+    in
+    (best_layout, best_visible)
 
 (** Get visible pager slots based on focus - focused pager is always visible *)
 let get_visible_pagers ~pagers ~focused_id ~max_visible =

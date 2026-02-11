@@ -483,17 +483,21 @@ let prune_cmd =
             Printf.printf
               "Found %d unused version(s):\n"
               (List.length unused_versions) ;
-            let total_bytes = ref 0L in
-            List.iter
-              (fun v ->
-                match Binary_downloader.get_version_size v with
-                | Ok (bytes, formatted) ->
-                    Printf.printf "  - v%s (%s)\n" v formatted ;
-                    total_bytes := Int64.add !total_bytes bytes
-                | Error _ -> Printf.printf "  - v%s (size unknown)\n" v)
-              unused_versions ;
+            let total_bytes =
+              List.fold_left
+                (fun acc v ->
+                  match Binary_downloader.get_version_size v with
+                  | Ok (bytes, formatted) ->
+                      Printf.printf "  - v%s (%s)\n" v formatted ;
+                      Int64.add acc bytes
+                  | Error _ ->
+                      Printf.printf "  - v%s (size unknown)\n" v ;
+                      acc)
+                0L
+                unused_versions
+            in
             let total_formatted =
-              Binary_downloader.format_size_bytes !total_bytes
+              Binary_downloader.format_size_bytes total_bytes
             in
             Printf.printf "\nTotal space to free: %s\n" total_formatted ;
             if dry_run then (
@@ -501,19 +505,22 @@ let prune_cmd =
               `Ok ())
             else (
               Printf.printf "\nRemoving...\n" ;
-              let failures = ref [] in
-              List.iter
-                (fun version ->
-                  match Binary_downloader.remove_version version with
-                  | Ok () -> Printf.printf "  ✓ Removed v%s\n" version
-                  | Error (`Msg msg) ->
-                      Printf.eprintf
-                        "  ✗ Failed to remove v%s: %s\n"
-                        version
-                        msg ;
-                      failures := version :: !failures)
-                unused_versions ;
-              if !failures = [] then (
+              let failures =
+                List.filter_map
+                  (fun version ->
+                    match Binary_downloader.remove_version version with
+                    | Ok () ->
+                        Printf.printf "  ✓ Removed v%s\n" version ;
+                        None
+                    | Error (`Msg msg) ->
+                        Printf.eprintf
+                          "  ✗ Failed to remove v%s: %s\n"
+                          version
+                          msg ;
+                        Some version)
+                  unused_versions
+              in
+              if failures = [] then (
                 Printf.printf
                   "\n✓ Successfully pruned %d version(s), freed %s\n"
                   (List.length unused_versions)
@@ -523,7 +530,7 @@ let prune_cmd =
                 Cli_helpers.cmdliner_error
                   (Printf.sprintf
                      "%d version(s) failed to prune"
-                     (List.length !failures))))
+                     (List.length failures))))
     in
     let dry_run_flag =
       let doc = "Show what would be pruned without removing" in

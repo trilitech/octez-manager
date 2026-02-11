@@ -146,26 +146,25 @@ let total_memory =
   lazy
     (try
        let ic = open_in "/proc/meminfo" in
-       let result = ref 0L in
-       (try
-          while true do
-            let line = input_line ic in
-            if String.length line > 9 && String.sub line 0 9 = "MemTotal:" then
-              let parts =
-                String.split_on_char ' ' line |> List.filter (fun s -> s <> "")
-              in
-              match parts with
-              | _ :: kb_str :: _ -> (
-                  match Int64.of_string_opt kb_str with
-                  | Some kb ->
-                      result := Int64.mul kb 1024L ;
-                      raise Exit
-                  | None -> ())
-              | _ -> ()
-          done
-        with Exit | End_of_file -> ()) ;
+       let rec find_memtotal () =
+         match input_line ic with
+         | exception End_of_file -> 0L
+         | line ->
+             if String.length line > 9 && String.sub line 0 9 = "MemTotal:" then
+               let parts =
+                 String.split_on_char ' ' line |> List.filter (fun s -> s <> "")
+               in
+               match parts with
+               | _ :: kb_str :: _ -> (
+                   match Int64.of_string_opt kb_str with
+                   | Some kb -> Int64.mul kb 1024L
+                   | None -> find_memtotal ())
+               | _ -> find_memtotal ()
+             else find_memtotal ()
+       in
+       let result = find_memtotal () in
        close_in ic ;
-       !result
+       result
      with _ -> 0L)
 
 (** Calculate CPU percentage from two samples *)
