@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS type_fields (
     field_name TEXT NOT NULL,               -- 'instance'
     field_type TEXT NOT NULL,               -- 'string'
     position INTEGER NOT NULL DEFAULT 0,    -- order within the record
+    is_mutable BOOLEAN DEFAULT 0,           -- whether field is declared mutable
     UNIQUE(type_id, field_name)
 );
 
@@ -152,6 +153,18 @@ CREATE TABLE IF NOT EXISTS type_constructors (
 
 CREATE INDEX IF NOT EXISTS idx_type_constructors_type ON type_constructors(type_id);
 CREATE INDEX IF NOT EXISTS idx_type_constructors_name ON type_constructors(constructor_name);
+
+-- Mutable pattern usages (ref, :=, !, Atomic, mutable field access)
+CREATE TABLE IF NOT EXISTS mutable_usages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    function_id INTEGER NOT NULL REFERENCES functions(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,                     -- 'ref', 'ref_assign', 'ref_deref', 'atomic', 'mutable_field'
+    line INTEGER NOT NULL,                  -- line number of usage
+    UNIQUE(function_id, kind, line)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mutable_usages_function ON mutable_usages(function_id);
+CREATE INDEX IF NOT EXISTS idx_mutable_usages_kind ON mutable_usages(kind);
 
 -- =============================================================================
 -- Useful Views
@@ -239,6 +252,24 @@ FROM type_constructors tc
 JOIN types t ON tc.type_id = t.id
 JOIN modules m ON t.module_id = m.id
 ORDER BY m.path, t.name, tc.position;
+
+-- Mutable record fields
+CREATE VIEW IF NOT EXISTS v_mutable_fields AS
+SELECT m.path, t.name as type_name, tf.field_name, tf.field_type
+FROM type_fields tf
+JOIN types t ON tf.type_id = t.id
+JOIN modules m ON t.module_id = m.id
+WHERE tf.is_mutable = 1
+ORDER BY m.path, t.name, tf.position;
+
+-- Functions using mutable patterns
+CREATE VIEW IF NOT EXISTS v_mutable_functions AS
+SELECT m.path, f.name, mu.kind, COUNT(*) as usage_count
+FROM mutable_usages mu
+JOIN functions f ON mu.function_id = f.id
+JOIN modules m ON f.module_id = m.id
+GROUP BY f.id, mu.kind
+ORDER BY m.path, f.name, mu.kind;
 
 -- =============================================================================
 -- Sample Queries (for reference)

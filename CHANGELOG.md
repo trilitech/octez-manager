@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Mutable pattern detection**: Architecture index now tracks usage of `ref`, `:=`, `!`, `Atomic`, and mutable record fields. New `arch_query mutables` command shows summary of mutable patterns across the codebase. CI blocks PRs that increase `mutable_fields` or `functions_with_mutables` metrics.
+
 ## [0.3.0] - 2026-02-11
 
 ### Added

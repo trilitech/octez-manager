@@ -447,6 +447,49 @@ let cmd_duplicates () =
     rows ;
   ignore (Sqlite3.db_close db)
 
+let cmd_mutables () =
+  let db = open_db () in
+  (* Summary by kind *)
+  Printf.printf "Mutable pattern usage summary:\n\n" ;
+  let summary_sql =
+    "SELECT kind, COUNT(*) as cnt FROM mutable_usages GROUP BY kind ORDER BY \
+     cnt DESC"
+  in
+  let summary = query_rows db summary_sql in
+  List.iter
+    (fun row ->
+      match row with
+      | [kind; cnt] -> Printf.printf "  %-15s %s occurrences\n" kind cnt
+      | _ -> ())
+    summary ;
+  Printf.printf "\n" ;
+  (* Mutable record fields *)
+  let mf_sql =
+    "SELECT m.path, t.name, tf.field_name FROM type_fields tf JOIN types t ON \
+     tf.type_id = t.id JOIN modules m ON t.module_id = m.id WHERE \
+     tf.is_mutable = 1 ORDER BY m.path, t.name"
+  in
+  let mf_rows = query_rows db mf_sql in
+  Printf.printf "Mutable record fields (%d):\n\n" (List.length mf_rows) ;
+  List.iter
+    (fun row ->
+      match row with
+      | [path; typ; field] -> Printf.printf "  %s: %s.%s\n" path typ field
+      | _ -> ())
+    mf_rows ;
+  Printf.printf "\n" ;
+  (* Functions with most mutable usages *)
+  let fn_sql =
+    "SELECT m.path || ':' || f.name, mu.kind, COUNT(*) as cnt FROM \
+     mutable_usages mu JOIN functions f ON mu.function_id = f.id JOIN modules \
+     m ON f.module_id = m.id GROUP BY f.id, mu.kind HAVING cnt >= 3 ORDER BY \
+     cnt DESC LIMIT 30"
+  in
+  let fn_rows = query_rows db fn_sql in
+  Printf.printf "Functions with 3+ mutable pattern usages (top 30):\n\n" ;
+  print_table ~headers:["Function"; "Kind"; "Count"] fn_rows ;
+  ignore (Sqlite3.db_close db)
+
 let cmd_large_files ~min_lines =
   let db = open_db () in
   let sql =
@@ -578,6 +621,8 @@ let worse_when_higher =
     "missing_mli";
     "god_modules";
     "unsafe_string_fields";
+    "mutable_fields";
+    "functions_with_mutables";
   ]
 
 (** Metrics that get WORSE when they decrease. *)
@@ -648,6 +693,17 @@ let cmd_metrics output_file =
           (geti
              "SELECT COUNT(*) FROM (SELECT field_name FROM type_fields WHERE \
               field_type = 'string' GROUP BY field_name HAVING COUNT(*) >= 3)")
+      );
+      ( "mutable_fields",
+        string_of_int
+          (geti "SELECT COUNT(*) FROM type_fields WHERE is_mutable = 1") );
+      ( "functions_with_mutables",
+        string_of_int
+          (geti "SELECT COUNT(DISTINCT function_id) FROM mutable_usages") );
+      ( "atomic_usages",
+        string_of_int
+          (geti
+             "SELECT COUNT(*) FROM mutable_usages WHERE kind LIKE 'atomic_%'")
       );
     ]
   in
@@ -840,6 +896,32 @@ let detail_unsafe_string_fields db ~max =
       | [field; cnt] -> Printf.sprintf "%s (%sx)" field cnt
       | _ -> "?")
 
+let detail_mutable_fields db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT m.path || ':' || t.name || '.' || tf.field_name FROM type_fields \
+       tf JOIN types t ON tf.type_id = t.id JOIN modules m ON t.module_id = \
+       m.id WHERE tf.is_mutable = 1 ORDER BY m.path, t.name LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row -> match row with [loc] -> loc | _ -> "?")
+
+let detail_functions_with_mutables db ~max =
+  let sql =
+    Printf.sprintf
+      "SELECT m.path || ':' || f.name, mu.kind, COUNT(*) as cnt FROM \
+       mutable_usages mu JOIN functions f ON mu.function_id = f.id JOIN \
+       modules m ON f.module_id = m.id GROUP BY f.id, mu.kind ORDER BY cnt \
+       DESC LIMIT %d"
+      max
+  in
+  query_rows db sql
+  |> List.map (fun row ->
+      match row with
+      | [loc; kind; cnt] -> Printf.sprintf "%s (%s: %sx)" loc kind cnt
+      | _ -> "?")
+
 (** Look up the detail function for a given metric name.
 
     Returns [None] for metrics that are not tracked per-item (e.g.
@@ -853,6 +935,8 @@ let detail_for_metric metric db ~max =
   | "missing_mli" -> Some (detail_missing_mli db ~max)
   | "god_modules" -> Some (detail_god_modules db ~max)
   | "unsafe_string_fields" -> Some (detail_unsafe_string_fields db ~max)
+  | "mutable_fields" -> Some (detail_mutable_fields db ~max)
+  | "functions_with_mutables" -> Some (detail_functions_with_mutables db ~max)
   | _ -> None
 
 let try_open_db () =
@@ -1029,6 +1113,10 @@ let duplicates_cmd =
   let doc = "Find duplicate functions across modules" in
   Cmd.v (Cmd.info "duplicates" ~doc) Term.(const cmd_duplicates $ const ())
 
+let mutables_cmd =
+  let doc = "Show mutable patterns (ref, :=, !, mutable fields, Atomic)" in
+  Cmd.v (Cmd.info "mutables" ~doc) Term.(const cmd_mutables $ const ())
+
 let large_files_cmd =
   let doc = "Show large files" in
   let run min = cmd_large_files ~min_lines:min in
@@ -1126,6 +1214,7 @@ let main_cmd =
       search_cmd;
       search_types_cmd;
       duplicates_cmd;
+      mutables_cmd;
       large_files_cmd;
       large_functions_cmd;
       missing_docs_cmd;

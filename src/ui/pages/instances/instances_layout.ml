@@ -69,6 +69,15 @@ let group_by_role services =
       if instances = [] then None else Some (role, instances))
     roles
 
+(** Find index of minimum element in array *)
+let array_min_index arr =
+  let rec loop min_idx i =
+    if i >= Array.length arr then min_idx
+    else if arr.(i) < arr.(min_idx) then loop i (i + 1)
+    else loop min_idx (i + 1)
+  in
+  loop 0 1
+
 (** Distribute role groups across columns, balancing by instance count.
     Returns: column index -> list of (role, instances) *)
 let distribute_to_columns ~num_columns role_groups =
@@ -79,13 +88,7 @@ let distribute_to_columns ~num_columns role_groups =
     (* Assign each role group to the column with fewest instances *)
     List.iter
       (fun ((_role, instances) as group) ->
-        let min_col =
-          let min_idx = ref 0 in
-          for i = 1 to num_columns - 1 do
-            if column_counts.(i) < column_counts.(!min_idx) then min_idx := i
-          done ;
-          !min_idx
-        in
+        let min_col = array_min_index column_counts in
         columns.(min_col) <- columns.(min_col) @ [group] ;
         column_counts.(min_col) <-
           column_counts.(min_col) + List.length instances + 2

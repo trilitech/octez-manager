@@ -89,22 +89,24 @@ let cache_lock = Mutex.create ()
 (** Use pgrep to efficiently find Octez-related PIDs instead of scanning all PIDs.
     This avoids reading /proc for 500+ irrelevant processes. *)
 let list_octez_candidate_pids () =
+  (* Read all lines from input channel and parse as PIDs *)
+  let read_pids ic =
+    let rec loop acc =
+      match input_line ic with
+      | line -> (
+          match int_of_string_opt (String.trim line) with
+          | Some pid when pid > 0 -> loop (pid :: acc)
+          | _ -> loop acc)
+      | exception End_of_file -> acc
+    in
+    loop []
+  in
   try
     (* Use pgrep to find PIDs of processes with "octez" or "tezos" in their command *)
     let ic = Unix.open_process_in "pgrep -f 'octez|tezos' 2>/dev/null" in
-    let pids = ref [] in
     Fun.protect
       ~finally:(fun () -> ignore (Unix.close_process_in ic))
-      (fun () ->
-        try
-          while true do
-            let line = input_line ic in
-            match int_of_string_opt (String.trim line) with
-            | Some pid when pid > 0 -> pids := pid :: !pids
-            | _ -> ()
-          done
-        with End_of_file -> ()) ;
-    !pids
+      (fun () -> read_pids ic)
   with _ -> (
     (* Fallback to full scan if pgrep fails *)
     try
@@ -182,44 +184,47 @@ let is_octez_binary cmdline =
 (** Scan processes for Octez binaries, using cache to avoid re-scanning unchanged PIDs *)
 let scan_octez_processes () =
   let candidate_pids = list_octez_candidate_pids () in
-  let result = ref [] in
-  (* Check each candidate PID *)
-  List.iter
-    (fun pid ->
-      (* Try cache first *)
-      let cached =
-        Mutex.protect cache_lock (fun () -> Hashtbl.find_opt process_cache pid)
-      in
-      match cached with
-      | Some proc_info ->
-          (* Already in cache, reuse *)
-          result := proc_info :: !result
-      | None -> (
-          (* New PID, need to scan *)
-          match read_cmdline pid with
-          | None -> ()
-          | Some cmdline ->
-              let binary_realpath = read_binary_realpath pid in
-              (* Use cmdline (argv[0]) for binary check to filter out child processes *)
-              if is_octez_binary cmdline then (
-                let ppid, uid = read_status pid in
-                let user = Option.bind uid get_username in
-                let binary_path = extract_binary_path cmdline in
-                let proc_info =
-                  {
-                    pid;
-                    cmdline;
-                    binary_path;
-                    binary_realpath;
-                    parent_pid = ppid;
-                    user;
-                  }
-                in
-                (* Add to cache *)
-                Mutex.protect cache_lock (fun () ->
-                    Hashtbl.replace process_cache pid proc_info) ;
-                result := proc_info :: !result)))
-    candidate_pids ;
+  (* Check each candidate PID, accumulating results *)
+  let result =
+    List.filter_map
+      (fun pid ->
+        (* Try cache first *)
+        let cached =
+          Mutex.protect cache_lock (fun () ->
+              Hashtbl.find_opt process_cache pid)
+        in
+        match cached with
+        | Some proc_info ->
+            (* Already in cache, reuse *)
+            Some proc_info
+        | None -> (
+            (* New PID, need to scan *)
+            match read_cmdline pid with
+            | None -> None
+            | Some cmdline ->
+                let binary_realpath = read_binary_realpath pid in
+                (* Use cmdline (argv[0]) for binary check to filter out child processes *)
+                if is_octez_binary cmdline then (
+                  let ppid, uid = read_status pid in
+                  let user = Option.bind uid get_username in
+                  let binary_path = extract_binary_path cmdline in
+                  let proc_info =
+                    {
+                      pid;
+                      cmdline;
+                      binary_path;
+                      binary_realpath;
+                      parent_pid = ppid;
+                      user;
+                    }
+                  in
+                  (* Add to cache *)
+                  Mutex.protect cache_lock (fun () ->
+                      Hashtbl.replace process_cache pid proc_info) ;
+                  Some proc_info)
+                else None))
+      candidate_pids
+  in
   (* Clean up stale entries from cache (PIDs that no longer exist) *)
   Mutex.protect cache_lock (fun () ->
       let candidate_set = Hashtbl.create (List.length candidate_pids) in
@@ -228,7 +233,7 @@ let scan_octez_processes () =
         (fun pid info ->
           if Hashtbl.mem candidate_set pid then Some info else None)
         process_cache) ;
-  !result
+  result
 
 (** Check if PID is managed by a systemd service unit (not just in user.slice) *)
 let is_systemd_managed pid =

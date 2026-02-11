@@ -153,22 +153,22 @@ let prune_unused s =
     s)
   else
     (* Calculate total size and build detailed message *)
-    let version_details = ref [] in
-    let total_bytes = ref 0L in
-    List.iter
-      (fun (v, _, _) ->
-        match Binary_downloader.get_version_size v with
-        | Ok (bytes, formatted) ->
-            version_details := (v, formatted) :: !version_details ;
-            total_bytes := Int64.add !total_bytes bytes
-        | Error _ -> version_details := (v, "unknown size") :: !version_details)
-      unused ;
+    let version_details, total_bytes =
+      List.fold_left
+        (fun (details, bytes) (v, _, _) ->
+          match Binary_downloader.get_version_size v with
+          | Ok (size_bytes, formatted) ->
+              ((v, formatted) :: details, Int64.add bytes size_bytes)
+          | Error _ -> ((v, "unknown size") :: details, bytes))
+        ([], 0L)
+        unused
+    in
     let details_lines =
       List.map
         (fun (v, size) -> Printf.sprintf "  \xe2\x80\xa2 v%s (%s)" v size)
-        (List.rev !version_details)
+        (List.rev version_details)
     in
-    let total_formatted = Binary_downloader.format_size_bytes !total_bytes in
+    let total_formatted = Binary_downloader.format_size_bytes total_bytes in
     let message =
       String.concat
         "\n"
@@ -181,26 +181,27 @@ let prune_unused s =
       ~message
       ~on_result:(fun confirmed ->
         if confirmed then (
-          let success_count = ref 0 in
-          let fail_count = ref 0 in
-          List.iter
-            (fun (v, _, _) ->
-              match Binary_downloader.remove_version v with
-              | Ok () -> incr success_count
-              | Error _ -> incr fail_count)
-            unused ;
-          if !fail_count = 0 then
+          let success_count, fail_count =
+            List.fold_left
+              (fun (succ, fail) (v, _, _) ->
+                match Binary_downloader.remove_version v with
+                | Ok () -> (succ + 1, fail)
+                | Error _ -> (succ, fail + 1))
+              (0, 0)
+              unused
+          in
+          if fail_count = 0 then
             Context.toast_info
               (Printf.sprintf
                  "Removed %d version(s), freed %s"
-                 !success_count
+                 success_count
                  total_formatted)
           else
             Context.toast_error
               (Printf.sprintf
                  "Removed %d version(s), %d failed"
-                 !success_count
-                 !fail_count) ;
+                 success_count
+                 fail_count) ;
           Context.mark_instances_dirty ()))
       () ;
     s
