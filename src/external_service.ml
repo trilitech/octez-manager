@@ -264,45 +264,38 @@ let endpoint_matches_rpc ~endpoint ~rpc_addr =
 (** Get services this one depends on via endpoint matching. *)
 let get_dependencies external_svc all_services =
   let config = external_svc.config in
-  let deps = ref [] in
+  (* Helper to find matching services for an endpoint *)
+  let find_matches endpoint existing_deps =
+    List.fold_left
+      (fun acc (other : t) ->
+        if other.config.unit_name <> config.unit_name then
+          match other.config.rpc_addr.value with
+          | Some rpc when endpoint_matches_rpc ~endpoint ~rpc_addr:rpc ->
+              let role_str =
+                match other.config.role.value with
+                | Some r -> role_to_string r
+                | None -> "unknown"
+              in
+              let dep = (other.config.unit_name, role_str) in
+              if List.mem dep acc then acc else dep :: acc
+          | _ -> acc
+        else acc)
+      existing_deps
+      all_services
+  in
   (* Check node_endpoint *)
-  (match config.node_endpoint.value with
-  | Some endpoint ->
-      List.iter
-        (fun (other : t) ->
-          if other.config.unit_name <> config.unit_name then
-            match other.config.rpc_addr.value with
-            | Some rpc ->
-                if endpoint_matches_rpc ~endpoint ~rpc_addr:rpc then
-                  let role_str =
-                    match other.config.role.value with
-                    | Some r -> role_to_string r
-                    | None -> "unknown"
-                  in
-                  deps := (other.config.unit_name, role_str) :: !deps
-            | None -> ())
-        all_services
-  | None -> ()) ;
+  let deps =
+    match config.node_endpoint.value with
+    | Some endpoint -> find_matches endpoint []
+    | None -> []
+  in
   (* Check dal_endpoint *)
-  (match config.dal_endpoint.value with
-  | Some endpoint ->
-      List.iter
-        (fun (other : t) ->
-          if other.config.unit_name <> config.unit_name then
-            match other.config.rpc_addr.value with
-            | Some rpc ->
-                if endpoint_matches_rpc ~endpoint ~rpc_addr:rpc then
-                  let role_str =
-                    match other.config.role.value with
-                    | Some r -> role_to_string r
-                    | None -> "unknown"
-                  in
-                  if not (List.mem (other.config.unit_name, role_str) !deps)
-                  then deps := (other.config.unit_name, role_str) :: !deps
-            | None -> ())
-        all_services
-  | None -> ()) ;
-  List.rev !deps
+  let deps =
+    match config.dal_endpoint.value with
+    | Some endpoint -> find_matches endpoint deps
+    | None -> deps
+  in
+  List.rev deps
 
 (** Get services that depend on this one (reverse lookup). *)
 let get_dependents external_svc all_services =

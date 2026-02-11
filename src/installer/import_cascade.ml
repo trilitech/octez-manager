@@ -75,10 +75,9 @@ let topological_sort nodes =
 
   let visited = Hashtbl.create 17 in
   let rec_stack = Hashtbl.create 17 in
-  let result = ref [] in
-  let cycles = ref [] in
 
-  let rec visit node_name path =
+  (* visit returns (result_acc, cycles_acc) *)
+  let rec visit node_name path (result_acc, cycles_acc) =
     if Hashtbl.mem rec_stack node_name then
       (* Cycle detected *)
       let cycle_start =
@@ -86,20 +85,32 @@ let topological_sort nodes =
         with _ -> 0
       in
       let cycle = list_drop cycle_start path @ [node_name] in
-      cycles := cycle :: !cycles
-    else if not (Hashtbl.mem visited node_name) then (
+      (result_acc, cycle :: cycles_acc)
+    else if Hashtbl.mem visited node_name then (result_acc, cycles_acc)
+    else (
       Hashtbl.add rec_stack node_name true ;
       Hashtbl.add visited node_name true ;
       (* Visit dependencies first *)
-      (match Hashtbl.find_opt dep_map node_name with
-      | Some deps -> List.iter (fun dep -> visit dep (node_name :: path)) deps
-      | None -> ()) ;
+      let result_acc, cycles_acc =
+        match Hashtbl.find_opt dep_map node_name with
+        | Some deps ->
+            List.fold_left
+              (fun acc dep -> visit dep (node_name :: path) acc)
+              (result_acc, cycles_acc)
+              deps
+        | None -> (result_acc, cycles_acc)
+      in
       Hashtbl.remove rec_stack node_name ;
-      result := node_name :: !result)
+      (node_name :: result_acc, cycles_acc))
   in
 
-  List.iter (fun node -> visit (unit_name node.service) []) nodes ;
-  (List.rev !result, !cycles)
+  let result, cycles =
+    List.fold_left
+      (fun acc node -> visit (unit_name node.service) [] acc)
+      ([], [])
+      nodes
+  in
+  (List.rev result, cycles)
 
 (** {1 Dependency Analysis} *)
 
@@ -136,28 +147,32 @@ let analyze_dependencies ~services ~target_services =
 let get_dependency_chain ~service ~all_services =
   (* BFS to find all transitive dependencies (things this service needs) *)
   let visited = Hashtbl.create 17 in
-  let queue = Queue.create () in
-  Queue.add service queue ;
   Hashtbl.add visited (unit_name service) true ;
 
-  let chain = ref [] in
-
-  while not (Queue.is_empty queue) do
-    let current = Queue.take queue in
-    chain := current :: !chain ;
-    let deps = get_dependency_names current all_services in
-    List.iter
-      (fun dep_name ->
-        if not (Hashtbl.mem visited dep_name) then (
-          Hashtbl.add visited dep_name true ;
-          match find_service ~unit_name:dep_name all_services with
-          | Some dep_svc -> Queue.add dep_svc queue
-          | None -> ()))
-      deps
-  done ;
+  let rec bfs queue acc =
+    match queue with
+    | [] -> acc
+    | current :: rest ->
+        let deps = get_dependency_names current all_services in
+        let new_queue, new_visited =
+          List.fold_left
+            (fun (q, ()) dep_name ->
+              if Hashtbl.mem visited dep_name then (q, ())
+              else (
+                Hashtbl.add visited dep_name true ;
+                match find_service ~unit_name:dep_name all_services with
+                | Some dep_svc -> (q @ [dep_svc], ())
+                | None -> (q, ())))
+            (rest, ())
+            deps
+        in
+        ignore new_visited ;
+        bfs new_queue (current :: acc)
+  in
+  let chain = bfs [service] [] in
 
   (* Reverse to get dependencies first *)
-  let all_services_in_chain = List.rev !chain in
+  let all_services_in_chain = List.rev chain in
   (* Do topological sort *)
   let nodes =
     build_graph_nodes ~all_services ~target_services:all_services_in_chain
@@ -177,54 +192,56 @@ let get_dependency_chain ~service ~all_services =
 *)
 let get_full_cascade ~service ~all_services =
   let visited = Hashtbl.create 17 in
-  let chain = ref [] in
 
-  let add_service svc =
+  (* Try to add a service, returns (was_added, updated_chain) *)
+  let try_add_service chain svc =
     let name = unit_name svc in
-    if not (Hashtbl.mem visited name) then (
+    if Hashtbl.mem visited name then (false, chain)
+    else (
       Hashtbl.add visited name true ;
-      chain := svc :: !chain)
+      (true, svc :: chain))
   in
 
   (* Add initial service *)
-  add_service service ;
+  let _, initial_chain = try_add_service [] service in
 
   (* Fixed-point iteration: keep expanding until no new services are added *)
-  let changed = ref true in
-  while !changed do
-    changed := false ;
-    let current_chain = !chain in
+  let rec expand current_chain =
+    let changed, new_chain =
+      List.fold_left
+        (fun (changed_acc, chain_acc) svc ->
+          (* Add all dependencies (things this service needs) *)
+          let changed_acc, chain_acc =
+            List.fold_left
+              (fun (ch, ch_acc) dep_name ->
+                match find_service ~unit_name:dep_name all_services with
+                | Some dep_svc ->
+                    let was_new, ch_acc = try_add_service ch_acc dep_svc in
+                    (ch || was_new, ch_acc)
+                | None -> (ch, ch_acc))
+              (changed_acc, chain_acc)
+              (get_dependency_names svc all_services)
+          in
+          (* Add all dependents (things that depend on this service) *)
+          List.fold_left
+            (fun (ch, ch_acc) dep_name ->
+              match find_service ~unit_name:dep_name all_services with
+              | Some dep_svc ->
+                  let was_new, ch_acc = try_add_service ch_acc dep_svc in
+                  (ch || was_new, ch_acc)
+              | None -> (ch, ch_acc))
+            (changed_acc, chain_acc)
+            (get_dependent_names svc all_services))
+        (false, current_chain)
+        current_chain
+    in
+    if changed then expand new_chain else new_chain
+  in
 
-    List.iter
-      (fun svc ->
-        (* Add all dependencies (things this service needs) *)
-        let deps = get_dependency_names svc all_services in
-        List.iter
-          (fun dep_name ->
-            match find_service ~unit_name:dep_name all_services with
-            | Some dep_svc ->
-                let was_new = not (Hashtbl.mem visited dep_name) in
-                add_service dep_svc ;
-                if was_new then changed := true
-            | None -> ())
-          deps ;
-
-        (* Add all dependents (things that depend on this service) *)
-        let dependents = get_dependent_names svc all_services in
-        List.iter
-          (fun dep_name ->
-            match find_service ~unit_name:dep_name all_services with
-            | Some dep_svc ->
-                let was_new = not (Hashtbl.mem visited dep_name) in
-                add_service dep_svc ;
-                if was_new then changed := true
-            | None -> ())
-          dependents)
-      current_chain
-  done ;
+  let final_chain = expand initial_chain in
 
   (* Do topological sort on the complete chain *)
-  let nodes = build_graph_nodes ~all_services ~target_services:!chain in
+  let nodes = build_graph_nodes ~all_services ~target_services:final_chain in
   let sorted, _cycles = topological_sort nodes in
   (* Map back to services *)
   List.filter_map (fun name -> find_service ~unit_name:name all_services) sorted
