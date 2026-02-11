@@ -5142,10 +5142,8 @@ let generate_instance_name_weeklynet_with_date () =
       ~network:"https://teztnets.com/weeklynet-2026-02-04"
       ~history_mode:"rolling"
   in
-  Alcotest.(check string)
-    "weeklynet with full date"
-    "node-weeklynet-2026-02-04"
-    name
+  (* Date suffix is stripped so snapshot URLs resolve on tzinit.org *)
+  Alcotest.(check string) "weeklynet date stripped" "node-weeklynet" name
 
 let generate_instance_name_mainnet () =
   let name =
