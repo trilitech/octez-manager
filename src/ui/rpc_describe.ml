@@ -69,70 +69,75 @@ let candidate_paths segs =
     ]
 
 let parse_describe_json (j : Yojson.Safe.t) : entry list =
-  let entries = ref [] in
-  let add_entry e = entries := e :: !entries in
   (* Helper to extract string from JSON *)
   let get_string key kvs =
     match List.assoc_opt key kvs with Some (`String s) -> Some s | _ -> None
   in
-  (* Check for GET service *)
+  (* Check for GET service - returns entry if found *)
   let check_get_service kvs =
     match List.assoc_opt "static" kvs with
     | Some (`Assoc stat) -> (
         match List.assoc_opt "get_service" stat with
-        | Some (`Assoc _) -> add_entry {name = ""; kind = Get}
-        | _ -> ())
-    | _ -> ()
+        | Some (`Assoc _) -> [{name = ""; kind = Get}]
+        | _ -> [])
+    | _ -> []
   in
-  (* Parse subdirs for suffixes and dynamic_dispatch *)
+  (* Parse subdirs for suffixes and dynamic_dispatch - returns entries *)
   let parse_subdirs subdirs_json =
     match subdirs_json with
-    | `Assoc kv -> (
+    | `Assoc kv ->
         (* Static suffixes *)
-        (match List.assoc_opt "suffixes" kv with
-        | Some (`List items) ->
-            List.iter
-              (fun item ->
-                match item with
-                | `Assoc item_kv -> (
-                    match get_string "name" item_kv with
-                    | Some name -> add_entry {name; kind = Sub}
-                    | None -> ())
-                | _ -> ())
-              items
-        | _ -> ()) ;
+        let suffix_entries =
+          match List.assoc_opt "suffixes" kv with
+          | Some (`List items) ->
+              List.filter_map
+                (fun item ->
+                  match item with
+                  | `Assoc item_kv -> (
+                      match get_string "name" item_kv with
+                      | Some name -> Some {name; kind = Sub}
+                      | None -> None)
+                  | _ -> None)
+                items
+          | _ -> []
+        in
         (* Dynamic dispatch *)
-        match List.assoc_opt "dynamic_dispatch" kv with
-        | Some (`Assoc dd) -> (
-            match List.assoc_opt "arg" dd with
-            | Some (`Assoc arg) ->
-                let arg_name =
-                  match get_string "name" arg with
-                  | Some n -> n
-                  | None -> "value"
-                in
-                add_entry {name = "<" ^ arg_name ^ ">"; kind = Dyn arg_name}
-            | _ -> ())
-        | _ -> ())
-    | _ -> ()
+        let dyn_entries =
+          match List.assoc_opt "dynamic_dispatch" kv with
+          | Some (`Assoc dd) -> (
+              match List.assoc_opt "arg" dd with
+              | Some (`Assoc arg) ->
+                  let arg_name =
+                    match get_string "name" arg with
+                    | Some n -> n
+                    | None -> "value"
+                  in
+                  [{name = "<" ^ arg_name ^ ">"; kind = Dyn arg_name}]
+              | _ -> [])
+          | _ -> []
+        in
+        suffix_entries @ dyn_entries
+    | _ -> []
   in
   (* Parse the JSON structure *)
-  (match j with
-  | `Assoc kvs -> (
-      check_get_service kvs ;
-      (* Check static.subdirs *)
-      (match List.assoc_opt "static" kvs with
-      | Some (`Assoc stat) -> (
-          match List.assoc_opt "subdirs" stat with
-          | Some subdirs -> parse_subdirs subdirs
-          | None -> ())
-      | _ -> ()) ;
-      (* Also check top-level subdirs *)
-      match List.assoc_opt "subdirs" kvs with
-      | Some subdirs -> parse_subdirs subdirs
-      | None -> ())
-  | _ -> ()) ;
-  List.rev !entries
+  match j with
+  | `Assoc kvs ->
+      let get_entries = check_get_service kvs in
+      let static_subdir_entries =
+        match List.assoc_opt "static" kvs with
+        | Some (`Assoc stat) -> (
+            match List.assoc_opt "subdirs" stat with
+            | Some subdirs -> parse_subdirs subdirs
+            | None -> [])
+        | _ -> []
+      in
+      let top_subdir_entries =
+        match List.assoc_opt "subdirs" kvs with
+        | Some subdirs -> parse_subdirs subdirs
+        | None -> []
+      in
+      get_entries @ static_subdir_entries @ top_subdir_entries
+  | _ -> []
 
 let parse_description (j : Yojson.Safe.t) : string option =
   match j with

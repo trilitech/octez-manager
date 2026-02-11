@@ -28,31 +28,43 @@ type t = {
       (* line -> node_id for foldable lines *)
 }
 
-(* Convert Yojson to our node type, assigning IDs *)
-let rec json_to_node next_id (json : Yojson.Safe.t) : json_node =
+(* Convert Yojson to our node type, assigning IDs.
+   Returns (node, next_id) where next_id is the next available ID. *)
+let rec json_to_node next_id (json : Yojson.Safe.t) : json_node * int =
   match json with
-  | `Null -> JNull
-  | `Bool b -> JBool b
-  | `Int i -> JInt i
-  | `Intlit s -> JInt (int_of_string_opt s |> Option.value ~default:0)
-  | `Float f -> JFloat f
-  | `String s -> JString s
+  | `Null -> (JNull, next_id)
+  | `Bool b -> (JBool b, next_id)
+  | `Int i -> (JInt i, next_id)
+  | `Intlit s -> (JInt (int_of_string_opt s |> Option.value ~default:0), next_id)
+  | `Float f -> (JFloat f, next_id)
+  | `String s -> (JString s, next_id)
   | `List items ->
-      let id = !next_id in
-      next_id := !next_id + 1 ;
-      JArray {id; items = List.map (json_to_node next_id) items}
+      let id = next_id in
+      let next_id = next_id + 1 in
+      let items, next_id =
+        List.fold_left
+          (fun (acc, nid) item ->
+            let node, nid = json_to_node nid item in
+            (node :: acc, nid))
+          ([], next_id)
+          items
+      in
+      (JArray {id; items = List.rev items}, next_id)
   | `Assoc fields ->
-      let id = !next_id in
-      next_id := !next_id + 1 ;
-      JObject
-        {
-          id;
-          fields = List.map (fun (k, v) -> (k, json_to_node next_id v)) fields;
-        }
+      let id = next_id in
+      let next_id = next_id + 1 in
+      let fields, next_id =
+        List.fold_left
+          (fun (acc, nid) (k, v) ->
+            let node, nid = json_to_node nid v in
+            ((k, node) :: acc, nid))
+          ([], next_id)
+          fields
+      in
+      (JObject {id; fields = List.rev fields}, next_id)
 
 let of_json json =
-  let next_id = ref 0 in
-  let root = json_to_node next_id json in
+  let root, _ = json_to_node 0 json in
   let folded = Hashtbl.create 64 in
   (* Fold all nodes by default *)
   let rec fold_all_nodes node =
@@ -104,67 +116,92 @@ let render_null () = Widgets.dim "null"
 (* Render JSON with folding *)
 let render t =
   let buf = Buffer.create 4096 in
-  let line_map = ref [] in
-  let current_line = ref 0 in
 
-  let add_line s =
-    Buffer.add_string buf s ;
-    Buffer.add_char buf '\n' ;
-    incr current_line
-  in
-
-  let add_inline s = Buffer.add_string buf s in
-
-  let rec render_node depth node =
+  (* State: current_line and accumulated line_map *)
+  let rec render_node depth (line, line_map) node =
     match node with
-    | JNull -> add_inline (render_null ())
-    | JBool b -> add_inline (render_bool b)
-    | JInt i -> add_inline (render_number (string_of_int i))
-    | JFloat f -> add_inline (render_number (string_of_float f))
-    | JString s -> add_inline (render_string s)
+    | JNull ->
+        Buffer.add_string buf (render_null ()) ;
+        (line, line_map)
+    | JBool b ->
+        Buffer.add_string buf (render_bool b) ;
+        (line, line_map)
+    | JInt i ->
+        Buffer.add_string buf (render_number (string_of_int i)) ;
+        (line, line_map)
+    | JFloat f ->
+        Buffer.add_string buf (render_number (string_of_float f)) ;
+        (line, line_map)
+    | JString s ->
+        Buffer.add_string buf (render_string s) ;
+        (line, line_map)
     | JArray {id; items} ->
         let folded = is_folded t id in
         let count = List.length items in
         if folded then (
-          line_map := (!current_line, id) :: !line_map ;
-          add_inline (Widgets.dim (Printf.sprintf "[...] (%d items)" count)))
-        else if items = [] then add_inline "[]"
-        else (
-          line_map := (!current_line, id) :: !line_map ;
-          add_line "[" ;
-          List.iteri
-            (fun i item ->
-              add_inline (indent (depth + 1)) ;
-              render_node (depth + 1) item ;
-              if i < count - 1 then add_inline "," ;
-              add_line "")
-            items ;
-          add_inline (indent depth) ;
-          add_inline "]")
+          Buffer.add_string
+            buf
+            (Widgets.dim (Printf.sprintf "[...] (%d items)" count)) ;
+          (line, (line, id) :: line_map))
+        else if items = [] then (
+          Buffer.add_string buf "[]" ;
+          (line, line_map))
+        else
+          let line_map = (line, id) :: line_map in
+          Buffer.add_string buf "[\n" ;
+          let line = line + 1 in
+          let line, line_map =
+            List.fold_left
+              (fun (line, line_map) (i, item) ->
+                Buffer.add_string buf (indent (depth + 1)) ;
+                let line, line_map =
+                  render_node (depth + 1) (line, line_map) item
+                in
+                if i < count - 1 then Buffer.add_string buf "," ;
+                Buffer.add_char buf '\n' ;
+                (line + 1, line_map))
+              (line, line_map)
+              (List.mapi (fun i x -> (i, x)) items)
+          in
+          Buffer.add_string buf (indent depth) ;
+          Buffer.add_string buf "]" ;
+          (line, line_map)
     | JObject {id; fields} ->
         let folded = is_folded t id in
         let count = List.length fields in
         if folded then (
-          line_map := (!current_line, id) :: !line_map ;
-          add_inline (Widgets.dim (Printf.sprintf "{...} (%d fields)" count)))
-        else if fields = [] then add_inline "{}"
-        else (
-          line_map := (!current_line, id) :: !line_map ;
-          add_line "{" ;
-          List.iteri
-            (fun i (key, value) ->
-              add_inline (indent (depth + 1)) ;
-              add_inline (render_key key) ;
-              add_inline ": " ;
-              render_node (depth + 1) value ;
-              if i < count - 1 then add_inline "," ;
-              add_line "")
-            fields ;
-          add_inline (indent depth) ;
-          add_inline "}")
+          Buffer.add_string
+            buf
+            (Widgets.dim (Printf.sprintf "{...} (%d fields)" count)) ;
+          (line, (line, id) :: line_map))
+        else if fields = [] then (
+          Buffer.add_string buf "{}" ;
+          (line, line_map))
+        else
+          let line_map = (line, id) :: line_map in
+          Buffer.add_string buf "{\n" ;
+          let line = line + 1 in
+          let line, line_map =
+            List.fold_left
+              (fun (line, line_map) (i, (key, value)) ->
+                Buffer.add_string buf (indent (depth + 1)) ;
+                Buffer.add_string buf (render_key key) ;
+                Buffer.add_string buf ": " ;
+                let line, line_map =
+                  render_node (depth + 1) (line, line_map) value
+                in
+                if i < count - 1 then Buffer.add_string buf "," ;
+                Buffer.add_char buf '\n' ;
+                (line + 1, line_map))
+              (line, line_map)
+              (List.mapi (fun i x -> (i, x)) fields)
+          in
+          Buffer.add_string buf (indent depth) ;
+          Buffer.add_string buf "}" ;
+          (line, line_map)
   in
-  render_node 0 t.root ;
-  t.line_to_node <- List.rev !line_map ;
+  let _, line_map = render_node 0 (0, []) t.root in
+  t.line_to_node <- List.rev line_map ;
   Buffer.contents buf
 
 let toggle_fold_at_line t ~line =

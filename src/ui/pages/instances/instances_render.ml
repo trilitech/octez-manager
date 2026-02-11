@@ -398,26 +398,31 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
 let truncate_visible ~max_width s =
   let len = String.length s in
   let buf = Buffer.create len in
-  let visible = ref 0 in
-  let i = ref 0 in
-  while !i < len && !visible < max_width do
-    let c = s.[!i] in
-    if c = '\027' then (
-      (* ANSI escape sequence - copy until 'm' *)
-      while !i < len && s.[!i] <> 'm' do
-        Buffer.add_char buf s.[!i] ;
-        incr i
-      done ;
-      if !i < len then (
-        Buffer.add_char buf 'm' ;
-        incr i))
+  (* Skip ANSI escape sequence starting at position i, return new position *)
+  let rec skip_ansi i =
+    if i >= len then i
+    else if s.[i] = 'm' then (
+      Buffer.add_char buf 'm' ;
+      i + 1)
     else (
-      Buffer.add_char buf c ;
-      incr visible ;
-      incr i)
-  done ;
+      Buffer.add_char buf s.[i] ;
+      skip_ansi (i + 1))
+  in
+  (* Main loop: i = position, visible = visible char count *)
+  let rec loop i visible =
+    if i >= len || visible >= max_width then (i, visible)
+    else if s.[i] = '\027' then (
+      Buffer.add_char buf '\027' ;
+      let i' = skip_ansi (i + 1) in
+      loop i' visible)
+    else (
+      Buffer.add_char buf s.[i] ;
+      loop (i + 1) (visible + 1))
+  in
+  let final_i, final_visible = loop 0 0 in
   (* Add reset if we truncated mid-formatting *)
-  if !i < len && !visible >= max_width then Buffer.add_string buf "\027[0m" ;
+  if final_i < len && final_visible >= max_width then
+    Buffer.add_string buf "\027[0m" ;
   Buffer.contents buf
 
 (** Pad or truncate a line to exact column width using visible character count *)
