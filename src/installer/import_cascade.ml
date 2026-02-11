@@ -182,62 +182,40 @@ let get_dependency_chain ~service ~all_services =
   List.filter_map (fun name -> find_service ~unit_name:name all_services) sorted
 
 (** Get complete cascade: service + dependencies + dependents (full transitive closure).
-    
-    Algorithm:
-    1. Start with target service
-    2. BFS to collect all dependencies (things it needs)
-    3. For each service in the chain, BFS to collect all dependents (things that need it)
-    4. Repeat step 2 for newly added dependents (they may have their own dependencies)
-    5. Continue until no new services are added (fixed point)
-*)
+    Fixed-point iteration: expand deps/dependents until no new services are added. *)
 let get_full_cascade ~service ~all_services =
   let visited = Hashtbl.create 17 in
-
-  (* Try to add a service, returns (was_added, updated_chain) *)
-  let try_add_service chain svc =
+  let try_add chain svc =
     let name = unit_name svc in
     if Hashtbl.mem visited name then (false, chain)
     else (
       Hashtbl.add visited name true ;
       (true, svc :: chain))
   in
-
-  (* Add initial service *)
-  let _, initial_chain = try_add_service [] service in
-
-  (* Fixed-point iteration: keep expanding until no new services are added *)
-  let rec expand current_chain =
+  let _, initial_chain = try_add [] service in
+  let add_related get_names svc (ch, acc) =
+    List.fold_left
+      (fun (ch, acc) name ->
+        match find_service ~unit_name:name all_services with
+        | Some s ->
+            let was_new, acc = try_add acc s in
+            (ch || was_new, acc)
+        | None -> (ch, acc))
+      (ch, acc)
+      (get_names svc all_services)
+  in
+  let rec expand chain =
     let changed, new_chain =
       List.fold_left
-        (fun (changed_acc, chain_acc) svc ->
-          (* Add all dependencies (things this service needs) *)
-          let changed_acc, chain_acc =
-            List.fold_left
-              (fun (ch, ch_acc) dep_name ->
-                match find_service ~unit_name:dep_name all_services with
-                | Some dep_svc ->
-                    let was_new, ch_acc = try_add_service ch_acc dep_svc in
-                    (ch || was_new, ch_acc)
-                | None -> (ch, ch_acc))
-              (changed_acc, chain_acc)
-              (get_dependency_names svc all_services)
-          in
-          (* Add all dependents (things that depend on this service) *)
-          List.fold_left
-            (fun (ch, ch_acc) dep_name ->
-              match find_service ~unit_name:dep_name all_services with
-              | Some dep_svc ->
-                  let was_new, ch_acc = try_add_service ch_acc dep_svc in
-                  (ch || was_new, ch_acc)
-              | None -> (ch, ch_acc))
-            (changed_acc, chain_acc)
-            (get_dependent_names svc all_services))
-        (false, current_chain)
-        current_chain
+        (fun acc svc ->
+          acc
+          |> add_related get_dependency_names svc
+          |> add_related get_dependent_names svc)
+        (false, chain)
+        chain
     in
     if changed then expand new_chain else new_chain
   in
-
   let final_chain = expand initial_chain in
 
   (* Do topological sort on the complete chain *)

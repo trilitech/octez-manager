@@ -892,8 +892,10 @@ make arch-index
 
 The indexer extracts:
 - **Modules**: path, line count, `.mli` presence
-- **Functions**: name, type signature, line range, exposed in `.mli`, doc comment
+- **Functions**: name, type signature, line range, exposed in `.mli`, doc comment, mutable pattern usage
 - **Types**: name, kind (record/variant/abstract/alias), fields, constructors, doc comment
+
+**Note:** Function and type line counts **exclude doc comments** to avoid penalizing documentation. The count starts from the `let`/`type` keyword, not from any preceding `(** ... *)` comment.
 
 Doc comments from `.mli` files are preferred; `.ml` implementation comments are used as fallback. Hand-written intent fields set via `sqlite3 UPDATE` are preserved across re-indexing.
 
