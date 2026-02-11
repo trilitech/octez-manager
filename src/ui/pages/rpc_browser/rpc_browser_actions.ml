@@ -6,6 +6,7 @@
 (******************************************************************************)
 
 module State = Rpc_browser_state
+module Bg = Background_runner
 
 (** Default shortcuts for when no recent paths exist *)
 let default_shortcuts =
@@ -153,46 +154,55 @@ let prompt_dynamic ~name ~typ state on_value on_update =
       on_value value)
     ()
 
+(** Expand Rpc_describe entries to State entries with recent dynamic values. *)
+let expand_entries state entries =
+  let expand_entry (e : Rpc_describe.entry) =
+    match e.Rpc_describe.kind with
+    | Rpc_describe.Sub -> [{State.name = e.Rpc_describe.name; kind = State.Sub}]
+    | Rpc_describe.Get -> [{State.name = e.Rpc_describe.name; kind = State.Get}]
+    | Rpc_describe.Dyn typ ->
+        (* Get recent values for this type, limit to 5 *)
+        let recent =
+          State.get_recent_values ~segment_type:typ state |> fun lst ->
+          if List.length lst > 5 then List.filteri (fun i _ -> i < 5) lst
+          else lst
+        in
+        (* Create DynValue entries for recent values *)
+        let recent_entries =
+          List.map
+            (fun value ->
+              {State.name = "<>" ^ value; kind = State.DynValue (typ, value)})
+            recent
+        in
+        (* Add the original Dyn entry after recent values *)
+        recent_entries
+        @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
+  in
+  let state_entries = List.concat_map expand_entry entries in
+  (* Add [change target] button at the top *)
+  let change_target_entry =
+    {State.name = "[change target]"; kind = State.ChangeTarget}
+  in
+  change_target_entry :: state_entries
+
 let fetch_entries_sync state =
   match State.current_instance state with
   | None -> State.set_error "No instance selected" state
   | Some service ->
       let segs = state.State.path in
       let entries, _source = Rpc_describe.fetch_entries service ~segs in
-      (* Expand Dyn entries to include recent values *)
-      let expand_entry (e : Rpc_describe.entry) =
-        match e.Rpc_describe.kind with
-        | Rpc_describe.Sub ->
-            [{State.name = e.Rpc_describe.name; kind = State.Sub}]
-        | Rpc_describe.Get ->
-            [{State.name = e.Rpc_describe.name; kind = State.Get}]
-        | Rpc_describe.Dyn typ ->
-            (* Get recent values for this type, limit to 5 *)
-            let recent =
-              State.get_recent_values ~segment_type:typ state |> fun lst ->
-              if List.length lst > 5 then List.filteri (fun i _ -> i < 5) lst
-              else lst
-            in
-            (* Create DynValue entries for recent values *)
-            let recent_entries =
-              List.map
-                (fun value ->
-                  {
-                    State.name = "<>" ^ value;
-                    kind = State.DynValue (typ, value);
-                  })
-                recent
-            in
-            (* Add the original Dyn entry after recent values *)
-            recent_entries
-            @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
-      in
-      let state_entries = List.concat_map expand_entry entries in
-      (* Add [change target] button at the top *)
-      let change_target_entry =
-        {State.name = "[change target]"; kind = State.ChangeTarget}
-      in
-      State.set_entries (change_target_entry :: state_entries) state
+      State.set_entries (expand_entries state entries) state
+
+(** Async version: fetch entries in background pool.
+    Sets loading state first, then fetches in background. *)
+let fetch_entries_async state ~on_done =
+  match State.current_instance state with
+  | None -> on_done (State.set_error "No instance selected" state)
+  | Some service ->
+      let segs = state.State.path in
+      Bg.submit_blocking (fun () ->
+          let entries, _source = Rpc_describe.fetch_entries service ~segs in
+          on_done (State.set_entries (expand_entries state entries) state))
 
 (* Get the target instance for the current/focused pager, falling back to current_instance *)
 let get_target_instance state =
@@ -213,38 +223,44 @@ let is_streaming_path (path_segments : string list) =
     (fun seg -> seg = "monitor" || String.starts_with ~prefix:"monitor_" seg)
     path_segments
 
-(** Execute a synchronous GET request: fetch, highlight JSON, and update state
-    with the result or error.
+(** Execute a GET request in background: fetch, highlight JSON, and update state
+    with the result or error. The HTTP request runs in the background pool
+    to avoid blocking the main TUI thread.
     @param caller Label for debug logging (e.g., "execute_get_internal")
     @param service Target node
     @param path RPC path (e.g., "/chains/main/blocks/head")
     @param state Current state (already in loading)
     @param on_update Callback to push updated state *)
 let fetch_and_set_result ~caller ~service ~path state on_update =
-  let start_time = Unix.gettimeofday () in
-  match Rpc_client.http_get_url service path with
-  | Ok body ->
-      let response_time_ms = (Unix.gettimeofday () -. start_time) *. 1000.0 in
-      let response_size = String.length body in
-      debug
-        (Printf.sprintf
-           "%s: OK %d bytes in %.1fms"
-           caller
-           response_size
-           response_time_ms) ;
-      let highlighted =
-        match Json_highlighter.highlight body with Ok h -> h | Error _ -> body
-      in
-      on_update
-        (State.set_result
-           ~body:highlighted
-           ~raw_body:body
-           ~response_time_ms
-           ~response_size
-           state)
-  | Error msg ->
-      debug (Printf.sprintf "%s: ERROR: %s" caller msg) ;
-      on_update (State.set_error msg state)
+  Bg.submit_blocking (fun () ->
+      let start_time = Unix.gettimeofday () in
+      match Rpc_client.http_get_url service path with
+      | Ok body ->
+          let response_time_ms =
+            (Unix.gettimeofday () -. start_time) *. 1000.0
+          in
+          let response_size = String.length body in
+          debug
+            (Printf.sprintf
+               "%s: OK %d bytes in %.1fms"
+               caller
+               response_size
+               response_time_ms) ;
+          let highlighted =
+            match Json_highlighter.highlight body with
+            | Ok h -> h
+            | Error _ -> body
+          in
+          on_update
+            (State.set_result
+               ~body:highlighted
+               ~raw_body:body
+               ~response_time_ms
+               ~response_size
+               state)
+      | Error msg ->
+          debug (Printf.sprintf "%s: ERROR: %s" caller msg) ;
+          on_update (State.set_error msg state))
 
 (** Start a streaming pager for a streaming RPC endpoint. *)
 let start_streaming ~service ~url ~rpc_path state on_update =
@@ -295,9 +311,7 @@ let execute_get_with_name endpoint_name state on_update =
 let execute_get state on_update =
   execute_get_internal ~url_path:state.State.path state on_update
 
-let fetch_entries state on_update =
-  let new_state = fetch_entries_sync state in
-  on_update new_state
+let fetch_entries state on_update = fetch_entries_async state ~on_done:on_update
 
 let handle_enter state on_update =
   match get_selected_entry state with
@@ -462,39 +476,10 @@ let fetch_cached_entries state on_update =
   | None -> on_update (State.set_error "No instance selected" state)
   | Some service ->
       let segs = state.State.path in
-      let entries, _source = Rpc_describe.fetch_entries service ~segs in
-      (* Expand Dyn entries to include recent values *)
-      let expand_entry (e : Rpc_describe.entry) =
-        match e.Rpc_describe.kind with
-        | Rpc_describe.Sub ->
-            [{State.name = e.Rpc_describe.name; kind = State.Sub}]
-        | Rpc_describe.Get ->
-            [{State.name = e.Rpc_describe.name; kind = State.Get}]
-        | Rpc_describe.Dyn typ ->
-            let recent =
-              State.get_recent_values ~segment_type:typ state |> fun lst ->
-              if List.length lst > 5 then List.filteri (fun i _ -> i < 5) lst
-              else lst
-            in
-            let recent_entries =
-              List.map
-                (fun value ->
-                  {
-                    State.name = "<>" ^ value;
-                    kind = State.DynValue (typ, value);
-                  })
-                recent
-            in
-            recent_entries
-            @ [{State.name = e.Rpc_describe.name; kind = State.Dyn typ}]
-      in
-      let state_entries = List.concat_map expand_entry entries in
-      (* Add [change target] button at the top *)
-      let change_target_entry =
-        {State.name = "[change target]"; kind = State.ChangeTarget}
-      in
-      on_update
-        (State.set_cached_entries (change_target_entry :: state_entries) state)
+      Bg.submit_blocking (fun () ->
+          let entries, _source = Rpc_describe.fetch_entries service ~segs in
+          let state_entries = expand_entries state entries in
+          on_update (State.set_cached_entries state_entries state))
 
 let handle_cached_enter state on_update =
   match State.get_cached_entry state with

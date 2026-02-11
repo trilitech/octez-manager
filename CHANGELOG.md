@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **RPC Browser responsiveness**: HTTP requests and endpoint listing now run in background worker pool, preventing UI freezes during slow network responses (fixes #673)
+
 ## [0.3.0] - 2026-02-11
 
 ### Added
