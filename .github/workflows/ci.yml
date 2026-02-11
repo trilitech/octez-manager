@@ -181,9 +181,13 @@ jobs:
       - name: Architecture metrics
         run: |
           eval $(opam env)
-          # Install sqlite3 if not pre-installed in Docker image
-          if ! ocamlfind query sqlite3 > /dev/null 2>&1; then
+          # Install sqlite3 system library if not present (opam cache may have
+          # the OCaml package but container may lack the system .so file)
+          if ! ldconfig -p | grep -q libsqlite3; then
             apt-get update -qq && apt-get install -y -qq libsqlite3-dev > /dev/null
+          fi
+          # Install OCaml sqlite3 bindings if not in opam cache
+          if ! ocamlfind query sqlite3 > /dev/null 2>&1; then
             opam install sqlite3 -y
           fi
           # Ensure all .cmt/.cmti files exist (the cached _build may be stale)
