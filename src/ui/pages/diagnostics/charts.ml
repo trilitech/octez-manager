@@ -347,40 +347,42 @@ let render_summary_bars samples ~width ~height =
     let last = List.hd (List.rev samples) in
 
     (* Create a clearer summary focusing on key metrics *)
-    let lines = ref [] in
-    lines := Widgets.fg 14 (Widgets.bold "━━━ Current Snapshot ━━━") :: !lines ;
-    lines := "" :: !lines ;
+    let header = Widgets.fg 14 (Widgets.bold "━━━ Current Snapshot ━━━") in
 
     (* Services *)
-    lines :=
+    let services_line =
       Printf.sprintf
         "  %s %s active / %s total"
         (Widgets.fg 10 "Services:")
         (Widgets.bold (string_of_int last.Metrics.services_active))
         (string_of_int last.services_total)
-      :: !lines ;
+    in
 
     (* BG Queue *)
     let bg_status =
       if last.bg_queue_depth = 0 then Widgets.fg 10 "idle"
       else Widgets.fg 11 (Printf.sprintf "%d tasks" last.bg_queue_depth)
     in
-    lines :=
-      Printf.sprintf "  %s %s" (Widgets.fg 12 "BG Queue:") bg_status :: !lines ;
+    let bg_line =
+      Printf.sprintf "  %s %s" (Widgets.fg 12 "BG Queue:") bg_status
+    in
 
     (* Render Performance *)
-    (match last.render_p99 with
-    | Some p99 ->
-        let color = if p99 < 16.0 then 10 else if p99 < 33.0 then 11 else 9 in
-        lines :=
-          Printf.sprintf
-            "  %s %s (p99)"
-            (Widgets.fg 12 "Render:")
-            (Widgets.fg color (Widgets.bold (Printf.sprintf "%.1fms" p99)))
-          :: !lines
-    | None -> ()) ;
+    let render_line =
+      match last.render_p99 with
+      | Some p99 ->
+          let color = if p99 < 16.0 then 10 else if p99 < 33.0 then 11 else 9 in
+          Some
+            (Printf.sprintf
+               "  %s %s (p99)"
+               (Widgets.fg 12 "Render:")
+               (Widgets.fg color (Widgets.bold (Printf.sprintf "%.1fms" p99))))
+      | None -> None
+    in
 
-    String.concat "\n" (List.rev !lines)
+    String.concat
+      "\n"
+      ([header; ""; services_line; bg_line] @ Option.to_list render_line)
 
 let render_bg_queue_sparkline spark =
   if Sparkline.is_empty spark then "BG Queue (60s): " ^ "[collecting...]"

@@ -558,18 +558,13 @@ let get_snapshots () =
   Mutex.protect state.lock (fun () ->
       if state.snapshots_count = 0 then []
       else
-        let result = ref [] in
+        let arr_len = Array.length state.snapshots in
         let start_idx =
-          (state.snapshots_next
-          + Array.length state.snapshots
-          - state.snapshots_count)
-          mod Array.length state.snapshots
+          (state.snapshots_next + arr_len - state.snapshots_count) mod arr_len
         in
-        for i = 0 to state.snapshots_count - 1 do
-          let idx = (start_idx + i) mod Array.length state.snapshots in
-          result := state.snapshots.(idx) :: !result
-        done ;
-        List.rev !result)
+        List.init state.snapshots_count (fun i ->
+            let idx = (start_idx + i) mod arr_len in
+            state.snapshots.(idx)))
 
 let set_recording_duration samples =
   Mutex.protect state.lock (fun () ->

@@ -216,46 +216,48 @@ let render_caches_content () =
   let cache_stats = Cache.get_stats () in
   if cache_stats = [] then [Widgets.dim "No caches registered"]
   else
-    let lines = ref [] in
-    List.iter
-      (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
-        let age_str =
-          match age with
-          | None -> Widgets.dim "empty"
-          | Some a ->
-              let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
-              if expired then Widgets.red s else Widgets.green s
-        in
-        let stats_str =
-          if hits + misses > 0 then
-            Printf.sprintf " hits:%d misses:%d" hits misses
-          else ""
-        in
-        let count_str =
-          if sub_entries <> [] then
-            Printf.sprintf " (%d)" (List.length sub_entries)
-          else ""
-        in
-        lines :=
-          Printf.sprintf
-            "%-20s  %s%s%s"
-            name
-            age_str
-            count_str
-            (Widgets.dim stats_str)
-          :: !lines ;
-        List.iter
-          (fun (entry : Cache.sub_entry) ->
-            let sub_age_str =
-              let s = Printf.sprintf "%.1fs" entry.age in
-              if entry.expired then Widgets.red s else Widgets.green s
-            in
-            lines :=
-              Printf.sprintf "  └─ %-16s  %s" entry.key sub_age_str :: !lines)
-          sub_entries)
-      cache_stats ;
-    lines := Widgets.dim "(press 'c' to clear all)" :: !lines ;
-    List.rev !lines
+    let lines =
+      List.concat_map
+        (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
+          let age_str =
+            match age with
+            | None -> Widgets.dim "empty"
+            | Some a ->
+                let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
+                if expired then Widgets.red s else Widgets.green s
+          in
+          let stats_str =
+            if hits + misses > 0 then
+              Printf.sprintf " hits:%d misses:%d" hits misses
+            else ""
+          in
+          let count_str =
+            if sub_entries <> [] then
+              Printf.sprintf " (%d)" (List.length sub_entries)
+            else ""
+          in
+          let main_line =
+            Printf.sprintf
+              "%-20s  %s%s%s"
+              name
+              age_str
+              count_str
+              (Widgets.dim stats_str)
+          in
+          let sub_lines =
+            List.map
+              (fun (entry : Cache.sub_entry) ->
+                let sub_age_str =
+                  let s = Printf.sprintf "%.1fs" entry.age in
+                  if entry.expired then Widgets.red s else Widgets.green s
+                in
+                Printf.sprintf "  └─ %-16s  %s" entry.key sub_age_str)
+              sub_entries
+          in
+          main_line :: sub_lines)
+        cache_stats
+    in
+    lines @ [Widgets.dim "(press 'c' to clear all)"]
 
 let render_realtime_content bg_queue_spark =
   let bg_depth = Metrics.get_bg_queue_depth () in
@@ -436,67 +438,60 @@ let view ps ~focus:_ ~size =
   Metrics.record_render ~page:name (fun () ->
       let box_width = min 78 (size.LTerm_geom.cols - 2) in
       let chart_width = min 70 (box_width - 6) in
-      let lines = ref [] in
-      let add_box ~title ~color content_lines =
+      let render_box ~title ~color content_lines =
         let content = String.concat "\n" content_lines in
         let box =
           Box.render ~title ~style:Single ~color ~width:box_width content
         in
-        String.split_on_char '\n' box
-        |> List.iter (fun l -> lines := l :: !lines) ;
-        lines := "" :: !lines
+        String.split_on_char '\n' box @ [""]
       in
 
-      (* Service Status *)
-      add_box
-        ~title:"Service Status"
-        ~color:14
-        (render_services_content s.services) ;
+      (* Build all boxes *)
+      let boxes =
+        [
+          render_box
+            ~title:"Service Status"
+            ~color:14
+            (render_services_content s.services);
+          render_box ~title:"Caches" ~color:13 (render_caches_content ());
+          render_box
+            ~title:"Real-Time Metrics"
+            ~color:12
+            (render_realtime_content s.bg_queue_spark);
+          render_box
+            ~title:"Metrics Recorder"
+            ~color:11
+            (render_recorder_content ());
+        ]
+        @ (if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
+             [
+               render_box
+                 ~title:"Historical Metrics"
+                 ~color:13
+                 (render_historical_content ~chart_width);
+             ]
+           else [])
+        @ [
+            render_box
+              ~title:"Scheduler Performance"
+              ~color:11
+              (render_scheduler_content ());
+            render_box
+              ~title:"Worker Queue Stats"
+              ~color:12
+              (render_worker_stats_content ());
+            render_box
+              ~title:"Metrics Server"
+              ~color:14
+              (render_metrics_server_content ());
+            render_box
+              ~title:"System Information"
+              ~color:12
+              (render_system_info_content ());
+          ]
+      in
 
-      (* Caches *)
-      add_box ~title:"Caches" ~color:13 (render_caches_content ()) ;
-
-      (* Real-Time Metrics *)
-      add_box
-        ~title:"Real-Time Metrics"
-        ~color:12
-        (render_realtime_content s.bg_queue_spark) ;
-
-      (* Metrics Recorder *)
-      add_box ~title:"Metrics Recorder" ~color:11 (render_recorder_content ()) ;
-
-      (* Historical Charts - only show if recording or has data *)
-      if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
-        add_box
-          ~title:"Historical Metrics"
-          ~color:13
-          (render_historical_content ~chart_width) ;
-
-      (* Scheduler Performance *)
-      add_box
-        ~title:"Scheduler Performance"
-        ~color:11
-        (render_scheduler_content ()) ;
-
-      (* Worker Queue Stats *)
-      add_box
-        ~title:"Worker Queue Stats"
-        ~color:12
-        (render_worker_stats_content ()) ;
-
-      (* Metrics Server Configuration *)
-      add_box
-        ~title:"Metrics Server"
-        ~color:14
-        (render_metrics_server_content ()) ;
-
-      (* System Information *)
-      add_box
-        ~title:"System Information"
-        ~color:12
-        (render_system_info_content ()) ;
-
-      let all_lines = List.rev !lines in
+      let all_lines = List.concat boxes in
       let content_height = List.length all_lines in
       content_height_ref := content_height ;
 

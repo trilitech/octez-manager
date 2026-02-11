@@ -920,6 +920,7 @@ dune exec tools/arch_query.exe -- missing-docs       # exposed functions without
 dune exec tools/arch_query.exe -- missing-mli        # modules without .mli
 dune exec tools/arch_query.exe -- god-modules        # modules with 30+ functions (--min N)
 dune exec tools/arch_query.exe -- unsafe-strings     # string fields appearing 3+ times
+dune exec tools/arch_query.exe -- mutables           # mutable pattern usage (ref, :=, !, mutable fields)
 
 # Summary and raw SQL
 dune exec tools/arch_query.exe -- stats
@@ -947,6 +948,8 @@ Tracked metrics (regressions block merge):
 - `missing_mli` -- must not increase
 - `god_modules` (>30 functions) -- must not increase
 - `unsafe_string_fields` -- must not increase
+- `mutable_fields` -- must not increase
+- `functions_with_mutables` -- must not increase
 - `doc_coverage_pct` -- must not decrease
 
 #### When Creating New Functions

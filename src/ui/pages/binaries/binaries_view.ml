@@ -260,11 +260,14 @@ let render_progress add =
 (** Main view function for the binaries page. Assembles all sections. *)
 let view ps ~focus:_ ~size:_ =
   let s = ps.Navigation.s in
-  let lines = ref [] in
-  let add line = lines := line :: !lines in
+  let buf = Buffer.create 2048 in
+  let add line =
+    if Buffer.length buf > 0 then Buffer.add_char buf '\n' ;
+    Buffer.add_string buf line
+  in
   set_help_hint s ;
   render_managed_versions s add ;
   render_registered_dirs s add ;
   render_available_versions s add ;
   render_progress add ;
-  String.concat "\n" (List.rev !lines)
+  Buffer.contents buf
