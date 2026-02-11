@@ -104,61 +104,43 @@ let absolutize_url (s : Service.t) (path : string) : string =
   if String.length path > 0 && path.[0] = '/' then base ^ path
   else base ^ "/" ^ path
 
-let http_fetch_methods ~url ~rpc_path (s : Service.t) :
-    (unit -> (string, string) result option) list =
-  let via_curl () =
-    if curl_available () then (
-      log (Printf.sprintf "via_curl: attempting url=%s" url) ;
-      Some
-        (with_request_slot (fun () ->
-             match
-               Cmd_runner.run_out
-                 ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
-             with
-             | Ok s ->
-                 log
-                   (Printf.sprintf "via_curl: OK (%d bytes)" (String.length s)) ;
-                 Ok s
-             | Error (`Msg m) ->
-                 log (Printf.sprintf "via_curl: FAILED: %s" m) ;
-                 Error m)))
-    else (
-      log "via_curl: curl not available" ;
-      None)
-  in
-  let via_wget () =
-    if wget_available () then (
-      log (Printf.sprintf "via_wget: attempting url=%s" url) ;
-      Some
-        (with_request_slot (fun () ->
-             match
-               Cmd_runner.run_out
-                 ["wget"; "-qO-"; "--timeout=1"; "--tries=1"; url]
-             with
-             | Ok s ->
-                 log
-                   (Printf.sprintf "via_wget: OK (%d bytes)" (String.length s)) ;
-                 Ok s
-             | Error (`Msg m) ->
-                 log (Printf.sprintf "via_wget: FAILED: %s" m) ;
-                 Error m)))
-    else (
-      log "via_wget: wget not available" ;
-      None)
-  in
-  let via_rpc_get () =
-    log
-      (Printf.sprintf
-         "via_rpc_get: attempting path=%s instance=%s"
-         rpc_path
-         s.instance) ;
+let via_curl ~url () =
+  if curl_available () then (
+    log (Printf.sprintf "via_curl: url=%s" url) ;
     Some
       (with_request_slot (fun () ->
-           match rpc_get s rpc_path with
+           match
+             Cmd_runner.run_out
+               ["curl"; "-sfm"; "2"; "--connect-timeout"; "0.8"; url]
+           with
            | Ok s -> Ok s
-           | Error (`Msg m) -> Error m))
-  in
-  [via_curl; via_wget; via_rpc_get]
+           | Error (`Msg m) -> Error m)))
+  else None
+
+let via_wget ~url () =
+  if wget_available () then (
+    log (Printf.sprintf "via_wget: url=%s" url) ;
+    Some
+      (with_request_slot (fun () ->
+           match
+             Cmd_runner.run_out
+               ["wget"; "-qO-"; "--timeout=1"; "--tries=1"; url]
+           with
+           | Ok s -> Ok s
+           | Error (`Msg m) -> Error m)))
+  else None
+
+let via_rpc_get ~rpc_path (s : Service.t) () =
+  log (Printf.sprintf "via_rpc_get: path=%s instance=%s" rpc_path s.instance) ;
+  Some
+    (with_request_slot (fun () ->
+         match rpc_get s rpc_path with
+         | Ok s -> Ok s
+         | Error (`Msg m) -> Error m))
+
+let http_fetch_methods ~url ~rpc_path (s : Service.t) :
+    (unit -> (string, string) result option) list =
+  [via_curl ~url; via_wget ~url; via_rpc_get ~rpc_path s]
 
 let http_get_string (s : Service.t) (path : string) =
   let url = absolutize_url s path in
@@ -348,93 +330,6 @@ let parse_head_line line ~on_head =
     on_head ~level ~proto ~chain_id
   with _ -> ()
 
-let run_head_monitor_eio (Eio_process.Mgr mgr) ~stopped ~url ~on_head =
-  Eio.Switch.run @@ fun sw ->
-  let argv =
-    [
-      "curl";
-      "-sN";
-      "--connect-timeout";
-      "2";
-      "--max-time";
-      "86400";
-      "--no-buffer";
-      url;
-    ]
-  in
-  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w argv in
-  Eio.Flow.close stdout_w ;
-  let reader =
-    Eio.Buf_read.of_flow
-      ~max_size:(10 * 1024 * 1024)
-      (stdout_r :> _ Eio.Flow.source)
-  in
-  let rec loop () =
-    match
-      Eio.Fiber.first
-        (fun () ->
-          match Eio.Buf_read.line reader with
-          | line -> `Line line
-          | exception End_of_file -> `Eof)
-        (fun () ->
-          (* Periodically check the stop flag so we don't block forever
-             waiting for the next JSON line from the streaming endpoint. *)
-          let rec wait () =
-            if Atomic.get stopped then `Stopped
-            else (
-              Eio_unix.sleep 0.5 ;
-              wait ())
-          in
-          wait ())
-    with
-    | `Line line ->
-        parse_head_line line ~on_head ;
-        loop ()
-    | `Eof -> ()
-    | `Stopped -> ( try Eio.Process.signal proc Sys.sigterm with _ -> ())
-  in
-  loop () ;
-  try ignore (Eio.Process.await proc) with _ -> ()
-
-let run_head_monitor_blocking ~stopped ~cmd ~on_head =
-  let ic = Unix.open_process_in cmd in
-  let rec loop () =
-    if Atomic.get stopped then ()
-    else
-      match input_line ic with
-      | exception End_of_file -> ()
-      | exception Sys_error _ -> ()
-      | line ->
-          parse_head_line line ~on_head ;
-          loop ()
-  in
-  loop () ;
-  try ignore (Unix.close_process_in ic) with _ -> ()
-
-let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
-    =
-  let stopped = Atomic.make false in
-  let running = Atomic.make true in
-  let url = absolutize_url s "/monitor/heads/main" in
-  let run () =
-    (match Eio_process.get_process_mgr () with
-    | Some mgr -> run_head_monitor_eio mgr ~stopped ~url ~on_head
-    | None ->
-        let cmd =
-          Printf.sprintf
-            "curl -sN --connect-timeout 2 --max-time 86400 --no-buffer %s"
-            url
-        in
-        run_head_monitor_blocking ~stopped ~cmd ~on_head) ;
-    Atomic.set running false ;
-    on_disconnect ()
-  in
-  Domain_pool.submit (fun () -> try run () with _ -> ()) ;
-  let stop () = Atomic.set stopped true in
-  let alive () = Atomic.get running in
-  {stop; alive}
-
 (* Generic RPC stream: open a long-lived curl connection and feed each line
    to the caller. Works for any streaming endpoint (monitor/*, etc.). *)
 
@@ -468,6 +363,8 @@ let run_rpc_stream_eio (Eio_process.Mgr mgr) ~stopped ~url ~on_line =
           | line -> `Line line
           | exception End_of_file -> `Eof)
         (fun () ->
+          (* Periodically check the stop flag so we don't block forever
+             waiting for the next JSON line from the streaming endpoint. *)
           let rec wait () =
             if Atomic.get stopped then `Stopped
             else (
@@ -522,6 +419,14 @@ let start_rpc_stream (s : Service.t) ~path ~on_line ~on_disconnect :
   let stop () = Atomic.set stopped true in
   let alive () = Atomic.get running in
   {stop; alive}
+
+let start_head_monitor (s : Service.t) ~on_head ~on_disconnect : monitor_handle
+    =
+  start_rpc_stream
+    s
+    ~path:"/monitor/heads/main"
+    ~on_line:(fun line -> parse_head_line line ~on_head)
+    ~on_disconnect
 
 module For_tests = struct
   let try_fetch_methods = try_fetch_methods
