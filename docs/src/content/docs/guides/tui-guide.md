@@ -223,6 +223,21 @@ The diagnostics page is read-only and refreshes automatically.
 | `Tab` | Fold/unfold instance details |
 | `b` | Open Binaries page |
 | `d` | Open Diagnostics page |
+| `r` | Open RPC Browser |
 | `?` | Show help |
 | `Esc` | Go back / Close modal |
 | `q` | Quit |
+
+## RPC Browser
+
+Press `r` from the main dashboard to open the **RPC Browser** — an interactive explorer for Tezos node RPC endpoints.
+
+Features:
+- Navigate the RPC endpoint tree with arrow keys
+- Quick access shortcuts (`1`-`5`) for common endpoints like `/version` and `/chains/main/blocks/head`
+- JSON syntax highlighting for responses
+- Response time and size metrics
+- Switch between node instances with `Tab`
+- Stream live data from monitor endpoints
+
+See [RPC Browser Guide](/guides/rpc-browser/) for details.
