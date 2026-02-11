@@ -413,8 +413,16 @@ class ScenarioRunner:
             init_wait = self.scenario.get('init_wait', 2.0)
             self.log(f"Waiting {init_wait}s for TUI to initialize...")
             time.sleep(init_wait)
-            self.pty.read_output(0.5)
-            self.capture_frame(500)  # Initial frame with 500ms delay
+            
+            # Collect all initial output - this is the full screen
+            initial_content = self.pty.read_output(1.0)
+            self.log(f"Initial screen: {len(initial_content)} bytes")
+            
+            # Add the initial frame with all the startup content
+            if initial_content:
+                self.recording.frames.append(Frame(content=initial_content, delay=500))
+                self.last_frame_time = time.time()
+                self.log(f"Captured initial frame #{len(self.recording.frames)} ({len(initial_content)} bytes)")
             
             # Run actions
             actions = self.scenario.get('actions', [])
