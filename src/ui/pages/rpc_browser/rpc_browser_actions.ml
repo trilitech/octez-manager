@@ -200,7 +200,7 @@ let get_target_instance state =
   | Some svc -> Some svc
   | None -> State.current_instance state
 
-let log msg = Cmd_runner.append_debug_log ("RPC_BROWSER " ^ msg)
+let debug msg = Cmd_runner.append_debug_log ("RPC_BROWSER " ^ msg)
 
 (** Detect whether an RPC path is a streaming endpoint.
     Streaming endpoints never complete - they keep sending JSON objects
@@ -213,66 +213,79 @@ let is_streaming_path (path_segments : string list) =
     (fun seg -> seg = "monitor" || String.starts_with ~prefix:"monitor_" seg)
     path_segments
 
+(** Execute a synchronous GET request: fetch, highlight JSON, and update state
+    with the result or error.
+    @param caller Label for debug logging (e.g., "execute_get_internal")
+    @param service Target node
+    @param path RPC path (e.g., "/chains/main/blocks/head")
+    @param state Current state (already in loading)
+    @param on_update Callback to push updated state *)
+let fetch_and_set_result ~caller ~service ~path state on_update =
+  let start_time = Unix.gettimeofday () in
+  match Rpc_client.http_get_url service path with
+  | Ok body ->
+      let response_time_ms = (Unix.gettimeofday () -. start_time) *. 1000.0 in
+      let response_size = String.length body in
+      debug
+        (Printf.sprintf
+           "%s: OK %d bytes in %.1fms"
+           caller
+           response_size
+           response_time_ms) ;
+      let highlighted =
+        match Json_highlighter.highlight body with Ok h -> h | Error _ -> body
+      in
+      on_update
+        (State.set_result
+           ~body:highlighted
+           ~raw_body:body
+           ~response_time_ms
+           ~response_size
+           state)
+  | Error msg ->
+      debug (Printf.sprintf "%s: ERROR: %s" caller msg) ;
+      on_update (State.set_error msg state)
+
+(** Start a streaming pager for a streaming RPC endpoint. *)
+let start_streaming ~service ~url ~rpc_path state on_update =
+  debug "detected streaming endpoint, starting stream" ;
+  let state = State.execute_get ~url state in
+  let pager_id = State.get_focused_pager_id state in
+  let _state =
+    State.start_streaming_pager
+      ~pager_id
+      ~request:url
+      ~service
+      ~rpc_path
+      ~on_state_update:on_update
+      state
+  in
+  ()
+
 (* Internal: execute GET with a specific path for the HTTP request *)
 let execute_get_internal ~url_path state on_update =
   match get_target_instance state with
   | None -> on_update (State.set_error "No instance selected" state)
-  | Some service -> (
+  | Some service ->
       let url = build_rpc_url service url_path in
       let path = "/" ^ String.concat "/" url_path in
-      log
+      debug
         (Printf.sprintf
            "execute_get_internal: path=%s url=%s instance=%s"
            path
            url
            service.Octez_manager_lib.Service.instance) ;
-      if is_streaming_path url_path then (
-        (* Streaming RPC: use background stream with pager in streaming mode *)
-        log
-          (Printf.sprintf
-             "execute_get_internal: detected streaming endpoint, starting \
-              stream") ;
-        let state = State.execute_get ~url state in
-        let pager_id = State.get_focused_pager_id state in
-        let _state =
-          State.start_streaming_pager
-            ~pager_id
-            ~request:url
-            ~service
-            ~rpc_path:path
-            ~on_state_update:on_update
-            state
-        in
-        ())
+      if is_streaming_path url_path then
+        start_streaming ~service ~url ~rpc_path:path state on_update
       else
         let state = State.execute_get ~url state in
         on_update state ;
-        let start_time = Unix.gettimeofday () in
-        match Rpc_client.http_get_url service path with
-        | Ok body ->
-            let end_time = Unix.gettimeofday () in
-            let response_time_ms = (end_time -. start_time) *. 1000.0 in
-            let response_size = String.length body in
-            log
-              (Printf.sprintf
-                 "execute_get_internal: OK %d bytes in %.1fms"
-                 response_size
-                 response_time_ms) ;
-            let highlighted =
-              match Json_highlighter.highlight body with
-              | Ok h -> h
-              | Error _ -> body
-            in
-            on_update
-              (State.set_result
-                 ~body:highlighted
-                 ~raw_body:body
-                 ~response_time_ms
-                 ~response_size
-                 state)
-        | Error msg ->
-            log (Printf.sprintf "execute_get_internal: ERROR: %s" msg) ;
-            on_update (State.set_error msg state))
+        fetch_and_set_result
+          ~caller:"execute_get_internal"
+          ~service
+          ~path
+          state
+          on_update
 
 (* Execute GET with an additional endpoint name appended to the path *)
 let execute_get_with_name endpoint_name state on_update =
@@ -419,65 +432,29 @@ let execute_shortcut ~key state on_update =
           true
       | Some service ->
           let url = Rpc_client.endpoint_of service ^ path in
-          log
+          debug
             (Printf.sprintf
-               "execute_shortcut: key=%s path=%s url=%s instance=%s"
+               "execute_shortcut: key=%s path=%s instance=%s"
                key
                path
-               url
                service.Octez_manager_lib.Service.instance) ;
           (* Record in LRU before executing *)
           let state = State.add_recent_path ~path ~desc state in
-          (* Check if this is a streaming endpoint *)
           let path_segments =
             String.split_on_char '/' path |> List.filter (fun s -> s <> "")
           in
           if is_streaming_path path_segments then (
-            log
-              (Printf.sprintf
-                 "execute_shortcut: detected streaming endpoint, starting \
-                  stream") ;
-            let state = State.execute_get ~url state in
-            let pager_id = State.get_focused_pager_id state in
-            let _state =
-              State.start_streaming_pager
-                ~pager_id
-                ~request:url
-                ~service
-                ~rpc_path:path
-                ~on_state_update:on_update
-                state
-            in
+            start_streaming ~service ~url ~rpc_path:path state on_update ;
             true)
           else
             let state = State.execute_get ~url state in
             on_update state ;
-            let start_time = Unix.gettimeofday () in
-            (match Rpc_client.http_get_url service path with
-            | Ok body ->
-                let end_time = Unix.gettimeofday () in
-                let response_time_ms = (end_time -. start_time) *. 1000.0 in
-                let response_size = String.length body in
-                log
-                  (Printf.sprintf
-                     "execute_shortcut: OK %d bytes in %.1fms"
-                     response_size
-                     response_time_ms) ;
-                let highlighted =
-                  match Json_highlighter.highlight body with
-                  | Ok h -> h
-                  | Error _ -> body
-                in
-                on_update
-                  (State.set_result
-                     ~body:highlighted
-                     ~raw_body:body
-                     ~response_time_ms
-                     ~response_size
-                     state)
-            | Error msg ->
-                log (Printf.sprintf "execute_shortcut: ERROR: %s" msg) ;
-                on_update (State.set_error msg state)) ;
+            fetch_and_set_result
+              ~caller:"execute_shortcut"
+              ~service
+              ~path
+              state
+              on_update ;
             true)
 
 let fetch_cached_entries state on_update =

@@ -408,6 +408,15 @@ let is_streaming state =
       | None -> false)
   | None -> false
 
+(** Highlight a streaming JSON line and append it (with separator) to a pager. *)
+let append_streaming_line pager line =
+  let highlighted =
+    match Json_highlighter.highlight line with Ok h -> h | Error _ -> line
+  in
+  let lines = String.split_on_char '\n' highlighted in
+  (* Add a blank separator line between JSON objects for readability *)
+  Pager.append_lines_batched pager (lines @ [""])
+
 (** Set up a streaming pager: create pager in streaming mode, start RPC stream,
     wire on_line to highlight each JSON object and append to pager.
     @param pager_id Target pager ID
@@ -417,7 +426,6 @@ let is_streaming state =
     @param on_state_update Callback to update global state ref and trigger re-render *)
 let start_streaming_pager ~pager_id ~request ~service ~rpc_path ~on_state_update
     state =
-  (* Create pager in streaming mode with notify_render callback *)
   let pager =
     Pager.open_text
       ~title:"Streaming"
@@ -425,7 +433,6 @@ let start_streaming_pager ~pager_id ~request ~service ~rpc_path ~on_state_update
       ""
   in
   Pager.start_streaming pager ;
-  (* Update state with the new streaming pager *)
   let state =
     update_pager_slot
       pager_id
@@ -442,32 +449,15 @@ let start_streaming_pager ~pager_id ~request ~service ~rpc_path ~on_state_update
         })
       state
   in
-  (* Start the RPC stream *)
   let handle =
     Rpc_client.start_rpc_stream
       service
       ~path:rpc_path
-      ~on_line:(fun line ->
-        (* Use Json_highlighter for syntax highlighting instead of the
-           Miaou json_streamer, which has a bug where it doesn't check
-           in_string state before the pending_string key/value decision,
-           causing each string character to be individually quoted.
-           Each streaming line is a complete JSON object, so
-           Json_highlighter.highlight works correctly here. *)
-        let highlighted =
-          match Json_highlighter.highlight line with
-          | Ok h -> h
-          | Error _ -> line
-        in
-        let lines = String.split_on_char '\n' highlighted in
-        (* Add a blank separator line between JSON objects for readability *)
-        let lines = lines @ [""] in
-        Pager.append_lines_batched pager lines)
+      ~on_line:(append_streaming_line pager)
       ~on_disconnect:(fun () ->
         Pager.stop_streaming pager ;
         Context.mark_instances_dirty ())
   in
-  (* Store the handle *)
   let state =
     update_pager_slot
       pager_id
