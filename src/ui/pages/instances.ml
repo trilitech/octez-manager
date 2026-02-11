@@ -111,7 +111,11 @@ let maybe_refresh ps =
   let now = Unix.gettimeofday () in
   let pending_nav = Context.consume_navigation () in
   let ps =
-    match pending_nav with Some p -> Navigation.goto p ps | None -> ps
+    match pending_nav with
+    | Some (Context.Goto p) -> Navigation.goto p ps
+    | Some Context.Back -> Navigation.back ps
+    | Some Context.Quit -> Navigation.quit ps
+    | None -> ps
   in
   (* Check for pending restart dependents after edit *)
   let pending_restart = Context.take_pending_restart_dependents () in
@@ -256,10 +260,8 @@ struct
   let service_cycle ps _ = refresh ps
 
   let back ps =
-    (* Instances is the home page - back/Esc should quit the TUI.
-       Navigate to special __EXIT__ page to signal quit to the framework. *)
-    Context.navigate "__EXIT__" ;
-    ps
+    (* Instances is the home page - back/Esc should quit the TUI. *)
+    Navigation.quit ps
 
   let handled_keys () =
     Miaou.Core.Keys.
@@ -634,7 +636,9 @@ Press **Enter** to open instance menu.|}
 
   let check_navigation ps =
     match Context.consume_navigation () with
-    | Some p -> Navigation.goto p ps
+    | Some (Context.Goto p) -> Navigation.goto p ps
+    | Some Context.Back -> Navigation.back ps
+    | Some Context.Quit -> Navigation.quit ps
     | None -> ps
 
   let handle_modal_key ps key ~size:_ =
