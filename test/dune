@@ -938,3 +938,10 @@
  (modules test_signatory_validation)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_signatory_downloader)
+ (libraries alcotest octez_manager_lib yojson str)
+ (modules test_signatory_downloader)
+ (instrumentation
+  (backend bisect_ppx)))

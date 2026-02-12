@@ -65,13 +65,13 @@ let list_remote_cmd =
 let list_cmd =
   let term =
     let run () =
-      (* List managed versions *)
+      (* List managed Octez versions *)
       (match Binary_registry.list_managed_versions () with
       | Error (`Msg msg) ->
           Printf.eprintf "Warning: Failed to list managed versions: %s\n" msg
       | Ok versions ->
           if versions <> [] then (
-            Printf.printf "Managed Versions:\n" ;
+            Printf.printf "Octez Managed Versions:\n" ;
             List.iter
               (fun version ->
                 let path = Binary_registry.managed_version_path version in
@@ -90,6 +90,24 @@ let list_cmd =
                   else Printf.sprintf "%d instances" count
                 in
                 Printf.printf "  v%s - %s (%s)\n" version size_str usage)
+              versions)) ;
+
+      (* List managed Signatory versions *)
+      (match Signatory_downloader.list_managed_versions () with
+      | Error (`Msg msg) ->
+          Printf.eprintf "Warning: Failed to list Signatory versions: %s\n" msg
+      | Ok versions ->
+          if versions <> [] then (
+            Printf.printf "\nSignatory Managed Versions:\n" ;
+            List.iter
+              (fun version ->
+                let size_str =
+                  match Signatory_downloader.get_version_size version with
+                  | Ok (_bytes, formatted) -> formatted
+                  | Error _ -> "unknown size"
+                in
+                (* TODO: Track which signatory instances use which binary *)
+                Printf.printf "  v%s - %s\n" version size_str)
               versions)) ;
 
       (* List registered directories *)
@@ -554,6 +572,225 @@ let prune_cmd =
   in
   Cmd.v info term
 
+(** Signatory list-remote command *)
+let signatory_list_remote_cmd =
+  let term =
+    let run include_prerelease =
+      match Signatory_downloader.fetch_versions ~include_prerelease () with
+      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+      | Ok versions ->
+          if versions = [] then (
+            Printf.printf "No Signatory versions available.\n" ;
+            `Ok ())
+          else (
+            Printf.printf "Available Signatory versions:\n" ;
+            List.iter
+              (fun (v : Signatory_downloader.version_info) ->
+                let pre_marker =
+                  if v.is_prerelease then " (prerelease)" else ""
+                in
+                let date_str =
+                  match v.release_date with
+                  | Some d -> Printf.sprintf " - %s" d
+                  | None -> ""
+                in
+                Printf.printf "  %s%s%s\n" v.version pre_marker date_str)
+              versions ;
+            `Ok ())
+    in
+    let all_flag =
+      let doc = "Include prerelease versions (RC, beta, alpha)" in
+      Arg.(value & flag & info ["all"; "a"] ~doc)
+    in
+    Term.(ret (const run $ all_flag))
+  in
+  let info =
+    Cmd.info
+      "signatory-list-remote"
+      ~doc:"List available Signatory versions from GitHub"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P
+            "Fetches and displays available Signatory versions from GitHub \
+             releases.";
+          `P "By default, only stable releases are shown.";
+          `P "Use --all to include prerelease versions (RC, beta, alpha).";
+        ]
+  in
+  Cmd.v info term
+
+(** Signatory list command *)
+let signatory_list_cmd =
+  let term =
+    let run () =
+      match Signatory_downloader.list_managed_versions () with
+      | Error (`Msg msg) ->
+          Printf.eprintf "Error: Failed to list Signatory versions: %s\n" msg ;
+          `Error (false, msg)
+      | Ok versions ->
+          if versions = [] then (
+            Printf.printf "No managed Signatory versions installed.\n" ;
+            `Ok ())
+          else (
+            Printf.printf "Managed Signatory Versions:\n" ;
+            List.iter
+              (fun version ->
+                let size_str =
+                  match Signatory_downloader.get_version_size version with
+                  | Ok (_bytes, formatted) -> formatted
+                  | Error _ -> "unknown size"
+                in
+                (* TODO: Track which signatory instances use which binary *)
+                Printf.printf "  v%s - %s\n" version size_str)
+              versions ;
+            `Ok ())
+    in
+    Term.(ret (const run $ const ()))
+  in
+  let info =
+    Cmd.info
+      "signatory-list"
+      ~doc:"List installed Signatory versions"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P
+            "Shows all managed Signatory binary versions with their disk usage.";
+        ]
+  in
+  Cmd.v info term
+
+(** Signatory download command *)
+let signatory_download_cmd =
+  let term =
+    let run version_input verify_checksums =
+      (* Cleanup stale temporary download directories *)
+      Signatory_downloader.cleanup_stale_temp_dirs () ;
+
+      (* Resolve "latest" to actual version *)
+      let version =
+        if String.trim version_input = "latest" then (
+          match
+            Signatory_downloader.fetch_versions ~include_prerelease:false ()
+          with
+          | Error (`Msg e) ->
+              Printf.eprintf "Error: Failed to fetch latest version: %s\n" e ;
+              exit 1
+          | Ok [] ->
+              Printf.eprintf "Error: No versions available\n" ;
+              exit 1
+          | Ok (latest :: _) ->
+              Printf.printf "Latest Signatory version is v%s\n" latest.version ;
+              latest.version)
+        else String.trim version_input
+      in
+
+      Printf.printf "Downloading Signatory v%s...\n\n" version ;
+
+      (* Simple progress callback *)
+      let last_percent = ref (-1) in
+      let progress ~downloaded ~total =
+        match total with
+        | Some t ->
+            let percent = Int64.(to_int (div (mul 100L downloaded) t)) in
+            if percent <> !last_percent && percent mod 10 = 0 then (
+              last_percent := percent ;
+              Printf.printf "\rProgress: %d%%" percent ;
+              flush stdout)
+        | None -> ()
+      in
+
+      (* Perform download *)
+      match
+        Signatory_downloader.download_version
+          ~version
+          ~verify_checksums
+          ~progress
+          ()
+      with
+      | Error (`Msg msg) ->
+          Printf.printf "\n" ;
+          Cli_helpers.cmdliner_error msg
+      | Ok result ->
+          Printf.printf "\n" ;
+          let checksum_msg =
+            match result.checksum_status with
+            | Signatory_downloader.Verified -> "✓ Checksum verified"
+            | Signatory_downloader.Skipped -> "⚠ Checksum verification skipped"
+            | Signatory_downloader.Failed reason ->
+                Printf.sprintf "✗ Checksum verification failed: %s" reason
+          in
+          Printf.printf "%s\n" checksum_msg ;
+          Printf.printf
+            "✓ Signatory v%s installed to: %s\n"
+            version
+            result.installed_path ;
+          `Ok ()
+    in
+    let version_arg =
+      let doc = "Version to download (e.g., 1.3.1 or 'latest')" in
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
+    in
+    let no_verify_flag =
+      let doc = "Skip checksum verification" in
+      Arg.(value & flag & info ["no-verify"] ~doc)
+    in
+    Term.(
+      ret (const (fun v nv -> run v (not nv)) $ version_arg $ no_verify_flag))
+  in
+  let info =
+    Cmd.info
+      "signatory-download"
+      ~doc:"Download a Signatory version"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P "Downloads the specified Signatory version from GitHub releases.";
+          `P "Use 'latest' to automatically download the newest stable version.";
+          `P
+            "Checksums are verified by default. Use --no-verify to skip \
+             verification.";
+          `P
+            "Downloaded binaries are stored in \
+             ~/.local/share/octez-manager/signatory-binaries/";
+        ]
+  in
+  Cmd.v info term
+
+(** Signatory remove command *)
+let signatory_remove_cmd =
+  let term =
+    let run version _force =
+      (* TODO: Check if version is in use by signatory instances *)
+      match Signatory_downloader.remove_version version with
+      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+      | Ok () ->
+          Printf.printf "✓ Removed Signatory v%s\n" version ;
+          `Ok ()
+    in
+    let version_arg =
+      let doc = "Version to remove (e.g., 1.3.1)" in
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
+    in
+    let force_flag =
+      let doc = "Force removal even if in use" in
+      Arg.(value & flag & info ["force"; "f"] ~doc)
+    in
+    Term.(ret (const run $ version_arg $ force_flag))
+  in
+  let info =
+    Cmd.info
+      "signatory-remove"
+      ~doc:"Remove a Signatory version"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P "Removes a managed Signatory binary version from disk.";
+        ]
+  in
+  Cmd.v info term
+
 (** Main binaries command group *)
 let binaries_cmd =
   let info =
@@ -581,4 +818,8 @@ let binaries_cmd =
       register_cmd;
       unregister_cmd;
       prune_cmd;
+      signatory_list_remote_cmd;
+      signatory_list_cmd;
+      signatory_download_cmd;
+      signatory_remove_cmd;
     ]
