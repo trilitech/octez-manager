@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Signatory binary download**: New CLI commands for managing Signatory remote signer binaries from GitHub releases. `om binaries signatory-list-remote` shows available versions, `om binaries signatory-download <version>` downloads and installs to `~/.local/share/octez-manager/signatory-binaries/`, `om binaries signatory-list` shows installed versions, `om binaries signatory-remove <version>` removes installations. Includes checksum verification and atomic installation. (Part of milestone #7, issue #709)
 - **Mutable pattern detection**: Architecture index now tracks usage of `ref`, `:=`, `!`, `Atomic`, and mutable record fields. New `arch_query mutables` command shows summary of mutable patterns across the codebase. CI blocks PRs that increase `mutable_fields` or `functions_with_mutables` metrics.
 - **Network topology page**: Canvas-rendered visualization of service dependency relationships, accessible via 't' key from instances page. Shows nodes as bordered boxes with status indicators, connected by dependency lines. Adapts layout for narrow terminals (vertical stack) and wide terminals (side-by-side roots).
 
