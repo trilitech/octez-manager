@@ -15,6 +15,7 @@
   systemd_dropin
   binary_registry
   binary_downloader
+  signatory_downloader
   version_checker
   service
   service_registry
