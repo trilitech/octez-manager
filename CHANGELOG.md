@@ -9,9 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - **Mutable pattern detection**: Architecture index now tracks usage of `ref`, `:=`, `!`, `Atomic`, and mutable record fields. New `arch_query mutables` command shows summary of mutable patterns across the codebase. CI blocks PRs that increase `mutable_fields` or `functions_with_mutables` metrics.
+- **Network topology page**: Canvas-rendered visualization of service dependency relationships, accessible via 't' key from instances page. Shows nodes as bordered boxes with status indicators, connected by dependency lines. Adapts layout for narrow terminals (vertical stack) and wide terminals (side-by-side roots).
 
 ### Changed
 
+- Instances page now groups services by role (Nodes, Bakers, Accusers, DAL nodes) with each group wrapped in a Box_widget container with distinct colors
+- Diagnostics dashboard now uses Canvas-rendered header with live status indicators (metrics server, recorder, privilege level) and bordered title panel
+- Diagnostics dashboard uses Flex_layout for side-by-side panel arrangement: Real-Time Metrics + Metrics Recorder in one row, Metrics Server + System Information in another row, reducing vertical scrolling
 - Instance details page now renders service details and file paths sections in Box_widget Rounded borders with distinct colors (service details in color 12, file paths in color 14)
 - Instance details page now uses Description_list widget for key-value displays with improved alignment and automatic value wrapping
 
