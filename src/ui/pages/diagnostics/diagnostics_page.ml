@@ -505,51 +505,6 @@ let view ps ~focus:_ ~size =
         String.split_on_char '\n' box @ [""]
       in
 
-      (* Build all boxes *)
-      let boxes =
-        [
-          render_box
-            ~title:"Service Status"
-            ~color:14
-            (render_services_content s.services);
-          render_box ~title:"Caches" ~color:13 (render_caches_content ());
-          render_box
-            ~title:"Real-Time Metrics"
-            ~color:12
-            (render_realtime_content s.bg_queue_spark);
-          render_box
-            ~title:"Metrics Recorder"
-            ~color:11
-            (render_recorder_content ());
-        ]
-        @ (if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
-             [
-               render_box
-                 ~title:"Historical Metrics"
-                 ~color:13
-                 (render_historical_content ~chart_width);
-             ]
-           else [])
-        @ [
-            render_box
-              ~title:"Scheduler Performance"
-              ~color:11
-              (render_scheduler_content ());
-            render_box
-              ~title:"Worker Queue Stats"
-              ~color:12
-              (render_worker_stats_content ());
-            render_box
-              ~title:"Metrics Server"
-              ~color:14
-              (render_metrics_server_content ());
-            render_box
-              ~title:"System Information"
-              ~color:12
-              (render_system_info_content ());
-          ]
-      in
-
       (* Helper to render a flex row and convert to lines *)
       let render_flex_row items =
         let row = Flex.create ~direction:Row ~gap:{h = 2; v = 0} items in
@@ -604,8 +559,7 @@ let view ps ~focus:_ ~size =
                   basis = Fill;
                   cross = None;
                 };
-              ]
-            |> List.concat;
+              ];
           ]
         @ (if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
              [
@@ -659,8 +613,7 @@ let view ps ~focus:_ ~size =
                   basis = Fill;
                   cross = None;
                 };
-              ]
-            |> List.concat;
+              ];
           ]
       in
 
