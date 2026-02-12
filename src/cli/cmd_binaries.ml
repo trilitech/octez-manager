@@ -38,7 +38,12 @@ let list_remote_cmd =
               "Warning: Failed to fetch Signatory versions: %s\n"
               msg ;
             []
-        | Ok versions -> versions
+        | Ok versions ->
+            (* Filter out versions < 1.3.0 *)
+            List.filter
+              (fun (v : Signatory_downloader.version_info) ->
+                Version_utils.compare_versions v.version "1.3.0" >= 0)
+              versions
       in
 
       if octez_result = [] && signatory_result = [] then (
@@ -95,6 +100,9 @@ let list_remote_cmd =
              distribution and Signatory versions from GitHub releases.";
           `P "By default, only stable releases are shown.";
           `P "Use --all to include release candidates and prereleases.";
+          `P
+            "Only Octez versions >= 23.0 and Signatory versions >= 1.3.0 are \
+             shown.";
         ]
   in
   Cmd.v info term
@@ -135,6 +143,13 @@ let list_cmd =
       | Error (`Msg msg) ->
           Printf.eprintf "Warning: Failed to list Signatory versions: %s\n" msg
       | Ok versions ->
+          (* Filter out versions < 1.3.0 *)
+          let versions =
+            List.filter
+              (fun version ->
+                Version_utils.compare_versions version "1.3.0" >= 0)
+              versions
+          in
           if versions <> [] then (
             Printf.printf "\nSignatory Managed Versions:\n" ;
             List.iter
@@ -361,51 +376,59 @@ let download_octez_cmd =
 let download_signatory_cmd =
   let term =
     let run version verify_checksums =
-      (* Cleanup stale temporary download directories *)
-      Signatory_downloader.cleanup_stale_temp_dirs () ;
+      (* Check version is >= 1.3.0 *)
+      if Version_utils.compare_versions version "1.3.0" < 0 then
+        Cli_helpers.cmdliner_error
+          (Printf.sprintf
+             "Signatory version %s is not supported. Minimum version is 1.3.0"
+             version)
+      else (
+        (* Cleanup stale temporary download directories *)
+        Signatory_downloader.cleanup_stale_temp_dirs () ;
 
-      Printf.printf "Downloading Signatory v%s...\n\n" version ;
+        Printf.printf "Downloading Signatory v%s...\n\n" version ;
 
-      (* Simple progress callback *)
-      let last_percent = ref (-1) in
-      let progress ~downloaded ~total =
-        match total with
-        | Some t ->
-            let percent = Int64.(to_int (div (mul 100L downloaded) t)) in
-            if percent <> !last_percent && percent mod 10 = 0 then (
-              last_percent := percent ;
-              Printf.printf "\rProgress: %d%%" percent ;
-              flush stdout)
-        | None -> ()
-      in
+        (* Simple progress callback *)
+        let last_percent = ref (-1) in
+        let progress ~downloaded ~total =
+          match total with
+          | Some t ->
+              let percent = Int64.(to_int (div (mul 100L downloaded) t)) in
+              if percent <> !last_percent && percent mod 10 = 0 then (
+                last_percent := percent ;
+                Printf.printf "\rProgress: %d%%" percent ;
+                flush stdout)
+          | None -> ()
+        in
 
-      (* Perform download *)
-      match
-        Signatory_downloader.download_version
-          ~version
-          ~verify_checksums
-          ~progress
-          ()
-      with
-      | Error (`Msg msg) ->
-          Printf.printf "\n" ;
-          Cli_helpers.cmdliner_error msg
-      | Ok result ->
-          Printf.printf "\n" ;
-          let checksum_msg =
-            match result.checksum_status with
-            | Signatory_downloader.Verified -> "✓ Checksum verified"
-            | Signatory_downloader.Skipped -> "⚠ Checksum verification skipped"
-            | Signatory_downloader.Failed reason ->
-                Printf.sprintf "✗ Checksum verification failed: %s" reason
-          in
-          Printf.printf "%s\n" checksum_msg ;
+        (* Perform download *)
+        match
+          Signatory_downloader.download_version
+            ~version
+            ~verify_checksums
+            ~progress
+            ()
+        with
+        | Error (`Msg msg) ->
+            Printf.printf "\n" ;
+            Cli_helpers.cmdliner_error msg
+        | Ok result ->
+            Printf.printf "\n" ;
+            let checksum_msg =
+              match result.checksum_status with
+              | Signatory_downloader.Verified -> "✓ Checksum verified"
+              | Signatory_downloader.Skipped ->
+                  "⚠ Checksum verification skipped"
+              | Signatory_downloader.Failed reason ->
+                  Printf.sprintf "✗ Checksum verification failed: %s" reason
+            in
+            Printf.printf "%s\n" checksum_msg ;
 
-          Printf.printf
-            "✓ Signatory v%s installed to: %s\n"
-            version
-            result.installed_path ;
-          `Ok ()
+            Printf.printf
+              "✓ Signatory v%s installed to: %s\n"
+              version
+              result.installed_path ;
+            `Ok ())
     in
     let version_arg =
       let doc = "Version to download (e.g., 1.3.1, 1.3.1-rc1)" in
@@ -426,6 +449,7 @@ let download_signatory_cmd =
         [
           `S Manpage.s_description;
           `P "Downloads the specified Signatory version from GitHub releases.";
+          `P "Only versions >= 1.3.0 are supported.";
           `P
             "Checksums are verified by default. Use --no-verify to skip \
              verification.";
