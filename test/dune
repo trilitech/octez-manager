@@ -931,3 +931,10 @@
  (modules test_cli_helpers)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_signatory_validation)
+ (libraries alcotest octez_manager_lib)
+ (modules test_signatory_validation)
+ (instrumentation
+  (backend bisect_ppx)))
