@@ -340,6 +340,10 @@ let detect_daily_logs_dir ~role ~data_dir ~base_dir =
   | External_service.Dal_node ->
       (* DAL node: <data_dir>/daily_logs/ *)
       check_dir (Filename.concat data_dir "daily_logs")
+  | External_service.Signatory ->
+      (* Signatory: <base_dir>/logs/signatory/ *)
+      let base = if base_dir <> "" then base_dir else data_dir in
+      check_dir (Filename.concat (Filename.concat base "logs") "signatory")
   | External_service.Unknown _ ->
       (* Unknown role: try generic daily_logs *)
       check_dir (Filename.concat data_dir "daily_logs")
@@ -480,6 +484,9 @@ let build_external_service ~unit_name ~exec_start ~properties =
           | External_service.Dal_node ->
               (* Baker/Accuser/DAL: probe their connected node's endpoint *)
               endpoint_field.value
+          | External_service.Signatory ->
+              (* Signatory: doesn't connect to node RPC *)
+              None
           | External_service.Unknown _ -> (
               (* Unknown: try rpc_addr first, then endpoint *)
               match rpc_addr_field.value with
@@ -663,6 +670,9 @@ let process_to_external_service (proc : Process_scanner.process_info) =
           | External_service.Dal_node ->
               (* Baker/Accuser/DAL: probe their connected node's endpoint *)
               node_endpoint.value
+          | External_service.Signatory ->
+              (* Signatory: doesn't connect to node RPC *)
+              None
           | External_service.Unknown _ -> (
               (* Unknown: try rpc_addr first, then endpoint *)
               match rpc_addr.value with

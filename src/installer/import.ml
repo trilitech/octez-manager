@@ -105,6 +105,7 @@ let missing_required_fields external_svc =
     | Some External_service.Baker -> ["network"; "base_dir"; "node_endpoint"]
     | Some External_service.Accuser -> ["network"; "base_dir"; "node_endpoint"]
     | Some External_service.Dal_node -> ["network"; "data_dir"; "node_endpoint"]
+    | Some External_service.Signatory -> ["address"; "authorized_keys"]
     | Some (External_service.Unknown _) | None -> []
   in
   List.filter
@@ -149,9 +150,10 @@ let resolve_data_dir ~overrides ~external_svc =
         ~field_name:"data_dir"
   | Some External_service.Baker
   | Some External_service.Accuser
+  | Some External_service.Signatory
   | Some (External_service.Unknown _)
   | None ->
-      Ok "" (* Not required for baker/accuser *)
+      Ok "" (* Not required for baker/accuser/signatory *)
 
 let resolve_base_dir ~overrides ~external_svc =
   let config = external_svc.External_service.config in
@@ -163,9 +165,10 @@ let resolve_base_dir ~overrides ~external_svc =
         ~field_name:"base_dir"
   | Some External_service.Node
   | Some External_service.Dal_node
+  | Some External_service.Signatory
   | Some (External_service.Unknown _)
   | None ->
-      Ok "" (* Not required for node/dal *)
+      Ok "" (* Not required for node/dal/signatory *)
 
 let resolve_rpc_addr ~overrides ~external_svc =
   let config = external_svc.External_service.config in
@@ -1181,6 +1184,11 @@ let import_service ?(on_log = fun _ -> ())
               ~bin_dir
               ~strategy:options.strategy
               ~depends_on:depends_on_instance
+        | Some External_service.Signatory ->
+            Error
+              (`Msg
+                 "Signatory import is not yet implemented. Please use 'om \
+                  install-signatory' to create a new signatory instance.")
         | Some (External_service.Unknown role_str) ->
             Error (`Msg (Printf.sprintf "Unknown role: %s" role_str))
         | None -> Error (`Msg "Role not detected for external service")

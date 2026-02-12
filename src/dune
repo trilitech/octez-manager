@@ -39,6 +39,7 @@
   settings
   service_backend
   installer_types
+  signatory_validation
   manager_interfaces
   capabilities
   rpc_addr
