@@ -8,39 +8,77 @@
 open Cmdliner
 open Octez_manager_lib
 
+(* No auto-detection needed - using explicit subcommands *)
+
 (** list-remote command *)
 let list_remote_cmd =
   let term =
     let run include_rc =
-      match Binary_downloader.fetch_versions ~include_rc () with
-      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-      | Ok versions ->
-          (* Filter out versions < 23.0 *)
-          let versions =
+      (* Fetch Octez versions *)
+      let octez_result =
+        match Binary_downloader.fetch_versions ~include_rc () with
+        | Error (`Msg msg) ->
+            Printf.eprintf "Warning: Failed to fetch Octez versions: %s\n" msg ;
+            []
+        | Ok versions ->
+            (* Filter out versions < 23.0 *)
             List.filter
               (fun (v : Binary_downloader.version_info) ->
                 Binary_registry.compare_versions v.version "23.0" >= 0)
               versions
-          in
-          if versions = [] then (
-            Printf.printf "No versions available.\n" ;
-            `Ok ())
-          else (
-            Printf.printf "Available versions:\n" ;
-            List.iter
-              (fun (v : Binary_downloader.version_info) ->
-                let rc_marker = if v.is_rc then " (RC)" else "" in
-                let date_str =
-                  match v.release_date with
-                  | Some d -> Printf.sprintf " - %s" d
-                  | None -> ""
-                in
-                Printf.printf "  %s%s%s\n" v.version rc_marker date_str)
-              versions ;
-            `Ok ())
+      in
+
+      (* Fetch Signatory versions *)
+      let signatory_result =
+        match
+          Signatory_downloader.fetch_versions ~include_prerelease:include_rc ()
+        with
+        | Error (`Msg msg) ->
+            Printf.eprintf
+              "Warning: Failed to fetch Signatory versions: %s\n"
+              msg ;
+            []
+        | Ok versions -> versions
+      in
+
+      if octez_result = [] && signatory_result = [] then (
+        Printf.printf "No versions available.\n" ;
+        `Ok ())
+      else (
+        (* Display Octez versions *)
+        if octez_result <> [] then (
+          Printf.printf "Available Octez versions:\n" ;
+          List.iter
+            (fun (v : Binary_downloader.version_info) ->
+              let rc_marker = if v.is_rc then " (RC)" else "" in
+              let date_str =
+                match v.release_date with
+                | Some d -> Printf.sprintf " - %s" d
+                | None -> ""
+              in
+              Printf.printf "  %s%s%s\n" v.version rc_marker date_str)
+            octez_result) ;
+
+        (* Display Signatory versions *)
+        if signatory_result <> [] then (
+          Printf.printf "\nAvailable Signatory versions:\n" ;
+          List.iter
+            (fun (v : Signatory_downloader.version_info) ->
+              let pre_marker =
+                if v.is_prerelease then " (prerelease)" else ""
+              in
+              let date_str =
+                match v.release_date with
+                | Some d -> Printf.sprintf " - %s" d
+                | None -> ""
+              in
+              Printf.printf "  %s%s%s\n" v.version pre_marker date_str)
+            signatory_result) ;
+
+        `Ok ())
     in
     let all_flag =
-      let doc = "Include release candidates" in
+      let doc = "Include release candidates and prereleases" in
       Arg.(value & flag & info ["all"; "a"] ~doc)
     in
     Term.(ret (const run $ all_flag))
@@ -48,15 +86,15 @@ let list_remote_cmd =
   let info =
     Cmd.info
       "list-remote"
-      ~doc:"List available versions from remote repository"
+      ~doc:"List available versions from remote repositories"
       ~man:
         [
           `S Manpage.s_description;
           `P
             "Fetches and displays available Octez versions from the official \
-             distribution.";
+             distribution and Signatory versions from GitHub releases.";
           `P "By default, only stable releases are shown.";
-          `P "Use --all to include release candidates.";
+          `P "Use --all to include release candidates and prereleases.";
         ]
   in
   Cmd.v info term
@@ -151,16 +189,18 @@ let list_cmd =
   in
   Cmd.v info term
 
-(** download command *)
-let download_cmd =
+(** download octez subcommand *)
+let download_octez_cmd =
   let term =
     let run version_input verify_checksums =
+      let version = String.trim version_input in
+
       (* Cleanup stale temporary download directories *)
       Binary_downloader.cleanup_stale_temp_dirs () ;
 
       (* Resolve "latest" to actual version *)
       let version =
-        if String.trim version_input = "latest" then
+        if version = "latest" then
           match Binary_downloader.fetch_versions ~include_rc:false () with
           | Error (`Msg e) ->
               Printf.eprintf "Error: Failed to fetch latest version: %s\n" e ;
@@ -186,12 +226,12 @@ let download_cmd =
               in
               match sorted with
               | latest :: _ ->
-                  Printf.printf "Latest version is v%s\n" latest.version ;
+                  Printf.printf "Latest Octez version is v%s\n" latest.version ;
                   latest.version
               | [] ->
                   Printf.eprintf "Error: No versions available\n" ;
                   exit 1)
-        else String.trim version_input
+        else version
       in
 
       Printf.printf "Downloading Octez v%s...\n\n" version ;
@@ -289,7 +329,7 @@ let download_cmd =
           `Ok ()
     in
     let version_arg =
-      let doc = "Version to download (e.g., 24.0 or 'latest')" in
+      let doc = "Version to download (e.g., 24.0, 24.0-rc1, or 'latest')" in
       Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
     in
     let no_verify_flag =
@@ -301,8 +341,8 @@ let download_cmd =
   in
   let info =
     Cmd.info
-      "download"
-      ~doc:"Download an Octez version"
+      "octez"
+      ~doc:"Download an Octez binary version"
       ~man:
         [
           `S Manpage.s_description;
@@ -317,15 +357,107 @@ let download_cmd =
   in
   Cmd.v info term
 
-(** remove command *)
-let remove_cmd =
+(** download signatory subcommand *)
+let download_signatory_cmd =
+  let term =
+    let run version verify_checksums =
+      (* Cleanup stale temporary download directories *)
+      Signatory_downloader.cleanup_stale_temp_dirs () ;
+
+      Printf.printf "Downloading Signatory v%s...\n\n" version ;
+
+      (* Simple progress callback *)
+      let last_percent = ref (-1) in
+      let progress ~downloaded ~total =
+        match total with
+        | Some t ->
+            let percent = Int64.(to_int (div (mul 100L downloaded) t)) in
+            if percent <> !last_percent && percent mod 10 = 0 then (
+              last_percent := percent ;
+              Printf.printf "\rProgress: %d%%" percent ;
+              flush stdout)
+        | None -> ()
+      in
+
+      (* Perform download *)
+      match
+        Signatory_downloader.download_version
+          ~version
+          ~verify_checksums
+          ~progress
+          ()
+      with
+      | Error (`Msg msg) ->
+          Printf.printf "\n" ;
+          Cli_helpers.cmdliner_error msg
+      | Ok result ->
+          Printf.printf "\n" ;
+          let checksum_msg =
+            match result.checksum_status with
+            | Signatory_downloader.Verified -> "✓ Checksum verified"
+            | Signatory_downloader.Skipped -> "⚠ Checksum verification skipped"
+            | Signatory_downloader.Failed reason ->
+                Printf.sprintf "✗ Checksum verification failed: %s" reason
+          in
+          Printf.printf "%s\n" checksum_msg ;
+
+          Printf.printf
+            "✓ Signatory v%s installed to: %s\n"
+            version
+            result.installed_path ;
+          `Ok ()
+    in
+    let version_arg =
+      let doc = "Version to download (e.g., 1.3.1, 1.3.1-rc1)" in
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
+    in
+    let no_verify_flag =
+      let doc = "Skip checksum verification" in
+      Arg.(value & flag & info ["no-verify"] ~doc)
+    in
+    Term.(
+      ret (const (fun v nv -> run v (not nv)) $ version_arg $ no_verify_flag))
+  in
+  let info =
+    Cmd.info
+      "signatory"
+      ~doc:"Download a Signatory binary version"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P "Downloads the specified Signatory version from GitHub releases.";
+          `P
+            "Checksums are verified by default. Use --no-verify to skip \
+             verification.";
+        ]
+  in
+  Cmd.v info term
+
+(** download command group *)
+let download_cmd =
+  let info =
+    Cmd.info
+      "download"
+      ~doc:"Download binary versions"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P "Download Octez or Signatory binary versions.";
+          `P "Use 'om binaries download octez --version VERSION'";
+          `P "or  'om binaries download signatory --version VERSION'";
+        ]
+  in
+  Cmd.group info [download_octez_cmd; download_signatory_cmd]
+
+(** remove octez subcommand *)
+let remove_octez_cmd =
   let term =
     let run version force =
       let bin_source = Binary_registry.Managed_version version in
       let instances = Service_registry.get_instances_using bin_source in
       if instances <> [] && not force then (
         Printf.printf
-          "Version v%s is currently used by the following instances:\n"
+          "Octez version v%s is currently used by the following instances:\n"
           version ;
         List.iter (fun inst -> Printf.printf "  - %s\n" inst) instances ;
         Printf.printf
@@ -335,7 +467,7 @@ let remove_cmd =
         match Binary_downloader.remove_version version with
         | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
         | Ok () ->
-            Printf.printf "✓ Removed version v%s\n" version ;
+            Printf.printf "✓ Removed Octez v%s\n" version ;
             `Ok ()
     in
     let version_arg =
@@ -350,18 +482,67 @@ let remove_cmd =
   in
   let info =
     Cmd.info
-      "remove"
-      ~doc:"Remove a managed version"
+      "octez"
+      ~doc:"Remove an Octez binary version"
       ~man:
         [
           `S Manpage.s_description;
-          `P "Removes a managed binary version from disk.";
+          `P "Removes a managed Octez binary version from disk.";
           `P
             "If the version is in use by any instances, you must use --force \
              to remove it.";
         ]
   in
   Cmd.v info term
+
+(** remove signatory subcommand *)
+let remove_signatory_cmd =
+  let term =
+    let run version _force =
+      (* TODO: Check if version is in use by signatory instances *)
+      match Signatory_downloader.remove_version version with
+      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+      | Ok () ->
+          Printf.printf "✓ Removed Signatory v%s\n" version ;
+          `Ok ()
+    in
+    let version_arg =
+      let doc = "Version to remove (e.g., 1.3.1)" in
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
+    in
+    let force_flag =
+      let doc = "Force removal even if in use" in
+      Arg.(value & flag & info ["force"; "f"] ~doc)
+    in
+    Term.(ret (const run $ version_arg $ force_flag))
+  in
+  let info =
+    Cmd.info
+      "signatory"
+      ~doc:"Remove a Signatory binary version"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P "Removes a managed Signatory binary version from disk.";
+        ]
+  in
+  Cmd.v info term
+
+(** remove command group *)
+let remove_cmd =
+  let info =
+    Cmd.info
+      "remove"
+      ~doc:"Remove managed binary versions"
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P "Remove Octez or Signatory binary versions from disk.";
+          `P "Use 'om binaries remove octez VERSION'";
+          `P "or  'om binaries remove signatory VERSION'";
+        ]
+  in
+  Cmd.group info [remove_octez_cmd; remove_signatory_cmd]
 
 (** register command *)
 let register_cmd =
@@ -572,240 +753,23 @@ let prune_cmd =
   in
   Cmd.v info term
 
-(** Signatory list-remote command *)
-let signatory_list_remote_cmd =
-  let term =
-    let run include_prerelease =
-      match Signatory_downloader.fetch_versions ~include_prerelease () with
-      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-      | Ok versions ->
-          if versions = [] then (
-            Printf.printf "No Signatory versions available.\n" ;
-            `Ok ())
-          else (
-            Printf.printf "Available Signatory versions:\n" ;
-            List.iter
-              (fun (v : Signatory_downloader.version_info) ->
-                let pre_marker =
-                  if v.is_prerelease then " (prerelease)" else ""
-                in
-                let date_str =
-                  match v.release_date with
-                  | Some d -> Printf.sprintf " - %s" d
-                  | None -> ""
-                in
-                Printf.printf "  %s%s%s\n" v.version pre_marker date_str)
-              versions ;
-            `Ok ())
-    in
-    let all_flag =
-      let doc = "Include prerelease versions (RC, beta, alpha)" in
-      Arg.(value & flag & info ["all"; "a"] ~doc)
-    in
-    Term.(ret (const run $ all_flag))
-  in
-  let info =
-    Cmd.info
-      "signatory-list-remote"
-      ~doc:"List available Signatory versions from GitHub"
-      ~man:
-        [
-          `S Manpage.s_description;
-          `P
-            "Fetches and displays available Signatory versions from GitHub \
-             releases.";
-          `P "By default, only stable releases are shown.";
-          `P "Use --all to include prerelease versions (RC, beta, alpha).";
-        ]
-  in
-  Cmd.v info term
-
-(** Signatory list command *)
-let signatory_list_cmd =
-  let term =
-    let run () =
-      match Signatory_downloader.list_managed_versions () with
-      | Error (`Msg msg) ->
-          Printf.eprintf "Error: Failed to list Signatory versions: %s\n" msg ;
-          `Error (false, msg)
-      | Ok versions ->
-          if versions = [] then (
-            Printf.printf "No managed Signatory versions installed.\n" ;
-            `Ok ())
-          else (
-            Printf.printf "Managed Signatory Versions:\n" ;
-            List.iter
-              (fun version ->
-                let size_str =
-                  match Signatory_downloader.get_version_size version with
-                  | Ok (_bytes, formatted) -> formatted
-                  | Error _ -> "unknown size"
-                in
-                (* TODO: Track which signatory instances use which binary *)
-                Printf.printf "  v%s - %s\n" version size_str)
-              versions ;
-            `Ok ())
-    in
-    Term.(ret (const run $ const ()))
-  in
-  let info =
-    Cmd.info
-      "signatory-list"
-      ~doc:"List installed Signatory versions"
-      ~man:
-        [
-          `S Manpage.s_description;
-          `P
-            "Shows all managed Signatory binary versions with their disk usage.";
-        ]
-  in
-  Cmd.v info term
-
-(** Signatory download command *)
-let signatory_download_cmd =
-  let term =
-    let run version_input verify_checksums =
-      (* Cleanup stale temporary download directories *)
-      Signatory_downloader.cleanup_stale_temp_dirs () ;
-
-      (* Resolve "latest" to actual version *)
-      let version =
-        if String.trim version_input = "latest" then (
-          match
-            Signatory_downloader.fetch_versions ~include_prerelease:false ()
-          with
-          | Error (`Msg e) ->
-              Printf.eprintf "Error: Failed to fetch latest version: %s\n" e ;
-              exit 1
-          | Ok [] ->
-              Printf.eprintf "Error: No versions available\n" ;
-              exit 1
-          | Ok (latest :: _) ->
-              Printf.printf "Latest Signatory version is v%s\n" latest.version ;
-              latest.version)
-        else String.trim version_input
-      in
-
-      Printf.printf "Downloading Signatory v%s...\n\n" version ;
-
-      (* Simple progress callback *)
-      let last_percent = ref (-1) in
-      let progress ~downloaded ~total =
-        match total with
-        | Some t ->
-            let percent = Int64.(to_int (div (mul 100L downloaded) t)) in
-            if percent <> !last_percent && percent mod 10 = 0 then (
-              last_percent := percent ;
-              Printf.printf "\rProgress: %d%%" percent ;
-              flush stdout)
-        | None -> ()
-      in
-
-      (* Perform download *)
-      match
-        Signatory_downloader.download_version
-          ~version
-          ~verify_checksums
-          ~progress
-          ()
-      with
-      | Error (`Msg msg) ->
-          Printf.printf "\n" ;
-          Cli_helpers.cmdliner_error msg
-      | Ok result ->
-          Printf.printf "\n" ;
-          let checksum_msg =
-            match result.checksum_status with
-            | Signatory_downloader.Verified -> "✓ Checksum verified"
-            | Signatory_downloader.Skipped -> "⚠ Checksum verification skipped"
-            | Signatory_downloader.Failed reason ->
-                Printf.sprintf "✗ Checksum verification failed: %s" reason
-          in
-          Printf.printf "%s\n" checksum_msg ;
-          Printf.printf
-            "✓ Signatory v%s installed to: %s\n"
-            version
-            result.installed_path ;
-          `Ok ()
-    in
-    let version_arg =
-      let doc = "Version to download (e.g., 1.3.1 or 'latest')" in
-      Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
-    in
-    let no_verify_flag =
-      let doc = "Skip checksum verification" in
-      Arg.(value & flag & info ["no-verify"] ~doc)
-    in
-    Term.(
-      ret (const (fun v nv -> run v (not nv)) $ version_arg $ no_verify_flag))
-  in
-  let info =
-    Cmd.info
-      "signatory-download"
-      ~doc:"Download a Signatory version"
-      ~man:
-        [
-          `S Manpage.s_description;
-          `P "Downloads the specified Signatory version from GitHub releases.";
-          `P "Use 'latest' to automatically download the newest stable version.";
-          `P
-            "Checksums are verified by default. Use --no-verify to skip \
-             verification.";
-          `P
-            "Downloaded binaries are stored in \
-             ~/.local/share/octez-manager/signatory-binaries/";
-        ]
-  in
-  Cmd.v info term
-
-(** Signatory remove command *)
-let signatory_remove_cmd =
-  let term =
-    let run version _force =
-      (* TODO: Check if version is in use by signatory instances *)
-      match Signatory_downloader.remove_version version with
-      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
-      | Ok () ->
-          Printf.printf "✓ Removed Signatory v%s\n" version ;
-          `Ok ()
-    in
-    let version_arg =
-      let doc = "Version to remove (e.g., 1.3.1)" in
-      Arg.(required & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc)
-    in
-    let force_flag =
-      let doc = "Force removal even if in use" in
-      Arg.(value & flag & info ["force"; "f"] ~doc)
-    in
-    Term.(ret (const run $ version_arg $ force_flag))
-  in
-  let info =
-    Cmd.info
-      "signatory-remove"
-      ~doc:"Remove a Signatory version"
-      ~man:
-        [
-          `S Manpage.s_description;
-          `P "Removes a managed Signatory binary version from disk.";
-        ]
-  in
-  Cmd.v info term
-
 (** Main binaries command group *)
 let binaries_cmd =
   let info =
     Cmd.info
       "binaries"
-      ~doc:"Manage Octez binaries"
+      ~doc:"Manage Octez and Signatory binaries"
       ~man:
         [
           `S Manpage.s_description;
           `P
-            "Commands for managing Octez binary versions and registered \
-             directories.";
+            "Commands for managing Octez and Signatory binary versions and \
+             registered directories.";
           `P
             "You can download official releases, register local directories \
              (e.g., dev builds), and manage versions used by instances.";
+          `P "Download Octez: om binaries download octez VERSION";
+          `P "Download Signatory: om binaries download signatory VERSION";
         ]
   in
   Cmd.group
@@ -818,8 +782,4 @@ let binaries_cmd =
       register_cmd;
       unregister_cmd;
       prune_cmd;
-      signatory_list_remote_cmd;
-      signatory_list_cmd;
-      signatory_download_cmd;
-      signatory_remove_cmd;
     ]
