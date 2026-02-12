@@ -128,7 +128,7 @@ let list_cmd =
                 in
                 let count =
                   Service_registry.count_instances_using
-                    (Binary_registry.Managed_version version)
+                    (Binary_registry.Managed_octez_version version)
                 in
                 let usage =
                   if count = 0 then "unused"
@@ -477,7 +477,7 @@ let download_cmd =
 let remove_octez_cmd =
   let term =
     let run version force =
-      let bin_source = Binary_registry.Managed_version version in
+      let bin_source = Binary_registry.Managed_octez_version version in
       let instances = Service_registry.get_instances_using bin_source in
       if instances <> [] && not force then (
         Printf.printf
@@ -695,7 +695,9 @@ let prune_cmd =
           let unused_versions =
             List.filter
               (fun version ->
-                let bin_source = Binary_registry.Managed_version version in
+                let bin_source =
+                  Binary_registry.Managed_octez_version version
+                in
                 Service_registry.count_instances_using bin_source = 0)
               versions
           in

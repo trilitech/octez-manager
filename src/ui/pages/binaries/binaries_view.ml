@@ -34,7 +34,7 @@ let set_help_hint s =
       else
         Miaou.Core.Help_hint.set
           (Some "Press Enter to unregister this directory. Press ? for help.")
-  | Some (ManagedVersion (_, _, count)) ->
+  | Some (ManagedVersion (_, _, _, count)) ->
       if count > 0 then
         Miaou.Core.Help_hint.set
           (Some
@@ -43,69 +43,112 @@ let set_help_hint s =
       else
         Miaou.Core.Help_hint.set
           (Some "Press Enter to remove this version. Press ? for help.")
-  | Some (AvailableVersion _) ->
+  | Some (AvailableVersion (_, _)) | Some (AvailableSignatoryVersion _) ->
       Miaou.Core.Help_hint.set
         (Some "Press Enter to download this version. Press ? for help.")
-  | Some (AvailableMajorGroup _) ->
+  | Some (AvailableMajorGroup (_, _)) ->
       Miaou.Core.Help_hint.set
         (Some
            "Press Enter or Tab to expand/collapse version group. Press ? for \
             help.")
+  | Some (ManagedGroup (_, _)) | Some (AvailableGroup (_, _)) ->
+      Miaou.Core.Help_hint.set
+        (Some
+           "Press Enter or Tab to expand/collapse binary group. Press ? for \
+            help.")
   | None -> Miaou.Core.Help_hint.clear ()
 
-(** Render the managed versions section. *)
+(** Render the managed versions section with nested groups. *)
 let render_managed_versions s =
-  if s.managed_versions = [] then Widgets.dim "No managed versions installed"
+  if s.managed_octez_versions = [] && s.managed_signatory_versions = [] then
+    Widgets.dim "No managed versions installed"
   else
     let lines =
       List.concat_map
-        (fun (version, size, count) ->
-          let is_selected =
-            match List.nth_opt s.items s.selected with
-            | Some (ManagedVersion (v, _, _)) when v = version -> true
-            | _ -> false
-          in
-          let prefix = if is_selected then "\xe2\x9e\xa4 " else "  " in
-          let size_str =
-            match size with
-            | Some s -> String_utils.format_size s
-            | None -> "unknown"
-          in
-          let usage =
-            if count = 0 then Widgets.dim "unused"
-            else if count = 1 then "1 instance"
-            else Printf.sprintf "%d instances" count
-          in
-          let expansion_indicator =
-            if count > 0 then
-              if List.mem version s.expanded_managed then " \xe2\x96\xbc"
-              else " \xe2\x96\xb6"
-            else ""
-          in
-          let line =
-            Printf.sprintf
-              "%sv%-15s  %10s  %s%s"
-              prefix
-              version
-              size_str
-              usage
-              expansion_indicator
-          in
-          let main_line = if is_selected then Widgets.bold line else line in
-          if List.mem version s.expanded_managed then
-            let instances =
-              Service_registry.get_instances_using
-                (Binary_registry.Managed_version version)
-            in
-            let instance_lines =
-              List.map
-                (fun inst ->
-                  Widgets.dim (Printf.sprintf "      \xe2\x86\x92 %s" inst))
-                instances
-            in
-            main_line :: instance_lines
-          else [main_line])
-        s.managed_versions
+        (fun item ->
+          match item with
+          | ManagedGroup (kind, is_expanded) ->
+              let is_selected =
+                match List.nth_opt s.items s.selected with
+                | Some (ManagedGroup (k, _)) when k = kind -> true
+                | _ -> false
+              in
+              let kind_name =
+                match kind with Octez -> "Octez" | Signatory -> "Signatory"
+              in
+              let prefix = if is_selected then "\xe2\x9e\xa4 " else "  " in
+              let expand_icon =
+                if is_expanded then "\xe2\x96\xbc" else "\xe2\x96\xb6"
+              in
+              let line =
+                Printf.sprintf "%s%s %s" prefix expand_icon kind_name
+              in
+              let final_line =
+                if is_selected then Widgets.bold line else line
+              in
+              [final_line]
+          | ManagedVersion (kind, version, size, count) ->
+              let is_selected =
+                match List.nth_opt s.items s.selected with
+                | Some (ManagedVersion (k, v, _, _))
+                  when k = kind && v = version ->
+                    true
+                | _ -> false
+              in
+              let prefix =
+                if is_selected then "    \xe2\x9e\xa4 " else "      "
+              in
+              let size_str =
+                match size with
+                | Some s -> String_utils.format_size s
+                | None -> "unknown"
+              in
+              let usage =
+                if count = 0 then Widgets.dim "unused"
+                else if count = 1 then "1 instance"
+                else Printf.sprintf "%d instances" count
+              in
+              let expansion_indicator =
+                if count > 0 then
+                  if
+                    List.mem version s.expanded_managed_octez_items
+                    && kind = Octez
+                  then " \xe2\x96\xbc"
+                  else " \xe2\x96\xb6"
+                else ""
+              in
+              let line =
+                Printf.sprintf
+                  "%sv%-15s  %10s  %s%s"
+                  prefix
+                  version
+                  size_str
+                  usage
+                  expansion_indicator
+              in
+              let main_line = if is_selected then Widgets.bold line else line in
+              if List.mem version s.expanded_managed_octez_items && kind = Octez
+              then
+                let bin_source =
+                  match kind with
+                  | Octez -> Binary_registry.Managed_octez_version version
+                  | Signatory ->
+                      Binary_registry.Managed_signatory_version version
+                in
+                let instances =
+                  Service_registry.get_instances_using bin_source
+                in
+                let instance_lines =
+                  List.map
+                    (fun inst ->
+                      Widgets.dim
+                        (Printf.sprintf "        \xe2\x86\x92 %s" inst))
+                    instances
+                in
+                main_line :: instance_lines
+              else [main_line]
+          | _ -> [])
+        s.items
     in
     String.concat "\n" lines
 
@@ -183,25 +226,45 @@ let render_registered_dirs s =
   in
   String.concat "\n" (header_lines @ dir_lines @ [button_line])
 
-(** Render the available-for-download versions section. *)
+(** Render the available-for-download versions section with nested groups. *)
 let render_available_versions s =
-  if s.available_versions = [] then
+  if s.available_octez_versions = [] && s.available_signatory_versions = [] then
     Widgets.dim "No versions available (or all installed)"
   else
     let lines =
       List.concat_map
         (fun item ->
           match item with
+          | AvailableGroup (kind, is_expanded) ->
+              let is_selected =
+                match List.nth_opt s.items s.selected with
+                | Some (AvailableGroup (k, _)) when k = kind -> true
+                | _ -> false
+              in
+              let kind_name =
+                match kind with Octez -> "Octez" | Signatory -> "Signatory"
+              in
+              let prefix = if is_selected then "\xe2\x9e\xa4 " else "  " in
+              let expand_icon =
+                if is_expanded then "\xe2\x96\xbc" else "\xe2\x96\xb6"
+              in
+              let line =
+                Printf.sprintf "%s%s %s" prefix expand_icon kind_name
+              in
+              let final_line =
+                if is_selected then Widgets.bold line else line
+              in
+              [final_line]
           | AvailableMajorGroup (major, versions) ->
               let is_group_selected =
                 match List.nth_opt s.items s.selected with
                 | Some (AvailableMajorGroup (m, _)) when m = major -> true
                 | _ -> false
               in
-              let is_expanded = List.mem major s.expanded_majors in
+              let is_expanded = List.mem major s.expanded_octez_majors in
               let expand_icon = if is_expanded then "\xe2\x88\x92" else "+" in
               let prefix =
-                if is_group_selected then "\xe2\x9e\xa4 " else "  "
+                if is_group_selected then "    \xe2\x9e\xa4 " else "      "
               in
               let version_count = List.length versions in
               let group_line =
@@ -223,15 +286,15 @@ let render_available_versions s =
                     (fun (vi : Binary_downloader.version_info) ->
                       let is_version_selected =
                         match List.nth_opt s.items s.selected with
-                        | Some (AvailableVersion vi2)
+                        | Some (AvailableVersion (Octez, vi2))
                           when vi.Binary_downloader.version
                                = vi2.Binary_downloader.version ->
                             true
                         | _ -> false
                       in
                       let v_prefix =
-                        if is_version_selected then "  \xe2\x9e\xa4 "
-                        else "    "
+                        if is_version_selected then "      \xe2\x9e\xa4 "
+                        else "        "
                       in
                       let date_str =
                         match vi.Binary_downloader.release_date with
@@ -250,6 +313,34 @@ let render_available_versions s =
                 in
                 main_line :: version_lines
               else [main_line]
+          | AvailableSignatoryVersion vi ->
+              let is_selected =
+                match List.nth_opt s.items s.selected with
+                | Some (AvailableSignatoryVersion vi2)
+                  when vi.Signatory_downloader.version
+                       = vi2.Signatory_downloader.version ->
+                    true
+                | _ -> false
+              in
+              let prefix =
+                if is_selected then "    \xe2\x9e\xa4 " else "      "
+              in
+              let date_str =
+                match vi.Signatory_downloader.release_date with
+                | Some d -> Printf.sprintf " - %s" d
+                | None -> ""
+              in
+              let line =
+                Printf.sprintf
+                  "  %sv%s%s"
+                  prefix
+                  vi.Signatory_downloader.version
+                  date_str
+              in
+              let final_line =
+                if is_selected then Widgets.bold line else line
+              in
+              [final_line]
           | _ -> [])
         s.items
     in

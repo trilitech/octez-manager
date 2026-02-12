@@ -193,14 +193,16 @@ and show_rollback_modal ~instance ~svc ~old_bin_source ~new_bin_source ~error:_
     =
   let old_version_str =
     match old_bin_source with
-    | Binary_registry.Managed_version v -> "v" ^ v
+    | Binary_registry.Managed_octez_version v -> "v" ^ v
+    | Binary_registry.Managed_signatory_version v -> "signatory-v" ^ v
     | Binary_registry.Registered_alias a -> a
     | Binary_registry.Raw_path p -> p
   in
 
   let new_version_str =
     match new_bin_source with
-    | Binary_registry.Managed_version v -> "v" ^ v
+    | Binary_registry.Managed_octez_version v -> "v" ^ v
+    | Binary_registry.Managed_signatory_version v -> "signatory-v" ^ v
     | Binary_registry.Registered_alias a -> a
     | Binary_registry.Raw_path p -> p
   in
@@ -421,7 +423,8 @@ let update_version_modal svc =
   (* Get current version for filtering - try to extract from binary *)
   let current_version_opt =
     match current_bin_source with
-    | Binary_registry.Managed_version v -> Some v
+    | Binary_registry.Managed_octez_version v -> Some v
+    | Binary_registry.Managed_signatory_version _
     | Binary_registry.Registered_alias _ | Binary_registry.Raw_path _ ->
         (* Try to get version from the actual binary *)
         let binary_name = Systemd_unit_template.role_binary svc.Service.role in
@@ -496,7 +499,7 @@ let update_version_modal svc =
       ~on_select:(fun choice ->
         let new_bin_source =
           match choice with
-          | ManagedVersion v -> Binary_registry.Managed_version v
+          | ManagedVersion v -> Binary_registry.Managed_octez_version v
           | RegisteredDir (alias, _) -> Binary_registry.Registered_alias alias
         in
 
@@ -507,7 +510,8 @@ let update_version_modal svc =
         else
           let new_version_str =
             match new_bin_source with
-            | Binary_registry.Managed_version v -> "v" ^ v
+            | Binary_registry.Managed_octez_version v -> "v" ^ v
+            | Binary_registry.Managed_signatory_version v -> "signatory-v" ^ v
             | Binary_registry.Registered_alias a -> a
             | Binary_registry.Raw_path p -> p
           in
