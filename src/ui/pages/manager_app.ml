@@ -19,6 +19,7 @@ let register_pages () =
   Install_dal_node_form_v3.register () ;
   Import_wizard.register () ;
   Binaries.register () ;
+  Signatory_info.register () ;
   Diagnostics.register () ;
   Log_viewer_page.register () ;
   Rpc_node_selection.register () ;
