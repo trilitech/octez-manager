@@ -291,17 +291,19 @@ let create_menu_modal state =
   let open Modal_helpers in
   open_choice_modal
     ~title:"Create Service"
-    ~items:[`Node; `DalNode; `Baker; `Accuser]
+    ~items:[`Node; `DalNode; `Baker; `Accuser; `Signatory]
     ~to_string:(function
       | `Node -> "Node"
       | `DalNode -> "DAL Node"
       | `Baker -> "Baker"
-      | `Accuser -> "Accuser")
+      | `Accuser -> "Accuser"
+      | `Signatory -> "Signatory")
     ~on_select:(function
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
       | `Accuser -> Context.navigate Install_accuser_form_v3.name
-      | `DalNode -> Context.navigate Install_dal_node_form_v3.name)
+      | `DalNode -> Context.navigate Install_dal_node_form_v3.name
+      | `Signatory -> Context.navigate Signatory_info.name)
     () ;
   state
 
