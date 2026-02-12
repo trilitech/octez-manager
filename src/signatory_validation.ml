@@ -89,6 +89,29 @@ let validate_backend = function
   | Installer_types.File path ->
       if path = "" then Error (`Msg "Backend: file path cannot be empty")
       else Ok ()
+  | Installer_types.YubiHSM {connector_url} ->
+      if connector_url = "" then
+        Error (`Msg "Backend: YubiHSM connector URL cannot be empty")
+      else Ok ()
+  | Installer_types.Azure_KMS {vault_name; tenant_id} ->
+      if vault_name = "" then
+        Error (`Msg "Backend: Azure KMS vault name cannot be empty")
+      else if tenant_id = "" then
+        Error (`Msg "Backend: Azure KMS tenant ID cannot be empty")
+      else Ok ()
+  | Installer_types.AWS_KMS {region} ->
+      if region = "" then Error (`Msg "Backend: AWS KMS region cannot be empty")
+      else Ok ()
+  | Installer_types.GCP_KMS {project_id; location} ->
+      if project_id = "" then
+        Error (`Msg "Backend: GCP KMS project ID cannot be empty")
+      else if location = "" then
+        Error (`Msg "Backend: GCP KMS location cannot be empty")
+      else Ok ()
+  | Installer_types.Vault {address; role} ->
+      if address = "" then Error (`Msg "Backend: Vault address cannot be empty")
+      else if role = "" then Error (`Msg "Backend: Vault role cannot be empty")
+      else Ok ()
 
 (** Validate watermark backend configuration.
     
@@ -98,6 +121,18 @@ let validate_watermark = function
   | Installer_types.Memory -> Ok ()
   | Installer_types.File_watermark path ->
       if path = "" then Error (`Msg "Watermark: file path cannot be empty")
+      else Ok ()
+  | Installer_types.AWS_DynamoDB {table_name; region} ->
+      if table_name = "" then
+        Error (`Msg "Watermark: DynamoDB table name cannot be empty")
+      else if region = "" then
+        Error (`Msg "Watermark: DynamoDB region cannot be empty")
+      else Ok ()
+  | Installer_types.GCP_Firestore {project_id; collection} ->
+      if project_id = "" then
+        Error (`Msg "Watermark: Firestore project ID cannot be empty")
+      else if collection = "" then
+        Error (`Msg "Watermark: Firestore collection cannot be empty")
       else Ok ()
 
 (** Validate a complete Signatory request.

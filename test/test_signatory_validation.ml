@@ -112,7 +112,16 @@ let test_invalid_http_addresses () =
     addresses
 
 let test_valid_backends () =
-  let backends = [Installer_types.File "/path/to/keys"] in
+  let backends =
+    [
+      Installer_types.File "/path/to/keys";
+      Installer_types.YubiHSM {connector_url = "http://localhost:12345"};
+      Installer_types.Azure_KMS {vault_name = "my-vault"; tenant_id = "tenant"};
+      Installer_types.AWS_KMS {region = "us-east-1"};
+      Installer_types.GCP_KMS {project_id = "my-project"; location = "global"};
+      Installer_types.Vault {address = "http://vault:8200"; role = "signer"};
+    ]
+  in
   List.iter
     (fun backend ->
       match Signatory_validation.validate_backend backend with
@@ -122,7 +131,24 @@ let test_valid_backends () =
     backends
 
 let test_invalid_backends () =
-  let backends = [(Installer_types.File "", "Empty file path")] in
+  let backends =
+    [
+      (Installer_types.File "", "Empty file path");
+      (Installer_types.YubiHSM {connector_url = ""}, "Empty YubiHSM URL");
+      ( Installer_types.Azure_KMS {vault_name = ""; tenant_id = "tenant"},
+        "Empty vault name" );
+      ( Installer_types.Azure_KMS {vault_name = "vault"; tenant_id = ""},
+        "Empty tenant ID" );
+      (Installer_types.AWS_KMS {region = ""}, "Empty AWS region");
+      ( Installer_types.GCP_KMS {project_id = ""; location = "global"},
+        "Empty project ID" );
+      ( Installer_types.GCP_KMS {project_id = "project"; location = ""},
+        "Empty location" );
+      ( Installer_types.Vault {address = ""; role = "signer"},
+        "Empty Vault address" );
+      (Installer_types.Vault {address = "http://vault"; role = ""}, "Empty role");
+    ]
+  in
   List.iter
     (fun (backend, description) ->
       match Signatory_validation.validate_backend backend with
@@ -135,6 +161,10 @@ let test_valid_watermarks () =
     [
       Installer_types.Memory;
       Installer_types.File_watermark "/path/to/watermark.json";
+      Installer_types.AWS_DynamoDB
+        {table_name = "watermarks"; region = "us-east-1"};
+      Installer_types.GCP_Firestore
+        {project_id = "my-project"; collection = "watermarks"};
     ]
   in
   List.iter
@@ -146,7 +176,19 @@ let test_valid_watermarks () =
     watermarks
 
 let test_invalid_watermarks () =
-  let watermarks = [(Installer_types.File_watermark "", "Empty file path")] in
+  let watermarks =
+    [
+      (Installer_types.File_watermark "", "Empty file path");
+      ( Installer_types.AWS_DynamoDB {table_name = ""; region = "us-east-1"},
+        "Empty table name" );
+      ( Installer_types.AWS_DynamoDB {table_name = "table"; region = ""},
+        "Empty region" );
+      ( Installer_types.GCP_Firestore {project_id = ""; collection = "coll"},
+        "Empty project ID" );
+      ( Installer_types.GCP_Firestore {project_id = "proj"; collection = ""},
+        "Empty collection" );
+    ]
+  in
   List.iter
     (fun (watermark, description) ->
       match Signatory_validation.validate_watermark watermark with
