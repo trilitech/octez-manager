@@ -129,12 +129,20 @@ type snapshot_metadata = {
 }
 
 (** Signatory backend configuration *)
-type signatory_backend = File of string  (** Path to keys directory *)
+type signatory_backend =
+  | File of string  (** Path to keys directory *)
+  | YubiHSM of {connector_url : string}
+  | Azure_KMS of {vault_name : string; tenant_id : string}
+  | AWS_KMS of {region : string}
+  | GCP_KMS of {project_id : string; location : string}
+  | Vault of {address : string; role : string}
 
 (** Signatory watermark backend *)
 type watermark_backend =
   | Memory
   | File_watermark of string  (** Path to watermark file *)
+  | AWS_DynamoDB of {table_name : string; region : string}
+  | GCP_Firestore of {project_id : string; collection : string}
 
 (** Signatory installation request *)
 type signatory_request = {
