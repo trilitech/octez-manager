@@ -5,7 +5,7 @@
 _octez-manager() {
   local -a commands
   commands=(
-    'binaries:Manage Octez binaries'
+    'binaries:Manage Octez and Signatory binaries'
     'cleanup-dependencies:Remove stale dependency entries from service configurations. This cleans up references to services that have been removed.'
     'cleanup-orphans:Remove orphan data directories and log files not associated with any registered service. Use --dry-run to preview what would be removed.'
     'import:Import an external Octez service'
