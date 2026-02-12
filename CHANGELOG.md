@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Instance details page now renders service details and file paths sections in Box_widget Rounded borders with distinct colors (service details in color 12, file paths in color 14)
+- Instance details page now uses Description_list widget for key-value displays with improved alignment and automatic value wrapping
 
 ## [0.3.0] - 2026-02-11
 
