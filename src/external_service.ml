@@ -7,13 +7,14 @@
 
 (** {1 Role Detection} *)
 
-type role = Node | Baker | Accuser | Dal_node | Unknown of string
+type role = Node | Baker | Accuser | Dal_node | Signatory | Unknown of string
 
 let role_to_string = function
   | Node -> "node"
   | Baker -> "baker"
   | Accuser -> "accuser"
   | Dal_node -> "dal-node"
+  | Signatory -> "signatory"
   | Unknown s -> s
 
 let role_of_string = function
@@ -21,6 +22,7 @@ let role_of_string = function
   | "baker" -> Baker
   | "accuser" -> Accuser
   | "dal-node" | "dal" -> Dal_node
+  | "signatory" -> Signatory
   | s -> Unknown s
 
 let role_of_binary_name ?subcommand binary_name =
@@ -40,6 +42,7 @@ let role_of_binary_name ?subcommand binary_name =
         || String.starts_with ~prefix:"tezos-accuser" name
       then Accuser
       else if String.starts_with ~prefix:"octez-dal-node" name then Dal_node
+      else if String.starts_with ~prefix:"signatory" name then Signatory
       else Unknown name
 
 (** {1 Confidence Tracking} *)

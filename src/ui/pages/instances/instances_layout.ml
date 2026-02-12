@@ -19,7 +19,7 @@ let role_order = function
   | "baker" -> 1
   | "accuser" -> 2
   | "dal-node" -> 3
-  | "signer" -> 4
+  | "signatory" -> 4
   | _ -> 5
 
 (** Role section headers *)
@@ -28,7 +28,7 @@ let role_header = function
   | "baker" -> "── Bakers ──"
   | "accuser" -> "── Accusers ──"
   | "dal-node" -> "── DAL Nodes ──"
-  | "signer" -> "── Signers ──"
+  | "signatory" -> "── Signatories ──"
   | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
 
 (** Sort services by role, then by instance name *)
@@ -58,7 +58,7 @@ let calc_num_columns ~cols ~min_column_width ~column_separator =
 
 (** Group services by role, preserving order *)
 let group_by_role services =
-  let roles = ["node"; "baker"; "accuser"; "dal-node"; "signer"] in
+  let roles = ["node"; "baker"; "accuser"; "dal-node"; "signatory"] in
   List.filter_map
     (fun role ->
       let instances =
