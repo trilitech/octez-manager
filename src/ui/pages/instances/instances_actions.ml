@@ -152,14 +152,14 @@ let _view_logs_old state =
                 ~default:svc.Service.data_dir
             in
             Filename.concat base "daily_logs"
-        | "signer" ->
-            (* Signer: <base_dir>/logs/octez-signer/ *)
+        | "signatory" ->
+            (* Signatory: <base_dir>/logs/signatory/ *)
             let base =
               Option.value
-                (lookup "OCTEZ_SIGNER_BASE_DIR")
+                (lookup "SIGNATORY_BASE_DIR")
                 ~default:svc.Service.data_dir
             in
-            Filename.concat (Filename.concat base "logs") "octez-signer"
+            Filename.concat (Filename.concat base "logs") "signatory"
         | _ -> Filename.concat svc.Service.data_dir "daily_logs"
       in
       let daily_logs () =

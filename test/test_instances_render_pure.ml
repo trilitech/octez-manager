@@ -28,7 +28,7 @@ let test_role_header_known_roles () =
   check string "baker" "── Bakers ──" (Layout.role_header "baker") ;
   check string "accuser" "── Accusers ──" (Layout.role_header "accuser") ;
   check string "dal-node" "── DAL Nodes ──" (Layout.role_header "dal-node") ;
-  check string "signer" "── Signers ──" (Layout.role_header "signer")
+  check string "signatory" "── Signatories ──" (Layout.role_header "signatory")
 
 let test_role_header_unknown_capitalizes () =
   let h = Layout.role_header "foobar" in
