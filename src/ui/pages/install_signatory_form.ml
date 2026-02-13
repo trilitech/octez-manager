@@ -215,14 +215,19 @@ let authorized_keys_field =
                 ~initial:""
                 ~on_submit:(fun key ->
                   let key = String.trim key in
-                  if validate_tezos_key key then (
+                  if not (validate_tezos_key key) then (
+                    Context.toast_error "Invalid Tezos key format" ;
+                    open_menu ())
+                  else if List.mem key !model_ref.authorized_keys then (
+                    Context.toast_error "Key already exists" ;
+                    open_menu ())
+                  else (
                     model_ref :=
                       {
                         !model_ref with
                         authorized_keys = !model_ref.authorized_keys @ [key];
                       } ;
-                    open_menu ())
-                  else Context.toast_error "Invalid Tezos key format")
+                    open_menu ()))
                 ()
         in
         let items =
@@ -432,7 +437,9 @@ let spec =
           {
             instance = model.core.instance_name;
             backend;
-            authorized_keys = model.authorized_keys;
+            authorized_keys =
+              (* Deduplicate keys to handle any potential double-adds *)
+              List.sort_uniq String.compare model.authorized_keys;
             address = model.address;
             metrics_address = model.metrics_address;
             watermark = model.watermark;
