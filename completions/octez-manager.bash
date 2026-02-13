@@ -27,7 +27,7 @@ _octez_manager() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="binaries cleanup-dependencies cleanup-orphans import install-accuser install-baker install-dal-node install-node instance list list-available-networks list-snapshots purge-all rpc self-update ui version web"
+  local commands="binaries cleanup-dependencies cleanup-orphans import install-accuser install-baker install-dal-node install-node install-signatory instance list list-available-networks list-snapshots purge-all rpc self-update ui version web"
   local instance_actions="start stop restart remove purge show show-service logs edit export-logs"
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
@@ -69,6 +69,10 @@ _octez_manager() {
       ;;
     --bin-dir-alias|--app-bin-dir.|--tmp-dir|--octez-version)
       COMPREPLY=( $(compgen -d -- "$cur") )
+      return 0
+      ;;
+    --keys-dir|--watermark)
+      COMPREPLY=( $(compgen -f -- "$cur") )
       return 0
       ;;
   esac
@@ -156,6 +160,13 @@ _octez_manager() {
     install-node)
       if [[ $cur == -* ]]; then
         opts="--app-bin-dir --bin-dir-alias --data-dir --extra-arg --history-mode --instance --keep-snapshot --net-addr --network --no-enable --octez-version --app-bin-dir. --preserve-data --rpc-addr --service-user --snapshot --snapshot-no-check --snapshot-uri --tmp-dir --help --version"
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      fi
+      return 0
+      ;;
+    install-signatory)
+      if [[ $cur == -* ]]; then
+        opts="--address --app-bin-dir --authorized-keys --backend --bin-dir-alias --instance --keys-dir --metrics-address --no-enable --octez-version --app-bin-dir. --service-user --watermark --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
