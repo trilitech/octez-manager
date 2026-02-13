@@ -46,11 +46,8 @@ let install_signatory_cmd =
       value & opt string "127.0.0.1:6732" & info ["address"] ~doc ~docv:"ADDR")
   in
   let metrics_address =
-    let doc = "Metrics endpoint address (default: 127.0.0.1:9583)" in
-    Arg.(
-      value
-      & opt string "127.0.0.1:9583"
-      & info ["metrics-address"] ~doc ~docv:"ADDR")
+    let doc = "Metrics endpoint address (optional, leave empty to disable)" in
+    Arg.(value & opt string "" & info ["metrics-address"] ~doc ~docv:"ADDR")
   in
   let watermark =
     let doc =
