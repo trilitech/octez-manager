@@ -79,8 +79,19 @@ let make_initial_model () =
               else Paths.default_role_dir "signatory" svc.Service.instance
             in
             File dir
-        | _ ->
-            (* For other backends, default to File for now *)
+        | "yubihsm" ->
+            (* TODO: Once YubiHSM is fully implemented, parse connector URL from env *)
+            let url = lookup "SIGNATORY_YUBIHSM_CONNECTOR_URL" in
+            if url <> "" then YubiHSM {connector_url = url}
+            else
+              (* Fallback to default for backwards compat *)
+              YubiHSM {connector_url = "http://127.0.0.1:12345"}
+        | kind ->
+            (* For unsupported backends, log warning and default to File *)
+            Context.toast_warn
+              (Printf.sprintf
+                 "Unsupported backend kind '%s' in env, defaulting to File"
+                 kind) ;
             File
               (if keys_dir <> "" then keys_dir
                else Paths.default_role_dir "signatory" svc.Service.instance)
