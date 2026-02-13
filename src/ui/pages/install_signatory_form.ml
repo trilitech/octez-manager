@@ -413,20 +413,7 @@ let spec =
             metrics_address_field;
             watermark_field;
           ]
-        (* 5. Extra args *)
-        @ core_service_fields
-            ~get_core:(fun m -> m.core)
-            ~set_core:(fun core m -> {m with core})
-            ~binary:"signatory"
-            ~subcommand:["launch"; "http"; "signer"]
-            ~binary_validator:Form_builder_common.has_signatory_binary
-            ~skip_instance_name:true
-            ~skip_app_bin_dir:true
-            ~skip_service_fields:true
-            ~edit_mode:model.edit_mode
-            ~original_instance:model.original_instance
-            ()
-        (* 6. Service fields *)
+        (* 4. Service fields *)
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
@@ -439,7 +426,7 @@ let spec =
             ~edit_mode:model.edit_mode
             ~original_instance:model.original_instance
             ()
-        (* 7. Instance name *)
+        (* 5. Instance name *)
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
