@@ -22,6 +22,15 @@ val resolve_app_bin_dir :
   string option ->
   (string * Binary_registry.bin_source, string) result
 
+(** Resolve Signatory binary directory from optional path, version, or alias.
+    Priority: signatory_version > bin_dir_alias > app_bin_dir > auto-detect
+    Returns: (path, bin_source) tuple *)
+val resolve_signatory_bin_dir :
+  ?signatory_version:string ->
+  ?bin_dir_alias:string ->
+  string option ->
+  (string * Binary_registry.bin_source, string) result
+
 (** Check if running in interactive terminal *)
 val is_interactive : unit -> bool
 
