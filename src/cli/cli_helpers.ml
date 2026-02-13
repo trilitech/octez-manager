@@ -198,6 +198,164 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
             "Unable to locate octez-node in PATH. Install Octez binaries or \
              use --octez-version, --bin-dir-alias, or --app-bin-dir")
 
+let resolve_signatory_bin_dir ?signatory_version ?bin_dir_alias app_bin_dir =
+  (* Priority: signatory_version > bin_dir_alias > app_bin_dir > auto-detect *)
+  (* Returns: (path, bin_source) *)
+  match (signatory_version, bin_dir_alias, app_bin_dir) with
+  | Some version_input, _, _ -> (
+      (* Use managed Signatory version *)
+      let version_input = String.trim version_input in
+      (* Resolve "latest" to actual version *)
+      let version_result =
+        if version_input = "latest" then
+          match
+            Signatory_downloader.fetch_versions ~include_prerelease:false ()
+          with
+          | Error (`Msg e) ->
+              Error (Printf.sprintf "Failed to fetch latest version: %s" e)
+          | Ok [] -> Error "No Signatory versions available"
+          | Ok versions -> (
+              (* Sort versions to get the latest *)
+              let sorted =
+                List.sort
+                  (fun (a : Signatory_downloader.version_info)
+                       (b : Signatory_downloader.version_info)
+                     -> -Version_checker.compare_versions a.version b.version)
+                  versions
+              in
+              match sorted with
+              | latest :: _ -> Ok latest.version
+              | [] -> Error "No Signatory versions available")
+        else Ok version_input
+      in
+      match version_result with
+      | Error e -> Error e
+      | Ok version ->
+          if Signatory_downloader.is_complete_installation version then
+            Ok
+              ( Signatory_downloader.signatory_version_path version,
+                Binary_registry.Managed_signatory_version version )
+          else if is_interactive () then
+            (* Prompt to download *)
+            let msg =
+              Printf.sprintf
+                "Managed version v%s not found locally. Download now? [Y/n] "
+                version
+            in
+            match LNoise.linenoise msg with
+            | None | Some "" | Some "y" | Some "Y" | Some "yes" | Some "Yes"
+              -> (
+                Printf.printf "Downloading Signatory v%s...\n\n%!" version ;
+
+                (* Single progress bar for Signatory *)
+                let display_state =
+                  ref (Cli_progress.init_display ["octez-signatory"])
+                in
+                let display_mutex = Mutex.create () in
+
+                (* Render initial state *)
+                let lines = Cli_progress.render_display !display_state in
+                display_state := {!display_state with lines_printed = lines} ;
+
+                (* Progress callback *)
+                let progress ~downloaded ~total =
+                  Mutex.lock display_mutex ;
+                  display_state :=
+                    Cli_progress.set_in_progress
+                      !display_state
+                      ~binary:"octez-signatory"
+                      ~downloaded
+                      ~total ;
+                  let lines = Cli_progress.render_display !display_state in
+                  display_state := {!display_state with lines_printed = lines} ;
+                  Mutex.unlock display_mutex
+                in
+
+                (* Perform download with progress *)
+                match
+                  Signatory_downloader.download_version ~version ~progress ()
+                with
+                | Ok result ->
+                    (* Mark as complete *)
+                    Mutex.lock display_mutex ;
+                    let size =
+                      try
+                        let path =
+                          Filename.concat
+                            result.Signatory_downloader.installed_path
+                            "octez-signatory"
+                        in
+                        let stats = Unix.stat path in
+                        Int64.of_int stats.Unix.st_size
+                      with _ -> 0L
+                    in
+                    display_state :=
+                      Cli_progress.set_complete
+                        !display_state
+                        ~binary:"octez-signatory"
+                        ~size ;
+                    let lines = Cli_progress.render_display !display_state in
+                    display_state := {!display_state with lines_printed = lines} ;
+                    Mutex.unlock display_mutex ;
+
+                    Printf.printf "\n" ;
+                    Ok
+                      ( result.Signatory_downloader.installed_path,
+                        Binary_registry.Managed_signatory_version version )
+                | Error (`Msg e) ->
+                    Printf.printf "\n" ;
+                    Error
+                      (Printf.sprintf
+                         "Download failed: %s\n\n\
+                          You can download manually with:\n\
+                         \  octez-manager binaries download-signatory %s"
+                         e
+                         version))
+            | Some _ ->
+                Error
+                  (Printf.sprintf
+                     "Version v%s not installed. Download it with:\n\
+                     \  octez-manager binaries download-signatory %s"
+                     version
+                     version)
+          else
+            Error
+              (Printf.sprintf
+                 "Managed version v%s not found. Download it first with:\n\
+                 \  octez-manager binaries download-signatory %s"
+                 version
+                 version))
+  | None, Some alias, _ -> (
+      (* Use registered directory alias *)
+      let alias = String.trim alias in
+      match Binary_registry.find_registered_dir alias with
+      | Ok (Some ld) ->
+          Ok (ld.Binary_registry.path, Binary_registry.Registered_alias alias)
+      | Ok None ->
+          Error
+            (Printf.sprintf
+               "Registered directory alias '%s' not found. Create it with:\n\
+               \  octez-manager binaries register --alias %s /path/to/binaries"
+               alias
+               alias)
+      | Error (`Msg e) -> Error e)
+  | None, None, Some dir when String.trim dir <> "" -> (
+      (* Use raw path *)
+      match Paths.make_absolute_path dir with
+      | Ok abs_path -> Ok (abs_path, Binary_registry.Raw_path abs_path)
+      | Error msg -> Error msg)
+  | None, None, _ -> (
+      (* Auto-detect from PATH *)
+      match Paths.which "octez-signatory" with
+      | Some path ->
+          let dir = Filename.dirname path in
+          Ok (dir, Binary_registry.Raw_path dir)
+      | None ->
+          Error
+            "Unable to locate octez-signatory in PATH. Install Signatory \
+             binaries or use --signatory-version, --bin-dir-alias, or \
+             --app-bin-dir")
+
 let normalize_opt_string = function
   | Some s ->
       let trimmed = String.trim s in

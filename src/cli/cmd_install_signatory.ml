@@ -106,8 +106,8 @@ let install_signatory_cmd =
       let ( let* ) = Result.bind in
       (* Resolve app_bin_dir *)
       let* app_bin_dir, bin_source =
-        Cli_helpers.resolve_app_bin_dir
-          ?octez_version:version
+        Cli_helpers.resolve_signatory_bin_dir
+          ?signatory_version:version
           ?bin_dir_alias
           app_bin_dir
       in
