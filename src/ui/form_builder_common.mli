@@ -151,6 +151,17 @@ val prepare_extra_args : string -> string list
     @return The directory containing the binary, or /usr/bin as fallback *)
 val default_app_bin_dir : binary_name:string -> string
 
+(** Find the best default app_bin_dir for Signatory binary.
+
+    Priority order:
+    1. Latest managed Signatory version if any exist
+    2. Use `which signatory` to find system-installed binary
+    3. Look in registered services for a directory containing the binary
+    4. Fall back to /usr/bin
+
+    @return The directory containing signatory binary, or /usr/bin as fallback *)
+val default_signatory_app_bin_dir : unit -> string
+
 (** Parse shellwords-style arguments with quote support.
 
     Supports:
