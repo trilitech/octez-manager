@@ -350,13 +350,11 @@ let address_field =
 
 (** Metrics address field *)
 let metrics_address_field =
-  Form_builder.validated_text
-    ~label:"Metrics Address (optional)"
-    ~get:(fun m -> m.metrics_address)
-    ~set:(fun metrics_address m -> {m with metrics_address})
+  Form_builder.custom
+    ~label:"Metrics Endpoint"
+    ~get:(fun m -> if m.metrics_address = "" then "None" else m.metrics_address)
     ~validate:(fun m ->
-      (* Empty is valid - metrics are optional *)
-      if m.metrics_address = "" || String.trim m.metrics_address = "" then Ok ()
+      if m.metrics_address = "" then true
       else
         let exclude_instance =
           match m.original_instance with Some inst -> Some inst | None -> None
@@ -368,10 +366,51 @@ let metrics_address_field =
             ~example:"127.0.0.1:9583"
             ()
         with
-        | Ok () -> Ok ()
-        | Error err -> Error (Port_validation.pp_error err))
+        | Ok () -> true
+        | Error _ -> false)
+    ~edit:(fun model_ref ->
+      let items = [`None; `Custom] in
+      let to_string = function
+        | `None -> "None · Metrics disabled"
+        | `Custom -> "Custom · Prometheus endpoint"
+      in
+      let on_select = function
+        | `None -> model_ref := {!model_ref with metrics_address = ""}
+        | `Custom ->
+            Modal_helpers.prompt_validated_text_modal
+              ~title:"Metrics Endpoint"
+              ~placeholder:(Some "127.0.0.1:9583")
+              ~initial:
+                (if !model_ref.metrics_address = "" then "127.0.0.1:9583"
+                 else !model_ref.metrics_address)
+              ~validator:(fun addr ->
+                let exclude_instance =
+                  match !model_ref.original_instance with
+                  | Some inst -> Some inst
+                  | None -> None
+                in
+                match
+                  Port_validation.validate_addr
+                    ~addr
+                    ?exclude_instance
+                    ~example:"127.0.0.1:9583"
+                    ()
+                with
+                | Ok () -> Ok ()
+                | Error err -> Error (Port_validation.pp_error err))
+              ~on_submit:(fun addr ->
+                model_ref := {!model_ref with metrics_address = addr})
+              ()
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Metrics Endpoint"
+        ~items
+        ~to_string
+        ~on_select
+        ())
+    ()
   |> Form_builder.with_hint
-       "Prometheus metrics endpoint (leave empty to disable metrics)"
+       "Prometheus metrics endpoint for monitoring (optional)"
 
 (** Watermark backend selection *)
 let watermark_field =
