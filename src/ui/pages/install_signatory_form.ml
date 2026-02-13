@@ -87,33 +87,14 @@ let make_initial_model () =
       let lookup key =
         match List.assoc_opt key env with Some v -> String.trim v | None -> ""
       in
-      (* Parse backend from env *)
-      let backend_kind_str = lookup "SIGNATORY_BACKEND_KIND" in
+      (* Parse backend from env - only File backend is supported *)
       let keys_dir = lookup "SIGNATORY_KEYS_DIR" in
       let backend =
-        match String.lowercase_ascii (String.trim backend_kind_str) with
-        | "file" | "" ->
-            let dir =
-              if keys_dir <> "" then keys_dir
-              else default_keys_dir svc.Service.instance
-            in
-            File dir
-        | "yubihsm" ->
-            (* TODO: Once YubiHSM is fully implemented, parse connector URL from env *)
-            let url = lookup "SIGNATORY_YUBIHSM_CONNECTOR_URL" in
-            if url <> "" then YubiHSM {connector_url = url}
-            else
-              (* Fallback to default for backwards compat *)
-              YubiHSM {connector_url = "http://127.0.0.1:12345"}
-        | kind ->
-            (* For unsupported backends, log warning and default to File *)
-            Context.toast_warn
-              (Printf.sprintf
-                 "Unsupported backend kind '%s' in env, defaulting to File"
-                 kind) ;
-            File
-              (if keys_dir <> "" then keys_dir
-               else default_keys_dir svc.Service.instance)
+        let dir =
+          if keys_dir <> "" then keys_dir
+          else default_keys_dir svc.Service.instance
+        in
+        File dir
       in
       (* Parse authorized keys (comma-separated) *)
       let authorized_keys_str = lookup "SIGNATORY_AUTHORIZED_KEYS" in
@@ -172,76 +153,15 @@ let validate_tezos_key key =
 
 (** Backend selection field with modal *)
 let backend_field =
-  Form_builder.custom
-    ~label:"Backend"
-    ~get:(fun m ->
-      match m.backend with
-      | File path -> Printf.sprintf "File (%s)" path
-      | YubiHSM {connector_url} -> Printf.sprintf "YubiHSM (%s)" connector_url
-      | Azure_KMS {vault_name; _} -> Printf.sprintf "Azure KMS (%s)" vault_name
-      | AWS_KMS {region} -> Printf.sprintf "AWS KMS (%s)" region
-      | GCP_KMS {project_id; _} -> Printf.sprintf "GCP KMS (%s)" project_id
-      | Vault {address; _} -> Printf.sprintf "Vault (%s)" address)
+  Form_builder.validated_text
+    ~label:"Keys Directory"
+    ~get:(fun m -> match m.backend with File path -> path | _ -> "")
+    ~set:(fun path m -> {m with backend = File path})
     ~validate:(fun m ->
       match m.backend with
-      | File path -> Form_builder_common.is_nonempty path
-      | _ -> true)
-    ~validate_msg:(fun m ->
-      match m.backend with
-      | File path when not (Form_builder_common.is_nonempty path) ->
-          Some "Keys directory path is required"
-      | _ -> None)
-    ~edit:(fun model_ref ->
-      let items = [`File; `YubiHSM; `Azure_KMS; `AWS_KMS; `GCP_KMS; `Vault] in
-      let to_string = function
-        | `File -> "File · Keys stored in directory"
-        | `YubiHSM -> "YubiHSM · Hardware security module"
-        | `Azure_KMS -> "Azure KMS · Azure Key Vault"
-        | `AWS_KMS -> "AWS KMS · Amazon Key Management"
-        | `GCP_KMS -> "GCP KMS · Google Cloud Key Management"
-        | `Vault -> "Vault · HashiCorp Vault"
-      in
-      let on_select choice =
-        match choice with
-        | `File ->
-            Modal_helpers.prompt_text_modal
-              ~title:"Keys Directory"
-              ~placeholder:(Some "/var/lib/signatory/keys")
-              ~initial:
-                (match !model_ref.backend with
-                | File path -> path
-                | _ ->
-                    Paths.default_role_dir
-                      "signatory"
-                      !model_ref.core.instance_name)
-              ~on_submit:(fun path ->
-                model_ref := {!model_ref with backend = File path})
-              ()
-        | `YubiHSM ->
-            Modal_helpers.prompt_text_modal
-              ~title:"YubiHSM Connector URL"
-              ~placeholder:(Some "http://127.0.0.1:12345")
-              ~initial:
-                (match !model_ref.backend with
-                | YubiHSM {connector_url} -> connector_url
-                | _ -> "http://127.0.0.1:12345")
-              ~on_submit:(fun url ->
-                model_ref :=
-                  {!model_ref with backend = YubiHSM {connector_url = url}})
-              ()
-        | `Azure_KMS ->
-            Context.toast_error "Azure KMS not yet implemented in TUI"
-        | `AWS_KMS -> Context.toast_error "AWS KMS not yet implemented in TUI"
-        | `GCP_KMS -> Context.toast_error "GCP KMS not yet implemented in TUI"
-        | `Vault -> Context.toast_error "Vault not yet implemented in TUI"
-      in
-      Modal_helpers.open_choice_modal
-        ~title:"Backend Type"
-        ~items
-        ~to_string
-        ~on_select
-        ())
-    ()
+      | File path when Form_builder_common.is_nonempty path -> Ok ()
+      | _ -> Error "Keys directory path is required")
+  |> Form_builder.with_hint "Directory for storing secret keys (File backend)"
 
 (** Authorized keys list editor *)
 let authorized_keys_field =
