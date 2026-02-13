@@ -84,9 +84,6 @@ val confirm_modal :
 (** Show the global help overlay listing all keybindings. *)
 val show_help_modal : unit -> unit
 
-(** Show the global menu overlay with available actions. *)
-val show_menu_modal : unit -> unit
-
 (** Open a file-system browser modal for selecting files or directories.
     @param dirs_only When [true], only directories are selectable.
     @param require_writable Only show directories the user can write to. *)
