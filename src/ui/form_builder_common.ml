@@ -341,3 +341,37 @@ let default_app_bin_dir ~binary_name =
               | Some svc -> svc.app_bin_dir
               | None -> "/usr/bin")
           | Error _ -> "/usr/bin"))
+
+(** Find the best default app_bin_dir for Signatory binary.
+
+    Priority order:
+    1. Latest managed Signatory version if any exist
+    2. Use `which signatory` to find system-installed binary
+    3. Look in registered services for a directory containing the binary
+    4. Fall back to /usr/bin
+
+    @return The directory containing signatory binary, or /usr/bin as fallback *)
+let default_signatory_app_bin_dir () =
+  (* 1. Try latest managed Signatory version first *)
+  match Signatory_downloader.list_managed_versions () with
+  | Ok (latest :: _) ->
+      (* Use latest managed Signatory version *)
+      Signatory_downloader.signatory_version_path latest
+  | Ok [] | Error _ -> (
+      (* 2. No managed versions, try `which signatory` *)
+      match Paths.which "signatory" with
+      | Some path -> Filename.dirname path
+      | None -> (
+          (* 3. Look in registered services for a directory with signatory binary *)
+          match Service_registry.list () with
+          | Ok services -> (
+              let found =
+                List.find_opt
+                  (fun (svc : Service.t) ->
+                    has_binary "signatory" svc.app_bin_dir)
+                  services
+              in
+              match found with
+              | Some svc -> svc.app_bin_dir
+              | None -> "/usr/bin")
+          | Error _ -> "/usr/bin"))
