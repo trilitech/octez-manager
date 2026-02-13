@@ -143,6 +143,7 @@ let validate_request (req : Installer_types.signatory_request) =
   let open Rresult.R.Infix in
   validate_authorized_keys req.authorized_keys >>= fun () ->
   validate_http_address ~addr:req.address ~name:"address" >>= fun () ->
-  validate_http_address ~addr:req.metrics_address ~name:"metrics_address"
+  (if req.metrics_address = "" then Ok ()
+   else validate_http_address ~addr:req.metrics_address ~name:"metrics_address")
   >>= fun () ->
   validate_backend req.backend >>= fun () -> validate_watermark req.watermark

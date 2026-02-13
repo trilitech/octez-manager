@@ -204,7 +204,8 @@ let test_valid_request () =
       backend = Installer_types.File "/keys";
       authorized_keys = ["tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb"];
       address = "127.0.0.1:6732";
-      metrics_address = "127.0.0.1:9583";
+      metrics_address = "";
+      (* Metrics are optional *)
       watermark = Installer_types.Memory;
       service_user = "tezos";
       app_bin_dir = "/usr/local/bin";
