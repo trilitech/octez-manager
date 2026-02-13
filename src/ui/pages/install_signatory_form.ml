@@ -339,7 +339,7 @@ let metrics_address_field =
 (** Watermark backend selection *)
 let watermark_field =
   Form_builder.custom
-    ~label:"Watermark"
+    ~label:"Watermark Storage"
     ~get:(fun m ->
       match m.watermark with
       | Memory -> "Memory"
@@ -350,8 +350,8 @@ let watermark_field =
     ~edit:(fun model_ref ->
       let items = [`Memory; `File] in
       let to_string = function
-        | `Memory -> "Memory · In-memory watermark storage"
-        | `File -> "File · Persistent file storage"
+        | `Memory -> "Memory · In-memory (lost on restart)"
+        | `File -> "File · Persistent watermark file"
       in
       let on_select = function
         | `Memory -> model_ref := {!model_ref with watermark = Memory}
@@ -372,7 +372,7 @@ let watermark_field =
               ()
       in
       Modal_helpers.open_choice_modal
-        ~title:"Select Watermark Backend"
+        ~title:"Watermark Storage (prevents double-signing)"
         ~items
         ~to_string
         ~on_select
