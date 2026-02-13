@@ -153,16 +153,46 @@ let validate_tezos_key key =
 
 (** Backend selection field with modal *)
 let backend_field =
-  Form_builder.validated_text
-    ~label:"Keys Directory"
-    ~get:(fun m -> match m.backend with File path -> path | _ -> "")
-    ~set:(fun path m -> {m with backend = File path})
+  Form_builder.custom
+    ~label:"Backend"
+    ~get:(fun m -> match m.backend with File path -> Printf.sprintf "File (%s)" path | _ -> "File")
     ~validate:(fun m ->
       match m.backend with
-      | File path when Form_builder_common.is_nonempty path -> Ok ()
-      | _ -> Error "Keys directory path is required")
-  |> Form_builder.with_hint "Directory for storing secret keys (File backend)"
-
+      | File path -> Form_builder_common.is_nonempty path
+      | _ -> false)
+    ~validate_msg:(fun m ->
+      match m.backend with
+      | File path when not (Form_builder_common.is_nonempty path) ->
+          Some "Keys directory path is required"
+      | _ -> None)
+    ~edit:(fun model_ref ->
+      let items = [`File] in
+      let to_string = function
+        | `File -> "File · Keys stored in local directory"
+      in
+      let on_select choice =
+        match choice with
+        | `File ->
+            Modal_helpers.prompt_text_modal
+              ~title:"Keys Directory"
+              ~placeholder:(Some "/path/to/keys")
+              ~initial:
+                (match !model_ref.backend with
+                | File path -> path
+                | _ -> default_keys_dir !model_ref.core.instance_name)
+              ~on_submit:(fun path ->
+                model_ref := {!model_ref with backend = File path})
+              ()
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Backend Type"
+        ~items
+        ~to_string
+        ~on_select
+        ())
+    ()
+  |> Form_builder.with_hint
+       "Key storage backend (only File is currently supported)"
 (** Authorized keys list editor *)
 let authorized_keys_field =
   Form_builder.custom
