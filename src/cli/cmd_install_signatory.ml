@@ -126,9 +126,17 @@ let install_signatory_cmd =
         | Some b -> Ok b
         | None ->
             if Cli_helpers.is_interactive () then
-              Ok
-                (Cli_helpers.prompt_required_string
-                   "Backend type (only 'file' supported)")
+              let completions = ["file"] in
+              let rec ask () =
+                match
+                  Cli_helpers.prompt_with_completion "Backend type" completions
+                with
+                | Some v -> Ok v
+                | None ->
+                    prerr_endline "Please choose 'file'." ;
+                    ask ()
+              in
+              ask ()
             else Error "Backend is required in non-interactive mode"
       in
       (* Validate backend (only file is supported for now) *)
