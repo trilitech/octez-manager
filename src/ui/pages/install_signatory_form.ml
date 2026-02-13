@@ -67,7 +67,7 @@ let base_initial_model () =
     backend = File (default_keys_dir "signatory");
     authorized_keys = [];
     address = "127.0.0.1:6732";
-    metrics_address = "127.0.0.1:9090";
+    metrics_address = "127.0.0.1:9583";
     watermark = Memory;
     edit_mode = false;
     original_instance = None;
@@ -154,7 +154,7 @@ let make_initial_model () =
         authorized_keys;
         address = (if address = "" then "127.0.0.1:6732" else address);
         metrics_address =
-          (if metrics_address = "" then "127.0.0.1:9090" else metrics_address);
+          (if metrics_address = "" then "127.0.0.1:9583" else metrics_address);
         watermark;
         edit_mode = true;
         original_instance = Some svc.Service.instance;
