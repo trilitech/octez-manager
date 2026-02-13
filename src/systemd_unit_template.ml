@@ -15,13 +15,14 @@ open Rresult
 
 let ( let* ) = Result.bind
 
-(** Map a service role name to its Octez binary name. *)
+(** Map a service role name to its binary name. *)
 let role_binary role =
   match String.lowercase_ascii role with
   | "node" -> "octez-node"
   | "baker" -> "octez-baker"
   | "accuser" -> "octez-baker"
   | "dal" | "dal-node" -> "octez-dal-node"
+  | "signatory" -> "signatory"
   | other -> "octez-" ^ other
 
 let env_file_template user_mode =
@@ -64,6 +65,10 @@ let exec_line role =
        --endpoint \"${OCTEZ_NODE_ENDPOINT}\" --data-dir \
        \"${OCTEZ_DAL_DATA_DIR}\" --rpc-addr \"${OCTEZ_DAL_RPC_ADDR}\" \
        --net-addr \"${OCTEZ_DAL_NET_ADDR}\" ${OCTEZ_SERVICE_ARGS:-}'"
+  | "signatory" ->
+      (* Signatory remote signer uses signatory binary with config file *)
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/signatory\" serve --config \
+       \"${SIGNATORY_CONFIG_PATH}\"'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \
