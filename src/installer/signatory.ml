@@ -110,11 +110,14 @@ let generate_signatory_yaml ~address ~metrics_address ~authorized_keys
   let watermark_section = generate_watermark_section data_dir watermark in
   (* The keys_path should point to a JSON file containing secret keys *)
   let secrets_file = Filename.concat keys_path "secret.json" in
+  let utility_line =
+    if metrics_address = "" then ""
+    else Printf.sprintf "  utility_address: %s\n" metrics_address
+  in
   Printf.sprintf
     {|server:
   address: %s
-  utility_address: %s
-
+%s
 vaults:
   local_secret:
     driver: file
@@ -126,7 +129,7 @@ tezos:
 
 %s|}
     address
-    metrics_address
+    utility_line
     secrets_file
     tezos_keys_section
     watermark_section
@@ -152,7 +155,10 @@ let install_signatory ?(quiet = false) (request : signatory_request) =
       ()
   in
   let* validated_address = validate_address request.address in
-  let* validated_metrics = validate_address request.metrics_address in
+  let* validated_metrics =
+    if request.metrics_address = "" then Ok ""
+    else validate_address request.metrics_address
+  in
   let* validated_keys = validate_authorized_keys request.authorized_keys in
   let* () = validate_backend request.backend in
 

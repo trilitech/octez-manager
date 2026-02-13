@@ -67,7 +67,7 @@ let base_initial_model () =
     backend = File (default_keys_dir "signatory");
     authorized_keys = [];
     address = "127.0.0.1:6732";
-    metrics_address = "127.0.0.1:9583";
+    metrics_address = "";
     watermark = Memory;
     edit_mode = false;
     original_instance = None;
@@ -153,8 +153,8 @@ let make_initial_model () =
         backend;
         authorized_keys;
         address = (if address = "" then "127.0.0.1:6732" else address);
-        metrics_address =
-          (if metrics_address = "" then "127.0.0.1:9583" else metrics_address);
+        metrics_address;
+        (* Keep as-is, even if empty *)
         watermark;
         edit_mode = true;
         original_instance = Some svc.Service.instance;
@@ -351,12 +351,12 @@ let address_field =
 (** Metrics address field *)
 let metrics_address_field =
   Form_builder.validated_text
-    ~label:"Metrics Address"
+    ~label:"Metrics Address (optional)"
     ~get:(fun m -> m.metrics_address)
     ~set:(fun metrics_address m -> {m with metrics_address})
     ~validate:(fun m ->
-      if not (Form_builder_common.is_nonempty m.metrics_address) then
-        Error "Metrics address is required"
+      (* Empty is valid - metrics are optional *)
+      if m.metrics_address = "" || String.trim m.metrics_address = "" then Ok ()
       else
         let exclude_instance =
           match m.original_instance with Some inst -> Some inst | None -> None
@@ -370,6 +370,8 @@ let metrics_address_field =
         with
         | Ok () -> Ok ()
         | Error err -> Error (Port_validation.pp_error err))
+  |> Form_builder.with_hint
+       "Prometheus metrics endpoint (leave empty to disable metrics)"
 
 (** Watermark backend selection *)
 let watermark_field =
