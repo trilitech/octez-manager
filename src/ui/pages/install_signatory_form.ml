@@ -331,6 +331,10 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"signatory"
             ~subcommand:["launch"; "http"; "signer"]
+            ~app_bin_dir_modal:Modal_helpers.select_signatory_app_bin_dir_modal
+            ~app_bin_dir_hint:
+              "Directory containing signatory binary. Must be accessible to \
+               the service user."
             ~skip_instance_name:true
             ~skip_extra_args:true
             ~skip_service_fields:true
