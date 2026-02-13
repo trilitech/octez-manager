@@ -88,31 +88,47 @@ let generate_watermark_section data_dir = function
 (** Generate Signatory YAML configuration *)
 let generate_signatory_yaml ~address ~metrics_address ~authorized_keys
     ~keys_path ~data_dir ~watermark =
-  let keys_section =
+  (* Generate tezos section with each key as its own subsection with policies *)
+  let tezos_keys_section =
     String.concat
       "\n"
-      (List.map (fun k -> Printf.sprintf "    - %s" k) authorized_keys)
+      (List.map
+         (fun key ->
+           Printf.sprintf
+             {|  %s:
+    log_payloads: true
+    allow:
+      block:
+      attestation:
+      preattestation:
+      attestation_with_dal:
+      generic:
+        - transaction|}
+             key)
+         authorized_keys)
   in
   let watermark_section = generate_watermark_section data_dir watermark in
+  (* The keys_path should point to a JSON file containing secret keys *)
+  let secrets_file = Filename.concat keys_path "secret.json" in
   Printf.sprintf
     {|server:
   address: %s
   utility_address: %s
 
-tezos:
-  authorized_keys:
-%s
-
 vaults:
-  file:
+  local_secret:
     driver: file
-    path: %s
+    config:
+      file: %s
+
+tezos:
+%s
 
 %s|}
     address
     metrics_address
-    keys_section
-    keys_path
+    secrets_file
+    tezos_keys_section
     watermark_section
 
 (** Compute data directory for signatory *)
