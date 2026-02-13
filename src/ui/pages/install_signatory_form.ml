@@ -16,6 +16,25 @@ open Rresult
 
 let ( let* ) = Result.bind
 
+(** Compute default keys directory for signatory instance.
+    Matches the installer's signatory_data_dir and keys_dir logic. *)
+let default_keys_dir instance =
+  let base =
+    if Paths.is_root () then "/var/lib/octez"
+    else Filename.concat (Paths.xdg_data_home ()) "octez"
+  in
+  let data_dir = Filename.concat (Filename.concat base "signatory") instance in
+  Filename.concat data_dir "keys"
+
+(** Compute default data directory for signatory instance.
+    Matches the installer's signatory_data_dir logic. *)
+let default_signatory_data_dir instance =
+  let base =
+    if Paths.is_root () then "/var/lib/octez"
+    else Filename.concat (Paths.xdg_data_home ()) "octez"
+  in
+  Filename.concat (Filename.concat base "signatory") instance
+
 let name = "install_signatory_form"
 
 (** Model contains both common service config and signatory-specific fields *)
@@ -45,7 +64,7 @@ let base_initial_model () =
         start_now = true;
         extra_args = "";
       };
-    backend = File (Paths.default_role_dir "signatory" "signatory");
+    backend = File (default_keys_dir "signatory");
     authorized_keys = [];
     address = "127.0.0.1:6732";
     metrics_address = "127.0.0.1:9090";
@@ -76,7 +95,7 @@ let make_initial_model () =
         | "file" | "" ->
             let dir =
               if keys_dir <> "" then keys_dir
-              else Paths.default_role_dir "signatory" svc.Service.instance
+              else default_keys_dir svc.Service.instance
             in
             File dir
         | "yubihsm" ->
@@ -94,7 +113,7 @@ let make_initial_model () =
                  kind) ;
             File
               (if keys_dir <> "" then keys_dir
-               else Paths.default_role_dir "signatory" svc.Service.instance)
+               else default_keys_dir svc.Service.instance)
       in
       (* Parse authorized keys (comma-separated) *)
       let authorized_keys_str = lookup "SIGNATORY_AUTHORIZED_KEYS" in
@@ -114,7 +133,7 @@ let make_initial_model () =
           let path = lookup "SIGNATORY_WATERMARK_FILE" in
           File_watermark
             (if path = "" then
-               Paths.default_role_dir "signatory" svc.Service.instance
+               default_signatory_data_dir svc.Service.instance
                ^ "/watermark.json"
              else path)
         else Memory
@@ -363,9 +382,7 @@ let watermark_field =
                 (match !model_ref.watermark with
                 | File_watermark path -> path
                 | _ ->
-                    Paths.default_role_dir
-                      "signatory"
-                      !model_ref.core.instance_name
+                    default_signatory_data_dir !model_ref.core.instance_name
                     ^ "/watermark.json")
               ~on_submit:(fun path ->
                 model_ref := {!model_ref with watermark = File_watermark path})
