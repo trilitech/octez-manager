@@ -20,7 +20,6 @@ let register_pages () =
   Install_signatory_form.register () ;
   Import_wizard.register () ;
   Binaries.register () ;
-  Signatory_info.register () ;
   Diagnostics.register () ;
   Log_viewer_page.register () ;
   Rpc_node_selection.register () ;
