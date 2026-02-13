@@ -40,8 +40,7 @@ let base_initial_model () =
       {
         instance_name = "signatory";
         service_user = Form_builder_common.default_service_user ();
-        app_bin_dir =
-          Form_builder_common.default_app_bin_dir ~binary_name:"signatory";
+        app_bin_dir = Form_builder_common.default_signatory_app_bin_dir ();
         bin_source = None;
         enable_on_boot = true;
         start_now = true;
