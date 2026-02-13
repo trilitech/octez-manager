@@ -69,10 +69,10 @@ let format_network_choice (info : Teztnets.network_info) =
 (** {1 Core Service Bundle} *)
 
 let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
-    ?(binary_validator = fun _ -> true) ?(skip_instance_name = false)
-    ?(skip_app_bin_dir = false) ?(skip_extra_args = false)
-    ?(skip_service_fields = false) ?(edit_mode = false)
-    ?(original_instance : string option = None) () =
+    ?(binary_validator = fun _ -> true) ?app_bin_dir_modal ?app_bin_dir_hint
+    ?(skip_instance_name = false) ?(skip_app_bin_dir = false)
+    ?(skip_extra_args = false) ?(skip_service_fields = false)
+    ?(edit_mode = false) ?(original_instance : string option = None) () =
   let open Form_builder in
   let instance_name_field =
     if skip_instance_name then []
@@ -170,6 +170,11 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
                    app_bin_dir)
             else None)
           ~edit:(fun model_ref ->
+            let modal_fn =
+              Option.value
+                ~default:Modal_helpers.select_app_bin_dir_modal
+                app_bin_dir_modal
+            in
             let on_select (path, bin_source) =
               let core = get_core !model_ref in
               model_ref :=
@@ -177,11 +182,14 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
                   {core with app_bin_dir = path; bin_source = Some bin_source}
                   !model_ref
             in
-            Modal_helpers.select_app_bin_dir_modal ~on_select ())
+            modal_fn ~on_select ())
           ()
         |> with_hint
-             "Directory containing octez binaries. Must be accessible to the \
-              service user."
+             (Option.value
+                ~default:
+                  "Directory containing octez binaries. Must be accessible to \
+                   the service user."
+                app_bin_dir_hint)
       in
       [app_bin_dir_custom]
   in

@@ -1363,6 +1363,354 @@ let select_app_bin_dir_modal ~on_select () =
     ~on_select:on_choice_select
     ()
 
+(** Signatory-specific app bin dir modal *)
+let rec select_signatory_app_bin_dir_modal ~on_select () =
+  (* Load managed Signatory versions *)
+  let managed_versions =
+    match Octez_manager_lib.Signatory_downloader.list_managed_versions () with
+    | Ok versions ->
+        List.map
+          (fun v -> `ManagedVersion v)
+          (List.sort
+             (fun a b ->
+               (* Sort descending: newest first *)
+               -Octez_manager_lib.Version_utils.compare_versions a b)
+             versions)
+    | Error _ -> []
+  in
+
+  (* Load registered directories *)
+  let registered_dirs =
+    match Octez_manager_lib.Binary_registry.load_registered_dirs () with
+    | Error _ -> []
+    | Ok dirs ->
+        List.map
+          (fun (ld : Octez_manager_lib.Binary_registry.registered_dir) ->
+            `Registered (ld.alias, ld.path))
+          dirs
+  in
+
+  (* Get latest uninstalled Signatory version to feature at the top *)
+  let latest_uninstalled :
+      Octez_manager_lib.Signatory_downloader.version_info option =
+    match Signatory_versions_scheduler.get_cached () with
+    | None -> None
+    | Some all_versions ->
+        (* Get already installed versions *)
+        let installed =
+          match
+            Octez_manager_lib.Signatory_downloader.list_managed_versions ()
+          with
+          | Ok vers -> vers
+          | Error _ -> []
+        in
+        (* Find highest installed version *)
+        let highest_installed =
+          List.fold_left
+            (fun acc v ->
+              match acc with
+              | None -> Some v
+              | Some prev ->
+                  if Octez_manager_lib.Version_utils.compare_versions v prev > 0
+                  then Some v
+                  else Some prev)
+            None
+            installed
+        in
+        (* Sort available versions newest first *)
+        let sorted_versions =
+          List.sort
+            (fun (a : Octez_manager_lib.Signatory_downloader.version_info)
+                 (b : Octez_manager_lib.Signatory_downloader.version_info)
+               ->
+              (* Sort descending: newer versions first *)
+              -Octez_manager_lib.Version_utils.compare_versions
+                 a.version
+                 b.version)
+            all_versions
+        in
+        (* Find first version that is:
+           1. Not already installed
+           2. Newer than the highest installed version (if any) *)
+        List.find_opt
+          (fun (vi : Octez_manager_lib.Signatory_downloader.version_info) ->
+            let not_installed = not (List.mem vi.version installed) in
+            let newer_than_installed =
+              match highest_installed with
+              | None -> true (* No installed versions, all are candidates *)
+              | Some highest ->
+                  Octez_manager_lib.Version_utils.compare_versions
+                    vi.version
+                    highest
+                  > 0
+            in
+            not_installed && newer_than_installed)
+          sorted_versions
+  in
+
+  (* Build sections with separators *)
+  let items =
+    if managed_versions = [] && registered_dirs = [] then
+      (* No installed versions - show latest uninstalled if available *)
+      match latest_uninstalled with
+      | Some vi -> [`LatestVersion vi; `DownloadOther; `CustomPath]
+      | None -> [`DownloadOther; `CustomPath]
+    else
+      (* Have installed versions - optionally show latest uninstalled at top *)
+      match latest_uninstalled with
+      | Some vi ->
+          `LatestVersion vi
+          :: (managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath])
+      | None ->
+          managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath]
+  in
+
+  let to_string :
+      [ `ManagedVersion of string
+      | `Registered of string * string
+      | `LatestVersion of Octez_manager_lib.Signatory_downloader.version_info
+      | `DownloadOther
+      | `CustomPath ] ->
+      string = function
+    | `ManagedVersion v -> Printf.sprintf "Signatory v%s (managed)" v
+    | `Registered (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `LatestVersion vi ->
+        Printf.sprintf
+          "Latest Signatory (v%s)  <download>"
+          vi.Octez_manager_lib.Signatory_downloader.version
+    | `DownloadOther -> "[ Download other Signatory version... ]"
+    | `CustomPath -> "[ Browse for custom directory... ]"
+  in
+
+  let on_choice_select = function
+    | `ManagedVersion version ->
+        let path =
+          Octez_manager_lib.Signatory_downloader.signatory_version_path version
+        in
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Managed_signatory_version version
+        in
+        on_select (path, bin_source)
+    | `Registered (alias, path) ->
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Registered_alias alias
+        in
+        on_select (path, bin_source)
+    | `LatestVersion (vi : Octez_manager_lib.Signatory_downloader.version_info)
+      ->
+        (* Directly download the latest version *)
+        let version = vi.Octez_manager_lib.Signatory_downloader.version in
+        open_signatory_download_progress_modal
+          ~version
+          ~on_complete:(fun success ->
+            if success then
+              (* Auto-select the downloaded version *)
+              let path =
+                Octez_manager_lib.Signatory_downloader.signatory_version_path
+                  version
+              in
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Managed_signatory_version
+                  version
+              in
+              on_select (path, bin_source))
+    | `DownloadOther -> (
+        (* Show available Signatory versions to download *)
+        match Signatory_versions_scheduler.get_cached () with
+        | None ->
+            show_error
+              ~title:"No Versions Available"
+              "Could not load available Signatory versions. Try again later."
+        | Some versions ->
+            (* Get already installed versions *)
+            let installed =
+              match
+                Octez_manager_lib.Signatory_downloader.list_managed_versions ()
+              with
+              | Ok vers -> vers
+              | Error _ -> []
+            in
+            (* Filter out already installed versions *)
+            let version_items =
+              List.filter
+                (fun (vi : Octez_manager_lib.Signatory_downloader.version_info)
+                   -> not (List.mem vi.version installed))
+                versions
+            in
+            if version_items = [] then
+              show_error
+                ~title:"No Versions to Download"
+                "All available Signatory versions are already installed."
+            else
+              open_choice_modal
+                ~title:"Select Signatory Version to Download"
+                ~items:version_items
+                ~to_string:(fun vi ->
+                  Printf.sprintf
+                    "Signatory v%s%s"
+                    vi.Octez_manager_lib.Signatory_downloader.version
+                    (match
+                       vi.Octez_manager_lib.Signatory_downloader.release_date
+                     with
+                    | Some date -> Printf.sprintf "  (%s)" date
+                    | None -> ""))
+                ~on_select:(fun vi ->
+                  let version =
+                    vi.Octez_manager_lib.Signatory_downloader.version
+                  in
+                  (* Open download progress modal *)
+                  open_signatory_download_progress_modal
+                    ~version
+                    ~on_complete:(fun success ->
+                      if success then
+                        (* Auto-select the downloaded version *)
+                        let path =
+                          Octez_manager_lib.Signatory_downloader
+                          .signatory_version_path
+                            version
+                        in
+                        let bin_source =
+                          Octez_manager_lib.Binary_registry
+                          .Managed_signatory_version
+                            version
+                        in
+                        on_select (path, bin_source)))
+                ())
+    | `CustomPath ->
+        (* Open read-only file browser - no write permissions required *)
+        open_file_browser_modal
+          ~dirs_only:true
+          ~require_writable:false
+          ~on_select:(fun path ->
+            let trimmed = String.trim path in
+
+            (* Validation *)
+            if trimmed = "" then
+              show_error ~title:"Invalid Path" "Directory path cannot be empty"
+            else if not (Sys.file_exists trimmed) then
+              show_error
+                ~title:"Directory Not Found"
+                (Printf.sprintf "Directory does not exist: %s" trimmed)
+            else if not (Sys.is_directory trimmed) then
+              show_error
+                ~title:"Invalid Path"
+                "Path exists but is not a directory"
+            else
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Raw_path trimmed
+              in
+              on_select (trimmed, bin_source))
+          ()
+  in
+
+  open_choice_modal
+    ~title:"Select Signatory Binaries"
+    ~items
+    ~to_string
+    ~on_select:on_choice_select
+    ()
+
+(** Signatory download progress modal *)
+and open_signatory_download_progress_modal ~version ~on_complete =
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      (* Start download in background *)
+      Background_runner.enqueue (fun () ->
+          let result =
+            Octez_manager_lib.Signatory_downloader.download_version
+              ~version
+              ~verify_checksums:true
+              ()
+          in
+
+          (* Handle result *)
+          match result with
+          | Ok _res ->
+              Context.toast_success
+                (Printf.sprintf "Signatory v%s downloaded successfully" version) ;
+              on_complete true ;
+              (* Close modal after successful download *)
+              Miaou.Core.Modal_manager.close_top `Commit
+          | Error (`Msg msg) ->
+              Context.toast_error
+                (Printf.sprintf "Signatory download failed: %s" msg) ;
+              on_complete false ;
+              (* Close modal after failed download *)
+              Miaou.Core.Modal_manager.close_top `Cancel) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+
+      add (Printf.sprintf "Downloading Signatory v%s..." version) ;
+      add "" ;
+      add "Please wait..." ;
+      add "" ;
+      add "Modal will close automatically when download completes." ;
+
+      let content = String.concat "\n" (List.rev !lines) in
+      let lines_list = String.split_on_char '\n' content in
+      Pager.render
+        ~win:(max 1 (size.LTerm_geom.rows - 4))
+        ~cols:(max 1 (size.LTerm_geom.cols - 2))
+        (Pager.open_lines ~title:"" lines_list)
+        ~focus:false
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Downloading Signatory v%s" version;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.8; min = 76; max = 120});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
+
 let show_help_modal () =
   let hint_lines =
     match Miaou.Core.Help_hint.get_active () with
