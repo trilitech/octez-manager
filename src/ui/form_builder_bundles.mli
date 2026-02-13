@@ -33,6 +33,8 @@ val of_rresult : ('a, [< `Msg of string]) result -> ('a, string) result
     @param binary Binary name (e.g., "octez-baker", "octez-node")
     @param subcommand Subcommand for help explorer (e.g., ["run"])
     @param binary_validator Optional custom validator for app_bin_dir
+    @param app_bin_dir_modal Optional custom modal for app_bin_dir selection
+    @param app_bin_dir_hint Optional custom hint text for app_bin_dir field
     @param skip_instance_name Skip instance name field (for forms with custom logic) *)
 val core_service_fields :
   get_core:('model -> Form_builder_common.core_service_config) ->
@@ -41,6 +43,11 @@ val core_service_fields :
   subcommand:string list ->
   ?baker_mode:('model -> [`Local | `Remote]) ->
   ?binary_validator:(string -> bool) ->
+  ?app_bin_dir_modal:
+    (on_select:(string * Octez_manager_lib.Binary_registry.bin_source -> unit) ->
+    unit ->
+    unit) ->
+  ?app_bin_dir_hint:string ->
   ?skip_instance_name:bool ->
   ?skip_app_bin_dir:bool ->
   ?skip_extra_args:bool ->
