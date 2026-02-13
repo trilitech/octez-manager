@@ -230,9 +230,20 @@ let install_signatory ?(quiet = false) (request : signatory_request) =
   in
 
   (* Write environment file *)
+  let backend_kind_str =
+    match request.backend with
+    | File _ -> "file"
+    | YubiHSM _ -> "yubihsm"
+    | Azure_KMS _ -> "azure-kms"
+    | AWS_KMS _ -> "aws-kms"
+    | GCP_KMS _ -> "gcp-kms"
+    | Vault _ -> "vault"
+  in
   let env_pairs =
     [
       ("SIGNATORY_CONFIG_PATH", config_path);
+      ("SIGNATORY_BACKEND_KIND", backend_kind_str);
+      ("SIGNATORY_KEYS_DIR", keys_path);
       ("APP_BIN_DIR", request.app_bin_dir);
     ]
   in
