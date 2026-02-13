@@ -67,8 +67,8 @@ let exec_line role =
        --net-addr \"${OCTEZ_DAL_NET_ADDR}\" ${OCTEZ_SERVICE_ARGS:-}'"
   | "signatory" ->
       (* Signatory remote signer uses signatory binary with config file *)
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/signatory\" serve --config \
-       \"${SIGNATORY_CONFIG_PATH}\"'"
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/signatory\" serve \
+       --base-dir \"${OCTEZ_DATA_DIR}\" --config \"${SIGNATORY_CONFIG_PATH}\"'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \
