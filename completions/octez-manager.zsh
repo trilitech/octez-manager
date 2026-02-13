@@ -186,7 +186,7 @@ _octez-manager() {
     '--bin-dir-alias[Use a registered directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries register]:ALIAS:_directories'
     '--instance[Signatory instance name]:NAME:'
     '--keys-dir[Directory path for storing keys (File backend only). If not specified, defaults to ~/.local/share/octez/signatory/<instance>/keys (or /var/lib/octez/signatory/<instance>/keys when running as root)]:DIR:_files'
-    '--metrics-address[Metrics endpoint address (default: 127.0.0.1:9583)]:ADDR:'
+    '--metrics-address[Metrics endpoint address (optional, leave empty to disable)]:ADDR:'
     '--no-enable[Disable automatic enable --now]'
     '--service-user[System user]:USER:_users'
     '--signatory-version[Use a managed Signatory version (e.g., '\''4.0'\'' or '\''latest'\''). Overrides --app-bin-dir. Download versions with: octez-manager binaries download VERSION]:VERSION:_directories'
