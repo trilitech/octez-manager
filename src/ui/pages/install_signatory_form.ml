@@ -335,10 +335,18 @@ let address_field =
       if not (Form_builder_common.is_nonempty m.address) then
         Error "HTTP address is required"
       else
-        match Form_builder_common.parse_host_port m.address with
-        | Some _ -> Ok ()
-        | None ->
-            Error "Invalid format (must be host:port, e.g., 127.0.0.1:6732)")
+        let exclude_instance =
+          match m.original_instance with Some inst -> Some inst | None -> None
+        in
+        match
+          Port_validation.validate_addr
+            ~addr:m.address
+            ?exclude_instance
+            ~example:"127.0.0.1:6732"
+            ()
+        with
+        | Ok () -> Ok ()
+        | Error err -> Error (Port_validation.pp_error err))
 
 (** Metrics address field *)
 let metrics_address_field =
@@ -350,10 +358,18 @@ let metrics_address_field =
       if not (Form_builder_common.is_nonempty m.metrics_address) then
         Error "Metrics address is required"
       else
-        match Form_builder_common.parse_host_port m.metrics_address with
-        | Some _ -> Ok ()
-        | None ->
-            Error "Invalid format (must be host:port, e.g., 127.0.0.1:9090)")
+        let exclude_instance =
+          match m.original_instance with Some inst -> Some inst | None -> None
+        in
+        match
+          Port_validation.validate_addr
+            ~addr:m.metrics_address
+            ?exclude_instance
+            ~example:"127.0.0.1:9583"
+            ()
+        with
+        | Ok () -> Ok ()
+        | Error err -> Error (Port_validation.pp_error err))
 
 (** Watermark backend selection *)
 let watermark_field =
