@@ -52,7 +52,7 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
           if Binary_registry.managed_version_exists version then
             Ok
               ( Binary_registry.managed_version_path version,
-                Binary_registry.Managed_version version )
+                Binary_registry.Managed_octez_version version )
           else if is_interactive () then
             (* Prompt to download *)
             let msg =
@@ -144,7 +144,7 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
                     Printf.printf "\n" ;
                     Ok
                       ( Binary_registry.managed_version_path version,
-                        Binary_registry.Managed_version version )
+                        Binary_registry.Managed_octez_version version )
                 | Error (`Msg e) ->
                     Printf.printf "\n" ;
                     Error

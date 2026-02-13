@@ -1216,7 +1216,7 @@ let select_app_bin_dir_modal ~on_select () =
           Octez_manager_lib.Binary_registry.managed_version_path version
         in
         let bin_source =
-          Octez_manager_lib.Binary_registry.Managed_version version
+          Octez_manager_lib.Binary_registry.Managed_octez_version version
         in
         on_select (path, bin_source)
     | `Registered (alias, path) ->
@@ -1234,7 +1234,7 @@ let select_app_bin_dir_modal ~on_select () =
                 Octez_manager_lib.Binary_registry.managed_version_path version
               in
               let bin_source =
-                Octez_manager_lib.Binary_registry.Managed_version version
+                Octez_manager_lib.Binary_registry.Managed_octez_version version
               in
               on_select (path, bin_source))
     | `DownloadOther -> (
@@ -1323,7 +1323,8 @@ let select_app_bin_dir_modal ~on_select () =
                             version
                         in
                         let bin_source =
-                          Octez_manager_lib.Binary_registry.Managed_version
+                          Octez_manager_lib.Binary_registry
+                          .Managed_octez_version
                             version
                         in
                         on_select (path, bin_source)))

@@ -21,7 +21,7 @@ let check_error_result actual =
 (** {2 bin_source_to_string tests} *)
 
 let test_bin_source_to_string_managed () =
-  let source = Binary_registry.Managed_version "24.0" in
+  let source = Binary_registry.Managed_octez_version "24.0" in
   let result = BR.bin_source_to_string source in
   check string "managed version string" "v24.0 (managed)" result
 
@@ -38,10 +38,10 @@ let test_bin_source_to_string_raw () =
 (** {2 bin_source JSON serialization tests} *)
 
 let test_bin_source_to_yojson_managed () =
-  let source = Binary_registry.Managed_version "24.0" in
+  let source = Binary_registry.Managed_octez_version "24.0" in
   let json = BR.bin_source_to_yojson source in
   let expected =
-    `Assoc [("type", `String "managed"); ("version", `String "24.0")]
+    `Assoc [("type", `String "managed_octez"); ("version", `String "24.0")]
   in
   check (testable Yojson.Safe.pp Yojson.Safe.equal) "managed JSON" expected json
 
@@ -71,12 +71,12 @@ let test_bin_source_to_yojson_raw () =
 
 let test_bin_source_of_yojson_managed () =
   let json =
-    `Assoc [("type", `String "managed"); ("version", `String "24.0")]
+    `Assoc [("type", `String "managed_octez"); ("version", `String "24.0")]
   in
   let result = BR.bin_source_of_yojson json in
   match result with
-  | Ok (Binary_registry.Managed_version "24.0") -> ()
-  | Ok _ -> Alcotest.fail "Expected Managed_version \"24.0\""
+  | Ok (Binary_registry.Managed_octez_version "24.0") -> ()
+  | Ok _ -> Alcotest.fail "Expected Managed_octez_version \"24.0\""
   | Error (`Msg err) -> Alcotest.fail (Printf.sprintf "Parse failed: %s" err)
 
 let test_bin_source_of_yojson_registered () =
