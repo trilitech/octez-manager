@@ -22,8 +22,7 @@ let name = "install_signatory_form"
 type model = {
   core : Form_builder_common.core_service_config;
   (* Signatory-specific fields *)
-  backend_kind : string;
-  keys_dir : string; (* Configuration file/directory for backend *)
+  backend : signatory_backend;
   authorized_keys : string list;
   address : string;
   metrics_address : string;
@@ -46,8 +45,7 @@ let base_initial_model () =
         start_now = true;
         extra_args = "";
       };
-    backend_kind = "file";
-    keys_dir = Paths.default_role_dir "signatory" "signatory";
+    backend = File (Paths.default_role_dir "signatory" "signatory");
     authorized_keys = [];
     address = "127.0.0.1:6732";
     metrics_address = "127.0.0.1:9090";
@@ -70,16 +68,22 @@ let make_initial_model () =
       let lookup key =
         match List.assoc_opt key env with Some v -> String.trim v | None -> ""
       in
-      (* Parse backend kind and keys dir from env *)
+      (* Parse backend from env *)
       let backend_kind_str = lookup "SIGNATORY_BACKEND_KIND" in
-      let backend_kind =
-        if backend_kind_str = "" then "file"
-        else String.lowercase_ascii backend_kind_str
-      in
-      let keys_dir =
-        let dir = lookup "SIGNATORY_KEYS_DIR" in
-        if dir <> "" then dir
-        else Paths.default_role_dir "signatory" svc.Service.instance
+      let keys_dir = lookup "SIGNATORY_KEYS_DIR" in
+      let backend =
+        match String.lowercase_ascii (String.trim backend_kind_str) with
+        | "file" | "" ->
+            let dir =
+              if keys_dir <> "" then keys_dir
+              else Paths.default_role_dir "signatory" svc.Service.instance
+            in
+            File dir
+        | _ ->
+            (* For other backends, default to File for now *)
+            File
+              (if keys_dir <> "" then keys_dir
+               else Paths.default_role_dir "signatory" svc.Service.instance)
       in
       (* Parse authorized keys (comma-separated) *)
       let authorized_keys_str = lookup "SIGNATORY_AUTHORIZED_KEYS" in
@@ -116,8 +120,7 @@ let make_initial_model () =
             start_now = false;
             extra_args;
           };
-        backend_kind;
-        keys_dir;
+        backend;
         authorized_keys;
         address = (if address = "" then "127.0.0.1:6732" else address);
         metrics_address =
@@ -137,30 +140,78 @@ let validate_tezos_key key =
     let prefixes = ["tz1"; "tz2"; "tz3"; "tz4"] in
     List.exists (fun prefix -> String.starts_with ~prefix key) prefixes
 
-(** Backend kind field - simple text input *)
-let backend_kind_field =
-  Form_builder.validated_text
-    ~label:"Backend Kind"
-    ~get:(fun m -> m.backend_kind)
-    ~set:(fun backend_kind m ->
-      {m with backend_kind = String.lowercase_ascii (String.trim backend_kind)})
+(** Backend selection field with modal *)
+let backend_field =
+  Form_builder.custom
+    ~label:"Backend"
+    ~get:(fun m ->
+      match m.backend with
+      | File path -> Printf.sprintf "File (%s)" path
+      | YubiHSM {connector_url} -> Printf.sprintf "YubiHSM (%s)" connector_url
+      | Azure_KMS {vault_name; _} -> Printf.sprintf "Azure KMS (%s)" vault_name
+      | AWS_KMS {region} -> Printf.sprintf "AWS KMS (%s)" region
+      | GCP_KMS {project_id; _} -> Printf.sprintf "GCP KMS (%s)" project_id
+      | Vault {address; _} -> Printf.sprintf "Vault (%s)" address)
     ~validate:(fun m ->
-      if not (Form_builder_common.is_nonempty m.backend_kind) then
-        Error "Backend kind is required"
-      else Ok ())
-
-(** Configuration file/directory field - shown conditionally based on backend *)
-let config_file_field =
-  Form_builder.validated_text
-    ~label:"Configuration File"
-    ~get:(fun m -> m.keys_dir)
-    ~set:(fun keys_dir m -> {m with keys_dir})
-    ~validate:(fun m ->
-      (* Only validate if backend is 'file' *)
-      if m.backend_kind = "file" then
-        if Form_builder_common.is_nonempty m.keys_dir then Ok ()
-        else Error "Configuration file is required for 'file' backend"
-      else Ok ())
+      match m.backend with
+      | File path -> Form_builder_common.is_nonempty path
+      | _ -> true)
+    ~validate_msg:(fun m ->
+      match m.backend with
+      | File path when not (Form_builder_common.is_nonempty path) ->
+          Some "Keys directory path is required"
+      | _ -> None)
+    ~edit:(fun model_ref ->
+      let items = [`File; `YubiHSM; `Azure_KMS; `AWS_KMS; `GCP_KMS; `Vault] in
+      let to_string = function
+        | `File -> "File · Keys stored in directory"
+        | `YubiHSM -> "YubiHSM · Hardware security module"
+        | `Azure_KMS -> "Azure KMS · Azure Key Vault"
+        | `AWS_KMS -> "AWS KMS · Amazon Key Management"
+        | `GCP_KMS -> "GCP KMS · Google Cloud Key Management"
+        | `Vault -> "Vault · HashiCorp Vault"
+      in
+      let on_select choice =
+        match choice with
+        | `File ->
+            Modal_helpers.prompt_text_modal
+              ~title:"Keys Directory"
+              ~placeholder:(Some "/var/lib/signatory/keys")
+              ~initial:
+                (match !model_ref.backend with
+                | File path -> path
+                | _ ->
+                    Paths.default_role_dir
+                      "signatory"
+                      !model_ref.core.instance_name)
+              ~on_submit:(fun path ->
+                model_ref := {!model_ref with backend = File path})
+              ()
+        | `YubiHSM ->
+            Modal_helpers.prompt_text_modal
+              ~title:"YubiHSM Connector URL"
+              ~placeholder:(Some "http://127.0.0.1:12345")
+              ~initial:
+                (match !model_ref.backend with
+                | YubiHSM {connector_url} -> connector_url
+                | _ -> "http://127.0.0.1:12345")
+              ~on_submit:(fun url ->
+                model_ref :=
+                  {!model_ref with backend = YubiHSM {connector_url = url}})
+              ()
+        | `Azure_KMS ->
+            Context.toast_error "Azure KMS not yet implemented in TUI"
+        | `AWS_KMS -> Context.toast_error "AWS KMS not yet implemented in TUI"
+        | `GCP_KMS -> Context.toast_error "GCP KMS not yet implemented in TUI"
+        | `Vault -> Context.toast_error "Vault not yet implemented in TUI"
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Backend Type"
+        ~items
+        ~to_string
+        ~on_select
+        ())
+    ()
 
 (** Authorized keys list editor *)
 let authorized_keys_field =
@@ -325,11 +376,9 @@ let spec =
     initial_model = make_initial_model;
     fields =
       (fun model ->
-        (* 1. Backend kind *)
-        [backend_kind_field]
-        (* 2. Configuration file (conditional - only for 'file' backend) *)
-        @ (if model.backend_kind = "file" then [config_file_field] else [])
-        (* 3. App bin dir *)
+        (* 1. Backend selection *)
+        [backend_field]
+        (* 2. App bin dir *)
         @ core_service_fields
             ~get_core:(fun m -> m.core)
             ~set_core:(fun core m -> {m with core})
@@ -346,7 +395,7 @@ let spec =
             ~edit_mode:model.edit_mode
             ~original_instance:model.original_instance
             ()
-        (* 4. Signatory-specific fields *)
+        (* 3. Signatory-specific fields *)
         @ [
             authorized_keys_field;
             address_field;
@@ -420,17 +469,8 @@ let spec =
         (* Always use journald logging *)
         let logging_mode = Logging_mode.default in
 
-        (* Construct backend from backend_kind and keys_dir *)
-        let backend =
-          match String.lowercase_ascii (String.trim model.backend_kind) with
-          | "file" -> File model.keys_dir
-          | _ ->
-              (* For unsupported backends, fail with error *)
-              failwith
-                (Printf.sprintf
-                   "Unsupported backend kind: %s"
-                   model.backend_kind)
-        in
+        (* Backend is already in the correct type from the model *)
+        let backend = model.backend in
 
         (* Build signatory request *)
         let req : Installer_types.signatory_request =
