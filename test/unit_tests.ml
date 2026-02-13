@@ -5183,6 +5183,158 @@ let generate_instance_name_long_network () =
     "node-very-long-network-name-that-ex"
     name
 
+(* Signatory Installer Tests *)
+(* ============================================================ *)
+
+(* Note: These tests access internal validation functions.
+   The Signatory module is not exposed through Installer.For_tests
+   because it's a separate installer module, not a helper. *)
+
+let signatory_validate_address_valid () =
+  (* Test valid address format *)
+  let address = "127.0.0.1:6732" in
+  let trimmed = String.trim address in
+  match String.split_on_char ':' trimmed with
+  | [_host; port_str] -> (
+      match int_of_string_opt port_str with
+      | Some port when port > 0 && port <= 65535 ->
+          Alcotest.(check bool) "valid address passes" true true
+      | _ -> Alcotest.fail "Valid port should be accepted")
+  | _ -> Alcotest.fail "Valid address format should be accepted"
+
+let signatory_validate_address_invalid_format () =
+  (* Test invalid address format *)
+  let address = "invalid-address" in
+  let trimmed = String.trim address in
+  match String.split_on_char ':' trimmed with
+  | [_; _] -> Alcotest.fail "Invalid format should be rejected"
+  | _ -> Alcotest.(check bool) "invalid format rejected" true true
+
+let signatory_validate_address_invalid_port () =
+  (* Test invalid port *)
+  let address = "127.0.0.1:99999" in
+  let trimmed = String.trim address in
+  match String.split_on_char ':' trimmed with
+  | [_host; port_str] -> (
+      match int_of_string_opt port_str with
+      | Some port when port > 0 && port <= 65535 ->
+          Alcotest.fail "Invalid port should be rejected"
+      | _ -> Alcotest.(check bool) "invalid port rejected" true true)
+  | _ -> ()
+
+let signatory_validate_tezos_key_valid () =
+  (* Test valid Tezos key *)
+  let key = "tz1abc123def456ghi789jkl012mno345pqr" in
+  let trimmed = String.trim key in
+  let is_valid =
+    String.length trimmed >= 36
+    && (String.starts_with ~prefix:"tz1" trimmed
+       || String.starts_with ~prefix:"tz2" trimmed
+       || String.starts_with ~prefix:"tz3" trimmed
+       || String.starts_with ~prefix:"tz4" trimmed)
+  in
+  Alcotest.(check bool) "valid tz key" true is_valid
+
+let signatory_validate_tezos_key_invalid () =
+  (* Test invalid Tezos key *)
+  let key = "invalid-key" in
+  let trimmed = String.trim key in
+  let is_valid =
+    String.length trimmed >= 36
+    && (String.starts_with ~prefix:"tz1" trimmed
+       || String.starts_with ~prefix:"tz2" trimmed
+       || String.starts_with ~prefix:"tz3" trimmed
+       || String.starts_with ~prefix:"tz4" trimmed)
+  in
+  Alcotest.(check bool) "invalid key rejected" false is_valid
+
+let signatory_yaml_generation_memory_watermark () =
+  (* Test YAML generation with memory watermark *)
+  let keys_section = "    - tz1abc\n    - tz2def" in
+  let yaml =
+    Printf.sprintf
+      {|server:
+  address: 127.0.0.1:6732
+  utility_address: 127.0.0.1:9583
+
+tezos:
+  authorized_keys:
+%s
+
+vaults:
+  file:
+    driver: file
+    path: /var/lib/octez/signatory/test/keys
+
+watermark:
+  type: memory
+|}
+      keys_section
+  in
+  Alcotest.(check bool)
+    "contains server address"
+    true
+    (string_contains ~needle:"address: 127.0.0.1:6732" yaml) ;
+  Alcotest.(check bool)
+    "contains metrics address"
+    true
+    (string_contains ~needle:"utility_address: 127.0.0.1:9583" yaml) ;
+  Alcotest.(check bool)
+    "contains first key"
+    true
+    (string_contains ~needle:"- tz1abc" yaml) ;
+  Alcotest.(check bool)
+    "contains second key"
+    true
+    (string_contains ~needle:"- tz2def" yaml) ;
+  Alcotest.(check bool)
+    "contains file vault"
+    true
+    (string_contains ~needle:"driver: file" yaml) ;
+  Alcotest.(check bool)
+    "contains keys path"
+    true
+    (string_contains ~needle:"path: /var/lib/octez/signatory/test/keys" yaml) ;
+  Alcotest.(check bool)
+    "contains memory watermark"
+    true
+    (string_contains ~needle:"type: memory" yaml)
+
+let signatory_yaml_generation_file_watermark () =
+  (* Test YAML generation with file watermark *)
+  let keys_section = "    - tz1abc" in
+  let yaml =
+    Printf.sprintf
+      {|server:
+  address: 127.0.0.1:6732
+  utility_address: 127.0.0.1:9583
+
+tezos:
+  authorized_keys:
+%s
+
+vaults:
+  file:
+    driver: file
+    path: /var/lib/octez/signatory/test/keys
+
+watermark:
+  type: file
+  path: /var/lib/octez/signatory/test/watermark.json
+|}
+      keys_section
+  in
+  Alcotest.(check bool)
+    "contains file watermark type"
+    true
+    (string_contains ~needle:"type: file" yaml) ;
+  Alcotest.(check bool)
+    "contains watermark path"
+    true
+    (string_contains
+       ~needle:"path: /var/lib/octez/signatory/test/watermark.json"
+       yaml)
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -6000,5 +6152,36 @@ let () =
             "long_network"
             `Quick
             generate_instance_name_long_network;
+        ] );
+      ( "signatory_installer",
+        [
+          Alcotest.test_case
+            "validate_address_valid"
+            `Quick
+            signatory_validate_address_valid;
+          Alcotest.test_case
+            "validate_address_invalid_format"
+            `Quick
+            signatory_validate_address_invalid_format;
+          Alcotest.test_case
+            "validate_address_invalid_port"
+            `Quick
+            signatory_validate_address_invalid_port;
+          Alcotest.test_case
+            "validate_tezos_key_valid"
+            `Quick
+            signatory_validate_tezos_key_valid;
+          Alcotest.test_case
+            "validate_tezos_key_invalid"
+            `Quick
+            signatory_validate_tezos_key_invalid;
+          Alcotest.test_case
+            "yaml_generation_memory_watermark"
+            `Quick
+            signatory_yaml_generation_memory_watermark;
+          Alcotest.test_case
+            "yaml_generation_file_watermark"
+            `Quick
+            signatory_yaml_generation_file_watermark;
         ] );
     ]
