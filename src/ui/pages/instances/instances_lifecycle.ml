@@ -283,6 +283,7 @@ let do_edit_instance svc =
     | "baker" -> "install_baker_form_v3"
     | "accuser" -> "install_accuser_form_v3"
     | "dal-node" | "dal" -> "install_dal_node_form_v3"
+    | "signatory" -> "install_signatory_form"
     | _ -> "instances"
   in
   Context.navigate form_page
