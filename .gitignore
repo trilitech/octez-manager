@@ -23,3 +23,5 @@ docs/architecture.db
 _coverage/
 coverage-report/
 test/integration/cli-tester/Dockerfile.local-golden
+docs/architecture.db-shm
+docs/architecture.db-wal
