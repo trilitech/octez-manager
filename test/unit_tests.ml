@@ -3685,7 +3685,7 @@ let binary_registry_bin_source_to_string () =
     "managed"
     "v24.0 (managed)"
     (Binary_registry.bin_source_to_string
-       (Binary_registry.Managed_version "24.0")) ;
+       (Binary_registry.Managed_octez_version "24.0")) ;
   Alcotest.(check string)
     "registered"
     "dev-build (registered)"
@@ -3704,7 +3704,7 @@ let binary_registry_bin_source_roundtrip () =
     | Ok bs' -> Alcotest.(check bin_source_testable) "roundtrip" bs bs'
     | Error (`Msg e) -> Alcotest.fail e
   in
-  test_roundtrip (Binary_registry.Managed_version "24.0") ;
+  test_roundtrip (Binary_registry.Managed_octez_version "24.0") ;
   test_roundtrip (Binary_registry.Registered_alias "dev-build") ;
   test_roundtrip (Binary_registry.Raw_path "/usr/local/bin")
 
@@ -3830,14 +3830,14 @@ let binary_registry_path_resolution () =
         (* Test managed version resolution *)
         (match
            Binary_registry.resolve_bin_source
-             (Binary_registry.Managed_version "24.0")
+             (Binary_registry.Managed_octez_version "24.0")
          with
         | Ok path -> Alcotest.(check string) "managed path" v24_dir path
         | Error (`Msg e) -> Alcotest.fail e) ;
         (* Test uninstalled managed version *)
         (match
            Binary_registry.resolve_bin_source
-             (Binary_registry.Managed_version "99.0")
+             (Binary_registry.Managed_octez_version "99.0")
          with
         | Ok _ -> Alcotest.fail "should fail for uninstalled"
         | Error _ -> ()) ;
@@ -3884,14 +3884,14 @@ let service_bin_source_roundtrip () =
   | Error (`Msg e) -> Alcotest.fail e) ;
   (* Test with Some bin_source *)
   let svc_with_bs =
-    {svc with bin_source = Some (Binary_registry.Managed_version "24.0")}
+    {svc with bin_source = Some (Binary_registry.Managed_octez_version "24.0")}
   in
   let json = Service.to_yojson svc_with_bs in
   match Service.of_yojson json with
   | Ok svc' ->
       Alcotest.(check (option bin_source_testable))
         "managed preserved"
-        (Some (Binary_registry.Managed_version "24.0"))
+        (Some (Binary_registry.Managed_octez_version "24.0"))
         svc'.bin_source
   | Error (`Msg e) -> Alcotest.fail e
 
@@ -3905,12 +3905,12 @@ let service_get_bin_source () =
     bs ;
   (* Service with bin_source should return it *)
   let svc_with_bs =
-    {svc with bin_source = Some (Binary_registry.Managed_version "24.0")}
+    {svc with bin_source = Some (Binary_registry.Managed_octez_version "24.0")}
   in
   let bs = Service.get_bin_source svc_with_bs in
   Alcotest.(check bin_source_testable)
     "with bin_source"
-    (Binary_registry.Managed_version "24.0")
+    (Binary_registry.Managed_octez_version "24.0")
     bs
 
 (* Binary downloader tests *)

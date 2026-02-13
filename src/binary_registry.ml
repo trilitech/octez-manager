@@ -10,7 +10,8 @@ open Rresult
 let ( let* ) = Result.bind
 
 type bin_source =
-  | Managed_version of string
+  | Managed_octez_version of string
+  | Managed_signatory_version of string
   | Registered_alias of string
   | Raw_path of string
 
@@ -19,13 +20,16 @@ type registered_dir = {alias : string; path : string}
 (* Bin source operations *)
 
 let bin_source_to_string = function
-  | Managed_version v -> Printf.sprintf "v%s (managed)" v
+  | Managed_octez_version v -> Printf.sprintf "v%s (managed)" v
+  | Managed_signatory_version v -> Printf.sprintf "signatory-v%s (managed)" v
   | Registered_alias a -> Printf.sprintf "%s (registered)" a
   | Raw_path p -> p
 
 let bin_source_to_yojson = function
-  | Managed_version v ->
-      `Assoc [("type", `String "managed"); ("version", `String v)]
+  | Managed_octez_version v ->
+      `Assoc [("type", `String "managed_octez"); ("version", `String v)]
+  | Managed_signatory_version v ->
+      `Assoc [("type", `String "managed_signatory"); ("version", `String v)]
   | Registered_alias a ->
       `Assoc [("type", `String "registered"); ("alias", `String a)]
   | Raw_path p ->
@@ -35,13 +39,56 @@ let bin_source_to_yojson = function
 
 let bin_source_of_yojson json =
   let open Yojson.Safe.Util in
+  (* Migration helper: infer Octez vs Signatory from filesystem *)
+  let migrate_legacy_managed_version version =
+    let xdg_data = Paths.xdg_data_home () in
+    let octez_path =
+      Filename.concat
+        (Filename.concat xdg_data "octez-manager/binaries")
+        ("v" ^ version)
+    in
+    let signatory_path =
+      Filename.concat
+        (Filename.concat xdg_data "octez-manager/signatory-binaries")
+        ("v" ^ version)
+    in
+    if Sys.file_exists octez_path && Sys.is_directory octez_path then (
+      Logs.warn (fun m ->
+          m
+            "Migrating legacy Managed_version \"%s\" to Managed_octez_version"
+            version) ;
+      Managed_octez_version version)
+    else if Sys.file_exists signatory_path && Sys.is_directory signatory_path
+    then (
+      Logs.warn (fun m ->
+          m
+            "Migrating legacy Managed_version \"%s\" to \
+             Managed_signatory_version"
+            version) ;
+      Managed_signatory_version version)
+    else (
+      (* Default to Octez for backward compatibility *)
+      Logs.warn (fun m ->
+          m
+            "Migrating legacy Managed_version \"%s\" to Managed_octez_version \
+             (path not found)"
+            version) ;
+      Managed_octez_version version)
+  in
   try
     match json with
     | `Assoc _ -> (
         match member "type" json with
-        | `String "managed" ->
+        | `String "managed_octez" ->
             let version = member "version" json |> to_string in
-            Ok (Managed_version version)
+            Ok (Managed_octez_version version)
+        | `String "managed_signatory" ->
+            let version = member "version" json |> to_string in
+            Ok (Managed_signatory_version version)
+        | `String "managed" ->
+            (* Legacy format - migrate *)
+            let version = member "version" json |> to_string in
+            Ok (migrate_legacy_managed_version version)
         | `String "registered" ->
             let alias = member "alias" json |> to_string in
             Ok (Registered_alias alias)
@@ -236,10 +283,14 @@ let managed_version_exists version =
 (* Path resolution *)
 
 let resolve_bin_source = function
-  | Managed_version version ->
+  | Managed_octez_version version ->
       let path = managed_version_path version in
       if Sys.file_exists path && Sys.is_directory path then Ok path
-      else R.error_msgf "Managed version v%s is not installed" version
+      else R.error_msgf "Managed Octez version v%s is not installed" version
+  | Managed_signatory_version version ->
+      let path = Signatory_downloader.signatory_version_path version in
+      if Sys.file_exists path && Sys.is_directory path then Ok path
+      else R.error_msgf "Managed Signatory version v%s is not installed" version
   | Registered_alias alias -> (
       match find_registered_dir alias with
       | Ok (Some ld) ->
