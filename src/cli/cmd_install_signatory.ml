@@ -25,7 +25,8 @@ let install_signatory_cmd =
   let keys_dir =
     let doc =
       "Directory path for storing keys (File backend only). If not specified, \
-       defaults to /var/lib/octez/signatory/<instance>/keys"
+       defaults to ~/.local/share/octez/signatory/<instance>/keys (or \
+       /var/lib/octez/signatory/<instance>/keys when running as root)"
     in
     Arg.(value & opt (some string) None & info ["keys-dir"] ~doc ~docv:"DIR")
   in
@@ -153,7 +154,16 @@ let install_signatory_cmd =
       let keys_path =
         match Cli_helpers.normalize_opt_string keys_dir_opt with
         | Some dir -> dir
-        | None -> Printf.sprintf "/var/lib/octez/signatory/%s/keys" instance
+        | None ->
+            (* Mirror the installer's signatory_data_dir logic *)
+            let base =
+              if Paths.is_root () then "/var/lib/octez"
+              else Filename.concat (Paths.xdg_data_home ()) "octez"
+            in
+            let data_dir =
+              Filename.concat (Filename.concat base "signatory") instance
+            in
+            Filename.concat data_dir "keys"
       in
       let backend = File keys_path in
       (* Prompt for authorized keys if not provided *)
@@ -183,11 +193,15 @@ let install_signatory_cmd =
         match String.lowercase_ascii watermark_str with
         | "memory" -> Ok Memory
         | "file" ->
-            let watermark_file =
-              Printf.sprintf
-                "/var/lib/octez/signatory/%s/watermark.json"
-                instance
+            (* Use same data directory logic as keys path *)
+            let base =
+              if Paths.is_root () then "/var/lib/octez"
+              else Filename.concat (Paths.xdg_data_home ()) "octez"
             in
+            let data_dir =
+              Filename.concat (Filename.concat base "signatory") instance
+            in
+            let watermark_file = Filename.concat data_dir "watermark.json" in
             Ok (File_watermark watermark_file)
         | _ ->
             Error
