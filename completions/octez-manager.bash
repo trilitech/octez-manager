@@ -67,7 +67,7 @@ _octez_manager() {
       COMPREPLY=( $(compgen -f -- "$cur") )
       return 0
       ;;
-    --bin-dir-alias|--app-bin-dir.|--tmp-dir|--octez-version)
+    --bin-dir-alias|--signatory-version|--app-bin-dir.|--tmp-dir|--octez-version)
       COMPREPLY=( $(compgen -d -- "$cur") )
       return 0
       ;;
@@ -166,7 +166,7 @@ _octez_manager() {
       ;;
     install-signatory)
       if [[ $cur == -* ]]; then
-        opts="--address --app-bin-dir --authorized-keys --backend --bin-dir-alias --instance --keys-dir --metrics-address --no-enable --octez-version --app-bin-dir. --service-user --watermark --help --version"
+        opts="--address --app-bin-dir --authorized-keys --backend --bin-dir-alias --instance --keys-dir --metrics-address --no-enable --service-user --signatory-version --watermark --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
