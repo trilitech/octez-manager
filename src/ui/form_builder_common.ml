@@ -181,6 +181,9 @@ let has_octez_signer_binary = has_binary "octez-signer"
 (** Check if octez-dal-node binary exists and is executable. *)
 let has_octez_dal_node_binary = has_binary "octez-dal-node"
 
+(** Check if signatory binary exists and is executable. *)
+let has_signatory_binary = has_binary "signatory"
+
 (** Cache for binary accessibility validation.
     Checks if service user can execute the binary.
     Cache key format: "user|app_bin_dir|binary_name"

@@ -330,6 +330,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"signatory"
             ~subcommand:["launch"; "http"; "signer"]
+            ~binary_validator:Form_builder_common.has_signatory_binary
             ~app_bin_dir_modal:Modal_helpers.select_signatory_app_bin_dir_modal
             ~app_bin_dir_hint:
               "Directory containing signatory binary. Must be accessible to \
@@ -353,6 +354,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"signatory"
             ~subcommand:["launch"; "http"; "signer"]
+            ~binary_validator:Form_builder_common.has_signatory_binary
             ~skip_instance_name:true
             ~skip_app_bin_dir:true
             ~skip_service_fields:true
@@ -365,6 +367,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"signatory"
             ~subcommand:["launch"; "http"; "signer"]
+            ~binary_validator:Form_builder_common.has_signatory_binary
             ~skip_instance_name:true
             ~skip_app_bin_dir:true
             ~skip_extra_args:true
@@ -377,6 +380,7 @@ let spec =
             ~set_core:(fun core m -> {m with core})
             ~binary:"signatory"
             ~subcommand:["launch"; "http"; "signer"]
+            ~binary_validator:Form_builder_common.has_signatory_binary
             ~skip_app_bin_dir:true
             ~skip_extra_args:true
             ~skip_service_fields:true
