@@ -67,7 +67,7 @@ let get_bin_source t =
         (* Managed versions are stored as "vX.Y" *)
         if String.starts_with ~prefix:"v" basename then
           let version = String.sub basename 1 (String.length basename - 1) in
-          Binary_registry.Managed_version version
+          Binary_registry.Managed_octez_version version
         else Binary_registry.Raw_path t.app_bin_dir
       else
         (* Check if this matches a registered directory *)

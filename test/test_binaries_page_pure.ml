@@ -20,22 +20,41 @@ let mk_version version =
 let mk_registered alias path =
   (Octez_manager_lib.Binary_registry.{alias; path}, 0)
 
-let mk_state ?(managed = []) ?(registered = []) ?(available = [])
-    ?(expanded_majors = []) ?(expanded_managed = []) ?(expanded_registered = [])
-    ?(selected = 0) () =
+let mk_state ?(managed_octez = []) ?(managed_signatory = []) ?(registered = [])
+    ?(available_octez = []) ?(available_signatory = [])
+    ?(expanded_octez_majors = []) ?(expanded_managed_octez_items = [])
+    ?(expanded_registered = []) ?(expanded_managed_octez = true)
+    ?(expanded_managed_signatory = true) ?(expanded_available_octez = true)
+    ?(expanded_available_signatory = true) ?(selected = 0) () =
   let items =
-    BP.For_tests.build_items managed registered available expanded_majors
+    BP.For_tests.build_items
+      managed_octez
+      managed_signatory
+      registered
+      available_octez
+      available_signatory
+      ~expanded_managed_octez
+      ~expanded_managed_signatory
+      ~expanded_available_octez
+      ~expanded_available_signatory
+      ~expanded_octez_majors
   in
   BP.
     {
-      managed_versions = managed;
+      managed_octez_versions = managed_octez;
+      managed_signatory_versions = managed_signatory;
       registered_dirs = registered;
-      available_versions = available;
+      available_octez_versions = available_octez;
+      available_signatory_versions = available_signatory;
       items;
       selected;
       loading_remote = false;
-      expanded_majors;
-      expanded_managed;
+      expanded_managed_octez;
+      expanded_managed_signatory;
+      expanded_available_octez;
+      expanded_available_signatory;
+      expanded_octez_majors;
+      expanded_managed_octez_items;
       expanded_registered;
     }
 
@@ -77,36 +96,88 @@ let is_registered_dir = function BP.RegisteredDir _ -> true | _ -> false
 
 let is_managed_version = function BP.ManagedVersion _ -> true | _ -> false
 
+let is_managed_group = function BP.ManagedGroup _ -> true | _ -> false
+
+let is_available_group = function BP.AvailableGroup _ -> true | _ -> false
+
 let is_major_group = function BP.AvailableMajorGroup _ -> true | _ -> false
 
 let is_available_version = function BP.AvailableVersion _ -> true | _ -> false
 
 let test_build_items_empty () =
-  let items = BP.For_tests.build_items [] [] [] [] in
-  (* One RegisterAction entry, nothing else *)
+  let items =
+    BP.For_tests.build_items
+      []
+      []
+      []
+      []
+      []
+      ~expanded_managed_octez:true
+      ~expanded_managed_signatory:true
+      ~expanded_available_octez:true
+      ~expanded_available_signatory:true
+      ~expanded_octez_majors:[]
+  in
+  (* Groups + RegisterAction *)
   check int "one register action" 1 (count_item_type items is_register_action) ;
-  check int "total items" 1 (List.length items)
+  check int "two managed groups" 2 (count_item_type items is_managed_group) ;
+  check int "two available groups" 2 (count_item_type items is_available_group)
 
 let test_build_items_with_registered () =
   let reg =
     [mk_registered "dev" "/home/dev/octez"; mk_registered "custom" "/opt/octez"]
   in
-  let items = BP.For_tests.build_items [] reg [] [] in
+  let items =
+    BP.For_tests.build_items
+      []
+      []
+      reg
+      []
+      []
+      ~expanded_managed_octez:true
+      ~expanded_managed_signatory:true
+      ~expanded_available_octez:true
+      ~expanded_available_signatory:true
+      ~expanded_octez_majors:[]
+  in
   check int "two registered dirs" 2 (count_item_type items is_registered_dir) ;
   check int "one register action" 1 (count_item_type items is_register_action)
 
 let test_build_items_with_managed () =
-  let managed = [("24.0", Some 1000L, 2); ("23.0", Some 500L, 0)] in
-  let items = BP.For_tests.build_items managed [] [] [] in
+  let managed_octez = [("24.0", Some 1000L, 2); ("23.0", Some 500L, 0)] in
+  let items =
+    BP.For_tests.build_items
+      managed_octez
+      []
+      []
+      []
+      []
+      ~expanded_managed_octez:true
+      ~expanded_managed_signatory:true
+      ~expanded_available_octez:true
+      ~expanded_available_signatory:true
+      ~expanded_octez_majors:[]
+  in
   check int "two managed versions" 2 (count_item_type items is_managed_version) ;
-  check int "one register action" 1 (count_item_type items is_register_action) ;
-  (* Managed versions appear before RegisterAction *)
-  let first = List.hd items in
-  check bool "first is managed" true (is_managed_version first)
+  check int "one register action" 1 (count_item_type items is_register_action)
 
 let test_build_items_with_available () =
-  let available = [mk_version "24.0"; mk_version "24.1"; mk_version "23.0"] in
-  let items = BP.For_tests.build_items [] [] available [] in
+  let available_octez =
+    [mk_version "24.0"; mk_version "24.1"; mk_version "23.0"]
+  in
+  let items =
+    BP.For_tests.build_items
+      []
+      []
+      []
+      available_octez
+      []
+      ~expanded_managed_octez:true
+      ~expanded_managed_signatory:true
+      ~expanded_available_octez:true
+      ~expanded_available_signatory:true
+      ~expanded_octez_majors:[]
+  in
   (* Should have major groups for 24 and 23 *)
   check int "two major groups" 2 (count_item_type items is_major_group) ;
   (* No expanded sub-items *)
@@ -117,8 +188,20 @@ let test_build_items_with_available () =
     (count_item_type items is_available_version)
 
 let test_build_items_expanded_major () =
-  let available = [mk_version "24.0"; mk_version "24.1"] in
-  let items = BP.For_tests.build_items [] [] available [24] in
+  let available_octez = [mk_version "24.0"; mk_version "24.1"] in
+  let items =
+    BP.For_tests.build_items
+      []
+      []
+      []
+      available_octez
+      []
+      ~expanded_managed_octez:true
+      ~expanded_managed_signatory:true
+      ~expanded_available_octez:true
+      ~expanded_available_signatory:true
+      ~expanded_octez_majors:[24]
+  in
   check int "one major group" 1 (count_item_type items is_major_group) ;
   check
     int
@@ -127,8 +210,20 @@ let test_build_items_expanded_major () =
     (count_item_type items is_available_version)
 
 let test_build_items_unexpanded_major () =
-  let available = [mk_version "24.0"; mk_version "24.1"] in
-  let items = BP.For_tests.build_items [] [] available [23] in
+  let available_octez = [mk_version "24.0"; mk_version "24.1"] in
+  let items =
+    BP.For_tests.build_items
+      []
+      []
+      []
+      available_octez
+      []
+      ~expanded_managed_octez:true
+      ~expanded_managed_signatory:true
+      ~expanded_available_octez:true
+      ~expanded_available_signatory:true
+      ~expanded_octez_majors:[23]
+  in
   (* 23 is expanded but has no versions; 24 is not expanded *)
   check
     int
@@ -151,18 +246,19 @@ let test_move_up_from_nonzero () =
 let test_move_down_from_zero () =
   let s = mk_state () in
   let s' = BP.For_tests.move_down s in
-  (* items has 1 RegisterAction item, max_idx = 0 *)
-  check int "stays at 0" 0 s'.selected
+  (* items has groups + RegisterAction, can move down from 0 *)
+  check int "moves to 1" 1 s'.selected
 
 let test_move_down_at_end () =
-  let s = mk_state ~selected:0 () in
-  (* items = [RegisterAction], max_idx = 0 *)
+  let s = mk_state () in
+  let max_idx = List.length s.items - 1 in
+  let s = {s with selected = max_idx} in
   let s' = BP.For_tests.move_down s in
-  check int "stays at end" 0 s'.selected
+  check int "stays at end" max_idx s'.selected
 
 let test_move_down_with_versions () =
-  let available = [mk_version "24.0"] in
-  let s = mk_state ~available () in
+  let available_octez = [mk_version "24.0"] in
+  let s = mk_state ~available_octez () in
   let max_idx = List.length s.items - 1 in
   let s' = BP.For_tests.move_down s in
   check int "moves down" 1 s'.selected ;
@@ -171,15 +267,15 @@ let test_move_down_with_versions () =
 (* ── toggle_major_expansion ───────────────────────────────────── *)
 
 let test_toggle_major_expand () =
-  let available = [mk_version "24.0"; mk_version "24.1"] in
-  let s = mk_state ~available () in
+  let available_octez = [mk_version "24.0"; mk_version "24.1"] in
+  let s = mk_state ~available_octez () in
   check
     int
     "initially no expanded versions"
     0
     (count_item_type s.items is_available_version) ;
   let s' = BP.For_tests.toggle_major_expansion s 24 in
-  check bool "24 is expanded" true (List.mem 24 s'.expanded_majors) ;
+  check bool "24 is expanded" true (List.mem 24 s'.expanded_octez_majors) ;
   check
     int
     "versions now visible"
@@ -187,15 +283,15 @@ let test_toggle_major_expand () =
     (count_item_type s'.items is_available_version)
 
 let test_toggle_major_collapse () =
-  let available = [mk_version "24.0"] in
-  let s = mk_state ~available ~expanded_majors:[24] () in
+  let available_octez = [mk_version "24.0"] in
+  let s = mk_state ~available_octez ~expanded_octez_majors:[24] () in
   check
     int
     "initially expanded"
     1
     (count_item_type s.items is_available_version) ;
   let s' = BP.For_tests.toggle_major_expansion s 24 in
-  check bool "24 is collapsed" false (List.mem 24 s'.expanded_majors) ;
+  check bool "24 is collapsed" false (List.mem 24 s'.expanded_octez_majors) ;
   check int "versions hidden" 0 (count_item_type s'.items is_available_version)
 
 (* ── toggle_managed_expansion ─────────────────────────────────── *)
@@ -203,12 +299,12 @@ let test_toggle_major_collapse () =
 let test_toggle_managed_expand () =
   let s = mk_state () in
   let s' = BP.For_tests.toggle_managed_expansion s "24.0" in
-  check bool "expanded" true (List.mem "24.0" s'.expanded_managed)
+  check bool "expanded" true (List.mem "24.0" s'.expanded_managed_octez_items)
 
 let test_toggle_managed_collapse () =
-  let s = mk_state ~expanded_managed:["24.0"] () in
+  let s = mk_state ~expanded_managed_octez_items:["24.0"] () in
   let s' = BP.For_tests.toggle_managed_expansion s "24.0" in
-  check bool "collapsed" false (List.mem "24.0" s'.expanded_managed)
+  check bool "collapsed" false (List.mem "24.0" s'.expanded_managed_octez_items)
 
 (* ── toggle_registered_expansion ──────────────────────────────── *)
 

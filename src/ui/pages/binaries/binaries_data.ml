@@ -14,7 +14,8 @@
 open Octez_manager_lib
 open Binaries_types
 
-let load_managed_versions () =
+(** Load managed Octez versions *)
+let load_managed_octez_versions () =
   match Binary_registry.list_managed_versions () with
   | Error _ -> []
   | Ok versions ->
@@ -24,7 +25,23 @@ let load_managed_versions () =
           let size = File_ops.get_dir_size path in
           let count =
             Service_registry.count_instances_using
-              (Binary_registry.Managed_version version)
+              (Binary_registry.Managed_octez_version version)
+          in
+          (version, size, count))
+        versions
+
+(** Load managed Signatory versions *)
+let load_managed_signatory_versions () =
+  match Signatory_downloader.list_managed_versions () with
+  | Error _ -> []
+  | Ok versions ->
+      List.map
+        (fun version ->
+          let path = Signatory_downloader.signatory_version_path version in
+          let size = File_ops.get_dir_size path in
+          let count =
+            Service_registry.count_instances_using
+              (Binary_registry.Managed_signatory_version version)
           in
           (version, size, count))
         versions
@@ -75,7 +92,8 @@ let filter_latest_n_major_versions n versions =
       Option.value ~default:[] (Hashtbl.find_opt major_versions major))
     latest_n_majors
 
-let load_available_versions () =
+(** Load available Octez versions *)
+let load_available_octez_versions () =
   match Versions_scheduler.get_cached () with
   | None -> []
   | Some versions ->
@@ -99,43 +117,110 @@ let load_available_versions () =
           not (List.mem v.version managed))
         filtered_versions
 
-let build_items managed registered available expanded_majors =
-  (* Group available versions by major version *)
-  let major_groups = Hashtbl.create 10 in
-  List.iter
-    (fun (v : Binary_downloader.version_info) ->
-      (* Parse major version from "24.0" or "23.1-rc1" *)
-      match String.split_on_char '.' v.version with
-      | major_str :: _ -> (
-          try
-            let major = int_of_string major_str in
-            let existing =
-              Hashtbl.find_opt major_groups major |> Option.value ~default:[]
-            in
-            Hashtbl.replace major_groups major (v :: existing)
-          with _ -> ())
-      | _ -> ())
-    available ;
+(** Load available Signatory versions *)
+let load_available_signatory_versions () =
+  match Signatory_versions_scheduler.get_cached () with
+  | None -> []
+  | Some versions ->
+      (* Filter out versions < 1.3.0 *)
+      let filtered_versions =
+        List.filter
+          (fun (v : Signatory_downloader.version_info) ->
+            Binary_registry.compare_versions v.version "1.3.0" >= 0)
+          versions
+      in
+      (* Filter out already installed versions *)
+      let managed =
+        match Signatory_downloader.list_managed_versions () with
+        | Ok v -> v
+        | Error _ -> []
+      in
+      List.filter
+        (fun (v : Signatory_downloader.version_info) ->
+          not (List.mem v.version managed))
+        filtered_versions
 
-  (* Build major groups in descending order, with sub-items if expanded *)
-  let majors =
-    Hashtbl.to_seq_keys major_groups
-    |> List.of_seq
-    |> List.sort (fun a b -> compare b a)
-  in
-  let major_items =
-    List.concat_map
-      (fun major ->
-        let versions = Hashtbl.find major_groups major |> List.rev in
-        let group = AvailableMajorGroup (major, versions) in
-        (* If expanded, add individual version items *)
-        if List.mem major expanded_majors then
-          group :: List.map (fun v -> AvailableVersion v) versions
-        else [group])
-      majors
+(** Build flat item list with nested structure *)
+let build_items managed_octez managed_signatory registered available_octez
+    available_signatory ~expanded_managed_octez ~expanded_managed_signatory
+    ~expanded_available_octez ~expanded_available_signatory
+    ~expanded_octez_majors =
+  let managed_section =
+    (* Managed Octez group *)
+    let octez_group = [ManagedGroup (Octez, expanded_managed_octez)] in
+    let octez_items =
+      if expanded_managed_octez then
+        List.map
+          (fun (v, s, c) -> ManagedVersion (Octez, v, s, c))
+          managed_octez
+      else []
+    in
+    (* Managed Signatory group *)
+    let signatory_group =
+      [ManagedGroup (Signatory, expanded_managed_signatory)]
+    in
+    let signatory_items =
+      if expanded_managed_signatory then
+        List.map
+          (fun (v, s, c) -> ManagedVersion (Signatory, v, s, c))
+          managed_signatory
+      else []
+    in
+    octez_group @ octez_items @ signatory_group @ signatory_items
   in
 
-  (* Build items list: managed, registered, register action, then available *)
-  List.map (fun (v, s, c) -> ManagedVersion (v, s, c)) managed
-  @ List.map (fun (ld, c) -> RegisteredDir (ld, c)) registered
-  @ [RegisterAction] @ major_items
+  let registered_section =
+    List.map (fun (ld, c) -> RegisteredDir (ld, c)) registered
+    @ [RegisterAction]
+  in
+
+  let available_section =
+    (* Available Octez group *)
+    let octez_group = [AvailableGroup (Octez, expanded_available_octez)] in
+    let octez_items =
+      if expanded_available_octez then (
+        (* Group by major version *)
+        let major_groups = Hashtbl.create 10 in
+        List.iter
+          (fun (v : Binary_downloader.version_info) ->
+            match String.split_on_char '.' v.version with
+            | major_str :: _ -> (
+                try
+                  let major = int_of_string major_str in
+                  let existing =
+                    Hashtbl.find_opt major_groups major
+                    |> Option.value ~default:[]
+                  in
+                  Hashtbl.replace major_groups major (v :: existing)
+                with _ -> ())
+            | _ -> ())
+          available_octez ;
+        (* Build major groups *)
+        let majors =
+          Hashtbl.to_seq_keys major_groups
+          |> List.of_seq
+          |> List.sort (fun a b -> compare b a)
+        in
+        List.concat_map
+          (fun major ->
+            let versions = Hashtbl.find major_groups major |> List.rev in
+            let group = AvailableMajorGroup (major, versions) in
+            if List.mem major expanded_octez_majors then
+              group :: List.map (fun v -> AvailableVersion (Octez, v)) versions
+            else [group])
+          majors)
+      else []
+    in
+    (* Available Signatory group *)
+    let signatory_group =
+      [AvailableGroup (Signatory, expanded_available_signatory)]
+    in
+    let signatory_items =
+      if expanded_available_signatory then
+        List.map (fun v -> AvailableSignatoryVersion v) available_signatory
+      else []
+    in
+    octez_group @ octez_items @ signatory_group @ signatory_items
+  in
+
+  managed_section @ registered_section @ available_section
