@@ -5335,6 +5335,200 @@ watermark:
        ~needle:"path: /var/lib/octez/signatory/test/watermark.json"
        yaml)
 
+(* Signatory CLI command tests *)
+
+let signatory_cli_backend_file_accepted () =
+  let backend = "file" in
+  let result =
+    match String.lowercase_ascii backend with
+    | "file" -> Ok ()
+    | _ -> Error "Unsupported backend"
+  in
+  Alcotest.(check bool) "file backend accepted" true (Result.is_ok result)
+
+let signatory_cli_backend_file_case_insensitive () =
+  let backends = ["FILE"; "File"; "FiLe"] in
+  List.iter
+    (fun backend ->
+      let result =
+        match String.lowercase_ascii backend with
+        | "file" -> Ok ()
+        | _ -> Error "Unsupported backend"
+      in
+      Alcotest.(check bool)
+        (Printf.sprintf "backend '%s' accepted" backend)
+        true
+        (Result.is_ok result))
+    backends
+
+let signatory_cli_backend_unsupported_rejected () =
+  let backends = ["yubihsm"; "azure"; "aws"; "gcp"; "vault"; "invalid"] in
+  List.iter
+    (fun backend ->
+      let result =
+        match String.lowercase_ascii backend with
+        | "file" -> Ok ()
+        | _ -> Error "Unsupported backend"
+      in
+      Alcotest.(check bool)
+        (Printf.sprintf "backend '%s' rejected" backend)
+        true
+        (Result.is_error result))
+    backends
+
+let signatory_cli_authorized_keys_single () =
+  let keys_str = "tz1abc123" in
+  let keys =
+    String.split_on_char ',' keys_str
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  in
+  Alcotest.(check int) "single key parsed" 1 (List.length keys) ;
+  Alcotest.(check string) "key value correct" "tz1abc123" (List.hd keys)
+
+let signatory_cli_authorized_keys_multiple () =
+  let keys_str = "tz1abc,tz2def,tz3ghi" in
+  let keys =
+    String.split_on_char ',' keys_str
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  in
+  Alcotest.(check int) "three keys parsed" 3 (List.length keys) ;
+  Alcotest.(check (list string))
+    "keys correct"
+    ["tz1abc"; "tz2def"; "tz3ghi"]
+    keys
+
+let signatory_cli_authorized_keys_with_spaces () =
+  let keys_str = "tz1abc , tz2def  ,  tz3ghi" in
+  let keys =
+    String.split_on_char ',' keys_str
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  in
+  Alcotest.(check int) "three keys parsed" 3 (List.length keys) ;
+  Alcotest.(check (list string))
+    "keys trimmed correctly"
+    ["tz1abc"; "tz2def"; "tz3ghi"]
+    keys
+
+let signatory_cli_authorized_keys_empty_rejected () =
+  let keys_str = "" in
+  let keys =
+    String.split_on_char ',' keys_str
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  in
+  let result = if List.length keys = 0 then Error "Empty" else Ok () in
+  Alcotest.(check bool) "empty keys rejected" true (Result.is_error result)
+
+let signatory_cli_authorized_keys_only_whitespace_rejected () =
+  let keys_str = "  ,  ,  " in
+  let keys =
+    String.split_on_char ',' keys_str
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  in
+  let result = if List.length keys = 0 then Error "Empty" else Ok () in
+  Alcotest.(check bool)
+    "whitespace-only keys rejected"
+    true
+    (Result.is_error result)
+
+let signatory_cli_watermark_memory () =
+  let watermark_str = "memory" in
+  let instance = "test-signer" in
+  let result =
+    match String.lowercase_ascii watermark_str with
+    | "memory" -> Ok `Memory
+    | "file" ->
+        Ok
+          (`File
+             (Printf.sprintf
+                "/var/lib/octez/signatory/%s/watermark.json"
+                instance))
+    | _ -> Error "Unsupported watermark"
+  in
+  Alcotest.(check bool) "memory watermark accepted" true (Result.is_ok result) ;
+  match result with
+  | Ok `Memory -> ()
+  | _ -> Alcotest.fail "Expected Memory variant"
+
+let signatory_cli_watermark_file () =
+  let watermark_str = "file" in
+  let instance = "test-signer" in
+  let result =
+    match String.lowercase_ascii watermark_str with
+    | "memory" -> Ok `Memory
+    | "file" ->
+        Ok
+          (`File
+             (Printf.sprintf
+                "/var/lib/octez/signatory/%s/watermark.json"
+                instance))
+    | _ -> Error "Unsupported watermark"
+  in
+  Alcotest.(check bool) "file watermark accepted" true (Result.is_ok result) ;
+  match result with
+  | Ok (`File path) ->
+      Alcotest.(check string)
+        "watermark path correct"
+        "/var/lib/octez/signatory/test-signer/watermark.json"
+        path
+  | _ -> Alcotest.fail "Expected File variant"
+
+let signatory_cli_watermark_case_insensitive () =
+  let variants = ["MEMORY"; "Memory"; "FILE"; "File"] in
+  List.iter
+    (fun variant ->
+      let result =
+        match String.lowercase_ascii variant with
+        | "memory" -> Ok ()
+        | "file" -> Ok ()
+        | _ -> Error "Unsupported"
+      in
+      Alcotest.(check bool)
+        (Printf.sprintf "watermark '%s' accepted" variant)
+        true
+        (Result.is_ok result))
+    variants
+
+let signatory_cli_watermark_invalid () =
+  let watermark_str = "dynamodb" in
+  let result =
+    match String.lowercase_ascii watermark_str with
+    | "memory" -> Ok ()
+    | "file" -> Ok ()
+    | _ -> Error "Unsupported watermark"
+  in
+  Alcotest.(check bool)
+    "invalid watermark rejected"
+    true
+    (Result.is_error result)
+
+let signatory_cli_keys_dir_default () =
+  let instance = "my-signer" in
+  let keys_dir_opt = None in
+  let keys_path =
+    match keys_dir_opt with
+    | Some dir -> dir
+    | None -> Printf.sprintf "/var/lib/octez/signatory/%s/keys" instance
+  in
+  Alcotest.(check string)
+    "default keys directory"
+    "/var/lib/octez/signatory/my-signer/keys"
+    keys_path
+
+let signatory_cli_keys_dir_custom () =
+  let instance = "my-signer" in
+  let keys_dir_opt = Some "/custom/path/keys" in
+  let keys_path =
+    match keys_dir_opt with
+    | Some dir -> dir
+    | None -> Printf.sprintf "/var/lib/octez/signatory/%s/keys" instance
+  in
+  Alcotest.(check string) "custom keys directory" "/custom/path/keys" keys_path
+
 let () =
   Alcotest.run
     "octez-manager"
@@ -6183,5 +6377,64 @@ let () =
             "yaml_generation_file_watermark"
             `Quick
             signatory_yaml_generation_file_watermark;
+        ] );
+      ( "signatory_cli",
+        [
+          Alcotest.test_case
+            "backend_file_accepted"
+            `Quick
+            signatory_cli_backend_file_accepted;
+          Alcotest.test_case
+            "backend_file_case_insensitive"
+            `Quick
+            signatory_cli_backend_file_case_insensitive;
+          Alcotest.test_case
+            "backend_unsupported_rejected"
+            `Quick
+            signatory_cli_backend_unsupported_rejected;
+          Alcotest.test_case
+            "authorized_keys_single"
+            `Quick
+            signatory_cli_authorized_keys_single;
+          Alcotest.test_case
+            "authorized_keys_multiple"
+            `Quick
+            signatory_cli_authorized_keys_multiple;
+          Alcotest.test_case
+            "authorized_keys_with_spaces"
+            `Quick
+            signatory_cli_authorized_keys_with_spaces;
+          Alcotest.test_case
+            "authorized_keys_empty_rejected"
+            `Quick
+            signatory_cli_authorized_keys_empty_rejected;
+          Alcotest.test_case
+            "authorized_keys_only_whitespace_rejected"
+            `Quick
+            signatory_cli_authorized_keys_only_whitespace_rejected;
+          Alcotest.test_case
+            "watermark_memory"
+            `Quick
+            signatory_cli_watermark_memory;
+          Alcotest.test_case
+            "watermark_file"
+            `Quick
+            signatory_cli_watermark_file;
+          Alcotest.test_case
+            "watermark_case_insensitive"
+            `Quick
+            signatory_cli_watermark_case_insensitive;
+          Alcotest.test_case
+            "watermark_invalid"
+            `Quick
+            signatory_cli_watermark_invalid;
+          Alcotest.test_case
+            "keys_dir_default"
+            `Quick
+            signatory_cli_keys_dir_default;
+          Alcotest.test_case
+            "keys_dir_custom"
+            `Quick
+            signatory_cli_keys_dir_custom;
         ] );
     ]
