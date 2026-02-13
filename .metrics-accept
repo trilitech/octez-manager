@@ -21,5 +21,8 @@ functions_with_mutables
 # Large functions detected (pre-existing, not introduced by this PR)
 large_functions
 
+# Large files - install forms follow established pattern (all are >500 lines)
+large_files
+
 # Missing .mli files (pre-existing, not introduced by this PR)
 missing_mli
