@@ -106,14 +106,17 @@ val has_binary : string -> string -> bool
 (** Check if octez-baker binary exists and is executable in the given directory. *)
 val has_octez_baker_binary : string -> bool
 
-(** Check if octez-node binary exists and is executable in the given directory. *)
+(** Check if octez-node exists in given directory. *)
 val has_octez_node_binary : string -> bool
 
-(** Check if octez-signer binary exists and is executable in the given directory. *)
+(** Check if octez-signer exists in given directory. *)
 val has_octez_signer_binary : string -> bool
 
-(** Check if octez-dal-node binary exists and is executable in the given directory. *)
+(** Check if octez-dal-node exists in given directory. *)
 val has_octez_dal_node_binary : string -> bool
+
+(** Check if signatory exists in given directory. *)
+val has_signatory_binary : string -> bool
 
 (** [binary_accessible_to_user ~user ~app_bin_dir ~binary_name] validates
     that [user] can execute [binary_name] in [app_bin_dir].
