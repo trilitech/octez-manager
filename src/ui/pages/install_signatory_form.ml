@@ -155,7 +155,10 @@ let validate_tezos_key key =
 let backend_field =
   Form_builder.custom
     ~label:"Backend"
-    ~get:(fun m -> match m.backend with File path -> Printf.sprintf "File (%s)" path | _ -> "File")
+    ~get:(fun m ->
+      match m.backend with
+      | File path -> Printf.sprintf "File (%s)" path
+      | _ -> "File")
     ~validate:(fun m ->
       match m.backend with
       | File path -> Form_builder_common.is_nonempty path
@@ -193,6 +196,7 @@ let backend_field =
     ()
   |> Form_builder.with_hint
        "Key storage backend (only File is currently supported)"
+
 (** Authorized keys list editor *)
 let authorized_keys_field =
   Form_builder.custom
