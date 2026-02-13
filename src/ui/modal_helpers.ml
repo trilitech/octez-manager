@@ -1383,24 +1383,6 @@ let show_help_modal () =
   in
   open_text_modal ~title:"Help" ~lines
 
-let show_menu_modal () =
-  let items =
-    [
-      ("Instances", "instances");
-      ("Install node", "install_node_form_v3");
-      ("Install baker", "install_baker_form_v3");
-      ("Install accuser", "install_accuser_form_v3");
-      ("Install DAL node", "install_dal_node_form_v3");
-      ("Install signatory", "install_signatory_form");
-    ]
-  in
-  open_choice_modal
-    ~title:"Menu"
-    ~items
-    ~to_string:(fun (label, _) -> label)
-    ~on_select:(fun (_, target) -> Context.navigate target)
-    ()
-
 (** Reference to close spinner modal from callback *)
 let spinner_modal_close_ref : (unit -> unit) option ref = ref None
 
