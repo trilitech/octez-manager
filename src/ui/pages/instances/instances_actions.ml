@@ -303,7 +303,7 @@ let create_menu_modal state =
       | `Baker -> Context.navigate Install_baker_form_v3.name
       | `Accuser -> Context.navigate Install_accuser_form_v3.name
       | `DalNode -> Context.navigate Install_dal_node_form_v3.name
-      | `Signatory -> Context.navigate Signatory_info.name)
+      | `Signatory -> Context.navigate Install_signatory_form.name)
     () ;
   state
 
