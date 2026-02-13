@@ -13,6 +13,7 @@ _octez-manager() {
     'install-baker:Install an octez-baker service'
     'install-dal-node:Install a DAL node service (octez-dal-node)'
     'install-node:Install an octez-node systemd instance'
+    'install-signatory:Install an octez-signatory service'
     'instance:Manage existing Octez services.'
     'list:Show services'
     'list-available-networks:Show networks advertised on teztnets.com (with fallbacks).'
@@ -172,6 +173,25 @@ _octez-manager() {
     '--snapshot-no-check[Pass --no-check to octez-node snapshot import during bootstrap.]'
     '--snapshot-uri[Snapshot URI (path, file://, or http(s)) to import when --snapshot is set.]:URI:'
     '--tmp-dir[Directory for temporary snapshot download. Use when /tmp has insufficient space for large snapshots (e.g., mainnet full).]:DIR:_directories'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_install_signatory
+  opts_install_signatory=(
+    '--address[HTTP server address (default: 127.0.0.1:6732)]:ADDR:'
+    '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
+    '--authorized-keys[Comma-separated list of authorized Tezos public key hashes (tz1, tz2, tz3, or tz4)]:KEYS:'
+    '--backend[Signatory backend type. Only '\''file'\'' is currently supported. File backend stores keys in the local filesystem.]:BACKEND:'
+    '--bin-dir-alias[Use a registered directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries register]:ALIAS:_directories'
+    '--instance[Signatory instance name]:NAME:'
+    '--keys-dir[Directory path for storing keys (File backend only). If not specified, defaults to /var/lib/octez/signatory/<instance>/keys]:DIR:_files'
+    '--metrics-address[Metrics endpoint address (default: 127.0.0.1:9583)]:ADDR:'
+    '--no-enable[Disable automatic enable --now]'
+    '--octez-version[Use a managed Octez version (e.g., '\''24.1'\'' or '\''latest'\''). Overrides]:VERSION:'
+    '--app-bin-dir.[download VERSION]:Download:_directories'
+    '--service-user[System user]:USER:_users'
+    '--watermark[Watermark storage backend: '\''memory'\'' (default) or '\''file'\''. Memory stores in RAM, file persists to disk for multi-instance setups.]:BACKEND:_files'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -336,6 +356,10 @@ _octez-manager() {
         install-node)
           _arguments \
             $opts_install_node
+          ;;
+        install-signatory)
+          _arguments \
+            $opts_install_signatory
           ;;
         list)
           _arguments \

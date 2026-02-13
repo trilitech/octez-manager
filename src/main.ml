@@ -77,6 +77,7 @@ let root_cmd =
       Cmd_install_baker.install_baker_cmd;
       Cmd_install_accuser.install_accuser_cmd;
       Cmd_install_dal.install_dal_node_cmd;
+      Cmd_install_signatory.install_signatory_cmd;
       Cmd_import.import_cmd;
       Cmd_binaries.binaries_cmd;
       Cmd_self_update.self_update_cmd;
