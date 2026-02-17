@@ -91,6 +91,29 @@ let install_baker_cmd =
     Arg.(
       value & opt (some string) None & info ["bin-dir-alias"] ~doc ~docv:"ALIAS")
   in
+  let remote_signer_instance =
+    let doc =
+      "Use a managed Signatory instance for remote signing. The baker will use \
+       the -R flag to connect to this Signatory's RPC endpoint. Use \
+       'octez-manager list' to see available Signatory instances. Mutually \
+       exclusive with --remote-signer-uri."
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["remote-signer-instance"] ~doc ~docv:"INSTANCE")
+  in
+  let remote_signer_uri =
+    let doc =
+      "Use an external remote signer URI (e.g., http://localhost:6732 or \
+       https://signer.example.com). The baker will use the -R flag with this \
+       URI. Mutually exclusive with --remote-signer-instance."
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ["remote-signer-uri"] ~doc ~docv:"URI")
+  in
   let auto_enable =
     Arg.(
       value & flag
@@ -98,7 +121,8 @@ let install_baker_cmd =
   in
   let make instance_opt node_instance base_dir delegates dal_endpoint_opt
       liquidity_baking_vote_opt extra_args service_user app_bin_dir
-      octez_version bin_dir_alias no_enable logging_mode =
+      octez_version bin_dir_alias remote_signer_instance remote_signer_uri
+      no_enable logging_mode =
     let res =
       let ( let* ) = Result.bind in
       let* app_bin_dir, bin_source =
@@ -229,6 +253,43 @@ let install_baker_cmd =
                     loop ()
             else Ok (Dal_disabled, None)
       in
+      (* Parse remote signer configuration *)
+      let* signer_mode =
+        match
+          ( Cli_helpers.normalize_opt_string remote_signer_instance,
+            Cli_helpers.normalize_opt_string remote_signer_uri )
+        with
+        | None, None -> Ok Signer_types.Local_keys
+        | Some _, Some _ ->
+            Error
+              "Cannot specify both --remote-signer-instance and \
+               --remote-signer-uri"
+        | Some inst, None ->
+            (* Managed Signatory instance *)
+            Result.map_error
+              (fun (`Msg s) -> s)
+              (let* svc = Service_registry.find ~instance:inst in
+               match svc with
+               | Some svc
+                 when String.lowercase_ascii svc.Service.role = "signatory" ->
+                   let uri = Rpc_addr.to_endpoint svc.Service.rpc_addr in
+                   Ok (Signer_types.Remote_signer {instance = Some inst; uri})
+               | Some _ ->
+                   Error
+                     (`Msg
+                        (Printf.sprintf
+                           "Instance '%s' is not a Signatory service"
+                           inst))
+               | None ->
+                   Error
+                     (`Msg
+                        (Printf.sprintf
+                           "Signatory instance '%s' not found"
+                           inst)))
+        | None, Some uri ->
+            (* External URI *)
+            Ok (Signer_types.Remote_signer {instance = None; uri})
+      in
       let req : baker_request =
         {
           instance;
@@ -238,7 +299,7 @@ let install_baker_cmd =
           dal_config;
           dal_node;
           liquidity_baking_vote;
-          signer_mode = Signer_types.Local_keys;
+          signer_mode;
           extra_args;
           service_user;
           app_bin_dir;
@@ -264,8 +325,8 @@ let install_baker_cmd =
       ret
         (const make $ instance $ node_instance $ base_dir $ delegates
        $ dal_endpoint $ liquidity_baking_vote $ extra_args $ service_user
-       $ app_bin_dir $ octez_version $ bin_dir_alias $ auto_enable
-       $ Cli_helpers.logging_mode_term))
+       $ app_bin_dir $ octez_version $ bin_dir_alias $ remote_signer_instance
+       $ remote_signer_uri $ auto_enable $ Cli_helpers.logging_mode_term))
   in
   let info = Cmd.info "install-baker" ~doc:"Install an octez-baker service" in
   Cmd.v info term
