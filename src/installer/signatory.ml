@@ -207,6 +207,47 @@ let install_signatory ?(quiet = false) (request : signatory_request) =
   (* Create keys directory with restricted permissions (0o700) *)
   let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o700 keys_path in
 
+  (* Create template secret.json file if it doesn't exist *)
+  let secrets_file = Filename.concat keys_path "secret.json" in
+  let* () =
+    if Sys.file_exists secrets_file then Ok ()
+    else
+      let template_content =
+        {|[
+  {
+    "name": "tz1YourPublicKeyHash",
+    "value": "unencrypted:edskYourBase58EncodedSecretKey"
+  }
+]
+
+# Instructions:
+# 1. Replace "tz1YourPublicKeyHash" with your actual public key hash
+# 2. Replace "edskYourBase58EncodedSecretKey" with your actual secret key
+# 3. You can add multiple keys by adding more objects to the array
+# 4. To export a key from octez-client: octez-client show address <alias> -S
+# 5. Remove these comment lines (lines starting with #) before starting the service
+#
+# Example with multiple keys:
+# [
+#   {
+#     "name": "tz1abc...",
+#     "value": "unencrypted:edsk..."
+#   },
+#   {
+#     "name": "tz3def...",
+#     "value": "unencrypted:edsk..."
+#   }
+# ]
+|}
+      in
+      File_ops.write_file
+        ~mode:0o600
+        ~owner
+        ~group
+        secrets_file
+        template_content
+  in
+
   let* () = ensure_logging_base_directory ~owner ~group logging_mode in
   let* () = ensure_runtime_log_directory ~owner ~group logging_mode in
 
