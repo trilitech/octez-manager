@@ -238,6 +238,7 @@ let install_baker_cmd =
           dal_config;
           dal_node;
           liquidity_baking_vote;
+          signer_mode = Signer_types.Local_keys;
           extra_args;
           service_user;
           app_bin_dir;

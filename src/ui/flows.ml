@@ -138,6 +138,7 @@ let create_baker_flow ~services ~on_success =
                       dal_config = Dal_auto;
                       dal_node = None;
                       liquidity_baking_vote = None;
+                      signer_mode = Signer_types.Local_keys;
                       extra_args = [];
                       service_user = "octez";
                       app_bin_dir =

@@ -38,6 +38,8 @@ let make_svc ?(instance = "my-node") ?(role = "node") ?(network = "mainnet")
     extra_args = [];
     depends_on;
     dependents;
+    signer_mode = None;
+    signer_uri = None;
   }
 
 let contains_substring = Test_string_helpers.contains_substring
