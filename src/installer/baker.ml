@@ -78,18 +78,52 @@ let install_baker ?(quiet = false) (request : baker_request) =
     | Local _ | Local_unmanaged _ -> "local"
     | Remote _ -> "remote"
   in
+  (* Validate and resolve remote signer configuration *)
+  let* signer_uri_opt =
+    Signer_validation.validate_and_resolve request.signer_mode
+  in
+  let signatory_instance =
+    match request.signer_mode with
+    | Signer_types.Remote_signer {instance = Some name; _} -> Some name
+    | _ -> None
+  in
   (* Delegates are positional arguments, not --delegate flags *)
   let delegate_args = String.concat " " request.delegates |> String.trim in
   (* Split extra args into global (before subcommand) and command (after) *)
   let global_args, command_args =
     split_baker_extra_args ~app_bin_dir:request.app_bin_dir request.extra_args
   in
-  let global_args_str = String.concat " " global_args |> String.trim in
+  (* Add -R flag to global args if using remote signer *)
+  let global_args_with_signer =
+    match signer_uri_opt with
+    | Some uri -> global_args @ ["-R"; uri]
+    | None -> global_args
+  in
+  let global_args_str =
+    String.concat " " global_args_with_signer |> String.trim
+  in
   let command_args_str = String.concat " " command_args |> String.trim in
   let depends_on =
     match node_mode with
     | Local svc -> Some svc.Service.instance
     | Local_unmanaged _ | Remote _ -> None
+  in
+  (* Collect all dependencies for systemd dropin (node + signatory if applicable) *)
+  let all_dependencies_for_systemd =
+    let node_deps =
+      match node_mode with
+      | Local svc -> [(svc.Service.role, svc.Service.instance)]
+      | Local_unmanaged _ | Remote _ -> []
+    in
+    let signatory_deps =
+      match signatory_instance with
+      | Some sig_inst -> (
+          match Service_registry.find ~instance:sig_inst with
+          | Ok (Some sig_svc) -> [(sig_svc.Service.role, sig_inst)]
+          | _ -> [])
+      | None -> []
+    in
+    match node_deps @ signatory_deps with [] -> None | deps -> Some deps
   in
   let* service =
     install_daemon
@@ -127,12 +161,43 @@ let install_baker ?(quiet = false) (request : baker_request) =
             ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
             ("OCTEZ_BAKER_GLOBAL_ARGS", global_args_str);
             ("OCTEZ_BAKER_COMMAND_ARGS", command_args_str);
+            ("OCTEZ_REMOTE_SIGNER_URI", Option.value ~default:"" signer_uri_opt);
+            ( "OCTEZ_SIGNATORY_INSTANCE",
+              Option.value ~default:"" signatory_instance );
           ];
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;
         depends_on;
         preserve_data = request.preserve_data;
       }
+  in
+  (* Update service with signer configuration *)
+  let service_with_signer =
+    {
+      service with
+      signer_mode = Some request.signer_mode;
+      signer_uri = signer_uri_opt;
+    }
+  in
+  let* () = Service_registry.write service_with_signer in
+  (* Rewrite dropin with all dependencies (node + signatory if applicable) *)
+  let* () =
+    match all_dependencies_for_systemd with
+    | Some deps when List.length deps > 1 || signatory_instance <> None ->
+        (* Only rewrite if we have signatory dependency (install_daemon already wrote node-only) *)
+        Systemd.write_dropin
+          ~quiet
+          ~role:"baker"
+          ~inst:request.instance
+          ~data_dir:service.Service.data_dir
+          ~logging_mode:service.Service.logging_mode
+          ~extra_paths:[base_dir]
+          ~app_bin_dir:request.app_bin_dir
+          ~depends_on:deps
+          ()
+    | _ ->
+        (* No signatory dependency, install_daemon already wrote correct dropin *)
+        Ok ()
   in
   (* Register as dependent on parent node (avoid duplicates) *)
   let* () =
@@ -167,4 +232,22 @@ let install_baker ?(quiet = false) (request : baker_request) =
         | _ -> Ok ())
     | None -> Ok ()
   in
-  Ok service
+  (* Register as dependent on Signatory instance if using managed signer (avoid duplicates) *)
+  let* () =
+    match signatory_instance with
+    | Some sig_inst -> (
+        match Service_registry.find ~instance:sig_inst with
+        | Ok (Some sig_svc) ->
+            if List.mem request.instance sig_svc.dependents then Ok ()
+            else
+              let updated_sig =
+                {
+                  sig_svc with
+                  dependents = request.instance :: sig_svc.dependents;
+                }
+              in
+              Service_registry.write updated_sig
+        | _ -> Ok ())
+    | None -> Ok ()
+  in
+  Ok service_with_signer
