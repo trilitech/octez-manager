@@ -46,15 +46,23 @@ let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?app_bin_dir
   (* Add dependency directives if depends_on is set *)
   let unit_section =
     match depends_on with
-    | Some (parent_role, parent_instance) ->
-        let parent_unit =
-          Printf.sprintf "octez-%s@%s.service" parent_role parent_instance
+    | Some dependencies when dependencies <> [] ->
+        let binds_to_lines =
+          List.map
+            (fun (parent_role, parent_instance) ->
+              Printf.sprintf "octez-%s@%s.service" parent_role parent_instance)
+            dependencies
         in
+        let after_lines = binds_to_lines in
         Printf.sprintf
-          "[Unit]\nBindsTo=%s\nAfter=%s\n\n"
-          parent_unit
-          parent_unit
-    | None -> ""
+          "[Unit]\n%s\n%s\n\n"
+          (String.concat
+             "\n"
+             (List.map (Printf.sprintf "BindsTo=%s") binds_to_lines))
+          (String.concat
+             "\n"
+             (List.map (Printf.sprintf "After=%s") after_lines))
+    | _ -> ""
   in
   let header =
     let base = ["[Service]"] in

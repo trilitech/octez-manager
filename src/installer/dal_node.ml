@@ -70,13 +70,14 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
       ~user:request.service_user
       ()
   in
-  (* Resolve depends_on to (parent_role, parent_instance) tuple for systemd *)
+  (* Resolve depends_on to list of (parent_role, parent_instance) tuples for systemd *)
   let depends_on_for_systemd =
     match request.depends_on with
     | None -> None
     | Some parent_instance -> (
         match Service_registry.find ~instance:parent_instance with
-        | Ok (Some parent_svc) -> Some (parent_svc.Service.role, parent_instance)
+        | Ok (Some parent_svc) ->
+            Some [(parent_svc.Service.role, parent_instance)]
         | _ -> None)
   in
   let* () =
