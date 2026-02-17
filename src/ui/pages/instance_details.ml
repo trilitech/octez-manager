@@ -12,6 +12,7 @@ module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 open Octez_manager_lib
+open Signatory_config
 
 let name = "instance_details"
 
@@ -88,6 +89,26 @@ let header s =
   ]
 
 let _footer = []
+
+let render_signatory_keys ~instance =
+  match Signatory_config.get_authorized_keys ~instance with
+  | Error _ -> Widgets.dim "  (keys unavailable)"
+  | Ok [] -> Widgets.dim "  (no keys configured)"
+  | Ok keys ->
+      let lines =
+        List.map
+          (fun (k : Signatory_config.key_info) ->
+            let allows_str =
+              if k.allows = [] then "no operations"
+              else String.concat ", " k.allows
+            in
+            Printf.sprintf
+              "  • %s\n    %s"
+              k.pkh
+              (Widgets.dim ("[" ^ allows_str ^ "]")))
+          keys
+      in
+      String.concat "\n" lines
 
 let view_details ~box_width svc =
   let render_fields items =
@@ -283,7 +304,12 @@ let view_details ~box_width svc =
         ]
   in
   let role_title = String.capitalize_ascii svc.Service.role ^ " Details" in
-  (role_title, render_fields details, render_fields paths)
+  let keys_section =
+    if svc.Service.role = "signatory" then
+      Some (render_signatory_keys ~instance:svc.Service.instance)
+    else None
+  in
+  (role_title, render_fields details, render_fields paths, keys_section)
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
@@ -293,7 +319,7 @@ let view ps ~focus:_ ~size =
     | Some err, _ -> Widgets.red ("Error: " ^ err)
     | None, None -> "Loading..."
     | None, Some svc ->
-        let title, details, paths = view_details ~box_width svc in
+        let title, details, paths, keys_opt = view_details ~box_width svc in
         let details_box =
           Box.render ~title ~style:Rounded ~color:12 ~width:box_width details
         in
@@ -305,7 +331,19 @@ let view ps ~focus:_ ~size =
             ~width:box_width
             paths
         in
-        details_box ^ "\n" ^ paths_box
+        let keys_box =
+          match keys_opt with
+          | None -> ""
+          | Some keys ->
+              "\n"
+              ^ Box.render
+                  ~title:"Authorized Keys"
+                  ~style:Rounded
+                  ~color:10
+                  ~width:box_width
+                  keys
+        in
+        details_box ^ "\n" ^ paths_box ^ keys_box
   in
   Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
       body)

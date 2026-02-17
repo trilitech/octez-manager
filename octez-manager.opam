@@ -32,6 +32,7 @@ depends: [
   "uri"
   "lambda-term"
   "linenoise"
+  "yaml"
   "ppx_deriving" {build}
   "sqlite3" {with-dev-setup}
   "alcotest" {with-test}

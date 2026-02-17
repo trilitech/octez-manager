@@ -16,6 +16,7 @@
   binary_registry
   binary_downloader
   signatory_downloader
+  signatory_config
   version_checker
   signer_types
   service
@@ -61,6 +62,7 @@
   octez_manager_common
   rresult
   yojson
+  yaml
   bos
   str
   unix
