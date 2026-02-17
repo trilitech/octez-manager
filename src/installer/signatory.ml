@@ -213,19 +213,20 @@ let install_signatory ?(quiet = false) (request : signatory_request) =
     if Sys.file_exists secrets_file then Ok ()
     else
       let template_content =
-        {|[
-  {
-    "name": "tz1YourPublicKeyHash",
-    "value": "unencrypted:edskYourBase58EncodedSecretKey"
-  }
-]
-
-# Instructions:
-# 1. Replace "tz1YourPublicKeyHash" with your actual public key hash
-# 2. Replace "edskYourBase58EncodedSecretKey" with your actual secret key
-# 3. You can add multiple keys by adding more objects to the array
+        {|# Instructions:
+# 1. Add your signing keys in JSON format below
+# 2. Each key is an object with "name" (public key hash) and "value" (secret key)
+# 3. The file must be valid JSON (an array of key objects)
 # 4. To export a key from octez-client: octez-client show address <alias> -S
 # 5. Remove these comment lines (lines starting with #) before starting the service
+#
+# Example with a single key:
+# [
+#   {
+#     "name": "tz1abc...",
+#     "value": "unencrypted:edsk..."
+#   }
+# ]
 #
 # Example with multiple keys:
 # [
