@@ -237,21 +237,22 @@ let install_signatory_cmd =
           in
           Filename.concat (Filename.concat base "signatory") service.S.instance
         in
-        let secrets_file =
-          Filename.concat (Filename.concat data_dir "keys") "secret.json"
-        in
+        let keys_dir = Filename.concat data_dir "keys" in
+        let secrets_file = Filename.concat keys_dir "secret.json" in
+        let readme_file = Filename.concat keys_dir "secret.json.README" in
         Format.printf
           "@[<v>@[Installed signatory %s@]@,\
            @,\
            @[<v 2>Next step: Add your signing keys to:@,\
            %s@]@,\
            @,\
-           @[The file contains a template with instructions. Edit it with your \
-           actual keys.@]@,\
+           @[<v 2>See format and examples in:@,\
+           %s@]@,\
            @,\
            @[Then start the service: octez-manager instance %s start@]@]@."
           service.S.instance
           secrets_file
+          readme_file
           service.S.instance ;
         `Ok ()
     | Error msg -> Cli_helpers.cmdliner_error msg

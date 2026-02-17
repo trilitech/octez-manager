@@ -212,41 +212,60 @@ let install_signatory ?(quiet = false) (request : signatory_request) =
   let* () =
     if Sys.file_exists secrets_file then Ok ()
     else
-      let template_content =
-        {|# Instructions:
-# 1. Add your signing keys in JSON format below
-# 2. Each key is an object with "name" (public key hash) and "value" (secret key)
-# 3. The file must be valid JSON (an array of key objects)
-# 4. To export a key from octez-client: octez-client show address <alias> -S
-# 5. Remove these comment lines (lines starting with #) before starting the service
-#
-# Example with a single key:
-# [
-#   {
-#     "name": "tz1abc...",
-#     "value": "unencrypted:edsk..."
-#   }
-# ]
-#
-# Example with multiple keys:
-# [
-#   {
-#     "name": "tz1abc...",
-#     "value": "unencrypted:edsk..."
-#   },
-#   {
-#     "name": "tz3def...",
-#     "value": "unencrypted:edsk..."
-#   }
-# ]
-|}
-      in
+      (* Write empty JSON array - always valid JSON *)
+      let template_content = "[]" in
       File_ops.write_file
         ~mode:0o600
         ~owner
         ~group
         secrets_file
         template_content
+  in
+
+  (* Always create/update the README file with instructions *)
+  let readme_file = Filename.concat keys_path "secret.json.README" in
+  let readme_content =
+    {|SECRET.JSON FORMAT
+==================
+
+This file stores your signing keys in JSON format.
+
+Format:
+  An array of key objects, where each object has:
+  - "name": The public key hash (tz1..., tz2..., tz3..., or tz4...)
+  - "value": The secret key (e.g., "unencrypted:edsk...")
+
+Example with a single key:
+[
+  {
+    "name": "tz1VzDhuGRB5yUHR9bLkib2kbntQAAFSr8zK",
+    "value": "unencrypted:edsk3iSX5sJ375y4yu1KkyToz1mXjJqHyJR6ewtVweSc9j9cJY8bSw"
+  }
+]
+
+Example with multiple keys:
+[
+  {
+    "name": "tz1abc...",
+    "value": "unencrypted:edsk..."
+  },
+  {
+    "name": "tz3def...",
+    "value": "unencrypted:edsk..."
+  }
+]
+
+Exporting keys from octez-client:
+  octez-client show address <alias> -S
+
+Security:
+  - This file (secret.json) has 0600 permissions (owner read/write only)
+  - Never share your secret keys
+  - Back up secret.json securely
+|}
+  in
+  let* () =
+    File_ops.write_file ~mode:0o644 ~owner ~group readme_file readme_content
   in
 
   let* () = ensure_logging_base_directory ~owner ~group logging_mode in
