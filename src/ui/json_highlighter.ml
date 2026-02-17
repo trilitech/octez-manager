@@ -6,17 +6,8 @@
 (******************************************************************************)
 
 module Widgets = Miaou_widgets_display.Widgets
-
-(* ANSI 256-color codes *)
-let color_key = 14 (* Cyan *)
-
-let color_string = 11 (* Yellow *)
-
-let color_number = 13 (* Magenta *)
-
-let color_bool = 10 (* Green *)
-
-let color_null = 8 (* Gray *)
+module Style = Miaou_style.Style
+module Style_context = Miaou_style.Style_context
 
 type options = {indent : int; max_depth : int; colors : bool}
 
@@ -24,8 +15,12 @@ let default_options = {indent = 2; max_depth = 20; colors = true}
 
 let make_indent n = String.make n ' '
 
-let colorize ~colors color_code text =
-  if colors then Widgets.fg color_code text else text
+let render_style ~colors style text =
+  if not colors then text
+  else
+    let resolved = Style.to_resolved style in
+    if resolved.r_fg >= 0 then Style.render style text
+    else Widgets.themed_text text
 
 let rec format_value ~options ~depth buf (j : Yojson.Safe.t) =
   if depth > options.max_depth then Buffer.add_string buf "..."
@@ -34,28 +29,40 @@ let rec format_value ~options ~depth buf (j : Yojson.Safe.t) =
     | `Null ->
         Buffer.add_string
           buf
-          (colorize ~colors:options.colors color_null "null")
+          (render_style
+             ~colors:options.colors
+             (Style_context.text_muted ())
+             "null")
     | `Bool b ->
         let s = if b then "true" else "false" in
-        Buffer.add_string buf (colorize ~colors:options.colors color_bool s)
+        Buffer.add_string
+          buf
+          (render_style ~colors:options.colors (Style_context.success ()) s)
     | `Int i ->
         Buffer.add_string
           buf
-          (colorize ~colors:options.colors color_number (string_of_int i))
+          (render_style
+             ~colors:options.colors
+             (Style_context.info ())
+             (string_of_int i))
     | `Float f ->
         let s =
           if Float.is_integer f then Printf.sprintf "%.0f" f
           else Printf.sprintf "%g" f
         in
-        Buffer.add_string buf (colorize ~colors:options.colors color_number s)
+        Buffer.add_string
+          buf
+          (render_style ~colors:options.colors (Style_context.info ()) s)
     | `Intlit s ->
-        Buffer.add_string buf (colorize ~colors:options.colors color_number s)
+        Buffer.add_string
+          buf
+          (render_style ~colors:options.colors (Style_context.info ()) s)
     | `String s ->
         Buffer.add_string
           buf
-          (colorize
+          (render_style
              ~colors:options.colors
-             color_string
+             (Style_context.warning ())
              ("\"" ^ String.escaped s ^ "\""))
     | `List [] -> Buffer.add_string buf "[]"
     | `List items ->
@@ -79,9 +86,9 @@ let rec format_value ~options ~depth buf (j : Yojson.Safe.t) =
             Buffer.add_string buf indent_str ;
             Buffer.add_string
               buf
-              (colorize
+              (render_style
                  ~colors:options.colors
-                 color_key
+                 (Style_context.text_emphasized ())
                  ("\"" ^ String.escaped key ^ "\"")) ;
             Buffer.add_string buf ": " ;
             format_value ~options ~depth:(depth + 1) buf value ;

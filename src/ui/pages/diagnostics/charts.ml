@@ -11,6 +11,18 @@ module Line_chart = Miaou_widgets_display.Line_chart_widget
 module Bar_chart = Miaou_widgets_display.Bar_chart_widget
 module Sparkline = Miaou_widgets_display.Sparkline_widget
 module Widgets = Miaou_widgets_display.Widgets
+module Style = Miaou_style.Style
+module Style_context = Miaou_style.Style_context
+
+let ansi_fg style =
+  let resolved = Style.to_resolved style in
+  if resolved.r_fg < 0 then None
+  else Some (Printf.sprintf "38;5;%d" resolved.r_fg)
+
+(** ANSI color string from theme style for chart thresholds *)
+let threshold_color style =
+  let resolved = Style.to_resolved style in
+  if resolved.r_fg >= 0 then Printf.sprintf "38;5;%d" resolved.r_fg else "32"
 
 (* Helper to trim trailing padding from chart lines *)
 let trim_chart_padding chart_str =
@@ -48,13 +60,23 @@ let render_bg_queue_chart samples ~width ~height =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
           let y = float_of_int s.bg_queue_depth in
-          let color = if y > 5.0 then Some "33" else Some "32" in
+          let color =
+            if y > 5.0 then ansi_fg (Style_context.warning ())
+            else ansi_fg (Style_context.success ())
+          in
           (* yellow if busy, green if idle *)
           Line_chart.{x = float_of_int i; y; color})
         samples
     in
     let series =
-      [Line_chart.{label = "Queue Depth"; points; color = Some "36"}]
+      [
+        Line_chart.
+          {
+            label = "Queue Depth";
+            points;
+            color = ansi_fg (Style_context.info ());
+          };
+      ]
     in
     (* cyan series *)
     let chart =
@@ -87,12 +109,12 @@ let render_bg_queue_chart samples ~width ~height =
       Printf.sprintf
         "%s\n%s %s  %s %s  %s %s"
         chart_str
-        (Widgets.fg 12 "Current:")
-        (Widgets.bold (string_of_int last_depth))
-        (Widgets.fg 12 "Avg:")
+        (Widgets.themed_emphasis "Current:")
+        (Widgets.themed_emphasis (string_of_int last_depth))
+        (Widgets.themed_emphasis "Avg:")
         (Printf.sprintf "%.1f" avg_depth)
-        (Widgets.fg 12 "Max:")
-        (Widgets.bold (string_of_int max_depth))
+        (Widgets.themed_emphasis "Max:")
+        (Widgets.themed_emphasis (string_of_int max_depth))
     in
     summary
 
@@ -107,7 +129,7 @@ let render_service_status_chart samples ~width ~height =
             {
               x = float_of_int i;
               y = float_of_int s.services_active;
-              color = Some "32";
+              color = ansi_fg (Style_context.success ());
             }) (* green *)
         samples
     in
@@ -118,15 +140,25 @@ let render_service_status_chart samples ~width ~height =
             {
               x = float_of_int i;
               y = float_of_int s.services_total;
-              color = Some "90";
+              color = ansi_fg (Style_context.text_muted ());
             }) (* gray *)
         samples
     in
     let series =
       [
-        Line_chart.{label = "Active"; points = active_points; color = Some "32"};
+        Line_chart.
+          {
+            label = "Active";
+            points = active_points;
+            color = ansi_fg (Style_context.success ());
+          };
         (* green *)
-        Line_chart.{label = "Total"; points = total_points; color = Some "90"};
+        Line_chart.
+          {
+            label = "Total";
+            points = total_points;
+            color = ansi_fg (Style_context.text_muted ());
+          };
         (* gray *)
       ]
     in
@@ -155,7 +187,13 @@ let render_latency_chart samples ~width ~height =
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.render_p50 with
           | Some v ->
-              Some Line_chart.{x = float_of_int i; y = v; color = Some "32"}
+              Some
+                Line_chart.
+                  {
+                    x = float_of_int i;
+                    y = v;
+                    color = ansi_fg (Style_context.success ());
+                  }
               (* green *)
           | None -> None)
         samples
@@ -166,7 +204,13 @@ let render_latency_chart samples ~width ~height =
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.render_p90 with
           | Some v ->
-              Some Line_chart.{x = float_of_int i; y = v; color = Some "33"}
+              Some
+                Line_chart.
+                  {
+                    x = float_of_int i;
+                    y = v;
+                    color = ansi_fg (Style_context.warning ());
+                  }
               (* yellow *)
           | None -> None)
         samples
@@ -177,7 +221,13 @@ let render_latency_chart samples ~width ~height =
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.render_p99 with
           | Some v ->
-              Some Line_chart.{x = float_of_int i; y = v; color = Some "31"}
+              Some
+                Line_chart.
+                  {
+                    x = float_of_int i;
+                    y = v;
+                    color = ansi_fg (Style_context.error ());
+                  }
               (* red *)
           | None -> None)
         samples
@@ -191,11 +241,26 @@ let render_latency_chart samples ~width ~height =
     else
       let series =
         [
-          Line_chart.{label = "p50"; points = p50_points; color = Some "32"};
+          Line_chart.
+            {
+              label = "p50";
+              points = p50_points;
+              color = ansi_fg (Style_context.success ());
+            };
           (* green *)
-          Line_chart.{label = "p90"; points = p90_points; color = Some "33"};
+          Line_chart.
+            {
+              label = "p90";
+              points = p90_points;
+              color = ansi_fg (Style_context.warning ());
+            };
           (* yellow *)
-          Line_chart.{label = "p99"; points = p99_points; color = Some "31"};
+          Line_chart.
+            {
+              label = "p99";
+              points = p99_points;
+              color = ansi_fg (Style_context.error ());
+            };
           (* red *)
         ]
         |> List.filter (fun (s : Line_chart.series) ->
@@ -211,11 +276,14 @@ let render_latency_chart samples ~width ~height =
       in
       let thresholds =
         [
-          Line_chart.{value = 0.0; color = "32"};
+          Line_chart.
+            {value = 0.0; color = threshold_color (Style_context.success ())};
           (* Green for fast *)
-          Line_chart.{value = 16.0; color = "33"};
+          Line_chart.
+            {value = 16.0; color = threshold_color (Style_context.warning ())};
           (* Yellow for 30fps+ *)
-          Line_chart.{value = 33.0; color = "31"};
+          Line_chart.
+            {value = 33.0; color = threshold_color (Style_context.error ())};
           (* Red for slow *)
         ]
       in
@@ -250,12 +318,12 @@ let render_latency_chart samples ~width ~height =
       Printf.sprintf
         "%s\n%s %s  %s %s  %s %s"
         chart_str
-        (Widgets.fg 10 "p50:")
-        (Widgets.bold p50_str)
-        (Widgets.fg 11 "p90:")
-        (Widgets.bold p90_str)
-        (Widgets.fg 9 "p99:")
-        (Widgets.bold p99_str)
+        (Widgets.themed_emphasis "p50:")
+        (Widgets.themed_emphasis p50_str)
+        (Widgets.themed_emphasis "p90:")
+        (Widgets.themed_emphasis p90_str)
+        (Widgets.themed_emphasis "p99:")
+        (Widgets.themed_emphasis p99_str)
 
 let render_key_to_render_chart samples ~width ~height =
   if samples = [] then
@@ -264,13 +332,14 @@ let render_key_to_render_chart samples ~width ~height =
       width
       height
   else
+    let p50_color = ansi_fg (Style_context.info ()) in
+    let p90_color = ansi_fg (Style_context.accent ()) in
     let p50_points =
       List.mapi
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.key_to_render_p50 with
           | Some v ->
-              Some Line_chart.{x = float_of_int i; y = v; color = Some "36"}
-              (* cyan *)
+              Some Line_chart.{x = float_of_int i; y = v; color = p50_color}
           | None -> None)
         samples
       |> List.filter_map (fun x -> x)
@@ -280,8 +349,7 @@ let render_key_to_render_chart samples ~width ~height =
         (fun i (s : Metrics.metrics_snapshot) ->
           match s.key_to_render_p90 with
           | Some v ->
-              Some Line_chart.{x = float_of_int i; y = v; color = Some "35"}
-              (* magenta *)
+              Some Line_chart.{x = float_of_int i; y = v; color = p90_color}
           | None -> None)
         samples
       |> List.filter_map (fun x -> x)
@@ -294,10 +362,8 @@ let render_key_to_render_chart samples ~width ~height =
     else
       let series =
         [
-          Line_chart.{label = "p50"; points = p50_points; color = Some "36"};
-          (* cyan *)
-          Line_chart.{label = "p90"; points = p90_points; color = Some "35"};
-          (* magenta *)
+          Line_chart.{label = "p50"; points = p50_points; color = p50_color};
+          Line_chart.{label = "p90"; points = p90_points; color = p90_color};
         ]
         |> List.filter (fun (s : Line_chart.series) ->
             s.Line_chart.points <> [])
@@ -335,10 +401,10 @@ let render_key_to_render_chart samples ~width ~height =
       Printf.sprintf
         "%s\n%s %s  %s %s"
         chart_str
-        (Widgets.fg 14 "p50:")
-        (Widgets.bold p50_str)
-        (Widgets.fg 13 "p90:")
-        (Widgets.bold p90_str)
+        (Widgets.themed_emphasis "p50:")
+        (Widgets.themed_emphasis p50_str)
+        (Widgets.themed_emphasis "p90:")
+        (Widgets.themed_emphasis p90_str)
 
 let render_summary_bars samples ~width ~height =
   if samples = [] then
@@ -347,36 +413,42 @@ let render_summary_bars samples ~width ~height =
     let last = List.hd (List.rev samples) in
 
     (* Create a clearer summary focusing on key metrics *)
-    let header = Widgets.fg 14 (Widgets.bold "━━━ Current Snapshot ━━━") in
+    let header = Widgets.themed_emphasis "━━━ Current Snapshot ━━━" in
 
     (* Services *)
     let services_line =
       Printf.sprintf
         "  %s %s active / %s total"
-        (Widgets.fg 10 "Services:")
-        (Widgets.bold (string_of_int last.Metrics.services_active))
+        (Widgets.themed_emphasis "Services:")
+        (Widgets.themed_emphasis (string_of_int last.Metrics.services_active))
         (string_of_int last.services_total)
     in
 
     (* BG Queue *)
     let bg_status =
-      if last.bg_queue_depth = 0 then Widgets.fg 10 "idle"
-      else Widgets.fg 11 (Printf.sprintf "%d tasks" last.bg_queue_depth)
+      if last.bg_queue_depth = 0 then Widgets.themed_success "idle"
+      else
+        Widgets.themed_warning (Printf.sprintf "%d tasks" last.bg_queue_depth)
     in
     let bg_line =
-      Printf.sprintf "  %s %s" (Widgets.fg 12 "BG Queue:") bg_status
+      Printf.sprintf "  %s %s" (Widgets.themed_emphasis "BG Queue:") bg_status
     in
 
     (* Render Performance *)
     let render_line =
       match last.render_p99 with
       | Some p99 ->
-          let color = if p99 < 16.0 then 10 else if p99 < 33.0 then 11 else 9 in
+          let value = Printf.sprintf "%.1fms" p99 in
+          let styled_value =
+            if p99 < 16.0 then Widgets.themed_success value
+            else if p99 < 33.0 then Widgets.themed_warning value
+            else Widgets.themed_error value
+          in
           Some
             (Printf.sprintf
                "  %s %s (p99)"
-               (Widgets.fg 12 "Render:")
-               (Widgets.fg color (Widgets.bold (Printf.sprintf "%.1fms" p99))))
+               (Widgets.themed_emphasis "Render:")
+               styled_value)
       | None -> None
     in
 
@@ -392,5 +464,11 @@ let render_bg_queue_sparkline spark =
         spark
         ~label:""
         ~focus:false
-        ~thresholds:[{Sparkline.value = 3.0; color = "11"}]
+        ~thresholds:
+          [
+            {
+              Sparkline.value = 3.0;
+              color = threshold_color (Style_context.warning ());
+            };
+          ]
         ()

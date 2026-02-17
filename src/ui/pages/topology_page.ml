@@ -101,17 +101,24 @@ let build_tree services =
       })
     roots
 
+module Style_context = Miaou_style.Style_context
+
+(** Extract foreground color from a theme style, with fallback *)
+let fg_of_style style fallback =
+  let resolved = Miaou_style.Style.to_resolved style in
+  if resolved.r_fg >= 0 then resolved.r_fg else fallback
+
 let role_color = function
-  | "node" -> 14
-  | "baker" -> 12
-  | "accuser" -> 6
-  | "dal-node" -> 13
-  | _ -> 8
+  | "node" -> fg_of_style (Style_context.primary ()) 14
+  | "baker" -> fg_of_style (Style_context.accent ()) 12
+  | "accuser" -> fg_of_style (Style_context.info ()) 6
+  | "dal-node" -> fg_of_style (Style_context.secondary ()) 13
+  | _ -> fg_of_style (Style_context.text_muted ()) 8
 
 let status_color = function
-  | Data.Service_state.Running -> 10
-  | Data.Service_state.Stopped -> 8
-  | Data.Service_state.Unknown _ -> 9
+  | Data.Service_state.Running -> fg_of_style (Style_context.success ()) 10
+  | Data.Service_state.Stopped -> fg_of_style (Style_context.text_muted ()) 8
+  | Data.Service_state.Unknown _ -> fg_of_style (Style_context.warning ()) 9
 
 let style_of fg = {C.default_style with fg}
 
@@ -300,7 +307,7 @@ let render_compact ~width ~node_w trees =
 (* Render the topology, choosing layout based on available width *)
 let render_topology ~width ~services =
   let trees = build_tree services in
-  if trees = [] then Widgets.dim "No services to display"
+  if trees = [] then Widgets.themed_muted "No services to display"
   else
     (* Adaptive node width: shrink for narrow terminals *)
     let node_w = max 14 (min 22 ((width - 4) / max 1 (List.length trees))) in
@@ -316,13 +323,13 @@ let render_topology ~width ~services =
     if wide_needed <= width then render_wide ~width ~node_w trees
     else render_compact ~width ~node_w trees
 
-let header = [Widgets.title_highlight " Network Topology "]
+let header = [Widgets.themed_primary " Network Topology "]
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   let box_width = min 120 (size.LTerm_geom.cols - 2) in
   let body = render_topology ~width:box_width ~services:s.services in
-  Vsection.render ~size ~header ~content_footer:[] ~child:(fun _ -> body)
+  Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun _ -> body)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
@@ -388,7 +395,7 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 end
 
 module Page =
-  Monitored_page.Make
+  Themed_page.Make
     (Page_Impl)
     (struct
       let page_name = "topology"

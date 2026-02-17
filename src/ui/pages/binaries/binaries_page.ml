@@ -365,23 +365,13 @@ struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps =
-    Miaou.Core.Tui_page.
-      [
-        {key = "Esc"; help = "Back"};
-        {key = "r"; help = "Refresh"};
-        {key = "d"; help = "Download latest"};
-        {key = "l"; help = "Register directory"};
-        {key = "p"; help = "Prune unused"};
-        {key = "Enter"; help = "Action"};
-        {key = "Tab"; help = "Expand/Collapse"};
-        {key = "↑/↓"; help = "Navigate"};
-        {key = "?"; help = "Help"};
-      ]
+  (* Footer is rendered by binaries_view using Themed_page.render_themed_footer,
+     so return empty key_hints to prevent Miaou from rendering a duplicate footer *)
+  let key_hints _ps = []
 end
 
 module Page =
-  Monitored_page.Make
+  Themed_page.Make
     (Page_Impl)
     (struct
       let page_name = "binaries"

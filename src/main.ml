@@ -26,9 +26,20 @@ let ui_term =
       & opt (some string) None
       & info ["ui-logfile"] ~doc:"Write UI logs to FILE" ~docv:"FILE")
   in
+  let theme_arg =
+    Arg.(
+      value
+      & opt (some string) None
+      & info
+          ["theme"]
+          ~doc:
+            "Theme name or path (built-ins: dark, light). Can also be set via \
+             OCTEZ_MANAGER_THEME."
+          ~docv:"THEME")
+  in
   Term.(
     ret
-      (const (fun page log logfile ->
+      (const (fun page log logfile theme ->
            Printexc.record_backtrace true ;
            Capabilities.register () ;
            (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
@@ -48,12 +59,12 @@ let ui_term =
              Binary_downloader.set_parallel_submit
                Octez_manager_ui.Domain_pool.submit ;
              Miaou_helpers.Fiber_runtime.init ~env ~sw ;
-             Octez_manager_ui.Manager_app.run ?page ~log ?logfile ()
+             Octez_manager_ui.Manager_app.run ?page ~log ?logfile ?theme ()
            in
            match result with
            | Ok () -> `Ok ()
            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
-      $ page_arg $ log_flag $ logfile_arg))
+      $ page_arg $ log_flag $ logfile_arg $ theme_arg))
 
 let ui_cmd =
   let open Cmdliner in

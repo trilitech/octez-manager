@@ -303,7 +303,7 @@ let view ps ~focus:_ ~size =
   let cols = size.LTerm_geom.cols in
   let lines =
     (* Error/warning *)
-    (match s.error with Some e -> [Widgets.yellow e; ""] | None -> [])
+    (match s.error with Some e -> [Widgets.themed_warning e; ""] | None -> [])
     @
     (* Render display items with proper indentation *)
     List.mapi
@@ -312,33 +312,39 @@ let view ps ~focus:_ ~size =
         let prefix = if is_selected then "> " else "  " in
         match item with
         | SectionHeader title ->
-            let styled =
-              if String.contains title 'P' then Widgets.cyan title
-              else Widgets.green title
+            let styled_title =
+              if String.contains title 'P' then Widgets.themed_info title
+              else Widgets.themed_success title
             in
-            if is_selected then Widgets.bold (prefix ^ styled)
-            else "  " ^ Widgets.bold styled
+            if is_selected then Widgets.themed_emphasis prefix ^ styled_title
+            else Widgets.themed_text "  " ^ styled_title
         | NetworkHeader network ->
-            let line = Printf.sprintf "%s• %s" prefix network in
-            if is_selected then Widgets.bold (Widgets.fg 14 line)
-            else Widgets.fg 14 ("  • " ^ network)
+            if is_selected then
+              Widgets.themed_emphasis prefix
+              ^ Widgets.themed_accent ("• " ^ network)
+            else
+              Widgets.themed_text "  " ^ Widgets.themed_accent ("• " ^ network)
         | NodeItem item ->
-            let line =
-              Printf.sprintf
-                "%s    %s  %s"
-                prefix
-                item.label
-                (Widgets.dim item.rpc_addr)
-            in
-            if is_selected then Widgets.bold line
-            else "      " ^ item.label ^ "  " ^ Widgets.dim item.rpc_addr)
+            if is_selected then
+              Widgets.themed_emphasis prefix
+              ^ Widgets.themed_text "    "
+              ^ Widgets.themed_emphasis item.label
+              ^ Widgets.themed_text "  "
+              ^ Widgets.themed_muted item.rpc_addr
+            else
+              Widgets.themed_text "      "
+              ^ Widgets.themed_text item.label
+              ^ Widgets.themed_text "  "
+              ^ Widgets.themed_muted item.rpc_addr)
       s.display_items
   in
-  let hint = Widgets.dim "↑/↓ navigate · Enter select · r refresh · Esc back" in
-  let header =
-    [Widgets.title_highlight " Browse RPCs - Select Node "; ""; hint; ""]
+  let hint =
+    Widgets.themed_muted "↑/↓ navigate · Enter select · r refresh · Esc back"
   in
-  Vsection.render ~size ~header ~content_footer:[] ~child:(fun _ ->
+  let header =
+    [Widgets.themed_primary " Browse RPCs - Select Node "; ""; hint; ""]
+  in
+  Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun _ ->
       let truncate line =
         if Widgets.visible_chars_count line <= cols then line
         else

@@ -67,7 +67,7 @@ let start_with_cascade ~instance ~role =
         ~description:(Printf.sprintf "Check dependents for %s" instance)
         (fun ~append_log:_ () ->
           (* Small delay to let the start complete *)
-          Unix.sleepf 0.5 ;
+          (Unix.sleepf [@allow_forbidden "job delay - TODO: use Eio"]) 0.5 ;
           Ok ())
         ~on_complete:(fun _ -> offer_start_dependents ~instance)
   | Ok stopped_deps ->
@@ -152,7 +152,8 @@ let offer_restart_dependents ~instance =
                 ~description:"Restarting dependents"
                 (fun ~append_log () ->
                   (* Wait a bit for parent service to be fully ready *)
-                  Unix.sleepf 1.0 ;
+                  (Unix.sleepf [@allow_forbidden "job delay - TODO: use Eio"])
+                    1.0 ;
                   dep_names
                   |> List.iter (fun dep_inst ->
                       match Service_registry.find ~instance:dep_inst with
@@ -175,7 +176,10 @@ let offer_restart_dependents ~instance =
                                      dep.Service.instance)
                             | Error (`Msg e) ->
                                 if retries > 0 then (
-                                  Unix.sleepf 2.0 ;
+                                  (Unix.sleepf
+                                  [@allow_forbidden
+                                    "retry delay - TODO: use Eio"])
+                                    2.0 ;
                                   try_restart (retries - 1))
                                 else (
                                   record_failure
@@ -210,7 +214,7 @@ let restart_with_cascade ~instance ~role =
       Job_manager.submit
         ~description:(Printf.sprintf "Check dependents for %s" instance)
         (fun ~append_log:_ () ->
-          Unix.sleepf 0.5 ;
+          (Unix.sleepf [@allow_forbidden "job delay - TODO: use Eio"]) 0.5 ;
           Ok ())
         ~on_complete:(fun _ -> offer_restart_dependents ~instance)
   | Ok stopped_deps ->

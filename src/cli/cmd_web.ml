@@ -6,6 +6,7 @@
 (******************************************************************************)
 
 open Cmdliner
+module Style_context = Miaou_style.Style_context
 
 let controller_html = [%blob "../web/static/index.html"]
 
@@ -49,17 +50,34 @@ let web_term =
       & opt (some string) None
       & info ["ui-logfile"] ~doc:"Write UI logs to FILE" ~docv:"FILE")
   in
+  let theme_arg =
+    Arg.(
+      value
+      & opt (some string) None
+      & info
+          ["theme"]
+          ~doc:
+            "Theme name or path (built-ins: dark, light). Can also be set via \
+             OCTEZ_MANAGER_THEME."
+          ~docv:"THEME")
+  in
   Term.(
     ret
-      (const (fun port password viewer_password page log logfile ->
+      (const (fun port password viewer_password page log logfile theme ->
            Printexc.record_backtrace true ;
            Octez_manager_lib.Capabilities.register () ;
            Sys.set_signal Sys.sigpipe Sys.Signal_ignore ;
+           let theme, warning =
+             Octez_manager_ui.Theme_manager.load ?name:theme ()
+           in
            let result =
              Eio_posix.run @@ fun env ->
              Eio.Switch.run @@ fun sw ->
              Miaou_helpers.Fiber_runtime.init ~env ~sw ;
              Octez_manager_ui.Manager_app.register_and_init ~log ?logfile () ;
+             (match warning with
+             | Some msg -> Octez_manager_ui.Context.toast_warn msg
+             | None -> ()) ;
              let controller_pw =
                match password with
                | Some _ -> password
@@ -116,21 +134,22 @@ let web_term =
                "Octez Manager web interface: http://0.0.0.0:%d\n%!"
                port ;
              ignore
-               (Miaou_runner_web.Runner_web.run
-                  ~enable_mouse:false
-                  ~port
-                  ?auth
-                  ~controller_html
-                  ~viewer_html
-                  ~extra_assets
-                  initial_page) ;
+               (Style_context.with_theme theme (fun () ->
+                    Miaou_runner_web.Runner_web.run
+                      ~enable_mouse:true
+                      ~port
+                      ?auth
+                      ~controller_html
+                      ~viewer_html
+                      ~extra_assets
+                      initial_page)) ;
              Ok ()
            in
            match result with
            | Ok () -> `Ok ()
            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
       $ port_arg $ password_arg $ viewer_password_arg $ page_arg $ log_flag
-      $ logfile_arg))
+      $ logfile_arg $ theme_arg))
 
 let web_cmd =
   let info =

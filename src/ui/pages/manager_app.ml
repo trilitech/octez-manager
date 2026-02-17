@@ -7,6 +7,7 @@
 
 open Rresult
 open Octez_manager_lib
+module Style_context = Miaou_style.Style_context
 
 let ( let* ) = Result.bind
 
@@ -87,7 +88,38 @@ let shutdown () =
   Domain_pool.shutdown () ;
   Download.kill_active_download ()
 
-let run ?page ?(log = false) ?logfile () =
+(** Open theme picker modal with live preview *)
+let open_theme_picker () =
+  let items = Theme_manager.list_available () in
+  (* Remember current theme to restore on cancel *)
+  let original_theme = Theme_manager.get_current () in
+  let load_theme name =
+    let theme, _warn = Theme_manager.load ~name () in
+    Theme_manager.set_current theme ;
+    Style_context.set_theme theme
+  in
+  Modal_helpers.open_theme_picker_modal
+    ~title:"Switch Theme (Ctrl+T)"
+    ~items
+    ~to_string:(fun s -> s)
+    ~load_theme
+    ~on_select:(fun name ->
+      (* Theme already applied via live preview, just save preference and notify *)
+      Theme_manager.save_preference name ;
+      Context.toast_info (Printf.sprintf "Switched to theme: %s" name))
+    ~on_cancel:(fun () ->
+      (* Restore the original theme on Esc *)
+      Theme_manager.set_current original_theme ;
+      Style_context.set_theme original_theme)
+    ()
+
+(** Register global key handler for Ctrl+T *)
+let register_global_keys () =
+  Context.register_global_key "C-t" (fun () -> open_theme_picker ())
+
+let run ?page ?(log = false) ?logfile ?theme () =
+  let initial_theme, warning = Theme_manager.load ?name:theme () in
+  Theme_manager.set_current initial_theme ;
   let quit_requested = ref false in
   let handle_break _ =
     quit_requested := true ;
@@ -97,13 +129,18 @@ let run ?page ?(log = false) ?logfile () =
   Sys.set_signal Sys.sigint (Sys.Signal_handle handle_break) ;
   Sys.set_signal Sys.sigterm (Sys.Signal_handle handle_break) ;
   register_and_init ~log ?logfile () ;
+  register_global_keys () ;
+  (match warning with Some msg -> Context.toast_warn msg | None -> ()) ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
     if !quit_requested then raise Exit
     else
       let* current_page = find_page_or_default current_name Instances.name in
       let result =
-        Miaou_runner_tui.Runner_tui.run ~enable_mouse:false current_page
+        Miaou_runner_tui.Runner_tui.run
+          ~enable_mouse:true
+          ~handle_sigint:false
+          current_page
       in
       match result with
       | `Quit -> raise Exit

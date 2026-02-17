@@ -9,7 +9,7 @@
 
 (** List of keys reserved for global shortcuts. Pages should avoid using these
     for page-specific actions. *)
-let reserved_keys = ["?"; "Esc"; "q"]
+let reserved_keys = ["?"; "Esc"; "q"; "C-t"]
 
 (** Check if a key is reserved for global use *)
 let is_reserved key = List.mem key reserved_keys
@@ -45,7 +45,12 @@ let handle key =
   | "?" ->
       Modal_helpers.show_help_modal () ;
       Handled
-  | _ -> NotGlobal
+  | "C-t" ->
+      (* Theme picker - delegated to Context for dynamic registration *)
+      if Context.handle_global_key key then Handled else NotGlobal
+  | _ ->
+      (* Check Context for dynamically registered handlers *)
+      if Context.handle_global_key key then Handled else NotGlobal
 
 (** Convenience function: warn if a page is trying to use a reserved key *)
 let warn_if_reserved key action_name =

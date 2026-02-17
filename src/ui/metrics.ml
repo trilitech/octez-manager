@@ -461,7 +461,9 @@ let start_server ~addr ~port =
        - No CPU parallelism needed, just concurrent I/O
        - Simpler than domains (no cross-domain mutex issues) *)
     ignore
-      (Thread.create
+      ((Thread.create
+       [@allow_forbidden
+         "metrics server - separate thread for blocking Unix.accept"])
          (fun () ->
            try serve_forever ~addr ~port
            with exn ->
@@ -639,7 +641,9 @@ let recording_loop () =
   while state.recording_enabled do
     let snapshot = take_snapshot () in
     add_snapshot snapshot ;
-    Unix.sleepf 5.0
+    (Unix.sleepf
+    [@allow_forbidden "metrics recording interval - runs in separate thread"])
+      5.0
   done
 
 let start_recording () =
@@ -649,7 +653,12 @@ let start_recording () =
     (* Use Thread.create for periodic snapshots:
        - Unix.sleepf releases runtime lock during 5s sleep
        - No parallelism needed, just periodic execution *)
-    ignore (Thread.create recording_loop ()))
+    ignore
+      ((Thread.create
+       [@allow_forbidden
+         "metrics recording - separate thread for periodic snapshots"])
+         recording_loop
+         ()))
 
 let stop_recording () = state.recording_enabled <- false
 

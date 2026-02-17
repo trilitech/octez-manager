@@ -57,8 +57,8 @@ let keymap _ =
 
 let header s =
   [
-    Widgets.title_highlight (" Snapshots · " ^ s.network);
-    Widgets.dim "n: select network";
+    Widgets.themed_primary (" Snapshots · " ^ s.network);
+    Widgets.themed_muted "n: select network";
   ]
 
 let view ps ~focus:_ ~size =
@@ -68,14 +68,16 @@ let view ps ~focus:_ ~size =
     else
       s.entries
       |> List.mapi (fun i (entry : Snapshots.entry) ->
-          let marker = if i = s.selected then Widgets.bold ">" else " " in
+          let marker =
+            if i = s.selected then Widgets.themed_emphasis ">" else " "
+          in
           Printf.sprintf
             "%s %-20s %s"
             marker
-            (Widgets.bold entry.label)
-            (Widgets.dim (Option.value ~default:"" entry.download_url)))
+            (Widgets.themed_emphasis entry.label)
+            (Widgets.themed_muted (Option.value ~default:"" entry.download_url)))
   in
-  Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
+  Themed_page.render_layout ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
       String.concat "\n" body)
 
 let handle_modal_key ps key ~size:_ =
@@ -178,7 +180,7 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 end
 
 module Page =
-  Monitored_page.Make
+  Themed_page.Make
     (Page_Impl)
     (struct
       let page_name = "snapshots"

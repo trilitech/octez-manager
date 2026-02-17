@@ -59,7 +59,8 @@ let open_stream_via_file ~title cmd =
   match Sys.command full_cmd with
   | 0 -> (
       (* Give it a moment to create/write *)
-      Unix.sleepf 0.1 ;
+      (Unix.sleepf [@allow_forbidden "file readiness delay - TODO: use Eio"])
+        0.1 ;
       match open_file_with_tail ~title temp_file with
       | Ok fp -> Ok (fp, temp_file)
       | Error e -> Error (`Msg e))
@@ -302,24 +303,25 @@ let view ps ~focus ~size =
     | Log_viewer.DailyLogs -> "daily logs"
   in
   let privilege =
-    if Paths.is_root () then Widgets.red "@ SYSTEM" else Widgets.green "@ USER"
+    if Paths.is_root () then Widgets.themed_error "@ SYSTEM"
+    else Widgets.themed_success "@ USER"
   in
   let title =
     Printf.sprintf
       "%s   %s"
-      (Widgets.title_highlight
+      (Widgets.themed_primary
          (Printf.sprintf " Logs: %s " (String.capitalize_ascii s.instance)))
       privilege
   in
   let help =
-    Widgets.dim
+    Widgets.themed_muted
       (Printf.sprintf
          "Source: %s . r: refresh . t: toggle . /: search . f: follow . w: \
           wrap . ?: help . Esc: back"
          source_str)
   in
   let header = [title; help] in
-  Vsection.render ~size ~header ~content_footer:[] ~child:(fun inner_size ->
+  Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun inner_size ->
       Pager.render
         ~cols:inner_size.LTerm_geom.cols
         ~win:inner_size.LTerm_geom.rows
@@ -457,7 +459,7 @@ module For_tests = struct
 end
 
 module Page =
-  Monitored_page.Make
+  Themed_page.Make
     (Page_Impl)
     (struct
       let page_name = "log_viewer"
