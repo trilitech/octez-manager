@@ -130,6 +130,8 @@ _octez-manager() {
     '--node-instance[Existing octez-manager node instance to reuse for data-dir and network. Use '\''octez-manager list'\'' to see available node instances. It can also be a custom RPC endpoint for the baker to contact. Defaults to http://127.0.0.1:8732]:NODE:'
     '--octez-version[Use a managed Octez version (e.g., '\''24.1'\'' or '\''latest'\''). Overrides]:VERSION:'
     '--app-bin-dir.[download VERSION]:Download:_directories'
+    '--remote-signer-instance[Use a managed Signatory instance for remote signing. The baker will use the -R flag to connect to this Signatory'\''s RPC endpoint. Use '\''octez-manager list'\'' to see available Signatory instances. Mutually exclusive with --remote-signer-uri.]:INSTANCE:'
+    '--remote-signer-uri[Use an external remote signer URI (e.g., http://localhost:6732 or https://signer.example.com). The baker will use the -R flag with this URI. Mutually exclusive with --remote-signer-instance.]:URI:'
     '--service-user[System user owning the service]:USER:_users'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
