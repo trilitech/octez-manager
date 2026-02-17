@@ -145,7 +145,7 @@ _octez_manager() {
       ;;
     install-baker)
       if [[ $cur == -* ]]; then
-        opts="--app-bin-dir --base-dir --bin-dir-alias --dal-endpoint --delegate --extra-arg --instance --liquidity-baking-vote --no-enable --node-instance --octez-version --app-bin-dir. --service-user --help --version"
+        opts="--app-bin-dir --base-dir --bin-dir-alias --dal-endpoint --delegate --extra-arg --instance --liquidity-baking-vote --no-enable --node-instance --octez-version --app-bin-dir. --remote-signer-instance --remote-signer-uri --service-user --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
