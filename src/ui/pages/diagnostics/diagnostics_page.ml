@@ -12,6 +12,8 @@ module Navigation = Miaou.Core.Navigation
 module Box = Miaou_widgets_layout.Box_widget
 module Flex = Miaou_widgets_layout.Flex_layout
 module C = Miaou_canvas.Canvas
+module Style = Miaou_style.Style
+module Style_context = Miaou_style.Style_context
 open Octez_manager_lib
 
 let name = "diagnostics"
@@ -181,9 +183,26 @@ let keymap _ =
     kb "?" "Help";
   ]
 
+let resolve_fg ~fallback style =
+  let resolved = Style.to_resolved style in
+  if resolved.r_fg < 0 then fallback else resolved.r_fg
+
+let resolve_bg ~fallback style =
+  let resolved = Style.to_resolved style in
+  if resolved.r_bg < 0 then fallback else resolved.r_bg
+
 let render_canvas_header ~width =
   let style_of fg = {C.default_style with fg} in
   let bold_of fg = {C.default_style with fg; bold = true} in
+  let bg_base =
+    resolve_bg ~fallback:236 (Style_context.background_secondary ())
+  in
+  let border_fg = resolve_fg ~fallback:69 (Style_context.border ()) in
+  let title_fg = resolve_fg ~fallback:147 (Style_context.text_emphasized ()) in
+  let label_fg = resolve_fg ~fallback:252 (Style_context.text ()) in
+  let ok_fg = resolve_fg ~fallback:10 (Style_context.success ()) in
+  let off_fg = resolve_fg ~fallback:8 (Style_context.text_muted ()) in
+  let err_fg = resolve_fg ~fallback:196 (Style_context.error ()) in
   let rows = 5 in
   let c = C.create ~rows ~cols:width in
   (* Background fill *)
@@ -194,7 +213,7 @@ let render_canvas_header ~width =
     ~width
     ~height:rows
     ~char:" "
-    ~style:{C.default_style with bg = 236} ;
+    ~style:{C.default_style with bg = bg_base} ;
   (* Rounded border *)
   C.draw_box
     c
@@ -203,11 +222,11 @@ let render_canvas_header ~width =
     ~width
     ~height:rows
     ~border:Rounded
-    ~style:(style_of 69) ;
+    ~style:(style_of border_fg) ;
   (* Title centered *)
   let title = " Diagnostics & Metrics " in
   let title_col = max 2 ((width - String.length title) / 2) in
-  C.draw_text c ~row:1 ~col:title_col ~style:(bold_of 147) title ;
+  C.draw_text c ~row:1 ~col:title_col ~style:(bold_of title_fg) title ;
   (* Status indicators on row 3 *)
   let metrics_on = Metrics.is_enabled () in
   let recorder_on = Metrics.is_recording () in
@@ -215,13 +234,13 @@ let render_canvas_header ~width =
   let indicators =
     [
       ( (if metrics_on then "●" else "○"),
-        (if metrics_on then 10 else 8),
+        (if metrics_on then ok_fg else off_fg),
         "metrics" );
       ( (if recorder_on then "●" else "○"),
-        (if recorder_on then 10 else 8),
+        (if recorder_on then ok_fg else off_fg),
         "recorder" );
       ( (if is_root then "●" else "●"),
-        (if is_root then 196 else 10),
+        (if is_root then err_fg else ok_fg),
         if is_root then "root" else "user" );
     ]
   in
@@ -237,7 +256,7 @@ let render_canvas_header ~width =
     List.fold_left
       (fun col (icon, color, label) ->
         C.draw_text c ~row:3 ~col ~style:(bold_of color) icon ;
-        C.draw_text c ~row:3 ~col:(col + 2) ~style:(style_of 252) label ;
+        C.draw_text c ~row:3 ~col:(col + 2) ~style:(style_of label_fg) label ;
         col + String.length icon + 1 + String.length label + 3)
       start_col
       indicators
@@ -248,23 +267,23 @@ let _footer = []
 
 (* Section content renderers - each returns lines for that section *)
 let render_services_content services =
-  if services = [] then [Widgets.dim "No services registered"]
+  if services = [] then [Widgets.themed_muted "No services registered"]
   else
     List.map
       (fun (st : Data.Service_state.t) ->
         let svc = st.service in
-        let status_icon, status_color =
+        let status_icon =
           match st.status with
-          | Running -> ("●", 10)
-          | Stopped -> ("○", 8)
-          | Unknown _ -> ("?", 11)
+          | Running -> Widgets.themed_success "●"
+          | Stopped -> Widgets.themed_muted "○"
+          | Unknown _ -> Widgets.themed_warning "?"
         in
         Printf.sprintf
           "%s %-20s  %s  %s"
-          (Widgets.fg status_color status_icon)
-          (Widgets.bold svc.Service.instance)
-          (Widgets.fg 8 svc.Service.role)
-          (Widgets.dim
+          status_icon
+          (Widgets.themed_emphasis svc.Service.instance)
+          (Widgets.themed_muted svc.Service.role)
+          (Widgets.themed_muted
              (Printf.sprintf
                 "net:%s mode:%s"
                 svc.Service.network
@@ -273,17 +292,18 @@ let render_services_content services =
 
 let render_caches_content () =
   let cache_stats = Cache.get_stats () in
-  if cache_stats = [] then [Widgets.dim "No caches registered"]
+  if cache_stats = [] then [Widgets.themed_muted "No caches registered"]
   else
     let lines =
       List.concat_map
         (fun (name, hits, misses, age, ttl, expired, sub_entries) ->
           let age_str =
             match age with
-            | None -> Widgets.dim "empty"
+            | None -> Widgets.themed_muted "empty"
             | Some a ->
                 let s = Printf.sprintf "%.1fs/%.1fs" a ttl in
-                if expired then Widgets.red s else Widgets.green s
+                if expired then Widgets.themed_error s
+                else Widgets.themed_success s
           in
           let stats_str =
             if hits + misses > 0 then
@@ -301,14 +321,15 @@ let render_caches_content () =
               name
               age_str
               count_str
-              (Widgets.dim stats_str)
+              (Widgets.themed_muted stats_str)
           in
           let sub_lines =
             List.map
               (fun (entry : Cache.sub_entry) ->
                 let sub_age_str =
                   let s = Printf.sprintf "%.1fs" entry.age in
-                  if entry.expired then Widgets.red s else Widgets.green s
+                  if entry.expired then Widgets.themed_error s
+                  else Widgets.themed_success s
                 in
                 Printf.sprintf "  └─ %-16s  %s" entry.key sub_age_str)
               sub_entries
@@ -316,7 +337,7 @@ let render_caches_content () =
           main_line :: sub_lines)
         cache_stats
     in
-    lines @ [Widgets.dim "(press 'c' to clear all)"]
+    lines @ [Widgets.themed_muted "(press 'c' to clear all)"]
 
 let render_realtime_content bg_queue_spark =
   let bg_depth = Metrics.get_bg_queue_depth () in
@@ -327,18 +348,19 @@ let render_realtime_content bg_queue_spark =
       "Current: %d/%d  %s"
       bg_depth
       bg_max
-      (if bg_depth > 0 then Widgets.fg 11 "⚠ tasks pending"
-       else Widgets.fg 10 "✓ idle");
+      (if bg_depth > 0 then Widgets.themed_warning "⚠ tasks pending"
+       else Widgets.themed_success "✓ idle");
   ]
 
 let render_recorder_content () =
   let recorder_enabled = Metrics.is_recording () in
   let recorder_icon =
-    if recorder_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
+    if recorder_enabled then Widgets.themed_success "●"
+    else Widgets.themed_muted "○"
   in
   let recorder_status =
-    if recorder_enabled then Widgets.fg 10 "recording"
-    else Widgets.fg 8 "stopped"
+    if recorder_enabled then Widgets.themed_success "recording"
+    else Widgets.themed_muted "stopped"
   in
   let duration_samples = Metrics.get_recording_duration () in
   let duration_str =
@@ -351,20 +373,20 @@ let render_recorder_content () =
   [
     Printf.sprintf
       "%s %s %s %s"
-      (Widgets.fg 12 "Status:")
+      (Widgets.themed_emphasis "Status:")
       recorder_icon
       recorder_status
-      (Widgets.dim
+      (Widgets.themed_muted
          (Printf.sprintf "(duration: %s, 'd' to change)" duration_str));
-    Widgets.dim "(press 'R' to start/stop)";
+    Widgets.themed_muted "(press 'R' to start/stop)";
   ]
 
 let render_historical_content ~chart_width =
   let samples = Metrics.get_snapshots () in
   if samples = [] then
     [
-      Widgets.dim "Collecting data... (wait ~5 seconds)";
-      Widgets.dim "Charts will appear once samples are recorded";
+      Widgets.themed_muted "Collecting data... (wait ~5 seconds)";
+      Widgets.themed_muted "Charts will appear once samples are recorded";
     ]
   else
     let charts =
@@ -380,7 +402,8 @@ let render_historical_content ~chart_width =
 
 let render_scheduler_content () =
   let scheduler_snapshots = Metrics.get_scheduler_snapshots () in
-  if scheduler_snapshots = [] then [Widgets.dim "No scheduler metrics yet"]
+  if scheduler_snapshots = [] then
+    [Widgets.themed_muted "No scheduler metrics yet"]
   else
     List.map
       (fun (name, (snap : Metrics.snapshot)) ->
@@ -396,17 +419,17 @@ let render_scheduler_content () =
         let p99_str =
           match snap.p99 with Some v -> Printf.sprintf "%.1f" v | None -> "-"
         in
-        let color =
+        let status_dot =
           match snap.p90 with
-          | Some v when v > 100. -> 9
-          | Some v when v > 50. -> 11
-          | _ -> 10
+          | Some v when v > 100. -> Widgets.themed_error "●"
+          | Some v when v > 50. -> Widgets.themed_warning "●"
+          | _ -> Widgets.themed_success "●"
         in
         Printf.sprintf
           "%s %-16s  %s avg:%.1fms  p50:%s  p90:%s  p99:%s  (n=%d)"
-          (Widgets.fg color "●")
+          status_dot
           name
-          (Widgets.dim "|")
+          (Widgets.themed_muted "|")
           avg
           p50_str
           p90_str
@@ -423,16 +446,18 @@ let render_worker_stats_content () =
         /. float_of_int stats.requests_total
       else 0.0
     in
-    let color =
-      if stats.p90_ms > 100. then 9 else if stats.p90_ms > 50. then 11 else 10
+    let status_dot =
+      if stats.p90_ms > 100. then Widgets.themed_error "●"
+      else if stats.p90_ms > 50. then Widgets.themed_warning "●"
+      else Widgets.themed_success "●"
     in
     let main_line =
       Printf.sprintf
         "%s %-16s  %s reqs:%d dedup:%d(%.0f%%)  p50:%.1fms p90:%.1fms \
          p95:%.1fms p99:%.1fms"
-        (Widgets.fg color "●")
+        status_dot
         stats.name
-        (Widgets.dim "|")
+        (Widgets.themed_muted "|")
         stats.requests_total
         stats.requests_deduped
         dedup_pct
@@ -447,7 +472,7 @@ let render_worker_stats_content () =
         (fun (kd : Worker_queue.key_dedup) ->
           Printf.sprintf
             "    └─ %s %s"
-            (Widgets.dim (Printf.sprintf "%5d×" kd.count))
+            (Widgets.themed_muted (Printf.sprintf "%5d×" kd.count))
             kd.key)
         top_keys
     in
@@ -459,13 +484,19 @@ let render_worker_stats_content () =
 let render_metrics_server_content () =
   let metrics_enabled = Metrics.is_enabled () in
   let status_icon =
-    if metrics_enabled then Widgets.fg 10 "●" else Widgets.fg 8 "○"
+    if metrics_enabled then Widgets.themed_success "●"
+    else Widgets.themed_muted "○"
   in
   let status_text =
-    if metrics_enabled then Widgets.fg 10 "enabled" else Widgets.fg 8 "disabled"
+    if metrics_enabled then Widgets.themed_success "enabled"
+    else Widgets.themed_muted "disabled"
   in
   let status_line =
-    Printf.sprintf "%s %s %s" (Widgets.fg 12 "Status:") status_icon status_text
+    Printf.sprintf
+      "%s %s %s"
+      (Widgets.themed_emphasis "Status:")
+      status_icon
+      status_text
   in
   match Metrics.get_server_info () with
   | Some (addr, port) ->
@@ -473,23 +504,27 @@ let render_metrics_server_content () =
         status_line;
         Printf.sprintf
           "%s %s"
-          (Widgets.fg 12 "Endpoint:")
-          (Widgets.fg 14 (Printf.sprintf "http://%s:%d/metrics" addr port));
-        Widgets.dim "(server is running)";
+          (Widgets.themed_emphasis "Endpoint:")
+          (Widgets.themed_accent
+             (Printf.sprintf "http://%s:%d/metrics" addr port));
+        Widgets.themed_muted "(server is running)";
       ]
   | None ->
       [
         status_line;
-        Printf.sprintf "%s %s" (Widgets.fg 12 "Address:") !metrics_addr_ref;
-        Widgets.dim "('m' to start, 'a' to edit address)";
+        Printf.sprintf
+          "%s %s"
+          (Widgets.themed_emphasis "Address:")
+          !metrics_addr_ref;
+        Widgets.themed_muted "('m' to start, 'a' to edit address)";
       ]
 
 let render_system_info_content () =
   [
     Printf.sprintf
       "Privilege: %s"
-      (if Paths.is_root () then Widgets.red "● SYSTEM"
-       else Widgets.green "● USER");
+      (if Paths.is_root () then Widgets.themed_error "● SYSTEM"
+       else Widgets.themed_success "● USER");
   ]
 
 let view ps ~focus:_ ~size =
@@ -497,10 +532,11 @@ let view ps ~focus:_ ~size =
   Metrics.record_render ~page:name (fun () ->
       let box_width = min 78 (size.LTerm_geom.cols - 2) in
       let chart_width = min 70 (box_width - 6) in
-      let render_box ~title ~color content_lines =
+      let render_box ~title ~widget_name content_lines =
         let content = String.concat "\n" content_lines in
         let box =
-          Box.render ~title ~style:Single ~color ~width:box_width content
+          Style_context.with_child_context ~widget_name (fun () ->
+              Box.render ~title ~style:Single ~width:box_width content)
         in
         String.split_on_char '\n' box @ [""]
       in
@@ -519,9 +555,12 @@ let view ps ~focus:_ ~size =
         [
           render_box
             ~title:"Service Status"
-            ~color:14
+            ~widget_name:"diagnostics-service-status"
             (render_services_content s.services);
-          render_box ~title:"Caches" ~color:13 (render_caches_content ());
+          render_box
+            ~title:"Caches"
+            ~widget_name:"diagnostics-caches"
+            (render_caches_content ());
         ]
         @ [
             (* Real-Time Metrics + Metrics Recorder side-by-side *)
@@ -535,12 +574,14 @@ let view ps ~focus:_ ~size =
                           "\n"
                           (render_realtime_content s.bg_queue_spark)
                       in
-                      Box.render
-                        ~title:"Real-Time Metrics"
-                        ~style:Single
-                        ~color:12
-                        ~width:size.LTerm_geom.cols
-                        content);
+                      Style_context.with_child_context
+                        ~widget_name:"diagnostics-realtime"
+                        (fun () ->
+                          Box.render
+                            ~title:"Real-Time Metrics"
+                            ~style:Single
+                            ~width:size.LTerm_geom.cols
+                            content));
                   basis = Fill;
                   cross = None;
                 };
@@ -550,12 +591,14 @@ let view ps ~focus:_ ~size =
                       let content =
                         String.concat "\n" (render_recorder_content ())
                       in
-                      Box.render
-                        ~title:"Metrics Recorder"
-                        ~style:Single
-                        ~color:11
-                        ~width:size.LTerm_geom.cols
-                        content);
+                      Style_context.with_child_context
+                        ~widget_name:"diagnostics-recorder"
+                        (fun () ->
+                          Box.render
+                            ~title:"Metrics Recorder"
+                            ~style:Single
+                            ~width:size.LTerm_geom.cols
+                            content));
                   basis = Fill;
                   cross = None;
                 };
@@ -565,18 +608,18 @@ let view ps ~focus:_ ~size =
              [
                render_box
                  ~title:"Historical Metrics"
-                 ~color:13
+                 ~widget_name:"diagnostics-historical"
                  (render_historical_content ~chart_width);
              ]
            else [])
         @ [
             render_box
               ~title:"Scheduler Performance"
-              ~color:11
+              ~widget_name:"diagnostics-scheduler"
               (render_scheduler_content ());
             render_box
               ~title:"Worker Queue Stats"
-              ~color:12
+              ~widget_name:"diagnostics-worker-queue"
               (render_worker_stats_content ());
           ]
         @ [
@@ -589,12 +632,14 @@ let view ps ~focus:_ ~size =
                       let content =
                         String.concat "\n" (render_metrics_server_content ())
                       in
-                      Box.render
-                        ~title:"Metrics Server"
-                        ~style:Single
-                        ~color:14
-                        ~width:size.LTerm_geom.cols
-                        content);
+                      Style_context.with_child_context
+                        ~widget_name:"diagnostics-metrics-server"
+                        (fun () ->
+                          Box.render
+                            ~title:"Metrics Server"
+                            ~style:Single
+                            ~width:size.LTerm_geom.cols
+                            content));
                   basis = Fill;
                   cross = None;
                 };
@@ -604,12 +649,14 @@ let view ps ~focus:_ ~size =
                       let content =
                         String.concat "\n" (render_system_info_content ())
                       in
-                      Box.render
-                        ~title:"System Information"
-                        ~style:Single
-                        ~color:12
-                        ~width:size.LTerm_geom.cols
-                        content);
+                      Style_context.with_child_context
+                        ~widget_name:"diagnostics-system-info"
+                        (fun () ->
+                          Box.render
+                            ~title:"System Information"
+                            ~style:Single
+                            ~width:size.LTerm_geom.cols
+                            content));
                   basis = Fill;
                   cross = None;
                 };
@@ -657,13 +704,9 @@ let view ps ~focus:_ ~size =
             (100 * visible_height / content_height)
         else ""
       in
-      let header = [canvas_header; Widgets.dim scroll_indicator] in
+      let header = [canvas_header; Widgets.themed_muted scroll_indicator] in
 
-      Miaou_widgets_layout.Vsection.render
-        ~size
-        ~header
-        ~content_footer:[]
-        ~child:(fun _ -> body))
+      Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun _ -> body))
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;

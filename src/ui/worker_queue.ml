@@ -86,7 +86,11 @@ let worker_loop t =
         Eio_unix.sleep 0.1
     | Some req -> (
         let start_time = Unix.gettimeofday () in
-        let result = try req.work () with _ -> Obj.magic () in
+        let result =
+          try req.work ()
+          with _ ->
+            Obj.magic () [@allow_forbidden "TODO: proper error handling"]
+        in
         let elapsed_ms = (Unix.gettimeofday () -. start_time) *. 1000.0 in
         Mutex.lock t.lock ;
         Hashtbl.remove t.pending req.key ;

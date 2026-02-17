@@ -70,6 +70,20 @@ val prompt_validated_text_modal :
   unit ->
   unit
 
+(** Open a multi-line text input prompt modal.
+    @param initial Pre-filled text.
+    @param placeholder Ghost text shown when input is empty.
+    @param height Height in rows for the textarea. *)
+val prompt_textarea_modal :
+  ?title:string ->
+  ?width:int ->
+  ?height:int ->
+  ?initial:string ->
+  ?placeholder:string ->
+  on_submit:(string -> unit) ->
+  unit ->
+  unit
+
 (** Show a success modal with a green-highlighted message. *)
 val show_success : title:string -> string -> unit
 
@@ -83,6 +97,20 @@ val confirm_modal :
 
 (** Show the global help overlay listing all keybindings. *)
 val show_help_modal : unit -> unit
+
+(** Open a theme picker modal with live preview.
+    As the user navigates through themes, [load_theme] is called to preview each one.
+    On Enter, [on_select] is called with the chosen theme ID.
+    On Esc, [on_cancel] is called to restore the previous theme. *)
+val open_theme_picker_modal :
+  title:string ->
+  items:string list ->
+  to_string:(string -> string) ->
+  load_theme:(string -> unit) ->
+  on_select:(string -> unit) ->
+  on_cancel:(unit -> unit) ->
+  unit ->
+  unit
 
 (** Open a file-system browser modal for selecting files or directories.
     @param dirs_only When [true], only directories are selectable.

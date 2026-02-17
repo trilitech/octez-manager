@@ -168,21 +168,17 @@ let keymap _ps =
 (* Minimum width for side-by-side layout *)
 let side_by_side_min_width = 140
 
-(* Render two columns side by side using Grid_layout with focus-aware separator *)
+(* OpenCode style: render two columns side by side with muted separator *)
 let render_side_by_side ~left ~right ~left_width ~total_width ~rows
-    ~left_focused ~right_focused =
-  (* Styled vertical separator based on focus *)
-  let separator =
-    if left_focused then Widgets.bold (Widgets.fg 14 "│")
-    else if right_focused then Widgets.fg 14 "│"
-    else Widgets.dim "│"
-  in
+    ~left_focused:_ ~right_focused:_ =
+  (* Thicker muted vertical separator (3 chars: space + bar + space) *)
+  let separator = Widgets.themed_muted " │ " in
   let sep_column = String.concat "\n" (List.init rows (fun _ -> separator)) in
-  let right_width = total_width - left_width - 1 in
+  let right_width = total_width - left_width - 3 in
   let grid =
     Grid.create
       ~rows:[Grid.Fr 1.]
-      ~cols:[Grid.Px left_width; Grid.Px 1; Grid.Px right_width]
+      ~cols:[Grid.Px left_width; Grid.Px 3; Grid.Px right_width]
       [
         Grid.cell ~row:0 ~col:0 (fun ~size:_ -> left);
         Grid.cell ~row:0 ~col:1 (fun ~size:_ -> sep_column);
@@ -232,18 +228,26 @@ let view ps ~focus ~size =
               ~cols:left_width
           in
           let left =
-            if browser_focus then
-              let header_text = " ▶▶ BROWSER ◀◀ " in
-              let header_len = String.length header_text in
-              let header_padded =
-                if header_len >= left_width then header_text
-                else header_text ^ String.make (left_width - header_len) ' '
-              in
-              let header = Widgets.bg 33 (Widgets.fg 15 header_padded) in
-              header :: left_lines |> String.concat "\n"
-            else
-              let header = Widgets.dim "   Browser" in
-              header :: left_lines |> String.concat "\n"
+            (* OpenCode style: clean header with subtle focus indicator *)
+            let header_text =
+              if browser_focus then " Browser" else " Browser"
+            in
+            let header_len = String.length header_text in
+            let header_padded =
+              if header_len >= left_width then header_text
+              else header_text ^ String.make (left_width - header_len) ' '
+            in
+            let header =
+              if browser_focus then
+                Miaou_style.Style_context.with_child_context
+                  ~widget_name:"rpc-browser-header"
+                  ~focused:true
+                  (fun () ->
+                    Widgets.themed_contextual_fill
+                      (Widgets.themed_contextual header_padded))
+              else Widgets.themed_muted header_padded
+            in
+            header :: left_lines |> String.concat "\n"
           in
           let right =
             Rpc_browser_render_result.render
@@ -280,41 +284,56 @@ let view ps ~focus ~size =
           let lines =
             Rpc_browser_render_list.render ~focus ~state:left_state ~cols
           in
+          (* OpenCode style: clean header for single-column browser mode *)
           let pager_ids = State.get_pager_ids s in
-          let focused = State.get_focused_pager_id s in
+          let focused_pager = State.get_focused_pager_id s in
           let tabs_plain =
             pager_ids |> List.sort compare
             |> List.map (fun id ->
-                if id = focused then Printf.sprintf "[%d*]" id
-                else Printf.sprintf "[%d]" id)
+                if id = focused_pager then Printf.sprintf "[%d]" id
+                else Printf.sprintf " %d " id)
             |> String.concat ""
           in
-          let header_text = " ▶▶ BROWSER ◀◀  → Pager " ^ tabs_plain ^ " " in
+          let header_text = " Browser  |  Pager " ^ tabs_plain in
           let header_len = String.length header_text in
           let header_padded =
             if header_len >= cols then header_text
             else header_text ^ String.make (cols - header_len) ' '
           in
-          let header = Widgets.bg 33 (Widgets.fg 15 header_padded) in
+          let header =
+            Miaou_style.Style_context.with_child_context
+              ~widget_name:"rpc-browser-header"
+              ~focused:true
+              (fun () ->
+                Widgets.themed_contextual_fill
+                  (Widgets.themed_contextual header_padded))
+          in
           header :: lines |> String.concat "\n"
         else
-          (* Show only pager with focus border *)
+          (* OpenCode style: clean header for single-column pager mode *)
           let pager_ids = State.get_pager_ids s in
-          let focused = State.get_focused_pager_id s in
+          let focused_pager = State.get_focused_pager_id s in
           let tabs_plain =
             pager_ids |> List.sort compare
             |> List.map (fun id ->
-                if id = focused then Printf.sprintf "[%d*]" id
-                else Printf.sprintf "[%d]" id)
+                if id = focused_pager then Printf.sprintf "[%d]" id
+                else Printf.sprintf " %d " id)
             |> String.concat ""
           in
-          let header_text = " ← Browser  ▶▶ PAGER " ^ tabs_plain ^ " ◀◀ " in
+          let header_text = " Browser  |  Pager " ^ tabs_plain in
           let header_len = String.length header_text in
           let header_padded =
             if header_len >= cols then header_text
             else header_text ^ String.make (cols - header_len) ' '
           in
-          let header = Widgets.bg 33 (Widgets.fg 15 header_padded) in
+          let header =
+            Miaou_style.Style_context.with_child_context
+              ~widget_name:"rpc-pager-header"
+              ~focused:true
+              (fun () ->
+                Widgets.themed_contextual_fill
+                  (Widgets.themed_contextual header_padded))
+          in
           let result =
             Rpc_browser_render_result.render
               ~state:s
@@ -324,7 +343,7 @@ let view ps ~focus ~size =
           in
           header ^ "\n" ^ result
   in
-  Vsection.render ~size ~header:[] ~content_footer:[] ~child:(fun _ -> body)
+  Themed_page.render_layout ~size ~header:[] ~footer:[] ~child:(fun _ -> body)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
@@ -537,10 +556,10 @@ let handle_key ps key ~size =
                             then "Local Instances"
                             else "Public Nodes"
                           in
-                          Miaou_widgets_display.Widgets.bold
-                            ("── " ^ section ^ " ──")
+                          Miaou_widgets_display.Widgets.themed_emphasis section
                       | `NetworkHeader ->
-                          Miaou_widgets_display.Widgets.fg 14 ("  • " ^ network)
+                          Miaou_widgets_display.Widgets.themed_accent
+                            ("  • " ^ network)
                       | `Service ->
                           let name = svc.Octez_manager_lib.Service.instance in
                           "        " ^ name)
@@ -717,7 +736,7 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 end
 
 module Page =
-  Monitored_page.Make
+  Themed_page.Make
     (Page_Impl)
     (struct
       let page_name = "rpc_browser"

@@ -11,6 +11,8 @@
     configurable intervals. Uses sparklines to display history. *)
 
 open Octez_manager_lib
+module Style = Miaou_style.Style
+module Style_context = Miaou_style.Style_context
 
 let shutdown_requested = Atomic.make false
 
@@ -257,6 +259,21 @@ let render_cpu_chart ~role ~instance ~focus:_ =
       | Some state ->
           if state.cpu_history = [] then None
           else
+            let text_color =
+              let resolved = Style.to_resolved (Style_context.text ()) in
+              if resolved.r_fg < 0 then None
+              else Some ("38;5;" ^ string_of_int resolved.r_fg)
+            in
+            let warn_color =
+              let resolved = Style.to_resolved (Style_context.warning ()) in
+              if resolved.r_fg < 0 then "33"
+              else "38;5;" ^ string_of_int resolved.r_fg
+            in
+            let error_color =
+              let resolved = Style.to_resolved (Style_context.error ()) in
+              if resolved.r_fg < 0 then "31"
+              else "38;5;" ^ string_of_int resolved.r_fg
+            in
             (* Convert history to points *)
             let points =
               List.mapi
@@ -267,7 +284,7 @@ let render_cpu_chart ~role ~instance ~focus:_ =
             in
             let series =
               Miaou_widgets_display.Line_chart_widget.
-                [{label = "cpu"; points; color = None}]
+                [{label = "cpu"; points; color = text_color}]
             in
             let chart =
               Miaou_widgets_display.Line_chart_widget.create
@@ -278,7 +295,10 @@ let render_cpu_chart ~role ~instance ~focus:_ =
             in
             let thresholds =
               Miaou_widgets_display.Line_chart_widget.
-                [{value = 90.0; color = "31"}; {value = 75.0; color = "33"}]
+                [
+                  {value = 90.0; color = error_color};
+                  {value = 75.0; color = warn_color};
+                ]
             in
             let rendered =
               Miaou_widgets_display.Line_chart_widget.render
@@ -306,12 +326,18 @@ let render_mem_sparkline ~role ~instance ~focus =
           if Miaou_widgets_display.Sparkline_widget.is_empty state.mem_sparkline
           then ""
           else
+            let spark_color =
+              let resolved = Style.to_resolved (Style_context.text ()) in
+              if resolved.r_fg < 0 then None
+              else Some ("38;5;" ^ string_of_int resolved.r_fg)
+            in
             let value_str = System_metrics.format_bytes state.memory_rss in
             let chart =
               Miaou_widgets_display.Sparkline_widget.render
                 state.mem_sparkline
                 ~focus
                 ~show_value:false
+                ?color:spark_color
                 ()
             in
             Printf.sprintf "%s %s" chart value_str)
@@ -499,21 +525,18 @@ let check_version_status ~running =
 (** Get ANSI color for version status *)
 let version_color status =
   match status with
-  | Latest -> "\027[32m" (* green *)
-  | MinorBehind -> "\027[33m" (* yellow *)
-  | MajorBehind -> "\027[31m" (* red *)
-  | DevOrRC -> "\027[34m" (* blue *)
-  | Unknown -> "" (* no color *)
-
-(** Color reset *)
-let color_reset = "\027[0m"
+  | Latest -> Some (Miaou_style.Style_context.success ())
+  | MinorBehind -> Some (Miaou_style.Style_context.warning ())
+  | MajorBehind -> Some (Miaou_style.Style_context.error ())
+  | DevOrRC -> Some (Miaou_style.Style_context.info ())
+  | Unknown -> None
 
 (** Format version with color based on status *)
 let format_version_colored version =
   let status = check_version_status ~running:version in
-  let color = version_color status in
-  if color = "" then Printf.sprintf "v%s" version
-  else Printf.sprintf "%sv%s%s" color version color_reset
+  match version_color status with
+  | None -> Printf.sprintf "v%s" version
+  | Some style -> Miaou_style.Style.render style (Printf.sprintf "v%s" version)
 
 (** Check version for a single instance and show toast if outdated *)
 let check_version_toast_for ~key ~instance ~version =

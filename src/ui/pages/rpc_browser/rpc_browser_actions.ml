@@ -62,12 +62,16 @@ let format_service_label (svc : Octez_manager_lib.Service.t) ~is_current =
         Octez_manager_lib.Rpc_addr.to_string
           svc.Octez_manager_lib.Service.rpc_addr
       in
-      Printf.sprintf "%s %s" name (Miaou_widgets_display.Widgets.dim url)
+      Printf.sprintf
+        "%s %s"
+        name
+        (Miaou_widgets_display.Widgets.themed_muted url)
     else
       (* Local instances: just show name *)
       name
   in
-  if is_current then Miaou_widgets_display.Widgets.fg 10 ("      ✓ " ^ label)
+  if is_current then
+    Miaou_widgets_display.Widgets.themed_success ("      ✓ " ^ label)
   else "        " ^ label
 
 (** Build modal items with local/public sections and network grouping.
@@ -414,9 +418,10 @@ let handle_enter state on_update =
                       then "Local Instances"
                       else "Public Nodes"
                     in
-                    Miaou_widgets_display.Widgets.bold ("── " ^ section ^ " ──")
+                    Miaou_widgets_display.Widgets.themed_emphasis section
                 | `NetworkHeader ->
-                    Miaou_widgets_display.Widgets.fg 14 ("  • " ^ network)
+                    Miaou_widgets_display.Widgets.themed_accent
+                      ("  • " ^ network)
                 | `Service ->
                     format_service_label svc ~is_current:(is_current svc))
               ~on_select:(fun (_, _, svc, kind) ->
@@ -590,9 +595,10 @@ let handle_cached_enter state on_update =
                       then "Local Instances"
                       else "Public Nodes"
                     in
-                    Miaou_widgets_display.Widgets.bold ("── " ^ section ^ " ──")
+                    Miaou_widgets_display.Widgets.themed_emphasis section
                 | `NetworkHeader ->
-                    Miaou_widgets_display.Widgets.fg 14 ("  • " ^ network)
+                    Miaou_widgets_display.Widgets.themed_accent
+                      ("  • " ^ network)
                 | `Service ->
                     format_service_label svc ~is_current:(is_current svc))
               ~on_select:(fun (_, _, svc, kind) ->

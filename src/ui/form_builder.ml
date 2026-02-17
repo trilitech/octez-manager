@@ -623,7 +623,7 @@ struct
           let ok = f.validate model in
           let value_str = f.to_string value in
           let formatted_value =
-            if ok then smart_truncate value_space value_str
+            if ok then Ui_fmt.text "%s" (smart_truncate value_space value_str)
             else
               (* Show value and short error message *)
               let err_msg =
@@ -631,22 +631,23 @@ struct
                 | Some msg -> " ⚠ " ^ truncate err_msg_space msg
                 | None -> " ⚠ invalid"
               in
-              Widgets.fg
-                214
-                (Widgets.bold (truncate value_truncate value_str ^ err_msg))
+              Widgets.themed_warning
+                (truncate value_truncate value_str ^ err_msg)
           in
-          (f.label, formatted_value, ok))
+          let label = Ui_fmt.text "%s" f.label in
+          (label, formatted_value, ok))
     in
     let all_valid = List.for_all (fun (_, _, ok) -> ok) field_results in
     let rows =
       field_results
       |> List.map (fun (label, value, ok) ->
-          (label, value, if ok then "✓" else "✗"))
+          let status = if ok then Ui_fmt.success "✓" else Ui_fmt.error "✗" in
+          (label, value, status))
     in
     let confirm_row =
-      ( "Confirm & Install",
-        (if all_valid then "Ready" else "Incomplete"),
-        if all_valid then "✓" else "✗" )
+      ( Ui_fmt.text "%s" "Confirm & Install",
+        (if all_valid then Ui_fmt.success "Ready" else Ui_fmt.error "Incomplete"),
+        if all_valid then Ui_fmt.success "✓" else Ui_fmt.error "✗" )
     in
     let all_rows = rows @ [confirm_row] in
     let columns =
@@ -669,8 +670,8 @@ struct
     let table = Table_widget.Table.move_cursor table (cursor_of_focus s) in
     let status_banner =
       if all_valid then
-        Widgets.bg 22 (Widgets.fg 15 " ✓ Form is valid - ready to install! ")
-      else Widgets.bg 160 (Widgets.fg 15 (Widgets.bold " ⚠ Form incomplete "))
+        Widgets.themed_success " ✓ Form is valid - ready to install! "
+      else Widgets.themed_error " ⚠ Form incomplete "
     in
     (* Get hint for current field and set it for Help_hint modal *)
     (* If field is invalid, show validation error instead of hint *)
@@ -687,18 +688,15 @@ struct
       else Some "Press Enter to install the service"
     in
     Miaou.Core.Help_hint.set current_hint ;
-    let title_line = Widgets.title_highlight S.spec.title in
+    let title_line = Widgets.themed_primary S.spec.title in
     let header = [title_line; status_banner] in
-    let content_footer =
+    let footer =
       match current_hint with
-      | Some hint -> [Widgets.dim (Printf.sprintf "  %s" hint)]
+      | Some hint -> [Widgets.themed_muted (Printf.sprintf "  %s" hint)]
       | None -> []
     in
-    Miaou_widgets_layout.Vsection.render
-      ~size
-      ~header
-      ~content_footer
-      ~child:(fun _ -> Table_widget.Table.render table)
+    Themed_page.render_layout ~size ~header ~footer ~child:(fun _ ->
+        Table_widget.Table.render table)
 
   let handle_modal_key ps key ~size:_ =
     Miaou.Core.Modal_manager.handle_key key ;

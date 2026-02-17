@@ -19,10 +19,12 @@ val shutdown : unit -> unit
 (** Start the TUI application.
     @param page Initial page to display (defaults to the instances page).
     @param log Enable Miaou debug logging.
-    @param logfile Path to log file. *)
+    @param logfile Path to log file.
+    @param theme Theme name or path. *)
 val run :
   ?page:string ->
   ?log:bool ->
   ?logfile:string ->
+  ?theme:string ->
   unit ->
   (unit, [> `Msg of string]) result

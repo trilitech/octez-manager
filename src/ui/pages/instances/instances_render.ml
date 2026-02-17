@@ -12,6 +12,7 @@ module Vsection = Miaou_widgets_layout.Vsection
 module Grid = Miaou_widgets_layout.Grid_layout
 module Box = Miaou_widgets_layout.Box_widget
 module Metrics = Rpc_metrics
+module Style_context = Miaou_style.Style_context
 open Octez_manager_lib
 open Instances_state
 open Instances_layout
@@ -19,21 +20,22 @@ open Instances_layout
 let status_icon (st : Service_state.t) =
   let instance = st.Service_state.service.Service.instance in
   match st.Service_state.status with
-  | Service_state.Running -> Widgets.green "●"
+  | Service_state.Running -> Widgets.themed_success "●"
   | Service_state.Stopped ->
       (* Stopped but check for recent failure from UI-initiated start *)
-      if Option.is_some (get_recent_failure ~instance) then Widgets.red "●"
-      else Widgets.yellow "●"
+      if Option.is_some (get_recent_failure ~instance) then
+        Widgets.themed_error "●"
+      else Widgets.themed_warning "●"
   | Service_state.Unknown _ ->
       (* Unknown status from systemd means the service failed.
          This catches crashes at startup even when not started via UI. *)
-      Widgets.red "●"
+      Widgets.themed_error "●"
 
 let enabled_badge (st : Service_state.t) =
   match st.Service_state.enabled with
-  | Some true -> Widgets.dim "[enabled]"
-  | Some false -> Widgets.dim "[disabled]"
-  | None -> Widgets.dim "[unknown]"
+  | Some true -> Widgets.themed_secondary "[enabled]"
+  | Some false -> Widgets.themed_secondary "[disabled]"
+  | None -> Widgets.themed_secondary "[unknown]"
 
 let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
   let stopped =
@@ -49,17 +51,19 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
     | Service_state.Stopped -> (
         (* Check for recent start failure first *)
         match get_recent_failure ~instance:svc.Service.instance with
-        | Some error -> Some (Widgets.red ("failed: " ^ error))
-        | None -> Some (Widgets.yellow "stopped"))
+        | Some error -> Some (Widgets.themed_error ("failed: " ^ error))
+        | None -> Some (Widgets.themed_warning "stopped"))
     | Service_state.Unknown msg ->
-        Some (Widgets.red ("failed" ^ if msg = "" then "" else ": " ^ msg))
+        Some
+          (Widgets.themed_error
+             ("failed" ^ if msg = "" then "" else ": " ^ msg))
   in
   match Metrics.get ~instance:svc.Service.instance with
   | None -> (
       (* No metrics yet *)
       match service_prefix with
       | Some prefix -> prefix
-      | None -> Widgets.dim "pending")
+      | None -> Widgets.themed_muted "pending")
   | Some
       {
         Metrics.head_level;
@@ -72,7 +76,7 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
       } ->
       let error_prefix =
         match last_error with
-        | Some _ -> Some (Widgets.red "no rpc")
+        | Some _ -> Some (Widgets.themed_error "no rpc")
         | None -> None
       in
       let lvl =
@@ -82,35 +86,38 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
         match (error_prefix, service_prefix, bootstrapped) with
         | Some err, _, _ -> err
         | None, Some prefix, _ -> prefix
-        | None, None, Some true -> Widgets.green "synced"
-        | None, None, Some false -> Widgets.yellow "syncing"
-        | None, None, None -> Widgets.dim (Context.render_spinner "")
+        | None, None, Some true -> Widgets.themed_success "synced"
+        | None, None, Some false -> Widgets.themed_warning "syncing"
+        | None, None, None -> Widgets.themed_muted (Context.render_spinner "")
       in
       let staleness =
         match last_block_time with
         | None -> ""
         | Some ts ->
             let age = Unix.gettimeofday () -. ts in
-            if age >= 120. then Widgets.red (Printf.sprintf "Δ %.0fs" age)
+            if age >= 120. then
+              Widgets.themed_error (Printf.sprintf "Δ %.0fs" age)
             else if age >= 30. then
-              Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
-            else Widgets.green (Printf.sprintf "Δ %.0fs" age)
+              Widgets.themed_warning (Printf.sprintf "Δ %.0fs" age)
+            else Widgets.themed_success (Printf.sprintf "Δ %.0fs" age)
       in
       let proto_s =
         match proto with
-        | None -> Widgets.dim "?"
+        | None -> Widgets.themed_muted "?"
         | Some p ->
             let s = String.sub p 0 (min 8 (String.length p)) in
-            if stopped then Widgets.dim s else s
+            if stopped then Widgets.themed_muted s else Widgets.themed_text s
       in
       let chain_s =
         match chain_id with
-        | None -> Widgets.dim "?"
+        | None -> Widgets.themed_muted "?"
         | Some c ->
             let s = String.sub c 0 (min 8 (String.length c)) in
-            if stopped then Widgets.dim s else s
+            if stopped then Widgets.themed_muted s else Widgets.themed_text s
       in
-      let lvl_s = if stopped then Widgets.dim lvl else lvl in
+      let lvl_s =
+        if stopped then Widgets.themed_muted lvl else Widgets.themed_text lvl
+      in
       let parts =
         [boot; lvl_s; proto_s; chain_s]
         @ if staleness = "" then [] else [staleness]
@@ -123,7 +130,8 @@ let network_short (n : string) =
 let line_for_service idx selected ~folded (st : Service_state.t) =
   let svc = st.Service_state.service in
   let marker =
-    if idx + services_start_idx = selected then Widgets.bold "➤" else " "
+    if idx + services_start_idx = selected then Widgets.themed_emphasis "➤"
+    else " "
   in
   let status = status_icon st in
   let enabled = enabled_badge st in
@@ -136,16 +144,24 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
            This avoids showing failure for normal stops. *)
         Option.is_some (get_recent_failure ~instance:svc.Service.instance)
   in
-  let failure_badge = if has_failure then Widgets.red " [!]" else "" in
-  let instance_str = Printf.sprintf "%-16s" svc.Service.instance in
+  let failure_badge = if has_failure then Widgets.themed_error " [!]" else "" in
+  let instance_str =
+    Widgets.themed_text (Printf.sprintf "%-16s" svc.Service.instance)
+  in
   (* For nodes: show history mode. For others: no extra info on first line *)
   let role_info =
     match svc.Service.role with
     | "node" ->
-        Printf.sprintf "%-10s" (History_mode.to_string svc.Service.history_mode)
-    | _ -> Printf.sprintf "%-10s" ""
+        Widgets.themed_text
+          (Printf.sprintf
+             "%-10s"
+             (History_mode.to_string svc.Service.history_mode))
+    | _ -> Widgets.themed_text (Printf.sprintf "%-10s" "")
   in
-  let network = Printf.sprintf "%-12s" (network_short svc.Service.network) in
+  let network =
+    Widgets.themed_text
+      (Printf.sprintf "%-12s" (network_short svc.Service.network))
+  in
   let fold_indicator = if folded then "+" else "−" in
   let first_line =
     Printf.sprintf
@@ -166,7 +182,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   let baker_highwatermarks_line ~instance =
     let activities = Baker_highwatermarks.read ~instance in
     match Baker_highwatermarks.format_summary activities with
-    | None -> Widgets.yellow "no signing activity"
+    | None -> Widgets.themed_warning "no signing activity"
     | Some summary -> summary
   in
   (* Check if baker has DAL enabled *)
@@ -183,7 +199,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   (* Render delegate status for bakers (from RPC) *)
   let delegate_status_line ~instance =
     let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
-    if delegate_pkhs = [] then Widgets.dim "no delegates configured"
+    if delegate_pkhs = [] then Widgets.themed_muted "no delegates configured"
     else
       let has_dal = baker_has_dal ~instance in
       let parts =
@@ -196,12 +212,12 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
             match Delegate_data.get ~pkh with
             | None ->
                 (* No data yet - show pending *)
-                Printf.sprintf "%s:%s" short_pkh (Widgets.dim "…")
+                Printf.sprintf "%s:%s" short_pkh (Widgets.themed_muted "…")
             | Some d ->
                 (* Status indicators *)
                 let status =
-                  if d.is_forbidden then Widgets.red "FORBIDDEN"
-                  else if d.deactivated then Widgets.dim "inactive"
+                  if d.is_forbidden then Widgets.themed_error "FORBIDDEN"
+                  else if d.deactivated then Widgets.themed_muted "inactive"
                   else
                     (* Missed slots status *)
                     let missed = d.participation.missed_slots in
@@ -210,15 +226,15 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                     in
                     match Delegate_data.missed_slots_status d with
                     | Delegate_data.Critical ->
-                        Widgets.red
+                        Widgets.themed_error
                           (Printf.sprintf "missed:%d/%d" missed remaining)
                     | Delegate_data.Warning ->
-                        Widgets.yellow
+                        Widgets.themed_warning
                           (Printf.sprintf "missed:%d/%d" missed remaining)
                     | Delegate_data.Good ->
                         if missed > 0 then
                           Printf.sprintf "missed:%d/%d" missed remaining
-                        else Widgets.green "ok"
+                        else Widgets.themed_success "ok"
                 in
                 (* DAL participation info if baker has DAL enabled *)
                 let dal_info =
@@ -233,12 +249,13 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                       else "-"
                     in
                     let dal_status =
-                      if dp.denounced then Widgets.red "denounced"
+                      if dp.denounced then Widgets.themed_error "denounced"
                       else if
                         (not dp.sufficient_dal_participation) && attestable > 0
-                      then Widgets.yellow (Printf.sprintf "dal:%s" ratio)
+                      then
+                        Widgets.themed_warning (Printf.sprintf "dal:%s" ratio)
                       else if attestable > 0 then
-                        Widgets.green (Printf.sprintf "dal:%s" ratio)
+                        Widgets.themed_success (Printf.sprintf "dal:%s" ratio)
                       else ""
                     in
                     if dal_status = "" then "" else " " ^ dal_status
@@ -250,14 +267,14 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   in
   let dal_health_line ~instance =
     match Dal_health.get ~instance with
-    | None -> Widgets.dim "health: ?"
+    | None -> Widgets.themed_muted "health: ?"
     | Some health ->
         let status_str =
           match health.Dal_health.status with
-          | Dal_health.Up -> Widgets.green "up"
-          | Dal_health.Down -> Widgets.red "down"
-          | Dal_health.Degraded -> Widgets.yellow "degraded"
-          | Dal_health.Unknown -> Widgets.dim "?"
+          | Dal_health.Up -> Widgets.themed_success "up"
+          | Dal_health.Down -> Widgets.themed_error "down"
+          | Dal_health.Degraded -> Widgets.themed_warning "degraded"
+          | Dal_health.Unknown -> Widgets.themed_muted "?"
         in
         let checks_str =
           if health.Dal_health.checks = [] then ""
@@ -267,10 +284,10 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                 (fun (c : Dal_health.check) ->
                   let st =
                     match c.status with
-                    | Dal_health.Up -> Widgets.green "ok"
-                    | Dal_health.Down -> Widgets.red "ko"
-                    | Dal_health.Degraded -> Widgets.yellow "deg"
-                    | Dal_health.Unknown -> "?"
+                    | Dal_health.Up -> Widgets.themed_success "ok"
+                    | Dal_health.Down -> Widgets.themed_error "ko"
+                    | Dal_health.Degraded -> Widgets.themed_warning "deg"
+                    | Dal_health.Unknown -> Widgets.themed_muted "?"
                   in
                   Printf.sprintf "%s:%s" c.name st)
                 health.Dal_health.checks
@@ -290,12 +307,12 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
           (* Stopped but check for recent failure from UI-initiated start *)
           if has_failure then
             match get_recent_failure ~instance:svc.Service.instance with
-            | Some error -> indent ^ Widgets.red ("failed: " ^ error)
-            | None -> indent ^ Widgets.yellow "stopped"
-          else indent ^ Widgets.yellow "stopped"
+            | Some error -> indent ^ Widgets.themed_error ("failed: " ^ error)
+            | None -> indent ^ Widgets.themed_warning "stopped"
+          else indent ^ Widgets.themed_warning "stopped"
       | Service_state.Unknown msg ->
           (* Unknown status from systemd means the service failed *)
-          indent ^ Widgets.red ("failed: " ^ msg)
+          indent ^ Widgets.themed_error ("failed: " ^ msg)
       | Service_state.Running -> indent (* shouldn't happen *)
     else
       match svc.Service.role with
@@ -311,7 +328,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
             (dal_health_line ~instance:svc.Service.instance)
       | "accuser" ->
           (* Line 2 for accusers: simple monitoring status *)
-          Printf.sprintf "%s%s" indent (Widgets.green "monitoring")
+          Printf.sprintf "%s%s" indent (Widgets.themed_success "monitoring")
       | _ ->
           Printf.sprintf
             "%s%s"
@@ -344,7 +361,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                 ~instance:svc.Service.instance
             with
             | Some v -> System_metrics_scheduler.format_version_colored v
-            | None -> Widgets.dim "v?"
+            | None -> Widgets.themed_muted "v?"
           in
           let mem =
             System_metrics_scheduler.render_mem_sparkline
@@ -355,7 +372,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
           (* Metrics line: version, memory, disk (for nodes and dal-nodes) *)
           let metrics_parts =
             [version]
-            @ (if mem = "" then [] else ["MEM " ^ mem])
+            @ (if mem = "" then [] else [Widgets.themed_text "MEM " ^ mem])
             @
             if svc.Service.role = "node" || svc.Service.role = "dal-node" then
               let disk =
@@ -364,10 +381,11 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                     ~role:svc.Service.role
                     ~instance:svc.Service.instance
                 with
-                | Some sz -> System_metrics.format_bytes sz
-                | None -> Widgets.dim "?"
+                | Some sz ->
+                    Widgets.themed_text (System_metrics.format_bytes sz)
+                | None -> Widgets.themed_muted "?"
               in
-              ["DISK " ^ disk]
+              [Widgets.themed_text "DISK " ^ disk]
             else []
           in
           let metrics_line = indent ^ String.concat " · " metrics_parts in
@@ -386,7 +404,12 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                 List.mapi
                   (fun i row ->
                     if i = last_idx then
-                      Printf.sprintf "%sCPU %s %.0f%%" indent row avg
+                      Printf.sprintf
+                        "%s%s%s %.0f%%"
+                        indent
+                        (Widgets.themed_text "CPU ")
+                        row
+                        avg
                     else Printf.sprintf "%s    %s" indent row)
                   chart_rows
           in
@@ -435,12 +458,22 @@ let pad_line ~col_width line =
     truncate_visible ~max_width:col_width line
   else line
 
-let role_color = function
-  | "node" | "── Nodes ──" -> 14
-  | "baker" | "── Bakers ──" -> 12
-  | "accuser" | "── Accusers ──" -> 6
-  | "dal-node" | "── DAL Nodes ──" -> 13
-  | _ -> 8
+let role_key_of_header = function
+  | "Nodes" -> "node"
+  | "Bakers" -> "baker"
+  | "Accusers" -> "accuser"
+  | "DAL Nodes" -> "dal-node"
+  | "Signatories" -> "signatory"
+  | header ->
+      let buf = Buffer.create (String.length header) in
+      String.iter
+        (fun c ->
+          let lower = Char.lowercase_ascii c in
+          if (lower >= 'a' && lower <= 'z') || (lower >= '0' && lower <= '9')
+          then Buffer.add_char buf lower
+          else Buffer.add_char buf '-')
+        header ;
+      Buffer.contents buf
 
 (** Render a single column's content - returns list of lines *)
 let render_column ~col_width ~state ~column_groups =
@@ -474,7 +507,7 @@ let render_column ~col_width ~state ~column_groups =
   let lines =
     List.concat_map
       (fun (role_name, instances) ->
-        let color = role_color role_name in
+        let widget_name = "instances-box-" ^ role_key_of_header role_name in
         let instance_lines =
           List.concat_map
             (fun (idx, (svc : Service_state.t)) ->
@@ -489,12 +522,12 @@ let render_column ~col_width ~state ~column_groups =
         in
         let content = String.concat "\n" instance_lines in
         let box =
-          Box.render
-            ~title:role_name
-            ~style:Rounded
-            ~color
-            ~width:col_width
-            content
+          Style_context.with_child_context ~widget_name (fun () ->
+              Box.render
+                ~title:role_name
+                ~style:Rounded
+                ~width:col_width
+                content)
         in
         let box_lines =
           String.split_on_char '\n' box |> List.map (pad_line ~col_width)
@@ -509,7 +542,7 @@ let render_column ~col_width ~state ~column_groups =
 (** Dim inactive column lines to make active column stand out. *)
 let dim_inactive_column line =
   (* Wrap entire line in dim formatting *)
-  Printf.sprintf "\027[2m%s\027[22m" line
+  Widgets.themed_muted line
 
 (** Merge multiple column renders into combined lines with per-column scrolling.
     Uses Grid_layout for consistent column layout. *)
@@ -590,28 +623,34 @@ let render_external_service ~selected_idx ~current_idx ~folded
   let network_str = match cfg.network.value with Some n -> n | None -> "?" in
   let status_str = status_label (status_of_unit_state cfg.unit_state) in
 
-  let marker = if current_idx = selected_idx then Widgets.bold "➤" else " " in
+  let marker =
+    if current_idx = selected_idx then Widgets.themed_emphasis "➤" else " "
+  in
   let fold_indicator = if folded then "+" else "−" in
   let status =
     match cfg.unit_state.active_state with
-    | "active" -> Widgets.green "●"
-    | "failed" -> Widgets.red "●"
-    | _ -> Widgets.yellow "●"
+    | "active" -> Widgets.themed_success "●"
+    | "failed" -> Widgets.themed_error "●"
+    | _ -> Widgets.themed_warning "●"
   in
 
   (* First line: like managed services *)
-  let instance_str = Printf.sprintf "%-16s" ext.suggested_instance_name in
-  let role_str = Printf.sprintf "%-10s" role_str in
-  let network = Printf.sprintf "%-12s" network_str in
+  let instance_str =
+    Widgets.themed_text (Printf.sprintf "%-16s" ext.suggested_instance_name)
+  in
+  let role_str = Widgets.themed_text (Printf.sprintf "%-10s" role_str) in
+  let network = Widgets.themed_text (Printf.sprintf "%-12s" network_str) in
+  let external_badge = Widgets.themed_muted "[external]" in
   let first_line =
     Printf.sprintf
-      "%s %s %s %s %s %s [external]"
+      "%s %s %s %s %s %s %s"
       marker
       fold_indicator
       status
       instance_str
       role_str
       network
+      external_badge
   in
 
   if folded then [first_line]
@@ -654,13 +693,13 @@ let render_external_service ~selected_idx ~current_idx ~folded
       match cfg.role.value with
       | Some Node ->
           let rpc = match cfg.rpc_addr.value with Some r -> r | None -> "?" in
-          indent ^ "RPC: " ^ rpc
+          Widgets.themed_text (indent ^ "RPC: " ^ rpc)
       | Some (Baker | Accuser | Dal_node) ->
           let ep =
             match cfg.node_endpoint.value with Some e -> e | None -> "?"
           in
-          indent ^ "Node: " ^ ep
-      | _ -> indent ^ "Status: " ^ status_str
+          Widgets.themed_text (indent ^ "Node: " ^ ep)
+      | _ -> Widgets.themed_text (indent ^ "Status: " ^ status_str)
     in
 
     (* System metrics *)
@@ -672,7 +711,7 @@ let render_external_service ~selected_idx ~current_idx ~folded
           ~instance:instance_for_metrics
       with
       | Some v -> System_metrics_scheduler.format_version_colored v
-      | None -> Widgets.dim "v?"
+      | None -> Widgets.themed_muted "v?"
     in
     let mem =
       System_metrics_scheduler.render_mem_sparkline
@@ -688,14 +727,14 @@ let render_external_service ~selected_idx ~current_idx ~folded
           | Some metrics ->
               let head_str =
                 match metrics.Rpc_metrics.head_level with
-                | Some l -> Printf.sprintf "L%d" l
-                | None -> "L?"
+                | Some l -> Widgets.themed_text (Printf.sprintf "L%d" l)
+                | None -> Widgets.themed_muted "L?"
               in
               let sync_badge =
                 match metrics.Rpc_metrics.bootstrapped with
-                | Some true -> Widgets.green "synced"
-                | Some false -> Widgets.yellow "syncing"
-                | None -> Widgets.dim (Context.render_spinner "")
+                | Some true -> Widgets.themed_success "synced"
+                | Some false -> Widgets.themed_warning "syncing"
+                | None -> Widgets.themed_muted (Context.render_spinner "")
               in
               let staleness =
                 match metrics.Rpc_metrics.last_block_time with
@@ -703,10 +742,10 @@ let render_external_service ~selected_idx ~current_idx ~folded
                 | Some ts ->
                     let age = Unix.gettimeofday () -. ts in
                     if age >= 120. then
-                      Widgets.red (Printf.sprintf "Δ %.0fs" age)
+                      Widgets.themed_error (Printf.sprintf "Δ %.0fs" age)
                     else if age >= 30. then
-                      Widgets.yellow (Printf.sprintf "Δ %.0fs" age)
-                    else Widgets.green (Printf.sprintf "Δ %.0fs" age)
+                      Widgets.themed_warning (Printf.sprintf "Δ %.0fs" age)
+                    else Widgets.themed_success (Printf.sprintf "Δ %.0fs" age)
               in
               [head_str; sync_badge]
               @ if staleness = "" then [] else [staleness]
@@ -714,7 +753,9 @@ let render_external_service ~selected_idx ~current_idx ~folded
       | _ -> []
     in
     let metrics_parts =
-      [version] @ (if mem = "" then [] else ["MEM " ^ mem]) @ node_info
+      [version]
+      @ (if mem = "" then [] else [Widgets.themed_text "MEM " ^ mem])
+      @ node_info
     in
     let metrics_line = indent ^ String.concat " · " metrics_parts in
 
@@ -737,7 +778,7 @@ let render_external_service ~selected_idx ~current_idx ~folded
 let render_external_services_section state =
   if state.external_services = [] then []
   else
-    let header = Widgets.bold "── Unmanaged Instances ──" in
+    let header = Widgets.themed_emphasis "Unmanaged Instances" in
     (* Calculate base index for external services (after menu and managed services) *)
     let external_start_idx = services_start_idx + List.length state.services in
     let service_lines =
@@ -765,16 +806,28 @@ let render_external_services_section state =
 (** Single-column layout (original) *)
 let table_lines_single state =
   let install_row =
-    let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+    let marker =
+      if state.selected = 0 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf
+      "%s %s"
+      marker
+      (Widgets.themed_emphasis "[ Install new instance ]")
   in
   let binaries_row =
-    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage binaries ]")
+    let marker =
+      if state.selected = 1 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf
+      "%s %s"
+      marker
+      (Widgets.themed_emphasis "[ Manage binaries ]")
   in
   let rpc_row =
-    let marker = if state.selected = 2 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Browse RPCs ]")
+    let marker =
+      if state.selected = 2 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
   in
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
@@ -808,7 +861,7 @@ let table_lines_single state =
       List.concat_map
         (fun (role, svcs) ->
           let hdr = role_header role in
-          let color = role_color role in
+          let widget_name = "instances-box-" ^ role in
           let instance_lines =
             List.concat_map
               (fun (svc : Service_state.t) ->
@@ -825,7 +878,8 @@ let table_lines_single state =
           in
           let content = String.concat "\n" instance_lines in
           let box =
-            Box.render ~title:hdr ~style:Rounded ~color ~width:78 content
+            Style_context.with_child_context ~widget_name (fun () ->
+                Box.render ~title:hdr ~style:Rounded ~width:78 content)
           in
           let box_lines = String.split_on_char '\n' box in
           let result = if !is_first then box_lines else "" :: box_lines in
@@ -836,9 +890,8 @@ let table_lines_single state =
   let external_rows = render_external_services_section state in
   let external_rows =
     if external_rows = [] then []
-    else
-      (* Add separator above external services *)
-      let separator = Widgets.dim (String.make 80 '-') in
+    else (* Add separator above external services *)
+      let separator = Widgets.themed_muted (String.make 80 '-') in
       "" :: separator :: external_rows
   in
   (install_row :: binaries_row :: rpc_row :: "" :: instance_rows)
@@ -871,16 +924,28 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   let columns_visible_height = max 5 (visible_height - reserved_for_external) in
   (* Header row (install, binaries, rpcs) spans full width in single line *)
   let install_row =
-    let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+    let marker =
+      if state.selected = 0 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf
+      "%s %s"
+      marker
+      (Widgets.themed_emphasis "[ Install new instance ]")
   in
   let binaries_row =
-    let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage binaries ]")
+    let marker =
+      if state.selected = 1 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf
+      "%s %s"
+      marker
+      (Widgets.themed_emphasis "[ Manage binaries ]")
   in
   let rpc_row =
-    let marker = if state.selected = 2 then Widgets.bold "➤" else " " in
-    Printf.sprintf "%s %s" marker (Widgets.bold "[ Browse RPCs ]")
+    let marker =
+      if state.selected = 2 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
   in
   (* When selection is in menu area, use -1 to dim all columns equally *)
   let effective_active_column =
@@ -911,7 +976,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     install_row :: binaries_row :: rpc_row :: "" :: instance_rows_trimmed
   in
   if external_line_count > 0 then
-    let separator = Widgets.dim (String.make (min cols 120) '-') in
+    let separator = Widgets.themed_muted (String.make (min cols 120) '-') in
     result @ [""; separator] @ external_lines
   else result
 
@@ -923,16 +988,28 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
   in
   if state.services = [] then
     let install_row =
-      let marker = if state.selected = 0 then Widgets.bold "➤" else " " in
-      Printf.sprintf "%s %s" marker (Widgets.bold "[ Install new instance ]")
+      let marker =
+        if state.selected = 0 then Widgets.themed_emphasis "➤" else " "
+      in
+      Printf.sprintf
+        "%s %s"
+        marker
+        (Widgets.themed_emphasis "[ Install new instance ]")
     in
     let binaries_row =
-      let marker = if state.selected = 1 then Widgets.bold "➤" else " " in
-      Printf.sprintf "%s %s" marker (Widgets.bold "[ Manage binaries ]")
+      let marker =
+        if state.selected = 1 then Widgets.themed_emphasis "➤" else " "
+      in
+      Printf.sprintf
+        "%s %s"
+        marker
+        (Widgets.themed_emphasis "[ Manage binaries ]")
     in
     let rpc_row =
-      let marker = if state.selected = 2 then Widgets.bold "➤" else " " in
-      Printf.sprintf "%s %s" marker (Widgets.bold "[ Browse RPCs ]")
+      let marker =
+        if state.selected = 2 then Widgets.themed_emphasis "➤" else " "
+      in
+      Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
     in
     let external_rows = render_external_services_section state in
     let external_rows =

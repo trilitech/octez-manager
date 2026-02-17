@@ -137,7 +137,7 @@ let download_octez_version (version_info : Binary_downloader.version_info) =
       match result with
       | Ok res ->
           Context.multi_progress_checksum "Verifying checksums..." ;
-          Unix.sleepf 0.5 ;
+          (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 0.5 ;
           (match res.Binary_downloader.checksum_status with
           | Binary_downloader.Verified ->
               Context.multi_progress_checksum
@@ -148,7 +148,7 @@ let download_octez_version (version_info : Binary_downloader.version_info) =
           | Binary_downloader.Failed reason ->
               Context.multi_progress_checksum
                 (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
-          Unix.sleepf 2.0 ;
+          (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 2.0 ;
           (* Linger to show final status *)
           Context.multi_progress_finish () ;
           Context.toast_success (Printf.sprintf "Downloaded Octez v%s" version) ;
@@ -185,7 +185,7 @@ let download_signatory_version
       match result with
       | Ok res ->
           Context.multi_progress_checksum "Verifying checksums..." ;
-          Unix.sleepf 0.5 ;
+          (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 0.5 ;
           (match res.Signatory_downloader.checksum_status with
           | Signatory_downloader.Verified ->
               Context.multi_progress_checksum "\xe2\x9c\x93 Checksum verified"
@@ -195,7 +195,7 @@ let download_signatory_version
           | Signatory_downloader.Failed reason ->
               Context.multi_progress_checksum
                 (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
-          Unix.sleepf 2.0 ;
+          (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 2.0 ;
           (* Linger to show final status *)
           Context.multi_progress_finish () ;
           Context.toast_success

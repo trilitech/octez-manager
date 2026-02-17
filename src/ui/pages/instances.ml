@@ -6,10 +6,12 @@
 (******************************************************************************)
 
 module Widgets = Miaou_widgets_display.Widgets
-module Vsection = Miaou_widgets_layout.Vsection
+module Flex = Miaou_widgets_layout.Flex_layout
 module Keys = Miaou.Core.Keys
 module Metrics = Rpc_metrics
 module Navigation = Miaou.Core.Navigation
+module Style = Miaou_style.Style
+module Style_context = Miaou_style.Style_context
 open Octez_manager_lib
 open Rresult
 
@@ -293,8 +295,8 @@ struct
 
   let header s =
     let privilege =
-      if Paths.is_root () then Widgets.red "● SYSTEM"
-      else Widgets.green "● USER"
+      if Paths.is_root () then Widgets.themed_error "● SYSTEM"
+      else Widgets.themed_success "● USER"
     in
     let hint =
       "Hint: c create · b binaries · d diagnostics · t topology · r rpc · ? \
@@ -303,10 +305,10 @@ struct
     [
       Printf.sprintf
         "%s   %s    %s"
-        (Widgets.title_highlight " octez-manager ")
+        (Widgets.themed_primary " octez-manager ")
         privilege
-        (Widgets.dim hint);
-      Widgets.dim (summary_line s);
+        (Widgets.themed_secondary hint);
+      Widgets.themed_secondary (summary_line s);
     ]
 
   let node_help_hint =
@@ -445,7 +447,7 @@ Press **Enter** to open instance menu.|}
           else
             let log_lines = job.Job_manager.log in
             let tail =
-              if log_lines = [] then Widgets.dim "(starting...)"
+              if log_lines = [] then Widgets.themed_muted "(starting...)"
               else log_lines |> take 5 |> List.rev |> String.concat "\n"
             in
             let status_str =
@@ -456,16 +458,16 @@ Press **Enter** to open instance menu.|}
                   in
                   Printf.sprintf "Running (%.0fs)" elapsed
               | Job_manager.Pending -> "Pending"
-              | Job_manager.Succeeded -> Widgets.green "Done"
+              | Job_manager.Succeeded -> Widgets.themed_success "Done"
               | Job_manager.Failed msg ->
-                  Widgets.red (Printf.sprintf "Failed: %s" msg)
+                  Widgets.themed_error (Printf.sprintf "Failed: %s" msg)
             in
             let phase_str =
               if job.Job_manager.phase = "" then ""
-              else " " ^ Widgets.cyan ("[" ^ job.phase ^ "]")
+              else " " ^ Widgets.themed_accent ("[" ^ job.phase ^ "]")
             in
             "\n"
-            ^ Widgets.dim
+            ^ Widgets.themed_muted
                 (Printf.sprintf
                    "--- Job: %s (%s)%s ---"
                    job.description
@@ -475,176 +477,258 @@ Press **Enter** to open instance menu.|}
       | None -> ""
     in
     let toast_lines_str = Context.render_toasts ~cols in
-    Vsection.render
-      ~size
-      ~header:(header s)
-      ~content_footer:[]
-      ~child:(fun inner_size ->
-        (* Available rows for content (reserve space for progress/toasts/logs) *)
-        let progress_lines =
-          if String.trim progress = "" then 0
-          else List.length (String.split_on_char '\n' progress)
+    let header_lines = header s in
+    let header_block = String.concat "\n" header_lines in
+    let separator = Widgets.themed_border (Widgets.hr ~width:cols ()) in
+    let footer_pairs =
+      [
+        ("Enter", "Open");
+        ("c", "Create");
+        ("d", "Diagnostics");
+        ("t", "Topology");
+        ("b", "Binaries");
+        ("r", "RPC Browser");
+        ("x", "Clear failure");
+        ("?", "Help");
+      ]
+    in
+    let footer_segments =
+      List.map
+        (fun (k, v) ->
+          Widgets.themed_secondary (k ^ ": ") ^ Widgets.themed_text v)
+        footer_pairs
+    in
+    let footer_lines =
+      let space = "    " in
+      let lines = ref [] in
+      let current = ref "" in
+      let add_line () =
+        if !current <> "" then (
+          lines := !current :: !lines ;
+          current := "")
+      in
+      List.iter
+        (fun seg ->
+          if !current = "" then current := seg
+          else
+            let candidate = !current ^ space ^ seg in
+            if Widgets.visible_chars_count candidate > cols then (
+              add_line () ;
+              current := seg)
+            else current := candidate)
+        footer_segments ;
+      add_line () ;
+      let max_lines = 2 in
+      let lines = List.rev !lines in
+      if List.length lines <= max_lines then lines else take max_lines lines
+    in
+    let footer_block = String.concat "\n" footer_lines in
+    let render_body ~size:inner_size =
+      (* Available rows for content (reserve space for progress/toasts/logs) *)
+      let progress_lines =
+        if String.trim progress = "" then 0
+        else List.length (String.split_on_char '\n' progress)
+      in
+      let log_lines_count =
+        if job_logs = "" then 0
+        else List.length (String.split_on_char '\n' job_logs)
+      in
+      let toast_lines =
+        if String.length toast_lines_str = 0 then 0
+        else List.length (String.split_on_char '\n' toast_lines_str)
+      in
+      let avail_rows =
+        inner_size.LTerm_geom.rows - progress_lines - log_lines_count
+        - toast_lines - 1
+      in
+      let avail_rows = max 5 avail_rows in
+      (* Update visible height for scroll calculations - subtract menu rows *)
+      last_visible_height_ref := avail_rows - services_start_idx ;
+      let num_columns =
+        calc_num_columns ~cols ~min_column_width ~column_separator
+      in
+      (* Matrix layout handles its own scrolling per-column *)
+      if num_columns > 1 then
+        let table = table_lines ~cols ~visible_height:avail_rows s in
+        let body = String.concat "\n" table in
+        let body =
+          if String.trim progress = "" then body else progress ^ "\n" ^ body
         in
-        let log_lines_count =
-          if job_logs = "" then 0
-          else List.length (String.split_on_char '\n' job_logs)
+        let body = if job_logs = "" then body else body ^ job_logs in
+        if String.length toast_lines_str > 0 then body ^ "\n" ^ toast_lines_str
+        else body
+      else
+        (* Single column: use global scrolling *)
+        let table = table_lines ~cols ~visible_height:avail_rows s in
+        let all_lines =
+          List.concat_map (fun s -> String.split_on_char '\n' s) table
         in
-        let toast_lines =
-          if String.length toast_lines_str = 0 then 0
-          else List.length (String.split_on_char '\n' toast_lines_str)
-        in
-        let avail_rows =
-          inner_size.LTerm_geom.rows - progress_lines - log_lines_count
-          - toast_lines - 1
-        in
-        let avail_rows = max 5 avail_rows in
-        (* Update visible height for scroll calculations - subtract menu rows *)
-        last_visible_height_ref := avail_rows - services_start_idx ;
-        let num_columns =
-          calc_num_columns ~cols ~min_column_width ~column_separator
-        in
-        (* Matrix layout handles its own scrolling per-column *)
-        if num_columns > 1 then
-          let table = table_lines ~cols ~visible_height:avail_rows s in
-          let body = String.concat "\n" table in
-          let body =
-            if String.trim progress = "" then body else progress ^ "\n" ^ body
-          in
-          let body = if job_logs = "" then body else body ^ job_logs in
-          if String.length toast_lines_str > 0 then
-            body ^ "\n" ^ toast_lines_str
-          else body
-        else
-          (* Single column: use global scrolling *)
-          let table = table_lines ~cols ~visible_height:avail_rows s in
-          let all_lines =
-            List.concat_map (fun s -> String.split_on_char '\n' s) table
-          in
-          let total_lines = List.length all_lines in
-          (* Calculate line index where current selection starts.
-             s.selected meanings:
-               0 -> install menu
-               1 -> separator (skipped in navigation)
-               2+ -> service at index (s.selected - services_start_idx)
+        let total_lines = List.length all_lines in
+        (* Calculate line index where current selection starts.
+           s.selected meanings:
+             0 -> install menu
+             1 -> separator (skipped in navigation)
+             2+ -> service at index (s.selected - services_start_idx)
 
-             Table structure from table_lines_single:
-               [install; ""; ...instance_rows...]
-             where instance_rows = headers interleaved with services.
+           Table structure from table_lines_single:
+             [install; ""; ...instance_rows...]
+           where instance_rows = headers interleaved with services.
 
-             We need to find where the selected item starts in all_lines.
-          *)
-          let selection_line_start, selection_line_count =
-            if s.selected < services_start_idx then
-              (* Menu items: count lines for entries 0..s.selected-1 *)
-              let line_start =
-                let rec count idx acc =
-                  if idx >= s.selected then acc
-                  else if idx >= List.length table then acc
-                  else
-                    let entry = List.nth table idx in
-                    let lines = String.split_on_char '\n' entry in
-                    count (idx + 1) (acc + List.length lines)
-                in
-                count 0 0
-              in
-              let line_count =
-                if s.selected >= List.length table then 1
+           We need to find where the selected item starts in all_lines.
+        *)
+        let selection_line_start, selection_line_count =
+          if s.selected < services_start_idx then
+            (* Menu items: count lines for entries 0..s.selected-1 *)
+            let line_start =
+              let rec count idx acc =
+                if idx >= s.selected then acc
+                else if idx >= List.length table then acc
                 else
-                  List.length
-                    (String.split_on_char '\n' (List.nth table s.selected))
+                  let entry = List.nth table idx in
+                  let lines = String.split_on_char '\n' entry in
+                  count (idx + 1) (acc + List.length lines)
               in
-              (line_start, line_count)
-            else
-              (* Service selection: s.selected = services_start_idx + service_index.
-                 Count menu lines, then iterate through services
-                 adding header lines when role changes. *)
-              let target_svc_idx = s.selected - services_start_idx in
-              (* Menu lines: install + "" *)
-              let menu_lines =
-                let rec count idx acc =
-                  if idx >= services_start_idx then acc
-                  else if idx >= List.length table then acc
-                  else
-                    let entry = List.nth table idx in
-                    count
-                      (idx + 1)
-                      (acc + List.length (String.split_on_char '\n' entry))
-                in
-                count 0 0
+              count 0 0
+            in
+            let line_count =
+              if s.selected >= List.length table then 1
+              else
+                List.length
+                  (String.split_on_char '\n' (List.nth table s.selected))
+            in
+            (line_start, line_count)
+          else
+            (* Service selection: s.selected = services_start_idx + service_index.
+               Count menu lines, then iterate through services
+               adding header lines when role changes. *)
+            let target_svc_idx = s.selected - services_start_idx in
+            (* Menu lines: install + "" *)
+            let menu_lines =
+              let rec count idx acc =
+                if idx >= services_start_idx then acc
+                else if idx >= List.length table then acc
+                else
+                  let entry = List.nth table idx in
+                  count
+                    (idx + 1)
+                    (acc + List.length (String.split_on_char '\n' entry))
               in
-              (* Count lines through services until target *)
-              let rec count_service_lines svc_idx prev_role acc services =
-                match services with
-                | [] -> (acc, 1) (* fallback *)
-                | (st : Service_state.t) :: rest ->
-                    let role = st.service.Service.role in
-                    (* Add header lines if role changed *)
-                    let header_lines =
-                      if Some role <> prev_role then
-                        (* Role header + empty line before it (except first) *)
-                        if prev_role = None then 1 else 2
-                      else 0
+              count 0 0
+            in
+            (* Count lines through services until target *)
+            let rec count_service_lines svc_idx prev_role acc services =
+              match services with
+              | [] -> (acc, 1) (* fallback *)
+              | (st : Service_state.t) :: rest ->
+                  let role = st.service.Service.role in
+                  (* Add header lines if role changed *)
+                  let header_lines =
+                    if Some role <> prev_role then
+                      (* Role header + empty line before it (except first) *)
+                      if prev_role = None then 1 else 2
+                    else 0
+                  in
+                  let acc = acc + header_lines in
+                  if svc_idx = target_svc_idx then
+                    (* Found target service *)
+                    let is_folded =
+                      StringSet.mem st.service.Service.instance s.folded
                     in
-                    let acc = acc + header_lines in
-                    if svc_idx = target_svc_idx then
-                      (* Found target service *)
-                      let is_folded =
-                        StringSet.mem st.service.Service.instance s.folded
-                      in
-                      let line_count = if is_folded then 2 else 6 in
-                      (acc, line_count)
-                    else
-                      (* Count this service's lines and continue *)
-                      let is_folded =
-                        StringSet.mem st.service.Service.instance s.folded
-                      in
-                      let svc_lines = if is_folded then 2 else 6 in
-                      count_service_lines
-                        (svc_idx + 1)
-                        (Some role)
-                        (acc + svc_lines)
-                        rest
-              in
-              let svc_line_start, line_count =
-                count_service_lines 0 None 0 s.services
-              in
-              (menu_lines + svc_line_start, line_count)
-          in
-          (* Adjust scroll offset to keep selection visible *)
-          let scroll = !scroll_offset_ref in
-          let scroll =
-            if selection_line_start < scroll then selection_line_start
-            else if
-              selection_line_start + selection_line_count > scroll + avail_rows
-            then selection_line_start + selection_line_count - avail_rows
-            else scroll
-          in
-          (* Clamp scroll to valid range *)
-          let scroll = max 0 (min scroll (max 0 (total_lines - avail_rows))) in
-          scroll_offset_ref := scroll ;
-          let visible_lines =
-            all_lines
-            |> List.mapi (fun i l -> (i, l))
-            |> List.filter (fun (i, _) ->
-                i >= scroll && i < scroll + avail_rows)
-            |> List.map snd
-          in
-          let up_indicator =
-            if scroll > 0 then [Widgets.dim "↑ more"] else []
-          in
-          let down_indicator =
-            if scroll + avail_rows < total_lines then [Widgets.dim "↓ more"]
-            else []
-          in
-          let content_lines = up_indicator @ visible_lines @ down_indicator in
-          let base = String.concat "\n" content_lines in
-          let body =
-            if String.trim progress = "" then base else progress ^ "\n" ^ base
-          in
-          let body = if job_logs = "" then body else body ^ job_logs in
-          if String.length toast_lines_str > 0 then
-            body ^ "\n" ^ toast_lines_str
-          else body)
+                    let line_count = if is_folded then 2 else 6 in
+                    (acc, line_count)
+                  else
+                    (* Count this service's lines and continue *)
+                    let is_folded =
+                      StringSet.mem st.service.Service.instance s.folded
+                    in
+                    let svc_lines = if is_folded then 2 else 6 in
+                    count_service_lines
+                      (svc_idx + 1)
+                      (Some role)
+                      (acc + svc_lines)
+                      rest
+            in
+            let svc_line_start, line_count =
+              count_service_lines 0 None 0 s.services
+            in
+            (menu_lines + svc_line_start, line_count)
+        in
+        (* Adjust scroll offset to keep selection visible *)
+        let scroll = !scroll_offset_ref in
+        let scroll =
+          if selection_line_start < scroll then selection_line_start
+          else if
+            selection_line_start + selection_line_count > scroll + avail_rows
+          then selection_line_start + selection_line_count - avail_rows
+          else scroll
+        in
+        (* Clamp scroll to valid range *)
+        let scroll = max 0 (min scroll (max 0 (total_lines - avail_rows))) in
+        scroll_offset_ref := scroll ;
+        let visible_lines =
+          all_lines
+          |> List.mapi (fun i l -> (i, l))
+          |> List.filter (fun (i, _) -> i >= scroll && i < scroll + avail_rows)
+          |> List.map snd
+        in
+        let up_indicator =
+          if scroll > 0 then [Widgets.themed_muted "↑ more"] else []
+        in
+        let down_indicator =
+          if scroll + avail_rows < total_lines then
+            [Widgets.themed_muted "↓ more"]
+          else []
+        in
+        let content_lines = up_indicator @ visible_lines @ down_indicator in
+        let base = String.concat "\n" content_lines in
+        let body =
+          if String.trim progress = "" then base else progress ^ "\n" ^ base
+        in
+        let body = if job_logs = "" then body else body ^ job_logs in
+        if String.length toast_lines_str > 0 then body ^ "\n" ^ toast_lines_str
+        else body
+    in
+    let layout =
+      Flex.create
+        ~direction:Flex.Column
+        [
+          {
+            render = (fun ~size:_ -> header_block);
+            basis = Flex.Px (List.length header_lines);
+            cross = None;
+          };
+          {render = (fun ~size:_ -> separator); basis = Flex.Px 1; cross = None};
+          {render = render_body; basis = Flex.Fill; cross = None};
+          {render = (fun ~size:_ -> separator); basis = Flex.Px 1; cross = None};
+          {
+            render = (fun ~size:_ -> footer_block);
+            basis = Flex.Px (List.length footer_lines);
+            cross = None;
+          };
+        ]
+    in
+    let rendered = Flex.render layout ~size in
+    let bg_style = Style_context.background () in
+    let resolved = Style.to_resolved bg_style in
+    let rows = size.LTerm_geom.rows in
+    let lines = String.split_on_char '\n' rendered in
+    let line_count = List.length lines in
+    let lines =
+      if line_count < rows then
+        lines @ List.init (rows - line_count) (fun _ -> "")
+      else if line_count > rows then take rows lines
+      else lines
+    in
+    let lines =
+      if resolved.Style.r_bg < 0 then lines
+      else
+        List.map
+          (fun line ->
+            let padded = Widgets.pad_to_cols_line ~cols line in
+            Widgets.apply_bg_fill ~bg:resolved.Style.r_bg padded)
+          lines
+    in
+    String.concat "\n" lines
 
   let check_navigation ps =
     match Context.consume_navigation () with
@@ -803,18 +887,7 @@ Press **Enter** to open instance menu.|}
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps =
-    Miaou.Core.Tui_page.
-      [
-        {key = "Enter"; help = "Open"};
-        {key = "c"; help = "Create"};
-        {key = "d"; help = "Diagnostics"};
-        {key = "t"; help = "Topology"};
-        {key = "b"; help = "Binaries"};
-        {key = "r"; help = "RPC Browser"};
-        {key = "x"; help = "Clear failure"};
-        {key = "?"; help = "Help"};
-      ]
+  let key_hints _ps = []
 end
 
 module Page =

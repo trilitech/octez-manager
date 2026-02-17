@@ -11,32 +11,37 @@ module State = Rpc_browser_state
 
 let render_breadcrumb path =
   match path with
-  | [] -> Widgets.bold "/"
+  | [] -> Widgets.themed_emphasis "/"
   | segments ->
       let parts =
-        Widgets.dim "/" :: List.map (fun seg -> Widgets.bold seg) segments
+        Widgets.themed_muted "/"
+        :: List.map (fun seg -> Widgets.themed_emphasis seg) segments
       in
       String.concat " / " parts
 
 let render_instance_selector ~target =
   match target with
-  | None -> Widgets.dim "No instance selected"
+  | None -> Widgets.themed_muted "No instance selected"
   | Some svc ->
       let name = svc.Service.instance in
       let network = svc.Service.network in
-      Printf.sprintf "%s (%s)" (Widgets.bold name) (Widgets.dim network)
+      Printf.sprintf
+        "%s (%s)"
+        (Widgets.themed_emphasis name)
+        (Widgets.themed_muted network)
 
 let render_entry_kind = function
-  | State.Get -> Widgets.green "[GET]"
-  | State.Sub -> Widgets.fg 14 "[SUB]"
-  | State.Dyn typ -> Widgets.yellow (Printf.sprintf "[DYN:%s]" typ)
-  | State.DynValue (typ, _) -> Widgets.dim (Printf.sprintf "[%s]" typ)
-  | State.ChangeTarget -> Widgets.fg 11 "[TARGET]"
+  | State.Get -> Widgets.themed_success "[GET]"
+  | State.Sub -> Widgets.themed_accent "[SUB]"
+  | State.Dyn typ -> Widgets.themed_warning (Printf.sprintf "[DYN:%s]" typ)
+  | State.DynValue (typ, _) -> Widgets.themed_muted (Printf.sprintf "[%s]" typ)
+  | State.ChangeTarget -> Widgets.themed_info "[TARGET]"
 
 let render_entry ~cursor ~idx ~focus entry =
   let is_selected = cursor = idx in
   let marker =
-    if is_selected then if focus then Widgets.fg 14 "▸ " else Widgets.dim "▸ "
+    if is_selected then
+      if focus then Widgets.themed_accent "▸ " else Widgets.themed_muted "▸ "
     else "  "
   in
   (* For GET at current path, show [GET] as the name *)
@@ -47,7 +52,8 @@ let render_entry ~cursor ~idx ~focus entry =
   in
   let name =
     if is_selected then
-      if focus then Widgets.bold display_name else Widgets.dim display_name
+      if focus then Widgets.themed_emphasis display_name
+      else Widgets.themed_muted display_name
     else display_name
   in
   let kind = render_entry_kind entry.State.kind in
@@ -55,33 +61,34 @@ let render_entry ~cursor ~idx ~focus entry =
 
 let render_loading ?(msg = "Loading...") () =
   let spinner = Context.render_spinner "" in
-  Printf.sprintf "%s %s" spinner (Widgets.dim msg)
+  Printf.sprintf "%s %s" spinner (Widgets.themed_muted msg)
 
 let render_error = function
   | None -> []
-  | Some msg -> [Widgets.red ("Error: " ^ msg)]
+  | Some msg -> [Widgets.themed_error ("Error: " ^ msg)]
 
 let render_header ~target ~path =
+  (* OpenCode style: clean header without heavy box characters *)
   let instance = render_instance_selector ~target in
   let breadcrumb = render_breadcrumb path in
-  Printf.sprintf "RPC Browser │ %s │ %s" instance breadcrumb
+  Printf.sprintf "RPC Browser  |  %s  |  %s" instance breadcrumb
 
 let render_entries ~cursor ~entries ~focus =
-  if entries = [] then [Widgets.dim "  (no entries at this path)"]
+  if entries = [] then [Widgets.themed_muted "  (no entries at this path)"]
   else
     List.mapi (fun idx entry -> render_entry ~cursor ~idx ~focus entry) entries
 
 let render_shortcuts ~state =
   let shortcuts = Rpc_browser_actions.get_shortcuts state in
-  let header = Widgets.bold "Quick Access:" in
+  let header = Widgets.themed_emphasis "Quick Access:" in
   let items =
     List.map
       (fun (key, path, desc) ->
         Printf.sprintf
           "  %s. %s  %s"
-          (Widgets.fg 14 key)
-          (Widgets.bold path)
-          (Widgets.dim (Printf.sprintf "(%s)" desc)))
+          (Widgets.themed_accent key)
+          (Widgets.themed_emphasis path)
+          (Widgets.themed_muted (Printf.sprintf "(%s)" desc)))
       shortcuts
   in
   header :: items
@@ -97,7 +104,7 @@ let render_help () =
     ]
   in
   let parts = List.map (fun (k, v) -> Printf.sprintf "%s: %s" k v) keys in
-  Widgets.dim (String.concat "  " parts)
+  Widgets.themed_muted (String.concat "  " parts)
 
 let render ~focus ~state ~cols =
   (* Truncate a line to fit within cols, preserving ANSI codes *)
@@ -115,14 +122,15 @@ let render ~focus ~state ~cols =
     | None -> List.nth_opt state.State.instances state.State.selected_idx
   in
   let header = render_header ~target ~path:state.State.path in
-  let separator = Widgets.dim (String.make (min 60 cols) '-') in
+  (* OpenCode style: no heavy separators, just empty line for spacing *)
   match state.State.mode with
   | State.List {entries; cursor; loading} ->
       let shortcuts_section =
         if state.State.path = [] then render_shortcuts ~state @ [""] else []
       in
       let entries_header =
-        if state.State.path = [] then [Widgets.bold "All Endpoints:"] else []
+        if state.State.path = [] then [Widgets.themed_emphasis "All Endpoints:"]
+        else []
       in
       let content =
         if loading then [render_loading ()]
@@ -131,12 +139,16 @@ let render ~focus ~state ~cols =
       let error_lines = render_error state.State.error in
       let help = render_help () in
       let lines =
-        [header; separator] @ shortcuts_section @ entries_header @ content
-        @ error_lines @ [separator; help]
+        [header; ""] @ shortcuts_section @ entries_header @ content
+        @ error_lines @ [""; help]
       in
       List.map truncate lines
   | State.Result _ ->
       (* Result mode is handled by a different renderer *)
       List.map
         truncate
-        [header; separator; Widgets.dim "  (result mode - use detail renderer)"]
+        [
+          header;
+          "";
+          Widgets.themed_muted "  (result mode - use detail renderer)";
+        ]
