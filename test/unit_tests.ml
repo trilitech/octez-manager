@@ -5351,6 +5351,152 @@ let signatory_secret_json_template_is_valid_json () =
     true
     (Result.is_ok result)
 
+(* Signatory YAML parsing tests *)
+
+let signatory_read_authorized_keys_valid_yaml () =
+  (* Test reading authorized keys from a valid signatory.yaml *)
+  let yaml_content =
+    {|server:
+  address: 127.0.0.1:6732
+
+vaults:
+  local_secret:
+    driver: file
+    config:
+      file: /path/to/secret.json
+
+tezos:
+  tz1VzDhuGRB5yUHR9bLkib2kbntQAAFSr8zK:
+    log_payloads: true
+    allow:
+      block:
+      attestation:
+  tz3RDC3Jdn4j15J7bBHZd29EUee9gVB1CxD9:
+    log_payloads: true
+    allow:
+      block:
+
+watermark:
+  type: memory
+|}
+  in
+  let tmp_base = Filename.temp_file "om-test-" "-signatory" in
+  Unix.unlink tmp_base ;
+  let tmp_dir = tmp_base ^ ".d" in
+  Unix.mkdir tmp_dir 0o700 ;
+  Fun.protect
+    ~finally:(fun () ->
+      let rec rmdir path =
+        if Sys.is_directory path then (
+          Array.iter
+            (fun entry -> rmdir (Filename.concat path entry))
+            (Sys.readdir path) ;
+          Unix.rmdir path)
+        else Sys.remove path
+      in
+      rmdir tmp_dir)
+    (fun () ->
+      let config_dir =
+        Filename.concat tmp_dir ".local/share/octez/instances/test-sig"
+      in
+      let rec mkdir_p path =
+        if not (Sys.file_exists path) then (
+          mkdir_p (Filename.dirname path) ;
+          if not (Sys.file_exists path) then Unix.mkdir path 0o755)
+      in
+      mkdir_p config_dir ;
+      let config_path = Filename.concat config_dir "signatory.yaml" in
+      let oc = open_out config_path in
+      output_string oc yaml_content ;
+      close_out oc ;
+      (* Mock Paths.xdg_data_home to point to tmp_dir *)
+      let saved_home = Sys.getenv_opt "XDG_DATA_HOME" in
+      Unix.putenv "XDG_DATA_HOME" (Filename.concat tmp_dir ".local/share") ;
+      Fun.protect
+        ~finally:(fun () ->
+          match saved_home with
+          | Some h -> Unix.putenv "XDG_DATA_HOME" h
+          | None -> Unix.putenv "XDG_DATA_HOME" "")
+        (fun () ->
+          let result = Signatory.read_authorized_keys "test-sig" in
+          match result with
+          | Ok keys ->
+              Alcotest.(check (list string))
+                "extracts both keys"
+                [
+                  "tz1VzDhuGRB5yUHR9bLkib2kbntQAAFSr8zK";
+                  "tz3RDC3Jdn4j15J7bBHZd29EUee9gVB1CxD9";
+                ]
+                keys
+          | Error (`Msg msg) ->
+              Alcotest.fail
+                (Printf.sprintf "Failed to parse signatory yaml: %s" msg)))
+
+let signatory_read_authorized_keys_empty_tezos_section () =
+  (* Test with empty tezos section *)
+  let yaml_content =
+    {|server:
+  address: 127.0.0.1:6732
+
+tezos:
+
+watermark:
+  type: memory
+|}
+  in
+  let tmp_base = Filename.temp_file "om-test-" "-signatory" in
+  Unix.unlink tmp_base ;
+  let tmp_dir = tmp_base ^ ".d" in
+  Unix.mkdir tmp_dir 0o700 ;
+  Fun.protect
+    ~finally:(fun () ->
+      let rec rmdir path =
+        if Sys.is_directory path then (
+          Array.iter
+            (fun entry -> rmdir (Filename.concat path entry))
+            (Sys.readdir path) ;
+          Unix.rmdir path)
+        else Sys.remove path
+      in
+      rmdir tmp_dir)
+    (fun () ->
+      let config_dir =
+        Filename.concat tmp_dir ".local/share/octez/instances/test-sig-empty"
+      in
+      let rec mkdir_p path =
+        if not (Sys.file_exists path) then (
+          mkdir_p (Filename.dirname path) ;
+          if not (Sys.file_exists path) then Unix.mkdir path 0o755)
+      in
+      mkdir_p config_dir ;
+      let config_path = Filename.concat config_dir "signatory.yaml" in
+      let oc = open_out config_path in
+      output_string oc yaml_content ;
+      close_out oc ;
+      let saved_home = Sys.getenv_opt "XDG_DATA_HOME" in
+      Unix.putenv "XDG_DATA_HOME" (Filename.concat tmp_dir ".local/share") ;
+      Fun.protect
+        ~finally:(fun () ->
+          match saved_home with
+          | Some h -> Unix.putenv "XDG_DATA_HOME" h
+          | None -> Unix.putenv "XDG_DATA_HOME" "")
+        (fun () ->
+          let result = Signatory.read_authorized_keys "test-sig-empty" in
+          match result with
+          | Ok keys ->
+              Alcotest.(check (list string)) "returns empty list" [] keys
+          | Error (`Msg msg) ->
+              Alcotest.fail
+                (Printf.sprintf "Failed to parse signatory yaml: %s" msg)))
+
+let signatory_read_authorized_keys_nonexistent () =
+  (* Test with nonexistent config file *)
+  let result = Signatory.read_authorized_keys "nonexistent-instance-12345" in
+  Alcotest.(check bool)
+    "returns error for nonexistent config"
+    true
+    (Result.is_error result)
+
 (* Signer validation tests *)
 
 let signer_validate_uri_http_with_port () =
@@ -6611,6 +6757,18 @@ let () =
             "secret_json_template_is_valid_json"
             `Quick
             signatory_secret_json_template_is_valid_json;
+          Alcotest.test_case
+            "read_authorized_keys_valid_yaml"
+            `Quick
+            signatory_read_authorized_keys_valid_yaml;
+          Alcotest.test_case
+            "read_authorized_keys_empty_tezos_section"
+            `Quick
+            signatory_read_authorized_keys_empty_tezos_section;
+          Alcotest.test_case
+            "read_authorized_keys_nonexistent"
+            `Quick
+            signatory_read_authorized_keys_nonexistent;
         ] );
       ( "signatory_cli",
         [
