@@ -531,6 +531,115 @@ let node_endpoint_field =
             ())
     ()
 
+(** Custom delegates field with signatory key selection integration *)
+let delegates_field =
+  Form_builder.custom
+    ~label:"Delegates"
+    ~get:(fun m -> String.concat ", " m.delegates)
+    ~validate:(fun _m -> true)
+    ~edit:(fun model_ref ->
+      (* Check if a signatory instance is selected *)
+      let signatory_instance =
+        match !model_ref.signer with
+        | Signer_instance inst -> Some inst
+        | _ -> None
+      in
+      let get_suggestions () =
+        (* Get suggestions from base_dir keys *)
+        if String.trim !model_ref.client.base_dir = "" then []
+        else
+          match
+            Keys_reader.read_public_key_hashes
+              ~base_dir:!model_ref.client.base_dir
+          with
+          | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
+          | Error _ -> []
+      in
+      (* Build modal items based on signatory selection *)
+      let build_items () =
+        let current = !model_ref.delegates in
+        let suggestions = get_suggestions () in
+        let base_items =
+          (* Toggle items for current delegates *)
+          (current |> List.map (fun d -> `Toggle d))
+          (* Add suggestions not in current list *)
+          @ (suggestions
+            |> List.filter (fun s -> not (List.mem s current))
+            |> List.map (fun s -> `Toggle s))
+        in
+        let signatory_items =
+          match signatory_instance with
+          | Some inst -> (
+              match Signatory.read_authorized_keys inst with
+              | Ok keys ->
+                  (* Add keys from signatory that aren't already in the list *)
+                  keys
+                  |> List.filter (fun k ->
+                      not
+                        (List.mem k current
+                        || List.exists
+                             (fun (`Toggle d) -> String.equal d k)
+                             base_items))
+                  |> List.map (fun k -> `Toggle k)
+              | Error _ -> [])
+          | None -> []
+        in
+        base_items @ signatory_items @ [`Add; `Clear]
+      in
+      let to_string = function
+        | `Toggle item ->
+            let current = !model_ref.delegates in
+            let checked = List.mem item current in
+            let checkbox = if checked then "[x]" else "[ ]" in
+            Printf.sprintf "%s %s" checkbox item
+        | `Add -> "Add key (manual)"
+        | `Clear -> "Clear all"
+      in
+      let on_select = function
+        | `Toggle item ->
+            let current = !model_ref.delegates in
+            let updated =
+              if List.mem item current then
+                List.filter (fun x -> x <> item) current
+              else current @ [item]
+            in
+            model_ref := {!model_ref with delegates = updated} ;
+            `KeepOpen
+        | `Add ->
+            Modal_helpers.prompt_validated_text_modal
+              ~title:"Add Delegate Key"
+              ~validator:(fun v ->
+                if String.trim v = "" then Error "Cannot be empty"
+                else if
+                  String.starts_with ~prefix:"tz1" v
+                  || String.starts_with ~prefix:"tz2" v
+                  || String.starts_with ~prefix:"tz3" v
+                  || String.starts_with ~prefix:"tz4" v
+                then Ok ()
+                else Error "Key must start with tz1, tz2, tz3, or tz4")
+              ~on_submit:(fun v ->
+                let v = String.trim v in
+                let current = !model_ref.delegates in
+                if not (List.mem v current) then
+                  model_ref := {!model_ref with delegates = current @ [v]})
+              () ;
+            `KeepOpen
+        | `Clear ->
+            model_ref := {!model_ref with delegates = []} ;
+            `KeepOpen
+      in
+      let title =
+        match signatory_instance with
+        | Some inst -> Printf.sprintf "Delegates (Signatory: %s)" inst
+        | None -> "Delegates"
+      in
+      Modal_helpers.open_multiselect_modal
+        ~title
+        ~items:build_items
+        ~to_string
+        ~on_select)
+    ()
+
 (** {1 Form Specification} *)
 
 let spec =
@@ -580,20 +689,7 @@ let spec =
         @ [base_dir_field]
         (* 5. Baker params: delegates, liquidity baking *)
         @ [
-            string_list
-              ~label:"Delegates"
-              ~get:(fun m -> m.delegates)
-              ~set:(fun delegates m -> {m with delegates})
-              ~get_suggestions:(fun m ->
-                if String.trim m.client.base_dir = "" then []
-                else
-                  match
-                    Keys_reader.read_public_key_hashes
-                      ~base_dir:m.client.base_dir
-                  with
-                  | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
-                  | Error _ -> [])
-              ();
+            delegates_field;
             choice
               ~label:"Liquidity Baking Vote"
               ~get:(fun m -> m.liquidity_baking_vote)
@@ -686,7 +782,55 @@ let spec =
                 then Error "Instance name already exists"
                 else Ok ());
           ]);
-    pre_submit = None;
+    pre_submit =
+      Some
+        (fun model ->
+          (* Validate delegates against Signatory authorized keys *)
+          match model.signer with
+          | Signer_instance inst -> (
+              match Signatory.read_authorized_keys inst with
+              | Ok authorized_keys ->
+                  (* Check if all delegates are authorized *)
+                  let unauthorized =
+                    List.filter
+                      (fun delegate -> not (List.mem delegate authorized_keys))
+                      model.delegates
+                  in
+                  if unauthorized = [] then Ok ()
+                  else
+                    let message =
+                      Printf.sprintf
+                        "The following delegate key(s) are NOT in Signatory \
+                         '%s' authorized keys:\n\n\
+                         %s\n\n\
+                         The baker will fail at runtime if these keys are not \
+                         configured in the Signatory.\n\n\
+                         Continue anyway?"
+                        inst
+                        (String.concat "\n" unauthorized)
+                    in
+                    Error
+                      (`Modal
+                         ( message,
+                           fun () ->
+                             (* on_continue callback - will trigger submit *)
+                             () ))
+              | Error _ ->
+                  (* If we can't read signatory config, show warning *)
+                  let message =
+                    Printf.sprintf
+                      "Could not read Signatory '%s' configuration to validate \
+                       delegate keys.\n\n\
+                       Continue anyway?"
+                      inst
+                  in
+                  Error
+                    (`Modal
+                       ( message,
+                         fun () ->
+                           (* on_continue callback - will trigger submit *)
+                           () )))
+          | _ -> Ok ());
     on_init = None;
     on_refresh = None;
     pre_submit_modal = None;
