@@ -24,6 +24,11 @@ type dal_selection =
   | Dal_instance of string
   | Dal_endpoint of string
 
+type signer_selection =
+  | Signer_local_keys
+  | Signer_instance of string
+  | Signer_uri of string
+
 (** {1 Model} *)
 
 type model = {
@@ -35,6 +40,7 @@ type model = {
   dal : dal_selection;
   delegates : string list;
   liquidity_baking_vote : string;
+  signer : signer_selection;
   (* Edit mode fields *)
   edit_mode : bool;
   original_instance : string option;
@@ -65,6 +71,7 @@ let base_initial_model () =
     dal = Dal_none;
     delegates = [];
     liquidity_baking_vote = "pass";
+    signer = Signer_local_keys;
     edit_mode = false;
     original_instance = None;
     stopped_dependents = [];
@@ -101,6 +108,13 @@ let make_initial_model () =
         else if dal_config = "" then Dal_none
         else Dal_endpoint dal_config
       in
+      let signer_uri = lookup "OCTEZ_REMOTE_SIGNER_URI" in
+      let signer_instance = lookup "OCTEZ_SIGNATORY_INSTANCE" in
+      let signer =
+        if signer_uri = "" then Signer_local_keys
+        else if signer_instance <> "" then Signer_instance signer_instance
+        else Signer_uri signer_uri
+      in
       let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
       {
         core =
@@ -133,6 +147,7 @@ let make_initial_model () =
         dal;
         delegates;
         liquidity_baking_vote = (if lb_vote = "" then "pass" else lb_vote);
+        signer;
         edit_mode = true;
         original_instance = Some svc.Service.instance;
         stopped_dependents = edit_ctx.stopped_dependents;
@@ -363,6 +378,86 @@ let dal_node_field =
         ())
     ()
 
+let signer_field =
+  Form_builder.custom
+    ~label:"Remote Signer"
+    ~get:(fun m ->
+      match m.signer with
+      | Signer_local_keys -> "Local keys"
+      | Signer_instance inst -> inst
+      | Signer_uri uri -> uri)
+    ~validate:(fun m ->
+      match m.signer with
+      | Signer_local_keys -> true
+      | Signer_instance inst ->
+          (* Validate that instance exists and is a Signatory *)
+          let states =
+            Form_builder_common.cached_service_states_nonblocking ()
+          in
+          List.exists
+            (fun (s : Data.Service_state.t) ->
+              String.equal s.service.Service.instance inst
+              && String.equal
+                   (String.lowercase_ascii s.service.Service.role)
+                   "signatory")
+            states
+      | Signer_uri uri ->
+          (* Basic URI format validation *)
+          String.length uri > 0
+          && (String.starts_with ~prefix:"http://" uri
+             || String.starts_with ~prefix:"https://" uri
+             || String.starts_with ~prefix:"unix:" uri))
+    ~edit:(fun model_ref ->
+      let states = Form_builder_common.cached_service_states () in
+      let signatory_services =
+        List.filter
+          (fun (s : Data.Service_state.t) ->
+            String.equal
+              (String.lowercase_ascii s.service.Service.role)
+              "signatory")
+          states
+      in
+      let items =
+        [`Local]
+        @ (signatory_services |> List.map (fun n -> `Signatory n))
+        @ [`Custom]
+      in
+      let to_string = function
+        | `Local -> "Local keys (default)"
+        | `Signatory n ->
+            let svc = n.Data.Service_state.service in
+            let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
+            Printf.sprintf "Signatory · %s (%s)" svc.Service.instance endpoint
+        | `Custom -> "Custom URI"
+      in
+      let on_select choice =
+        match choice with
+        | `Local -> model_ref := {!model_ref with signer = Signer_local_keys}
+        | `Signatory n ->
+            let svc = n.Data.Service_state.service in
+            model_ref :=
+              {!model_ref with signer = Signer_instance svc.Service.instance}
+        | `Custom ->
+            Modal_helpers.prompt_text_modal
+              ~title:"Remote Signer URI"
+              ~placeholder:
+                (Some
+                   "http://host:port or unix:/path (e.g., \
+                    http://127.0.0.1:6732)")
+              ~initial:
+                (match !model_ref.signer with Signer_uri uri -> uri | _ -> "")
+              ~on_submit:(fun uri ->
+                model_ref := {!model_ref with signer = Signer_uri uri})
+              ()
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Remote Signer"
+        ~items
+        ~to_string
+        ~on_select
+        ())
+    ()
+
 let node_data_dir_field =
   Form_builder.custom
     ~label:"Node Data Dir"
@@ -506,6 +601,7 @@ let spec =
                 {m with liquidity_baking_vote})
               ~items:["pass"; "on"; "off"]
               ~to_string:(fun x -> x);
+            signer_field;
           ]
         (* 6. Addresses and ports: node endpoint, node data dir *)
         @ [
@@ -619,6 +715,28 @@ let spec =
         let dal_node =
           match model.dal with Dal_instance inst -> Some inst | _ -> None
         in
+        (* Convert signer_selection to signer_mode *)
+        let signer_mode =
+          match model.signer with
+          | Signer_local_keys -> Signer_types.Local_keys
+          | Signer_instance inst -> (
+              (* Look up instance to get URI *)
+              let states = Form_builder_common.cached_service_states () in
+              let signatory =
+                List.find_opt
+                  (fun (s : Data.Service_state.t) ->
+                    String.equal s.service.Service.instance inst)
+                  states
+              in
+              match signatory with
+              | Some s ->
+                  let uri = Rpc_addr.to_endpoint s.service.Service.rpc_addr in
+                  Signer_types.Remote_signer {instance = Some inst; uri}
+              | None ->
+                  (* Fallback if instance not found - should not happen due to validation *)
+                  Signer_types.Local_keys)
+          | Signer_uri uri -> Signer_types.Remote_signer {instance = None; uri}
+        in
         let req =
           {
             Installer_types.instance = model.core.instance_name;
@@ -635,7 +753,7 @@ let spec =
             liquidity_baking_vote =
               (if String.trim model.liquidity_baking_vote = "" then None
                else Some (String.trim model.liquidity_baking_vote));
-            signer_mode = Signer_types.Local_keys;
+            signer_mode;
             extra_args;
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
