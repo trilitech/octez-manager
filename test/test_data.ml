@@ -34,6 +34,8 @@ let make_service ?(instance = "my-node") ?(role = "node") ?(network = "mainnet")
     extra_args = [];
     depends_on = None;
     dependents = [];
+    signer_mode = None;
+    signer_uri = None;
   }
 
 let make_state ?(instance = "my-node") ?(role = "node") ?(enabled = Some true)

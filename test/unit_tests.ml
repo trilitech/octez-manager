@@ -157,6 +157,8 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     extra_args = [];
     depends_on = None;
     dependents = [];
+    signer_mode = None;
+    signer_uri = None;
   }
 
 let sort_services =

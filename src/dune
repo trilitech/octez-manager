@@ -17,6 +17,7 @@
   binary_downloader
   signatory_downloader
   version_checker
+  signer_types
   service
   service_registry
   base_dir_registry
@@ -42,6 +43,7 @@
   service_backend
   installer_types
   signatory_validation
+  signer_validation
   manager_interfaces
   capabilities
   rpc_addr

@@ -650,6 +650,7 @@ let instance_term =
                             liquidity_baking_vote =
                               (if new_lb_vote = "" then None
                                else Some new_lb_vote);
+                            signer_mode = Signer_types.Local_keys;
                             service_user = svc.service_user;
                             app_bin_dir = svc.app_bin_dir;
                             bin_source = svc.bin_source;

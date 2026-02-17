@@ -26,6 +26,9 @@ type t = {
   extra_args : string list;
   depends_on : string option;
   dependents : string list;
+  signer_mode : Signer_types.signer_mode option;
+      (** Remote signer configuration for bakers (None = Local_keys for backward compat) *)
+  signer_uri : string option;  (** Resolved URI for display/metrics *)
 }
 
 (** Create a service configuration record.
@@ -50,6 +53,8 @@ val make :
   ?extra_args:string list ->
   ?depends_on:string option ->
   ?dependents:string list ->
+  ?signer_mode:Signer_types.signer_mode option ->
+  ?signer_uri:string option ->
   unit ->
   t
 
