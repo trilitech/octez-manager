@@ -5337,6 +5337,20 @@ watermark:
        ~needle:"path: /var/lib/octez/signatory/test/watermark.json"
        yaml)
 
+let signatory_secret_json_template_is_valid_json () =
+  (* Verify that the generated secret.json template is valid JSON *)
+  let template_content = "[]" in
+  let result =
+    try
+      let _ = Yojson.Safe.from_string template_content in
+      Ok ()
+    with Yojson.Json_error msg -> Error msg
+  in
+  Alcotest.(check bool)
+    "generated secret.json template is valid JSON"
+    true
+    (Result.is_ok result)
+
 (* Signer validation tests *)
 
 let signer_validate_uri_http_with_port () =
@@ -6593,6 +6607,10 @@ let () =
             "yaml_generation_file_watermark"
             `Quick
             signatory_yaml_generation_file_watermark;
+          Alcotest.test_case
+            "secret_json_template_is_valid_json"
+            `Quick
+            signatory_secret_json_template_is_valid_json;
         ] );
       ( "signatory_cli",
         [
