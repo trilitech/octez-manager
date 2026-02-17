@@ -77,6 +77,9 @@ type resolved_baker_node_mode =
 
 type dal_config = Dal_auto | Dal_disabled | Dal_endpoint of string
 
+(** Re-export signer_mode from Signer_types for convenience *)
+include Signer_types
+
 type baker_request = {
   instance : string;
   node_mode : baker_node_mode;
@@ -85,6 +88,7 @@ type baker_request = {
   dal_config : dal_config;
   dal_node : string option;  (** DAL node instance name if using local DAL *)
   liquidity_baking_vote : string option;
+  signer_mode : signer_mode;  (** Remote signer configuration *)
   extra_args : string list;
   service_user : string;
   app_bin_dir : string;

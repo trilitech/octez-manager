@@ -404,6 +404,7 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       dal_config;
       dal_node;
       liquidity_baking_vote;
+      signer_mode = Signer_types.Local_keys;
       extra_args;
       service_user;
       app_bin_dir = bin_dir;
