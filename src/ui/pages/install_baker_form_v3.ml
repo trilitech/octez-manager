@@ -687,8 +687,9 @@ let spec =
             ()
         (* 4. Base dir *)
         @ [base_dir_field]
-        (* 5. Baker params: delegates, liquidity baking *)
+        (* 5. Baker params: remote signer, delegates, liquidity baking *)
         @ [
+            signer_field;
             delegates_field;
             choice
               ~label:"Liquidity Baking Vote"
@@ -697,7 +698,6 @@ let spec =
                 {m with liquidity_baking_vote})
               ~items:["pass"; "on"; "off"]
               ~to_string:(fun x -> x);
-            signer_field;
           ]
         (* 6. Addresses and ports: node endpoint, node data dir *)
         @ [
