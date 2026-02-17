@@ -390,3 +390,81 @@ Security:
   in
 
   Ok service
+
+(** Get the path to signatory.yaml config file for an instance *)
+let signatory_config_path instance =
+  let base =
+    (* Respect XDG_DATA_HOME override (used by tests), otherwise use standard paths *)
+    match Sys.getenv_opt "XDG_DATA_HOME" with
+    | Some xdg ->
+        if xdg <> "" then Filename.concat xdg "octez/instances"
+        else if Paths.is_root () then "/etc/octez/instances"
+        else Filename.concat (Paths.xdg_data_home ()) "octez/instances"
+    | None ->
+        if Paths.is_root () then "/etc/octez/instances"
+        else Filename.concat (Paths.xdg_data_home ()) "octez/instances"
+  in
+  Filename.concat (Filename.concat base instance) "signatory.yaml"
+
+(** Read authorized keys from signatory.yaml.
+    
+    Parses the YAML to extract keys from the "tezos:" section.
+    Returns a list of public key hashes (tz1/tz2/tz3/tz4 addresses). *)
+let read_authorized_keys instance =
+  let config_path = signatory_config_path instance in
+  if not (Sys.file_exists config_path) then
+    R.error_msgf
+      "Signatory config not found: %s (instance '%s' may not exist)"
+      config_path
+      instance
+  else
+    try
+      let ic = open_in config_path in
+      let content =
+        Fun.protect
+          ~finally:(fun () -> close_in_noerr ic)
+          (fun () ->
+            let len = in_channel_length ic in
+            really_input_string ic len)
+      in
+      (* Simple line-based parsing of YAML to extract keys from tezos: section *)
+      let lines = String.split_on_char '\n' content in
+      let rec extract_keys in_tezos_section acc = function
+        | [] -> List.rev acc
+        | line :: rest ->
+            let trimmed = String.trim line in
+            (* Detect when we enter the tezos: section *)
+            if String.equal trimmed "tezos:" then extract_keys true acc rest
+              (* If we're in tezos section and hit another top-level key, we're done *)
+            else if
+              in_tezos_section
+              && String.length trimmed > 0
+              && (not (String.starts_with ~prefix:" " line))
+              && String.ends_with ~suffix:":" trimmed
+            then
+              (* Exited tezos section *)
+              List.rev acc
+              (* Extract keys: lines in tezos section that look like tz[1-4]... keys *)
+            else if
+              in_tezos_section
+              && String.starts_with ~prefix:"  " line
+              (* Must have 2+ spaces indent *)
+              && (String.starts_with ~prefix:"tz1" trimmed
+                 || String.starts_with ~prefix:"tz2" trimmed
+                 || String.starts_with ~prefix:"tz3" trimmed
+                 || String.starts_with ~prefix:"tz4" trimmed)
+              && String.ends_with ~suffix:":" trimmed
+            then
+              let key =
+                String.sub trimmed 0 (String.length trimmed - 1) |> String.trim
+              in
+              extract_keys in_tezos_section (key :: acc) rest
+            else extract_keys in_tezos_section acc rest
+      in
+      Ok (extract_keys false [] lines)
+    with
+    | Sys_error msg -> R.error_msg msg
+    | e ->
+        R.error_msgf
+          "Failed to parse signatory config: %s"
+          (Printexc.to_string e)
