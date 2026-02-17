@@ -525,6 +525,75 @@ let get ~instance =
      Domains 2-6              Hashtables            Main thread
 ```
 
+### Testing TUI Form Changes (MANDATORY)
+
+**When adding, removing, or reordering form fields, you MUST run the golden path tests and fix them if necessary.**
+
+#### Why This Matters
+
+The golden path test (`test/test_golden_path_tui_v2.ml`) validates the complete end-to-end flow of creating services through the TUI. It uses declarative keypresses to navigate forms and expects specific field counts to reach the "Confirm & Install" button.
+
+**The Problem:**
+- The golden path test is **intentionally skipped during local `dune runtest`** (requires systemd in Docker)
+- This means `dune build && dune runtest` will pass locally even if the test is broken
+- The test only runs in CI, where failures block the PR
+
+#### Affected Forms
+
+Forms with field-count dependencies in the golden path test:
+- `install_node_form_v3` - Node installation form
+- `install_dal_node_form_v3` - DAL node installation form
+- `install_baker_form_v3` - Baker installation form
+- `install_accuser_form_v3` - Accuser installation form
+
+#### Required Steps When Modifying Forms
+
+1. **Check if the form is tested in the golden path:**
+   ```bash
+   grep -n "install_.*_form" test/test_golden_path_tui_v2.ml
+   ```
+
+2. **Count the field change:**
+   - Adding a field: increment Down key count
+   - Removing a field: decrement Down key count
+   - Reordering fields: verify navigation logic still works
+
+3. **Update the test in the SAME commit:**
+   ```ocaml
+   (* Before: Baker form has 13 fields *)
+   (* Baker form: 13 fields + confirm. Cursor on field 0, need 13 Downs *)
+   @ submit_form ~downs:13
+   
+   (* After: Added "Remote Signer" field, now 14 fields *)
+   (* Baker form: 14 fields + confirm. Cursor on field 0, need 14 Downs *)
+   @ submit_form ~downs:14
+   ```
+
+4. **Document the change in the test comment** - explain what field was added/removed
+
+5. **Verify in CI** - the test will run automatically, but check the logs if it fails
+
+#### Why The Test Doesn't Run Locally
+
+The golden path test creates real systemd services. To protect developer machines from service pollution, the test detects non-CI environments and skips:
+
+```ocaml
+(** SAFETY: This test ONLY runs in CI (Docker containers with systemd).
+    It will skip when run locally to avoid creating services on your system. *)
+```
+
+This safety feature means **you cannot catch these failures locally with `dune runtest`**.
+
+#### Detection Pattern
+
+When you see CI failures like:
+```
+WaitFor timeout after 500 iterations
+Condition: ScreenContains("Hint: c create")
+```
+
+This usually means the form submission failed (cursor didn't reach Confirm button) due to incorrect field count.
+
 ---
 
 ## Working with Miaou
