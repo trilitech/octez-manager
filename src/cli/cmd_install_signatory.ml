@@ -230,7 +230,29 @@ let install_signatory_cmd =
     in
     match res with
     | Ok service ->
-        Format.printf "Installed signatory %s\n" service.S.instance ;
+        let data_dir =
+          let base =
+            if Paths.is_root () then "/var/lib/octez"
+            else Filename.concat (Paths.xdg_data_home ()) "octez"
+          in
+          Filename.concat (Filename.concat base "signatory") service.S.instance
+        in
+        let secrets_file =
+          Filename.concat (Filename.concat data_dir "keys") "secret.json"
+        in
+        Format.printf
+          "@[<v>@[Installed signatory %s@]@,\
+           @,\
+           @[<v 2>Next step: Add your signing keys to:@,\
+           %s@]@,\
+           @,\
+           @[The file contains a template with instructions. Edit it with your \
+           actual keys.@]@,\
+           @,\
+           @[Then start the service: octez-manager instance %s start@]@]@."
+          service.S.instance
+          secrets_file
+          service.S.instance ;
         `Ok ()
     | Error msg -> Cli_helpers.cmdliner_error msg
   in
