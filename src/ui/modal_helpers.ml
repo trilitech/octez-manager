@@ -7,6 +7,7 @@
 
 module Pager = Miaou_widgets_display.Pager_widget
 module Select_widget = Miaou_widgets_input.Select_widget
+module Textarea_widget = Miaou_widgets_input.Textarea_widget
 module Textbox_widget = Miaou_widgets_input.Textbox_widget
 module Widgets = Miaou_widgets_display.Widgets
 module Navigation = Miaou.Core.Navigation
@@ -450,6 +451,79 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
     ~init:(Navigation.make widget)
     ~title:modal_title
     ~extract:(fun pstate -> Some (Textbox_widget.get_text pstate.Navigation.s))
+    ~on_result:(function Some text -> on_submit text | None -> ())
+    ()
+
+let prompt_textarea_modal ?title ?(width = 70) ?(height = 8) ?initial
+    ?placeholder ~on_submit () =
+  let module Modal = struct
+    type state = Textarea_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "textarea modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size:_ = Textarea_widget.render ps.Navigation.s ~focus
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else Navigation.update (fun _ -> Textarea_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps =
+      Miaou.Core.Tui_page.
+        [
+          {key = "Enter"; help = "Submit"};
+          {key = "Alt+Enter"; help = "New line"};
+          {key = "Esc"; help = "Cancel"};
+        ]
+
+    let has_modal _ = true
+  end in
+  let widget =
+    Textarea_widget.open_centered ?title ~width ~height ?initial ?placeholder ()
+  in
+  let modal_title = Option.value ~default:"Input" title in
+  Miaou.Core.Modal_manager.prompt
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~title:modal_title
+    ~extract:(fun pstate -> Some (Textarea_widget.value pstate.Navigation.s))
     ~on_result:(function Some text -> on_submit text | None -> ())
     ()
 
@@ -993,7 +1067,7 @@ let open_download_progress_modal ~version ~on_complete =
           match result with
           | Ok res ->
               Context.multi_progress_checksum "Verifying checksums..." ;
-              Unix.sleepf 0.5 ;
+              (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 0.5 ;
               (match
                  res.Octez_manager_lib.Binary_downloader.checksum_status
                with
@@ -1006,7 +1080,7 @@ let open_download_progress_modal ~version ~on_complete =
               | Octez_manager_lib.Binary_downloader.Failed reason ->
                   Context.multi_progress_checksum
                     (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
-              Unix.sleepf 2.0 ;
+              (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 2.0 ;
               (* Linger to show final status *)
               Context.multi_progress_finish () ;
               on_complete true ;
@@ -1830,6 +1904,109 @@ let show_spinner_modal ~title ~label ~work ~on_complete () =
     ~init:(Modal.init ())
     ~ui
     ~on_close:(fun _ _ -> spinner_modal_close_ref := None)
+
+let open_theme_picker_modal ~title ~items ~to_string ~load_theme ~on_select
+    ~on_cancel () =
+  (* Track the last previewed theme to avoid redundant loads *)
+  let last_preview = ref None in
+  let module Modal = struct
+    type state = string Select_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "theme picker modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      let s = ps.Navigation.s in
+      (* Live preview: apply theme when selection changes *)
+      (match Select_widget.get_selection s with
+      | Some id when !last_preview <> Some id ->
+          last_preview := Some id ;
+          load_theme id
+      | _ -> ()) ;
+      Select_widget.render_with_size s ~focus ~size
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      let key =
+        match Miaou.Core.Keys.of_string key with
+        | Some Miaou.Core.Keys.Up -> "Up"
+        | Some Miaou.Core.Keys.Down -> "Down"
+        | Some (Miaou.Core.Keys.Char "k") -> "Up"
+        | Some (Miaou.Core.Keys.Char "j") -> "Down"
+        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
+        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
+        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
+        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.Enter -> "Enter"
+        | Some (Miaou.Core.Keys.Char "Esc")
+        | Some (Miaou.Core.Keys.Char "Escape")
+        | Some (Miaou.Core.Keys.Char "q") ->
+            "Esc"
+        | _ -> key
+      in
+      if key = "Enter" || key = "Esc" then ps
+      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget = Select_widget.open_centered ~title:"" ~items ~to_string () in
+  (* Trigger initial preview *)
+  (match Select_widget.get_selection widget with
+  | Some id ->
+      last_preview := Some id ;
+      load_theme id
+  | None -> ()) ;
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 40; max = 60});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~ui
+    ~on_close:(fun pstate -> function
+      | `Commit -> (
+          match Select_widget.get_selection pstate.Navigation.s with
+          | Some choice -> on_select choice
+          | None -> on_cancel ())
+      | `Cancel -> on_cancel ())
 
 module For_tests = struct
   let first_nonempty_line = first_nonempty_line

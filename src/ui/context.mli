@@ -5,6 +5,13 @@
 (*                                                                            *)
 (******************************************************************************)
 
+(** Register a global key handler. *)
+val register_global_key : string -> (unit -> unit) -> unit
+
+(** Try to handle a key via registered global handlers.
+    Returns [true] if a handler was found and executed. *)
+val handle_global_key : string -> bool
+
 (** Store an instance name to navigate to the instance details page. *)
 val set_pending_instance_detail : string -> unit
 

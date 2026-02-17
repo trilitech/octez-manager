@@ -6,6 +6,8 @@
 (******************************************************************************)
 
 module Widgets = Miaou_widgets_display.Widgets
+module Style = Miaou_style.Style
+module Style_context = Miaou_style.Style_context
 
 (* Node ID for tracking fold state *)
 type node_id = int
@@ -99,19 +101,28 @@ let raw t = t.raw_json
 
 let is_folded t id = Hashtbl.find_opt t.folded id |> Option.value ~default:false
 
-(* Render helpers *)
+(* Render helpers - use same styles as json_highlighter.ml for consistency *)
 let indent n = String.make (n * 2) ' '
 
+let render_style style text =
+  let resolved = Style.to_resolved style in
+  if resolved.r_fg >= 0 then Style.render style text
+  else Widgets.themed_text text
+
 let render_string s =
-  Widgets.yellow (Printf.sprintf "\"%s\"" (String.escaped s))
+  render_style
+    (Style_context.warning ())
+    (Printf.sprintf "\"%s\"" (String.escaped s))
 
-let render_key k = Widgets.fg 14 (Printf.sprintf "\"%s\"" k)
+let render_key k =
+  render_style (Style_context.text_emphasized ()) (Printf.sprintf "\"%s\"" k)
 
-let render_number n = Widgets.magenta n
+let render_number n = render_style (Style_context.info ()) n
 
-let render_bool b = Widgets.green (if b then "true" else "false")
+let render_bool b =
+  render_style (Style_context.success ()) (if b then "true" else "false")
 
-let render_null () = Widgets.dim "null"
+let render_null () = render_style (Style_context.text_muted ()) "null"
 
 (* Render JSON with folding *)
 let render t =
@@ -141,7 +152,7 @@ let render t =
         if folded then (
           Buffer.add_string
             buf
-            (Widgets.dim (Printf.sprintf "[...] (%d items)" count)) ;
+            (Widgets.themed_muted (Printf.sprintf "[...] (%d items)" count)) ;
           (line, (line, id) :: line_map))
         else if items = [] then (
           Buffer.add_string buf "[]" ;
@@ -172,7 +183,7 @@ let render t =
         if folded then (
           Buffer.add_string
             buf
-            (Widgets.dim (Printf.sprintf "{...} (%d fields)" count)) ;
+            (Widgets.themed_muted (Printf.sprintf "{...} (%d fields)" count)) ;
           (line, (line, id) :: line_map))
         else if fields = [] then (
           Buffer.add_string buf "{}" ;

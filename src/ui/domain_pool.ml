@@ -36,7 +36,8 @@ let create ~sw ~domain_mgr ~num_domains =
                     Eio.Fiber.fork ~sw:domain_sw (fun () ->
                         try task ()
                         with exn ->
-                          Printf.eprintf
+                          (Printf.eprintf
+                          [@allow_forbidden "error logging in domain pool"])
                             "[Domain_pool] task failed: %s\n%!"
                             (Printexc.to_string exn))
                 | None -> ()) ;
@@ -56,7 +57,8 @@ let submit fn =
         (Domain.spawn (fun () ->
              try fn ()
              with exn ->
-               Printf.eprintf
+               (Printf.eprintf
+               [@allow_forbidden "error logging in domain pool"])
                  "[Domain_pool] task failed: %s\n%!"
                  (Printexc.to_string exn)))
 

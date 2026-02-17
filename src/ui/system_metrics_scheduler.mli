@@ -127,8 +127,8 @@ module For_test : sig
   (** Compare running version against latest stable *)
   val check_version_status : running:string -> version_status_t
 
-  (** Get ANSI color code for version status *)
-  val version_color : version_status_t -> string
+  (** Get themed color style for version status *)
+  val version_color : version_status_t -> Miaou_style.Style.t option
 
   (** Set the latest stable version for testing *)
   val set_latest_version : string option -> unit

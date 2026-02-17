@@ -169,17 +169,32 @@ let test_version_status_unknown_invalid () =
 
 let test_version_color_codes () =
   let open System_metrics_scheduler.For_test in
-  Alcotest.(check string) "latest is green" "\027[32m" (version_color Latest) ;
-  Alcotest.(check string)
-    "minor behind is yellow"
-    "\027[33m"
-    (version_color MinorBehind) ;
-  Alcotest.(check string)
-    "major behind is red"
-    "\027[31m"
-    (version_color MajorBehind) ;
-  Alcotest.(check string) "dev/rc is blue" "\027[34m" (version_color DevOrRC) ;
-  Alcotest.(check string) "unknown is no color" "" (version_color Unknown)
+  let has_fg = function
+    | None -> false
+    | Some style ->
+        let resolved = Miaou_style.Style.to_resolved style in
+        resolved.Miaou_style.Style.r_fg >= 0
+  in
+  Alcotest.(check bool)
+    "latest has themed fg"
+    true
+    (has_fg (version_color Latest)) ;
+  Alcotest.(check bool)
+    "minor behind has themed fg"
+    true
+    (has_fg (version_color MinorBehind)) ;
+  Alcotest.(check bool)
+    "major behind has themed fg"
+    true
+    (has_fg (version_color MajorBehind)) ;
+  Alcotest.(check bool)
+    "dev/rc has themed fg"
+    true
+    (has_fg (version_color DevOrRC)) ;
+  Alcotest.(check bool)
+    "unknown has no color"
+    false
+    (has_fg (version_color Unknown))
 
 (** {2 Visibility Tracking Tests} *)
 

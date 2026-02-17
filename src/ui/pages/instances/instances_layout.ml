@@ -24,12 +24,12 @@ let role_order = function
 
 (** Role section headers *)
 let role_header = function
-  | "node" -> "── Nodes ──"
-  | "baker" -> "── Bakers ──"
-  | "accuser" -> "── Accusers ──"
-  | "dal-node" -> "── DAL Nodes ──"
-  | "signatory" -> "── Signatories ──"
-  | r -> Printf.sprintf "── %s ──" (String.capitalize_ascii r)
+  | "node" -> "Nodes"
+  | "baker" -> "Bakers"
+  | "accuser" -> "Accusers"
+  | "dal-node" -> "DAL Nodes"
+  | "signatory" -> "Signatories"
+  | r -> String.capitalize_ascii r
 
 (** Sort services by role, then by instance name *)
 let sort_services services =

@@ -214,7 +214,10 @@ let header s =
     | ReviewImport -> "Step 3/3: Review & Confirm"
     | Importing -> "Importing..."
   in
-  [Widgets.title_highlight (" Import Wizard · " ^ step_text); Widgets.dim ""]
+  [
+    Widgets.themed_primary (" Import Wizard · " ^ step_text);
+    Widgets.themed_muted "";
+  ]
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
@@ -232,20 +235,23 @@ let view ps ~focus:_ ~size =
           s.external_services
           |> List.mapi (fun idx (svc : External_service.t) ->
               let is_selected = idx = s.selected_idx in
-              let marker = if is_selected then Widgets.fg 14 "▸ " else "  " in
-              let name = Widgets.bold svc.suggested_instance_name in
+              let marker =
+                if is_selected then Widgets.themed_accent "▸ " else "  "
+              in
+              let name = Widgets.themed_emphasis svc.suggested_instance_name in
               let role =
                 match svc.config.role.value with
-                | Some r -> Widgets.fg 12 (External_service.role_to_string r)
+                | Some r ->
+                    Widgets.themed_secondary (External_service.role_to_string r)
                 | None -> "unknown"
               in
               let conf =
                 match svc.config.role.confidence with
-                | External_service.Detected -> Widgets.fg 10 "●●●"
-                | External_service.Inferred -> Widgets.fg 11 "●●○"
+                | External_service.Detected -> Widgets.themed_success "●●●"
+                | External_service.Inferred -> Widgets.themed_warning "●●○"
                 | External_service.Permission_denied | External_service.Unknown
                   ->
-                    Widgets.fg 9 "●○○"
+                    Widgets.themed_error "●○○"
               in
               let line =
                 Printf.sprintf "%s%-25s %-12s %s" marker name role conf
@@ -253,9 +259,9 @@ let view ps ~focus:_ ~size =
               if is_selected then
                 [
                   line;
-                  Widgets.dim
+                  Widgets.themed_muted
                     (Printf.sprintf "    Unit: %s" svc.config.unit_name);
-                  Widgets.dim
+                  Widgets.themed_muted
                     (Printf.sprintf
                        "    Network: %s"
                        (External_service.value_or
@@ -269,8 +275,7 @@ let view ps ~focus:_ ~size =
           |> List.append
                (if s.error <> None then
                   [
-                    Widgets.fg
-                      9
+                    Widgets.themed_error
                       (Printf.sprintf "Error: %s" (Option.get s.error));
                     "";
                   ]
@@ -293,7 +298,7 @@ let view ps ~focus:_ ~size =
               "";
               Printf.sprintf
                 "Service: %s"
-                (Widgets.bold svc.suggested_instance_name);
+                (Widgets.themed_emphasis svc.suggested_instance_name);
               "";
               Printf.sprintf "  Instance name: %s" final_name;
               Printf.sprintf "  Strategy:      %s" strategy_text;
@@ -310,9 +315,8 @@ let view ps ~focus:_ ~size =
             @ (let missing = Import.missing_required_fields svc in
                if missing <> [] then
                  [
-                   Widgets.fg 11 "⚠ Missing fields:";
-                   Widgets.fg
-                     11
+                   Widgets.themed_warning "⚠ Missing fields:";
+                   Widgets.themed_warning
                      (Printf.sprintf "  %s" (String.concat ", " missing));
                    "";
                  ]
@@ -327,16 +331,18 @@ let view ps ~focus:_ ~size =
             in
             [
               "";
-              Widgets.fg 10 "Ready to import:";
+              Widgets.themed_success "Ready to import:";
               "";
               Printf.sprintf "  Original unit: %s" svc.config.unit_name;
-              Printf.sprintf "  New instance:  %s" (Widgets.bold final_name);
+              Printf.sprintf
+                "  New instance:  %s"
+                (Widgets.themed_emphasis final_name);
               Printf.sprintf
                 "  Strategy:      %s"
                 (match s.strategy with
                 | Import.Takeover ->
-                    Widgets.fg 11 "Takeover (will disable original)"
-                | Import.Clone -> Widgets.fg 10 "Clone (keep original)");
+                    Widgets.themed_warning "Takeover (will disable original)"
+                | Import.Clone -> Widgets.themed_success "Clone (keep original)");
               "";
               "What will happen:";
             ]
@@ -377,7 +383,7 @@ let view ps ~focus:_ ~size =
             @ log_lines
             @ [
                 "";
-                Widgets.dim
+                Widgets.themed_muted
                   (Printf.sprintf
                      "  (job #%d, %d log lines, %d jobs total)"
                      job.id
@@ -394,7 +400,7 @@ let view ps ~focus:_ ~size =
                   "";
                   "  ⏳  Importing...";
                   "";
-                  Widgets.dim
+                  Widgets.themed_muted
                     (Printf.sprintf "  Debug: No jobs (%d total)" num_jobs);
                   "";
                 ]
@@ -407,7 +413,7 @@ let view ps ~focus:_ ~size =
                 | Job_manager.Succeeded ->
                     [
                       "";
-                      Widgets.fg 10 "  ✓ Import succeeded!";
+                      Widgets.themed_success "  ✓ Import succeeded!";
                       "";
                       "  Returning to instances page...";
                       "";
@@ -422,14 +428,14 @@ let view ps ~focus:_ ~size =
                       else lines)
                       |> List.map (fun line -> "  " ^ line)
                     in
-                    [""; Widgets.fg 9 "  ✗ Import failed"; ""]
+                    [""; Widgets.themed_error "  ✗ Import failed"; ""]
                     @ (if msg <> "" then ["  Error: " ^ msg; ""] else [])
                     @ (if log_lines <> [] then
                          ["  Log output:"; ""] @ log_lines @ [""]
                        else ["  (no log output)"; ""])
                     @ [""; "Press Esc to go back"])))
   in
-  Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
+  Themed_page.render_layout ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
       String.concat "\n" body_lines)
 
 let handle_modal_key ps key ~size:_ =
@@ -513,7 +519,7 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 end
 
 module Page =
-  Monitored_page.Make
+  Themed_page.Make
     (Page_Impl)
     (struct
       let page_name = name
