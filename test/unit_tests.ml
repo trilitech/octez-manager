@@ -5337,6 +5337,149 @@ watermark:
        ~needle:"path: /var/lib/octez/signatory/test/watermark.json"
        yaml)
 
+(* Signer validation tests *)
+
+let signer_validate_uri_http_with_port () =
+  let uri = "http://127.0.0.1:6732" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool) "http with port is valid" true (Result.is_ok result)
+
+let signer_validate_uri_https_with_port () =
+  let uri = "https://signer.example.com:8443" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool) "https with port is valid" true (Result.is_ok result)
+
+let signer_validate_uri_http_default_port () =
+  let uri = "http://localhost" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool)
+    "http without port defaults to 80"
+    true
+    (Result.is_ok result)
+
+let signer_validate_uri_https_default_port () =
+  let uri = "https://secure.example.com" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool)
+    "https without port defaults to 443"
+    true
+    (Result.is_ok result)
+
+let signer_validate_uri_unix_socket () =
+  let uri = "unix:/run/signatory.sock" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool) "unix socket is valid" true (Result.is_ok result)
+
+let signer_validate_uri_unix_socket_absolute () =
+  let uri = "unix:/var/lib/signatory/signer.sock" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool)
+    "unix socket with absolute path is valid"
+    true
+    (Result.is_ok result)
+
+let signer_validate_uri_empty_rejected () =
+  let uri = "" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool) "empty URI is rejected" true (Result.is_error result)
+
+let signer_validate_uri_whitespace_rejected () =
+  let uri = "   " in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool)
+    "whitespace-only URI is rejected"
+    true
+    (Result.is_error result)
+
+let signer_validate_uri_invalid_scheme_rejected () =
+  let uris =
+    ["ftp://localhost:6732"; "ws://localhost:6732"; "tcp://127.0.0.1"]
+  in
+  List.iter
+    (fun uri ->
+      let result = Signer_validation.validate_uri uri in
+      Alcotest.(check bool)
+        (Printf.sprintf "invalid scheme '%s' rejected" uri)
+        true
+        (Result.is_error result))
+    uris
+
+let signer_validate_uri_invalid_port_rejected () =
+  (* Note: Port 0 and very large ports are handled by Uri library's parsing.
+     We only test the validator's logic for ports it can detect as invalid. *)
+  let uri = "http://localhost:99999" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool)
+    "invalid port 99999 rejected"
+    true
+    (Result.is_error result)
+
+let signer_validate_uri_unix_socket_relative_rejected () =
+  let uri = "unix:relative/path.sock" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool)
+    "unix socket with relative path is rejected"
+    true
+    (Result.is_error result)
+
+let signer_validate_uri_unix_socket_empty_rejected () =
+  let uri = "unix:" in
+  let result = Signer_validation.validate_uri uri in
+  Alcotest.(check bool)
+    "unix socket with empty path is rejected"
+    true
+    (Result.is_error result)
+
+let signer_validate_uri_case_insensitive () =
+  let uris = ["HTTP://localhost:6732"; "HTTPS://host:443"; "Unix:/path.sock"] in
+  List.iter
+    (fun uri ->
+      let result = Signer_validation.validate_uri uri in
+      Alcotest.(check bool)
+        (Printf.sprintf "case variation '%s' accepted" uri)
+        true
+        (Result.is_ok result))
+    uris
+
+let signer_validate_and_resolve_local_keys () =
+  let mode = Signer_types.Local_keys in
+  let result = Signer_validation.validate_and_resolve mode in
+  match result with
+  | Ok None -> Alcotest.(check bool) "local keys returns None" true true
+  | Ok (Some _) -> Alcotest.fail "local keys should return None, got Some"
+  | Error (`Msg msg) ->
+      Alcotest.failf "local keys should succeed, got error: %s" msg
+
+let signer_validate_and_resolve_remote_uri () =
+  let mode =
+    Signer_types.Remote_signer {instance = None; uri = "http://127.0.0.1:6732"}
+  in
+  let result = Signer_validation.validate_and_resolve mode in
+  match result with
+  | Ok (Some uri) ->
+      Alcotest.(check string)
+        "remote signer returns URI"
+        "http://127.0.0.1:6732"
+        uri
+  | Ok None -> Alcotest.fail "remote signer should return Some, got None"
+  | Error (`Msg msg) ->
+      Alcotest.failf "remote signer should succeed, got error: %s" msg
+
+let signer_validate_and_resolve_invalid_uri () =
+  let mode =
+    Signer_types.Remote_signer {instance = None; uri = "invalid://bad"}
+  in
+  let result = Signer_validation.validate_and_resolve mode in
+  Alcotest.(check bool) "invalid URI is rejected" true (Result.is_error result)
+
+let signer_resolve_signatory_nonexistent () =
+  let instance = "nonexistent-signatory-instance" in
+  let result = Signer_validation.resolve_signatory_instance instance in
+  Alcotest.(check bool)
+    "nonexistent instance is rejected"
+    true
+    (Result.is_error result)
+
 (* Signatory CLI command tests *)
 
 let signatory_cli_backend_file_accepted () =
@@ -6348,6 +6491,77 @@ let () =
             "long_network"
             `Quick
             generate_instance_name_long_network;
+        ] );
+      ( "signer_validation",
+        [
+          Alcotest.test_case
+            "validate_uri_http_with_port"
+            `Quick
+            signer_validate_uri_http_with_port;
+          Alcotest.test_case
+            "validate_uri_https_with_port"
+            `Quick
+            signer_validate_uri_https_with_port;
+          Alcotest.test_case
+            "validate_uri_http_default_port"
+            `Quick
+            signer_validate_uri_http_default_port;
+          Alcotest.test_case
+            "validate_uri_https_default_port"
+            `Quick
+            signer_validate_uri_https_default_port;
+          Alcotest.test_case
+            "validate_uri_unix_socket"
+            `Quick
+            signer_validate_uri_unix_socket;
+          Alcotest.test_case
+            "validate_uri_unix_socket_absolute"
+            `Quick
+            signer_validate_uri_unix_socket_absolute;
+          Alcotest.test_case
+            "validate_uri_empty_rejected"
+            `Quick
+            signer_validate_uri_empty_rejected;
+          Alcotest.test_case
+            "validate_uri_whitespace_rejected"
+            `Quick
+            signer_validate_uri_whitespace_rejected;
+          Alcotest.test_case
+            "validate_uri_invalid_scheme_rejected"
+            `Quick
+            signer_validate_uri_invalid_scheme_rejected;
+          Alcotest.test_case
+            "validate_uri_invalid_port_rejected"
+            `Quick
+            signer_validate_uri_invalid_port_rejected;
+          Alcotest.test_case
+            "validate_uri_unix_socket_relative_rejected"
+            `Quick
+            signer_validate_uri_unix_socket_relative_rejected;
+          Alcotest.test_case
+            "validate_uri_unix_socket_empty_rejected"
+            `Quick
+            signer_validate_uri_unix_socket_empty_rejected;
+          Alcotest.test_case
+            "validate_uri_case_insensitive"
+            `Quick
+            signer_validate_uri_case_insensitive;
+          Alcotest.test_case
+            "validate_and_resolve_local_keys"
+            `Quick
+            signer_validate_and_resolve_local_keys;
+          Alcotest.test_case
+            "validate_and_resolve_remote_uri"
+            `Quick
+            signer_validate_and_resolve_remote_uri;
+          Alcotest.test_case
+            "validate_and_resolve_invalid_uri"
+            `Quick
+            signer_validate_and_resolve_invalid_uri;
+          Alcotest.test_case
+            "resolve_signatory_nonexistent"
+            `Quick
+            signer_resolve_signatory_nonexistent;
         ] );
       ( "signatory_installer",
         [
