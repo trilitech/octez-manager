@@ -635,6 +635,7 @@ let spec =
             liquidity_baking_vote =
               (if String.trim model.liquidity_baking_vote = "" then None
                else Some (String.trim model.liquidity_baking_vote));
+            signer_mode = Signer_types.Local_keys;
             extra_args;
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
