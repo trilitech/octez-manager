@@ -14,6 +14,12 @@ type dal_selection =
   | Dal_endpoint of string
       (** Use an external DAL node at the given endpoint. *)
 
+(** How the baker handles key signing. *)
+type signer_selection =
+  | Signer_local_keys  (** Use local key files from base directory. *)
+  | Signer_instance of string  (** Use a managed Signatory instance by name. *)
+  | Signer_uri of string  (** Use an external remote signer at the given URI. *)
+
 (** Form model holding all baker configuration fields. *)
 type model = {
   core : Form_builder_common.core_service_config;
@@ -27,6 +33,7 @@ type model = {
   delegates : string list;  (** List of delegate public key hashes. *)
   liquidity_baking_vote : string;
       (** Liquidity baking toggle vote (["on"], ["off"], or ["pass"]). *)
+  signer : signer_selection;  (** Key signing mode. *)
   edit_mode : bool;  (** [true] when editing an existing baker instance. *)
   original_instance : string option;
       (** Original instance name in edit mode. *)
