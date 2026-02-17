@@ -121,12 +121,14 @@ let create_baker_flow ~services ~on_success =
             else if not (String.for_all Config.is_valid_instance_char instance)
             then show_error ~title:"Error" invalid_instance_name_error_msg
             else
-              prompt_text_modal
-                ~title:"Delegates (comma separated)"
+              prompt_textarea_modal
+                ~title:"Delegates (comma or newline separated)"
+                ~placeholder:"tz1...\ntz2...\ntz3..."
                 ~on_submit:(fun delegates_str ->
                   let delegates =
-                    String.split_on_char ',' delegates_str
-                    |> List.map String.trim
+                    delegates_str |> String.split_on_char '\n'
+                    |> List.concat_map (fun line ->
+                        String.split_on_char ',' line |> List.map String.trim)
                     |> List.filter (( <> ) "")
                   in
                   let request =

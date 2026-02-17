@@ -383,7 +383,10 @@ let run_rpc_stream_eio (Eio_process.Mgr mgr) ~stopped ~url ~on_line =
   try ignore (Eio.Process.await proc) with _ -> ()
 
 let run_rpc_stream_blocking ~stopped ~cmd ~on_line =
-  let ic = Unix.open_process_in cmd in
+  let ic =
+    (Unix.open_process_in
+       cmd [@allow_forbidden "blocking I/O in background domain"])
+  in
   let rec loop () =
     if Atomic.get stopped then ()
     else
@@ -395,7 +398,12 @@ let run_rpc_stream_blocking ~stopped ~cmd ~on_line =
           loop ()
   in
   loop () ;
-  try ignore (Unix.close_process_in ic) with _ -> ()
+  try
+    ignore
+      ((Unix.close_process_in
+       [@allow_forbidden "blocking I/O in background domain"])
+         ic)
+  with _ -> ()
 
 let start_rpc_stream (s : Service.t) ~path ~on_line ~on_disconnect :
     monitor_handle =

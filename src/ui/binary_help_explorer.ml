@@ -210,7 +210,7 @@ let open_value_modal row placeholder =
       let s = ps.Navigation.s in
       let doc_block = String.concat "\n" s.doc_lines in
       let input_block = Textbox_widget.render s.textbox ~focus in
-      let hint = Widgets.dim "Enter: confirm · Esc: cancel" in
+      let hint = Widgets.themed_muted "Enter: confirm · Esc: cancel" in
       doc_block ^ "\n\n" ^ input_block ^ "\n\n" ^ hint
 
     let move ps _ = ps
@@ -405,7 +405,9 @@ module Flags_modal = struct
     let arg_width = max 10 (min 24 (width / 3)) in
     let value_width = max 8 (width - opt_width - arg_width - 12) in
     let render_row idx row =
-      let marker = if idx = s.cursor then Widgets.bold "➤" else " " in
+      let marker =
+        if idx = s.cursor then Widgets.themed_emphasis "➤" else " "
+      in
       let checkbox = if row.selected then "●" else "○" in
       let opt = truncate ~max_len:opt_width (option_label row.opt) in
       let arg =
@@ -429,14 +431,16 @@ module Flags_modal = struct
           arg
           value
       in
-      let header = if row.selected then Widgets.fg 22 header else header in
+      let header =
+        if row.selected then Widgets.themed_accent header else header
+      in
       header
     in
     let summary_tokens = format_tokens (Array.to_list s.rows) in
     let summary_line =
       match summary_tokens with
-      | [] -> Widgets.dim "No flags selected"
-      | ts -> Widgets.fg 22 (String.concat " " ts)
+      | [] -> Widgets.themed_muted "No flags selected"
+      | ts -> Widgets.themed_accent (String.concat " " ts)
     in
     (* Only render visible rows *)
     let all_rows = Array.to_list s.rows in
@@ -448,11 +452,11 @@ module Flags_modal = struct
       |> List.map (fun (idx, row) -> render_row idx row)
     in
     let body = String.concat "\n" visible in
-    Miaou_widgets_layout.Vsection.render
+    Themed_page.render_layout
       ~size
       ~header:
         [
-          Widgets.title_highlight
+          Widgets.themed_primary
             (Printf.sprintf
                "%s [%s] off=%d cur=%d"
                s.title
@@ -462,7 +466,7 @@ module Flags_modal = struct
           summary_line;
           "";
         ]
-      ~content_footer:[]
+      ~footer:[]
       ~child:(fun _ -> body)
 
   let handle_modal_key ps key ~size:_ =

@@ -11,6 +11,7 @@ module Desc_list = Miaou_widgets_display.Description_list
 module Vsection = Miaou_widgets_layout.Vsection
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
+module Style_context = Miaou_style.Style_context
 open Octez_manager_lib
 
 let name = "instance_details"
@@ -81,9 +82,10 @@ let keymap _ =
 
 let header s =
   [
-    Widgets.title_highlight (" Instance Details . " ^ s.instance);
+    Widgets.themed_primary (" Instance Details . " ^ s.instance);
     (match s.service with
-    | Some svc -> Widgets.dim (svc.Service.role ^ " @ " ^ svc.Service.network)
+    | Some svc ->
+        Widgets.themed_muted (svc.Service.role ^ " @ " ^ svc.Service.network)
     | None -> "");
   ]
 
@@ -290,24 +292,29 @@ let view ps ~focus:_ ~size =
   let box_width = min 78 (size.LTerm_geom.cols - 2) in
   let body =
     match (s.error, s.service) with
-    | Some err, _ -> Widgets.red ("Error: " ^ err)
+    | Some err, _ -> Widgets.themed_error ("Error: " ^ err)
     | None, None -> "Loading..."
     | None, Some svc ->
         let title, details, paths = view_details ~box_width svc in
         let details_box =
-          Box.render ~title ~style:Rounded ~color:12 ~width:box_width details
+          Style_context.with_child_context
+            ~widget_name:"instance-details-main"
+            (fun () ->
+              Box.render ~title ~style:Rounded ~width:box_width details)
         in
         let paths_box =
-          Box.render
-            ~title:"Files & Paths"
-            ~style:Rounded
-            ~color:14
-            ~width:box_width
-            paths
+          Style_context.with_child_context
+            ~widget_name:"instance-details-paths"
+            (fun () ->
+              Box.render
+                ~title:"Files & Paths"
+                ~style:Rounded
+                ~width:box_width
+                paths)
         in
         details_box ^ "\n" ^ paths_box
   in
-  Vsection.render ~size ~header:(header s) ~content_footer:[] ~child:(fun _ ->
+  Themed_page.render_layout ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
       body)
 
 let handle_modal_key ps key ~size:_ =
@@ -374,7 +381,7 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 end
 
 module Page =
-  Monitored_page.Make
+  Themed_page.Make
     (Page_Impl)
     (struct
       let page_name = "instance_details"

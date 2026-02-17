@@ -96,11 +96,18 @@ let run_command argv cwd =
         | Some dir ->
             Printf.sprintf "cd %s && %s" (Cmd_runner.sh_quote dir) base
       in
-      let ic, oc, ec = Unix.open_process_full command (Unix.environment ()) in
+      let ic, oc, ec =
+        (Unix.open_process_full [@allow_forbidden "TUI system interface"])
+          command
+          (Unix.environment ())
+      in
       close_out_noerr oc ;
       let stdout = read_all ic in
       let stderr = read_all ec in
-      match Unix.close_process_full (ic, oc, ec) with
+      match
+        (Unix.close_process_full [@allow_forbidden "TUI system interface"])
+          (ic, oc, ec)
+      with
       | Unix.WEXITED code ->
           Ok {Miaou_interfaces.System.exit_code = code; stdout; stderr}
       | Unix.WSIGNALED signal | Unix.WSTOPPED signal ->
@@ -206,7 +213,8 @@ let register_logger ~log ~logfile_path =
   log_enabled := log ;
   ignore (set_logfile logfile_path)
 
-let register_palette () =
+let[@allow_forbidden "legacy Miaou palette - TODO: migrate to theme system"] register_palette
+    () =
   let module Palette = Miaou_interfaces.Palette in
   let module W = Miaou_widgets_display.Widgets in
   let id x = x in

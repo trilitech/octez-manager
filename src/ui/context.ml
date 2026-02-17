@@ -7,6 +7,21 @@
 
 let pending_instance_detail : string option ref = ref None
 
+(** Global key handlers - checked before page handles keys *)
+let global_key_handlers : (string, unit -> unit) Hashtbl.t = Hashtbl.create 8
+
+let register_global_key key handler =
+  Hashtbl.replace global_key_handlers key handler
+
+let get_global_key_handler key = Hashtbl.find_opt global_key_handlers key
+
+let handle_global_key key =
+  match get_global_key_handler key with
+  | Some handler ->
+      handler () ;
+      true
+  | None -> false
+
 let pending_external_service : Octez_manager_lib.External_service.t option ref =
   ref None
 
@@ -124,7 +139,11 @@ let render_toasts ~cols =
     (fun () -> Miaou_widgets_layout.Toast_widget.render !toasts ~cols)
 
 (* Global spinner for loading states *)
-let spinner = ref (Miaou_widgets_layout.Spinner_widget.open_centered ())
+let spinner =
+  ref
+    (Miaou_widgets_layout.Spinner_widget.open_centered
+       ~style:Miaou_widgets_layout.Spinner_widget.Blocks
+       ())
 
 let tick_spinner () =
   spinner := Miaou_widgets_layout.Spinner_widget.tick !spinner
