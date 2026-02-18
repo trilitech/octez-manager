@@ -33,6 +33,7 @@
   baker
   accuser
   signatory
+  signatory_config
   lifecycle
   removal
   import
@@ -61,6 +62,7 @@
   octez_manager_common
   rresult
   yojson
+  yaml
   bos
   str
   unix
