@@ -225,6 +225,16 @@ let check_forbidden loc (lid : Longident.t) =
             modname
             fname
             suggestion
+      | Function (modname, fname, suggestion), None
+        when modname = "Stdlib" && name = fname ->
+          (* Unqualified Stdlib functions: prerr_endline, print_string, etc. *)
+          Location.raise_errorf
+            ~loc
+            "Forbidden call: %s.%s is not allowed.@.Suggestion: %s@.Use \
+             [@allow_forbidden \"reason\"] to suppress."
+            modname
+            fname
+            suggestion
       | _ -> ())
     items
 
@@ -288,12 +298,12 @@ let strip_build_prefix path =
   (* Look for /default/ which marks the end of dune build prefix *)
   match String.split_on_char '/' path with
   | parts -> (
-      let rec find_default acc = function
+      let rec find_default = function
         | [] -> None
         | "default" :: rest -> Some rest
-        | _ :: rest -> find_default acc rest
+        | _ :: rest -> find_default rest
       in
-      match find_default [] parts with
+      match find_default parts with
       | Some rest -> Some (String.concat "/" rest)
       | None -> None)
 

@@ -192,7 +192,8 @@ let log_line level msg =
       | Logger.Error -> "ERR"
     in
     let line = Printf.sprintf "[%s] %s" prefix msg in
-    prerr_endline line ;
+    (prerr_endline [@allow_forbidden "TUI logger - stderr is the log sink"])
+      line ;
     match !logfile with
     | None -> ()
     | Some oc ->
