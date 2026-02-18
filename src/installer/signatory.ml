@@ -137,8 +137,12 @@ tezos:
 (** Compute data directory for signatory *)
 let signatory_data_dir instance =
   let base =
-    if Paths.is_root () then "/var/lib/octez"
-    else Filename.concat (Paths.xdg_data_home ()) "octez"
+    (* Respect XDG_DATA_HOME override (used by tests), otherwise use standard paths *)
+    match Sys.getenv_opt "XDG_DATA_HOME" with
+    | Some xdg when xdg <> "" -> Filename.concat xdg "octez"
+    | _ ->
+        if Paths.is_root () then "/var/lib/octez"
+        else Filename.concat (Paths.xdg_data_home ()) "octez"
   in
   Filename.concat (Filename.concat base "signatory") instance
 
