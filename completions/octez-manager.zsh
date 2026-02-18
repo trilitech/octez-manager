@@ -254,6 +254,7 @@ _octez-manager() {
   local -a opts_ui
   opts_ui=(
     '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
@@ -272,6 +273,7 @@ _octez-manager() {
     '--port[TCP port to listen on]:PORT:'
     '--page[Start on a registered page]:NAME:'
     '--password[Controller password]:PASSWORD:'
+    '--theme[Theme name or path (built-ins: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
     '--viewer-password[Viewer password (defaults to controller password if not set)]:PASSWORD:'

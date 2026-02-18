@@ -97,7 +97,6 @@ let rec format_value ~options ~depth buf (j : Yojson.Safe.t) =
           pairs ;
         Buffer.add_string buf (make_indent (depth * options.indent)) ;
         Buffer.add_char buf '}'
-    | _ -> Buffer.add_string buf "null"
 
 let highlight ?(options = default_options) json_string =
   try
