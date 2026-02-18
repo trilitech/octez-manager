@@ -91,6 +91,41 @@ let header s =
 
 let _footer = []
 
+let render_signatory_keys ~box_width instance =
+  (* Parse signatory.yaml to get detailed key information *)
+  match Signatory_config.get_authorized_keys ~instance with
+  | Ok [] ->
+      Box.render
+        ~title:"Authorized Keys"
+        ~style:Rounded
+        ~color:11
+        ~width:box_width
+        "(none)"
+  | Ok keys ->
+      let render_key key =
+        let allows_str =
+          match key.Signatory_config.allows with
+          | [] -> "    (no specific operations allowed)"
+          | ops ->
+              ops |> List.map (fun op -> "    • " ^ op) |> String.concat "\n"
+        in
+        "  " ^ Widgets.cyan key.Signatory_config.pkh ^ "\n" ^ allows_str
+      in
+      let content = keys |> List.map render_key |> String.concat "\n\n" in
+      Box.render
+        ~title:"Authorized Keys"
+        ~style:Rounded
+        ~color:11
+        ~width:box_width
+        content
+  | Error (`Msg err) ->
+      Box.render
+        ~title:"Authorized Keys"
+        ~style:Rounded
+        ~color:11
+        ~width:box_width
+        (Widgets.yellow ("Unable to parse config: " ^ err))
+
 let view_details ~box_width svc =
   let render_fields items =
     Desc_list.create ~key_width:18 ~items ()
@@ -285,13 +320,6 @@ let view_details ~box_width svc =
           | [] -> "(none)"
           | deps -> String.concat ", " deps
         in
-        (* Get authorized keys from config *)
-        let authorized_keys =
-          match Signatory.read_authorized_keys svc.Service.instance with
-          | Ok keys when keys <> [] -> String.concat ", " keys
-          | Ok _ -> "(none)"
-          | Error _ -> "(unable to read config)"
-        in
         (* Get health status from metrics cache *)
         let health_status =
           match Signatory_metrics.get ~instance:svc.Service.instance with
@@ -312,7 +340,6 @@ let view_details ~box_width svc =
             if metrics_address = "" then "(none)" else metrics_address );
           ("Backend", if backend = "" then "(unset)" else backend);
           ("Watermark", if watermark = "" then "(unset)" else watermark);
-          ("Authorized Keys", authorized_keys);
           ("Dependents", dependents);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
@@ -342,7 +369,13 @@ let view_details ~box_width svc =
         ]
   in
   let role_title = String.capitalize_ascii svc.Service.role ^ " Details" in
-  (role_title, render_fields details, render_fields paths)
+  (* Return optional keys box for signatory *)
+  let keys_box =
+    if svc.Service.role = "signatory" then
+      Some (render_signatory_keys ~box_width svc.Service.instance)
+    else None
+  in
+  (role_title, render_fields details, render_fields paths, keys_box)
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
@@ -352,7 +385,7 @@ let view ps ~focus:_ ~size =
     | Some err, _ -> Widgets.themed_error ("Error: " ^ err)
     | None, None -> "Loading..."
     | None, Some svc ->
-        let title, details, paths = view_details ~box_width svc in
+        let title, details, paths, keys_box_opt = view_details ~box_width svc in
         let details_box =
           Style_context.with_child_context
             ~widget_name:"instance-details-main"
@@ -369,7 +402,13 @@ let view ps ~focus:_ ~size =
                 ~width:box_width
                 paths)
         in
-        details_box ^ "\n" ^ paths_box
+        (* Add authorized keys box for signatory *)
+        let boxes =
+          match keys_box_opt with
+          | Some keys_box -> [details_box; keys_box; paths_box]
+          | None -> [details_box; paths_box]
+        in
+        String.concat "\n" boxes
   in
   Themed_page.render_layout ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
       body)
