@@ -146,7 +146,12 @@ let render_single_pager ~slot ~cols ~rows ~is_focused ~is_target =
   let body_content =
     match slot.State.pager with
     | Some p ->
-        render_with_pager ~pager:p ~cols ~rows:pager_rows ~focus:is_focused
+        Style_context.with_child_context
+          ~widget_name:"rpc-pager-body"
+          ~focused:false
+          ~selected:false
+          (fun () ->
+            render_with_pager ~pager:p ~cols ~rows:pager_rows ~focus:is_focused)
     | None ->
         if slot.State.request = "" then Widgets.themed_muted "(no request yet)"
         else render_loading ()
@@ -319,16 +324,15 @@ let split_lines_padded s ~target_lines ~width =
     padded
 
 (** Render a row of pagers horizontally (side-by-side) - OpenCode style *)
-let render_pager_row ~pagers ~focused_id ~target_id ~pager_width ~pager_height
-    ~focus ~(result_focus : State.result_focus) =
-  if pagers = [] then ""
+let render_pager_row ~pager_slots ~focused_id ~target_id ~pager_width
+    ~pager_height ~focus ~(result_focus : State.result_focus) =
+  if pager_slots = [] then ""
   else
     (* Thicker muted vertical separator (3 chars: space + bar + space) *)
     let separator_col = Widgets.themed_muted " │ " in
-    (* Render each pager to its own string - use full pager_width *)
-    let pager_renders =
-      List.map
-        (fun slot ->
+    let render_slot = function
+      | None -> ""
+      | Some slot ->
           let is_focused =
             focus && slot.State.id = focused_id
             && match result_focus with State.FocusPager _ -> true | _ -> false
@@ -342,9 +346,10 @@ let render_pager_row ~pagers ~focused_id ~target_id ~pager_width ~pager_height
             ~cols:pager_width
             ~rows:pager_height
             ~is_focused
-            ~is_target)
-        pagers
+            ~is_target
     in
+    (* Render each pager (or blank slot) to its own string *)
+    let pager_renders = List.map render_slot pager_slots in
     (* Split each render into lines and pad/truncate to exact dimensions *)
     let line_arrays =
       List.map
@@ -370,16 +375,33 @@ let repeat_utf8 s n =
   done ;
   Buffer.contents buf
 
-(** Build a horizontal separator row with proper box-drawing intersections *)
-let build_separator_row ~pager_width ~grid_cols ~separator_width:_ =
+(** Build a horizontal separator row with proper box-drawing intersections
+    based on which columns have pagers above/below. *)
+let build_separator_row ~pager_width ~row_above ~row_below =
+  let grid_cols = List.length row_above in
   let buf = Buffer.create 256 in
+  let has_pager row col =
+    match List.nth_opt row col with Some (Some _) -> true | _ -> false
+  in
   for col = 0 to grid_cols - 1 do
-    (* Add horizontal line for this pager width *)
-    Buffer.add_string buf (repeat_utf8 "─" pager_width) ;
-    (* Add intersection or end *)
+    let has_left = has_pager row_above col || has_pager row_below col in
+    (* Add horizontal line segment for this column if needed *)
+    if has_left then Buffer.add_string buf (repeat_utf8 "─" pager_width)
+    else Buffer.add_string buf (String.make pager_width ' ') ;
     if col < grid_cols - 1 then
-      (* Intersection: space + cross + space to match " │ " vertical separator *)
-      Buffer.add_string buf "─┼─"
+      let has_right =
+        has_pager row_above (col + 1) || has_pager row_below (col + 1)
+      in
+      let joint =
+        match (has_left, has_right) with
+        | true, true -> "┼"
+        | true, false -> "┤"
+        | false, true -> "├"
+        | false, false -> "│"
+      in
+      let left_seg = if has_left then "─" else " " in
+      let right_seg = if has_right then "─" else " " in
+      Buffer.add_string buf (left_seg ^ joint ^ right_seg)
   done ;
   Widgets.themed_muted (Buffer.contents buf)
 
@@ -391,37 +413,46 @@ let render_grid ~pagers ~focused_id ~target_id ~cols ~rows ~grid_cols ~grid_rows
   let total_separator_width = separator_width * (grid_cols - 1) in
   let pager_width = (cols - total_separator_width) / grid_cols in
   let pager_height = rows / grid_rows in
-  (* Build horizontal separator with proper intersections *)
-  let separator_row =
-    build_separator_row ~pager_width ~grid_cols ~separator_width
-  in
   (* Arrange pagers into grid rows *)
   let pager_array = Array.of_list pagers in
   let num_pagers = Array.length pager_array in
-  let grid_row_renders =
+  let row_slots =
     List.init grid_rows (fun row_idx ->
         let start = row_idx * grid_cols in
-        let row_pagers =
-          List.init grid_cols (fun col_idx ->
-              let idx = start + col_idx in
-              if idx < num_pagers then Some pager_array.(idx) else None)
-          |> List.filter_map Fun.id
-        in
-        if row_pagers = [] then ""
-        else
-          render_pager_row
-            ~pagers:row_pagers
-            ~focused_id
-            ~target_id
-            ~pager_width
-            ~pager_height
-            ~focus
-            ~result_focus)
+        List.init grid_cols (fun col_idx ->
+            let idx = start + col_idx in
+            if idx < num_pagers then Some pager_array.(idx) else None))
   in
-  (* Join grid rows with separator that has proper intersections *)
-  String.concat
-    ("\n" ^ separator_row ^ "\n")
-    (List.filter (fun s -> s <> "") grid_row_renders)
+  let rendered_rows =
+    List.filter_map
+      (fun slots ->
+        if List.for_all Option.is_none slots then None
+        else
+          Some
+            ( slots,
+              render_pager_row
+                ~pager_slots:slots
+                ~focused_id
+                ~target_id
+                ~pager_width
+                ~pager_height
+                ~focus
+                ~result_focus ))
+      row_slots
+  in
+  let rec join acc = function
+    | [] -> List.rev acc
+    | [(_, row)] -> List.rev (row :: acc)
+    | (slots, row) :: ((next_slots, _) as next_row) :: rest ->
+        let separator_row =
+          build_separator_row
+            ~pager_width
+            ~row_above:slots
+            ~row_below:next_slots
+        in
+        join (separator_row :: row :: acc) (next_row :: rest)
+  in
+  join [] rendered_rows |> String.concat "\n"
 
 (** Render pager tabs for single-column mode *)
 let render_pager_tabs ~pagers ~focused_id =
