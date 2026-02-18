@@ -31,6 +31,7 @@
   lambda-term
   linenoise
    (ppx_deriving :build)
+   (ppx_forbid :build)
    (ppxlib (>= 0.28.0))
    (sqlite3 :with-dev-setup)
    (alcotest :with-test)

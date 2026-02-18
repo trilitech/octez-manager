@@ -27,6 +27,7 @@ jobs:
       OPAMYES: "true"
       OPAMROOT: /root/.opam
       MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
+      PPX_FORBID_GIT_URL: "https://github.com/atacama-dev/ppx_forbid.git"
 
     steps:
       - name: Checkout
@@ -68,17 +69,19 @@ jobs:
             echo "switch-valid=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Pin miaou packages
+      - name: Pin miaou and ppx_forbid packages
         if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
         run: |
           eval $(opam env)
-          echo "Installing miaou packages..."
+          echo "Pinning ppx_forbid..."
+          opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
+          echo "Pinning miaou packages..."
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
+          opam install ppx_forbid miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix --jobs=4
 
       - name: Install project dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
