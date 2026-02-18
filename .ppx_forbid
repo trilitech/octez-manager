@@ -1,0 +1,26 @@
+# ppx_forbid configuration for octez-manager
+# Enforces Eio-based concurrency, theming, and safe coding practices
+
+# === Forbidden modules ===
+module Obj "Obj is unsafe and breaks type safety"
+
+# === Blocking process calls - use Eio.Process instead ===
+function Unix.open_process_in "Use Eio.Process.run or Common.run_out"
+function Unix.open_process_out "Use Eio.Process.run or Common.run"
+function Unix.open_process "Use Eio.Process.run"
+function Unix.open_process_full "Use Eio.Process.run"
+function Unix.close_process_in "Use Eio.Process (automatic cleanup with switch)"
+function Unix.close_process_out "Use Eio.Process (automatic cleanup with switch)"
+function Unix.close_process "Use Eio.Process (automatic cleanup with switch)"
+function Unix.close_process_full "Use Eio.Process (automatic cleanup with switch)"
+function Unix.system "Use Eio.Process.run or Common.run"
+function Unix.create_process "Use Eio.Process.spawn"
+function Unix.create_process_env "Use Eio.Process.spawn"
+
+# === Blocking sleep - use Eio.Time instead ===
+function Unix.sleep "Use Eio.Time.sleep"
+function Unix.sleepf "Use Eio.Time.sleep"
+
+# === Thread creation - use Eio.Fiber instead ===
+function Thread.create "Use Eio.Fiber.fork or Eio.Fiber.fork_daemon"
+function Thread.delay "Use Eio.Time.sleep"
