@@ -71,7 +71,7 @@ _octez_manager() {
       COMPREPLY=( $(compgen -d -- "$cur") )
       return 0
       ;;
-    --keys-dir|--watermark)
+    --theme|--keys-dir|--watermark)
       COMPREPLY=( $(compgen -f -- "$cur") )
       return 0
       ;;
@@ -215,7 +215,7 @@ _octez_manager() {
       ;;
     ui)
       if [[ $cur == -* ]]; then
-        opts="--page --ui-log --ui-logfile --help --version"
+        opts="--page --theme --ui-log --ui-logfile --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
@@ -229,7 +229,7 @@ _octez_manager() {
       ;;
     web)
       if [[ $cur == -* ]]; then
-        opts="-p --port --page --password --ui-log --ui-logfile --viewer-password --help --version"
+        opts="-p --port --page --password --theme --ui-log --ui-logfile --viewer-password --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
