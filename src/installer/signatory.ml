@@ -282,16 +282,8 @@ Security:
       ~watermark:request.watermark
   in
 
-  (* Write config file *)
-  let config_dir =
-    let base =
-      if Paths.is_root () then "/etc/octez/instances"
-      else Filename.concat (Paths.xdg_data_home ()) "octez/instances"
-    in
-    Filename.concat base request.instance
-  in
-  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 config_dir in
-  let config_path = Filename.concat config_dir "signatory.yaml" in
+  (* Write config file in the signatory data directory *)
+  let config_path = Filename.concat data_dir "signatory.yaml" in
   let* () =
     File_ops.write_file ~mode:0o644 ~owner ~group config_path yaml_content
   in
@@ -393,18 +385,8 @@ Security:
 
 (** Get the path to signatory.yaml config file for an instance *)
 let signatory_config_path instance =
-  let base =
-    (* Respect XDG_DATA_HOME override (used by tests), otherwise use standard paths *)
-    match Sys.getenv_opt "XDG_DATA_HOME" with
-    | Some xdg ->
-        if xdg <> "" then Filename.concat xdg "octez/instances"
-        else if Paths.is_root () then "/etc/octez/instances"
-        else Filename.concat (Paths.xdg_data_home ()) "octez/instances"
-    | None ->
-        if Paths.is_root () then "/etc/octez/instances"
-        else Filename.concat (Paths.xdg_data_home ()) "octez/instances"
-  in
-  Filename.concat (Filename.concat base instance) "signatory.yaml"
+  let data_dir = signatory_data_dir instance in
+  Filename.concat data_dir "signatory.yaml"
 
 (** Read authorized keys from signatory.yaml.
     

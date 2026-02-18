@@ -5397,7 +5397,7 @@ watermark:
       rmdir tmp_dir)
     (fun () ->
       let config_dir =
-        Filename.concat tmp_dir ".local/share/octez/instances/test-sig"
+        Filename.concat tmp_dir ".local/share/octez/signatory/test-sig"
       in
       let rec mkdir_p path =
         if not (Sys.file_exists path) then (
@@ -5461,7 +5461,7 @@ watermark:
       rmdir tmp_dir)
     (fun () ->
       let config_dir =
-        Filename.concat tmp_dir ".local/share/octez/instances/test-sig-empty"
+        Filename.concat tmp_dir ".local/share/octez/signatory/test-sig-empty"
       in
       let rec mkdir_p path =
         if not (Sys.file_exists path) then (
