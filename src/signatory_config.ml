@@ -11,13 +11,9 @@ open Rresult
 
 type key_info = {pkh : string; allows : string list}
 
-(** Get the path to signatory.yaml for an instance *)
-let config_path ~instance =
-  let base =
-    if Paths.is_root () then "/etc/octez/instances"
-    else Filename.concat (Paths.xdg_data_home ()) "octez/instances"
-  in
-  Filename.concat (Filename.concat base instance) "signatory.yaml"
+(** Get the path to signatory.yaml for an instance.
+    Uses Signatory.signatory_config_path to get the correct path. *)
+let config_path ~instance = Signatory.signatory_config_path instance
 
 (** Extract allowed operations from a key's config *)
 let extract_allows yaml_value =
