@@ -25,13 +25,22 @@ let extract_allows yaml_value =
   | `O assoc -> (
       match List.assoc_opt "allow" assoc with
       | Some (`O allow_assoc) ->
-          (* Extract operation names from the allow section *)
+          (* Extract operation names from the allow section.
+             In signatory.yaml, operations are typically set with null values:
+               block:
+               attestation:
+             which parse as ("block", `Null), ("attestation", `Null). *)
           List.filter_map
-            (fun (op_name, _) ->
-              (* Filter out operations that might be disabled or have values *)
-              match op_name with
-              | "generic" -> None (* generic has sub-items, skip for now *)
-              | op -> Some op)
+            (fun (op_name, op_value) ->
+              match (op_name, op_value) with
+              (* Skip generic operations with sub-items (they appear as lists) *)
+              | "generic", `A _ -> None
+              (* Include operations with null values (standard format) *)
+              | op, `Null -> Some op
+              (* Include operations with empty object values (alternative format) *)
+              | op, `O [] -> Some op
+              (* Skip other structures *)
+              | _ -> None)
             allow_assoc
       | _ -> [])
   | _ -> []
