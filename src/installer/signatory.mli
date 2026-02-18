@@ -32,6 +32,12 @@ val install_signatory :
     @return absolute path to signatory.yaml *)
 val signatory_config_path : string -> string
 
+(** Get the data directory for a signatory instance.
+    
+    @param instance the signatory instance name
+    @return absolute path to data directory *)
+val signatory_data_dir : string -> string
+
 (** Read authorized keys from a signatory instance's YAML configuration.
     
     Parses the signatory.yaml file to extract the list of public key hashes
