@@ -250,14 +250,8 @@ let fetch_and_set_result ~caller ~service ~path state on_update =
                caller
                response_size
                response_time_ms) ;
-          let highlighted =
-            match Json_highlighter.highlight body with
-            | Ok h -> h
-            | Error _ -> body
-          in
           on_update
             (State.set_result
-               ~body:highlighted
                ~raw_body:body
                ~response_time_ms
                ~response_size
