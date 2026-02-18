@@ -9,6 +9,17 @@ open Rresult
 include Helpers
 include Config
 
+(** Check if a data directory is shared by multiple services.
+    Returns true if other services (besides [instance]) use the same data_dir. *)
+let is_shared_data_dir ~instance ~data_dir () =
+  match Service_registry.list () with
+  | Error _ -> false
+  | Ok all_services ->
+      List.exists
+        (fun (svc : Service.t) ->
+          svc.instance <> instance && svc.data_dir = data_dir)
+        all_services
+
 let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
@@ -52,7 +63,15 @@ let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
       Systemd.remove_dropin ~role:svc.role ~instance ;
       let* () =
         match delete_data_dir with
-        | true -> File_ops.remove_tree svc.data_dir
+        | true ->
+            if is_shared_data_dir ~instance ~data_dir:svc.data_dir () then (
+              if not quiet then
+                Format.printf
+                  "⚠ Skipping data directory deletion (shared with other \
+                   services): %s@."
+                  svc.data_dir ;
+              Ok ())
+            else File_ops.remove_tree svc.data_dir
         | false -> Ok ()
       in
       Service_registry.remove ~instance
