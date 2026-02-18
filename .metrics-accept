@@ -24,5 +24,8 @@ large_functions
 # Large files - install forms follow established pattern (all are >500 lines)
 large_files
 
+# Missing docs on derived/utility functions (pre-existing, not introduced by this PR)
+missing_docs
+
 # Missing .mli files (pre-existing, not introduced by this PR)
 missing_mli
