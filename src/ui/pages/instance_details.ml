@@ -153,6 +153,19 @@ let view_details ~box_width svc =
           ("Config File", config_file);
           ("Identity File", identity_file);
         ]
+    | "signatory" ->
+        let data_dir = Signatory.signatory_data_dir svc.Service.instance in
+        let config_file =
+          Signatory.signatory_config_path svc.Service.instance
+        in
+        let keys_dir = Filename.concat data_dir "keys" in
+        let secrets_file = Filename.concat keys_dir "secret.json" in
+        [
+          ("Data Directory", data_dir);
+          ("Config File", config_file);
+          ("Keys Directory", keys_dir);
+          ("Secrets File", secrets_file);
+        ]
     | _ -> [("Data Directory", svc.Service.data_dir)]
   in
   let paths = specific_paths @ service_paths @ log_file @ service_metadata in
@@ -260,7 +273,51 @@ let view_details ~box_width svc =
           ("Bin Dir", svc.Service.app_bin_dir);
           ("Created At", svc.Service.created_at);
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
-          ("Extra Args", if extra_args = "" then "(none)" else extra_args);
+          ("Extra Args", if extra_args = "" then "(unset)" else extra_args);
+        ]
+    | "signatory" ->
+        let address = lookup "SIGNATORY_ADDRESS" in
+        let metrics_address = lookup "SIGNATORY_METRICS_ADDRESS" in
+        let backend = lookup "SIGNATORY_BACKEND" in
+        let watermark = lookup "SIGNATORY_WATERMARK" in
+        let dependents =
+          match svc.Service.dependents with
+          | [] -> "(none)"
+          | deps -> String.concat ", " deps
+        in
+        (* Get authorized keys from config *)
+        let authorized_keys =
+          match Signatory.read_authorized_keys svc.Service.instance with
+          | Ok keys when keys <> [] -> String.concat ", " keys
+          | Ok _ -> "(none)"
+          | Error _ -> "(unable to read config)"
+        in
+        (* Get health status from metrics cache *)
+        let health_status =
+          match Signatory_metrics.get ~instance:svc.Service.instance with
+          | Some metrics -> (
+              match metrics.Signatory_metrics.health with
+              | Signatory_metrics.Up -> Widgets.green "Healthy"
+              | Signatory_metrics.Down -> Widgets.red "Down"
+              | Signatory_metrics.Degraded -> Widgets.yellow "Degraded"
+              | Signatory_metrics.Unknown -> Widgets.dim "Unknown")
+          | None -> Widgets.dim "Not monitored"
+        in
+        [
+          ("Instance", svc.Service.instance);
+          ("Role", svc.Service.role);
+          ("Health", health_status);
+          ("Server Address", if address = "" then "(unset)" else address);
+          ( "Metrics Address",
+            if metrics_address = "" then "(none)" else metrics_address );
+          ("Backend", if backend = "" then "(unset)" else backend);
+          ("Watermark", if watermark = "" then "(unset)" else watermark);
+          ("Authorized Keys", authorized_keys);
+          ("Dependents", dependents);
+          ("Service User", svc.Service.service_user);
+          ("Bin Dir", svc.Service.app_bin_dir);
+          ("Created At", svc.Service.created_at);
+          ("Logging", Logging_mode.to_string svc.Service.logging_mode);
         ]
     | _ ->
         (* Default case - typically node *)
