@@ -161,9 +161,7 @@ let test_set_result () =
     State.init ~instances:[]
     |> State.execute_get ~url:"http://localhost/version"
   in
-  let state' =
-    State.set_result ~body:"{\"version\":\"1.0\"}" ~raw_body:"{}" state
-  in
+  let state' = State.set_result ~raw_body:"{}" state in
   match State.get_focused_pager state' with
   | Some slot ->
       (* The body might be transformed by foldable JSON, so check raw_body instead *)
