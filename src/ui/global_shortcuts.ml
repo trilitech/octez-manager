@@ -55,7 +55,7 @@ let handle key =
 (** Convenience function: warn if a page is trying to use a reserved key *)
 let warn_if_reserved key action_name =
   if is_reserved key then
-    prerr_endline
+    (prerr_endline [@allow_forbidden "dev-time warning, not shown to users"])
       (Printf.sprintf
          "WARNING: Key '%s' is reserved for global shortcuts but is being used \
           for '%s'"
