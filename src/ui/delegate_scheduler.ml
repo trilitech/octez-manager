@@ -168,7 +168,7 @@ let start () =
            Baker_highwatermarks.refresh ~instance)
          bakers
      with exn ->
-       prerr_endline
+       (prerr_endline [@allow_forbidden "startup error before TUI init"])
          (Printf.sprintf
             "delegate_scheduler: startup refresh failed: %s"
             (Printexc.to_string exn))) ;

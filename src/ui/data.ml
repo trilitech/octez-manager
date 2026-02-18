@@ -161,7 +161,8 @@ let refresh_cache ?detail () =
       set_cache states ;
       states
   | Error (`Msg msg) ->
-      prerr_endline (Printf.sprintf "Failed to read registry: %s" msg) ;
+      (prerr_endline [@allow_forbidden "startup error before TUI init"])
+        (Printf.sprintf "Failed to read registry: %s" msg) ;
       set_cache [] ;
       []
 

@@ -470,7 +470,8 @@ let start_server ~addr ~port =
              state.enabled <- false ;
              state.server_addr <- None ;
              state.server_port <- None ;
-             prerr_endline
+             (prerr_endline
+             [@allow_forbidden "metrics server runs outside TUI context"])
                (Printf.sprintf
                   "metrics server stopped: %s"
                   (Printexc.to_string exn)))
@@ -483,7 +484,8 @@ let maybe_start_from_env () =
       match parse_addr raw with
       | Ok (addr, port) -> start_server ~addr ~port
       | Error (`Msg msg) ->
-          prerr_endline
+          (prerr_endline
+          [@allow_forbidden "metrics server runs outside TUI context"])
             (Printf.sprintf "metrics server disabled: %s (%s)" msg raw))
 
 (** Recording / Historical Snapshots *)

@@ -34,7 +34,7 @@ let find_page_or_default name default_name =
   | None -> (
       match Registry.find default_name with
       | Some page ->
-          prerr_endline
+          (prerr_endline [@allow_forbidden "startup warning before TUI init"])
             (Printf.sprintf
                "Unknown page '%s', falling back to '%s'"
                name
