@@ -193,18 +193,14 @@ let test_render_list_mode () =
 let test_render_result_mode () =
   let state = State.init ~instances:[] in
   let state = State.execute_get ~url:"http://localhost/version" state in
-  let state =
-    State.set_result ~body:"{\"version\": \"1.0\"}" ~raw_body:"{}" state
-  in
+  let state = State.set_result ~raw_body:"{}" state in
   let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
   Alcotest.(check bool) "has content" true (String.length result > 2)
 
 let test_render_result_with_error () =
   let state = State.init ~instances:[] in
   let state = State.execute_get ~url:"http://localhost/error" state in
-  let state =
-    State.set_result ~body:"error data" ~raw_body:"error data" state
-  in
+  let state = State.set_result ~raw_body:"error data" state in
   let state = State.set_error "Parse error" state in
   let result = Render.render ~state ~cols:80 ~rows:24 ~focus:true in
   Alcotest.(check bool) "has content" true (String.length result > 0)
@@ -212,7 +208,7 @@ let test_render_result_with_error () =
 let test_render_multi_pager () =
   let state = State.init ~instances:[] in
   let state = State.execute_get ~url:"http://localhost/v1" state in
-  let state = State.set_result ~body:"{}" ~raw_body:"{}" state in
+  let state = State.set_result ~raw_body:"{}" state in
   let state = match State.add_pager state with Some s -> s | None -> state in
   let result = Render.render ~state ~cols:200 ~rows:50 ~focus:true in
   Alcotest.(check bool) "has content" true (String.length result > 0)
