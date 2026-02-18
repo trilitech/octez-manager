@@ -12,6 +12,7 @@
   cmdliner
   rresult
   yojson
+  yaml
   bos
   (miaou-core (>= 0.3.0))
   (miaou-driver-term (>= 0.3.0))
