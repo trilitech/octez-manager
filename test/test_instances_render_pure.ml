@@ -24,16 +24,15 @@ let string_contains = Test_string_helpers.string_contains
 (* ================================================================== *)
 
 let test_role_header_known_roles () =
-  check string "node" "── Nodes ──" (Layout.role_header "node") ;
-  check string "baker" "── Bakers ──" (Layout.role_header "baker") ;
-  check string "accuser" "── Accusers ──" (Layout.role_header "accuser") ;
-  check string "dal-node" "── DAL Nodes ──" (Layout.role_header "dal-node") ;
-  check string "signatory" "── Signatories ──" (Layout.role_header "signatory")
+  check string "node" "Nodes" (Layout.role_header "node") ;
+  check string "baker" "Bakers" (Layout.role_header "baker") ;
+  check string "accuser" "Accusers" (Layout.role_header "accuser") ;
+  check string "dal-node" "DAL Nodes" (Layout.role_header "dal-node") ;
+  check string "signatory" "Signatories" (Layout.role_header "signatory")
 
 let test_role_header_unknown_capitalizes () =
   let h = Layout.role_header "foobar" in
-  (* Unknown roles get ── Capitalized ── format *)
-  check bool "has dashes" true (string_contains ~needle:"──" h) ;
+  (* Unknown roles get capitalized name *)
   check bool "has capitalized name" true (string_contains ~needle:"Foobar" h)
 
 (* ================================================================== *)
