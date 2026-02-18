@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Signatory service name**: Signatory services now use `signatory@instance` instead of `octez-signatory@instance` as the systemd service name. The "octez-" prefix was redundant since the signatory binary is not part of the Octez project. External service detector now recognizes both naming patterns for backward compatibility.
 - **TUI: Signatory install form improvements**: Backend selection now uses modal-based UI (File, YubiHSM, Azure KMS, AWS KMS, GCP KMS, Vault) instead of text input. Form validates signatory binary exists before allowing submission. Watermark field renamed to "Watermark Storage" for clarity. Defaults to latest managed Signatory version when available. Prevents duplicate authorized keys.
 - **TUI: Removed redundant "m" global menu**: The global "m" shortcut that opened a duplicate service installation menu has been removed. All service installation now goes through the "c" (Create Service) menu on the instances page, providing a single consistent installation path.
 - Instances page now groups services by role (Nodes, Bakers, Accusers, DAL nodes) with each group wrapped in a Box_widget container with distinct colors
