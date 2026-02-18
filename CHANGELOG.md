@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Baker/accuser purge preserves node data**: Purging a baker or accuser instance no longer deletes the node's blockchain data directory. Previously, `om instance purge <baker>` would delete the node's data even though the node instance still existed, causing data loss. The fix detects when a data directory is shared by multiple services and skips deletion, preventing scenarios where purging one baker breaks other services using the same node. (fixes #727)
 - **Signatory key storage**: `secret.json` is now generated as valid JSON (empty array `[]`) instead of with `#` comment instructions that caused JSON parse errors. Instructions moved to separate `secret.json.README` file in the keys directory. Users with existing installations should remove `#` comment lines from their `secret.json` files to avoid "invalid character" errors that prevent Signatory from loading keys.
 - **RPC Browser responsiveness**: HTTP requests and endpoint listing now run in background worker pool, preventing UI freezes during slow network responses (fixes #673)
 
