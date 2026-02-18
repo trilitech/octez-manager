@@ -82,6 +82,25 @@ let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
   | None -> R.error_msgf "Instance '%s' not found" instance
   | Some svc ->
       let* () = remove_service ~quiet ~delete_data_dir:true ~instance () in
+      (* Clean up empty parent directory for signatory *)
+      let* () =
+        if svc.role = "signatory" then
+          let parent_dir = Filename.dirname svc.data_dir in
+          (* Only remove if it's the signatory parent dir and it's empty *)
+          if
+            Filename.basename parent_dir = "signatory"
+            && Sys.file_exists parent_dir
+          then
+            try
+              let entries = Sys.readdir parent_dir in
+              if Array.length entries = 0 then (
+                Unix.rmdir parent_dir ;
+                Ok ())
+              else Ok ()
+            with Unix.Unix_error _ -> Ok ()
+          else Ok ()
+        else Ok ()
+      in
       let* () =
         let is_baker = svc.role = "baker" in
         let is_accuser = svc.role = "accuser" in
