@@ -64,6 +64,7 @@ let rec json_to_node next_id (json : Yojson.Safe.t) : json_node * int =
           fields
       in
       (JObject {id; fields = List.rev fields}, next_id)
+  | _ -> (JNull, next_id)
 
 let of_json json =
   let root, _ = json_to_node 0 json in
