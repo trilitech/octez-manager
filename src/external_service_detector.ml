@@ -24,17 +24,22 @@ let clear_cache () = Mutex.protect cache_lock (fun () -> cache := [])
 (** {1 Filtering} *)
 
 (** Check if unit name matches octez-manager's naming convention.
-    Pattern: octez-<role>@<instance>.service *)
+    Patterns: 
+    - octez-<role>@<instance>.service (for node, baker, accuser, dal-node)
+    - signatory@<instance>.service (for signatory) *)
 let is_managed_unit_name unit_name =
-  (* Must start with "octez-" *)
-  if not (String.starts_with ~prefix:"octez-" unit_name) then false
-  else
+  (* Check for signatory@ pattern *)
+  if String.starts_with ~prefix:"signatory@" unit_name then
+    (* Must end with .service *)
+    String.ends_with ~suffix:".service" unit_name
+  else if String.starts_with ~prefix:"octez-" unit_name then
     (* Must contain exactly one @ symbol *)
     match String.split_on_char '@' unit_name with
     | [_role_part; instance_part] ->
         (* instance_part should end with .service *)
         String.ends_with ~suffix:".service" instance_part
     | _ -> false
+  else false
 
 let is_in_registry ~unit_name =
   (* Extract instance name from unit name *)
@@ -87,35 +92,41 @@ let list_all_service_units () =
     | Error _ -> []
   in
   let list_unit_files () =
-    let cmd =
-      Systemd.systemctl_cmd ()
-      @ [
-          "list-unit-files";
-          "--type=service";
-          "octez-*.service";
-          "--no-legend";
-          "--no-pager";
-        ]
+    (* Query both octez-* and signatory@ patterns *)
+    let query_pattern pattern =
+      let cmd =
+        Systemd.systemctl_cmd ()
+        @ [
+            "list-unit-files";
+            "--type=service";
+            pattern;
+            "--no-legend";
+            "--no-pager";
+          ]
+      in
+      match Cmd_runner.run_out cmd with
+      | Ok output ->
+          let lines = String.split_on_char '\n' output in
+          List.filter_map
+            (fun line ->
+              let trimmed = String.trim line in
+              if trimmed = "" then None
+              else
+                (* Line format: "unit.service   enabled/disabled/static" *)
+                (* Extract first field (unit name) *)
+                match String.split_on_char ' ' trimmed with
+                | unit_name :: _
+                  when String.ends_with ~suffix:".service" unit_name
+                       (* Skip template units (ending with @.service) *)
+                       && not (String.ends_with ~suffix:"@.service" unit_name)
+                  ->
+                    Some unit_name
+                | _ -> None)
+            lines
+      | Error _ -> []
     in
-    match Cmd_runner.run_out cmd with
-    | Ok output ->
-        let lines = String.split_on_char '\n' output in
-        List.filter_map
-          (fun line ->
-            let trimmed = String.trim line in
-            if trimmed = "" then None
-            else
-              (* Line format: "unit.service   enabled/disabled/static" *)
-              (* Extract first field (unit name) *)
-              match String.split_on_char ' ' trimmed with
-              | unit_name :: _
-                when String.ends_with ~suffix:".service" unit_name
-                     (* Skip template units (ending with @.service) *)
-                     && not (String.ends_with ~suffix:"@.service" unit_name) ->
-                  Some unit_name
-              | _ -> None)
-          lines
-    | Error _ -> []
+    (* Query both patterns and combine results *)
+    query_pattern "octez-*.service" @ query_pattern "signatory@*.service"
   in
   (* Get loaded units and unit files *)
   let loaded = list_loaded_units () in

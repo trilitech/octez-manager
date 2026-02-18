@@ -6,26 +6,43 @@
 (******************************************************************************)
 
 let system_unit_path role =
-  Printf.sprintf "/etc/systemd/system/octez-%s@.service" role
+  (* Signatory uses "signatory@.service", other services use "octez-<role>@.service" *)
+  match role with
+  | "signatory" -> "/etc/systemd/system/signatory@.service"
+  | _ -> Printf.sprintf "/etc/systemd/system/octez-%s@.service" role
 
 let user_unit_path role =
   let dir = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
-  Filename.concat dir (Printf.sprintf "octez-%s@.service" role)
+  (* Signatory uses "signatory@.service", other services use "octez-<role>@.service" *)
+  let service_name =
+    match role with
+    | "signatory" -> "signatory@.service"
+    | _ -> Printf.sprintf "octez-%s@.service" role
+  in
+  Filename.concat dir service_name
 
 let unit_path role =
   if Paths.is_root () then system_unit_path role else user_unit_path role
 
 let dropin_dir role inst =
+  (* Signatory uses "signatory@", other services use "octez-<role>@" *)
+  let service_prefix =
+    match role with "signatory" -> "signatory" | _ -> "octez-" ^ role
+  in
   if Paths.is_root () then
-    Printf.sprintf "/etc/systemd/system/octez-%s@%s.service.d" role inst
+    Printf.sprintf "/etc/systemd/system/%s@%s.service.d" service_prefix inst
   else
     let base = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
-    Filename.concat base (Printf.sprintf "octez-%s@%s.service.d" role inst)
+    Filename.concat base (Printf.sprintf "%s@%s.service.d" service_prefix inst)
 
 let dropin_path role inst =
   Filename.concat (dropin_dir role inst) "override.conf"
 
-let unit_name role inst = Printf.sprintf "octez-%s@%s" role inst
+let unit_name role inst =
+  (* Signatory uses "signatory@" prefix, other services use "octez-<role>@" *)
+  match role with
+  | "signatory" -> Printf.sprintf "signatory@%s" inst
+  | _ -> Printf.sprintf "octez-%s@%s" role inst
 
 let systemctl_cmd () =
   if Paths.is_root () then ["systemctl"] else ["systemctl"; "--user"]
