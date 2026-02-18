@@ -102,14 +102,12 @@ val get_focused_pager_id : state -> int
 (** Set result in a specific pager slot.
     @param pager_id Target pager ID
     @param request The request URL
-    @param body Formatted/highlighted body
     @param raw_body Original response
     @param response_time_ms Optional request duration in milliseconds
     @param response_size Optional response body size in bytes *)
 val set_pager_result :
   pager_id:int ->
   request:string ->
-  body:string ->
   raw_body:string ->
   ?response_time_ms:float ->
   ?response_size:int ->
@@ -142,12 +140,10 @@ val enter_result_mode : state -> state
 val execute_get : url:string -> state -> state
 
 (** Set result body after successful request.
-    @param body Formatted/highlighted body
     @param raw_body Original response
     @param response_time_ms Optional request duration in milliseconds
     @param response_size Optional response body size in bytes *)
 val set_result :
-  body:string ->
   raw_body:string ->
   ?response_time_ms:float ->
   ?response_size:int ->

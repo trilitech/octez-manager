@@ -14,6 +14,10 @@
 
 open Rpc_browser_types
 module Pager = Miaou_widgets_display.Pager_widget
+module Style_context = Miaou_style.Style_context
+
+let with_current_theme f =
+  Style_context.with_theme (Theme_manager.get_current ()) f
 
 (** Create an empty pager slot with the given ID.
     @param target_instance Optional target node for this pager *)
@@ -248,13 +252,20 @@ let update_pager_slot id f state =
     @param raw_body Original response
     @param response_time_ms Optional request duration in milliseconds
     @param response_size Optional response body size in bytes *)
-let set_pager_result ~pager_id ~request ~body ~raw_body ?response_time_ms
+let set_pager_result ~pager_id ~request ~raw_body ?response_time_ms
     ?response_size state =
   (* Create foldable JSON from raw body *)
   let foldable = Foldable_json.of_string raw_body in
-  (* Use foldable render if available, otherwise fall back to highlighted body *)
+  (* Use foldable render if available, otherwise highlight raw JSON.
+     Always render with the current theme to avoid cross-pager color drift. *)
   let display_body =
-    match foldable with Some f -> Foldable_json.render f | None -> body
+    with_current_theme (fun () ->
+        match foldable with
+        | Some f -> Foldable_json.render f
+        | None -> (
+            match Json_highlighter.highlight raw_body with
+            | Ok h -> h
+            | Error _ -> raw_body))
   in
   (* Create pager from rendered content *)
   let pager = Pager.open_text ~title:"Response" display_body in
@@ -335,7 +346,7 @@ let execute_get ~url state =
 
 (** Set result body after successful request.
     Uses the focused pager's request URL. *)
-let set_result ~body ~raw_body ?response_time_ms ?response_size state =
+let set_result ~raw_body ?response_time_ms ?response_size state =
   match state.mode with
   | Result _ ->
       let pager_id = get_focused_pager_id state in
@@ -346,7 +357,6 @@ let set_result ~body ~raw_body ?response_time_ms ?response_size state =
       set_pager_result
         ~pager_id
         ~request
-        ~body
         ~raw_body
         ?response_time_ms
         ?response_size
@@ -411,7 +421,8 @@ let is_streaming state =
 (** Highlight a streaming JSON line and append it (with separator) to a pager. *)
 let append_streaming_line pager line =
   let highlighted =
-    match Json_highlighter.highlight line with Ok h -> h | Error _ -> line
+    with_current_theme (fun () ->
+        match Json_highlighter.highlight line with Ok h -> h | Error _ -> line)
   in
   let lines = String.split_on_char '\n' highlighted in
   (* Add a blank separator line between JSON objects for readability *)
