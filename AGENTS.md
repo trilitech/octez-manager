@@ -47,9 +47,11 @@ dune fmt                        # Format code (MUST pass before commit)
 ```
 
 **Critical:**
+- **Every commit must compile independently.** You should be able to run `git rebase --exec 'dune build' main` and have every commit pass. Broken intermediate commits destroy `git bisect`.
 - Every commit must be properly formatted. Do not create separate "formatting" commits.
 - Every commit must have correct copyright headers. Run `./scripts/check-copyright.sh --fix` to automatically update headers if needed.
 - Shell completions must be up to date. Run `make completions` after CLI changes.
+- **Never weaken checks to pass CI.** Fix the code instead. Don't skip hooks, disable lints, or relax thresholds to make a build green.
 - To bypass hooks temporarily: `git commit --no-verify` (use sparingly!)
 
 ### Verification Check Pattern
@@ -341,11 +343,68 @@ If any run fails, the test has dependencies or conflicts.
 - `Obj.magic`
 - Mutable globals (use proper state management)
 - Incomplete pattern matches
+- `exit` in library code (only allowed in binary entry points)
+- Catching `Stack_overflow` or `Out_of_memory` without compelling justification
 
 ### Discouraged
 - `List.hd`, `Option.get` (use pattern matching or `_opt` variants)
 - Stringly-typed code (use variants/records)
 - Partial functions
+- Polymorphic equality `(=)` on structured types — use typed comparators (e.g. `String.equal`, `Int.equal`)
+- `Stdlib.compare` on structured types — use typed comparators
+- `Hashtbl` in public APIs — prefer `Map` for determinism; `Hashtbl` is fine for internal caches
+
+### TODO/FIXME Comments
+
+TODO and FIXME comments must reference a GitHub issue so they remain trackable:
+
+```ocaml
+(* TODO: https://github.com/trilitech/octez-manager/issues/123
+   Handle the case where the node is unreachable *)
+
+(* FIXME: #456 — Race condition when two schedulers update simultaneously *)
+```
+
+Untracked TODOs rot. If a TODO doesn't have an issue yet, create one.
+
+### Exposing Internals for Tests
+
+When you need to expose internal functions for testing, use an explicit internal module:
+
+```ocaml
+(* In the .ml file *)
+module Internal_for_tests = struct
+  let parse_version_string = parse_version_string
+  let validate_port = validate_port
+end
+```
+
+```ocaml
+(* In the .mli file — exclude from public docs *)
+(**/**)
+module Internal_for_tests : sig
+  val parse_version_string : string -> (int * int * int) option
+  val validate_port : int -> bool
+end
+(**/**)
+```
+
+The `(**/**)` stop comment excludes the module from odoc-generated documentation.
+
+### Logging Guidelines
+
+Use appropriate log levels consistently:
+
+| Level | Use For | Example |
+|-------|---------|---------|
+| Debug | Execution flow details for developers | "Parsing RPC response for instance X" |
+| Info | Useful context during normal operation | "Connected to node at localhost:8732" |
+| Warning | Actionable items requiring attention | "Disk usage above 90% for instance X" |
+| Error | Requires intervention, include context | "Failed to reach node RPC: connection refused" |
+
+- Never log sensitive data (keys, passwords, tokens)
+- Include enough context to diagnose the issue (instance name, port, file path)
+- Prefer structured data over string interpolation where possible
 
 ### Code Duplication Prevention (MANDATORY)
 
@@ -763,6 +822,13 @@ All pull requests must include:
 - **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
 - **Never delete untracked files without confirmation** - user scripts, test data, and work-in-progress files must be preserved unless explicitly requested
 
+### Atomic Commits
+
+- **Separate refactoring from functional changes.** A commit that renames a function should not also change its behavior. This makes each commit reviewable and revertable in isolation.
+- **No "penelop" commits.** Don't undo work from an earlier commit in a later one within the same PR. If you realize an earlier approach was wrong, amend or squash — don't add a "revert part of commit X" commit.
+- **Squash fixups before merge.** Typo fixes, formatting corrections, and "oops forgot this file" commits should be squashed into the commit they fix. Preserve meaningful atomic commits that tell the story of the change.
+- **Don't touch unrelated code.** A commit that fixes a bug in the installer should not also rename variables in the DAL scheduler. If you notice something unrelated, fix it in a separate commit or create a gardening issue.
+
 ### Opportunistic Code Quality Improvements
 
 Agents lack the long-term memory that lets human developers notice and fix code smells over time. To compensate, **small code quality improvements are encouraged inline** when you encounter them during normal work. Larger refactorings must be separate.
@@ -937,6 +1003,52 @@ When unsure about:
 - Breaking changes
 
 Ask for confirmation before proceeding.
+
+---
+
+## Plan-First Workflow
+
+For non-trivial changes, write a plan before writing code. Plans serve as the primary review unit — it's cheaper to catch a wrong approach in a plan than in a 500-line diff.
+
+### When a Plan Is Required
+
+- New abstractions or module boundaries
+- Changes touching 3+ files (non-local refactoring)
+- New TUI pages or major page rewrites
+- Changes to scheduler architecture or data flow
+- Anything that affects the public CLI interface
+
+### Plan Format
+
+Plans live in `plans/<short-name>.md` and must include:
+
+```markdown
+# Plan: <short description>
+
+## Goal
+What user-visible problem does this solve?
+
+## Affected Modules
+Which files/modules will be created, modified, or deleted?
+
+## Approach
+How will you implement this? Include key design decisions.
+
+## Risks
+What could go wrong? What assumptions are you making?
+
+## Verification
+How will you verify the change works? (tests, manual steps, CI checks)
+```
+
+### Workflow
+
+1. **Write the plan** and get approval before writing code
+2. **Implement** following the approved plan
+3. **Validate** through CI pipeline
+4. **Review** the diff against the plan
+
+Small changes (bug fixes, single-file edits, documentation) don't need plans — use good judgment.
 
 ---
 
@@ -1171,3 +1283,33 @@ When reviewing PRs:
 - ✅ Concrete fix suggestions
 - ✅ Links to correct patterns in codebase
 - ✅ Severity indicators (BLOCKER, issue, question)
+
+---
+
+## Common Mistakes
+
+Consolidated list of mistakes agents repeatedly make. Check this before submitting a PR.
+
+1. **I/O in view functions.** The render loop runs many times per second. File reads, RPC calls, or shell commands in `view` functions cause visible lag. Use scheduler caches instead. (See: TUI Architecture)
+
+2. **Duplicating existing code.** Search `arch_query` and `grep` before writing new functions. The CI metrics gate catches duplicates and blocks the PR. (See: Code Duplication Prevention)
+
+3. **Commits that don't compile.** Every commit must build independently. A commit that adds a function call before the commit that defines it breaks `git bisect`. (See: Build & Verification)
+
+4. **Modifying golden path test counts.** Adding or removing form fields without updating `submit_form ~downs:N` in the golden path test. This test doesn't run locally — it only fails in CI. (See: Testing TUI Form Changes)
+
+5. **Stale shell completions.** Adding CLI subcommands without running `make completions`. The completions check in CI will catch this.
+
+6. **Missing copyright headers.** Creating new files without running `./scripts/check-copyright.sh --fix`. The copyright check in CI will reject the PR.
+
+7. **TODO without issue reference.** Writing `(* TODO: fix this later *)` without a GitHub issue link. These are untrackable and rot. (See: TODO/FIXME Comments)
+
+8. **Weakening CI to pass.** Disabling checks, skipping hooks (`--no-verify`), or relaxing thresholds instead of fixing the underlying issue.
+
+9. **Mixing refactoring with functional changes.** A single commit that renames variables AND changes behavior is impossible to review or revert cleanly. Separate them. (See: Atomic Commits)
+
+10. **Using `include` instead of `open`.** Re-exporting an entire module's API when you only need local access. This pollutes the public interface. (See: Module Inclusion)
+
+11. **Large Read+Write for code movement.** Copying code through the agent's context window drops lines and introduces subtle errors. Use `sed` for extraction. (See: Refactoring)
+
+12. **Polymorphic equality on structured types.** Using `(=)` instead of typed comparators like `String.equal`. Polymorphic equality can produce wrong results on abstract types.
