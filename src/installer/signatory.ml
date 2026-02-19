@@ -454,3 +454,189 @@ let read_authorized_keys instance =
         R.error_msgf
           "Failed to parse signatory config: %s"
           (Printexc.to_string e)
+
+(** Signatory configuration parsed from signatory.yaml *)
+type signatory_config = {
+  address : string option;
+  metrics_address : string option;
+  backend : string option;
+  authorized_keys : string list;
+}
+
+(** Read full configuration from a signatory instance's YAML file *)
+let read_config instance =
+  let config_path = signatory_config_path instance in
+  if not (Sys.file_exists config_path) then
+    R.error_msgf
+      "Signatory config not found: %s (instance '%s' may not exist)"
+      config_path
+      instance
+  else
+    try
+      let ic = open_in config_path in
+      let content =
+        Fun.protect
+          ~finally:(fun () -> close_in_noerr ic)
+          (fun () ->
+            let len = in_channel_length ic in
+            really_input_string ic len)
+      in
+      (* Simple line-based YAML parsing *)
+      let lines = String.split_on_char '\n' content in
+      let rec parse_lines in_server in_vaults in_tezos current_indent address
+          metrics backend keys = function
+        | [] ->
+            Ok
+              {
+                address;
+                metrics_address = metrics;
+                backend;
+                authorized_keys = keys;
+              }
+        | line :: rest ->
+            let trimmed = String.trim line in
+            let indent = String.length line - String.length trimmed in
+            (* Parse server section *)
+            if String.equal trimmed "server:" then
+              parse_lines true false false 0 address metrics backend keys rest
+            else if in_server && String.starts_with ~prefix:"address:" trimmed
+            then
+              let addr =
+                String.sub trimmed 8 (String.length trimmed - 8) |> String.trim
+              in
+              parse_lines
+                in_server
+                in_vaults
+                in_tezos
+                current_indent
+                (Some addr)
+                metrics
+                backend
+                keys
+                rest
+            else if
+              in_server && String.starts_with ~prefix:"utility_address:" trimmed
+            then
+              let util =
+                String.sub trimmed 17 (String.length trimmed - 17)
+                |> String.trim
+              in
+              parse_lines
+                in_server
+                in_vaults
+                in_tezos
+                current_indent
+                address
+                (Some util)
+                backend
+                keys
+                rest (* Exit server section when we hit a top-level key *)
+            else if
+              in_server && indent = 0
+              && String.length trimmed > 0
+              && String.ends_with ~suffix:":" trimmed
+              && not (String.equal trimmed "server:")
+            then
+              (* Check if entering vaults section *)
+              if String.equal trimmed "vaults:" then
+                parse_lines false true false 0 address metrics backend keys rest
+              else if String.equal trimmed "tezos:" then
+                parse_lines false false true 2 address metrics backend keys rest
+              else
+                parse_lines
+                  false
+                  false
+                  false
+                  0
+                  address
+                  metrics
+                  backend
+                  keys
+                  rest (* Parse vaults section for backend type *)
+            else if String.equal trimmed "vaults:" then
+              parse_lines false true false 0 address metrics backend keys rest
+            else if
+              in_vaults && indent = 2 && String.ends_with ~suffix:":" trimmed
+            then
+              (* Extract vault name, which often indicates backend type *)
+              let vault_name =
+                String.sub trimmed 0 (String.length trimmed - 1) |> String.trim
+              in
+              parse_lines
+                in_server
+                in_vaults
+                in_tezos
+                current_indent
+                address
+                metrics
+                (Some vault_name)
+                keys
+                rest
+            else if
+              in_vaults && indent = 0
+              && String.length trimmed > 0
+              && String.ends_with ~suffix:":" trimmed
+            then
+              (* Exited vaults section *)
+              if String.equal trimmed "tezos:" then
+                parse_lines false false true 2 address metrics backend keys rest
+              else
+                parse_lines
+                  false
+                  false
+                  false
+                  0
+                  address
+                  metrics
+                  backend
+                  keys
+                  rest (* Parse tezos section for authorized keys *)
+            else if String.equal trimmed "tezos:" then
+              parse_lines false false true 2 address metrics backend keys rest
+            else if
+              in_tezos && indent = 2
+              && (String.starts_with ~prefix:"tz1" trimmed
+                 || String.starts_with ~prefix:"tz2" trimmed
+                 || String.starts_with ~prefix:"tz3" trimmed
+                 || String.starts_with ~prefix:"tz4" trimmed)
+              && String.ends_with ~suffix:":" trimmed
+            then
+              let key =
+                String.sub trimmed 0 (String.length trimmed - 1) |> String.trim
+              in
+              parse_lines
+                in_server
+                in_vaults
+                in_tezos
+                current_indent
+                address
+                metrics
+                backend
+                (key :: keys)
+                rest
+            else if
+              in_tezos && indent = 0
+              && String.length trimmed > 0
+              && String.ends_with ~suffix:":" trimmed
+            then
+              (* Exited tezos section *)
+              parse_lines false false false 0 address metrics backend keys rest
+            else
+              parse_lines
+                in_server
+                in_vaults
+                in_tezos
+                current_indent
+                address
+                metrics
+                backend
+                keys
+                rest
+      in
+      parse_lines false false false 0 None None None [] lines
+    with
+    | Sys_error msg -> R.error_msg msg
+    | e ->
+        R.error_msgf
+          "Failed to parse signatory config: %s"
+          (Printexc.to_string e)
