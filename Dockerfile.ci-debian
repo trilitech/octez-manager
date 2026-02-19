@@ -49,11 +49,11 @@ RUN eval $(opam env) && \
 # Install miaou packages (pre-pinned to avoid git cloning on every CI run)
 # This saves ~2 minutes per build by having miaou already available
 RUN eval $(opam env) && \
-    opam pin add miaou-core git+https://github.com/trilitech/miaou.git --no-action && \
-    opam pin add miaou-driver-term git+https://github.com/trilitech/miaou.git --no-action && \
-    opam pin add miaou-driver-matrix git+https://github.com/trilitech/miaou.git --no-action && \
-    opam pin add miaou-driver-web git+https://github.com/trilitech/miaou.git --no-action && \
-    opam pin add miaou-runner git+https://github.com/trilitech/miaou.git --no-action && \
+    opam pin add miaou-core git+https://github.com/trilitech/miaou.git --no-action --yes && \
+    opam pin add miaou-driver-term git+https://github.com/trilitech/miaou.git --no-action --yes && \
+    opam pin add miaou-driver-matrix git+https://github.com/trilitech/miaou.git --no-action --yes && \
+    opam pin add miaou-driver-web git+https://github.com/trilitech/miaou.git --no-action --yes && \
+    opam pin add miaou-runner git+https://github.com/trilitech/miaou.git --no-action --yes && \
     opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner
 
 # Clean up opam cache

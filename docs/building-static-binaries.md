@@ -21,9 +21,6 @@ This guide explains how to reproduce the exact static binary build process used 
 ## Prerequisites
 
 - **Docker**: Must be installed and running
-- **MIAOU_GIT_URL**: Environment variable with Miaou git repository URL
-  - Can be set in environment: `export MIAOU_GIT_URL="..."`
-  - Or script will prompt for it interactively
 
 ## What the Script Does
 
@@ -93,14 +90,6 @@ If pulling the CI image fails:
 ```bash
 # The script automatically falls back to local build, or force it:
 ./scripts/build-static-binary.sh --use-local-image
-```
-
-### MIAOU_GIT_URL not set
-
-The script will prompt you to enter it interactively. To avoid prompts:
-```bash
-export MIAOU_GIT_URL="git+https://..."
-./scripts/build-static-binary.sh
 ```
 
 ### Binary doesn't run on my system
