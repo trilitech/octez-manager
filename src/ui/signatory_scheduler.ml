@@ -184,35 +184,31 @@ let is_due_for_refresh now instance =
   | None -> true
   | Some last -> now -. last >= refresh_interval
 
-(** Main scheduler loop *)
-let scheduler_loop () =
-  while not (Atomic.get shutdown_requested) do
-    try
-      let now = Unix.gettimeofday () in
-      (* Get all signatory instances from registry *)
-      let all_services =
-        match Service_registry.list () with Ok svcs -> svcs | Error _ -> []
-      in
-      let signatory_services =
-        List.filter
-          (fun (svc : Service.t) -> svc.Service.role = "signatory")
-          all_services
-      in
-      (* Submit refresh for instances that are due *)
-      List.iter
-        (fun svc ->
-          if is_due_for_refresh now svc.Service.instance then submit_refresh svc)
-        signatory_services ;
-      Unix.sleepf 1.0
-    with _ -> Unix.sleepf 1.0
-  done
-
 (** Start the scheduler in a background domain *)
 let start () =
-  let _ : unit Domain.t =
-    Domain.spawn (fun () -> try scheduler_loop () with _ -> ())
-  in
-  ()
+  Domain_pool.submit (fun () ->
+      (* Simple polling loop *)
+      while not (Atomic.get shutdown_requested) do
+        try
+          let now = Unix.gettimeofday () in
+          (* Get all signatory instances from registry *)
+          let all_services =
+            match Service_registry.list () with Ok svcs -> svcs | Error _ -> []
+          in
+          let signatory_services =
+            List.filter
+              (fun (svc : Service.t) -> svc.Service.role = "signatory")
+              all_services
+          in
+          (* Submit refresh for instances that are due *)
+          List.iter
+            (fun svc ->
+              if is_due_for_refresh now svc.Service.instance then
+                submit_refresh svc)
+            signatory_services ;
+          Eio_unix.sleep 1.0
+        with _ -> Eio_unix.sleep 1.0
+      done)
 
 (** Request scheduler shutdown *)
 let stop () = Atomic.set shutdown_requested true
