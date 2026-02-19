@@ -84,7 +84,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /root/.opam
-          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
+          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version', 'octez-manager.opam') }}
 
       - name: Ensure opam is initialized
         id: opam-init
@@ -396,7 +396,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/opam/.opam
-          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          key: opam-miaou-${{ hashFiles('.github/miaou-version', 'octez-manager.opam') }}
 
       - name: Pin miaou and ppx_forbid packages
         if: steps.cache-opam.outputs.cache-hit != 'true'
