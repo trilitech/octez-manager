@@ -41,3 +41,23 @@ val signatory_config_path : string -> string
     @param instance the signatory instance name
     @return list of public key hashes (tz1/tz2/tz3/tz4 addresses), or error *)
 val read_authorized_keys : string -> (string list, Rresult.R.msg) result
+
+(** Signatory configuration parsed from signatory.yaml *)
+type signatory_config = {
+  address : string option;  (** Server address (e.g., "127.0.0.1:6732") *)
+  metrics_address : string option;  (** Metrics/utility address *)
+  backend : string option;  (** Backend type (e.g., "file") *)
+  authorized_keys : string list;  (** List of authorized public key hashes *)
+}
+
+(** Read full configuration from a signatory instance's YAML file.
+    
+    Parses the signatory.yaml file to extract:
+    - Server address from server.address field
+    - Metrics address from server.utility_address field
+    - Backend type from vaults section
+    - Authorized keys from tezos section
+    
+    @param instance the signatory instance name
+    @return parsed configuration or error *)
+val read_config : string -> (signatory_config, Rresult.R.msg) result

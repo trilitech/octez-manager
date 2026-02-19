@@ -329,6 +329,19 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
       | "accuser" ->
           (* Line 2 for accusers: simple monitoring status *)
           Printf.sprintf "%s%s" indent (Widgets.themed_success "monitoring")
+      | "signatory" ->
+          (* Line 2 for signatories: basic status *)
+          let status_text =
+            match Signatory_metrics.get ~instance:svc.Service.instance with
+            | None -> Widgets.themed_dim "pending"
+            | Some metrics -> (
+                match metrics.Signatory_metrics.health with
+                | Signatory_metrics.Up -> Widgets.themed_success "healthy"
+                | Signatory_metrics.Down -> Widgets.themed_error "down"
+                | Signatory_metrics.Degraded -> Widgets.themed_warning "degraded"
+                | Signatory_metrics.Unknown -> Widgets.themed_dim "unknown")
+          in
+          Printf.sprintf "%s%s" indent status_text
       | _ ->
           Printf.sprintf
             "%s%s"
@@ -342,9 +355,36 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     System_metrics_scheduler.mark_visible
       ~role:svc.Service.role
       ~instance:svc.Service.instance ;
-    (* Additional lines for nodes, bakers, accusers, and dal-nodes: metrics + CPU chart *)
+    (* Additional lines for nodes, bakers, accusers, dal-nodes, and signatories: metrics + CPU chart *)
     let extra_lines =
       match svc.Service.role with
+      | "signatory" -> (
+          (* For signatories: show address, keys count, and backend info *)
+          let indent = String.make indent_start ' ' in
+          match Signatory_metrics.get ~instance:svc.Service.instance with
+          | None -> []
+          | Some metrics ->
+              let parts = [] in
+              (* Add address if available *)
+              let parts =
+                match metrics.Signatory_metrics.address with
+                | Some addr -> parts @ [addr]
+                | None -> parts
+              in
+              (* Add keys count *)
+              let parts =
+                let key_count =
+                  List.length metrics.Signatory_metrics.authorized_keys
+                in
+                parts @ [Printf.sprintf "%d keys" key_count]
+              in
+              (* Add backend type if available *)
+              let parts =
+                match metrics.Signatory_metrics.backend with
+                | Some backend -> parts @ [backend]
+                | None -> parts
+              in
+              if parts = [] then [] else [indent ^ String.concat " · " parts])
       | "node" | "baker" | "accuser" | "dal-node" ->
           let focus = idx + services_start_idx = selected in
           let indent = String.make indent_start ' ' in
