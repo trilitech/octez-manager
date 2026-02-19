@@ -59,7 +59,6 @@ NOTES:
   - First build may take several minutes (downloading/building image + dependencies)
   - Subsequent builds are much faster due to Docker layer caching
   - The binary will be truly statically linked (Alpine musl-based)
-  - MIAOU_GIT_URL must be set in environment or will be prompted
 
 EOF
 	exit 0
@@ -132,18 +131,8 @@ fi
 
 success "Docker is available"
 
-# Check for MIAOU_GIT_URL
-if [[ -z "${MIAOU_GIT_URL:-}" ]]; then
-	warn "MIAOU_GIT_URL environment variable is not set"
-	echo "The Miaou library is required to build octez-manager."
-	echo "Please enter the Miaou git URL (or press Ctrl+C to exit):"
-	read -r MIAOU_GIT_URL
-	export MIAOU_GIT_URL
-
-	if [[ -z "$MIAOU_GIT_URL" ]]; then
-		error "MIAOU_GIT_URL is required to build"
-	fi
-fi
+# Miaou git URL (public repository)
+MIAOU_GIT_URL="https://github.com/trilitech/miaou.git"
 
 # Determine Docker image strategy
 DOCKER_IMAGE=""

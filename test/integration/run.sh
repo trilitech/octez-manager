@@ -10,7 +10,6 @@ usage() {
     echo ""
     echo "Options:"
     echo "  --build    Build static binary using CI Docker image before running tests"
-    echo "             (requires MIAOU_GIT_URL env var and ghcr.io authentication)"
     echo ""
     echo "Without --build, expects a statically-linked binary at:"
     echo "  $SCRIPT_DIR/cli-tester/octez-manager"
@@ -48,7 +47,7 @@ if [ ! -f "$SCRIPT_DIR/cli-tester/octez-manager" ]; then
     echo "ERROR: No octez-manager binary found at $SCRIPT_DIR/cli-tester/octez-manager"
     echo ""
     echo "Options:"
-    echo "  1. Run with --build flag to build a static binary (requires MIAOU_GIT_URL)"
+    echo "  1. Run with --build flag to build a static binary"
     echo "  2. Download a static binary from CI artifacts"
     echo "  3. Copy a pre-built static binary to $SCRIPT_DIR/cli-tester/octez-manager"
     exit 1

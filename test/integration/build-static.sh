@@ -1,19 +1,12 @@
 #!/bin/bash
 # Build a static octez-manager binary using the CI Docker image
-# Requires MIAOU_GIT_URL environment variable to be set
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 OUTPUT_PATH="$SCRIPT_DIR/cli-tester/octez-manager"
 
-# Check for MIAOU_GIT_URL
-if [ -z "${MIAOU_GIT_URL:-}" ]; then
-    echo "ERROR: MIAOU_GIT_URL environment variable is required"
-    echo "This is the git URL for the private miaou repository"
-    exit 1
-fi
-
+MIAOU_GIT_URL="https://github.com/trilitech/miaou.git"
 CI_IMAGE="ghcr.io/trilitech/octez-manager-ci:latest"
 
 echo "Building static octez-manager binary..."
