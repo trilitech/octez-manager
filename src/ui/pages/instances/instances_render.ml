@@ -333,13 +333,13 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
           (* Line 2 for signatories: basic status *)
           let status_text =
             match Signatory_metrics.get ~instance:svc.Service.instance with
-            | None -> Widgets.themed_dim "pending"
+            | None -> Widgets.themed_muted "pending"
             | Some metrics -> (
                 match metrics.Signatory_metrics.health with
                 | Signatory_metrics.Up -> Widgets.themed_success "healthy"
                 | Signatory_metrics.Down -> Widgets.themed_error "down"
                 | Signatory_metrics.Degraded -> Widgets.themed_warning "degraded"
-                | Signatory_metrics.Unknown -> Widgets.themed_dim "unknown")
+                | Signatory_metrics.Unknown -> Widgets.themed_muted "unknown")
           in
           Printf.sprintf "%s%s" indent status_text
       | _ ->
