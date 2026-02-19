@@ -28,13 +28,13 @@
   ca-certs
   domain-name
   mirage-crypto-rng
-  uri
-  lambda-term
-  linenoise
-   (ppx_deriving :build)
-   (ppx_forbid :build)
-   (ppxlib (>= 0.28.0))
-   (sqlite3 :with-dev-setup)
+   uri
+   lambda-term
+   linenoise
+    (ppx_deriving :build)
+    (ppx_forbid :build)
+    (ppxlib (>= 0.28.0))
+    (sqlite3 :with-dev-setup)
    (alcotest :with-test)
    (qcheck-alcotest :with-test)
    (bisect_ppx :with-test))
