@@ -290,15 +290,20 @@ let instance_actions_modal state =
 let create_menu_modal state =
   let open Modal_helpers in
   open_choice_modal
-    ~title:"Create Service"
-    ~items:[`Node; `DalNode; `Baker; `Accuser; `Signatory]
+    ~title:"Create"
+    ~items:[`Group; `Node; `DalNode; `Baker; `Accuser; `Signatory]
     ~to_string:(function
+      | `Group -> "Group"
       | `Node -> "Node"
       | `DalNode -> "DAL Node"
       | `Baker -> "Baker"
       | `Accuser -> "Accuser"
       | `Signatory -> "Signatory")
     ~on_select:(function
+      | `Group ->
+          (* TODO: https://github.com/trilitech/octez-manager/issues/335
+             Navigate to create group form (PR 4) *)
+          Context.toast_info "Create Group form coming soon"
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
       | `Accuser -> Context.navigate Install_accuser_form_v3.name
@@ -346,6 +351,68 @@ let dismiss_failure s =
       Context.mark_instances_dirty () ;
       s
   | None -> s
+
+let group_action_modal (grp : Group.t) =
+  Modal_helpers.open_choice_modal
+    ~title:(Printf.sprintf "Group · %s" grp.name)
+    ~items:[`Start; `Stop; `Restart]
+    ~to_string:(function
+      | `Start -> "Start all" | `Stop -> "Stop all" | `Restart -> "Restart all")
+    ~on_select:(fun choice ->
+      let verb, action =
+        match choice with
+        | `Start ->
+            ( "start",
+              fun () ->
+                Lifecycle.start_group ~quiet:true ~group_name:grp.name ()
+                |> Result.map (fun _ -> ()) )
+        | `Stop ->
+            ( "stop",
+              fun () ->
+                Lifecycle.stop_group ~quiet:true ~group_name:grp.name ()
+                |> Result.map (fun _ -> ()) )
+        | `Restart ->
+            ( "restart",
+              fun () ->
+                Lifecycle.restart_group ~quiet:true ~group_name:grp.name ()
+                |> Result.map (fun _ -> ()) )
+      in
+      run_unit_action
+        ~verb:(Printf.sprintf "%s group %s" verb grp.name)
+        ~instance:grp.name
+        action)
+    ()
+
+let group_actions_modal state =
+  (* If selected service is in a group, jump directly to that group's actions *)
+  let direct_group =
+    match current_service state with
+    | Some st -> st.Service_state.service.Service.group
+    | None -> None
+  in
+  match direct_group with
+  | Some gname -> (
+      match Group_registry.find ~name:gname with
+      | Ok (Some grp) ->
+          group_action_modal grp ;
+          state
+      | _ -> state)
+  | None -> (
+      (* No group context — show group selector *)
+      let groups = state.groups in
+      match groups with
+      | [] ->
+          Context.toast_info "No groups configured" ;
+          state
+      | _ ->
+          Modal_helpers.open_choice_modal
+            ~title:"Select Group"
+            ~items:groups
+            ~to_string:(fun (g : Group.t) ->
+              Printf.sprintf "%s (%s)" g.name g.network)
+            ~on_select:(fun grp -> group_action_modal grp)
+            () ;
+          state)
 
 module For_tests = struct
   let journalctl_args = journalctl_args
