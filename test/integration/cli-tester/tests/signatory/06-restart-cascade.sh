@@ -16,6 +16,11 @@ SIGNATORY_INSTANCE="test-signatory-cascade"
 NODE_INSTANCE="test-node-cascade"
 BAKER_INSTANCE="test-baker-cascade"
 
+# Register all instances for cleanup
+register_instance "$SIGNATORY_INSTANCE"
+register_instance "$NODE_INSTANCE"
+register_instance "$BAKER_INSTANCE"
+
 echo "==> Step 1: Install signatory instance"
 om install-signatory \
 	--instance "$SIGNATORY_INSTANCE" \
@@ -25,8 +30,6 @@ om install-signatory \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$SIGNATORY_INSTANCE"
 
 echo "==> Step 2: Install node instance"
 om install-node \
@@ -40,8 +43,6 @@ om install-node \
 	--service-user tezos \
 	--no-enable 2>&1
 
-register_instance "$NODE_INSTANCE"
-
 echo "==> Step 3: Install baker with signatory dependency"
 om install-baker \
 	--instance "$BAKER_INSTANCE" \
@@ -51,8 +52,6 @@ om install-baker \
 	--liquidity-baking-vote pass \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$BAKER_INSTANCE"
 
 echo "==> Step 4: Reload systemd and verify dependencies"
 systemctl daemon-reload
