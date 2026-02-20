@@ -61,14 +61,15 @@ om install-signatory \
 	--no-enable 2>&1
 
 echo "==> Step 2: Verify signatory service template was created"
-echo "DEBUG: Checking for signatory template unit..."
-ls -la /etc/systemd/system/signatory* 2>&1 || echo "No signatory files found"
-systemctl list-unit-files | grep signatory || echo "No signatory units found"
-if ! systemctl list-unit-files | grep -q "signatory@.service"; then
-	echo "ERROR: Signatory service template not found: signatory@.service"
+# Check if the unit file exists (list-unit-files may not show it immediately after install)
+UNIT_FILE="/etc/systemd/system/signatory@.service"
+if [ ! -f "$UNIT_FILE" ]; then
+	echo "ERROR: Signatory service template not found: $UNIT_FILE"
+	echo "Checking /etc/systemd/system:"
+	ls -la /etc/systemd/system/signatory* 2>&1 || echo "No signatory files found"
 	exit 1
 fi
-echo "Signatory service template exists"
+echo "Signatory service template exists: $UNIT_FILE"
 
 echo "==> Step 3: Verify list shows all signatory instances"
 om list 2>&1 | tee /tmp/signatory-list.txt
