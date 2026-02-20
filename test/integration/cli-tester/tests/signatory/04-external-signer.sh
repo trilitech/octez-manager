@@ -63,16 +63,18 @@ if ! om list 2>&1 | grep -q "$BAKER_INSTANCE"; then
 fi
 
 echo "==> Step 5: Verify baker configuration includes signer URI"
-BAKER_CONFIG_FILE="/var/lib/tezos/.tezos-baker/${BAKER_INSTANCE}/config"
+# Remote signer URI is stored in the environment file, not a config file
+BAKER_ENV_FILE="/etc/octez-manager/services/${BAKER_INSTANCE}.env"
 
-if [ ! -f "$BAKER_CONFIG_FILE" ]; then
-	echo "ERROR: Baker config file not found: $BAKER_CONFIG_FILE"
+if [ ! -f "$BAKER_ENV_FILE" ]; then
+	echo "ERROR: Baker env file not found: $BAKER_ENV_FILE"
+	ls -la /etc/octez-manager/services/ 2>&1
 	exit 1
 fi
 
-if ! grep -q "$EXTERNAL_SIGNER_URI" "$BAKER_CONFIG_FILE"; then
-	echo "ERROR: External signer URI not found in baker config"
-	cat "$BAKER_CONFIG_FILE"
+if ! grep -q "$EXTERNAL_SIGNER_URI" "$BAKER_ENV_FILE"; then
+	echo "ERROR: External signer URI not found in baker env file"
+	cat "$BAKER_ENV_FILE"
 	exit 1
 fi
 
@@ -122,9 +124,11 @@ if ! grep -q "$EXTERNAL_SIGNER_URI" /tmp/baker-info.txt && ! grep -q "$EXTERNAL_
 fi
 
 echo "==> Step 9: Verify baker key is configured"
-if ! grep -q "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb" "$BAKER_CONFIG_FILE"; then
-	echo "ERROR: Baker key not found in config"
-	cat "$BAKER_CONFIG_FILE"
+# Check the registry JSON for the delegate
+BAKER_REGISTRY="/var/lib/octez-manager/registry/${BAKER_INSTANCE}.json"
+if ! grep -q "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb" "$BAKER_REGISTRY"; then
+	echo "ERROR: Baker key not found in registry"
+	cat "$BAKER_REGISTRY"
 	exit 1
 fi
 
