@@ -29,6 +29,16 @@ om install-signatory \
 
 register_instance "$SIGNATORY_INSTANCE"
 
+echo "DEBUG: Verifying signatory is in registry..."
+om list 2>&1 | tee /tmp/om-list.txt
+if ! grep -q "$SIGNATORY_INSTANCE" /tmp/om-list.txt; then
+	echo "ERROR: Signatory not visible in 'om list' after installation"
+	echo "Full om list output:"
+	cat /tmp/om-list.txt
+	exit 1
+fi
+echo "Signatory instance appears in om list"
+
 echo "==> Step 2: Verify signatory service unit exists"
 echo "DEBUG: Listing /etc/systemd/system/signatory* files:"
 ls -la /etc/systemd/system/signatory* 2>&1 || echo "No signatory files found"
