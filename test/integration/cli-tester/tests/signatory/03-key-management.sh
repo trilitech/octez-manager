@@ -15,9 +15,10 @@ echo "==> Step 1: Install signatory with multiple authorized keys (different key
 om install-signatory \
 	--instance "$SIGNATORY_INSTANCE" \
 	--backend file \
-	--address "127.0.0.1:$SIGNER_PORT" \
-	--authorized-keys "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx,tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE,tz3RDC3Jdn4j15J7bBHZd29EUee9gVB1CxD9" \
+	--address "127.0.0.1:$SIGNATORY_PORT" \
+	--authorized-keys "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx,tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE,tz3RDC3Jdn4j15J7bBHZd29EUee9gVB1CxD9,tz4EECtMxAuJ9UDLaisMwAnHTG8ZfdQahMWq" \
 	--watermark file \
+	--keys-dir "/var/lib/octez/signatory/keys-test" \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos \
 	--no-enable 2>&1
@@ -34,14 +35,14 @@ fi
 
 echo "==> Step 3: Verify all key types are in authorized_keys"
 # Check for tz1 (ed25519)
-if ! grep -q "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb" "$CONFIG_FILE"; then
+if ! grep -q "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE"; then
 	echo "ERROR: tz1 key not found in config"
 	cat "$CONFIG_FILE"
 	exit 1
 fi
 
 # Check for tz2 (secp256k1)
-if ! grep -q "tz2TSvNTh2epDMhZHrw73nV9piBX7kLZ9K9m" "$CONFIG_FILE"; then
+if ! grep -q "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE"; then
 	echo "ERROR: tz2 key not found in config"
 	cat "$CONFIG_FILE"
 	exit 1
