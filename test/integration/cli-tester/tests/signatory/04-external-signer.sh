@@ -116,11 +116,11 @@ if systemctl list-dependencies "$BAKER_UNIT" | grep -q "signatory@"; then
 	exit 1
 fi
 
-echo "==> Step 8: Test baker info command shows signer URI"
-om info-baker --instance "$BAKER_INSTANCE" 2>&1 | tee /tmp/baker-info.txt
+echo "==> Step 8: Test baker show command displays signer URI"
+om instance "$BAKER_INSTANCE" show 2>&1 | tee /tmp/baker-info.txt
 
 if ! grep -q "$EXTERNAL_SIGNER_URI" /tmp/baker-info.txt && ! grep -q "$EXTERNAL_SIGNER_PORT" /tmp/baker-info.txt; then
-	echo "WARNING: Signer URI not visible in baker info (may be expected)"
+	echo "WARNING: Signer URI not visible in baker show output (may be expected)"
 	cat /tmp/baker-info.txt
 fi
 
