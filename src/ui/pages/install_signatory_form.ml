@@ -63,6 +63,7 @@ let base_initial_model () =
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
+        group = None;
       };
     backend = File (default_keys_dir "signatory");
     authorized_keys = [];
@@ -130,6 +131,7 @@ let make_initial_model () =
             enable_on_boot = true;
             start_now = false;
             extra_args;
+            group = svc.Service.group;
           };
         backend;
         authorized_keys;
@@ -466,7 +468,15 @@ let spec =
             ~skip_service_fields:true
             ~edit_mode:model.edit_mode
             ~original_instance:model.original_instance
-            ());
+            ()
+        (* 6. Group *)
+        @ [
+            group_field
+              ~get_core:(fun m -> m.core)
+              ~set_core:(fun core m -> {m with core})
+              ~edit_mode:model.edit_mode
+              ();
+          ]);
     pre_submit =
       Some
         (fun model ->
@@ -544,6 +554,12 @@ let spec =
           else Ok ()
         in
         let* _service = Signatory.install_signatory ~quiet:true req in
+
+        let* () =
+          Form_builder_common.set_service_group
+            ~instance_name:model.core.instance_name
+            ~group:model.core.group
+        in
 
         (* Handle rename: clean up old instance if name changed *)
         let* () =

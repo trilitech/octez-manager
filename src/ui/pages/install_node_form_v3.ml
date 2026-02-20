@@ -125,6 +125,7 @@ let base_initial_model () =
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
+        group = None;
       };
     node =
       {
@@ -404,6 +405,7 @@ let make_initial_model () =
             start_now = false;
             (* Don't auto-start after edit *)
             extra_args = String.concat " " svc.Service.extra_args;
+            group = svc.Service.group;
           };
         node =
           {
@@ -881,6 +883,14 @@ let spec =
             |> with_hint
                  "Unique identifier for this node. Used in systemd unit and \
                   default paths.";
+          ]
+        (* 10. Group *)
+        @ [
+            group_field
+              ~get_core:(fun m -> m.core)
+              ~set_core:(fun core m -> {m with core})
+              ~edit_mode:model.edit_mode
+              ();
           ]);
     pre_submit = None;
     on_init = Some (fun model -> prefetch_snapshot_list model.node.network);
@@ -1046,6 +1056,11 @@ let spec =
             | Error (`Msg e) ->
                 append_log (Printf.sprintf "install_node failed: %s\n" e)) ;
             let* _service = result in
+            let* () =
+              Form_builder_common.set_service_group
+                ~instance_name:model.core.instance_name
+                ~group:model.core.group
+            in
             (* Handle rename: clean up old instance if name changed *)
             let* () =
               match (model.edit_mode, model.original_instance) with
