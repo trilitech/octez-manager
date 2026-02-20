@@ -10,9 +10,8 @@ For detailed information about baking on Tezos, see the [Octez documentation on 
 ## Prerequisites
 
 1. **Running Node**: A synced Tezos node (e.g., your Shadownet node). See [Setting Up a Node](/guides/node-setup/) to get started.
-2. **Octez Binaries**: Octez Manager can download and manage Octez binaries for you. See [Managing Binaries](/guides/tui-guide/#managing-binaries) for details. Alternatively, you can use your own installation of `octez-client` and `octez-baker`.
-3. **Staked Tez**: Minimum 6,000 tez staked to your baker address (use the faucet on testnets)
-4. **Baker Key**: Your baker's secret key imported into the client
+2. **Staked Tez**: Minimum 6,000 tez staked to your baker address (use the faucet on testnets)
+3. **Baker Key**: Your baker's secret key imported into the client
 
 ## Set Up Baker Directory
 
