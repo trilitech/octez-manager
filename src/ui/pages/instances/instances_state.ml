@@ -68,6 +68,71 @@ let clamp_selection services external_services idx =
   in
   max 0 (min idx (len - 1))
 
+let role_order = function
+  | "node" -> 0
+  | "baker" -> 1
+  | "accuser" -> 2
+  | "dal-node" -> 3
+  | "signatory" -> 4
+  | _ -> 5
+
+let sort_services_by_role services =
+  List.sort
+    (fun (a : Service_state.t) (b : Service_state.t) ->
+      let rc =
+        Int.compare
+          (role_order a.service.Octez_manager_lib.Service.role)
+          (role_order b.service.Octez_manager_lib.Service.role)
+      in
+      if rc <> 0 then rc
+      else
+        String.compare
+          a.service.Octez_manager_lib.Service.instance
+          b.service.Octez_manager_lib.Service.instance)
+    services
+
+let display_ordered_services state =
+  match state.view_mode with
+  | By_role -> state.services (* already sorted by role *)
+  | By_group ->
+      (* Grouped first (sorted by group name, then by role), then ungrouped *)
+      let grouped, ungrouped =
+        List.partition
+          (fun (st : Service_state.t) ->
+            Option.is_some st.service.Octez_manager_lib.Service.group)
+          state.services
+      in
+      let by_group =
+        let tbl : (string, Service_state.t list) Hashtbl.t =
+          Hashtbl.create 17
+        in
+        List.iter
+          (fun (st : Service_state.t) ->
+            match st.service.Octez_manager_lib.Service.group with
+            | Some gname ->
+                let prev =
+                  match Hashtbl.find_opt tbl gname with
+                  | Some l -> l
+                  | None -> []
+                in
+                Hashtbl.replace tbl gname (st :: prev)
+            | None -> ())
+          grouped ;
+        let names =
+          Hashtbl.fold (fun k _ acc -> k :: acc) tbl []
+          |> List.sort String.compare
+        in
+        List.concat_map
+          (fun gname ->
+            match Hashtbl.find_opt tbl gname with
+            | Some l -> sort_services_by_role l
+            | None -> [])
+          names
+      in
+      by_group @ sort_services_by_role ungrouped
+
 let current_service state =
   if state.selected < services_start_idx then None
-  else List.nth_opt state.services (state.selected - services_start_idx)
+  else
+    let ordered = display_ordered_services state in
+    List.nth_opt ordered (state.selected - services_start_idx)

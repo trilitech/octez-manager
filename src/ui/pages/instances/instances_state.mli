@@ -63,5 +63,8 @@ val clamp_selection :
   int ->
   int
 
+(** Services in display order (respects view_mode grouping) *)
+val display_ordered_services : state -> Service_state.t list
+
 (** Get currently selected service, if any *)
 val current_service : state -> Service_state.t option
