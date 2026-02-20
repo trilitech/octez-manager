@@ -6,10 +6,8 @@ description: How to install Octez Manager
 ## Prerequisites
 
 - Linux (Ubuntu 22.04+, Debian 12+, or similar)
-- **Octez binaries** (`octez-node`, `octez-client`, `octez-baker`, etc.) — See [How to get Octez](https://octez.tezos.com/docs/introduction/howtoget.html) for installation options including:
-  - Static binaries (easiest)
-  - Debian/Ubuntu packages
-  - Building from source
+
+> **Note:** You don't need to install Octez binaries manually. Octez Manager can download and manage Octez binaries for you. See [Managing Binaries](/guides/tui-guide/#managing-binaries) for details.
 
 ## Quick Install (Recommended)
 
