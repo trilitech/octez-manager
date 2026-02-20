@@ -66,7 +66,6 @@ make build
 
 - OCaml 5.1+, opam 2.1+
 - systemd
-- Octez binaries in PATH
 - sudo access (for system-wide services)
 
 ### Launch the UI
