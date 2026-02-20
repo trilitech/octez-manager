@@ -16,6 +16,11 @@ SIGNATORY_INSTANCE="test-signatory-baker-dep"
 NODE_INSTANCE="test-node-baker-dep"
 BAKER_INSTANCE="test-baker-with-signatory"
 
+# Register instances for cleanup (pre-cleanup removes any leftovers from previous runs)
+register_instance "$SIGNATORY_INSTANCE"
+register_instance "$NODE_INSTANCE"
+register_instance "$BAKER_INSTANCE"
+
 echo "==> Step 1: Install signatory instance"
 om install-signatory \
 	--instance "$SIGNATORY_INSTANCE" \
@@ -26,8 +31,6 @@ om install-signatory \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$SIGNATORY_INSTANCE"
 
 echo "DEBUG: Verifying signatory is in registry..."
 echo "DEBUG: Checking registry files..."
@@ -79,8 +82,6 @@ om install-node \
 	--service-user tezos \
 	--no-enable 2>&1
 
-register_instance "$NODE_INSTANCE"
-
 echo "==> Step 4: Install baker with signatory dependency"
 om install-baker \
 	--instance "$BAKER_INSTANCE" \
@@ -90,8 +91,6 @@ om install-baker \
 	--liquidity-baking-vote pass \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$BAKER_INSTANCE"
 
 echo "==> Step 5: Verify baker service unit was created"
 BAKER_UNIT="octez-baker@${BAKER_INSTANCE}.service"
