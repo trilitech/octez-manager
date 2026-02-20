@@ -87,7 +87,7 @@ if [ ! -d "$DROPIN_DIR" ]; then
 	exit 1
 fi
 
-DROPIN_FILE="${DROPIN_DIR}/dependencies.conf"
+DROPIN_FILE="${DROPIN_DIR}/override.conf"
 if [ ! -f "$DROPIN_FILE" ]; then
 	echo "ERROR: Drop-in file not found: $DROPIN_FILE"
 	exit 1

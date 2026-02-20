@@ -85,7 +85,7 @@ fi
 echo "==> Step 6: Verify NO signatory dependency in systemd drop-in"
 # When using external signer URI, there should be no signatory dependency
 DROPIN_DIR="/etc/systemd/system/${BAKER_UNIT}.d"
-DROPIN_FILE="${DROPIN_DIR}/dependencies.conf"
+DROPIN_FILE="${DROPIN_DIR}/override.conf"
 
 if [ -f "$DROPIN_FILE" ]; then
 	# If drop-in exists, it should NOT reference any signatory service
