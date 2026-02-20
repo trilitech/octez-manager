@@ -61,6 +61,9 @@ val table_lines_matrix :
   state ->
   string list
 
+(** Compute role or group sections based on view_mode *)
+val sections_for_view : state -> (string * Service_state.t list) list
+
 (** Main table rendering function *)
 val table_lines : ?cols:int -> ?visible_height:int -> state -> string list
 

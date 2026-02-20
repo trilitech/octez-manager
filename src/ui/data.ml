@@ -38,6 +38,10 @@ let last_refresh = Atomic.make 0.0
 
 let refresh_inflight = Atomic.make false
 
+(** Generation counter incremented by [force_refresh].  Background refreshes
+    that started before a [force_refresh] must not overwrite its results. *)
+let force_gen = Atomic.make 0
+
 let cache_ttl_secs = 5.0
 
 let () =
@@ -129,7 +133,9 @@ let fetch_statuses ?detail services =
   in
   List.map (safe_fetch ?detail) services
 
-let refresh_cache ?detail () =
+(** Fetch service states from registry + systemd without updating the cache.
+    Initialises [Rpc_metrics] entries for new node services as a side-effect. *)
+let fetch_states ?detail () =
   let module SM =
     (val Miaou_interfaces.Capability.require Service_manager_capability.key)
   in
@@ -158,22 +164,37 @@ let refresh_cache ?detail () =
                   }
             | Some _ -> ())
         states ;
-      set_cache states ;
-      states
+      Ok states
   | Error (`Msg msg) ->
       (prerr_endline [@allow_forbidden "startup error before TUI init"])
         (Printf.sprintf "Failed to read registry: %s" msg) ;
+      Error ()
+
+let refresh_cache ?detail () =
+  match fetch_states ?detail () with
+  | Ok states ->
+      set_cache states ;
+      states
+  | Error () ->
       set_cache [] ;
       []
 
 let schedule_refresh ?detail () =
   if Atomic.compare_and_set refresh_inflight false true then
+    let gen = Atomic.get force_gen in
     Bg.submit_blocking (fun () ->
         Fun.protect
           ~finally:(fun () -> Atomic.set refresh_inflight false)
-          (fun () -> ignore (refresh_cache ?detail ())))
+          (fun () ->
+            match fetch_states ?detail () with
+            | Ok states ->
+                (* Only update cache if no force_refresh happened while we ran *)
+                if Atomic.get force_gen = gen then set_cache states
+            | Error () -> if Atomic.get force_gen = gen then set_cache []))
 
-let force_refresh () = ignore (refresh_cache ())
+let force_refresh () =
+  ignore (Atomic.fetch_and_add force_gen 1) ;
+  ignore (refresh_cache ())
 
 let load_service_states ?detail () =
   match detail with

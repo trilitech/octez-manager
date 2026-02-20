@@ -499,6 +499,9 @@ let pad_line ~col_width line =
     truncate_visible ~max_width:col_width line
   else line
 
+(** Compute sections based on view_mode *)
+let sections_for_view state = Instances_layout.sections_of_state state
+
 let role_key_of_header = function
   | "Nodes" -> "node"
   | "Bakers" -> "baker"
@@ -873,36 +876,21 @@ let table_lines_single state =
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
     else
-      (* Group services by role, preserving order *)
-      let groups =
-        let rec collect prev_role current_group acc = function
-          | [] ->
-              let groups =
-                match prev_role with
-                | Some r -> List.rev ((r, List.rev current_group) :: acc)
-                | None -> List.rev acc
-              in
-              groups
-          | (svc : Service_state.t) :: rest ->
-              let role = svc.service.Service.role in
-              if Some role <> prev_role then
-                let acc =
-                  match prev_role with
-                  | Some r -> (r, List.rev current_group) :: acc
-                  | None -> acc
-                in
-                collect (Some role) [svc] acc rest
-              else collect prev_role (svc :: current_group) acc rest
-        in
-        collect None [] [] state.services
-      in
-      (* Render each role group as a Box *)
+      (* Group services by role or group based on view_mode *)
+      let sections = sections_for_view state in
+      (* Render each section as a Box *)
       let idx = ref 0 in
       let is_first = ref true in
       List.concat_map
-        (fun (role, svcs) ->
-          let hdr = role_header role in
-          let widget_name = "instances-box-" ^ role in
+        (fun (section_name, svcs) ->
+          let hdr =
+            match state.view_mode with
+            | By_role -> role_header section_name
+            | By_group -> section_name
+          in
+          let widget_name =
+            "instances-box-" ^ role_key_of_header section_name
+          in
           let instance_lines =
             List.concat_map
               (fun (svc : Service_state.t) ->
@@ -926,7 +914,7 @@ let table_lines_single state =
           let result = if !is_first then box_lines else "" :: box_lines in
           is_first := false ;
           result)
-        groups
+        sections
   in
   let external_rows = render_external_services_section state in
   let external_rows =
@@ -943,8 +931,8 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   let num_columns =
     calc_num_columns ~cols ~min_column_width ~column_separator
   in
-  let role_groups = group_by_role state.services in
-  let columns = distribute_to_columns ~num_columns role_groups in
+  let sections = sections_for_view state in
+  let columns = distribute_to_columns ~num_columns sections in
   let col_width =
     (cols - ((num_columns - 1) * String.length column_separator)) / num_columns
   in

@@ -35,6 +35,8 @@ let make_state ?(selected = 0) ?(num_columns = 1) ?(active_column = 0)
     num_columns;
     active_column;
     column_scroll;
+    view_mode = Instances_state.By_role;
+    groups = [];
   }
 
 let move = Instances.For_tests.move_selection
@@ -99,8 +101,9 @@ let test_multi_column_up_from_second_column_to_browse_rpcs () =
   (* Same fix applies when navigating up from column 1 *)
   let services = multi_role_services () in
   (* Find the first service index in column 1 *)
+  let sections = Instances_layout.group_by_role services in
   let col1_services =
-    Instances_layout.services_in_column ~num_columns:2 ~services 1
+    Instances_layout.services_in_column ~num_columns:2 ~sections ~services 1
   in
   match col1_services with
   | [] -> (* Column 1 is empty, skip test *) ()
