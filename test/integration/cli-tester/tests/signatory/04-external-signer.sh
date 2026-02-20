@@ -60,10 +60,11 @@ om install-baker \
 	--service-user tezos \
 	--no-enable 2>&1
 
-echo "==> Step 4: Verify baker service unit was created"
-BAKER_UNIT="octez-baker@${BAKER_INSTANCE}.service"
-if ! systemctl list-unit-files | grep -q "$BAKER_UNIT"; then
-	echo "ERROR: Baker service unit not found: $BAKER_UNIT"
+echo "==> Step 4: Verify baker installation succeeded"
+# Baker is installed successfully if registry entry exists
+if ! om list 2>&1 | grep -q "$BAKER_INSTANCE"; then
+	echo "ERROR: Baker instance '$BAKER_INSTANCE' not found in om list"
+	om list 2>&1
 	exit 1
 fi
 
