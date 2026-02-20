@@ -42,12 +42,15 @@ fi
 echo "Signatory instance appears in om list"
 
 echo "==> Step 3: Verify signatory service unit exists"
-if ! systemctl list-unit-files | grep -q "signatory@.service"; then
-	echo "ERROR: Signatory service template not found: signatory@.service"
-	echo "Full systemctl output:"
-	systemctl list-unit-files | head -50
+# Check if the unit file exists (list-unit-files may not show it immediately after install)
+UNIT_FILE="/etc/systemd/system/signatory@.service"
+if [ ! -f "$UNIT_FILE" ]; then
+	echo "ERROR: Signatory service template not found: $UNIT_FILE"
+	echo "Checking /etc/systemd/system:"
+	ls -la /etc/systemd/system/signatory* 2>&1 || echo "No signatory files found"
 	exit 1
 fi
+echo "Signatory service template exists: $UNIT_FILE"
 
 echo "==> Step 4: Install node instance"
 om install-node \
