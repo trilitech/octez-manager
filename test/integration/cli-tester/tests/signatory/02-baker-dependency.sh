@@ -30,6 +30,22 @@ om install-signatory \
 register_instance "$SIGNATORY_INSTANCE"
 
 echo "DEBUG: Verifying signatory is in registry..."
+echo "DEBUG: Checking registry files..."
+REGISTRY_DIR="/root/.local/share/octez-manager/registry/services"
+if [ -d "$REGISTRY_DIR" ]; then
+	echo "Registry directory exists: $REGISTRY_DIR"
+	ls -la "$REGISTRY_DIR" | head -20
+	if [ -f "$REGISTRY_DIR/${SIGNATORY_INSTANCE}.json" ]; then
+		echo "Signatory JSON file exists!"
+		echo "Content:"
+		cat "$REGISTRY_DIR/${SIGNATORY_INSTANCE}.json"
+	else
+		echo "ERROR: Signatory JSON file does NOT exist: $REGISTRY_DIR/${SIGNATORY_INSTANCE}.json"
+	fi
+else
+	echo "ERROR: Registry directory does NOT exist: $REGISTRY_DIR"
+fi
+
 om list 2>&1 | tee /tmp/om-list.txt
 if ! grep -q "$SIGNATORY_INSTANCE" /tmp/om-list.txt; then
 	echo "ERROR: Signatory not visible in 'om list' after installation"
