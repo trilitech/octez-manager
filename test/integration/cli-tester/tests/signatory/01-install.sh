@@ -5,6 +5,9 @@ source /tests/lib.sh
 
 test_init "Install signatory instance"
 
+# Use a unique instance name for this test
+TEST_INSTANCE="test-signatory-install"
+
 # Register instance for auto cleanup (also does pre-cleanup)
 register_instance "$TEST_INSTANCE"
 
