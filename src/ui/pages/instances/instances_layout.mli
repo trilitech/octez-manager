@@ -38,6 +38,15 @@ val calc_num_columns :
 (** Group services by role *)
 val group_by_role : Service_state.t list -> (string * Service_state.t list) list
 
+(** Group services by their instance group.
+    Returns [(group_display_name, services)] pairs where grouped services
+    come first (sorted by group name, services within sorted by role),
+    followed by ungrouped services in an "Ungrouped" section. *)
+val group_by_group :
+  groups:Octez_manager_lib.Group.t list ->
+  Service_state.t list ->
+  (string * Service_state.t list) list
+
 (** Distribute role groups across columns *)
 val distribute_to_columns :
   num_columns:int ->
@@ -59,21 +68,37 @@ val column_service_indices :
   global_services:Service_state.t list ->
   int list
 
+(** Compute layout sections based on view_mode *)
+val sections_of_state : state -> (string * Service_state.t list) list
+
 (** Get first service index in a column *)
 val first_service_in_column :
-  num_columns:int -> services:Service_state.t list -> int -> int
+  num_columns:int ->
+  sections:(string * Service_state.t list) list ->
+  services:Service_state.t list ->
+  int ->
+  int
 
 (** Get all service indices in a column *)
 val services_in_column :
-  num_columns:int -> services:Service_state.t list -> int -> int list
+  num_columns:int ->
+  sections:(string * Service_state.t list) list ->
+  services:Service_state.t list ->
+  int ->
+  int list
 
 (** Find which column contains a service index *)
 val column_for_service :
-  num_columns:int -> services:Service_state.t list -> int -> int
+  num_columns:int ->
+  sections:(string * Service_state.t list) list ->
+  services:Service_state.t list ->
+  int ->
+  int
 
 (** Calculate line position of a service within its column *)
 val service_line_position :
   num_columns:int ->
+  sections:(string * Service_state.t list) list ->
   services:Service_state.t list ->
   folded:StringSet.t ->
   int ->
@@ -94,7 +119,10 @@ val last_visible_height_ref : int ref
 
 (** Find first non-empty column *)
 val find_non_empty_column :
-  num_columns:int -> services:Service_state.t list -> int option
+  num_columns:int ->
+  sections:(string * Service_state.t list) list ->
+  services:Service_state.t list ->
+  int option
 
 (** Ensure active column points to a non-empty column *)
 val ensure_valid_column : state -> state

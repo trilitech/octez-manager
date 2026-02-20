@@ -69,6 +69,67 @@ let group_by_role services =
       if instances = [] then None else Some (role, instances))
     roles
 
+(** Build a display title for a group, e.g. "mainnet-prod (mainnet · v22.0)" *)
+let group_display_title (g : Group.t) =
+  let version =
+    match g.bin_source with
+    | Binary_registry.Managed_octez_version v -> v
+    | Binary_registry.Managed_signatory_version v -> v
+    | Binary_registry.Registered_alias a -> a
+    | Binary_registry.Raw_path p -> Filename.basename p
+  in
+  Printf.sprintf "%s (%s · %s)" g.name g.network version
+
+(** Group services by their instance group.
+    Grouped services come first (sorted by group name, services within sorted
+    by role), followed by ungrouped services in an "Ungrouped" section. *)
+let group_by_group ~(groups : Group.t list) services =
+  (* Separate grouped vs ungrouped *)
+  let grouped, ungrouped =
+    List.partition
+      (fun (st : Service_state.t) -> Option.is_some st.service.Service.group)
+      services
+  in
+  (* Build a map from group name to Group.t for display info *)
+  let group_map =
+    List.fold_left (fun acc (g : Group.t) -> (g.name, g) :: acc) [] groups
+  in
+  (* Collect services per group name *)
+  let group_services : (string * Service_state.t list) list =
+    let tbl : (string, Service_state.t list) Hashtbl.t = Hashtbl.create 17 in
+    List.iter
+      (fun (st : Service_state.t) ->
+        match st.service.Service.group with
+        | Some gname ->
+            let prev =
+              match Hashtbl.find_opt tbl gname with Some l -> l | None -> []
+            in
+            Hashtbl.replace tbl gname (st :: prev)
+        | None -> ())
+      grouped ;
+    (* Sort group names, then sort services within each by role *)
+    let names =
+      Hashtbl.fold (fun k _ acc -> k :: acc) tbl [] |> List.sort String.compare
+    in
+    List.map
+      (fun gname ->
+        let svcs =
+          match Hashtbl.find_opt tbl gname with Some l -> l | None -> []
+        in
+        let svcs = sort_services svcs in
+        let title =
+          match List.assoc_opt gname group_map with
+          | Some g -> group_display_title g
+          | None -> gname
+        in
+        (title, svcs))
+      names
+  in
+  let ungrouped_section =
+    if ungrouped = [] then [] else [("Ungrouped", sort_services ungrouped)]
+  in
+  group_services @ ungrouped_section
+
 (** Find index of minimum element in array *)
 let array_min_index arr =
   let rec loop min_idx i =
@@ -134,12 +195,17 @@ let column_service_indices ~column_groups ~global_services =
     | Header _ -> None
     | Instance (idx, _) -> Some idx)
 
+(** Compute layout sections based on view_mode *)
+let sections_of_state (state : state) =
+  match state.view_mode with
+  | By_role -> group_by_role state.services
+  | By_group -> group_by_group ~groups:state.groups state.services
+
 (** Get first service index in a column *)
-let first_service_in_column ~num_columns ~services col =
+let first_service_in_column ~num_columns ~sections ~services col =
   if num_columns <= 1 then 0
   else
-    let role_groups = group_by_role services in
-    let columns = distribute_to_columns ~num_columns role_groups in
+    let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then 0
     else
       let indices =
@@ -150,11 +216,10 @@ let first_service_in_column ~num_columns ~services col =
       match indices with [] -> 0 | first :: _ -> first
 
 (** Get all service indices in a column *)
-let services_in_column ~num_columns ~services col =
+let services_in_column ~num_columns ~sections ~services col =
   if num_columns <= 1 then List.mapi (fun i _ -> i) services
   else
-    let role_groups = group_by_role services in
-    let columns = distribute_to_columns ~num_columns role_groups in
+    let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then []
     else
       column_service_indices
@@ -162,13 +227,13 @@ let services_in_column ~num_columns ~services col =
         ~global_services:services
 
 (** Find which column contains a given service index *)
-let column_for_service ~num_columns ~services idx =
+let column_for_service ~num_columns ~sections ~services idx =
   if num_columns <= 1 then 0
   else
     let rec find_col col =
       if col >= num_columns then 0
       else
-        let indices = services_in_column ~num_columns ~services col in
+        let indices = services_in_column ~num_columns ~sections ~services col in
         if List.mem idx indices then col else find_col (col + 1)
     in
     find_col 0
@@ -176,11 +241,10 @@ let column_for_service ~num_columns ~services idx =
 (** Calculate line position of a service within its column.
     Returns (start_line, line_count) where start_line is 0-indexed
     from the top of the column content (after headers). *)
-let service_line_position ~num_columns ~services ~folded svc_idx col =
+let service_line_position ~num_columns ~sections ~services ~folded svc_idx col =
   if num_columns <= 1 then (0, 1)
   else
-    let role_groups = group_by_role services in
-    let columns = distribute_to_columns ~num_columns role_groups in
+    let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then (0, 1)
     else
       let column_groups = columns.(col) in
@@ -217,11 +281,11 @@ let adjust_column_scroll ~column_scroll ~col ~line_start ~line_count
 let last_visible_height_ref = ref 20
 
 (** Find first non-empty column, or None if all empty *)
-let find_non_empty_column ~num_columns ~services =
+let find_non_empty_column ~num_columns ~sections ~services =
   let rec find col =
     if col >= num_columns then None
     else
-      let indices = services_in_column ~num_columns ~services col in
+      let indices = services_in_column ~num_columns ~sections ~services col in
       if indices <> [] then Some col else find (col + 1)
   in
   find 0
@@ -237,9 +301,11 @@ let ensure_valid_column state =
     state
   else if state.num_columns <= 1 then state
   else
+    let sections = sections_of_state state in
     let current_indices =
       services_in_column
         ~num_columns:state.num_columns
+        ~sections
         ~services:state.services
         state.active_column
     in
@@ -249,6 +315,7 @@ let ensure_valid_column state =
       match
         find_non_empty_column
           ~num_columns:state.num_columns
+          ~sections
           ~services:state.services
       with
       | None ->
@@ -258,6 +325,7 @@ let ensure_valid_column state =
           let first_svc =
             first_service_in_column
               ~num_columns:state.num_columns
+              ~sections
               ~services:state.services
               new_col
           in

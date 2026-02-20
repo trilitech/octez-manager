@@ -61,6 +61,9 @@ val activate_selection : state -> state
 (** Dismiss failure status for selected instance *)
 val dismiss_failure : state -> state
 
+(** Show group actions modal (select group, then choose action) *)
+val group_actions_modal : state -> state
+
 (** Functions exposed for testing. *)
 module For_tests : sig
   (** Build journalctl arguments for a unit. *)

@@ -11,6 +11,11 @@ module Service_state = Data.Service_state
 
 module StringSet : Set.S with type elt = string
 
+(** View mode for instances page layout *)
+type view_mode =
+  | By_role  (** Group services by role (node, baker, etc.) *)
+  | By_group  (** Group services by instance group *)
+
 (** Recent failure tracking *)
 val recent_failure_ttl : float
 
@@ -40,11 +45,16 @@ type state = {
   num_columns : int;
   active_column : int;
   column_scroll : int array;
+  view_mode : view_mode;
+  groups : Octez_manager_lib.Group.t list;
 }
 
 type msg = unit
 
 type pstate = state Miaou.Core.Navigation.t
+
+(** Load groups from registry, returning empty list on error. *)
+val load_groups : unit -> Octez_manager_lib.Group.t list
 
 (** Clamp selection index to valid range *)
 val clamp_selection :
