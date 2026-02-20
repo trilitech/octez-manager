@@ -37,6 +37,16 @@ RUN for binary in octez-node octez-client octez-baker octez-accuser octez-dal-no
         chmod +x /usr/local/bin/${binary}; \
     done
 
+# Download Signatory binary for signatory integration tests
+ARG SIGNATORY_VERSION=1.3.1
+ARG SIGNATORY_URL=https://github.com/ecadlabs/signatory/releases/download/v${SIGNATORY_VERSION}/signatory_${SIGNATORY_VERSION}_linux_amd64.tar.gz
+RUN echo "Downloading signatory ${SIGNATORY_VERSION}..." && \
+    curl -sfL "${SIGNATORY_URL}" -o /tmp/signatory.tar.gz && \
+    tar -xzf /tmp/signatory.tar.gz -C /tmp && \
+    mv /tmp/signatory /usr/local/bin/signatory && \
+    chmod +x /usr/local/bin/signatory && \
+    rm -f /tmp/signatory.tar.gz
+
 # Download Zcash/Sapling parameters required for node operation
 ARG ZCASH_PARAMS_URL=https://download.z.cash/downloads
 RUN mkdir -p /usr/local/share/zcash-params && \
