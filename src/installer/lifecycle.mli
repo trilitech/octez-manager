@@ -61,3 +61,47 @@ val stop_service :
     @return Unit on success *)
 val restart_service :
   ?quiet:bool -> instance:string -> unit -> (unit, Rresult.R.msg) result
+
+(** Numeric role order for dependency sorting (node=0, baker=1, etc.) *)
+val role_order : string -> int
+
+(** Get all services belonging to a group, sorted by dependency order
+    (nodes first, then bakers/accusers/dal-nodes/signatories). *)
+val group_services :
+  group_name:string -> unit -> (Service.t list, Rresult.R.msg) result
+
+(** Start all services in a group, in dependency order (nodes first).
+    Stops on first failure.
+
+    @param quiet Suppress command output
+    @param group_name Group name
+    @return List of started instance names on success *)
+val start_group :
+  ?quiet:bool ->
+  group_name:string ->
+  unit ->
+  (string list, Rresult.R.msg) result
+
+(** Stop all services in a group, in reverse dependency order (children first).
+    Continues on failure (best-effort).
+
+    @param quiet Suppress command output
+    @param group_name Group name
+    @return List of stopped instance names (may be partial on errors) *)
+val stop_group :
+  ?quiet:bool ->
+  group_name:string ->
+  unit ->
+  (string list, Rresult.R.msg) result
+
+(** Restart all services in a group: stop all (reverse order),
+    then start all (forward order).
+
+    @param quiet Suppress command output
+    @param group_name Group name
+    @return List of restarted instance names on success *)
+val restart_group :
+  ?quiet:bool ->
+  group_name:string ->
+  unit ->
+  (string list, Rresult.R.msg) result

@@ -34,4 +34,6 @@ missing_mli
 # The 'pkh' field represents Tezos public key hashes (tz1/tz2/tz3/tz4) which are
 # validated strings. Creating a newtype wrapper would add unnecessary indirection
 # for this validated string type. See signatory_validation.ml for validation logic.
+# created_at timestamp field appears in Group.t, Service.t, and directory_entry
+# Same semantic concept (creation timestamp) across domain record types
 unsafe_string_fields

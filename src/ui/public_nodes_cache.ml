@@ -246,6 +246,7 @@ let to_service (info : node_info) : Service.t =
     dependents = [];
     signer_mode = None;
     signer_uri = None;
+    group = None;
   }
 
 (** Get all public nodes as Service.t list *)
