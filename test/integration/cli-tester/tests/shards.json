@@ -2,10 +2,10 @@
   "metadata": {
     "generated_at": "2026-01-27T19:00:00.000000",
     "generated_by": "rebalance from CI run 21409161432 (coverage shards)",
-    "total_tests": 63,
-    "total_duration": 506.04,
+    "total_tests": 66,
+    "total_duration": 509.04,
     "shard_count": 5,
-    "mean_shard_duration": 101.21,
+    "mean_shard_duration": 101.81,
     "max_shard_duration": 102.0,
     "min_shard_duration": 100.61,
     "duration_std_dev": 0.64,
@@ -22,10 +22,13 @@
       "dal/24-dal-show-service.sh",
       "baker/27-baker-with-delegates.sh",
       "node/04-install-custom-datadir.sh",
-      "binaries/01-download-and-verify.sh"
+      "binaries/01-download-and-verify.sh",
+      "group/54-group-create-list-show-delete.sh",
+      "group/55-group-add-remove-service.sh",
+      "group/56-group-multiple-groups.sh"
     ],
-    "test_count": 10,
-    "total_duration": 100.66
+    "test_count": 13,
+    "total_duration": 103.66
   },
   "shard-2": {
     "tests": [
