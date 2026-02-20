@@ -21,6 +21,14 @@ NODE_INSTANCE="test-node-multi"
 BAKER1_INSTANCE="test-baker-multi-1"
 BAKER2_INSTANCE="test-baker-multi-2"
 
+# Register all instances for cleanup
+register_instance "$SIGNATORY1_INSTANCE"
+register_instance "$SIGNATORY2_INSTANCE"
+register_instance "$SIGNATORY3_INSTANCE"
+register_instance "$NODE_INSTANCE"
+register_instance "$BAKER1_INSTANCE"
+register_instance "$BAKER2_INSTANCE"
+
 echo "==> Step 1: Install three signatory instances with different configurations"
 
 om install-signatory \
@@ -33,8 +41,6 @@ om install-signatory \
 	--service-user tezos \
 	--no-enable 2>&1
 
-register_instance "$SIGNATORY1_INSTANCE"
-
 om install-signatory \
 	--instance "$SIGNATORY2_INSTANCE" \
 	--backend file \
@@ -45,8 +51,6 @@ om install-signatory \
 	--service-user tezos \
 	--no-enable 2>&1
 
-register_instance "$SIGNATORY2_INSTANCE"
-
 om install-signatory \
 	--instance "$SIGNATORY3_INSTANCE" \
 	--backend file \
@@ -55,8 +59,6 @@ om install-signatory \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$SIGNATORY3_INSTANCE"
 
 echo "==> Step 2: Verify signatory service template was created"
 echo "DEBUG: Checking for signatory template unit..."
@@ -131,8 +133,6 @@ om install-node \
 	--service-user tezos \
 	--no-enable 2>&1
 
-register_instance "$NODE_INSTANCE"
-
 echo "==> Step 6: Install two bakers using different signatories"
 om install-baker \
 	--instance "$BAKER1_INSTANCE" \
@@ -143,8 +143,6 @@ om install-baker \
 	--service-user tezos \
 	--no-enable 2>&1
 
-register_instance "$BAKER1_INSTANCE"
-
 om install-baker \
 	--instance "$BAKER2_INSTANCE" \
 	--node-instance "$NODE_INSTANCE" \
@@ -153,8 +151,6 @@ om install-baker \
 	--liquidity-baking-vote pass \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$BAKER2_INSTANCE"
 
 echo "==> Step 7: Verify each baker depends on correct signatory"
 systemctl daemon-reload

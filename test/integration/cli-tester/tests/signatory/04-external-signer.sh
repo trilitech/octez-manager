@@ -15,6 +15,10 @@ EXTERNAL_SIGNER_PORT=$(alloc_port)
 NODE_INSTANCE="test-node-external-signer"
 BAKER_INSTANCE="test-baker-external-signer"
 
+# Register instances for cleanup
+register_instance "$NODE_INSTANCE"
+register_instance "$BAKER_INSTANCE"
+
 echo "==> Step 1: Install node instance"
 om install-node \
 	--instance "$NODE_INSTANCE" \
@@ -26,8 +30,6 @@ om install-node \
 	--net-addr "127.0.0.1:$NODE_NET_PORT" \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$NODE_INSTANCE"
 
 echo "==> Step 2: Start node to enable baker installation"
 om start --instance "$NODE_INSTANCE" 2>&1
@@ -57,8 +59,6 @@ om install-baker \
 	--liquidity-baking-vote pass \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$BAKER_INSTANCE"
 
 echo "==> Step 4: Verify baker service unit was created"
 BAKER_UNIT="octez-baker@${BAKER_INSTANCE}.service"

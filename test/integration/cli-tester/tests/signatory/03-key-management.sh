@@ -11,6 +11,9 @@ test_init
 SIGNATORY_PORT=$(alloc_port)
 SIGNATORY_INSTANCE="test-signatory-keys"
 
+# Register instance for cleanup
+register_instance "$SIGNATORY_INSTANCE"
+
 echo "==> Step 1: Install signatory with multiple authorized keys (different key types)"
 om install-signatory \
 	--instance "$SIGNATORY_INSTANCE" \
@@ -22,8 +25,6 @@ om install-signatory \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos \
 	--no-enable 2>&1
-
-register_instance "$SIGNATORY_INSTANCE"
 
 echo "==> Step 2: Verify signatory configuration file"
 CONFIG_FILE="/var/lib/octez/signatory/${SIGNATORY_INSTANCE}/signatory.yaml"
