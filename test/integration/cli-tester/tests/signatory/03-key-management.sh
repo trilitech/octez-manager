@@ -14,6 +14,10 @@ SIGNATORY_INSTANCE="test-signatory-keys"
 # Register instance for cleanup
 register_instance "$SIGNATORY_INSTANCE"
 
+# Clean up custom keys directory from previous runs (not part of normal data dir)
+CUSTOM_KEYS_DIR="/var/lib/octez/signatory/keys-test"
+rm -rf "$CUSTOM_KEYS_DIR" 2>/dev/null || true
+
 echo "==> Step 1: Install signatory with multiple authorized keys (different key types)"
 om install-signatory \
 	--instance "$SIGNATORY_INSTANCE" \
