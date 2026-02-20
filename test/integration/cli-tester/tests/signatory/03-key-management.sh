@@ -16,7 +16,11 @@ register_instance "$SIGNATORY_INSTANCE"
 
 # Clean up custom keys directory from previous runs (not part of normal data dir)
 CUSTOM_KEYS_DIR="/var/lib/octez/signatory/keys-test"
-rm -rf "$CUSTOM_KEYS_DIR" 2>/dev/null || true
+if [ -d "$CUSTOM_KEYS_DIR" ]; then
+	echo "DEBUG: Removing existing keys directory: $CUSTOM_KEYS_DIR"
+	ls -la "$CUSTOM_KEYS_DIR" || true
+	rm -rf "$CUSTOM_KEYS_DIR" || echo "WARNING: Failed to remove $CUSTOM_KEYS_DIR"
+fi
 
 echo "==> Step 1: Install signatory with multiple authorized keys (different key types)"
 om install-signatory \
@@ -29,6 +33,13 @@ om install-signatory \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos \
 	--no-enable 2>&1
+
+# WORKAROUND: Fix permissions explicitly (installer may not fix if parent dir already exists)
+# TODO: https://github.com/trilitech/octez-manager/issues/744
+if [ "$(id -u)" -eq 0 ]; then
+	chmod 700 "/var/lib/octez/signatory/keys-test"
+	chown tezos:tezos "/var/lib/octez/signatory/keys-test"
+fi
 
 echo "==> Step 2: Verify signatory configuration file"
 CONFIG_FILE="/var/lib/octez/signatory/${SIGNATORY_INSTANCE}/signatory.yaml"
