@@ -50,7 +50,15 @@ let write_dropin_body ~role ~data_dir ~logging_mode ~extra_paths ?app_bin_dir
         let binds_to_lines =
           List.map
             (fun (parent_role, parent_instance) ->
-              Printf.sprintf "octez-%s@%s.service" parent_role parent_instance)
+              (* Signatory uses "signatory@" prefix, other services use "octez-<role>@" *)
+              match parent_role with
+              | "signatory" ->
+                  Printf.sprintf "signatory@%s.service" parent_instance
+              | _ ->
+                  Printf.sprintf
+                    "octez-%s@%s.service"
+                    parent_role
+                    parent_instance)
             dependencies
         in
         let after_lines = binds_to_lines in
