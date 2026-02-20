@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "generated_at": "2026-02-20T11:00:00.000000",
-    "generated_by": "manual update - added 6 signatory tests for issue #707",
-    "total_tests": 69,
-    "total_duration": 566.04,
+    "generated_at": "2026-02-23T10:00:00.000000",
+    "generated_by": "manual update - added group tests + signatory tests",
+    "total_tests": 72,
+    "total_duration": 569.04,
     "shard_count": 5,
-    "mean_shard_duration": 113.21,
-    "max_shard_duration": 118.0,
+    "mean_shard_duration": 113.81,
+    "max_shard_duration": 123.66,
     "min_shard_duration": 110.61,
-    "duration_std_dev": 3.84,
+    "duration_std_dev": 4.5,
     "balance_coefficient": 1.28
   },
   "shard-1": {
@@ -24,10 +24,13 @@
       "node/04-install-custom-datadir.sh",
       "binaries/01-download-and-verify.sh",
       "signatory/01-install.sh",
-      "signatory/03-key-management.sh"
+      "signatory/03-key-management.sh",
+      "group/54-group-create-list-show-delete.sh",
+      "group/55-group-add-remove-service.sh",
+      "group/56-group-multiple-groups.sh"
     ],
-    "test_count": 12,
-    "total_duration": 120.66
+    "test_count": 15,
+    "total_duration": 123.66
   },
   "shard-2": {
     "tests": [
