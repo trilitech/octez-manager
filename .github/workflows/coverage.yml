@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /root/.opam
-          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version') }}
+          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version', 'octez-manager.opam') }}
 
       - name: Ensure opam is initialized
         id: opam-init
