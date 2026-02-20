@@ -26,6 +26,7 @@ include Instances_layout
 let init_state () =
   let services = load_services () in
   let external_services = External_services_scheduler.get () in
+  let groups = load_groups () in
   (* Start with all managed instances folded by default *)
   let all_folded =
     List.fold_left
@@ -44,6 +45,8 @@ let init_state () =
   in
   (* Default to 1 column, will be updated on first render with actual cols *)
   let num_columns = 1 in
+  (* Default to group view if groups exist, else role view *)
+  let view_mode = match groups with _ :: _ -> By_group | [] -> By_role in
   Navigation.make
     {
       services;
@@ -56,6 +59,8 @@ let init_state () =
       active_column = 0;
       column_scroll = Array.make 10 0;
       (* max practical columns based on terminal width; 10 is a safe upper bound *)
+      view_mode;
+      groups;
     }
 
 let force_refresh state =
@@ -63,12 +68,14 @@ let force_refresh state =
   External_services_scheduler.refresh () ;
   let services = load_services_fresh () in
   let external_services = External_services_scheduler.get () in
+  let groups = load_groups () in
   let selected = clamp_selection services external_services state.selected in
   let state =
     {
       state with
       services;
       external_services;
+      groups;
       selected;
       last_updated = Unix.gettimeofday ();
     }
@@ -149,8 +156,13 @@ let move_selection_single_column s delta =
 let move_selection_menu s delta =
   let selected = max 0 (min menu_item_count (s.selected + delta)) in
   if selected >= menu_item_count && delta > 0 then
+    let sections = sections_of_state s in
     let first_svc =
-      first_service_in_column ~num_columns:s.num_columns ~services:s.services 0
+      first_service_in_column
+        ~num_columns:s.num_columns
+        ~sections
+        ~services:s.services
+        0
     in
     {s with selected = first_svc + services_start_idx; active_column = 0}
   else {s with selected}
@@ -162,8 +174,13 @@ let move_selection_external s delta =
   if s.selected = first_external && delta < 0 then
     (* Moving up from first external service *)
     if List.length s.services > 0 && s.num_columns > 1 then
+      let sections = sections_of_state s in
       let col_indices =
-        services_in_column ~num_columns:s.num_columns ~services:s.services 0
+        services_in_column
+          ~num_columns:s.num_columns
+          ~sections
+          ~services:s.services
+          0
       in
       match List.rev col_indices with
       | [] -> {s with selected = menu_item_count - 1; active_column = 0}
@@ -183,9 +200,11 @@ let move_selection_external s delta =
     item; moving down past the last service goes to external services. *)
 let move_selection_managed s delta =
   let current_idx = s.selected - services_start_idx in
+  let sections = sections_of_state s in
   let col_indices =
     services_in_column
       ~num_columns:s.num_columns
+      ~sections
       ~services:s.services
       s.active_column
   in
@@ -209,6 +228,7 @@ let move_selection_managed s delta =
     let line_start, line_count =
       service_line_position
         ~num_columns:s.num_columns
+        ~sections
         ~services:s.services
         ~folded:s.folded
         new_idx
@@ -271,6 +291,8 @@ struct
         Enter;
         Char "b";
         Char "c";
+        Char "g";
+        Char "G";
         Char "r";
         Char "R";
         Char "d";
@@ -286,6 +308,8 @@ struct
     [
       kb "Enter" "Open";
       kb "c" "Create";
+      kb "g" "Group/Role view";
+      kb "G" "Group actions";
       kb "d" "Diagnostics";
       kb "b" "Binaries";
       kb "r" "RPC Browser";
@@ -299,8 +323,8 @@ struct
       else Widgets.themed_success "● USER"
     in
     let hint =
-      "Hint: c create · b binaries · d diagnostics · t topology · r rpc · ? \
-       help"
+      "Hint: c create · g group/role · b binaries · d diagnostics · t topology \
+       · r rpc · ? help"
     in
     [
       Printf.sprintf
@@ -484,6 +508,8 @@ Press **Enter** to open instance menu.|}
       [
         ("Enter", "Open");
         ("c", "Create");
+        ("g", "Group/Role");
+        ("G", "Group actions");
         ("d", "Diagnostics");
         ("t", "Topology");
         ("b", "Binaries");
@@ -788,9 +814,11 @@ Press **Enter** to open instance menu.|}
     else
       (* In services area: move to same position in target column *)
       let current_idx = s.selected - services_start_idx in
+      let sections = sections_of_state s in
       let current_col_indices =
         services_in_column
           ~num_columns:num_cols
+          ~sections
           ~services:s.services
           s.active_column
       in
@@ -802,7 +830,11 @@ Press **Enter** to open instance menu.|}
       in
       let new_col = (s.active_column + delta + num_cols) mod num_cols in
       let target_col_indices =
-        services_in_column ~num_columns:num_cols ~services:s.services new_col
+        services_in_column
+          ~num_columns:num_cols
+          ~sections
+          ~services:s.services
+          new_col
       in
       if target_col_indices = [] then
         (* Target column is empty, stay in current column *)
@@ -847,6 +879,17 @@ Press **Enter** to open instance menu.|}
             Navigation.update (fun s -> move_column s 1) ps
         | Some Keys.Tab -> Navigation.update toggle_fold ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
+        | Some (Keys.Char "g") ->
+            Navigation.update
+              (fun s ->
+                let view_mode =
+                  match s.view_mode with
+                  | By_role -> By_group
+                  | By_group -> By_role
+                in
+                {s with view_mode})
+              ps
+        | Some (Keys.Char "G") -> Navigation.update group_actions_modal ps
         | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
         | Some (Keys.Char "b") -> Navigation.update go_to_binaries ps
         | Some (Keys.Char "d") -> Navigation.update go_to_diagnostics ps
@@ -866,9 +909,11 @@ Press **Enter** to open instance menu.|}
         let s = ps.Navigation.s in
         if s.selected >= services_start_idx && s.num_columns > 1 then
           let svc_idx = s.selected - services_start_idx in
+          let sections = sections_of_state s in
           let col =
             column_for_service
               ~num_columns:s.num_columns
+              ~sections
               ~services:s.services
               svc_idx
           in

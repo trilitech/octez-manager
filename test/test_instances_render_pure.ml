@@ -132,6 +132,8 @@ let empty_state () =
       num_columns = 1;
       column_scroll = [||];
       active_column = 0;
+      view_mode = State.By_role;
+      groups = [];
     }
 
 let test_summary_empty () =

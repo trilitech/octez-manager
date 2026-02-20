@@ -8,6 +8,8 @@
 module Service_state = Data.Service_state
 module StringSet = Set.Make (String)
 
+type view_mode = By_role | By_group
+
 (** Track recent start/restart failures for display.
     Maps instance name to (error_message, timestamp) *)
 let recent_failures : (string, string * float) Hashtbl.t = Hashtbl.create 16
@@ -46,11 +48,18 @@ type state = {
   num_columns : int; (* number of columns based on terminal width *)
   active_column : int; (* which column has focus, 0-indexed *)
   column_scroll : int array; (* scroll offset per column *)
+  view_mode : view_mode;
+  groups : Octez_manager_lib.Group.t list;
 }
 
 type msg = unit
 
 type pstate = state Miaou.Core.Navigation.t
+
+let load_groups () =
+  match Octez_manager_lib.Group_registry.list () with
+  | Ok groups -> groups
+  | Error _ -> []
 
 let clamp_selection services external_services idx =
   (* Total selectable items: menu + managed services + external services *)
