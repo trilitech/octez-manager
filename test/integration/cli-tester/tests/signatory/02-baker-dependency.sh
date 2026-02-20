@@ -71,10 +71,12 @@ om install-baker \
 	--service-user tezos \
 	--no-enable 2>&1
 
-echo "==> Step 6: Verify baker service unit was created"
+echo "==> Step 6: Verify baker installation created drop-in directory"
 BAKER_UNIT="octez-baker@${BAKER_INSTANCE}.service"
-if ! systemctl list-unit-files | grep -q "$BAKER_UNIT"; then
-	echo "ERROR: Baker service unit not found: $BAKER_UNIT"
+DROPIN_DIR="/etc/systemd/system/${BAKER_UNIT}.d"
+if [ ! -d "$DROPIN_DIR" ]; then
+	echo "ERROR: Drop-in directory not found: $DROPIN_DIR"
+	echo "Baker installation may have failed to create systemd configuration"
 	exit 1
 fi
 

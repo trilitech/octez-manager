@@ -34,7 +34,7 @@ om install-signatory \
 echo "==> Step 2: Install node instance"
 om install-node \
 	--instance "$NODE_INSTANCE" \
-	--network ghostnet \
+	--network shadownet \
 	--snapshot \
 	--snapshot-no-check \
 	--snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
