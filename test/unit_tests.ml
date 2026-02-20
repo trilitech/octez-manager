@@ -2645,6 +2645,65 @@ let systemd_dropin_extra_paths () =
                    ~needle:("ReadWritePaths=" ^ extra_path)
                    dropin_body))))
 
+let systemd_dropin_signatory_dependency () =
+  (* Test that signatory dependencies use "signatory@" not "octez-signatory@" *)
+  with_fake_xdg (fun env ->
+      with_systemctl_stub (fun () ->
+          with_temp_dir (fun tmp ->
+              let bin_dir = Filename.concat tmp "bin" in
+              Unix.mkdir bin_dir 0o755 ;
+              let baker_bin = Filename.concat bin_dir "octez-baker" in
+              write_exec_file baker_bin "#!/bin/sh\nexit 0\n" ;
+              let owner, group = current_user_group () in
+              let data_dir = Filename.concat env.data "octez/baker-test" in
+              let () =
+                expect_ok
+                  (File_ops.ensure_dir_path ~owner ~group ~mode:0o755 data_dir)
+              in
+              let logging_mode = Logging_mode.default in
+              let () =
+                expect_ok
+                  (Systemd.install_unit
+                     ~role:"baker"
+                     ~app_bin_dir:bin_dir
+                     ~user:owner
+                     ())
+              in
+              (* Write dropin with both node and signatory dependencies *)
+              let dependencies =
+                [("node", "mainnet"); ("signatory", "my-signer")]
+              in
+              let () =
+                expect_ok
+                  (Systemd.write_dropin
+                     ~role:"baker"
+                     ~inst:"test"
+                     ~data_dir
+                     ~logging_mode
+                     ~depends_on:dependencies
+                     ())
+              in
+              let dropin_path = Systemd.For_tests.dropin_path "baker" "test" in
+              let dropin_body = read_file dropin_path in
+              (* Check node dependency uses octez-node@ pattern *)
+              Alcotest.(check bool)
+                "node dependency uses octez-node@"
+                true
+                (string_contains
+                   ~needle:"BindsTo=octez-node@mainnet.service"
+                   dropin_body) ;
+              (* Check signatory dependency uses signatory@ pattern (not octez-signatory@) *)
+              Alcotest.(check bool)
+                "signatory dependency uses signatory@"
+                true
+                (string_contains
+                   ~needle:"BindsTo=signatory@my-signer.service"
+                   dropin_body) ;
+              Alcotest.(check bool)
+                "signatory dependency does NOT use octez-signatory@"
+                false
+                (string_contains ~needle:"octez-signatory@" dropin_body))))
+
 let systemd_baker_exec_line_remote () =
   let exec = Systemd.For_tests.exec_line "baker" in
   Alcotest.(check bool)
@@ -6237,6 +6296,10 @@ let () =
             `Quick
             systemd_install_dropin_and_service_commands;
           Alcotest.test_case "extra paths" `Quick systemd_dropin_extra_paths;
+          Alcotest.test_case
+            "signatory dependency"
+            `Quick
+            systemd_dropin_signatory_dependency;
           Alcotest.test_case
             "baker exec remote"
             `Quick
