@@ -33,7 +33,7 @@ open TCR
 let keys_down n = List.init n (fun _ -> Key "Down")
 
 (** Open the create menu ('c') and select the nth item (0-indexed).
-    Menu order: Node=0, DAL Node=1, Baker=2, Accuser=3. *)
+    Menu order: Node=0, DAL Node=1, Baker=2, Accuser=3, Signatory=4. *)
 let open_create_menu ~menu_index ~target_page =
   [Key "c"; WaitFor [ModalActive; MaxIterations 50]]
   @ keys_down menu_index
@@ -94,8 +94,8 @@ let golden_path_script =
       (* Select first: None (manual sync) *)
       WaitFor [ModalClosed; MaxIterations 10];
     ]
-  (* From Snapshot (row 2), Confirm is row 15 => 13 Downs *)
-  @ submit_form ~downs:13
+  (* From Snapshot (row 2), Confirm is row 16 => 14 Downs (added Group field) *)
+  @ submit_form ~downs:14
   @ [
       Comment "Node install is async (Job_manager). Wait for instances page.";
       WaitFor [ScreenContains "Hint: c create"; MaxIterations 100];
@@ -114,8 +114,8 @@ let golden_path_script =
     ]
   @ select_first_node
   @ [Screenshot "04_dal_node_selected"]
-  (* DAL form: 10 fields + confirm. Cursor on field 0, need 10 Downs *)
-  @ submit_form ~downs:10
+  (* DAL form: 11 fields + confirm. Cursor on field 0, need 11 Downs (added Group field) *)
+  @ submit_form ~downs:11
   @ wait_for_sync_install
   @ [Screenshot "05_dal_installed"; AssertService "dal-shadownet"]
   (* ── Step 3: Install Baker ────────────────────────────────── *)
@@ -127,9 +127,9 @@ let golden_path_script =
     ]
   @ select_second_item
   @ [Screenshot "06_baker_node_selected"]
-  (* Baker form: 14 fields + confirm. Cursor on field 0, need 14 Downs.
-     Added "Remote Signer" field in PR #724 (baker remote signer integration) *)
-  @ submit_form ~downs:14
+  (* Baker form: 15 fields + confirm. Cursor on field 0, need 15 Downs.
+     Added "Remote Signer" field in PR #724 and "Group" field for instance groups *)
+  @ submit_form ~downs:15
   @ wait_for_sync_install
   @ [Screenshot "07_baker_installed"; AssertService "baker-shadownet"]
   (* ── Step 4: Install Accuser ──────────────────────────────── *)
@@ -141,8 +141,8 @@ let golden_path_script =
     ]
   @ select_first_node
   @ [Screenshot "08_accuser_node_selected"]
-  (* Accuser form: 8 fields + confirm. Cursor on field 0, need 8 Downs *)
-  @ submit_form ~downs:8
+  (* Accuser form: 9 fields + confirm. Cursor on field 0, need 9 Downs (added Group field) *)
+  @ submit_form ~downs:9
   @ wait_for_sync_install
   @ [Screenshot "09_accuser_installed"; AssertService "accuser-shadownet"]
   (* ── Step 5: Verify all services on instances page ────────── *)

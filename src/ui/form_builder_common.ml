@@ -35,6 +35,7 @@ type core_service_config = {
   enable_on_boot : bool;
   start_now : bool;
   extra_args : string;
+  group : string option;
 }
 
 type client_config = {
@@ -211,6 +212,20 @@ let binary_accessible_to_user ~user ~app_bin_dir ~binary_name =
     (* In root mode, verify service user can access *)
     let cache_key = Printf.sprintf "%s|%s|%s" user app_bin_dir binary_name in
     Cache.get_keyed binary_accessible_cache cache_key
+
+let set_service_group ~instance_name ~group =
+  match group with
+  | None -> Ok ()
+  | Some _ -> (
+      match Service_registry.find ~instance:instance_name with
+      | Ok (Some svc) -> Service_registry.write {svc with group}
+      | Ok None ->
+          Error
+            (`Msg
+               (Printf.sprintf
+                  "Service '%s' not found after install, group not set"
+                  instance_name))
+      | Error _ as e -> e)
 
 let require_package_manager () =
   match

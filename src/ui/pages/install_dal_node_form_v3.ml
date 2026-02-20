@@ -41,6 +41,7 @@ let base_initial_model () =
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
+        group = None;
       };
     client =
       {
@@ -113,6 +114,7 @@ let make_initial_model () =
             start_now = false;
             (* Don't auto-start after edit *)
             extra_args;
+            group = svc.Service.group;
           };
         client =
           {
@@ -289,7 +291,15 @@ let spec =
             ~skip_service_fields:true
             ~edit_mode:model.edit_mode
             ~original_instance:model.original_instance
-            ());
+            ()
+        (* 10. Group *)
+        @ [
+            group_field
+              ~get_core:(fun m -> m.core)
+              ~set_core:(fun core m -> {m with core})
+              ~edit_mode:model.edit_mode
+              ();
+          ]);
     pre_submit =
       Some
         (fun model ->
@@ -444,6 +454,11 @@ let spec =
         in
         let* (module PM) = Form_builder_common.require_package_manager () in
         let* _service = PM.install_daemon ~quiet:true req in
+        let* () =
+          Form_builder_common.set_service_group
+            ~instance_name:model.core.instance_name
+            ~group:model.core.group
+        in
         (* Handle rename: clean up old instance if name changed *)
         let* () =
           match (model.edit_mode, model.original_instance) with
