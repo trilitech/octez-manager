@@ -64,11 +64,12 @@ fi
 
 echo "==> Step 5: Verify baker configuration includes signer URI"
 # Remote signer URI is stored in the environment file, not a config file
-BAKER_ENV_FILE="/etc/octez-manager/services/${BAKER_INSTANCE}.env"
+BAKER_ENV_FILE="/etc/octez/instances/${BAKER_INSTANCE}/node.env"
 
 if [ ! -f "$BAKER_ENV_FILE" ]; then
 	echo "ERROR: Baker env file not found: $BAKER_ENV_FILE"
-	ls -la /etc/octez-manager/services/ 2>&1
+	ls -la /etc/octez/instances/${BAKER_INSTANCE}/ 2>&1 || true
+	ls -la /etc/octez/instances/ 2>&1 || true
 	exit 1
 fi
 
@@ -125,10 +126,10 @@ fi
 
 echo "==> Step 9: Verify baker key is configured"
 # Check the registry JSON for the delegate
-BAKER_REGISTRY="/var/lib/octez-manager/registry/${BAKER_INSTANCE}.json"
+BAKER_REGISTRY="/etc/octez_manager/services/${BAKER_INSTANCE}.json"
 if ! grep -q "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb" "$BAKER_REGISTRY"; then
 	echo "ERROR: Baker key not found in registry"
-	cat "$BAKER_REGISTRY"
+	cat "$BAKER_REGISTRY" 2>&1 || true
 	exit 1
 fi
 
