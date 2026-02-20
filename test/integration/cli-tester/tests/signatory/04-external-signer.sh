@@ -36,18 +36,11 @@ echo "==> Step 2: Start node to enable baker installation"
 om instance "$NODE_INSTANCE" start 2>&1
 
 # Wait for node RPC to be ready
-echo "Waiting for node RPC at 127.0.0.1:$NODE_RPC_PORT..."
-for i in {1..30}; do
-	if curl -s "http://127.0.0.1:$NODE_RPC_PORT/chains/main/blocks/head" >/dev/null 2>&1; then
-		echo "Node RPC is ready"
-		break
-	fi
-	if [ $i -eq 30 ]; then
-		echo "ERROR: Node RPC did not become ready"
-		exit 1
-	fi
-	sleep 1
-done
+if ! wait_for_node_ready "127.0.0.1:$NODE_RPC_PORT" 90; then
+	echo "ERROR: Node RPC did not become ready"
+	show_service_logs "node" "$NODE_INSTANCE" 50
+	exit 1
+fi
 
 echo "==> Step 3: Install baker with external signer URI (http://)"
 EXTERNAL_SIGNER_URI="http://127.0.0.1:$EXTERNAL_SIGNER_PORT"
