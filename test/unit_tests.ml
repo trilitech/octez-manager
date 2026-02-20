@@ -132,6 +132,7 @@ let service_equal a b =
   && Option.equal String.equal a.snapshot_network_slug b.snapshot_network_slug
   && Bool.equal a.snapshot_no_check b.snapshot_no_check
   && List.equal String.equal a.extra_args b.extra_args
+  && Option.equal String.equal a.group b.group
 
 let check_service expected actual =
   Alcotest.(check bool) "service equality" true (service_equal expected actual)
@@ -159,6 +160,7 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     dependents = [];
     signer_mode = None;
     signer_uri = None;
+    group = None;
   }
 
 let sort_services =
