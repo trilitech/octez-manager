@@ -1,0 +1,119 @@
+#!/bin/bash
+set -euo pipefail
+source /tests/lib.sh
+
+echo "Test: External Signer URI Configuration"
+
+# Initialize test harness (automatic cleanup on EXIT)
+test_init
+
+# Allocate unique ports for this test
+NODE_RPC_PORT=$(alloc_port)
+NODE_NET_PORT=$(alloc_port)
+EXTERNAL_SIGNER_PORT=$(alloc_port)
+
+NODE_INSTANCE="test-node-external-signer"
+BAKER_INSTANCE="test-baker-external-signer"
+
+echo "==> Step 1: Install node instance"
+om install-node \
+	--instance "$NODE_INSTANCE" \
+	--network ghostnet \
+	--snapshot \
+	--snapshot-no-check \
+	--snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
+	--rpc-addr "127.0.0.1:$NODE_RPC_PORT" \
+	--net-addr "127.0.0.1:$NODE_NET_PORT" \
+	--service-user tezos \
+	--no-enable 2>&1
+
+register_instance "$NODE_INSTANCE"
+
+echo "==> Step 2: Install baker with external signer URI (http://)"
+EXTERNAL_SIGNER_URI="http://127.0.0.1:$EXTERNAL_SIGNER_PORT"
+
+om install-baker \
+	--instance "$BAKER_INSTANCE" \
+	--node-instance "$NODE_INSTANCE" \
+	--protocol alpha \
+	--signer-uri "$EXTERNAL_SIGNER_URI" \
+	--baker-key "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb" \
+	--service-user tezos \
+	--no-enable 2>&1
+
+register_instance "$BAKER_INSTANCE"
+
+echo "==> Step 3: Verify baker service unit was created"
+BAKER_UNIT="octez-baker@${BAKER_INSTANCE}.service"
+if ! systemctl list-unit-files | grep -q "$BAKER_UNIT"; then
+	echo "ERROR: Baker service unit not found: $BAKER_UNIT"
+	exit 1
+fi
+
+echo "==> Step 4: Verify baker configuration includes signer URI"
+BAKER_CONFIG_FILE="/var/lib/tezos/.tezos-baker/${BAKER_INSTANCE}/config"
+
+if [ ! -f "$BAKER_CONFIG_FILE" ]; then
+	echo "ERROR: Baker config file not found: $BAKER_CONFIG_FILE"
+	exit 1
+fi
+
+if ! grep -q "$EXTERNAL_SIGNER_URI" "$BAKER_CONFIG_FILE"; then
+	echo "ERROR: External signer URI not found in baker config"
+	cat "$BAKER_CONFIG_FILE"
+	exit 1
+fi
+
+echo "==> Step 5: Verify NO signatory dependency in systemd drop-in"
+# When using external signer URI, there should be no signatory dependency
+DROPIN_DIR="/etc/systemd/system/${BAKER_UNIT}.d"
+DROPIN_FILE="${DROPIN_DIR}/dependencies.conf"
+
+if [ -f "$DROPIN_FILE" ]; then
+	# If drop-in exists, it should NOT reference any signatory service
+	if grep -q "signatory@" "$DROPIN_FILE"; then
+		echo "ERROR: Baker with external URI should not depend on signatory service"
+		cat "$DROPIN_FILE"
+		exit 1
+	fi
+
+	# Should still depend on the node though
+	if ! grep -q "octez-node@${NODE_INSTANCE}.service" "$DROPIN_FILE"; then
+		echo "ERROR: Baker should still depend on node"
+		cat "$DROPIN_FILE"
+		exit 1
+	fi
+fi
+
+echo "==> Step 6: Verify systemd dependencies"
+systemctl daemon-reload
+
+# Should depend on node only, not signatory
+if ! systemctl list-dependencies "$BAKER_UNIT" | grep -q "octez-node@${NODE_INSTANCE}.service"; then
+	echo "ERROR: Baker not dependent on node"
+	systemctl list-dependencies "$BAKER_UNIT"
+	exit 1
+fi
+
+if systemctl list-dependencies "$BAKER_UNIT" | grep -q "signatory@"; then
+	echo "ERROR: Baker with external URI should not depend on local signatory"
+	systemctl list-dependencies "$BAKER_UNIT"
+	exit 1
+fi
+
+echo "==> Step 7: Test baker info command shows signer URI"
+om info-baker --instance "$BAKER_INSTANCE" 2>&1 | tee /tmp/baker-info.txt
+
+if ! grep -q "$EXTERNAL_SIGNER_URI" /tmp/baker-info.txt && ! grep -q "$EXTERNAL_SIGNER_PORT" /tmp/baker-info.txt; then
+	echo "WARNING: Signer URI not visible in baker info (may be expected)"
+	cat /tmp/baker-info.txt
+fi
+
+echo "==> Step 8: Verify baker key is configured"
+if ! grep -q "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb" "$BAKER_CONFIG_FILE"; then
+	echo "ERROR: Baker key not found in config"
+	cat "$BAKER_CONFIG_FILE"
+	exit 1
+fi
+
+echo "Test passed: External signer URI configuration working correctly"

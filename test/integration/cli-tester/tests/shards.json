@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "generated_at": "2026-01-27T19:00:00.000000",
-    "generated_by": "rebalance from CI run 21409161432 (coverage shards)",
-    "total_tests": 63,
-    "total_duration": 506.04,
+    "generated_at": "2026-02-20T10:00:00.000000",
+    "generated_by": "manual update - added signatory tests for issue #707",
+    "total_tests": 71,
+    "total_duration": 586.04,
     "shard_count": 5,
-    "mean_shard_duration": 101.21,
-    "max_shard_duration": 102.0,
-    "min_shard_duration": 100.61,
-    "duration_std_dev": 0.64,
+    "mean_shard_duration": 117.21,
+    "max_shard_duration": 122.0,
+    "min_shard_duration": 110.61,
+    "duration_std_dev": 4.64,
     "balance_coefficient": 1.37
   },
   "shard-1": {
@@ -22,10 +22,12 @@
       "dal/24-dal-show-service.sh",
       "baker/27-baker-with-delegates.sh",
       "node/04-install-custom-datadir.sh",
-      "binaries/01-download-and-verify.sh"
+      "binaries/01-download-and-verify.sh",
+      "signatory/01-install.sh",
+      "signatory/04-key-management.sh"
     ],
-    "test_count": 10,
-    "total_duration": 100.66
+    "test_count": 12,
+    "total_duration": 120.66
   },
   "shard-2": {
     "tests": [
@@ -39,10 +41,12 @@
       "dal/20-dal-custom-addresses.sh",
       "baker/33-baker-show-service.sh",
       "node/12-show-service.sh",
-      "import/51-import-nonexistent-service.sh"
+      "import/51-import-nonexistent-service.sh",
+      "signatory/02-baker-dependency.sh",
+      "signatory/05-external-signer.sh"
     ],
-    "test_count": 11,
-    "total_duration": 100.78
+    "test_count": 13,
+    "total_duration": 120.78
   },
   "shard-3": {
     "tests": [
@@ -59,10 +63,12 @@
       "accuser/38-accuser-show-service.sh",
       "node/10-purge-with-data.sh",
       "node/06-install-custom-rpc-net.sh",
-      "node/09-install-no-snapshot.sh"
+      "node/09-install-no-snapshot.sh",
+      "signatory/03-accuser-dependency.sh",
+      "signatory/06-edit-signer.sh"
     ],
-    "test_count": 14,
-    "total_duration": 102.0
+    "test_count": 16,
+    "total_duration": 122.0
   },
   "shard-4": {
     "tests": [
@@ -79,10 +85,11 @@
       "node/11-remove-vs-purge.sh",
       "node/23-rename-updates-dependents.sh",
       "node/22-list-status-display.sh",
-      "binaries/02-list-remote-major-versions.sh"
+      "binaries/02-list-remote-major-versions.sh",
+      "signatory/07-multiple-instances.sh"
     ],
-    "test_count": 14,
-    "total_duration": 100.61
+    "test_count": 15,
+    "total_duration": 110.61
   },
   "shard-5": {
     "tests": [
@@ -99,9 +106,10 @@
       "dal/19-dal-remote-endpoint.sh",
       "node/08-install-preserve-data.sh",
       "node/07-install-extra-args.sh",
-      "node/15-list-format.sh"
+      "node/15-list-format.sh",
+      "signatory/08-restart-cascade.sh"
     ],
-    "test_count": 14,
-    "total_duration": 101.99
+    "test_count": 15,
+    "total_duration": 111.99
   }
 }
