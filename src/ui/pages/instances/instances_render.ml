@@ -338,7 +338,8 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                 match metrics.Signatory_metrics.health with
                 | Signatory_metrics.Up -> Widgets.themed_success "healthy"
                 | Signatory_metrics.Down -> Widgets.themed_error "down"
-                | Signatory_metrics.Degraded -> Widgets.themed_warning "degraded"
+                | Signatory_metrics.Degraded ->
+                    Widgets.themed_warning "degraded"
                 | Signatory_metrics.Unknown -> Widgets.themed_muted "unknown")
           in
           Printf.sprintf "%s%s" indent status_text

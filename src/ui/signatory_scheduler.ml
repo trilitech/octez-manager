@@ -193,7 +193,9 @@ let start () =
           let now = Unix.gettimeofday () in
           (* Get all signatory instances from registry *)
           let all_services =
-            match Service_registry.list () with Ok svcs -> svcs | Error _ -> []
+            match Service_registry.list () with
+            | Ok svcs -> svcs
+            | Error _ -> []
           in
           let signatory_services =
             List.filter
