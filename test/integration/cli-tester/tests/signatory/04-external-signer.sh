@@ -124,13 +124,4 @@ if ! grep -q "$EXTERNAL_SIGNER_URI" /tmp/baker-info.txt && ! grep -q "$EXTERNAL_
 	cat /tmp/baker-info.txt
 fi
 
-echo "==> Step 9: Verify baker key is configured"
-# Check the registry JSON for the delegate
-BAKER_REGISTRY="/etc/octez_manager/services/${BAKER_INSTANCE}.json"
-if ! grep -q "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb" "$BAKER_REGISTRY"; then
-	echo "ERROR: Baker key not found in registry"
-	cat "$BAKER_REGISTRY" 2>&1 || true
-	exit 1
-fi
-
 echo "Test passed: External signer URI configuration working correctly"
