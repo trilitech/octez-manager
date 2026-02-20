@@ -219,22 +219,114 @@ let _view_logs_old state =
           show_journald () ;
           state)
 
+let add_to_group_modal (svc : Service.t) =
+  let svc_net = Instances_render.network_short svc.Service.network in
+  let groups =
+    match Group_registry.list () with Ok gs -> gs | Error _ -> []
+  in
+  let compatible_groups =
+    List.filter
+      (fun (g : Group.t) ->
+        String.equal (Instances_render.network_short g.network) svc_net)
+      groups
+  in
+  let items =
+    [`Create_new] @ List.map (fun g -> `Existing g) compatible_groups
+  in
+  Modal_helpers.open_choice_modal
+    ~title:("Add to Group · " ^ svc.Service.instance)
+    ~items
+    ~to_string:(function
+      | `Create_new -> "+ Create New Group"
+      | `Existing (g : Group.t) -> Printf.sprintf "%s (%s)" g.name g.network)
+    ~on_select:(function
+      | `Create_new ->
+          let initial =
+            Instances_render.network_short svc.Service.network ^ "-"
+          in
+          Modal_helpers.prompt_validated_text_modal
+            ~title:"New Group Name"
+            ~initial
+            ~placeholder:(Some "e.g. mainnet-prod")
+            ~validator:(fun name ->
+              if String.length name = 0 then Error "Name cannot be empty"
+              else
+                match Group_registry.find ~name with
+                | Ok (Some _) ->
+                    Error (Printf.sprintf "Group '%s' already exists" name)
+                | _ -> Ok ())
+            ~on_submit:(fun name ->
+              let grp =
+                Group.make
+                  ~name
+                  ~network:svc.Service.network
+                  ~bin_source:(Service.get_bin_source svc)
+                  ~service_user:svc.Service.service_user
+                  ~app_bin_dir:svc.Service.app_bin_dir
+                  ()
+              in
+              match Group_registry.write grp with
+              | Ok () -> (
+                  match Service_registry.write {svc with group = Some name} with
+                  | Ok () ->
+                      Context.toast_info
+                        (Printf.sprintf
+                           "Created group '%s' and added %s"
+                           name
+                           svc.Service.instance) ;
+                      Context.mark_instances_dirty ()
+                  | Error (`Msg e) -> Context.toast_error e)
+              | Error (`Msg e) -> Context.toast_error e)
+            ()
+      | `Existing (grp : Group.t) -> (
+          match Service_registry.write {svc with group = Some grp.name} with
+          | Ok () ->
+              Context.toast_info
+                (Printf.sprintf
+                   "Added %s to group '%s'"
+                   svc.Service.instance
+                   grp.name) ;
+              Context.mark_instances_dirty ()
+          | Error (`Msg e) -> Context.toast_error e))
+    ()
+
+let remove_from_group (svc : Service.t) =
+  match svc.Service.group with
+  | None -> Context.toast_info "Service is not in any group"
+  | Some gname -> (
+      match Service_registry.write {svc with group = None} with
+      | Ok () ->
+          (* Auto-remove group if no services remain in it *)
+          let group_still_used =
+            match Service_registry.list () with
+            | Ok svcs ->
+                List.exists
+                  (fun (s : Service.t) ->
+                    Option.equal String.equal s.group (Some gname)
+                    && not (String.equal s.instance svc.instance))
+                  svcs
+            | Error _ -> true
+          in
+          if not group_still_used then
+            ignore (Group_registry.remove ~name:gname) ;
+          Context.toast_info
+            (Printf.sprintf
+               "Removed %s from group '%s'"
+               svc.Service.instance
+               gname) ;
+          Context.mark_instances_dirty ()
+      | Error (`Msg e) -> Context.toast_error e)
+
 let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
       let is_node = svc.Service.role = "node" in
+      let in_group = Option.is_some svc.Service.group in
       let base_items =
-        [
-          `Details;
-          `Edit;
-          `Start;
-          `Stop;
-          `Restart;
-          `Update_version;
-          `Logs;
-          `Export_logs;
-          `Remove;
-        ]
+        [`Details; `Edit; `Start; `Stop; `Restart; `Update_version]
+        @ [`Add_to_group]
+        @ (if in_group then [`Remove_from_group] else [])
+        @ [`Logs; `Export_logs; `Remove]
       in
       let items = if is_node then `Browse_rpc :: base_items else base_items in
       Modal_helpers.open_choice_modal
@@ -248,6 +340,11 @@ let instance_actions_modal state =
           | `Stop -> "Stop"
           | `Restart -> "Restart"
           | `Update_version -> "Update Version"
+          | `Add_to_group -> "Add to Group"
+          | `Remove_from_group ->
+              Printf.sprintf
+                "Remove from Group (%s)"
+                (Option.value ~default:"" svc.Service.group)
           | `Logs -> "View Logs"
           | `Export_logs -> "Export Logs"
           | `Remove -> "Remove")
@@ -262,7 +359,6 @@ let instance_actions_modal state =
           | `Edit -> Instances_lifecycle.confirm_edit_modal svc
           | `Start -> Instances_lifecycle.start_with_cascade ~instance ~role
           | `Stop ->
-              (* Clear any previous failure when user intentionally stops *)
               clear_failure ~instance ;
               run_unit_action ~verb:"stop" ~instance (fun () ->
                   let cap = Miaou_interfaces.Service_lifecycle.require () in
@@ -273,6 +369,8 @@ let instance_actions_modal state =
                   |> Result.map_error (fun e -> `Msg e))
           | `Restart -> Instances_lifecycle.restart_with_cascade ~instance ~role
           | `Update_version -> Instances_update.update_version_modal svc
+          | `Add_to_group -> add_to_group_modal svc
+          | `Remove_from_group -> remove_from_group svc
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
@@ -291,19 +389,14 @@ let create_menu_modal state =
   let open Modal_helpers in
   open_choice_modal
     ~title:"Create"
-    ~items:[`Group; `Node; `DalNode; `Baker; `Accuser; `Signatory]
+    ~items:[`Node; `DalNode; `Baker; `Accuser; `Signatory]
     ~to_string:(function
-      | `Group -> "Group"
       | `Node -> "Node"
       | `DalNode -> "DAL Node"
       | `Baker -> "Baker"
       | `Accuser -> "Accuser"
       | `Signatory -> "Signatory")
     ~on_select:(function
-      | `Group ->
-          (* TODO: https://github.com/trilitech/octez-manager/issues/335
-             Navigate to create group form (PR 4) *)
-          Context.toast_info "Create Group form coming soon"
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
       | `Accuser -> Context.navigate Install_accuser_form_v3.name
