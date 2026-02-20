@@ -15,6 +15,23 @@
 (** Convert an [Rresult] to a plain [result] by extracting the error message. *)
 val of_rresult : ('a, [< `Msg of string]) result -> ('a, string) result
 
+(** {1 Group Field} *)
+
+(** Generate a group selection field.
+
+    Shows a modal with existing groups + "None" option.
+    When a group is selected, sets [core.group] to [Some group_name].
+
+    @param get_core Extract core config from model
+    @param set_core Update model with new core config
+    @param edit_mode Whether the form is in edit mode *)
+val group_field :
+  get_core:('model -> Form_builder_common.core_service_config) ->
+  set_core:(Form_builder_common.core_service_config -> 'model -> 'model) ->
+  ?edit_mode:bool ->
+  unit ->
+  'model Form_builder.field
+
 (** {1 Core Service Bundle} *)
 
 (** Generate core service fields common to all Octez tools.

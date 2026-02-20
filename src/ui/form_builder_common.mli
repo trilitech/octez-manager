@@ -37,6 +37,7 @@ type core_service_config = {
   enable_on_boot : bool;
   start_now : bool;
   extra_args : string;
+  group : string option;
 }
 
 (** Client-based tool configuration (baker, accuser, DAL node, signer).
@@ -126,6 +127,14 @@ val has_signatory_binary : string -> bool
     Uses caching (5s TTL) to avoid excessive subprocess calls. *)
 val binary_accessible_to_user :
   user:string -> app_bin_dir:string -> binary_name:string -> bool
+
+(** Set the group on a just-installed service.
+    No-op if [group] is [None].
+
+    @param instance_name The service instance name
+    @param group The group to assign *)
+val set_service_group :
+  instance_name:string -> group:string option -> (unit, Rresult.R.msg) result
 
 (** Get the package manager capability, returning an error if unavailable. *)
 val require_package_manager :

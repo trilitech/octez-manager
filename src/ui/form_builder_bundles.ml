@@ -66,6 +66,53 @@ let format_network_choice (info : Teztnets.network_info) =
   if normalize_string info.network_url = normalize_string info.alias then label
   else Printf.sprintf "%s · %s" label info.network_url
 
+(** {1 Group Field} *)
+
+let group_field ~get_core ~set_core ?(edit_mode = false) () =
+  let open Form_builder in
+  custom
+    ~label:"Group"
+    ~get:(fun m ->
+      match (get_core m).group with None -> "None" | Some name -> name)
+    ~validate:(fun _m -> true)
+    ~edit:(fun model_ref ->
+      if edit_mode then
+        Modal_helpers.show_error
+          ~title:"Group"
+          "Group cannot be changed after creation."
+      else
+        let groups =
+          match Group_registry.list () with Ok gs -> gs | Error _ -> []
+        in
+        let items = [`None] @ (groups |> List.map (fun g -> `Group g)) in
+        let to_string = function
+          | `None -> "None"
+          | `Group (g : Group.t) ->
+              Printf.sprintf
+                "%s (%s · %s)"
+                g.name
+                g.network
+                (Binary_registry.bin_source_to_string g.bin_source)
+        in
+        let on_select = function
+          | `None ->
+              let core = get_core !model_ref in
+              model_ref := set_core {core with group = None} !model_ref
+          | `Group (g : Group.t) ->
+              let core = get_core !model_ref in
+              model_ref := set_core {core with group = Some g.name} !model_ref
+        in
+        Modal_helpers.open_choice_modal
+          ~title:"Select Group"
+          ~items
+          ~to_string
+          ~on_select
+          ())
+    ()
+  |> with_hint
+       "Optional instance group. Services in a group share configuration and \
+        can be managed together."
+
 (** {1 Core Service Bundle} *)
 
 let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
