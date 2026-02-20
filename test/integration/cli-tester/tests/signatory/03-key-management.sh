@@ -106,13 +106,15 @@ if [ "$KEYS_DIR_PERMS" != "700" ]; then
 fi
 
 echo "==> Step 7: Verify signatory service unit"
-echo "DEBUG: Checking for signatory template unit..."
-ls -la /etc/systemd/system/signatory* 2>&1 || echo "No signatory files found"
-systemctl list-unit-files | grep signatory || echo "No signatory units found"
-if ! systemctl list-unit-files | grep -q "signatory@.service"; then
-	echo "ERROR: Signatory service template not found: signatory@.service"
+# Check for template unit file existence directly
+# systemctl list-unit-files may not show newly installed units immediately
+UNIT_FILE="/etc/systemd/system/signatory@.service"
+if [ ! -f "$UNIT_FILE" ]; then
+	echo "ERROR: Signatory service template not found: $UNIT_FILE"
+	ls -la /etc/systemd/system/signatory* 2>&1 || echo "No signatory files found"
 	exit 1
 fi
+echo "Signatory template unit file exists: $UNIT_FILE"
 
 echo "==> Step 8: Verify signatory instance in list"
 om list 2>&1 | tee /tmp/list-output.txt
