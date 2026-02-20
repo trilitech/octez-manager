@@ -32,37 +32,16 @@ om install-signatory \
 	--service-user tezos \
 	--no-enable 2>&1
 
-echo "DEBUG: Verifying signatory is in registry..."
-echo "DEBUG: Checking registry files..."
-REGISTRY_DIR="/root/.local/share/octez-manager/registry/services"
-if [ -d "$REGISTRY_DIR" ]; then
-	echo "Registry directory exists: $REGISTRY_DIR"
-	ls -la "$REGISTRY_DIR" | head -20
-	if [ -f "$REGISTRY_DIR/${SIGNATORY_INSTANCE}.json" ]; then
-		echo "Signatory JSON file exists!"
-		echo "Content:"
-		cat "$REGISTRY_DIR/${SIGNATORY_INSTANCE}.json"
-	else
-		echo "ERROR: Signatory JSON file does NOT exist: $REGISTRY_DIR/${SIGNATORY_INSTANCE}.json"
-	fi
-else
-	echo "ERROR: Registry directory does NOT exist: $REGISTRY_DIR"
-fi
-
-om list 2>&1 | tee /tmp/om-list.txt
-if ! grep -q "$SIGNATORY_INSTANCE" /tmp/om-list.txt; then
-	echo "ERROR: Signatory not visible in 'om list' after installation"
+echo "==> Step 2: Verify signatory appears in om list"
+if ! om list 2>&1 | grep -q "$SIGNATORY_INSTANCE"; then
+	echo "ERROR: Signatory instance '$SIGNATORY_INSTANCE' not found in om list"
 	echo "Full om list output:"
-	cat /tmp/om-list.txt
+	om list 2>&1
 	exit 1
 fi
 echo "Signatory instance appears in om list"
 
-echo "==> Step 2: Verify signatory service unit exists"
-echo "DEBUG: Listing /etc/systemd/system/signatory* files:"
-ls -la /etc/systemd/system/signatory* 2>&1 || echo "No signatory files found"
-echo "DEBUG: systemctl list-unit-files output:"
-systemctl list-unit-files | grep signatory || echo "No signatory units in systemctl"
+echo "==> Step 3: Verify signatory service unit exists"
 if ! systemctl list-unit-files | grep -q "signatory@.service"; then
 	echo "ERROR: Signatory service template not found: signatory@.service"
 	echo "Full systemctl output:"
@@ -70,7 +49,7 @@ if ! systemctl list-unit-files | grep -q "signatory@.service"; then
 	exit 1
 fi
 
-echo "==> Step 3: Install node instance"
+echo "==> Step 4: Install node instance"
 om install-node \
 	--instance "$NODE_INSTANCE" \
 	--network shadownet \
@@ -82,7 +61,7 @@ om install-node \
 	--service-user tezos \
 	--no-enable 2>&1
 
-echo "==> Step 4: Install baker with signatory dependency"
+echo "==> Step 5: Install baker with signatory dependency"
 om install-baker \
 	--instance "$BAKER_INSTANCE" \
 	--node-instance "$NODE_INSTANCE" \
@@ -92,14 +71,14 @@ om install-baker \
 	--service-user tezos \
 	--no-enable 2>&1
 
-echo "==> Step 5: Verify baker service unit was created"
+echo "==> Step 6: Verify baker service unit was created"
 BAKER_UNIT="octez-baker@${BAKER_INSTANCE}.service"
 if ! systemctl list-unit-files | grep -q "$BAKER_UNIT"; then
 	echo "ERROR: Baker service unit not found: $BAKER_UNIT"
 	exit 1
 fi
 
-echo "==> Step 6: Verify systemd drop-in references correct signatory unit"
+echo "==> Step 7: Verify systemd drop-in references correct signatory unit"
 DROPIN_DIR="/etc/systemd/system/${BAKER_UNIT}.d"
 if [ ! -d "$DROPIN_DIR" ]; then
 	echo "ERROR: Drop-in directory not found: $DROPIN_DIR"
@@ -112,7 +91,7 @@ if [ ! -f "$DROPIN_FILE" ]; then
 	exit 1
 fi
 
-echo "==> Step 7: Check drop-in content for correct signatory unit name"
+echo "==> Step 8: Check drop-in content for correct signatory unit name"
 # The fix in src/systemd_dropin.ml ensures signatory uses "signatory@instance.service"
 # NOT "octez-signatory@instance.service"
 if ! grep -q "signatory@${SIGNATORY_INSTANCE}.service" "$DROPIN_FILE"; then
@@ -131,10 +110,10 @@ if grep -q "octez-signatory@${SIGNATORY_INSTANCE}.service" "$DROPIN_FILE"; then
 	exit 1
 fi
 
-echo "==> Step 8: Reload systemd to pick up new units"
+echo "==> Step 9: Reload systemd to pick up new units"
 systemctl daemon-reload
 
-echo "==> Step 9: Verify systemd can resolve the dependency chain"
+echo "==> Step 10: Verify systemd can resolve the dependency chain"
 # This command would have failed with "Unit octez-signatory@X.service not found"
 # before the fix in src/systemd_dropin.ml:53
 if ! systemctl list-dependencies "$BAKER_UNIT" 2>&1 | grep -q "signatory@${SIGNATORY_INSTANCE}.service"; then
@@ -143,7 +122,7 @@ if ! systemctl list-dependencies "$BAKER_UNIT" 2>&1 | grep -q "signatory@${SIGNA
 	exit 1
 fi
 
-echo "==> Step 10: Verify no dependency resolution errors"
+echo "==> Step 11: Verify no dependency resolution errors"
 # Try to start the baker (should fail gracefully since node isn't running, but dependency should resolve)
 if systemctl start "$BAKER_UNIT" 2>&1 | grep -q "not found"; then
 	echo "ERROR: systemd reports 'not found' when starting baker"
