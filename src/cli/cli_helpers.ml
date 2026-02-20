@@ -346,15 +346,14 @@ let resolve_signatory_bin_dir ?signatory_version ?bin_dir_alias app_bin_dir =
       | Error msg -> Error msg)
   | None, None, _ -> (
       (* Auto-detect from PATH *)
-      match Paths.which "octez-signatory" with
+      match Paths.which "signatory" with
       | Some path ->
           let dir = Filename.dirname path in
           Ok (dir, Binary_registry.Raw_path dir)
       | None ->
           Error
-            "Unable to locate octez-signatory in PATH. Install Signatory \
-             binaries or use --signatory-version, --bin-dir-alias, or \
-             --app-bin-dir")
+            "Unable to locate signatory in PATH. Install Signatory binaries or \
+             use --signatory-version, --bin-dir-alias, or --app-bin-dir")
 
 let normalize_opt_string = function
   | Some s ->
