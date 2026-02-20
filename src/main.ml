@@ -83,6 +83,7 @@ let root_cmd =
     info
     ~default:ui_term
     [
+      Cmd_group.group_cmd;
       Cmd_instance.instance_cmd;
       Cmd_install_node.install_node_cmd;
       Cmd_install_baker.install_baker_cmd;

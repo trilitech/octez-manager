@@ -29,3 +29,7 @@ missing_docs
 
 # Missing .mli files (pre-existing, not introduced by this PR)
 missing_mli
+
+# created_at timestamp field appears in Group.t, Service.t, and directory_entry
+# Same semantic concept (creation timestamp) across domain record types
+unsafe_string_fields

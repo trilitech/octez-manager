@@ -6,7 +6,7 @@
 (******************************************************************************)
 
 open Rresult
-include Helpers
+open Helpers
 
 let start_service ?quiet ~instance () =
   let* svc_opt = Service_registry.find ~instance in
@@ -124,3 +124,71 @@ let restart_service ?quiet ~instance () =
   match svc_opt with
   | Some svc -> Systemd.restart ?quiet ~role:svc.role ~instance ()
   | None -> R.error_msgf "Instance '%s' not found" instance
+
+(** Sort services by role order for dependency-aware start/stop. *)
+let role_order = function
+  | "node" -> 0
+  | "baker" -> 1
+  | "accuser" -> 2
+  | "dal-node" -> 3
+  | "signatory" -> 4
+  | _ -> 5
+
+let group_services ~group_name () =
+  let* services = Service_registry.list () in
+  let group_svcs =
+    List.filter
+      (fun (svc : Service.t) ->
+        Option.equal String.equal svc.group (Some group_name))
+      services
+  in
+  let sorted =
+    List.sort
+      (fun (a : Service.t) (b : Service.t) ->
+        let rc = Int.compare (role_order a.role) (role_order b.role) in
+        if rc <> 0 then rc else String.compare a.instance b.instance)
+      group_svcs
+  in
+  Ok sorted
+
+let start_group ?quiet ~group_name () =
+  let* svcs = group_services ~group_name () in
+  match svcs with
+  | [] -> R.error_msgf "No services in group '%s'" group_name
+  | _ ->
+      (* Start in dependency order (nodes first) — fail fast *)
+      let rec start_all acc = function
+        | [] -> Ok (List.rev acc)
+        | (svc : Service.t) :: rest -> (
+            match start_service ?quiet ~instance:svc.instance () with
+            | Ok () -> start_all (svc.instance :: acc) rest
+            | Error _ as err -> err)
+      in
+      start_all [] svcs
+
+let stop_group ?quiet ~group_name () =
+  let* svcs = group_services ~group_name () in
+  match svcs with
+  | [] -> R.error_msgf "No services in group '%s'" group_name
+  | _ ->
+      (* Stop in reverse dependency order (children first) — best effort *)
+      let rev_svcs = List.rev svcs in
+      let stopped =
+        List.filter_map
+          (fun (svc : Service.t) ->
+            match stop_service_cascade ?quiet ~instance:svc.instance () with
+            | Ok () -> Some svc.instance
+            | Error (`Msg msg) ->
+                if not (Option.value ~default:false quiet) then
+                  Printf.eprintf
+                    "Warning: failed to stop '%s': %s\n%!"
+                    svc.instance
+                    msg ;
+                None)
+          rev_svcs
+      in
+      Ok stopped
+
+let restart_group ?quiet ~group_name () =
+  let* _stopped = stop_group ?quiet ~group_name () in
+  start_group ?quiet ~group_name ()

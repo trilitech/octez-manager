@@ -18,6 +18,8 @@
   signatory_downloader
   version_checker
   signer_types
+  group
+  group_registry
   service
   service_registry
   base_dir_registry

@@ -28,6 +28,7 @@ type t = {
   signer_mode : Signer_types.signer_mode option;
       (** Remote signer configuration for bakers (None = Local_keys for backward compat) *)
   signer_uri : string option;  (** Resolved URI for display/metrics *)
+  group : string option;  (** Group this service belongs to, if any *)
 }
 
 let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
@@ -35,7 +36,7 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     ?(snapshot_auto = false) ?(snapshot_uri = None)
     ?(snapshot_network_slug = None) ?(snapshot_no_check = false)
     ?(extra_args = []) ?(depends_on = None) ?(dependents = [])
-    ?(signer_mode = None) ?(signer_uri = None) () =
+    ?(signer_mode = None) ?(signer_uri = None) ?(group = None) () =
   {
     instance;
     role;
@@ -58,6 +59,7 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     dependents;
     signer_mode;
     signer_uri;
+    group;
   }
 
 let get_bin_source t =
@@ -151,6 +153,7 @@ let to_yojson t =
         | None -> `Null );
       ( "signer_uri",
         match t.signer_uri with Some s -> `String s | None -> `Null );
+      ("group", match t.group with Some s -> `String s | None -> `Null);
     ]
   in
   (* Add bin_source if present *)
@@ -235,6 +238,11 @@ let of_yojson json =
       | `String s when s <> "" -> Some s
       | _ -> None
     in
+    let group =
+      match json |> member "group" with
+      | `String s when s <> "" -> Some s
+      | _ -> None
+    in
     match history_mode with
     | Error _ as err -> err
     | Ok history_mode -> (
@@ -263,6 +271,7 @@ let of_yojson json =
                 dependents;
                 signer_mode;
                 signer_uri;
+                group;
               }
         | Error _ as err -> err)
   with Yojson.Json_error msg -> Error (`Msg msg)
