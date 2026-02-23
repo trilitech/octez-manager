@@ -19,3 +19,8 @@ val name : string
 
 (** Register the page in the global page registry *)
 val register : unit -> unit
+
+(** Get all keys from all base directories (default + managed).
+    Returns a list of (key_hash, alias, base_dir) tuples.
+    Performs I/O - should not be called from render functions. *)
+val get_all_keys : unit -> (string * string * string) list
