@@ -5,7 +5,7 @@
 <h1 align="center">Octez Manager</h1>
 
 <p align="center">
-  A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, DAL nodes).
+  A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, DAL nodes, Signatory remote signers).
 </p>
 
 <p align="center">
@@ -27,6 +27,7 @@
 ## Features
 
 - **Install and manage** Octez services as systemd units
+- **Signatory integration** for secure remote signing with HSM/cloud KMS support
 - **Terminal UI** with real-time monitoring and logs
 - **Web interface** for browser-based remote management
 - **RPC Browser** — Interactively explore and query RPC endpoints with syntax highlighting

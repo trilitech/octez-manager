@@ -129,3 +129,5 @@ sudo octez-manager
 
 - [Using the TUI](/guides/tui-guide/)
 - [Setting Up a Node](/guides/node-setup/)
+- [Setting Up a Baker](/guides/baker-setup/)
+- [Signatory Setup Guide](/guides/signatory-setup/) (for secure key management)
