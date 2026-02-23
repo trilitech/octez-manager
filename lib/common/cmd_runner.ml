@@ -308,4 +308,4 @@ let run_as ?(quiet = false) ?on_log ~user argv =
   then run ~quiet ?on_log argv
   else
     let command = cmd_to_string argv in
-    run ~quiet ?on_log ["su"; "-s"; "/bin/sh"; "-c"; command; trimmed]
+    run ~quiet ?on_log ["runuser"; "-s"; "/bin/sh"; "-c"; command; trimmed]
