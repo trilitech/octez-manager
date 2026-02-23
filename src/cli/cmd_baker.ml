@@ -500,6 +500,101 @@ let update_consensus_key_cmd =
         (const update_consensus_key_run
         $ instance_arg $ key_arg $ delegate_opt $ json_flag $ yes_flag))
 
+(* ── baker <instance> vote <value> ───────────────────────── *)
+
+let vote_value_arg =
+  Arg.(required & pos 1 (some string) None & info [] ~docv:"VALUE")
+
+let vote_run instance value delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) -> (
+          (* Fetch voting info to determine the right operation *)
+          match Baker_wallet_data.fetch_voting_info ~node_endpoint:endpoint with
+          | None ->
+              Cli_helpers.cmdliner_error
+                "Unable to fetch voting info (node may be unreachable)"
+          | Some info -> (
+              (* Check if already voted *)
+              let already_voted =
+                List.exists (fun (p, _) -> String.equal p pkh) info.ballots
+              in
+              if already_voted then
+                Cli_helpers.cmdliner_error
+                  "Delegate has already voted in this period"
+              else
+                match info.period_kind with
+                | Baker_wallet_data.Proposal ->
+                    (* value is a protocol hash to upvote *)
+                    run_operation
+                      ~instance
+                      ~svc
+                      ~endpoint
+                      ~pkh
+                      ~op:(Baker_ops.Submit_proposals {proposals = [value]})
+                      ~json
+                      ~yes
+                | Baker_wallet_data.Exploration | Baker_wallet_data.Promotion
+                  -> (
+                    (* value is yay/nay/pass *)
+                    let ballot =
+                      match String.lowercase_ascii value with
+                      | "yay" -> Some Baker_wallet_data.Yay
+                      | "nay" -> Some Baker_wallet_data.Nay
+                      | "pass" -> Some Baker_wallet_data.Pass
+                      | _ -> None
+                    in
+                    match ballot with
+                    | None ->
+                        Cli_helpers.cmdliner_error
+                          (Printf.sprintf
+                             "Invalid ballot '%s' (expected: yay, nay, or pass)"
+                             value)
+                    | Some ballot ->
+                        let proposal =
+                          Option.value
+                            ~default:"(unknown)"
+                            info.current_proposal
+                        in
+                        run_operation
+                          ~instance
+                          ~svc
+                          ~endpoint
+                          ~pkh
+                          ~op:(Baker_ops.Submit_ballot {proposal; ballot})
+                          ~json
+                          ~yes)
+                | Baker_wallet_data.Cooldown | Baker_wallet_data.Adoption ->
+                    if json then (
+                      Printf.printf
+                        {|{"success": false, "error": "No voting action available during %s period"}|}
+                        (Baker_wallet_data.string_of_voting_period_kind
+                           info.period_kind) ;
+                      print_newline () ;
+                      `Ok ())
+                    else
+                      Cli_helpers.cmdliner_error
+                        (Printf.sprintf
+                           "No voting action available during %s period"
+                           (Baker_wallet_data.string_of_voting_period_kind
+                              info.period_kind)))))
+
+let vote_cmd =
+  let info =
+    Cmd.info
+      "vote"
+      ~doc:
+        "Vote on governance (protocol hash during proposal period, \
+         yay/nay/pass during exploration/promotion)"
+  in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const vote_run $ instance_arg $ vote_value_arg $ delegate_opt
+       $ json_flag $ yes_flag))
+
 (* ── Command group ─────────────────────────────────────────── *)
 
 let baker_cmd =
@@ -517,4 +612,5 @@ let baker_cmd =
       transfer_cmd;
       set_delegate_params_cmd;
       update_consensus_key_cmd;
+      vote_cmd;
     ]
