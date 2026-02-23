@@ -184,91 +184,46 @@ let run_wallet_operation ~svc ~pkh ~op =
   let client_bin = octez_client_bin svc in
   let base_dir = baker_base_dir svc in
   let description = Baker_ops.describe_operation op in
-  let fee_ref = ref "~0.001" in
-  (* Step 1: Estimate fee *)
-  Modal_helpers.show_spinner_modal
-    ~title:description
-    ~label:"Estimating fee..."
-    ~work:(fun () ->
-      match
-        Baker_ops.estimate_fee
-          ~instance_name:instance
-          ~octez_client_bin:client_bin
-          ~endpoint
-          ~base_dir
-          ~alias:pkh
-          ~op
-      with
-      | Ok fee ->
-          fee_ref := fee ;
-          Ok ()
-      | Error msg -> Error (`Msg msg))
-    ~on_complete:(fun status ->
-      match status with
-      | `Failed msg ->
-          Modal_helpers.show_error ~title:description msg ;
-          Context.toast_error (description ^ ": fee estimation failed")
-      | `Cancelled -> ()
-      | `Succeeded ->
-          (* Step 2: Confirmation modal *)
-          let summary_items =
-            [
-              ("Operation", description);
-              ("Delegate", truncate_pkh pkh);
-              ("Instance", instance);
-              ("Est. fee", !fee_ref ^ " ꜩ");
-            ]
-          in
-          let summary =
-            let dl =
-              Desc_list.create ~key_width:14 ~items:summary_items ()
-              |> Desc_list.render ~cols:50 ~wrap:false ~focus:false
-            in
-            Box.render ~title:"" ~style:Rounded ~width:54 dl
-          in
-          ignore summary ;
-          Modal_helpers.open_choice_modal
-            ~title:"Confirm Operation"
-            ~items:[`Confirm; `Cancel]
-            ~to_string:(function `Confirm -> "Confirm" | `Cancel -> "Cancel")
-            ~on_select:(function
-              | `Cancel -> ()
-              | `Confirm ->
-                  (* Step 3: Execute operation *)
-                  Modal_helpers.show_spinner_modal
+  (* Show confirmation modal directly — no dry-run fee estimation
+     to avoid blocking the node's RPC worker with a simulation. *)
+  Modal_helpers.open_choice_modal
+    ~title:("Confirm: " ^ description)
+    ~items:[`Confirm; `Cancel]
+    ~to_string:(function
+      | `Confirm ->
+          Printf.sprintf "Confirm  (%s · %s)" (truncate_pkh pkh) instance
+      | `Cancel -> "Cancel")
+    ~on_select:(function
+      | `Cancel -> ()
+      | `Confirm ->
+          Modal_helpers.show_spinner_modal
+            ~title:description
+            ~label:"Submitting operation..."
+            ~work:(fun () ->
+              let result =
+                Baker_ops.execute
+                  ~instance_name:instance
+                  ~octez_client_bin:client_bin
+                  ~endpoint
+                  ~base_dir
+                  ~alias:pkh
+                  ~op
+              in
+              if result.success then Ok ()
+              else
+                Error
+                  (`Msg (Option.value ~default:"Unknown error" result.error)))
+            ~on_complete:(fun exec_status ->
+              match exec_status with
+              | `Succeeded ->
+                  Modal_helpers.show_success
                     ~title:description
-                    ~label:"Submitting operation..."
-                    ~work:(fun () ->
-                      let result =
-                        Baker_ops.execute
-                          ~instance_name:instance
-                          ~octez_client_bin:client_bin
-                          ~endpoint
-                          ~base_dir
-                          ~alias:pkh
-                          ~op
-                      in
-                      if result.success then Ok ()
-                      else
-                        Error
-                          (`Msg
-                             (Option.value
-                                ~default:"Unknown error"
-                                result.error)))
-                    ~on_complete:(fun exec_status ->
-                      match exec_status with
-                      | `Succeeded ->
-                          Modal_helpers.show_success
-                            ~title:description
-                            "Operation submitted successfully" ;
-                          Context.toast_success
-                            (description ^ ": operation submitted")
-                      | `Failed msg ->
-                          Modal_helpers.show_error ~title:description msg ;
-                          Context.toast_error
-                            (description ^ ": operation failed")
-                      | `Cancelled -> ())
-                    ())
+                    "Operation submitted successfully" ;
+                  Context.toast_success (description ^ ": operation submitted")
+              | `Failed msg ->
+                  Modal_helpers.show_error ~title:description msg ;
+                  Context.toast_error (description ^ ": operation failed")
+              | `Cancelled -> ())
             ())
     ()
 
