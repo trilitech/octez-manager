@@ -8,8 +8,33 @@
 (** Parse signatory.yaml configuration to extract authorized keys. *)
 
 open Rresult
+open Installer_types
 
 type key_info = {pkh : string; allows : string list}
+
+(** Convert signatory_operation to string *)
+let operation_to_string = function
+  | Block -> "block"
+  | Attestation -> "attestation"
+  | Preattestation -> "preattestation"
+  | Attestation_with_dal -> "attestation_with_dal"
+  | Generic -> "generic"
+
+(** Convert string to signatory_operation *)
+let operation_of_string = function
+  | "block" -> Some Block
+  | "attestation" -> Some Attestation
+  | "preattestation" -> Some Preattestation
+  | "attestation_with_dal" -> Some Attestation_with_dal
+  | "generic" -> Some Generic
+  | _ -> None
+
+(** All available operations *)
+let all_operations =
+  [Block; Attestation; Preattestation; Attestation_with_dal; Generic]
+
+(** Default permissions for new keys *)
+let default_permissions () = all_operations
 
 (** Get the path to signatory.yaml for an instance.
     Uses Signatory.signatory_config_path to get the correct path. *)

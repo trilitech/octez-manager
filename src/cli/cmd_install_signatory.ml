@@ -10,6 +10,69 @@ open Octez_manager_lib
 open Installer_types
 module S = Service
 
+let ( let* ) = Result.bind
+
+(** Parse a single key specification from format "pkh[:perms]" *)
+let parse_key_spec key_spec =
+  match String.split_on_char ':' (String.trim key_spec) with
+  | [] -> Error "Empty key specification"
+  | [pkh] ->
+      (* No permissions specified, use defaults *)
+      Ok
+        {
+          pkh = String.trim pkh;
+          permissions = Signatory_config.default_permissions ();
+        }
+  | [pkh; perm_str] ->
+      (* Parse comma-separated permissions *)
+      let perm_names =
+        String.split_on_char ',' perm_str
+        |> List.map String.trim
+        |> List.filter (fun s -> s <> "")
+      in
+      let rec parse_perms acc = function
+        | [] -> Ok (List.rev acc)
+        | p :: rest -> (
+            match Signatory_config.operation_of_string p with
+            | Some op -> parse_perms (op :: acc) rest
+            | None ->
+                Error
+                  (Printf.sprintf
+                     "Invalid operation '%s'. Valid operations: block, \
+                      attestation, preattestation, attestation_with_dal, \
+                      generic"
+                     p))
+      in
+      let* perms = parse_perms [] perm_names in
+      Ok {pkh = String.trim pkh; permissions = perms}
+  | _ ->
+      Error
+        (Printf.sprintf
+           "Invalid key format '%s'. Expected 'pkh' or 'pkh:op1,op2,...'"
+           key_spec)
+
+(** Parse authorized keys string into list of authorized_key records *)
+let parse_authorized_keys_string s =
+  let ( let* ) = Result.bind in
+  (* Split by whitespace to support both old comma-separated and new space-separated *)
+  let key_specs =
+    String.split_on_char ' ' s |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+    |> List.concat_map (fun spec ->
+        (* Also split by comma for backward compatibility *)
+        String.split_on_char ',' spec
+        |> List.map String.trim
+        |> List.filter (fun s -> s <> ""))
+  in
+  (* Parse each key spec *)
+  List.fold_left
+    (fun acc spec ->
+      let* keys = acc in
+      let* key = parse_key_spec spec in
+      Ok (keys @ [key]))
+    (Ok [])
+    key_specs
+
 let install_signatory_cmd =
   let instance =
     let doc = "Signatory instance name" in
@@ -32,8 +95,12 @@ let install_signatory_cmd =
   in
   let authorized_keys =
     let doc =
-      "Comma-separated list of authorized Tezos public key hashes (tz1, tz2, \
-       tz3, or tz4)"
+      "Authorized Tezos public key hashes with optional permissions. Format: \
+       'PKH[:OPERATIONS]' where OPERATIONS is a comma-separated list. \
+       Operations: block, attestation, preattestation, attestation_with_dal, \
+       generic. Example: 'tz1abc:block,attestation tz2def:generic'. If no \
+       operations specified, defaults to all operations. Multiple keys \
+       separated by spaces."
     in
     Arg.(
       value
@@ -171,14 +238,16 @@ let install_signatory_cmd =
             if Cli_helpers.is_interactive () then
               Ok
                 (Cli_helpers.prompt_required_string
-                   "Authorized keys (comma-separated tz1/tz2/tz3/tz4 addresses)")
+                   "Authorized keys (space-separated, e.g., \
+                    'tz1abc:block,attestation tz2def')")
             else Error "Authorized keys are required in non-interactive mode"
       in
-      (* Parse authorized keys list *)
-      let authorized_keys =
-        String.split_on_char ',' authorized_keys_str
-        |> List.map String.trim
-        |> List.filter (fun s -> s <> "")
+      (* Parse authorized keys with permissions *)
+      let* authorized_keys =
+        match parse_authorized_keys_string authorized_keys_str with
+        | Ok keys -> Ok keys
+        | Error msg ->
+            Error (Printf.sprintf "Error parsing authorized keys: %s" msg)
       in
       let* () =
         if List.length authorized_keys = 0 then

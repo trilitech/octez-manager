@@ -53,10 +53,10 @@ let validate_authorized_keys keys =
   else
     (* Validate each key *)
     List.fold_left
-      (fun acc key ->
+      (fun acc (key : authorized_key) ->
         let* acc_keys = acc in
-        let* validated = validate_tezos_key key in
-        Ok (validated :: acc_keys))
+        let* validated_pkh = validate_tezos_key key.pkh in
+        Ok ({key with pkh = validated_pkh} :: acc_keys))
       (Ok [])
       keys
     |> Result.map List.rev
@@ -85,26 +85,38 @@ let generate_watermark_section data_dir = function
       (* These are not yet implemented but are in the type system *)
       "watermark:\n  type: memory\n"
 
+(** Generate allow section for a key based on its permissions *)
+let generate_allow_section (permissions : signatory_operation list) =
+  if List.is_empty permissions then "    # No operations allowed\n"
+  else
+    let ops =
+      List.map
+        (fun op ->
+          match op with
+          | Block -> "      block:"
+          | Attestation -> "      attestation:"
+          | Preattestation -> "      preattestation:"
+          | Attestation_with_dal -> "      attestation_with_dal:"
+          | Generic -> "      generic:\n        - transaction")
+        permissions
+      |> String.concat "\n"
+    in
+    Printf.sprintf "    allow:\n%s\n" ops
+
 (** Generate Signatory YAML configuration *)
 let generate_signatory_yaml ~address ~metrics_address ~authorized_keys
     ~keys_path ~data_dir ~watermark =
-  (* Generate tezos section with each key as its own subsection with policies *)
+  (* Generate tezos section with each key and its custom permissions *)
   let tezos_keys_section =
     String.concat
       "\n"
       (List.map
-         (fun key ->
+         (fun (key : authorized_key) ->
+           let allow_section = generate_allow_section key.permissions in
            Printf.sprintf
-             {|  %s:
-    log_payloads: true
-    allow:
-      block:
-      attestation:
-      preattestation:
-      attestation_with_dal:
-      generic:
-        - transaction|}
-             key)
+             "  %s:\n    log_payloads: true\n%s"
+             key.pkh
+             allow_section)
          authorized_keys)
   in
   let watermark_section = generate_watermark_section data_dir watermark in
