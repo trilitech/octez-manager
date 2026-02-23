@@ -72,20 +72,28 @@ let run_out_eio (Mgr mgr) argv =
   Eio.Flow.close stdout_w ;
   Eio.Flow.close stderr_w ;
   let stdout_out = ref "" in
+  let stderr_out = ref "" in
   Eio.Fiber.both
     (fun () ->
       stdout_out :=
         Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stdout_r |> take_all))
     (fun () ->
-      (* Drain stderr silently *)
-      ignore
+      stderr_out :=
         Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stderr_r |> take_all)) ;
   match Eio.Process.await proc with
   | `Exited 0 -> Ok (String.trim !stdout_out)
   | _ ->
-      Error
-        (`Msg
-           (Printf.sprintf "Command failed: %s" (Cmd_runner.cmd_to_string argv)))
+      let combined =
+        String.trim !stdout_out ^ "\n" ^ String.trim !stderr_out |> String.trim
+      in
+      let msg =
+        Printf.sprintf
+          "Command failed: %s\nOutput:\n%s"
+          (Cmd_runner.cmd_to_string argv)
+          combined
+      in
+      Cmd_runner.append_debug_log ("RUN_OUT ERROR: " ^ msg) ;
+      Error (`Msg msg)
 
 (** Run a command via Eio and return stdout, including stderr in error messages. *)
 let run_out_silent_eio (Mgr mgr) argv =
