@@ -16,7 +16,7 @@
   "border": {"fg": 245},
   "border_focused": {"fg": 24, "bold": true},
   "border_dim": {"fg": 250, "dim": true},
-  "selection": {"fg": 16, "bg": 153},
+  "selection": {"fg": 231, "bg": 24, "bold": true},
   "default_border_style": "Rounded",
   "rules": {
     "rpc-pager-header:focus": {
