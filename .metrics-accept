@@ -29,3 +29,9 @@ missing_docs
 
 # Missing .mli files (pre-existing, not introduced by this PR)
 missing_mli
+
+# String fields that are validated/structured (per-key signatory permissions feature)
+# The 'pkh' field represents Tezos public key hashes (tz1/tz2/tz3/tz4) which are
+# validated strings. Creating a newtype wrapper would add unnecessary indirection
+# for this validated string type. See signatory_validation.ml for validation logic.
+unsafe_string_fields
