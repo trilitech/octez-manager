@@ -5,6 +5,7 @@
 _octez-manager() {
   local -a commands
   commands=(
+    'baker:Baker wallet operations'
     'binaries:Manage Octez and Signatory binaries'
     'cleanup-dependencies:Remove stale dependency entries from service configurations. This cleans up references to services that have been removed.'
     'cleanup-orphans:Remove orphan data directories and log files not associated with any registered service. Use --dry-run to preview what would be removed.'
@@ -61,6 +62,12 @@ _octez-manager() {
     'on:Vote for liquidity baking'
     'off:Vote against liquidity baking'
     'pass:Abstain from voting (default)'
+  )
+
+  local -a opts_baker
+  opts_baker=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
   )
 
   local -a opts_binaries
@@ -334,6 +341,10 @@ _octez-manager() {
             _arguments \
               $opts_instance
           fi
+          ;;
+        baker)
+          _arguments \
+            $opts_baker
           ;;
         binaries)
           _arguments \
