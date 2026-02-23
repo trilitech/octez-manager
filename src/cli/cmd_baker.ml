@@ -263,8 +263,14 @@ let yes_flag =
 let resolve_octez_client (svc : Service.t) =
   Filename.concat svc.app_bin_dir "octez-client"
 
+let resolve_baker_base_dir (svc : Service.t) =
+  match Node_env.read ~inst:svc.instance with
+  | Error _ -> None
+  | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
+
 let run_operation ~instance ~svc ~endpoint ~pkh ~op ~json ~yes =
   let client_bin = resolve_octez_client svc in
+  let base_dir = resolve_baker_base_dir svc in
   let description = Baker_ops.describe_operation op in
   let confirmed =
     if yes then true
@@ -284,6 +290,7 @@ let run_operation ~instance ~svc ~endpoint ~pkh ~op ~json ~yes =
         ~instance_name:instance
         ~octez_client_bin:client_bin
         ~endpoint
+        ~base_dir
         ~alias:pkh
         ~op
     in
