@@ -473,8 +473,8 @@ let set_delegate_params_run instance limit_opt edge_opt delegate_opt json yes =
       match resolve_baker_context svc ~delegate_opt with
       | Error msg -> Cli_helpers.cmdliner_error msg
       | Ok (endpoint, pkh) ->
-          let limit = Option.value ~default:0 limit_opt * 1000000 in
-          let edge = Option.value ~default:0 edge_opt * 10000000 in
+          let limit = Option.value ~default:0 limit_opt in
+          let edge = Option.value ~default:0 edge_opt in
           run_operation
             ~instance
             ~svc
