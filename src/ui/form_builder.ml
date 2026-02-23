@@ -623,7 +623,7 @@ struct
           let ok = f.validate model in
           let value_str = f.to_string value in
           let formatted_value =
-            if ok then Ui_fmt.text "%s" (smart_truncate value_space value_str)
+            if ok then smart_truncate value_space value_str
             else
               (* Show value and short error message *)
               let err_msg =
@@ -631,23 +631,22 @@ struct
                 | Some msg -> " ⚠ " ^ truncate err_msg_space msg
                 | None -> " ⚠ invalid"
               in
-              Widgets.themed_warning
-                (truncate value_truncate value_str ^ err_msg)
+              truncate value_truncate value_str ^ err_msg
           in
-          let label = Ui_fmt.text "%s" f.label in
+          let label = f.label in
           (label, formatted_value, ok))
     in
     let all_valid = List.for_all (fun (_, _, ok) -> ok) field_results in
     let rows =
       field_results
       |> List.map (fun (label, value, ok) ->
-          let status = if ok then Ui_fmt.success "✓" else Ui_fmt.error "✗" in
+          let status = if ok then "✓" else "✗" in
           (label, value, status))
     in
     let confirm_row =
-      ( Ui_fmt.text "%s" "Confirm & Install",
-        (if all_valid then Ui_fmt.success "Ready" else Ui_fmt.error "Incomplete"),
-        if all_valid then Ui_fmt.success "✓" else Ui_fmt.error "✗" )
+      ( "Confirm & Install",
+        (if all_valid then "Ready" else "Incomplete"),
+        if all_valid then "✓" else "✗" )
     in
     let all_rows = rows @ [confirm_row] in
     let columns =
@@ -661,8 +660,16 @@ struct
       ]
     in
     let table =
+      let opts =
+        {
+          Table_widget.selection_mode = Row;
+          highlight_header = true;
+          sort = None;
+        }
+      in
       Table_widget.Table.create
         ~cols:size.LTerm_geom.cols
+        ~opts
         ~columns
         ~rows:all_rows
         ()
