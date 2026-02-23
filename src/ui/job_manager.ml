@@ -19,6 +19,7 @@ type job = {
   mutable log : string list;
   mutable phase : string;
   timeout : float option;
+  on_timeout : unit -> unit;
 }
 
 let jobs : job list ref = ref []
@@ -29,6 +30,10 @@ let submit ?(on_complete = fun _ -> ()) ?(timeout = Some 120.0) ~description
     action =
   let id = !next_id in
   incr next_id ;
+  let on_complete_called = Atomic.make false in
+  let call_on_complete status =
+    if not (Atomic.exchange on_complete_called true) then on_complete status
+  in
   let job =
     {
       id;
@@ -39,6 +44,7 @@ let submit ?(on_complete = fun _ -> ()) ?(timeout = Some 120.0) ~description
       log = [];
       phase = "";
       timeout;
+      on_timeout = (fun () -> call_on_complete (Failed "Operation timed out"));
     }
   in
   jobs := job :: !jobs ;
@@ -65,10 +71,10 @@ let submit ?(on_complete = fun _ -> ()) ?(timeout = Some 120.0) ~description
       match result with
       | Ok () ->
           job.status <- Succeeded ;
-          on_complete job.status
+          call_on_complete job.status
       | Error (`Msg e) ->
           job.status <- Failed e ;
-          on_complete job.status)
+          call_on_complete job.status)
 
 let list () = !jobs
 
@@ -91,7 +97,8 @@ let check_stuck_jobs () =
             (Printf.sprintf
                "Job \"%s\" timed out after %.0fs"
                job.description
-               timeout)
+               timeout) ;
+          job.on_timeout ()
       | _ -> ())
     !jobs
 
