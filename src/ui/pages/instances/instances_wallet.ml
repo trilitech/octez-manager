@@ -197,6 +197,262 @@ let tzkt_base_url ~network =
   if String.equal network "mainnet" then "https://tzkt.io"
   else Printf.sprintf "https://%s.tzkt.io" network
 
+(* ── Operation tracking ──────────────────────────────────── *)
+
+type tracking_step =
+  | Submitting
+  | Submitted of {op_hash : string}
+  | Included of {op_hash : string; block_hash : string}
+  | Confirmed of {op_hash : string; block_hash : string}
+  | Finalized of {op_hash : string; block_hash : string}
+  | Failed of string
+
+let rpc_get_json ~endpoint path =
+  let url = Printf.sprintf "%s%s" endpoint path in
+  match Cmd_runner.run_out_silent ["curl"; "-sfL"; "--max-time"; "10"; url] with
+  | Error _ -> None
+  | Ok body -> ( try Some (Yojson.Safe.from_string body) with _ -> None)
+
+(** Poll the chain until the operation is included and finalized.
+    Updates [step_ref] at each stage. Called from a background thread. *)
+let poll_operation ~endpoint ~op_hash (step_ref : tracking_step Atomic.t) =
+  let open Yojson.Safe.Util in
+  (* Poll for inclusion: check operation_hashes every 5s, up to ~120s *)
+  let rec wait_included attempts =
+    if attempts > 24 then
+      Atomic.set step_ref (Failed "Timed out waiting for inclusion")
+    else
+      match
+        rpc_get_json ~endpoint "/chains/main/blocks/head/operation_hashes"
+      with
+      | None ->
+          Eio_unix.sleep 5.0 ;
+          wait_included (attempts + 1)
+      | Some json ->
+          let all_hashes =
+            try
+              json |> to_list
+              |> List.concat_map (fun pass -> pass |> to_list |> filter_string)
+            with _ -> []
+          in
+          if List.exists (String.equal op_hash) all_hashes then (
+            match rpc_get_json ~endpoint "/chains/main/blocks/head/header" with
+            | Some header_json ->
+                let block_hash =
+                  try header_json |> member "hash" |> to_string
+                  with _ -> "unknown"
+                in
+                let inclusion_level =
+                  try header_json |> member "level" |> to_int with _ -> 0
+                in
+                Atomic.set step_ref (Included {op_hash; block_hash}) ;
+                wait_confirmed ~block_hash ~inclusion_level 0
+            | None ->
+                Atomic.set step_ref (Included {op_hash; block_hash = "unknown"}) ;
+                (* Cannot determine level, stop tracking *)
+                ())
+          else (
+            Eio_unix.sleep 5.0 ;
+            wait_included (attempts + 1))
+  and wait_confirmed ~block_hash ~inclusion_level attempts =
+    if attempts > 24 then
+      Atomic.set step_ref (Failed "Timed out waiting for confirmation")
+    else (
+      Eio_unix.sleep 5.0 ;
+      match rpc_get_json ~endpoint "/chains/main/blocks/head/header" with
+      | Some header_json ->
+          let head_level =
+            try header_json |> member "level" |> to_int with _ -> 0
+          in
+          if head_level > inclusion_level then (
+            Atomic.set step_ref (Confirmed {op_hash; block_hash}) ;
+            wait_finalized ~block_hash ~inclusion_level 0)
+          else wait_confirmed ~block_hash ~inclusion_level (attempts + 1)
+      | None -> wait_confirmed ~block_hash ~inclusion_level (attempts + 1))
+  and wait_finalized ~block_hash ~inclusion_level attempts =
+    if attempts > 24 then
+      Atomic.set step_ref (Failed "Timed out waiting for finalization")
+    else (
+      Eio_unix.sleep 5.0 ;
+      match rpc_get_json ~endpoint "/chains/main/blocks/head/header" with
+      | Some header_json ->
+          let head_level =
+            try header_json |> member "level" |> to_int with _ -> 0
+          in
+          if head_level > inclusion_level + 1 then
+            Atomic.set step_ref (Finalized {op_hash; block_hash})
+          else wait_finalized ~block_hash ~inclusion_level (attempts + 1)
+      | None -> wait_finalized ~block_hash ~inclusion_level (attempts + 1))
+  in
+  wait_included 0
+
+let render_tracking_checklist ~step ~network ~cols =
+  let done_sym = Widgets.themed_success "✓"
+  and spin_sym = Context.render_spinner ""
+  and pending_sym = Widgets.themed_muted "○" in
+  let op_hash_opt =
+    match step with
+    | Submitting | Failed _ -> None
+    | Submitted {op_hash}
+    | Included {op_hash; _}
+    | Confirmed {op_hash; _}
+    | Finalized {op_hash; _} ->
+        Some op_hash
+  in
+  let line sym label detail =
+    match detail with
+    | Some d -> Printf.sprintf "  %s %s %s" sym label (Widgets.themed_muted d)
+    | None -> Printf.sprintf "  %s %s" sym label
+  in
+  let lines =
+    match step with
+    | Submitting ->
+        [
+          line spin_sym "Submitting operation..." None;
+          line pending_sym "Included in block" None;
+          line pending_sym "Confirmed +1" None;
+          line pending_sym "Finalized +2" None;
+        ]
+    | Submitted _ ->
+        [
+          line done_sym "Submitted" None;
+          line spin_sym "Waiting for inclusion..." None;
+          line pending_sym "Confirmed +1" None;
+          line pending_sym "Finalized +2" None;
+        ]
+    | Included {block_hash; _} ->
+        let short_block = truncate_pkh block_hash in
+        [
+          line done_sym "Submitted" None;
+          line done_sym "Included in block" (Some short_block);
+          line spin_sym "Waiting for confirmation..." None;
+          line pending_sym "Finalized +2" None;
+        ]
+    | Confirmed {block_hash; _} ->
+        let short_block = truncate_pkh block_hash in
+        [
+          line done_sym "Submitted" None;
+          line done_sym "Included in block" (Some short_block);
+          line done_sym "Confirmed +1" None;
+          line spin_sym "Waiting for finalization..." None;
+        ]
+    | Finalized {block_hash; _} ->
+        let short_block = truncate_pkh block_hash in
+        [
+          line done_sym "Submitted" None;
+          line done_sym "Included in block" (Some short_block);
+          line done_sym "Confirmed +1" None;
+          line done_sym "Finalized +2" None;
+        ]
+    | Failed msg ->
+        [
+          line (Widgets.themed_error "✗") "Failed" (Some msg);
+          line pending_sym "Included in block" None;
+          line pending_sym "Confirmed +1" None;
+          line pending_sym "Finalized +2" None;
+        ]
+  in
+  let hash_lines =
+    match op_hash_opt with
+    | Some hash ->
+        let url = Printf.sprintf "%s/%s" (tzkt_base_url ~network) hash in
+        [
+          ""; Printf.sprintf "  Hash: %s" (Widgets.themed_muted hash); "  " ^ url;
+        ]
+    | None -> []
+  in
+  let hint_line =
+    [
+      "";
+      Printf.sprintf
+        "  %s"
+        (Widgets.themed_muted
+           (match step with
+           | Finalized _ | Failed _ -> "[Esc] close"
+           | _ -> "[Esc] close (tracking continues in background)"));
+    ]
+  in
+  let all_lines = [""] @ lines @ hash_lines @ hint_line @ [""] in
+  let content = String.concat "\n" all_lines in
+  ignore cols ;
+  content
+
+let open_tracking_modal ~title ~network ~step_ref =
+  let close_ref : (unit -> unit) option ref = ref None in
+  let module Tracking_modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      let step = Atomic.get step_ref in
+      let cols = size.LTerm_geom.cols in
+      render_tracking_checklist ~step ~network ~cols
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let key_parsed = Keys.of_string key in
+      (match key_parsed with
+      | Some Keys.Escape -> (
+          Modal_manager.set_consume_next_key () ;
+          match !close_ref with
+          | Some close -> close ()
+          | None -> Modal_manager.close_top `Commit)
+      | _ -> ()) ;
+      ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Modal_manager.ui =
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.6; min = 50; max = 72});
+      dim_background = true;
+    }
+  in
+  close_ref := Some (fun () -> Modal_manager.close_top `Commit) ;
+  Modal_manager.push
+    (module Tracking_modal)
+    ~init:(Tracking_modal.init ())
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun _ _ -> close_ref := None)
+
 let run_wallet_operation ~svc ~pkh ~op =
   let instance = svc.Service.instance in
   let network = svc.Service.network in
@@ -209,7 +465,6 @@ let run_wallet_operation ~svc ~pkh ~op =
   let base_dir = baker_base_dir svc in
   let password_file = baker_password_file svc in
   let description = Baker_ops.describe_operation op in
-  let op_hash_ref = ref None in
   (* Show confirmation modal directly — no dry-run fee estimation
      to avoid blocking the node's RPC worker with a simulation. *)
   Modal_helpers.open_choice_modal
@@ -222,10 +477,12 @@ let run_wallet_operation ~svc ~pkh ~op =
     ~on_select:(function
       | `Cancel -> ()
       | `Confirm ->
-          Modal_helpers.show_spinner_modal
-            ~title:description
-            ~label:"Submitting operation..."
-            ~work:(fun () ->
+          let step_ref = Atomic.make Submitting in
+          open_tracking_modal ~title:description ~network ~step_ref ;
+          Job_manager.submit
+            ~timeout:None
+            ~description
+            (fun ~append_log:_ () ->
               let result =
                 Baker_ops.execute
                   ~instance_name:instance
@@ -237,31 +494,22 @@ let run_wallet_operation ~svc ~pkh ~op =
                   ~op
               in
               if result.success then (
-                op_hash_ref := result.op_hash ;
                 Baker_wallet_data.remove ~pkh ;
-                Ok ())
+                match result.op_hash with
+                | Some op_hash ->
+                    Atomic.set step_ref (Submitted {op_hash}) ;
+                    Context.toast_success (description ^ ": operation submitted") ;
+                    poll_operation ~endpoint ~op_hash step_ref ;
+                    Ok ()
+                | None ->
+                    Atomic.set step_ref (Failed "No operation hash returned") ;
+                    Error (`Msg "No operation hash returned"))
               else
-                Error
-                  (`Msg (Option.value ~default:"Unknown error" result.error)))
-            ~on_complete:(fun exec_status ->
-              match exec_status with
-              | `Succeeded ->
-                  let hash_display =
-                    match !op_hash_ref with
-                    | Some hash ->
-                        let url =
-                          Printf.sprintf "%s/%s" (tzkt_base_url ~network) hash
-                        in
-                        Printf.sprintf "Hash: %s\n\n%s" hash url
-                    | None -> "Operation submitted (no hash returned)"
-                  in
-                  Modal_helpers.show_success ~title:description hash_display ;
-                  Context.toast_success (description ^ ": operation submitted")
-              | `Failed msg ->
-                  Modal_helpers.show_error ~title:description msg ;
-                  Context.toast_error (description ^ ": operation failed")
-              | `Cancelled -> ())
-            ())
+                let msg = Option.value ~default:"Unknown error" result.error in
+                Atomic.set step_ref (Failed msg) ;
+                Context.toast_error (description ^ ": operation failed") ;
+                Error (`Msg msg))
+            ~on_complete:(fun _status -> ()))
     ()
 
 (* ── Dispatch operation ──────────────────────────────────── *)
