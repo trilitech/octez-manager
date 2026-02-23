@@ -13,6 +13,9 @@
     3. Install a baker (sync, references the node)
     4. Install an accuser (sync, references the node)
     5. Verify all four services appear on the instances page
+    6. Create a group and add the node to it
+    7. Verify the group appears in group view
+    8. Remove the node from the group (auto-cleanup)
 
     Includes built-in regression testing and screenshot debugging.
 
@@ -31,6 +34,12 @@ open TCR
 
 (** Repeat a key press [n] times. *)
 let keys_down n = List.init n (fun _ -> Key "Down")
+
+(** Navigate down [n] times using 'j' key (vim-style).
+    The headless driver intercepts "Down" and routes it to [P.move],
+    which is a no-op on the instances page. "j" goes through
+    [handle_key] and properly calls [move_selection]. *)
+let keys_j n = List.init n (fun _ -> Key "j")
 
 (** Open the create menu ('c') and select the nth item (0-indexed).
     Menu order: Node=0, DAL Node=1, Baker=2, Accuser=3, Signatory=4. *)
@@ -201,6 +210,122 @@ let golden_path_script =
                 "accuser-shadownet";
               ]),
           "All four services visible in multi-column layout" );
+    ]
+  (* ── Step 6: Create group and add node ────────────────────── *)
+  @ [
+      Comment "=== Step 6: Create group and add node ===";
+      Comment
+        "Resize to single-column (60x80) for predictable navigation. Use Home \
+         to reset selection to 0, then j keys (not Down, which the headless \
+         driver routes to P.move, a no-op on instances) to reach \
+         node-shadownet (selected=4, skipping separator at index 3).";
+      Resize (60, 80);
+      Key "Home";
+    ]
+  @ keys_j 3
+  @ [
+      Comment "Open action modal for node-shadownet";
+      Key "Enter";
+      WaitFor [ModalActive; MaxIterations 50];
+      Comment
+        "Navigate to 'Add to Group' (index 7 for a node: Browse RPC=0, \
+         Details=1, Edit=2, Start=3, Stop=4, Restart=5, Update Version=6, Add \
+         to Group=7)";
+    ]
+  @ keys_down 7
+  @ [
+      Key "Enter";
+      (* Action modal closes, add-to-group choice modal opens *)
+      WaitFor [ScreenContains "Create New Group"; MaxIterations 100];
+      Comment "Select '+ Create New Group' (first item)";
+      Key "Enter";
+      WaitFor [ScreenContains "New Group Name"; MaxIterations 50];
+      Comment
+        "Type 'prod' to append to initial 'shadownet-' -> 'shadownet-prod'";
+      Type "prod";
+      Key "Enter";
+      (* Submit creates the group and adds the service *)
+      WaitFor [ModalClosed; MaxIterations 100];
+      WaitFor [ScreenContains "Created group"; MaxIterations 200];
+      Screenshot "12_group_created";
+      Assert
+        ( (fun _s ->
+            match
+              Octez_manager_lib.Group_registry.find ~name:"shadownet-prod"
+            with
+            | Ok (Some _) -> true
+            | _ -> false),
+          "Group 'shadownet-prod' exists in registry" );
+      Assert
+        ( (fun _s ->
+            match
+              Octez_manager_lib.Service_registry.find ~instance:"node-shadownet"
+            with
+            | Ok (Some svc) ->
+                Option.equal String.equal svc.group (Some "shadownet-prod")
+            | _ -> false),
+          "node-shadownet belongs to group 'shadownet-prod'" );
+    ]
+  (* ── Step 7: Verify group view ────────────────────────────── *)
+  @ [
+      Comment "=== Step 7: Verify group view ===";
+      Comment "Press 'g' to toggle to By_group view mode";
+      Key "g";
+      Comment
+        "Wait for the group HEADER (not the toast). The toast from Step 6 says \
+         'Created group \\'shadownet-prod\\' and added ...' which contains \
+         'shadownet-prod'. The group header includes the network: \
+         'shadownet-prod (shadownet ...)'. Matching on '(' avoids a false \
+         positive from the toast that would skip the idle_wait refresh.";
+      WaitFor [ScreenContains "shadownet-prod ("; MaxIterations 200];
+      Screenshot "13_group_view";
+      Assert
+        ( (fun s ->
+            try
+              ignore
+                (Str.search_forward (Str.regexp_string "shadownet-prod (") s 0) ;
+              true
+            with Not_found -> false),
+          "Group 'shadownet-prod' header visible in group view" );
+      Comment "Toggle back to By_role view";
+      Key "g";
+    ]
+  (* ── Step 8: Remove node from group ───────────────────────── *)
+  @ [
+      Comment "=== Step 8: Remove node from group ===";
+      Comment
+        "selected=4 preserved through Steps 6-7, By_role mode. Open action \
+         modal for node-shadownet (now has group).";
+      Key "Enter";
+      WaitFor [ModalActive; MaxIterations 50];
+      Comment
+        "Navigate to 'Remove from Group' (index 8 for a node in a group: \
+         Browse RPC=0, Details=1, Edit=2, Start=3, Stop=4, Restart=5, Update \
+         Version=6, Add to Group=7, Remove from Group=8)";
+    ]
+  @ keys_down 8
+  @ [
+      Key "Enter";
+      (* remove_from_group runs directly, no extra modal *)
+      WaitFor [ModalClosed; MaxIterations 100];
+      WaitFor [ScreenContains "Removed"; MaxIterations 200];
+      Screenshot "14_group_removed";
+      Assert
+        ( (fun _s ->
+            match
+              Octez_manager_lib.Service_registry.find ~instance:"node-shadownet"
+            with
+            | Ok (Some svc) -> Option.is_none svc.group
+            | _ -> false),
+          "node-shadownet no longer belongs to any group" );
+      Assert
+        ( (fun _s ->
+            match
+              Octez_manager_lib.Group_registry.find ~name:"shadownet-prod"
+            with
+            | Ok None -> true
+            | _ -> false),
+          "Group 'shadownet-prod' auto-removed (was only member)" );
     ]
 
 (* ============================================================ *)
