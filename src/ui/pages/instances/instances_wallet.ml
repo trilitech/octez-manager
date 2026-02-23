@@ -108,7 +108,7 @@ let render_pending_unstakes (data : Baker_wallet_data.t) =
         "  %s"
         (Widgets.themed_muted ("Pending unstake: " ^ String.concat ", " parts))
 
-let build_operations_list (data : Baker_wallet_data.t) ~_node_endpoint =
+let build_operations_list (data : Baker_wallet_data.t) ~node_endpoint:_ =
   if not data.is_registered then [Register; Transfer]
   else
     let items = [Stake; Unstake] in
@@ -119,7 +119,7 @@ let build_operations_list (data : Baker_wallet_data.t) ~_node_endpoint =
     in
     items @ [Transfer; Set_delegate_params; Update_consensus_key] @ [Vote]
 
-let action_to_string (data : Baker_wallet_data.t) ~_node_endpoint action =
+let action_to_string (data : Baker_wallet_data.t) ~node_endpoint action =
   match action with
   | Register -> "Register as Delegate"
   | Stake -> "Stake"
@@ -141,21 +141,20 @@ let action_to_string (data : Baker_wallet_data.t) ~_node_endpoint action =
   | Set_delegate_params -> "Set Delegate Parameters"
   | Update_consensus_key -> "Update Consensus Key"
   | Vote -> (
-      let vi =
-        Baker_wallet_data.get_voting_info
-          ~node_endpoint:
-            (match
-               Delegate_scheduler.get_baker_node_endpoint
-                 ~instance:"" (* placeholder *)
-             with
-            | Some ep -> ep
-            | None -> "")
-      in
-      match vi with
+      match Baker_wallet_data.get_voting_info ~node_endpoint with
       | Some info ->
-          Printf.sprintf
-            "Vote (%s period)"
-            (Baker_wallet_data.string_of_voting_period_kind info.period_kind)
+          let already_voted =
+            List.exists (fun (p, _) -> String.equal p data.pkh) info.ballots
+          in
+          let period =
+            Baker_wallet_data.string_of_voting_period_kind info.period_kind
+          in
+          if already_voted then
+            Printf.sprintf
+              "Vote (%s period) %s"
+              period
+              (Widgets.themed_muted "(already voted)")
+          else Printf.sprintf "Vote (%s period)" period
       | None -> "Vote")
 
 (* ── Operation execution helpers ──────────────────────────── *)
@@ -263,7 +262,7 @@ let run_wallet_operation ~svc ~pkh ~op =
 
 (* ── Dispatch operation ──────────────────────────────────── *)
 
-let dispatch_action svc pkh _data action =
+let dispatch_action svc pkh _data ~node_endpoint action =
   match action with
   | Register -> run_wallet_operation ~svc ~pkh ~op:Baker_ops.Register
   | Stake ->
@@ -365,8 +364,88 @@ let dispatch_action svc pkh _data action =
             ~pkh
             ~op:(Baker_ops.Update_consensus_key {key}))
         ()
-  | Vote ->
-      Context.toast_info "Voting not yet implemented (requires voting data)"
+  | Vote -> (
+      match Baker_wallet_data.get_voting_info ~node_endpoint with
+      | None ->
+          Context.toast_error
+            "Voting info unavailable — node may be unreachable"
+      | Some info -> (
+          (* Check if delegate already voted *)
+          let already_voted =
+            List.exists (fun (p, _) -> String.equal p pkh) info.ballots
+          in
+          if already_voted then
+            Modal_helpers.show_error
+              ~title:"Vote"
+              "You have already voted in this period."
+          else
+            match info.period_kind with
+            | Baker_wallet_data.Proposal ->
+                (* Proposal period: select a proposal to upvote *)
+                let proposals = info.proposals in
+                if List.length proposals = 0 then
+                  Modal_helpers.show_error
+                    ~title:"Vote"
+                    "No proposals available in this period."
+                else
+                  Modal_helpers.open_choice_modal
+                    ~title:"Vote · Proposal Period"
+                    ~items:proposals
+                    ~to_string:(fun (hash, count) ->
+                      Printf.sprintf
+                        "%s (%d supporter%s)"
+                        (truncate_pkh hash)
+                        count
+                        (if count = 1 then "" else "s"))
+                    ~on_select:(fun (hash, _count) ->
+                      run_wallet_operation
+                        ~svc
+                        ~pkh
+                        ~op:(Baker_ops.Submit_proposals {proposals = [hash]}))
+                    ()
+            | Baker_wallet_data.Exploration | Baker_wallet_data.Promotion ->
+                (* Ballot period: vote yay/nay/pass on current proposal *)
+                let period_name =
+                  Baker_wallet_data.string_of_voting_period_kind
+                    info.period_kind
+                in
+                let proposal =
+                  Option.value ~default:"(unknown)" info.current_proposal
+                in
+                Modal_helpers.open_choice_modal
+                  ~title:
+                    (Printf.sprintf
+                       "Vote · %s%s Period"
+                       (String.make 1 (Char.uppercase_ascii period_name.[0]))
+                       (String.sub
+                          period_name
+                          1
+                          (String.length period_name - 1)))
+                  ~items:
+                    [
+                      Baker_wallet_data.Yay;
+                      Baker_wallet_data.Nay;
+                      Baker_wallet_data.Pass;
+                    ]
+                  ~to_string:(fun ballot ->
+                    String.capitalize_ascii
+                      (Baker_wallet_data.string_of_ballot_vote ballot))
+                  ~on_select:(fun ballot ->
+                    run_wallet_operation
+                      ~svc
+                      ~pkh
+                      ~op:(Baker_ops.Submit_ballot {proposal; ballot}))
+                  ()
+            | Baker_wallet_data.Cooldown | Baker_wallet_data.Adoption ->
+                let period_name =
+                  Baker_wallet_data.string_of_voting_period_kind
+                    info.period_kind
+                in
+                Modal_helpers.show_error
+                  ~title:"Vote"
+                  (Printf.sprintf
+                     "No voting action available during %s period."
+                     period_name)))
 
 (* ── Wallet modal ────────────────────────────────────────── *)
 
@@ -387,7 +466,7 @@ let wallet_modal ~svc =
     | Some data ->
         List.map
           (fun a -> `Action a)
-          (build_operations_list data ~_node_endpoint:node_endpoint)
+          (build_operations_list data ~node_endpoint)
   in
   let render_header () =
     match Baker_wallet_data.get ~pkh:!current_pkh with
@@ -438,8 +517,7 @@ let wallet_modal ~svc =
       | `Action action -> (
           match Baker_wallet_data.get ~pkh:!current_pkh with
           | None -> "..."
-          | Some data ->
-              action_to_string data ~_node_endpoint:node_endpoint action))
+          | Some data -> action_to_string data ~node_endpoint action))
     ~on_tick:(fun () ->
       (* Refresh the header display *)
       ignore (render_header ()))
@@ -449,5 +527,6 @@ let wallet_modal ~svc =
       | `Action action -> (
           match Baker_wallet_data.get ~pkh:!current_pkh with
           | None -> Context.toast_error "No wallet data available"
-          | Some data -> dispatch_action svc !current_pkh data action))
+          | Some data ->
+              dispatch_action svc !current_pkh data ~node_endpoint action))
     ()

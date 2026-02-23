@@ -357,7 +357,43 @@ let fetch_wallet_data ~node_endpoint ~pkh =
                   unstake_requests = unstake_reqs;
                 }))
 
-let fetch_voting_info ~node_endpoint:_ = None
+let fetch_voting_info ~node_endpoint =
+  let block_prefix = "/chains/main/blocks/head" in
+  (* 1. Fetch current voting period *)
+  let period_path = Printf.sprintf "%s/votes/current_period" block_prefix in
+  match rpc_get ~node_endpoint period_path with
+  | None -> None
+  | Some period_json ->
+      (* 2. Fetch proposals list *)
+      let proposals_path = Printf.sprintf "%s/votes/proposals" block_prefix in
+      let proposals_json =
+        match rpc_get ~node_endpoint proposals_path with
+        | Some j -> j
+        | None -> `List []
+      in
+      (* 3. Fetch ballot list *)
+      let ballot_list_path =
+        Printf.sprintf "%s/votes/ballot_list" block_prefix
+      in
+      let ballot_list_json =
+        match rpc_get ~node_endpoint ballot_list_path with
+        | Some j -> j
+        | None -> `List []
+      in
+      (* 4. Fetch current proposal *)
+      let current_proposal_path =
+        Printf.sprintf "%s/votes/current_proposal" block_prefix
+      in
+      let current_proposal_json =
+        match rpc_get ~node_endpoint current_proposal_path with
+        | Some j -> j
+        | None -> `Null
+      in
+      parse_voting_info
+        ~period_json
+        ~proposals_json
+        ~ballot_list_json
+        ~current_proposal_json
 
 (* ── Wallet Data Cache ─────────────────────────────────────── *)
 
