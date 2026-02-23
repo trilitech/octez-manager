@@ -15,6 +15,10 @@ module Widgets = Miaou_widgets_display.Widgets
 module Box = Miaou_widgets_layout.Box_widget
 module Desc_list = Miaou_widgets_display.Description_list
 module Navigation = Miaou.Core.Navigation
+module Select_widget = Miaou_widgets_input.Select_widget
+module Flex = Miaou_widgets_layout.Flex_layout
+module Keys = Miaou.Core.Keys
+module Modal_manager = Miaou.Core.Modal_manager
 
 (* ── Wallet action menu items ────────────────────────────── *)
 
@@ -447,6 +451,50 @@ let dispatch_action svc pkh _data ~node_endpoint action =
                      "No voting action available during %s period."
                      period_name)))
 
+(* ── Wallet header rendering ──────────────────────────────── *)
+
+let render_wallet_header ~pkh ~delegates ~cols =
+  match Baker_wallet_data.get ~pkh with
+  | None ->
+      String.concat
+        "\n"
+        [
+          Printf.sprintf "  Delegate: %s" (Widgets.themed_muted pkh);
+          "";
+          Widgets.themed_error
+            "  Unable to fetch wallet data — node may be unreachable";
+          "";
+        ]
+  | Some data ->
+      let delegate_line =
+        Printf.sprintf
+          "  Delegate: %s%s"
+          data.pkh
+          (if List.length delegates > 1 then
+             "                   " ^ Widgets.themed_muted "[Tab] to switch"
+           else "")
+      in
+      let parts =
+        [
+          delegate_line;
+          "";
+          render_balance_box ~cols data;
+          "";
+          render_status_line data;
+        ]
+        @ (let p = render_staking_params data in
+           if p = "" then [] else [p])
+        @ (let u = render_pending_unstakes data in
+           if u = "" then [] else [u])
+        @ [""]
+      in
+      String.concat "\n" parts
+
+let count_lines s =
+  let n = ref 1 in
+  String.iter (fun c -> if c = '\n' then incr n) s ;
+  !n
+
 (* ── Wallet modal ────────────────────────────────────────── *)
 
 let wallet_modal ~svc =
@@ -458,75 +506,156 @@ let wallet_modal ~svc =
     | None -> ""
   in
   let initial_pkh = match delegates with first :: _ -> first | [] -> "" in
-  let current_pkh = ref initial_pkh in
-  (* Build the modal content dynamically using open_choice_modal with on_tick *)
-  let get_items () =
-    match Baker_wallet_data.get ~pkh:!current_pkh with
-    | None -> [`Error_state]
-    | Some data ->
-        List.map
-          (fun a -> `Action a)
-          (build_operations_list data ~node_endpoint)
-  in
-  let render_header () =
-    match Baker_wallet_data.get ~pkh:!current_pkh with
+  let build_select pkh :
+      [`Error_state | `Action of wallet_action] Select_widget.t =
+    match Baker_wallet_data.get ~pkh with
     | None ->
-        String.concat
-          "\n"
-          [
-            Printf.sprintf "  Delegate: %s" (Widgets.themed_muted !current_pkh);
-            "";
-            Widgets.themed_error
-              "  Unable to fetch wallet data — node may be unreachable";
-            "";
-          ]
+        Select_widget.open_centered
+          ~title:""
+          ~items:
+            ([`Error_state] : [`Error_state | `Action of wallet_action] list)
+          ~to_string:(function
+            | `Error_state -> Widgets.themed_error "Unable to fetch wallet data"
+            | `Action _ -> "...")
+          ()
     | Some data ->
-        let delegate_line =
-          Printf.sprintf
-            "  Delegate: %s%s"
-            data.pkh
-            (if List.length delegates > 1 then
-               "                   " ^ Widgets.themed_muted "[Tab] to switch"
-             else "")
-        in
-        let parts =
-          [
-            delegate_line;
-            "";
-            render_balance_box ~cols:60 data;
-            "";
-            render_status_line data;
-          ]
-          @ (let p = render_staking_params data in
-             if p = "" then [] else [p])
-          @ (let u = render_pending_unstakes data in
-             if u = "" then [] else [u])
-          @ [""]
-        in
-        String.concat "\n" parts
+        let actions = build_operations_list data ~node_endpoint in
+        Select_widget.open_centered
+          ~title:""
+          ~items:(List.map (fun a -> `Action a) actions)
+          ~to_string:(function
+            | `Error_state -> Widgets.themed_error "Unable to fetch wallet data"
+            | `Action action -> action_to_string data ~node_endpoint action)
+          ()
   in
-  (* Use a choice modal for the operations list *)
-  let items = get_items () in
   let title = Printf.sprintf "Wallet · %s" instance in
-  Modal_helpers.open_choice_modal
-    ~title
-    ~items
-    ~to_string:(fun item ->
-      match item with
-      | `Error_state -> Widgets.themed_error "Unable to fetch wallet data"
-      | `Action action -> (
-          match Baker_wallet_data.get ~pkh:!current_pkh with
-          | None -> "..."
-          | Some data -> action_to_string data ~node_endpoint action))
-    ~on_tick:(fun () ->
-      (* Refresh the header display *)
-      ignore (render_header ()))
-    ~on_select:(fun item ->
-      match item with
-      | `Error_state -> ()
-      | `Action action -> (
-          match Baker_wallet_data.get ~pkh:!current_pkh with
-          | None -> Context.toast_error "No wallet data available"
-          | Some data ->
-              dispatch_action svc !current_pkh data ~node_endpoint action))
-    ()
+  let module Wallet_modal = struct
+    type state = {
+      current_pkh : string;
+      select : [`Error_state | `Action of wallet_action] Select_widget.t;
+    }
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      Navigation.make
+        {current_pkh = initial_pkh; select = build_select initial_pkh}
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      let s = ps.Navigation.s in
+      let modal_cols = size.LTerm_geom.cols in
+      let header =
+        render_wallet_header ~pkh:s.current_pkh ~delegates ~cols:modal_cols
+      in
+      let header_rows = count_lines header in
+      let layout =
+        Flex.create
+          ~direction:Flex.Column
+          [
+            {
+              render = (fun ~size:_ -> header);
+              basis = Flex.Px header_rows;
+              cross = None;
+            };
+            {
+              render =
+                (fun ~size ->
+                  Select_widget.render_with_size s.select ~focus ~size);
+              basis = Flex.Fill;
+              cross = None;
+            };
+          ]
+      in
+      Flex.render layout ~size
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ =
+      (* Rebuild select widget to pick up cache changes *)
+      let s = ps.Navigation.s in
+      Navigation.update
+        (fun s -> {s with select = build_select s.current_pkh})
+        {ps with s}
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size =
+      let s = ps.Navigation.s in
+      let key_parsed = Keys.of_string key in
+      match key_parsed with
+      | Some Keys.Enter -> (
+          match Select_widget.get_selection s.select with
+          | Some (`Action action) -> (
+              match Baker_wallet_data.get ~pkh:s.current_pkh with
+              | None ->
+                  Context.toast_error "No wallet data available" ;
+                  ps
+              | Some data ->
+                  Modal_manager.set_consume_next_key () ;
+                  Modal_manager.close_top `Commit ;
+                  dispatch_action svc s.current_pkh data ~node_endpoint action ;
+                  ps)
+          | Some `Error_state | None -> ps)
+      | Some Keys.Escape ->
+          Modal_manager.set_consume_next_key () ;
+          Modal_manager.close_top `Cancel ;
+          ps
+      | Some Keys.Tab ->
+          (* Cycle to next delegate *)
+          let rec next = function
+            | [] -> initial_pkh
+            | [_] -> initial_pkh
+            | x :: y :: _ when String.equal x s.current_pkh -> y
+            | _ :: rest -> next rest
+          in
+          let new_pkh = next delegates in
+          Navigation.update
+            (fun _ -> {current_pkh = new_pkh; select = build_select new_pkh})
+            ps
+      | _ ->
+          Navigation.update
+            (fun s ->
+              {
+                s with
+                select = Select_widget.handle_key_with_size s.select ~key ~size;
+              })
+            ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Modal_manager.ui =
+    {title; left = None; max_width = Some (Fixed 68); dim_background = true}
+  in
+  Modal_manager.push
+    (module Wallet_modal)
+    ~init:(Wallet_modal.init ())
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun _ _ -> ())
