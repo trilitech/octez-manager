@@ -24,7 +24,7 @@ echo "✓ Test binary available"
 # Set CI environment variable (test requires it as safety check)
 export CI=true
 
-# Run the golden path test (new declarative version)
+# Run the golden path test (new declarative version — steps 1-8)
 echo ""
 echo "=== Running Golden Path Test Binary (V2 - Declarative) ==="
 /usr/local/bin/test_golden_path_tui_v2 -v
