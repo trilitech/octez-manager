@@ -225,7 +225,14 @@ let view_details ~box_width svc =
           else dal_config
         in
         let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-        let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+        let env_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+        let svc_args = String.concat " " svc.Service.extra_args in
+        let extra_args =
+          match (env_args, svc_args) with
+          | "", "" -> ""
+          | a, "" | "", a -> a
+          | a, b -> a ^ " " ^ b
+        in
         let logging = Logging_mode.to_string svc.Service.logging_mode in
         let node_depends =
           match svc.Service.depends_on with Some inst -> inst | None -> ""
@@ -259,7 +266,14 @@ let view_details ~box_width svc =
     | "accuser" ->
         let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
         let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
-        let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+        let env_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+        let svc_args = String.concat " " svc.Service.extra_args in
+        let extra_args =
+          match (env_args, svc_args) with
+          | "", "" -> ""
+          | a, "" | "", a -> a
+          | a, b -> a ^ " " ^ b
+        in
         let depends_on =
           match svc.Service.depends_on with
           | Some inst -> inst
@@ -283,7 +297,14 @@ let view_details ~box_width svc =
         let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
         let dal_rpc = lookup "OCTEZ_DAL_RPC_ADDR" in
         let dal_net = lookup "OCTEZ_DAL_NET_ADDR" in
-        let extra_args = lookup "OCTEZ_SERVICE_ARGS" in
+        let env_args = lookup "OCTEZ_SERVICE_ARGS" in
+        let svc_args = String.concat " " svc.Service.extra_args in
+        let extra_args =
+          match (env_args, svc_args) with
+          | "", "" -> ""
+          | a, "" | "", a -> a
+          | a, b -> a ^ " " ^ b
+        in
         let depends_on =
           match svc.Service.depends_on with
           | Some inst -> inst
