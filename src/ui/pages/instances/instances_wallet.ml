@@ -595,8 +595,8 @@ let dispatch_action svc pkh _data ~node_endpoint action =
               | Some n when n >= 0 && n <= 100 -> Ok ()
               | _ -> Error "Enter an integer from 0 to 100")
             ~on_submit:(fun edge_s ->
-              let limit = int_of_string limit_s * 1000000 in
-              let edge = int_of_string edge_s * 10000000 in
+              let limit = int_of_string limit_s in
+              let edge = int_of_string edge_s in
               run_wallet_operation
                 ~svc
                 ~pkh
