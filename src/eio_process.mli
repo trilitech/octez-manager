@@ -23,8 +23,8 @@ val get_process_mgr : unit -> any_proc_mgr option
 (** Initialize Eio-based process execution.
 
     Registers Eio implementations for [Cmd_runner.run],
-    [Cmd_runner.run_out], [Cmd_runner.run_out_silent],
-    [Cmd_runner.run_streaming], and
+    [Cmd_runner.run_out], [Cmd_runner.run_out_with_timeout],
+    [Cmd_runner.run_out_silent], [Cmd_runner.run_streaming], and
     [Download.download_file_with_progress].
 
     Must be called from within an Eio fiber context (i.e., inside

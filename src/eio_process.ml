@@ -95,6 +95,66 @@ let run_out_eio (Mgr mgr) argv =
       Cmd_runner.append_debug_log ("RUN_OUT ERROR: " ^ msg) ;
       Error (`Msg msg)
 
+(** Run a command via Eio and return its stdout, killing the process
+    after [timeout] seconds if it hasn't exited.  A watchdog OS thread
+    sends SIGTERM to unblock the Eio fiber reading from the pipes. *)
+let run_out_with_timeout_eio (Mgr mgr) ~timeout argv =
+  Eio.Switch.run @@ fun sw ->
+  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+  let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
+  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  Eio.Flow.close stdout_w ;
+  Eio.Flow.close stderr_w ;
+  (* State: 0 = running, 1 = completed, 2 = timed out.
+     compare_and_set ensures exactly one side claims the outcome. *)
+  let state = Atomic.make 0 in
+  let pid = Eio.Process.pid proc in
+  let _watchdog =
+    Thread.create
+      (fun () ->
+        Thread.delay timeout ;
+        if Atomic.compare_and_set state 0 2 then
+          (* Use Unix.kill — works from any OS thread, unlike
+             Eio.Process.signal which requires an Eio fiber context. *)
+          try Unix.kill pid Sys.sigterm with Unix.Unix_error _ -> ())
+      ()
+  in
+  let stdout_out = ref "" in
+  let stderr_out = ref "" in
+  Eio.Fiber.both
+    (fun () ->
+      stdout_out :=
+        Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stdout_r |> take_all))
+    (fun () ->
+      stderr_out :=
+        Eio.Buf_read.(of_flow ~max_size:(10 * 1024 * 1024) stderr_r |> take_all)) ;
+  if not (Atomic.compare_and_set state 0 1) then (
+    (* Watchdog already claimed state 2 — this is a timeout *)
+    let msg =
+      Printf.sprintf
+        "Command timed out after %.0fs: %s"
+        timeout
+        (Cmd_runner.cmd_to_string argv)
+    in
+    Cmd_runner.append_debug_log ("RUN_OUT TIMEOUT: " ^ msg) ;
+    Error (`Msg msg))
+  else
+    match Eio.Process.await proc with
+    | `Exited 0 -> Ok (String.trim !stdout_out)
+    | _ ->
+        let combined =
+          String.trim !stdout_out ^ "\n" ^ String.trim !stderr_out
+          |> String.trim
+        in
+        let msg =
+          Printf.sprintf
+            "Command failed: %s\nOutput:\n%s"
+            (Cmd_runner.cmd_to_string argv)
+            combined
+        in
+        Cmd_runner.append_debug_log ("RUN_OUT ERROR: " ^ msg) ;
+        Error (`Msg msg)
+
 (** Run a command via Eio and return stdout, including stderr in error messages. *)
 let run_out_silent_eio (Mgr mgr) argv =
   Eio.Switch.run @@ fun sw ->
@@ -267,6 +327,7 @@ let init proc_mgr =
   Atomic.set process_mgr_ref (Some mgr) ;
   Cmd_runner.set_run_hook (run_eio mgr) ;
   Cmd_runner.set_run_out_hook (run_out_eio mgr) ;
+  Cmd_runner.set_run_out_with_timeout_hook (run_out_with_timeout_eio mgr) ;
   Cmd_runner.set_run_out_silent_hook (run_out_silent_eio mgr) ;
   Cmd_runner.set_run_streaming_hook (run_streaming_eio mgr) ;
   Download.set_download_with_progress_hook (download_file_with_progress_eio mgr) ;
