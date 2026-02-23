@@ -98,7 +98,7 @@ run_tests() {
 	elif [ "$mode" == "all" ] || [ -z "$mode" ]; then
 		# All mode: run all tests (for local dev)
 		log "Running all test categories"
-		for category in node dal baker accuser import binaries headless signatory; do
+		for category in node dal baker accuser import binaries group headless signatory; do
 			if [ -d "$TESTS_DIR/$category" ]; then
 				for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
 					tests+=("$test")
