@@ -555,6 +555,13 @@ let delegates_field =
           | Ok keys -> List.map (fun k -> k.Keys_reader.value) keys
           | Error _ -> []
       in
+      (* Build alias lookup map for displaying keys with aliases *)
+      let alias_map =
+        let all_keys = Keys_page.get_all_keys () in
+        List.fold_left
+          (fun acc (hash, alias, _base_dir) -> (hash, alias) :: acc)
+          [] all_keys
+      in
       (* Build modal items based on signatory selection *)
       let build_items () =
         let current = !model_ref.delegates in
@@ -591,7 +598,13 @@ let delegates_field =
             let current = !model_ref.delegates in
             let checked = List.mem item current in
             let checkbox = if checked then "[x]" else "[ ]" in
-            Printf.sprintf "%s %s" checkbox item
+            (* Display as "alias (hash)" if alias exists, otherwise just hash *)
+            let display_text =
+              match List.assoc_opt item alias_map with
+              | Some alias -> Printf.sprintf "%s (%s)" alias item
+              | None -> item
+            in
+            Printf.sprintf "%s %s" checkbox display_text
         | `Add -> "Add key (manual)"
         | `Clear -> "Clear all"
       in
