@@ -224,6 +224,12 @@ let open_permissions_modal ~pkh ~initial_permissions ~on_submit () =
     perm_items @ [`Done]
   in
 
+  (* Extract stable key from item for cursor tracking *)
+  let item_key = function
+    | `Permission (op, _) -> `Op op
+    | `Done -> `DoneButton
+  in
+
   let to_string = function
     | `Permission (op, is_selected) ->
         let checkbox = if is_selected then "[✓] " else "[ ] " in
@@ -249,7 +255,7 @@ let open_permissions_modal ~pkh ~initial_permissions ~on_submit () =
         `Close
   in
 
-  (* Open multiselect modal with Done button *)
+  (* Open multiselect modal with cursor preservation *)
   Modal_helpers.open_multiselect_modal
     ~title:
       (Printf.sprintf
@@ -257,7 +263,9 @@ let open_permissions_modal ~pkh ~initial_permissions ~on_submit () =
          (if String.length pkh > 40 then String.sub pkh 0 37 ^ "..." else pkh))
     ~items
     ~to_string
+    ~item_key
     ~on_select
+    ()
 
 (** Authorized keys list editor *)
 let authorized_keys_field =
