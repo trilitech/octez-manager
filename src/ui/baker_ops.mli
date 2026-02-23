@@ -46,6 +46,7 @@ type operation_result = {
 val build_command :
   octez_client_bin:string ->
   endpoint:string ->
+  base_dir:string option ->
   alias:string ->
   op:wallet_operation ->
   string list
@@ -64,6 +65,7 @@ val execute :
   instance_name:string ->
   octez_client_bin:string ->
   endpoint:string ->
+  base_dir:string option ->
   alias:string ->
   op:wallet_operation ->
   operation_result
@@ -79,6 +81,7 @@ val estimate_fee :
   instance_name:string ->
   octez_client_bin:string ->
   endpoint:string ->
+  base_dir:string option ->
   alias:string ->
   op:wallet_operation ->
   (string, string) result

@@ -55,8 +55,12 @@ let with_instance_lock instance_name f =
 
 (* ── Command Building ──────────────────────────────────────── *)
 
-let build_command ~octez_client_bin ~endpoint ~alias ~op =
-  let base = [octez_client_bin; "--endpoint"; endpoint] in
+let build_command ~octez_client_bin ~endpoint ~base_dir ~alias ~op =
+  let base =
+    [octez_client_bin]
+    @ (match base_dir with Some d -> ["--base-dir"; d] | None -> [])
+    @ ["--endpoint"; endpoint]
+  in
   let cmd =
     match op with
     | Register -> ["register"; "key"; alias; "as"; "delegate"]
@@ -157,9 +161,11 @@ let extract_fee_estimate output =
 
 (* ── Execution ─────────────────────────────────────────────── *)
 
-let execute ~instance_name ~octez_client_bin ~endpoint ~alias ~op =
+let execute ~instance_name ~octez_client_bin ~endpoint ~base_dir ~alias ~op =
   with_instance_lock instance_name (fun () ->
-      let argv = build_command ~octez_client_bin ~endpoint ~alias ~op in
+      let argv =
+        build_command ~octez_client_bin ~endpoint ~base_dir ~alias ~op
+      in
       match Cmd_runner.run_out argv with
       | Ok output -> (
           match extract_op_hash output with
@@ -172,10 +178,12 @@ let execute ~instance_name ~octez_client_bin ~endpoint ~alias ~op =
               })
       | Error (`Msg err) -> {success = false; op_hash = None; error = Some err})
 
-let estimate_fee ~instance_name ~octez_client_bin ~endpoint ~alias ~op =
+let estimate_fee ~instance_name ~octez_client_bin ~endpoint ~base_dir ~alias ~op
+    =
   with_instance_lock instance_name (fun () ->
       let argv =
-        build_command ~octez_client_bin ~endpoint ~alias ~op @ ["--dry-run"]
+        build_command ~octez_client_bin ~endpoint ~base_dir ~alias ~op
+        @ ["--dry-run"]
       in
       match Cmd_runner.run_out argv with
       | Ok output -> (
@@ -188,17 +196,13 @@ let estimate_fee ~instance_name ~octez_client_bin ~endpoint ~alias ~op =
 
 let describe_operation = function
   | Register -> "Register as Delegate"
-  | Stake {amount} ->
-      Printf.sprintf "Stake %s ꜩ" (Baker_wallet_data.format_tez amount)
+  | Stake {amount} -> Printf.sprintf "Stake %s ꜩ" amount
   | Unstake {amount} ->
       if String.equal amount "everything" then "Unstake everything"
-      else Printf.sprintf "Unstake %s" (Baker_wallet_data.format_tez amount)
+      else Printf.sprintf "Unstake %s ꜩ" amount
   | Finalize_unstake -> "Finalize Unstake"
   | Transfer {amount; destination} ->
-      Printf.sprintf
-        "Transfer %s to %s"
-        (Baker_wallet_data.format_tez amount)
-        destination
+      Printf.sprintf "Transfer %s ꜩ to %s" amount destination
   | Set_delegate_params {limit; edge} ->
       Printf.sprintf
         "Set Delegate Parameters (limit: %s, edge: %s)"

@@ -24,7 +24,12 @@ let alias = "baker1"
 
 let test_build_register () =
   let cmd =
-    BO.build_command ~octez_client_bin:bin ~endpoint ~alias ~op:Register
+    BO.build_command
+      ~octez_client_bin:bin
+      ~endpoint
+      ~base_dir:None
+      ~alias
+      ~op:Register
   in
   check
     (list string)
@@ -37,6 +42,7 @@ let test_build_stake () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Stake {amount = "1000"})
   in
@@ -51,6 +57,7 @@ let test_build_unstake () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Unstake {amount = "500"})
   in
@@ -62,7 +69,12 @@ let test_build_unstake () =
 
 let test_build_finalize_unstake () =
   let cmd =
-    BO.build_command ~octez_client_bin:bin ~endpoint ~alias ~op:Finalize_unstake
+    BO.build_command
+      ~octez_client_bin:bin
+      ~endpoint
+      ~base_dir:None
+      ~alias
+      ~op:Finalize_unstake
   in
   check
     (list string)
@@ -75,6 +87,7 @@ let test_build_transfer () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Transfer {amount = "100"; destination = "tz1dest"})
   in
@@ -99,6 +112,7 @@ let test_build_set_delegate_params () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Set_delegate_params {limit = 5000000; edge = 100000000})
   in
@@ -126,6 +140,7 @@ let test_build_update_consensus_key () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Update_consensus_key {key = "edpkNew..."})
   in
@@ -151,6 +166,7 @@ let test_build_submit_proposals () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Submit_proposals {proposals = ["PtProto1"; "PtProto2"]})
   in
@@ -175,6 +191,7 @@ let test_build_submit_ballot () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Submit_ballot {proposal = "PtProto1"; ballot = BWD.Yay})
   in
@@ -199,11 +216,38 @@ let test_build_submit_ballot_nay () =
     BO.build_command
       ~octez_client_bin:bin
       ~endpoint
+      ~base_dir:None
       ~alias
       ~op:(Submit_ballot {proposal = "PtProto1"; ballot = BWD.Nay})
   in
   let last = List.rev cmd |> List.hd in
   check string "nay ballot" "nay" last
+
+let test_build_with_base_dir () =
+  let cmd =
+    BO.build_command
+      ~octez_client_bin:bin
+      ~endpoint
+      ~base_dir:(Some "/home/tezos/.tezos-client")
+      ~alias
+      ~op:Register
+  in
+  check
+    (list string)
+    "register with base_dir"
+    [
+      bin;
+      "--base-dir";
+      "/home/tezos/.tezos-client";
+      "--endpoint";
+      endpoint;
+      "register";
+      "key";
+      alias;
+      "as";
+      "delegate";
+    ]
+    cmd
 
 (* ── describe_operation ──────────────────────────────────── *)
 
@@ -277,6 +321,7 @@ let () =
           test_case "submit_proposals" `Quick test_build_submit_proposals;
           test_case "submit_ballot yay" `Quick test_build_submit_ballot;
           test_case "submit_ballot nay" `Quick test_build_submit_ballot_nay;
+          test_case "with base_dir" `Quick test_build_with_base_dir;
         ] );
       ( "describe_operation",
         [

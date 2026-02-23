@@ -169,6 +169,11 @@ let octez_client_bin (svc : Service.t) =
 (** Shared helper for all wallet operations.
     Flow: spinner (estimate fee) → confirmation modal → spinner (execute) → result.
     Reused by register, stake, unstake, transfer, etc. *)
+let baker_base_dir (svc : Service.t) =
+  match Node_env.read ~inst:svc.instance with
+  | Error _ -> None
+  | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
+
 let run_wallet_operation ~svc ~pkh ~op =
   let instance = svc.Service.instance in
   let endpoint =
@@ -177,6 +182,7 @@ let run_wallet_operation ~svc ~pkh ~op =
     | None -> ""
   in
   let client_bin = octez_client_bin svc in
+  let base_dir = baker_base_dir svc in
   let description = Baker_ops.describe_operation op in
   let fee_ref = ref "~0.001" in
   (* Step 1: Estimate fee *)
@@ -189,6 +195,7 @@ let run_wallet_operation ~svc ~pkh ~op =
           ~instance_name:instance
           ~octez_client_bin:client_bin
           ~endpoint
+          ~base_dir
           ~alias:pkh
           ~op
       with
@@ -237,6 +244,7 @@ let run_wallet_operation ~svc ~pkh ~op =
                           ~instance_name:instance
                           ~octez_client_bin:client_bin
                           ~endpoint
+                          ~base_dir
                           ~alias:pkh
                           ~op
                       in
