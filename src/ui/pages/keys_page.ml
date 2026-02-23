@@ -47,6 +47,12 @@ let load_keys_from_dir base_dir =
       if Sys.file_exists base_dir then {base_dir; keys = []; error = Some msg}
       else {base_dir; keys = []; error = None}
 
+(** Remove trailing slash from path for normalization *)
+let normalize_path path =
+  let len = String.length path in
+  if len > 1 && String.get path (len - 1) = '/' then String.sub path 0 (len - 1)
+  else path
+
 (** Get all base directories to scan for keys *)
 let get_all_base_dirs () =
   let default_dir = default_client_base_dir () in
@@ -58,8 +64,11 @@ let get_all_base_dirs () =
           entries
     | Error _ -> []
   in
-  (* Put default first, then managed dirs *)
-  default_dir :: managed_dirs
+  (* Put default first, then managed dirs. Deduplicate in case default is also registered. *)
+  (* Normalize paths to handle trailing slash differences *)
+  let all_dirs = default_dir :: managed_dirs in
+  let normalized = List.map normalize_path all_dirs in
+  List.sort_uniq String.compare normalized |> List.sort String.compare
 
 (** Get all keys from all base directories.
     Returns (key_hash, alias, base_dir) tuples. *)
@@ -279,6 +288,13 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
       [{key = "Esc"; help = "Back"}; {key = "?"; help = "Help"}]
 
   let has_modal = has_modal
+end
+
+(** Expose internals for testing *)
+module Internal_for_tests = struct
+  let default_client_base_dir = default_client_base_dir
+
+  let get_all_base_dirs = get_all_base_dirs
 end
 
 (** Register the page in the global registry *)
