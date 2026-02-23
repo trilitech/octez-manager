@@ -299,8 +299,8 @@ struct
       else Widgets.themed_success "● USER"
     in
     let hint =
-      "Hint: c create · b binaries · d diagnostics · t topology · r rpc · ? \
-       help"
+      "Hint: c create · b binaries · K keys · d diagnostics · t topology · r \
+       rpc · ? help"
     in
     [
       Printf.sprintf
