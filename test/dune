@@ -959,3 +959,17 @@
  (modules test_signatory_downloader)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_baker_wallet_data)
+ (libraries alcotest octez-manager.ui yojson unix)
+ (modules test_baker_wallet_data)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_baker_ops)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_baker_ops)
+ (instrumentation
+  (backend bisect_ppx)))
