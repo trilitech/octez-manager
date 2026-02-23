@@ -44,8 +44,14 @@ let test_invalid_public_key_hashes () =
 let test_valid_authorized_keys () =
   let keys =
     [
-      "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb";
-      "tz2TSvNTh2epDMhZHrw73nV9piBX7kLZ9K9m";
+      {
+        Installer_types.pkh = "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb";
+        permissions = Signatory_config.all_operations;
+      };
+      {
+        Installer_types.pkh = "tz2TSvNTh2epDMhZHrw73nV9piBX7kLZ9K9m";
+        permissions = Signatory_config.all_operations;
+      };
     ]
   in
   match Signatory_validation.validate_authorized_keys keys with
@@ -63,7 +69,15 @@ let test_empty_authorized_keys () =
         msg
 
 let test_authorized_keys_with_invalid () =
-  let keys = ["tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb"; "invalid_key"] in
+  let keys =
+    [
+      {
+        Installer_types.pkh = "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb";
+        permissions = Signatory_config.all_operations;
+      };
+      {Installer_types.pkh = "invalid_key"; permissions = []};
+    ]
+  in
   match Signatory_validation.validate_authorized_keys keys with
   | Ok () -> Alcotest.fail "Expected error for invalid key in list"
   | Error (`Msg _) -> ()
@@ -202,7 +216,13 @@ let test_valid_request () =
     {
       instance = "test-signatory";
       backend = Installer_types.File "/keys";
-      authorized_keys = ["tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb"];
+      authorized_keys =
+        [
+          {
+            pkh = "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb";
+            permissions = Signatory_config.all_operations;
+          };
+        ];
       address = "127.0.0.1:6732";
       metrics_address = "";
       (* Metrics are optional *)

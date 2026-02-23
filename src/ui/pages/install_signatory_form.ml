@@ -42,7 +42,7 @@ type model = {
   core : Form_builder_common.core_service_config;
   (* Signatory-specific fields *)
   backend : signatory_backend;
-  authorized_keys : string list;
+  authorized_keys : authorized_key list; (* Changed to authorized_key list *)
   address : string;
   metrics_address : string;
   watermark : watermark_backend;
@@ -96,14 +96,23 @@ let make_initial_model () =
         in
         File dir
       in
-      (* Parse authorized keys (comma-separated) *)
-      let authorized_keys_str = lookup "SIGNATORY_AUTHORIZED_KEYS" in
+      (* Parse authorized keys from signatory.yaml *)
       let authorized_keys =
-        if authorized_keys_str = "" then []
-        else
-          String.split_on_char ',' authorized_keys_str
-          |> List.map String.trim
-          |> List.filter (fun s -> s <> "")
+        match
+          Signatory_config.get_authorized_keys ~instance:svc.Service.instance
+        with
+        | Ok key_infos ->
+            (* Convert key_info list to authorized_key list *)
+            List.map
+              (fun (key_info : Signatory_config.key_info) ->
+                let permissions =
+                  List.filter_map
+                    Signatory_config.operation_of_string
+                    key_info.allows
+                in
+                {pkh = key_info.pkh; permissions})
+              key_infos
+        | Error _ -> []
       in
       let address = lookup "SIGNATORY_ADDRESS" in
       let metrics_address = lookup "SIGNATORY_METRICS_ADDRESS" in
@@ -212,8 +221,9 @@ let authorized_keys_field =
       else None)
     ~edit:(fun model_ref ->
       let to_string = function
-        | `Key (_, key) ->
-            if String.length key > 40 then String.sub key 0 37 ^ "..." else key
+        | `Key (_, (key : authorized_key)) ->
+            let pkh = key.pkh in
+            if String.length pkh > 40 then String.sub pkh 0 37 ^ "..." else pkh
         | `Add -> "+ Add new key"
       in
       let rec open_menu () =
@@ -261,17 +271,29 @@ let authorized_keys_field =
                         if not (validate_tezos_key key) then (
                           Context.toast_error "Invalid Tezos key format" ;
                           open_menu ())
-                        else if List.mem key !model_ref.authorized_keys then (
+                        else if
+                          List.exists
+                            (fun (k : authorized_key) -> k.pkh = key)
+                            !model_ref.authorized_keys
+                        then (
                           Context.toast_error "Key already exists" ;
                           open_menu ())
-                        else (
+                        else
+                          (* Create new authorized_key with default permissions *)
+                          let new_key =
+                            {
+                              pkh = key;
+                              permissions =
+                                Signatory_config.default_permissions ();
+                            }
+                          in
                           model_ref :=
                             {
                               !model_ref with
                               authorized_keys =
-                                !model_ref.authorized_keys @ [key];
+                                !model_ref.authorized_keys @ [new_key];
                             } ;
-                          open_menu ()))
+                          open_menu ())
                       ()
                 | `SelectExisting ->
                     (* Get all keys from all base directories *)
@@ -290,17 +312,29 @@ let authorized_keys_field =
                         Printf.sprintf "%s (%s)" alias hash
                       in
                       let on_select_key (key_hash, _alias, _base_dir) =
-                        if List.mem key_hash !model_ref.authorized_keys then (
+                        if
+                          List.exists
+                            (fun (k : authorized_key) -> k.pkh = key_hash)
+                            !model_ref.authorized_keys
+                        then (
                           Context.toast_error "Key already added" ;
                           open_menu ())
-                        else (
+                        else
+                          (* Create new authorized_key with default permissions *)
+                          let new_key =
+                            {
+                              pkh = key_hash;
+                              permissions =
+                                Signatory_config.default_permissions ();
+                            }
+                          in
                           model_ref :=
                             {
                               !model_ref with
                               authorized_keys =
-                                !model_ref.authorized_keys @ [key_hash];
+                                !model_ref.authorized_keys @ [new_key];
                             } ;
-                          open_menu ())
+                          open_menu ()
                       in
                       Modal_helpers.open_choice_modal
                         ~title:"Select Key"
@@ -528,7 +562,7 @@ let spec =
             (* Validate all keys *)
             let invalid_keys =
               List.filter
-                (fun key -> not (validate_tezos_key key))
+                (fun (key : authorized_key) -> not (validate_tezos_key key.pkh))
                 model.authorized_keys
             in
             if invalid_keys <> [] then
@@ -536,7 +570,9 @@ let spec =
                 (`Msg
                    (Printf.sprintf
                       "Invalid key format: %s"
-                      (String.concat ", " invalid_keys)))
+                      (String.concat
+                         ", "
+                         (List.map (fun k -> k.pkh) invalid_keys))))
             else Ok ());
     on_init = None;
     on_refresh = None;
@@ -555,8 +591,11 @@ let spec =
             instance = model.core.instance_name;
             backend;
             authorized_keys =
-              (* Deduplicate keys to handle any potential double-adds *)
-              List.sort_uniq String.compare model.authorized_keys;
+              (* Deduplicate keys by pkh to handle any potential double-adds *)
+              model.authorized_keys
+              |> List.sort_uniq
+                   (fun (a : authorized_key) (b : authorized_key) ->
+                     String.compare a.pkh b.pkh);
             address = model.address;
             metrics_address = model.metrics_address;
             watermark = model.watermark;
