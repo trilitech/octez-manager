@@ -528,7 +528,7 @@ let prompt_textarea_modal ?title ?(width = 70) ?(height = 8) ?initial
     ()
 
 let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
-    ~to_string ~on_select =
+    ~to_string ?item_key ~on_select () =
   let module Modal = struct
     type state = choice Select_widget.t
 
@@ -581,14 +581,24 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
       if key = "Enter" then
         match Select_widget.get_selection s with
         | Some choice -> (
-            match on_select choice with
-            | `KeepOpen ->
-                (* Find the index of current selection before rebuilding *)
-                let current_items = items () in
-                let selected_idx =
+            (* Find the index of current selection BEFORE calling on_select *)
+            let current_items = items () in
+            let selected_idx =
+              match item_key with
+              | Some get_key ->
+                  (* Use custom key extraction for stable comparison *)
+                  let choice_key = get_key choice in
+                  List.find_index
+                    (fun item -> get_key item = choice_key)
+                    current_items
+                  |> Option.value ~default:0
+              | None ->
+                  (* Fall back to direct comparison *)
                   List.find_index (fun item -> item = choice) current_items
                   |> Option.value ~default:0
-                in
+            in
+            match on_select choice with
+            | `KeepOpen ->
                 (* Rebuild widget with updated items *)
                 let updated_items = items () in
                 Navigation.update

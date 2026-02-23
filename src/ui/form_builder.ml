@@ -415,6 +415,7 @@ let string_list ~label ~get ~set ?(get_suggestions = fun _ -> [])
       ~items:build_items
       ~to_string:to_string_item
       ~on_select
+      ()
   in
   Field {label; hint = None; get; set; to_string; validate; validate_msg; edit}
 

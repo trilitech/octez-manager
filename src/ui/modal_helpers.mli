@@ -36,12 +36,19 @@ val open_choice_modal_with_hint :
 
 (** Open a multi-select list modal.
     [on_select] is called for each toggled item and returns
-    [`KeepOpen] to continue selecting or [`Close] to dismiss. *)
+    [`KeepOpen] to continue selecting or [`Close] to dismiss.
+    
+    @param item_key Optional function to extract a stable key from items for
+    cursor position tracking. When provided, the cursor will stay on the same
+    logical item after the list is rebuilt (even if the item's display changes).
+    Without this, cursor position is based on direct item equality. *)
 val open_multiselect_modal :
   title:string ->
   items:(unit -> 'a list) ->
   to_string:('a -> string) ->
+  ?item_key:('a -> 'key) ->
   on_select:('a -> [< `KeepOpen | `Close]) ->
+  unit ->
   unit
 
 (** Open a text input prompt modal.
