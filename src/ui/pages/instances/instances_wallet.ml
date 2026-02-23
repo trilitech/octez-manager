@@ -356,9 +356,7 @@ let render_tracking_checklist ~step ~network ~cols =
     match op_hash_opt with
     | Some hash ->
         let url = Printf.sprintf "%s/%s" (tzkt_base_url ~network) hash in
-        [
-          ""; Printf.sprintf "  Hash: %s" (Widgets.themed_muted hash); "  " ^ url;
-        ]
+        [""; " " ^ url]
     | None -> []
   in
   let hint_line =
@@ -440,7 +438,7 @@ let open_tracking_modal ~title ~network ~step_ref =
     {
       title;
       left = None;
-      max_width = Some (Clamped {ratio = 0.6; min = 50; max = 72});
+      max_width = Some (Clamped {ratio = 0.6; min = 50; max = 80});
       dim_background = true;
     }
   in
