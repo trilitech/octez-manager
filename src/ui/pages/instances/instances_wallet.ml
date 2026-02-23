@@ -359,12 +359,20 @@ let render_tracking_checklist ~step ~network ~cols =
     | Some hash ->
         let short_hash = truncate_pkh hash in
         let url = Printf.sprintf "%s/%s" (tzkt_base_url ~network) hash in
+        let osc8_open = Printf.sprintf "\027]8;;%s\027\\" url in
+        let osc8_close = "\027]8;;\027\\" in
         let qr_lines =
           match Qr.create ~data:url () with
-          | Ok qr -> [Qr.render qr ~focus:false]
+          | Ok qr -> [osc8_open ^ Qr.render qr ~focus:false ^ osc8_close]
           | Error _ -> []
         in
-        [""; Printf.sprintf "  %s" (Widgets.themed_muted short_hash)] @ qr_lines
+        [""; Printf.sprintf "  %s" (Widgets.themed_muted short_hash)]
+        @ qr_lines
+        @ [
+            Printf.sprintf
+              "  %s"
+              (Widgets.themed_muted "(Ctrl+click QR to open in browser)");
+          ]
     | None -> []
   in
   let hint_line =
