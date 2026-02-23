@@ -109,7 +109,7 @@ let poll_baker ~instance =
       let delegates = get_baker_delegates ~instance in
       List.iter
         (fun pkh ->
-          match Delegate_data.fetch ~node_endpoint ~pkh with
+          (match Delegate_data.fetch ~node_endpoint ~pkh with
           | None -> ()
           | Some data ->
               (* Check for forbidden status change *)
@@ -130,7 +130,11 @@ let poll_baker ~instance =
               with_forbidden_lock (fun () ->
                   Hashtbl.replace forbidden_status pkh data.is_forbidden) ;
               (* Store in cache *)
-              Delegate_data.set data)
+              Delegate_data.set data) ;
+          (* Fetch wallet data for this delegate *)
+          match Baker_wallet_data.fetch_wallet_data ~node_endpoint ~pkh with
+          | None -> ()
+          | Some wallet_data -> Baker_wallet_data.set wallet_data)
         delegates
 
 (** Poll all bakers *)
@@ -200,6 +204,7 @@ let invalidate_config ~instance = refresh_config ~instance
 (** Clear all state *)
 let clear () =
   Delegate_data.clear () ;
+  Baker_wallet_data.clear () ;
   with_forbidden_lock (fun () -> Hashtbl.clear forbidden_status) ;
   Mutex.protect config_lock (fun () -> Hashtbl.clear config_cache)
 
