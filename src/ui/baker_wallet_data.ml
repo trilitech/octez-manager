@@ -135,6 +135,14 @@ let parse_pending_consensus_keys json =
         with _ -> None)
   with _ -> []
 
+let try_fields json names =
+  List.find_map
+    (fun name ->
+      try Yojson.Safe.Util.(json |> member name |> to_string_option)
+      with _ -> None)
+    names
+  |> Option.value ~default:"0"
+
 let parse_delegate_aggregate ~pkh json =
   let open Yojson.Safe.Util in
   try
@@ -142,25 +150,39 @@ let parse_delegate_aggregate ~pkh json =
       json |> member "deactivated" |> to_bool_option
       |> Option.value ~default:false
     in
+    (* own_staked (Quebec+) or current_frozen_deposits (older protocols) *)
     let staked_balance =
-      json
-      |> member "current_frozen_deposits"
-      |> to_string_option |> Option.value ~default:"0"
+      try_fields json ["own_staked"; "current_frozen_deposits"]
     in
+    (* own_full_balance (Quebec+) or full_balance (older protocols) *)
+    let full_balance = try_fields json ["own_full_balance"; "full_balance"] in
+    (* Compute unstaked_frozen from full_balance - staked - own_delegated.
+       Falls back to 0 if any value is missing or the result is negative. *)
     let unstaked_frozen =
-      json |> member "frozen_deposits" |> to_string_option
-      |> Option.value ~default:"0"
-    in
-    let full_balance =
-      json |> member "full_balance" |> to_string_option
-      |> Option.value ~default:"0"
-    in
-    let active_consensus_key =
+      let own_delegated = try_fields json ["own_delegated"] in
       try
-        json
-        |> member "active_consensus_key"
-        |> to_string_option |> Option.value ~default:pkh
-      with _ -> pkh
+        let full = Int64.of_string full_balance in
+        let staked = Int64.of_string staked_balance in
+        let delegated = Int64.of_string own_delegated in
+        let frozen = Int64.sub (Int64.sub full staked) delegated in
+        if Int64.compare frozen 0L > 0 then Int64.to_string frozen else "0"
+      with _ -> "0"
+    in
+    (* consensus_key.active.pkh (Quebec+) or active_consensus_key (older) *)
+    let active_consensus_key =
+      let from_nested =
+        try
+          json |> member "consensus_key" |> member "active" |> member "pkh"
+          |> to_string_option
+        with _ -> None
+      in
+      let from_flat =
+        try json |> member "active_consensus_key" |> to_string_option
+        with _ -> None
+      in
+      match from_nested with
+      | Some s -> s
+      | None -> ( match from_flat with Some s -> s | None -> pkh)
     in
     let pending_consensus_keys =
       try

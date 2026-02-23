@@ -107,14 +107,16 @@ let test_parse_unstake_requests_with_unfinalizable () =
 (* ── parse_delegate_aggregate ──────────────────────────────── *)
 
 let test_parse_delegate_aggregate_full () =
+  (* Quebec+ field names: own_staked, own_full_balance, own_delegated,
+     consensus_key.active.pkh *)
   let json =
     Yojson.Safe.from_string
       {|{
     "deactivated": false,
-    "current_frozen_deposits": "5000000000",
-    "frozen_deposits": "200000000",
-    "full_balance": "6434567890",
-    "active_consensus_key": "tz1abc",
+    "own_staked": "5000000000",
+    "own_full_balance": "6434567890",
+    "own_delegated": "1234567890",
+    "consensus_key": {"active": {"pkh": "tz1abc", "pk": "edpk..."}},
     "pending_consensus_keys": [{"cycle": 150, "pkh": "tz1new"}]
   }|}
   in
@@ -125,6 +127,7 @@ let test_parse_delegate_aggregate_full () =
       check bool "registered" true d.is_registered ;
       check bool "not deactivated" false d.deactivated ;
       check string "staked" "5000000000" d.staked_balance ;
+      (* unstaked_frozen = full - staked - delegated = 6434567890 - 5000000000 - 1234567890 = 200000000 *)
       check string "unstaked_frozen" "200000000" d.unstaked_frozen ;
       check string "full_balance" "6434567890" d.full_balance ;
       check string "consensus_key" "tz1abc" d.active_consensus_key ;
@@ -133,14 +136,32 @@ let test_parse_delegate_aggregate_full () =
       check int "pending cycle" 150 cycle ;
       check string "pending pkh" "tz1new" pkh
 
+let test_parse_delegate_aggregate_old_fields () =
+  (* Pre-Quebec field names for backward compatibility *)
+  let json =
+    Yojson.Safe.from_string
+      {|{
+    "deactivated": false,
+    "current_frozen_deposits": "5000000000",
+    "full_balance": "6434567890",
+    "active_consensus_key": "tz1old"
+  }|}
+  in
+  match BWD.For_tests.parse_delegate_aggregate ~pkh:"tz1test" json with
+  | None -> fail "should parse"
+  | Some d ->
+      check string "staked (old field)" "5000000000" d.staked_balance ;
+      check string "full_balance (old field)" "6434567890" d.full_balance ;
+      check string "consensus_key (old field)" "tz1old" d.active_consensus_key
+
 let test_parse_delegate_aggregate_deactivated () =
   let json =
     Yojson.Safe.from_string
       {|{
     "deactivated": true,
-    "current_frozen_deposits": "0",
-    "frozen_deposits": "0",
-    "full_balance": "1000000"
+    "own_staked": "0",
+    "own_full_balance": "1000000",
+    "own_delegated": "1000000"
   }|}
   in
   match BWD.For_tests.parse_delegate_aggregate ~pkh:"tz1deact" json with
@@ -514,6 +535,10 @@ let () =
       ( "parse_delegate_aggregate",
         [
           test_case "full" `Quick test_parse_delegate_aggregate_full;
+          test_case
+            "old field names"
+            `Quick
+            test_parse_delegate_aggregate_old_fields;
           test_case
             "deactivated"
             `Quick
