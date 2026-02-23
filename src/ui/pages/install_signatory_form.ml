@@ -250,8 +250,8 @@ let open_permissions_modal ~pkh ~initial_permissions ~on_submit () =
           selected := op :: !selected ;
         `KeepOpen
     | `Done ->
-        (* Submit and close *)
-        on_submit !selected ;
+        (* Defer on_submit until after modal closes to avoid timing issues *)
+        Background_runner.enqueue (fun () -> on_submit !selected) ;
         `Close
   in
 
