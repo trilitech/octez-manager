@@ -13,6 +13,24 @@ type key_info = {
   allows : string list;  (** Allowed operations (block, attestation, etc.) *)
 }
 
+(** Convert signatory_operation to string representation.
+    
+    @param op The operation to convert
+    @return String representation (e.g., "block", "attestation") *)
+val operation_to_string : Installer_types.signatory_operation -> string
+
+(** Convert string to signatory_operation.
+    
+    @param s The string to parse
+    @return Some operation if valid, None otherwise *)
+val operation_of_string : string -> Installer_types.signatory_operation option
+
+(** All available signatory operations. *)
+val all_operations : Installer_types.signatory_operation list
+
+(** Default permissions for new keys (all operations). *)
+val default_permissions : unit -> Installer_types.signatory_operation list
+
 (** Get the path to signatory.yaml for an instance.
     
     @param instance The signatory instance name

@@ -132,6 +132,20 @@ type snapshot_metadata = {
   no_check : bool;
 }
 
+(** Signatory operation permissions *)
+type signatory_operation =
+  | Block  (** Sign new blocks (baking) *)
+  | Attestation  (** Sign consensus attestations *)
+  | Preattestation  (** Sign pre-attestations *)
+  | Attestation_with_dal  (** Sign DAL-enabled attestations *)
+  | Generic  (** Sign manager operations (transactions, etc.) *)
+
+(** Authorized key with its permissions *)
+type authorized_key = {
+  pkh : string;  (** Public key hash (tz1/tz2/tz3/tz4) *)
+  permissions : signatory_operation list;  (** Allowed operations *)
+}
+
 (** Signatory backend configuration *)
 type signatory_backend =
   | File of string  (** Path to keys directory *)
@@ -152,7 +166,8 @@ type watermark_backend =
 type signatory_request = {
   instance : string;
   backend : signatory_backend;
-  authorized_keys : string list;  (** tz1/tz2/tz3/tz4 public key hashes *)
+  authorized_keys : authorized_key list;
+      (** Authorized keys with permissions *)
   address : string;  (** HTTP server address, e.g., "127.0.0.1:6732" *)
   metrics_address : string;  (** Metrics endpoint address *)
   watermark : watermark_backend;

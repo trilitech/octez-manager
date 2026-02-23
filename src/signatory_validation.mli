@@ -15,9 +15,10 @@ val validate_public_key_hash : string -> (unit, [> `Msg of string]) result
 
 (** Validate a list of authorized keys.
     
-    @param keys List of public key hashes
+    @param keys List of authorized_key records
     @return [Ok ()] if all valid, [Error] with message for first invalid key *)
-val validate_authorized_keys : string list -> (unit, [> `Msg of string]) result
+val validate_authorized_keys :
+  Installer_types.authorized_key list -> (unit, [> `Msg of string]) result
 
 (** Validate an HTTP address (host:port format).
     

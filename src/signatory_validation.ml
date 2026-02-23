@@ -41,14 +41,16 @@ let validate_public_key_hash pkh =
 
 (** Validate a list of authorized keys.
     
-    @param keys List of public key hashes
+    @param keys List of authorized_key records
     @return Ok () if all valid, Error with message for first invalid key *)
 let validate_authorized_keys keys =
   if keys = [] then Error (`Msg "At least one authorized key is required")
   else
     List.fold_left
-      (fun acc key ->
-        match acc with Error _ -> acc | Ok () -> validate_public_key_hash key)
+      (fun acc (key : Installer_types.authorized_key) ->
+        match acc with
+        | Error _ -> acc
+        | Ok () -> validate_public_key_hash key.pkh)
       (Ok ())
       keys
 
