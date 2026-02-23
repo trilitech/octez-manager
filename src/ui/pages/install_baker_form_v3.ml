@@ -651,7 +651,8 @@ let delegates_field =
         ~title
         ~items:build_items
         ~to_string
-        ~on_select)
+        ~on_select
+        ())
     ()
 
 (** {1 Form Specification} *)
