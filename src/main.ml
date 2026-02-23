@@ -102,6 +102,7 @@ let root_cmd =
       Cmd_utils.list_snapshots_cmd;
       Cmd_rpc.rpc_cmd;
       Cmd_web.web_cmd;
+      Cmd_baker.baker_cmd;
       ui_cmd;
     ]
 
