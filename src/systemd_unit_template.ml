@@ -245,7 +245,7 @@ let validate_bin_dir ~user ~app_bin_dir ~role =
     | Ok () -> Ok ()
     | Error _ -> (
         let cmd = Printf.sprintf "test -x %s" (Cmd_runner.sh_quote binary) in
-        match Cmd_runner.run ["su"; "-s"; "/bin/sh"; "-c"; cmd; user] with
+        match Cmd_runner.run ["runuser"; "-s"; "/bin/sh"; "-c"; cmd; user] with
         | Ok () -> Ok ()
         | Error (`Msg m) ->
             R.error_msgf
@@ -274,7 +274,7 @@ let validate_binary_access ~user ~binary_path =
         let cmd =
           Printf.sprintf "test -x %s" (Cmd_runner.sh_quote binary_path)
         in
-        match Cmd_runner.run ["su"; "-s"; "/bin/sh"; "-c"; cmd; user] with
+        match Cmd_runner.run ["runuser"; "-s"; "/bin/sh"; "-c"; cmd; user] with
         | Ok () -> Ok ()
         | Error (`Msg m) ->
             R.error_msgf
