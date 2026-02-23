@@ -321,9 +321,11 @@ let instance_actions_modal state =
   with_service state (fun svc_state ->
       let svc = svc_state.Service_state.service in
       let is_node = svc.Service.role = "node" in
+      let is_baker = String.equal svc.Service.role "baker" in
       let in_group = Option.is_some svc.Service.group in
       let base_items =
-        [`Details; `Edit; `Start; `Stop; `Restart; `Update_version]
+        (if is_baker then [`Wallet] else [])
+        @ [`Details; `Edit; `Start; `Stop; `Restart; `Update_version]
         @ [`Add_to_group]
         @ (if in_group then [`Remove_from_group] else [])
         @ [`Logs; `Export_logs; `Remove]
@@ -333,6 +335,7 @@ let instance_actions_modal state =
         ~title:("Actions · " ^ svc.Service.instance)
         ~items
         ~to_string:(function
+          | `Wallet -> "Wallet"
           | `Browse_rpc -> "Browse RPC"
           | `Details -> "Details"
           | `Edit -> "Edit"
@@ -352,6 +355,7 @@ let instance_actions_modal state =
           let instance = svc.Service.instance in
           let role = svc.Service.role in
           match choice with
+          | `Wallet -> Instances_wallet.wallet_modal ~svc
           | `Browse_rpc -> Context.navigate Rpc_browser.name
           | `Details ->
               Context.set_pending_instance_detail instance ;
