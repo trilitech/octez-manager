@@ -11,8 +11,8 @@
     register, stake, unstake, finalize unstake, transfer,
     set delegate parameters, update consensus key, and governance voting.
 
-    Operations are serialized per-instance via a mutex to prevent
-    concurrent octez-client invocations for the same baker. *)
+    Each command is executed with a 100-second timeout; the process is
+    killed (SIGTERM) if it does not complete in time. *)
 
 (** {2 Types} *)
 
@@ -41,12 +41,15 @@ type operation_result = {
     Useful for display in confirmation prompts and testing.
     @param octez_client_bin  Path to the octez-client binary
     @param endpoint          Node RPC endpoint URL
+    @param base_dir          Optional base directory for octez-client
+    @param password_file     Optional path to password file for encrypted keys
     @param alias             Baker key alias in octez-client
     @param op                The operation to build *)
 val build_command :
   octez_client_bin:string ->
   endpoint:string ->
   base_dir:string option ->
+  password_file:string option ->
   alias:string ->
   op:wallet_operation ->
   string list
@@ -54,10 +57,12 @@ val build_command :
 (** {2 Execution} *)
 
 (** Execute a wallet operation via octez-client.
-    Acquires a per-instance mutex to serialize operations.
-    @param instance_name     Instance name for mutex selection
+    The process is killed after 100 seconds if it doesn't complete.
+    @param instance_name     Instance name (used for logging)
     @param octez_client_bin  Path to the octez-client binary
     @param endpoint          Node RPC endpoint URL
+    @param base_dir          Optional base directory for octez-client
+    @param password_file     Optional path to password file for encrypted keys
     @param alias             Baker key alias in octez-client
     @param op                The operation to execute
     @return Operation result with hash on success or error message *)
@@ -66,14 +71,17 @@ val execute :
   octez_client_bin:string ->
   endpoint:string ->
   base_dir:string option ->
+  password_file:string option ->
   alias:string ->
   op:wallet_operation ->
   operation_result
 
 (** Estimate fees for a wallet operation via octez-client dry-run.
-    @param instance_name     Instance name for mutex selection
+    @param instance_name     Instance name (used for logging)
     @param octez_client_bin  Path to the octez-client binary
     @param endpoint          Node RPC endpoint URL
+    @param base_dir          Optional base directory for octez-client
+    @param password_file     Optional path to password file for encrypted keys
     @param alias             Baker key alias in octez-client
     @param op                The operation to estimate
     @return Estimated fee string on success, error message on failure *)
@@ -82,6 +90,7 @@ val estimate_fee :
   octez_client_bin:string ->
   endpoint:string ->
   base_dir:string option ->
+  password_file:string option ->
   alias:string ->
   op:wallet_operation ->
   (string, string) result

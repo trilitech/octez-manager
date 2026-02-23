@@ -30,35 +30,16 @@ type operation_result = {
   error : string option;
 }
 
-(* ── Per-instance Mutex ────────────────────────────────────── *)
-
-let mutex_table : (string, Mutex.t) Hashtbl.t = Hashtbl.create 17
-
-let mutex_table_lock = Mutex.create ()
-
-let get_instance_mutex instance_name =
-  Mutex.lock mutex_table_lock ;
-  Fun.protect
-    ~finally:(fun () -> Mutex.unlock mutex_table_lock)
-    (fun () ->
-      match Hashtbl.find_opt mutex_table instance_name with
-      | Some m -> m
-      | None ->
-          let m = Mutex.create () in
-          Hashtbl.replace mutex_table instance_name m ;
-          m)
-
-let with_instance_lock instance_name f =
-  let m = get_instance_mutex instance_name in
-  Mutex.lock m ;
-  Fun.protect ~finally:(fun () -> Mutex.unlock m) f
-
 (* ── Command Building ──────────────────────────────────────── *)
 
-let build_command ~octez_client_bin ~endpoint ~base_dir ~alias ~op =
+let build_command ~octez_client_bin ~endpoint ~base_dir ~password_file ~alias
+    ~op =
   let base =
     [octez_client_bin]
     @ (match base_dir with Some d -> ["--base-dir"; d] | None -> [])
+    @ (match password_file with
+      | Some f -> ["--password-filename"; f]
+      | None -> [])
     @ ["--endpoint"; endpoint]
   in
   let cmd =
@@ -161,36 +142,47 @@ let extract_fee_estimate output =
 
 (* ── Execution ─────────────────────────────────────────────── *)
 
-let execute ~instance_name ~octez_client_bin ~endpoint ~base_dir ~alias ~op =
-  with_instance_lock instance_name (fun () ->
-      let argv =
-        build_command ~octez_client_bin ~endpoint ~base_dir ~alias ~op
-      in
-      match Cmd_runner.run_out argv with
-      | Ok output -> (
-          match extract_op_hash output with
-          | Some hash -> {success = true; op_hash = Some hash; error = None}
-          | None ->
-              {
-                success = true;
-                op_hash = None;
-                error = Some "Operation succeeded but no hash found in output";
-              })
-      | Error (`Msg err) -> {success = false; op_hash = None; error = Some err})
+let execute ~instance_name:_ ~octez_client_bin ~endpoint ~base_dir
+    ~password_file ~alias ~op =
+  let argv =
+    build_command
+      ~octez_client_bin
+      ~endpoint
+      ~base_dir
+      ~password_file
+      ~alias
+      ~op
+  in
+  match Cmd_runner.run_out_with_timeout ~timeout:100.0 argv with
+  | Ok output -> (
+      match extract_op_hash output with
+      | Some hash -> {success = true; op_hash = Some hash; error = None}
+      | None ->
+          {
+            success = true;
+            op_hash = None;
+            error = Some "Operation succeeded but no hash found in output";
+          })
+  | Error (`Msg err) -> {success = false; op_hash = None; error = Some err}
 
-let estimate_fee ~instance_name ~octez_client_bin ~endpoint ~base_dir ~alias ~op
-    =
-  with_instance_lock instance_name (fun () ->
-      let argv =
-        build_command ~octez_client_bin ~endpoint ~base_dir ~alias ~op
-        @ ["--dry-run"]
-      in
-      match Cmd_runner.run_out argv with
-      | Ok output -> (
-          match extract_fee_estimate output with
-          | Some fee -> Ok fee
-          | None -> Ok "~0.001")
-      | Error (`Msg err) -> Error err)
+let estimate_fee ~instance_name:_ ~octez_client_bin ~endpoint ~base_dir
+    ~password_file ~alias ~op =
+  let argv =
+    build_command
+      ~octez_client_bin
+      ~endpoint
+      ~base_dir
+      ~password_file
+      ~alias
+      ~op
+    @ ["--dry-run"]
+  in
+  match Cmd_runner.run_out_with_timeout ~timeout:30.0 argv with
+  | Ok output -> (
+      match extract_fee_estimate output with
+      | Some fee -> Ok fee
+      | None -> Ok "~0.001")
+  | Error (`Msg err) -> Error err
 
 (* ── Helpers ───────────────────────────────────────────────── *)
 

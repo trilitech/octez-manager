@@ -268,9 +268,26 @@ let resolve_baker_base_dir (svc : Service.t) =
   | Error _ -> None
   | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
 
+let resolve_baker_password_file (svc : Service.t) =
+  let rec find = function
+    | ("-f" | "--password-filename") :: path :: _ when path <> "" -> Some path
+    | _ :: rest -> find rest
+    | [] -> None
+  in
+  match find svc.extra_args with
+  | Some _ as result -> result
+  | None -> (
+      match Node_env.read ~inst:svc.instance with
+      | Error _ -> None
+      | Ok pairs -> (
+          match List.assoc_opt "OCTEZ_BAKER_GLOBAL_ARGS" pairs with
+          | None -> None
+          | Some global_str -> find (String.split_on_char ' ' global_str)))
+
 let run_operation ~instance ~svc ~endpoint ~pkh ~op ~json ~yes =
   let client_bin = resolve_octez_client svc in
   let base_dir = resolve_baker_base_dir svc in
+  let password_file = resolve_baker_password_file svc in
   let description = Baker_ops.describe_operation op in
   let confirmed =
     if yes then true
@@ -291,6 +308,7 @@ let run_operation ~instance ~svc ~endpoint ~pkh ~op ~json ~yes =
         ~octez_client_bin:client_bin
         ~endpoint
         ~base_dir
+        ~password_file
         ~alias:pkh
         ~op
     in

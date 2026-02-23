@@ -28,6 +28,7 @@ let test_build_register () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:Register
   in
@@ -54,6 +55,7 @@ let test_build_stake () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Stake {amount = "1000"})
   in
@@ -79,6 +81,7 @@ let test_build_unstake () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Unstake {amount = "500"})
   in
@@ -104,6 +107,7 @@ let test_build_finalize_unstake () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:Finalize_unstake
   in
@@ -129,6 +133,7 @@ let test_build_transfer () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Transfer {amount = "100"; destination = "tz1dest"})
   in
@@ -156,6 +161,7 @@ let test_build_set_delegate_params () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Set_delegate_params {limit = 5000000; edge = 100000000})
   in
@@ -186,6 +192,7 @@ let test_build_update_consensus_key () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Update_consensus_key {key = "edpkNew..."})
   in
@@ -214,6 +221,7 @@ let test_build_submit_proposals () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Submit_proposals {proposals = ["PtProto1"; "PtProto2"]})
   in
@@ -241,6 +249,7 @@ let test_build_submit_ballot () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Submit_ballot {proposal = "PtProto1"; ballot = BWD.Yay})
   in
@@ -268,6 +277,7 @@ let test_build_submit_ballot_nay () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:None
+      ~password_file:None
       ~alias
       ~op:(Submit_ballot {proposal = "PtProto1"; ballot = BWD.Nay})
   in
@@ -281,6 +291,7 @@ let test_build_with_base_dir () =
       ~octez_client_bin:bin
       ~endpoint
       ~base_dir:(Some "/home/tezos/.tezos-client")
+      ~password_file:None
       ~alias
       ~op:Register
   in
@@ -298,6 +309,65 @@ let test_build_with_base_dir () =
       alias;
       "as";
       "delegate";
+      "--burn-cap";
+      "1";
+    ]
+    cmd
+
+let test_build_with_password_file () =
+  let cmd =
+    BO.build_command
+      ~octez_client_bin:bin
+      ~endpoint
+      ~base_dir:None
+      ~password_file:(Some "/home/mathias/passwd")
+      ~alias
+      ~op:Register
+  in
+  check
+    (list string)
+    "register with password_file"
+    [
+      bin;
+      "--password-filename";
+      "/home/mathias/passwd";
+      "--endpoint";
+      endpoint;
+      "register";
+      "key";
+      alias;
+      "as";
+      "delegate";
+      "--burn-cap";
+      "1";
+    ]
+    cmd
+
+let test_build_with_base_dir_and_password_file () =
+  let cmd =
+    BO.build_command
+      ~octez_client_bin:bin
+      ~endpoint
+      ~base_dir:(Some "/home/tezos/.tezos-client")
+      ~password_file:(Some "/home/mathias/passwd")
+      ~alias
+      ~op:(Stake {amount = "500"})
+  in
+  check
+    (list string)
+    "stake with base_dir and password_file"
+    [
+      bin;
+      "--base-dir";
+      "/home/tezos/.tezos-client";
+      "--password-filename";
+      "/home/mathias/passwd";
+      "--endpoint";
+      endpoint;
+      "stake";
+      "500";
+      "for";
+      alias;
       "--burn-cap";
       "1";
     ]
@@ -376,6 +446,11 @@ let () =
           test_case "submit_ballot yay" `Quick test_build_submit_ballot;
           test_case "submit_ballot nay" `Quick test_build_submit_ballot_nay;
           test_case "with base_dir" `Quick test_build_with_base_dir;
+          test_case "with password_file" `Quick test_build_with_password_file;
+          test_case
+            "with base_dir and password_file"
+            `Quick
+            test_build_with_base_dir_and_password_file;
         ] );
       ( "describe_operation",
         [
