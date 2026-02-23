@@ -158,11 +158,215 @@ let action_to_string (data : Baker_wallet_data.t) ~_node_endpoint action =
             (Baker_wallet_data.string_of_voting_period_kind info.period_kind)
       | None -> "Vote")
 
+(* ── Operation execution helpers ──────────────────────────── *)
+
+let octez_client_bin (svc : Service.t) =
+  Filename.concat svc.app_bin_dir "octez-client"
+
+(** Shared helper for all wallet operations.
+    Flow: spinner (estimate fee) → confirmation modal → spinner (execute) → result.
+    Reused by register, stake, unstake, transfer, etc. *)
+let run_wallet_operation ~svc ~pkh ~op =
+  let instance = svc.Service.instance in
+  let endpoint =
+    match Delegate_scheduler.get_baker_node_endpoint ~instance with
+    | Some ep -> ep
+    | None -> ""
+  in
+  let client_bin = octez_client_bin svc in
+  let description = Baker_ops.describe_operation op in
+  let fee_ref = ref "~0.001" in
+  (* Step 1: Estimate fee *)
+  Modal_helpers.show_spinner_modal
+    ~title:description
+    ~label:"Estimating fee..."
+    ~work:(fun () ->
+      match
+        Baker_ops.estimate_fee
+          ~instance_name:instance
+          ~octez_client_bin:client_bin
+          ~endpoint
+          ~alias:pkh
+          ~op
+      with
+      | Ok fee ->
+          fee_ref := fee ;
+          Ok ()
+      | Error msg -> Error (`Msg msg))
+    ~on_complete:(fun status ->
+      match status with
+      | `Failed msg ->
+          Modal_helpers.show_error ~title:description msg ;
+          Context.toast_error (description ^ ": fee estimation failed")
+      | `Cancelled -> ()
+      | `Succeeded ->
+          (* Step 2: Confirmation modal *)
+          let summary_items =
+            [
+              ("Operation", description);
+              ("Delegate", truncate_pkh pkh);
+              ("Instance", instance);
+              ("Est. fee", !fee_ref ^ " ꜩ");
+            ]
+          in
+          let summary =
+            let dl =
+              Desc_list.create ~key_width:14 ~items:summary_items ()
+              |> Desc_list.render ~cols:50 ~wrap:false ~focus:false
+            in
+            Box.render ~title:"" ~style:Rounded ~width:54 dl
+          in
+          ignore summary ;
+          Modal_helpers.open_choice_modal
+            ~title:"Confirm Operation"
+            ~items:[`Confirm; `Cancel]
+            ~to_string:(function `Confirm -> "Confirm" | `Cancel -> "Cancel")
+            ~on_select:(function
+              | `Cancel -> ()
+              | `Confirm ->
+                  (* Step 3: Execute operation *)
+                  Modal_helpers.show_spinner_modal
+                    ~title:description
+                    ~label:"Submitting operation..."
+                    ~work:(fun () ->
+                      let result =
+                        Baker_ops.execute
+                          ~instance_name:instance
+                          ~octez_client_bin:client_bin
+                          ~endpoint
+                          ~alias:pkh
+                          ~op
+                      in
+                      if result.success then Ok ()
+                      else
+                        Error
+                          (`Msg
+                             (Option.value
+                                ~default:"Unknown error"
+                                result.error)))
+                    ~on_complete:(fun exec_status ->
+                      match exec_status with
+                      | `Succeeded ->
+                          Modal_helpers.show_success
+                            ~title:description
+                            "Operation submitted successfully" ;
+                          Context.toast_success
+                            (description ^ ": operation submitted")
+                      | `Failed msg ->
+                          Modal_helpers.show_error ~title:description msg ;
+                          Context.toast_error
+                            (description ^ ": operation failed")
+                      | `Cancelled -> ())
+                    ())
+            ())
+    ()
+
 (* ── Dispatch operation ──────────────────────────────────── *)
 
-let dispatch_action _svc _pkh _data _action =
-  (* Operations will be wired in Phase 3-10 tasks (T014+) *)
-  Context.toast_info "Operation not yet implemented"
+let dispatch_action svc pkh _data action =
+  match action with
+  | Register -> run_wallet_operation ~svc ~pkh ~op:Baker_ops.Register
+  | Stake ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Stake"
+        ~placeholder:(Some "e.g. 1000 or 500.5")
+        ~validator:(fun s ->
+          match float_of_string_opt s with
+          | Some f when f > 0.0 -> Ok ()
+          | _ -> Error "Enter a positive amount")
+        ~on_submit:(fun amount ->
+          run_wallet_operation ~svc ~pkh ~op:(Baker_ops.Stake {amount}))
+        ()
+  | Unstake ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Unstake"
+        ~placeholder:(Some "e.g. 500 or everything")
+        ~validator:(fun s ->
+          if String.equal s "everything" then Ok ()
+          else
+            match float_of_string_opt s with
+            | Some f when f > 0.0 -> Ok ()
+            | _ -> Error "Enter a positive amount or \"everything\"")
+        ~on_submit:(fun amount ->
+          run_wallet_operation ~svc ~pkh ~op:(Baker_ops.Unstake {amount}))
+        ()
+  | Finalize_unstake ->
+      run_wallet_operation ~svc ~pkh ~op:Baker_ops.Finalize_unstake
+  | Transfer ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Transfer · Amount"
+        ~placeholder:(Some "e.g. 100")
+        ~validator:(fun s ->
+          match float_of_string_opt s with
+          | Some f when f > 0.0 -> Ok ()
+          | _ -> Error "Enter a positive amount")
+        ~on_submit:(fun amount ->
+          Modal_helpers.prompt_validated_text_modal
+            ~title:"Transfer · Destination"
+            ~placeholder:(Some "tz1... or KT1...")
+            ~validator:(fun s ->
+              let len = String.length s in
+              if
+                len >= 36
+                && (String.sub s 0 3 = "tz1"
+                   || String.sub s 0 3 = "tz2"
+                   || String.sub s 0 3 = "tz3"
+                   || String.sub s 0 3 = "KT1")
+              then Ok ()
+              else Error "Enter a valid tz1/tz2/tz3/KT1 address")
+            ~on_submit:(fun destination ->
+              run_wallet_operation
+                ~svc
+                ~pkh
+                ~op:(Baker_ops.Transfer {amount; destination}))
+            ())
+        ()
+  | Set_delegate_params ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Staking Limit"
+        ~placeholder:(Some "0-9 (0 = reject external staking)")
+        ~validator:(fun s ->
+          match int_of_string_opt s with
+          | Some n when n >= 0 && n <= 9 -> Ok ()
+          | _ -> Error "Enter an integer from 0 to 9")
+        ~on_submit:(fun limit_s ->
+          Modal_helpers.prompt_validated_text_modal
+            ~title:"Baking Edge"
+            ~placeholder:(Some "0-100 (% of staker rewards to baker)")
+            ~validator:(fun s ->
+              match int_of_string_opt s with
+              | Some n when n >= 0 && n <= 100 -> Ok ()
+              | _ -> Error "Enter an integer from 0 to 100")
+            ~on_submit:(fun edge_s ->
+              let limit = int_of_string limit_s * 1000000 in
+              let edge = int_of_string edge_s * 10000000 in
+              run_wallet_operation
+                ~svc
+                ~pkh
+                ~op:(Baker_ops.Set_delegate_params {limit; edge}))
+            ())
+        ()
+  | Update_consensus_key ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Update Consensus Key"
+        ~placeholder:(Some "tz1... key alias or pkh")
+        ~validator:(fun s ->
+          let len = String.length s in
+          if
+            len >= 36
+            && (String.sub s 0 3 = "tz1"
+               || String.sub s 0 3 = "tz2"
+               || String.sub s 0 3 = "tz3")
+          then Ok ()
+          else Error "Enter a valid tz1/tz2/tz3 public key hash")
+        ~on_submit:(fun key ->
+          run_wallet_operation
+            ~svc
+            ~pkh
+            ~op:(Baker_ops.Update_consensus_key {key}))
+        ()
+  | Vote ->
+      Context.toast_info "Voting not yet implemented (requires voting data)"
 
 (* ── Wallet modal ────────────────────────────────────────── *)
 

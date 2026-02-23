@@ -254,9 +254,267 @@ let status_cmd =
     info
     Term.(ret (const status_run $ instance_arg $ delegate_opt $ json_flag))
 
+(* ── Common operation helpers ──────────────────────────────── *)
+
+let yes_flag =
+  let doc = "Skip confirmation prompt." in
+  Arg.(value & flag & info ["yes"; "y"] ~doc)
+
+let resolve_octez_client (svc : Service.t) =
+  Filename.concat svc.app_bin_dir "octez-client"
+
+let run_operation ~instance ~svc ~endpoint ~pkh ~op ~json ~yes =
+  let client_bin = resolve_octez_client svc in
+  let description = Baker_ops.describe_operation op in
+  let confirmed =
+    if yes then true
+    else (
+      Printf.printf "Operation: %s\n" description ;
+      Printf.printf "Delegate:  %s\n" pkh ;
+      Printf.printf "Instance:  %s\n" instance ;
+      Printf.printf "\n%!" ;
+      Cli_helpers.prompt_yes_no "Proceed?" ~default:false)
+  in
+  if not confirmed then (
+    Printf.printf "Cancelled.\n%!" ;
+    `Ok ())
+  else
+    let result =
+      Baker_ops.execute
+        ~instance_name:instance
+        ~octez_client_bin:client_bin
+        ~endpoint
+        ~alias:pkh
+        ~op
+    in
+    if result.success then (
+      let hash = Option.value ~default:"(no hash)" result.op_hash in
+      if json then Printf.printf {|{"success": true, "op_hash": "%s"}|} hash
+      else Printf.printf "Operation submitted. Hash: %s\n" hash ;
+      print_newline () ;
+      `Ok ())
+    else
+      let err = Option.value ~default:"Unknown error" result.error in
+      if json then (
+        Printf.printf {|{"success": false, "error": "%s"}|} err ;
+        print_newline () ;
+        `Ok ())
+      else Cli_helpers.cmdliner_error err
+
+(* ── baker <instance> register ───────────────────────────── *)
+
+let register_run instance delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) ->
+          run_operation
+            ~instance
+            ~svc
+            ~endpoint
+            ~pkh
+            ~op:Baker_ops.Register
+            ~json
+            ~yes)
+
+let register_cmd =
+  let info = Cmd.info "register" ~doc:"Register delegate key" in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const register_run $ instance_arg $ delegate_opt $ json_flag $ yes_flag))
+
+(* ── baker <instance> stake <amount> ─────────────────────── *)
+
+let amount_arg =
+  Arg.(required & pos 1 (some string) None & info [] ~docv:"AMOUNT")
+
+let stake_run instance amount delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) ->
+          run_operation
+            ~instance
+            ~svc
+            ~endpoint
+            ~pkh
+            ~op:(Baker_ops.Stake {amount})
+            ~json
+            ~yes)
+
+let stake_cmd =
+  let info = Cmd.info "stake" ~doc:"Stake tez for a baker delegate" in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const stake_run $ instance_arg $ amount_arg $ delegate_opt $ json_flag
+       $ yes_flag))
+
+(* ── baker <instance> unstake <amount|everything> ────────── *)
+
+let unstake_run instance amount delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) ->
+          run_operation
+            ~instance
+            ~svc
+            ~endpoint
+            ~pkh
+            ~op:(Baker_ops.Unstake {amount})
+            ~json
+            ~yes)
+
+let unstake_cmd =
+  let info = Cmd.info "unstake" ~doc:"Unstake tez (amount or \"everything\")" in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const unstake_run $ instance_arg $ amount_arg $ delegate_opt
+       $ json_flag $ yes_flag))
+
+(* ── baker <instance> finalize-unstake ───────────────────── *)
+
+let finalize_unstake_run instance delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) ->
+          run_operation
+            ~instance
+            ~svc
+            ~endpoint
+            ~pkh
+            ~op:Baker_ops.Finalize_unstake
+            ~json
+            ~yes)
+
+let finalize_unstake_cmd =
+  let info =
+    Cmd.info "finalize-unstake" ~doc:"Finalize pending unstake requests"
+  in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const finalize_unstake_run $ instance_arg $ delegate_opt $ json_flag
+       $ yes_flag))
+
+(* ── baker <instance> transfer <amount> <destination> ────── *)
+
+let destination_arg =
+  Arg.(required & pos 2 (some string) None & info [] ~docv:"DESTINATION")
+
+let transfer_run instance amount destination delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) ->
+          run_operation
+            ~instance
+            ~svc
+            ~endpoint
+            ~pkh
+            ~op:(Baker_ops.Transfer {amount; destination})
+            ~json
+            ~yes)
+
+let transfer_cmd =
+  let info = Cmd.info "transfer" ~doc:"Transfer tez to another address" in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const transfer_run $ instance_arg $ amount_arg $ destination_arg
+       $ delegate_opt $ json_flag $ yes_flag))
+
+(* ── baker <instance> set-delegate-params ────────────────── *)
+
+let limit_opt =
+  let doc = "Limit of staking over baking (0-9)." in
+  Arg.(value & opt (some int) None & info ["limit-of-staking-over-baking"] ~doc)
+
+let edge_opt =
+  let doc = "Edge of baking over staking (0-100)." in
+  Arg.(value & opt (some int) None & info ["edge-of-baking-over-staking"] ~doc)
+
+let set_delegate_params_run instance limit_opt edge_opt delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) ->
+          let limit = Option.value ~default:0 limit_opt * 1000000 in
+          let edge = Option.value ~default:0 edge_opt * 10000000 in
+          run_operation
+            ~instance
+            ~svc
+            ~endpoint
+            ~pkh
+            ~op:(Baker_ops.Set_delegate_params {limit; edge})
+            ~json
+            ~yes)
+
+let set_delegate_params_cmd =
+  let info =
+    Cmd.info "set-delegate-params" ~doc:"Set delegate staking parameters"
+  in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const set_delegate_params_run
+        $ instance_arg $ limit_opt $ edge_opt $ delegate_opt $ json_flag
+        $ yes_flag))
+
+(* ── baker <instance> update-consensus-key <key> ─────────── *)
+
+let key_arg = Arg.(required & pos 1 (some string) None & info [] ~docv:"KEY")
+
+let update_consensus_key_run instance key delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) ->
+          run_operation
+            ~instance
+            ~svc
+            ~endpoint
+            ~pkh
+            ~op:(Baker_ops.Update_consensus_key {key})
+            ~json
+            ~yes)
+
+let update_consensus_key_cmd =
+  let info =
+    Cmd.info "update-consensus-key" ~doc:"Update baker consensus key"
+  in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const update_consensus_key_run
+        $ instance_arg $ key_arg $ delegate_opt $ json_flag $ yes_flag))
+
 (* ── Command group ─────────────────────────────────────────── *)
 
 let baker_cmd =
   let doc = "Baker wallet operations" in
   let info = Cmd.info "baker" ~doc in
-  Cmd.group info [list_cmd; status_cmd]
+  Cmd.group
+    info
+    [
+      list_cmd;
+      status_cmd;
+      register_cmd;
+      stake_cmd;
+      unstake_cmd;
+      finalize_unstake_cmd;
+      transfer_cmd;
+      set_delegate_params_cmd;
+      update_consensus_key_cmd;
+    ]
