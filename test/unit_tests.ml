@@ -3135,6 +3135,7 @@ let job_manager_timeout_kills_expired_job () =
   let open Octez_manager_ui in
   Job_manager.clear_finished () ;
   (* Create a job that "started" 200 seconds ago with a 120s timeout *)
+  let on_timeout_called = ref false in
   let fake_job : Job_manager.job =
     {
       id = 9999;
@@ -3145,6 +3146,7 @@ let job_manager_timeout_kills_expired_job () =
       log = [];
       phase = "";
       timeout = Some 120.0;
+      on_timeout = (fun () -> on_timeout_called := true);
     }
   in
   Job_manager.For_tests.inject_job fake_job ;
@@ -3153,6 +3155,7 @@ let job_manager_timeout_kills_expired_job () =
   | Failed msg ->
       Alcotest.(check bool) "timed out message" true (String.length msg > 0)
   | _ -> Alcotest.fail "expected job to be Failed after timeout") ;
+  Alcotest.(check bool) "on_timeout called" true !on_timeout_called ;
   Job_manager.clear_finished ()
 
 let job_manager_no_timeout_keeps_running () =
@@ -3169,6 +3172,7 @@ let job_manager_no_timeout_keeps_running () =
       log = [];
       phase = "";
       timeout = None;
+      on_timeout = (fun () -> ());
     }
   in
   Job_manager.For_tests.inject_job fake_job ;
