@@ -104,6 +104,11 @@ val set : t -> unit
 (** Get all cached wallet data entries. *)
 val get_all : unit -> t list
 
+(** Remove cached wallet data for a specific delegate.
+    Use after a wallet operation to force a fresh fetch on the next
+    scheduler poll. *)
+val remove : pkh:string -> unit
+
 (** Clear all cached wallet data. *)
 val clear : unit -> unit
 
