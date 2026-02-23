@@ -193,8 +193,13 @@ let baker_password_file (svc : Service.t) =
           | None -> None
           | Some global_str -> find (String.split_on_char ' ' global_str)))
 
+let tzkt_base_url ~network =
+  if String.equal network "mainnet" then "https://tzkt.io"
+  else Printf.sprintf "https://%s.tzkt.io" network
+
 let run_wallet_operation ~svc ~pkh ~op =
   let instance = svc.Service.instance in
+  let network = svc.Service.network in
   let endpoint =
     match Delegate_scheduler.get_baker_node_endpoint ~instance with
     | Some ep -> ep
@@ -204,6 +209,7 @@ let run_wallet_operation ~svc ~pkh ~op =
   let base_dir = baker_base_dir svc in
   let password_file = baker_password_file svc in
   let description = Baker_ops.describe_operation op in
+  let op_hash_ref = ref None in
   (* Show confirmation modal directly — no dry-run fee estimation
      to avoid blocking the node's RPC worker with a simulation. *)
   Modal_helpers.open_choice_modal
@@ -230,16 +236,26 @@ let run_wallet_operation ~svc ~pkh ~op =
                   ~alias:pkh
                   ~op
               in
-              if result.success then Ok ()
+              if result.success then (
+                op_hash_ref := result.op_hash ;
+                Baker_wallet_data.remove ~pkh ;
+                Ok ())
               else
                 Error
                   (`Msg (Option.value ~default:"Unknown error" result.error)))
             ~on_complete:(fun exec_status ->
               match exec_status with
               | `Succeeded ->
-                  Modal_helpers.show_success
-                    ~title:description
-                    "Operation submitted successfully" ;
+                  let hash_display =
+                    match !op_hash_ref with
+                    | Some hash ->
+                        let url =
+                          Printf.sprintf "%s/%s" (tzkt_base_url ~network) hash
+                        in
+                        Printf.sprintf "Hash: %s\n\n%s" hash url
+                    | None -> "Operation submitted (no hash returned)"
+                  in
+                  Modal_helpers.show_success ~title:description hash_display ;
                   Context.toast_success (description ^ ": operation submitted")
               | `Failed msg ->
                   Modal_helpers.show_error ~title:description msg ;
