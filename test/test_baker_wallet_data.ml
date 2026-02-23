@@ -246,6 +246,78 @@ let test_parse_voting_info_cooldown () =
   | None -> fail "should parse"
   | Some vi -> check bool "cooldown" true (vi.period_kind = BWD.Cooldown)
 
+let test_parse_voting_info_promotion () =
+  let period_json =
+    Yojson.Safe.from_string
+      {|{"voting_period": {"kind": "promotion"}, "position": 50, "remaining": 150}|}
+  in
+  let current_proposal_json = Yojson.Safe.from_string {|"PtPromoProto..."|} in
+  match
+    BWD.For_tests.parse_voting_info
+      ~period_json
+      ~proposals_json:(`List [])
+      ~ballot_list_json:(`List [])
+      ~current_proposal_json
+  with
+  | None -> fail "should parse"
+  | Some vi ->
+      check bool "promotion" true (vi.period_kind = BWD.Promotion) ;
+      check int "position" 50 vi.period_position ;
+      check int "remaining" 150 vi.period_remaining ;
+      check
+        (option string)
+        "current proposal"
+        (Some "PtPromoProto...")
+        vi.current_proposal
+
+let test_parse_voting_info_adoption () =
+  let period_json =
+    Yojson.Safe.from_string
+      {|{"voting_period": {"kind": "adoption"}, "position": 10, "remaining": 90}|}
+  in
+  match
+    BWD.For_tests.parse_voting_info
+      ~period_json
+      ~proposals_json:(`List [])
+      ~ballot_list_json:(`List [])
+      ~current_proposal_json:`Null
+  with
+  | None -> fail "should parse"
+  | Some vi ->
+      check bool "adoption" true (vi.period_kind = BWD.Adoption) ;
+      check int "position" 10 vi.period_position
+
+let test_parse_voting_info_unknown_kind () =
+  let period_json =
+    Yojson.Safe.from_string
+      {|{"voting_period": {"kind": "unknown_kind"}, "position": 0, "remaining": 0}|}
+  in
+  match
+    BWD.For_tests.parse_voting_info
+      ~period_json
+      ~proposals_json:(`List [])
+      ~ballot_list_json:(`List [])
+      ~current_proposal_json:`Null
+  with
+  | None -> fail "should parse (defaults to Proposal)"
+  | Some vi ->
+      check bool "defaults to proposal" true (vi.period_kind = BWD.Proposal)
+
+let test_parse_voting_info_no_current_proposal () =
+  let period_json =
+    Yojson.Safe.from_string
+      {|{"voting_period": {"kind": "proposal"}, "position": 0, "remaining": 100}|}
+  in
+  match
+    BWD.For_tests.parse_voting_info
+      ~period_json
+      ~proposals_json:(`List [])
+      ~ballot_list_json:(`List [])
+      ~current_proposal_json:`Null
+  with
+  | None -> fail "should parse"
+  | Some vi -> check (option string) "no proposal" None vi.current_proposal
+
 (* ── format_tez ────────────────────────────────────────────── *)
 
 let test_format_tez_zero () =
@@ -348,6 +420,34 @@ let test_is_stale_old () =
   in
   check bool "stale" true (BWD.is_stale ~max_age:60.0 d)
 
+(* ── Voting info cache ─────────────────────────────────────── *)
+
+let test_voting_cache_set_and_get () =
+  let vi : BWD.voting_info =
+    {
+      period_kind = BWD.Proposal;
+      period_position = 5;
+      period_remaining = 95;
+      proposals = [("PtTest", 10)];
+      current_proposal = None;
+      ballots = [];
+    }
+  in
+  BWD.set_voting_info ~node_endpoint:"http://localhost:8732" vi ;
+  match BWD.get_voting_info ~node_endpoint:"http://localhost:8732" with
+  | None -> fail "should find voting info"
+  | Some found ->
+      check bool "proposal" true (found.period_kind = BWD.Proposal) ;
+      check int "position" 5 found.period_position ;
+      check int "1 proposal" 1 (List.length found.proposals)
+
+let test_voting_cache_missing () =
+  check
+    bool
+    "not found"
+    true
+    (BWD.get_voting_info ~node_endpoint:"http://nope:9999" = None)
+
 (* ── string_of helpers ─────────────────────────────────────── *)
 
 let test_string_of_ballot_vote () =
@@ -428,6 +528,16 @@ let () =
             `Quick
             test_parse_voting_info_exploration;
           test_case "cooldown period" `Quick test_parse_voting_info_cooldown;
+          test_case "promotion period" `Quick test_parse_voting_info_promotion;
+          test_case "adoption period" `Quick test_parse_voting_info_adoption;
+          test_case
+            "unknown kind defaults"
+            `Quick
+            test_parse_voting_info_unknown_kind;
+          test_case
+            "no current proposal"
+            `Quick
+            test_parse_voting_info_no_current_proposal;
         ] );
       ( "format_tez",
         [
@@ -459,6 +569,11 @@ let () =
           test_case "clear" `Quick test_cache_clear;
           test_case "is_stale fresh" `Quick test_is_stale_fresh;
           test_case "is_stale old" `Quick test_is_stale_old;
+        ] );
+      ( "voting_cache",
+        [
+          test_case "set and get" `Quick test_voting_cache_set_and_get;
+          test_case "missing endpoint" `Quick test_voting_cache_missing;
         ] );
       ( "string_of helpers",
         [
