@@ -583,15 +583,32 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
         | Some choice -> (
             match on_select choice with
             | `KeepOpen ->
-                (* Rebuild widget with updated items from the callback *)
+                (* Find the index of current selection before rebuilding *)
+                let current_items = items () in
+                let selected_idx =
+                  List.find_index (fun item -> item = choice) current_items
+                  |> Option.value ~default:0
+                in
+                (* Rebuild widget with updated items *)
                 let updated_items = items () in
                 Navigation.update
                   (fun _ ->
-                    Select_widget.open_centered
-                      ~title:""
-                      ~items:updated_items
-                      ~to_string
-                      ())
+                    let new_widget =
+                      Select_widget.open_centered
+                        ~title:""
+                        ~items:updated_items
+                        ~to_string
+                        ()
+                    in
+                    (* Move cursor back to the same position *)
+                    let rec move_to_index widget idx =
+                      if idx <= 0 then widget
+                      else
+                        move_to_index
+                          (Select_widget.handle_key widget ~key:"Down")
+                          (idx - 1)
+                    in
+                    move_to_index new_widget selected_idx)
                   ps
             | `Close ->
                 (* Close modal *)
