@@ -268,7 +268,8 @@ let authorized_keys_field =
                           model_ref :=
                             {
                               !model_ref with
-                              authorized_keys = !model_ref.authorized_keys @ [key];
+                              authorized_keys =
+                                !model_ref.authorized_keys @ [key];
                             } ;
                           open_menu ()))
                       ()
@@ -280,7 +281,10 @@ let authorized_keys_field =
                       open_menu ())
                     else
                       let key_items =
-                        List.map (fun (hash, alias, base_dir) -> (hash, alias, base_dir)) all_keys
+                        List.map
+                          (fun (hash, alias, base_dir) ->
+                            (hash, alias, base_dir))
+                          all_keys
                       in
                       let to_string (hash, alias, _base_dir) =
                         Printf.sprintf "%s (%s)" alias hash
@@ -293,7 +297,8 @@ let authorized_keys_field =
                           model_ref :=
                             {
                               !model_ref with
-                              authorized_keys = !model_ref.authorized_keys @ [key_hash];
+                              authorized_keys =
+                                !model_ref.authorized_keys @ [key_hash];
                             } ;
                           open_menu ())
                       in

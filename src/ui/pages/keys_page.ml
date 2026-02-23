@@ -6,7 +6,6 @@
 (******************************************************************************)
 
 open Octez_manager_lib
-
 module Widgets = Miaou_widgets_display.Widgets
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
@@ -22,9 +21,9 @@ type dir_group = {
 
 (** Page state *)
 type state = {
-  groups : dir_group list;  (* Keys grouped by base directory *)
-  selected : int;  (* Cursor position in flattened list *)
-  total_keys : int;  (* Total number of keys across all groups *)
+  groups : dir_group list; (* Keys grouped by base directory *)
+  selected : int; (* Cursor position in flattened list *)
+  total_keys : int; (* Total number of keys across all groups *)
 }
 
 type msg = unit
@@ -54,7 +53,9 @@ let get_all_base_dirs () =
   let managed_dirs =
     match Directory_registry.list ~dir_type:Client_base_dir () with
     | Ok entries ->
-        List.map (fun (e : Directory_registry.directory_entry) -> e.path) entries
+        List.map
+          (fun (e : Directory_registry.directory_entry) -> e.path)
+          entries
     | Error _ -> []
   in
   (* Put default first, then managed dirs *)
@@ -66,12 +67,12 @@ let get_all_keys () =
   let all_dirs = get_all_base_dirs () in
   all_dirs
   |> List.map (fun base_dir ->
-         match Keys_reader.read_public_key_hashes ~base_dir with
-         | Ok keys ->
-             List.map
-               (fun (k : Keys_reader.key_info) -> (k.value, k.name, base_dir))
-               keys
-         | Error _ -> [])
+      match Keys_reader.read_public_key_hashes ~base_dir with
+      | Ok keys ->
+          List.map
+            (fun (k : Keys_reader.key_info) -> (k.value, k.name, base_dir))
+            keys
+      | Error _ -> [])
   |> List.flatten
 
 (** Initialize page state by scanning all base directories *)
@@ -129,9 +130,7 @@ let header s =
 
 (** Render a single key entry *)
 let render_key ~is_selected (key : Keys_reader.key_info) =
-  let marker =
-    if is_selected then Widgets.themed_emphasis "  > " else "    "
-  in
+  let marker = if is_selected then Widgets.themed_emphasis "  > " else "    " in
   let alias = Widgets.themed_emphasis (Printf.sprintf "%-20s" key.name) in
   let hash = Widgets.themed_muted key.value in
   Printf.sprintf "%s%s %s" marker alias hash
@@ -180,14 +179,12 @@ let view ps ~focus:_ ~size =
     else
       let selected_counter = ref 0 in
       s.groups
-      |> List.map (render_group ~selected:selected_counter ~current_key:s.selected)
+      |> List.map
+           (render_group ~selected:selected_counter ~current_key:s.selected)
       |> List.flatten
   in
-  Themed_page.render_layout
-    ~size
-    ~header:(header s)
-    ~footer:[]
-    ~child:(fun _ -> String.concat "\n" body)
+  Themed_page.render_layout ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
+      String.concat "\n" body)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
@@ -204,14 +201,11 @@ let move_selection ps delta =
     ps
 
 (** Jump to first key *)
-let jump_to_top ps =
-  Navigation.update (fun s -> {s with selected = 0}) ps
+let jump_to_top ps = Navigation.update (fun s -> {s with selected = 0}) ps
 
 (** Jump to last key *)
 let jump_to_bottom ps =
-  Navigation.update
-    (fun s -> {s with selected = max 0 (s.total_keys - 1)})
-    ps
+  Navigation.update (fun s -> {s with selected = max 0 (s.total_keys - 1)}) ps
 
 (** Handle keyboard input *)
 let handle_key ps key ~size:_ =
