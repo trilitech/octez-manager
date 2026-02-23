@@ -206,6 +206,59 @@ let backend_field =
   |> Form_builder.with_hint
        "Key storage backend (only File is currently supported)"
 
+(** Helper to open permissions configuration modal for a key. *)
+let open_permissions_modal ~pkh ~initial_permissions ~on_submit () =
+  (* Track selected permissions using a ref *)
+  let selected = ref initial_permissions in
+  let all_ops = Signatory_config.all_operations in
+
+  (* Build items function that returns updated state with Done button *)
+  let items () =
+    let perm_items =
+      List.map
+        (fun op ->
+          let is_selected = List.mem op !selected in
+          `Permission (op, is_selected))
+        all_ops
+    in
+    perm_items @ [`Done]
+  in
+
+  let to_string = function
+    | `Permission (op, is_selected) ->
+        let checkbox = if is_selected then "[✓] " else "[ ] " in
+        let name = Signatory_config.operation_to_string op in
+        checkbox ^ name
+    | `Done ->
+        let count = List.length !selected in
+        Printf.sprintf "✓ Done (%d selected)" count
+  in
+
+  let on_select = function
+    | `Permission (op, is_selected) ->
+        if is_selected then
+          (* Deselect: remove from list *)
+          selected := List.filter (fun o -> o <> op) !selected
+        else
+          (* Select: add to list *)
+          selected := op :: !selected ;
+        `KeepOpen
+    | `Done ->
+        (* Submit and close *)
+        on_submit !selected ;
+        `Close
+  in
+
+  (* Open multiselect modal with Done button *)
+  Modal_helpers.open_multiselect_modal
+    ~title:
+      (Printf.sprintf
+         "Configure Permissions for %s"
+         (if String.length pkh > 40 then String.sub pkh 0 37 ^ "..." else pkh))
+    ~items
+    ~to_string
+    ~on_select
+
 (** Authorized keys list editor *)
 let authorized_keys_field =
   Form_builder.custom
@@ -223,19 +276,48 @@ let authorized_keys_field =
       let to_string = function
         | `Key (_, (key : authorized_key)) ->
             let pkh = key.pkh in
-            if String.length pkh > 40 then String.sub pkh 0 37 ^ "..." else pkh
+            let perm_count = List.length key.permissions in
+            let suffix =
+              Printf.sprintf
+                " (%d perm%s)"
+                perm_count
+                (if perm_count = 1 then "" else "s")
+            in
+            let display_pkh =
+              if String.length pkh > 35 then String.sub pkh 0 32 ^ "..."
+              else pkh
+            in
+            display_pkh ^ suffix
         | `Add -> "+ Add new key"
       in
       let rec open_menu () =
         let on_select = function
-          | `Key (idx, _key) ->
-              (* Toggle key - offer remove *)
-              let items = [`Remove; `Cancel] in
+          | `Key (idx, key) ->
+              (* Show menu: edit permissions or remove *)
+              let items = [`EditPermissions; `Remove; `Cancel] in
               let to_string = function
+                | `EditPermissions -> "Edit permissions"
                 | `Remove -> "Remove key"
                 | `Cancel -> "Cancel"
               in
               let on_select_action = function
+                | `EditPermissions ->
+                    (* Open permissions modal for existing key *)
+                    open_permissions_modal
+                      ~pkh:key.pkh
+                      ~initial_permissions:key.permissions
+                      ~on_submit:(fun perms ->
+                        let updated_keys =
+                          List.mapi
+                            (fun i k ->
+                              if i = idx then {k with permissions = perms}
+                              else k)
+                            !model_ref.authorized_keys
+                        in
+                        model_ref :=
+                          {!model_ref with authorized_keys = updated_keys} ;
+                        open_menu ())
+                      ()
                 | `Remove ->
                     let new_keys =
                       List.filteri
@@ -279,21 +361,21 @@ let authorized_keys_field =
                           Context.toast_error "Key already exists" ;
                           open_menu ())
                         else
-                          (* Create new authorized_key with default permissions *)
-                          let new_key =
-                            {
-                              pkh = key;
-                              permissions =
-                                Signatory_config.default_permissions ();
-                            }
-                          in
-                          model_ref :=
-                            {
-                              !model_ref with
-                              authorized_keys =
-                                !model_ref.authorized_keys @ [new_key];
-                            } ;
-                          open_menu ())
+                          (* Open permissions modal after key validation *)
+                          open_permissions_modal
+                            ~pkh:key
+                            ~initial_permissions:
+                              (Signatory_config.default_permissions ())
+                            ~on_submit:(fun perms ->
+                              let new_key = {pkh = key; permissions = perms} in
+                              model_ref :=
+                                {
+                                  !model_ref with
+                                  authorized_keys =
+                                    !model_ref.authorized_keys @ [new_key];
+                                } ;
+                              open_menu ())
+                            ())
                       ()
                 | `SelectExisting ->
                     (* Get all keys from all base directories *)
@@ -320,21 +402,23 @@ let authorized_keys_field =
                           Context.toast_error "Key already added" ;
                           open_menu ())
                         else
-                          (* Create new authorized_key with default permissions *)
-                          let new_key =
-                            {
-                              pkh = key_hash;
-                              permissions =
-                                Signatory_config.default_permissions ();
-                            }
-                          in
-                          model_ref :=
-                            {
-                              !model_ref with
-                              authorized_keys =
-                                !model_ref.authorized_keys @ [new_key];
-                            } ;
-                          open_menu ()
+                          (* Open permissions modal after key selection *)
+                          open_permissions_modal
+                            ~pkh:key_hash
+                            ~initial_permissions:
+                              (Signatory_config.default_permissions ())
+                            ~on_submit:(fun perms ->
+                              let new_key =
+                                {pkh = key_hash; permissions = perms}
+                              in
+                              model_ref :=
+                                {
+                                  !model_ref with
+                                  authorized_keys =
+                                    !model_ref.authorized_keys @ [new_key];
+                                } ;
+                              open_menu ())
+                            ()
                       in
                       Modal_helpers.open_choice_modal
                         ~title:"Select Key"
