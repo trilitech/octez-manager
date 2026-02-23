@@ -60,6 +60,20 @@ let get_all_base_dirs () =
   (* Put default first, then managed dirs *)
   default_dir :: managed_dirs
 
+(** Get all keys from all base directories.
+    Returns (key_hash, alias, base_dir) tuples. *)
+let get_all_keys () =
+  let all_dirs = get_all_base_dirs () in
+  all_dirs
+  |> List.map (fun base_dir ->
+         match Keys_reader.read_public_key_hashes ~base_dir with
+         | Ok keys ->
+             List.map
+               (fun (k : Keys_reader.key_info) -> (k.value, k.name, base_dir))
+               keys
+         | Error _ -> [])
+  |> List.flatten
+
 (** Initialize page state by scanning all base directories *)
 let init () =
   let all_dirs = get_all_base_dirs () in

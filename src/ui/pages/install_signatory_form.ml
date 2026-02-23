@@ -243,26 +243,72 @@ let authorized_keys_field =
                 ~on_select:on_select_action
                 ()
           | `Add ->
-              Modal_helpers.prompt_text_modal
+              (* Show submenu: manual entry or select from existing *)
+              let items = [`SelectExisting; `Manual] in
+              let to_string = function
+                | `SelectExisting -> "Select from existing keys"
+                | `Manual -> "Enter manually"
+              in
+              let on_select_add_method = function
+                | `Manual ->
+                    Modal_helpers.prompt_text_modal
+                      ~title:"Add Authorized Key"
+                      ~placeholder:
+                        (Some "tz1abc... or tz2abc... or tz3abc... or tz4abc...")
+                      ~initial:""
+                      ~on_submit:(fun key ->
+                        let key = String.trim key in
+                        if not (validate_tezos_key key) then (
+                          Context.toast_error "Invalid Tezos key format" ;
+                          open_menu ())
+                        else if List.mem key !model_ref.authorized_keys then (
+                          Context.toast_error "Key already exists" ;
+                          open_menu ())
+                        else (
+                          model_ref :=
+                            {
+                              !model_ref with
+                              authorized_keys = !model_ref.authorized_keys @ [key];
+                            } ;
+                          open_menu ()))
+                      ()
+                | `SelectExisting ->
+                    (* Get all keys from all base directories *)
+                    let all_keys = Keys_page.get_all_keys () in
+                    if all_keys = [] then (
+                      Context.toast_warn "No keys found in any base directory" ;
+                      open_menu ())
+                    else
+                      let key_items =
+                        List.map (fun (hash, alias, base_dir) -> (hash, alias, base_dir)) all_keys
+                      in
+                      let to_string (hash, alias, _base_dir) =
+                        Printf.sprintf "%s (%s)" alias hash
+                      in
+                      let on_select_key (key_hash, _alias, _base_dir) =
+                        if List.mem key_hash !model_ref.authorized_keys then (
+                          Context.toast_error "Key already added" ;
+                          open_menu ())
+                        else (
+                          model_ref :=
+                            {
+                              !model_ref with
+                              authorized_keys = !model_ref.authorized_keys @ [key_hash];
+                            } ;
+                          open_menu ())
+                      in
+                      Modal_helpers.open_choice_modal
+                        ~title:"Select Key"
+                        ~items:key_items
+                        ~to_string
+                        ~on_select:on_select_key
+                        ()
+              in
+              Modal_helpers.open_choice_modal
                 ~title:"Add Authorized Key"
-                ~placeholder:
-                  (Some "tz1abc... or tz2abc... or tz3abc... or tz4abc...")
-                ~initial:""
-                ~on_submit:(fun key ->
-                  let key = String.trim key in
-                  if not (validate_tezos_key key) then (
-                    Context.toast_error "Invalid Tezos key format" ;
-                    open_menu ())
-                  else if List.mem key !model_ref.authorized_keys then (
-                    Context.toast_error "Key already exists" ;
-                    open_menu ())
-                  else (
-                    model_ref :=
-                      {
-                        !model_ref with
-                        authorized_keys = !model_ref.authorized_keys @ [key];
-                      } ;
-                    open_menu ()))
+                ~items
+                ~to_string
+                ~on_select:on_select_add_method
                 ()
         in
         let items =
