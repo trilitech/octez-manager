@@ -286,6 +286,8 @@ let poll_operation ~endpoint ~op_hash (step_ref : tracking_step Atomic.t) =
   in
   wait_included 0
 
+module Qr = Miaou_widgets_display.Qr_code_widget
+
 let render_tracking_checklist ~step ~network ~cols =
   let done_sym = Widgets.themed_success "✓"
   and spin_sym = Context.render_spinner ""
@@ -355,8 +357,14 @@ let render_tracking_checklist ~step ~network ~cols =
   let hash_lines =
     match op_hash_opt with
     | Some hash ->
+        let short_hash = truncate_pkh hash in
         let url = Printf.sprintf "%s/%s" (tzkt_base_url ~network) hash in
-        [""; " " ^ url]
+        let qr_lines =
+          match Qr.create ~data:url () with
+          | Ok qr -> [Qr.render qr ~focus:false]
+          | Error _ -> []
+        in
+        [""; Printf.sprintf "  %s" (Widgets.themed_muted short_hash)] @ qr_lines
     | None -> []
   in
   let hint_line =
@@ -438,7 +446,7 @@ let open_tracking_modal ~title ~network ~step_ref =
     {
       title;
       left = None;
-      max_width = Some (Clamped {ratio = 0.6; min = 50; max = 80});
+      max_width = Some (Clamped {ratio = 0.6; min = 50; max = 68});
       dim_background = true;
     }
   in
