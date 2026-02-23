@@ -484,6 +484,7 @@ Press **Enter** to open instance menu.|}
       [
         ("Enter", "Open");
         ("c", "Create");
+        ("K", "Keys");
         ("d", "Diagnostics");
         ("t", "Topology");
         ("b", "Binaries");
