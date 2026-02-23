@@ -300,6 +300,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_keys_page)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_keys_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_binary_registry)
  (libraries alcotest octez_manager_lib yojson)
  (modules test_binary_registry)

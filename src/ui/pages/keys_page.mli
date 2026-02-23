@@ -24,3 +24,16 @@ val register : unit -> unit
     Returns a list of (key_hash, alias, base_dir) tuples.
     Performs I/O - should not be called from render functions. *)
 val get_all_keys : unit -> (string * string * string) list
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Get the default client base directory (~/.tezos-client) *)
+  val default_client_base_dir : unit -> string
+
+  (** Get all base directories to scan for keys (default + managed, deduplicated).
+      Exposed for testing deduplication logic. *)
+  val get_all_base_dirs : unit -> string list
+end
+
+(**/**)
