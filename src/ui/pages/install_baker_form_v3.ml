@@ -560,7 +560,8 @@ let delegates_field =
         let all_keys = Keys_page.get_all_keys () in
         List.fold_left
           (fun acc (hash, alias, _base_dir) -> (hash, alias) :: acc)
-          [] all_keys
+          []
+          all_keys
       in
       (* Build modal items based on signatory selection *)
       let build_items () =
