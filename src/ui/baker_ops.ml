@@ -95,7 +95,7 @@ let build_command ~octez_client_bin ~endpoint ~base_dir ~alias ~op =
           Baker_wallet_data.string_of_ballot_vote ballot;
         ]
   in
-  base @ cmd
+  base @ cmd @ ["--burn-cap"; "1"]
 
 (* ── Output Parsing ────────────────────────────────────────── *)
 
