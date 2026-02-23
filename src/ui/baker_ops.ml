@@ -51,6 +51,9 @@ let build_command ~octez_client_bin ~endpoint ~base_dir ~password_file ~alias
     | Transfer {amount; destination} ->
         ["transfer"; amount; "from"; alias; "to"; destination]
     | Set_delegate_params {limit; edge} ->
+        (* octez-client expects: limit as integer 0-9, edge as fraction 0-1.
+           User enters limit 0-9 and edge 0-100 (percentage). *)
+        let edge_frac = Printf.sprintf "%g" (Float.of_int edge /. 100.0) in
         [
           "set";
           "delegate";
@@ -60,7 +63,7 @@ let build_command ~octez_client_bin ~endpoint ~base_dir ~password_file ~alias
           "--limit-of-staking-over-baking";
           string_of_int limit;
           "--edge-of-baking-over-staking";
-          string_of_int edge;
+          edge_frac;
         ]
     | Update_consensus_key {key} ->
         ["update"; "consensus"; "key"; "for"; alias; "to"; key]
@@ -197,9 +200,9 @@ let describe_operation = function
       Printf.sprintf "Transfer %s ꜩ to %s" amount destination
   | Set_delegate_params {limit; edge} ->
       Printf.sprintf
-        "Set Delegate Parameters (limit: %s, edge: %s)"
-        (Baker_wallet_data.format_staking_limit limit)
-        (Baker_wallet_data.format_baking_edge edge)
+        "Set Delegate Parameters (limit: %dx, edge: %d%%)"
+        limit
+        edge
   | Update_consensus_key {key} ->
       Printf.sprintf "Update Consensus Key to %s" key
   | Submit_proposals {proposals} ->
