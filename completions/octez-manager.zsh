@@ -183,7 +183,7 @@ _octez-manager() {
   opts_install_signatory=(
     '--address[HTTP server address (default: 127.0.0.1:6732)]:ADDR:'
     '--app-bin-dir[Directory containing Octez binaries]:DIR:_directories'
-    '--authorized-keys[Comma-separated list of authorized Tezos public key hashes (tz1, tz2, tz3, or tz4)]:KEYS:'
+    '--authorized-keys[Authorized Tezos public key hashes with optional permissions. Format: '\''PKH[:OPERATIONS]'\'' where OPERATIONS is a comma-separated list. Operations: block, attestation, preattestation, attestation_with_dal, generic. Example: '\''tz1abc:block,attestation tz2def:generic'\''. If no operations specified, defaults to all operations. Multiple keys separated by spaces.]:KEYS:'
     '--backend[Signatory backend type. Only '\''file'\'' is currently supported. File backend stores keys in the local filesystem.]:BACKEND:'
     '--bin-dir-alias[Use a registered directory by alias. Overrides --app-bin-dir. Create aliases with: octez-manager binaries register]:ALIAS:_directories'
     '--instance[Signatory instance name]:NAME:'
