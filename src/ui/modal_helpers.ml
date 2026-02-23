@@ -621,7 +621,7 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
                     move_to_index new_widget selected_idx)
                   ps
             | `Close ->
-                (* Close modal *)
+                (* Close modal - the on_select handler has already done its work *)
                 Miaou.Core.Modal_manager.close_top `Commit ;
                 ps)
         | None -> ps
