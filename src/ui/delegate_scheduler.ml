@@ -105,7 +105,7 @@ let poll_baker ~instance =
   (* Now poll delegate data via RPC *)
   match get_baker_node_endpoint ~instance with
   | None -> ()
-  | Some node_endpoint ->
+  | Some node_endpoint -> (
       let delegates = get_baker_delegates ~instance in
       List.iter
         (fun pkh ->
@@ -135,7 +135,11 @@ let poll_baker ~instance =
           match Baker_wallet_data.fetch_wallet_data ~node_endpoint ~pkh with
           | None -> ()
           | Some wallet_data -> Baker_wallet_data.set wallet_data)
-        delegates
+        delegates ;
+      (* Fetch voting info once per node endpoint *)
+      match Baker_wallet_data.fetch_voting_info ~node_endpoint with
+      | None -> ()
+      | Some vi -> Baker_wallet_data.set_voting_info ~node_endpoint vi)
 
 (** Poll all bakers *)
 let tick () =
