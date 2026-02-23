@@ -34,7 +34,18 @@ let test_build_register () =
   check
     (list string)
     "register"
-    [bin; "--endpoint"; endpoint; "register"; "key"; alias; "as"; "delegate"]
+    [
+      bin;
+      "--endpoint";
+      endpoint;
+      "register";
+      "key";
+      alias;
+      "as";
+      "delegate";
+      "--burn-cap";
+      "1";
+    ]
     cmd
 
 let test_build_stake () =
@@ -49,7 +60,17 @@ let test_build_stake () =
   check
     (list string)
     "stake"
-    [bin; "--endpoint"; endpoint; "stake"; "1000"; "for"; alias]
+    [
+      bin;
+      "--endpoint";
+      endpoint;
+      "stake";
+      "1000";
+      "for";
+      alias;
+      "--burn-cap";
+      "1";
+    ]
     cmd
 
 let test_build_unstake () =
@@ -64,7 +85,17 @@ let test_build_unstake () =
   check
     (list string)
     "unstake"
-    [bin; "--endpoint"; endpoint; "unstake"; "500"; "for"; alias]
+    [
+      bin;
+      "--endpoint";
+      endpoint;
+      "unstake";
+      "500";
+      "for";
+      alias;
+      "--burn-cap";
+      "1";
+    ]
     cmd
 
 let test_build_finalize_unstake () =
@@ -79,7 +110,17 @@ let test_build_finalize_unstake () =
   check
     (list string)
     "finalize"
-    [bin; "--endpoint"; endpoint; "finalize"; "unstake"; "for"; alias]
+    [
+      bin;
+      "--endpoint";
+      endpoint;
+      "finalize";
+      "unstake";
+      "for";
+      alias;
+      "--burn-cap";
+      "1";
+    ]
     cmd
 
 let test_build_transfer () =
@@ -104,6 +145,8 @@ let test_build_transfer () =
       alias;
       "to";
       "tz1dest";
+      "--burn-cap";
+      "1";
     ]
     cmd
 
@@ -132,6 +175,8 @@ let test_build_set_delegate_params () =
       "5000000";
       "--edge-of-baking-over-staking";
       "100000000";
+      "--burn-cap";
+      "1";
     ]
     cmd
 
@@ -158,6 +203,8 @@ let test_build_update_consensus_key () =
       alias;
       "to";
       "edpkNew...";
+      "--burn-cap";
+      "1";
     ]
     cmd
 
@@ -183,6 +230,8 @@ let test_build_submit_proposals () =
       alias;
       "PtProto1";
       "PtProto2";
+      "--burn-cap";
+      "1";
     ]
     cmd
 
@@ -208,6 +257,8 @@ let test_build_submit_ballot () =
       alias;
       "PtProto1";
       "yay";
+      "--burn-cap";
+      "1";
     ]
     cmd
 
@@ -220,8 +271,9 @@ let test_build_submit_ballot_nay () =
       ~alias
       ~op:(Submit_ballot {proposal = "PtProto1"; ballot = BWD.Nay})
   in
-  let last = List.rev cmd |> List.hd in
-  check string "nay ballot" "nay" last
+  (* Find the ballot value (before --burn-cap suffix) *)
+  let has_nay = List.mem "nay" cmd in
+  check bool "nay ballot" true has_nay
 
 let test_build_with_base_dir () =
   let cmd =
@@ -246,6 +298,8 @@ let test_build_with_base_dir () =
       alias;
       "as";
       "delegate";
+      "--burn-cap";
+      "1";
     ]
     cmd
 
