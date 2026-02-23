@@ -174,6 +174,25 @@ let baker_base_dir (svc : Service.t) =
   | Error _ -> None
   | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
 
+(** Extract password file path from the baker's extra_args.
+    Looks for [-f path] or [--password-filename path] in the service JSON.
+    Falls back to parsing OCTEZ_BAKER_GLOBAL_ARGS from the env file. *)
+let baker_password_file (svc : Service.t) =
+  let rec find = function
+    | ("-f" | "--password-filename") :: path :: _ when path <> "" -> Some path
+    | _ :: rest -> find rest
+    | [] -> None
+  in
+  match find svc.extra_args with
+  | Some _ as result -> result
+  | None -> (
+      match Node_env.read ~inst:svc.instance with
+      | Error _ -> None
+      | Ok pairs -> (
+          match List.assoc_opt "OCTEZ_BAKER_GLOBAL_ARGS" pairs with
+          | None -> None
+          | Some global_str -> find (String.split_on_char ' ' global_str)))
+
 let run_wallet_operation ~svc ~pkh ~op =
   let instance = svc.Service.instance in
   let endpoint =
@@ -183,6 +202,7 @@ let run_wallet_operation ~svc ~pkh ~op =
   in
   let client_bin = octez_client_bin svc in
   let base_dir = baker_base_dir svc in
+  let password_file = baker_password_file svc in
   let description = Baker_ops.describe_operation op in
   (* Show confirmation modal directly — no dry-run fee estimation
      to avoid blocking the node's RPC worker with a simulation. *)
@@ -206,6 +226,7 @@ let run_wallet_operation ~svc ~pkh ~op =
                   ~octez_client_bin:client_bin
                   ~endpoint
                   ~base_dir
+                  ~password_file
                   ~alias:pkh
                   ~op
               in

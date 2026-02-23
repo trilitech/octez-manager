@@ -76,6 +76,15 @@ val run_streaming :
 (** Run a command and return its stdout (trimmed). *)
 val run_out : string list -> (string, [> `Msg of string]) result
 
+(** Like {!run_out} but kills the process after [timeout] seconds.
+    Returns a timeout error if the process does not complete in time. *)
+val run_out_with_timeout :
+  timeout:float -> string list -> (string, [> `Msg of string]) result
+
+(** Override [run_out_with_timeout] with a non-blocking implementation. *)
+val set_run_out_with_timeout_hook :
+  (timeout:float -> string list -> (string, [`Msg of string]) result) -> unit
+
 (** Like {!run_out} but captures stderr to prevent it from leaking to
     the terminal.  Returns only stdout.  Useful for HTTP operations in
     the TUI where curl errors would corrupt the display. *)
