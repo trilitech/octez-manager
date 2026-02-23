@@ -434,6 +434,8 @@ let set data = with_cache_lock (fun () -> Hashtbl.replace cache data.pkh data)
 let get_all () =
   with_cache_lock (fun () -> Hashtbl.fold (fun _ v acc -> v :: acc) cache [])
 
+let remove ~pkh = with_cache_lock (fun () -> Hashtbl.remove cache pkh)
+
 let clear () = with_cache_lock (fun () -> Hashtbl.clear cache)
 
 let is_stale ~max_age data = Unix.gettimeofday () -. data.fetched_at > max_age
