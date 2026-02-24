@@ -61,8 +61,10 @@ let pending_lock = Mutex.create ()
 let force_refresh ~pkh =
   Mutex.protect pending_lock (fun () -> Hashtbl.replace pending_refresh pkh ())
 
-(** Get all running node endpoints grouped by network.
-    Falls back to public RPC nodes when no local nodes are running. *)
+(** Get all node endpoints grouped by network.
+    Starts with local running nodes, then supplements with public RPC nodes
+    for any networks not already covered locally.  This ensures that a key
+    from a ghostnet-only setup is still checked on mainnet, etc. *)
 let get_node_endpoints () =
   let local =
     Data.load_service_states ()
@@ -72,17 +74,18 @@ let get_node_endpoints () =
     |> List.map (fun (st : Data.Service_state.t) ->
         (st.service.network, Rpc_addr.to_endpoint st.service.rpc_addr))
   in
-  let result =
-    if local <> [] then local
-    else
-      (* No local nodes — fall back to public RPC nodes *)
-      Public_nodes_cache.get_nodes ()
-      |> List.filter_map (fun (n : Public_nodes_cache.node_info) ->
-          match n.network with
-          | Some net -> Some (net, n.rpc_addr)
-          | None -> None)
+  let local_networks = List.map fst local |> List.sort_uniq String.compare in
+  let public_extra =
+    Public_nodes_cache.get_nodes ()
+    |> List.filter_map (fun (n : Public_nodes_cache.node_info) ->
+        match n.network with
+        | Some net
+          when not (List.exists (fun ln -> String.equal ln net) local_networks)
+          ->
+            Some (net, n.rpc_addr)
+        | _ -> None)
   in
-  List.sort_uniq (fun (a, _) (b, _) -> String.compare a b) result
+  List.sort_uniq (fun (a, _) (b, _) -> String.compare a b) (local @ public_extra)
 
 (** Fetch a JSON string field from an RPC endpoint. *)
 let rpc_get_string endpoint path =
