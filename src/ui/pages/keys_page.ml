@@ -887,6 +887,96 @@ let offer_download_or_error ~action_label =
             Download Octez binaries from the Binaries page first."
            action_label)
 
+(** Address entry for the pick-address modal. *)
+type address_entry = {label : string; pkh : string; category : string}
+
+(** Collect known addresses from wallet keys and MRU history.
+    Excludes [exclude_pkh] (the source key) from the list. *)
+let collect_addresses ~exclude_pkh ~include_mru =
+  let all_dirs = get_all_base_dirs () in
+  let wallet_entries =
+    List.concat_map
+      (fun dir ->
+        match Keys_reader.read_public_key_hashes ~base_dir:dir with
+        | Ok keys ->
+            List.filter_map
+              (fun (ki : Keys_reader.key_info) ->
+                if String.equal ki.value exclude_pkh then None
+                else
+                  Some
+                    {
+                      label = Printf.sprintf "%s  %s" ki.name ki.value;
+                      pkh = ki.value;
+                      category = "Wallet";
+                    })
+              keys
+        | Error _ -> [])
+      all_dirs
+  in
+  (* Deduplicate by PKH — same key may appear in multiple base dirs *)
+  let seen = Hashtbl.create 16 in
+  let wallet_entries =
+    List.filter
+      (fun e ->
+        if Hashtbl.mem seen e.pkh then false
+        else (
+          Hashtbl.replace seen e.pkh true ;
+          true))
+      wallet_entries
+  in
+  let mru_entries =
+    if include_mru then
+      Transfer_mru.get ()
+      |> List.filter_map (fun (e : Transfer_mru.entry) ->
+          if String.equal e.pkh exclude_pkh || Hashtbl.mem seen e.pkh then None
+          else
+            let alias_part =
+              match e.alias with Some a -> a ^ "  " | None -> ""
+            in
+            Some
+              {
+                label = Printf.sprintf "%s%s" alias_part e.pkh;
+                pkh = e.pkh;
+                category = "Recent";
+              })
+    else []
+  in
+  wallet_entries @ mru_entries
+
+(** Open an address picker modal. Shows wallet keys and optionally MRU
+    destinations, with a "Custom PKH" option at the end.
+    @param title Modal title
+    @param exclude_pkh PKH to exclude (the source key)
+    @param include_mru Whether to include MRU transfer destinations
+    @param on_select Called with the selected PKH *)
+let pick_address ~title ~exclude_pkh ~include_mru ~on_select =
+  let entries = collect_addresses ~exclude_pkh ~include_mru in
+  let items = List.map (fun e -> `Known e) entries @ [`Custom] in
+  Modal_helpers.open_choice_modal
+    ~title
+    ~items
+    ~to_string:(function
+      | `Known e -> Printf.sprintf "[%s] %s" e.category e.label
+      | `Custom -> "Enter custom PKH...")
+    ~on_select:(function
+      | `Known e -> on_select e.pkh
+      | `Custom ->
+          Modal_helpers.prompt_text_modal
+            ~title:(title ^ ": PKH")
+            ~width:50
+            ~initial:""
+            ~placeholder:(Some "tz1...")
+            ~on_submit:(fun pkh ->
+              let pkh = String.trim pkh in
+              match Pkh_validator.validate_format pkh with
+              | Pkh_validator.Invalid reason ->
+                  Modal_helpers.show_error
+                    ~title:"Invalid PKH"
+                    (Printf.sprintf "Invalid PKH: %s" reason)
+              | Pkh_validator.Valid -> on_select pkh)
+            ())
+    ()
+
 (** Rename a key alias via octez-client. *)
 let action_rename ~base_dir (key : Keys_reader.key_metadata) =
   Modal_helpers.prompt_text_modal
@@ -979,71 +1069,51 @@ let run_client_action ~base_dir ~description ~args ~on_success =
           | `Cancelled -> ())
         ()
 
-(** Transfer action: prompts for destination and amount. *)
+(** Transfer action: pick destination from known addresses, then amount. *)
 let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
-  Modal_helpers.prompt_text_modal
-    ~title:"Transfer: Destination PKH"
-    ~width:50
-    ~initial:""
-    ~placeholder:(Some "tz1...")
-    ~on_submit:(fun dest_pkh ->
-      let dest_pkh = String.trim dest_pkh in
-      match Pkh_validator.validate_format dest_pkh with
-      | Pkh_validator.Invalid reason ->
-          Modal_helpers.show_error
-            ~title:"Invalid destination"
-            (Printf.sprintf "Invalid PKH: %s" reason)
-      | Pkh_validator.Valid ->
-          Modal_helpers.prompt_text_modal
-            ~title:"Transfer: Amount (tez)"
-            ~width:30
-            ~initial:""
-            ~placeholder:(Some "e.g. 1.5")
-            ~on_submit:(fun amount_str ->
-              let amount_str = String.trim amount_str in
-              match float_of_string_opt amount_str with
-              | None ->
-                  Modal_helpers.show_error
-                    ~title:"Invalid amount"
-                    "Please enter a valid number."
-              | Some _ ->
-                  let description =
-                    Printf.sprintf
-                      "Transfer %s tez from %s"
-                      amount_str
-                      key.alias
-                  in
-                  let endpoint_args =
-                    let endpoints =
-                      Keys_scheduler.get_endpoints_for_network ~network
-                    in
-                    match endpoints with
-                    | ep :: _ -> ["--endpoint"; ep]
-                    | [] -> []
-                  in
-                  run_client_action
-                    ~base_dir
-                    ~description
-                    ~args:
-                      (endpoint_args
-                      @ [
-                          "transfer";
-                          amount_str;
-                          "from";
-                          key.alias;
-                          "to";
-                          dest_pkh;
-                        ])
-                    ~on_success:(fun () ->
-                      Transfer_mru.add ~pkh:dest_pkh () ;
-                      Context.toast_success
-                        (Printf.sprintf
-                           "Transferred %s tez to %s"
-                           amount_str
-                           dest_pkh) ;
-                      Keys_scheduler.force_refresh ~pkh:key.pkh))
-            ())
-    ()
+  pick_address
+    ~title:"Transfer: Destination"
+    ~exclude_pkh:key.pkh
+    ~include_mru:true
+    ~on_select:(fun dest_pkh ->
+      Modal_helpers.prompt_text_modal
+        ~title:"Transfer: Amount (tez)"
+        ~width:30
+        ~initial:""
+        ~placeholder:(Some "e.g. 1.5")
+        ~on_submit:(fun amount_str ->
+          let amount_str = String.trim amount_str in
+          match float_of_string_opt amount_str with
+          | None ->
+              Modal_helpers.show_error
+                ~title:"Invalid amount"
+                "Please enter a valid number."
+          | Some _ ->
+              let description =
+                Printf.sprintf "Transfer %s tez from %s" amount_str key.alias
+              in
+              let endpoint_args =
+                let endpoints =
+                  Keys_scheduler.get_endpoints_for_network ~network
+                in
+                match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+              in
+              run_client_action
+                ~base_dir
+                ~description
+                ~args:
+                  (endpoint_args
+                  @ ["transfer"; amount_str; "from"; key.alias; "to"; dest_pkh]
+                  )
+                ~on_success:(fun () ->
+                  Transfer_mru.add ~pkh:dest_pkh () ;
+                  Context.toast_success
+                    (Printf.sprintf
+                       "Transferred %s tez to %s"
+                       amount_str
+                       dest_pkh) ;
+                  Keys_scheduler.force_refresh ~pkh:key.pkh))
+        ())
 
 (** Register as delegate action. *)
 let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
@@ -1071,37 +1141,28 @@ let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
 
 (** Delegate to another baker. *)
 let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
-  Modal_helpers.prompt_text_modal
-    ~title:"Delegate to: Baker PKH"
-    ~width:50
-    ~initial:""
-    ~placeholder:(Some "tz1... (baker address)")
-    ~on_submit:(fun baker_pkh ->
-      let baker_pkh = String.trim baker_pkh in
-      match Pkh_validator.validate_format baker_pkh with
-      | Pkh_validator.Invalid reason ->
-          Modal_helpers.show_error
-            ~title:"Invalid baker PKH"
-            (Printf.sprintf "Invalid PKH: %s" reason)
-      | Pkh_validator.Valid ->
-          let description =
-            Printf.sprintf "Delegate '%s' to %s" key.alias baker_pkh
-          in
-          let endpoint_args =
-            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
-          in
-          run_client_action
-            ~base_dir
-            ~description
-            ~args:
-              (endpoint_args
-              @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh])
-            ~on_success:(fun () ->
-              Context.toast_success
-                (Printf.sprintf "Delegated '%s' to %s" key.alias baker_pkh) ;
-              Keys_scheduler.force_refresh ~pkh:key.pkh))
-    ()
+  pick_address
+    ~title:"Delegate to"
+    ~exclude_pkh:key.pkh
+    ~include_mru:false
+    ~on_select:(fun baker_pkh ->
+      let description =
+        Printf.sprintf "Delegate '%s' to %s" key.alias baker_pkh
+      in
+      let endpoint_args =
+        let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+        match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+      in
+      run_client_action
+        ~base_dir
+        ~description
+        ~args:
+          (endpoint_args
+          @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh])
+        ~on_success:(fun () ->
+          Context.toast_success
+            (Printf.sprintf "Delegated '%s' to %s" key.alias baker_pkh) ;
+          Keys_scheduler.force_refresh ~pkh:key.pkh))
 
 (** Undelegate action. *)
 let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
@@ -1442,30 +1503,54 @@ let open_batch_modal ps =
                 action_register_delegate ~base_dir:group.base_dir ~network key)
               selected_keys
         | `Batch_delegate ->
-            Modal_helpers.prompt_text_modal
-              ~title:"Delegate all to: Baker PKH"
-              ~width:50
-              ~initial:""
-              ~placeholder:(Some "tz1... (baker address)")
-              ~on_submit:(fun baker_pkh ->
-                let baker_pkh = String.trim baker_pkh in
-                match Pkh_validator.validate_format baker_pkh with
-                | Pkh_validator.Invalid reason ->
-                    Modal_helpers.show_error
-                      ~title:"Invalid baker PKH"
-                      (Printf.sprintf "Invalid PKH: %s" reason)
-                | Pkh_validator.Valid ->
-                    List.iter
-                      (fun (group, key) ->
-                        let network =
-                          match group.networks with
-                          | n :: _ -> n
-                          | [] -> "mainnet"
-                        in
-                        action_delegate_to ~base_dir:group.base_dir ~network key ;
-                        ignore baker_pkh)
-                      selected_keys)
-              ()
+            (* Pick a single baker address, then delegate all selected keys *)
+            let exclude =
+              List.map
+                (fun (_, (k : Keys_reader.key_metadata)) -> k.pkh)
+                selected_keys
+            in
+            let exclude_first =
+              match exclude with pkh :: _ -> pkh | [] -> ""
+            in
+            pick_address
+              ~title:"Delegate all to"
+              ~exclude_pkh:exclude_first
+              ~include_mru:false
+              ~on_select:(fun baker_pkh ->
+                List.iter
+                  (fun ( (group : enriched_group),
+                         (key : Keys_reader.key_metadata) )
+                     ->
+                    let network =
+                      match group.networks with n :: _ -> n | [] -> "mainnet"
+                    in
+                    let endpoint_args =
+                      let endpoints =
+                        Keys_scheduler.get_endpoints_for_network ~network
+                      in
+                      match endpoints with
+                      | ep :: _ -> ["--endpoint"; ep]
+                      | [] -> []
+                    in
+                    run_client_action
+                      ~base_dir:group.base_dir
+                      ~description:
+                        (Printf.sprintf
+                           "Delegate '%s' to %s"
+                           key.alias
+                           baker_pkh)
+                      ~args:
+                        (endpoint_args
+                        @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh]
+                        )
+                      ~on_success:(fun () ->
+                        Context.toast_success
+                          (Printf.sprintf
+                             "Delegated '%s' to %s"
+                             key.alias
+                             baker_pkh) ;
+                        Keys_scheduler.force_refresh ~pkh:key.pkh))
+                  selected_keys)
         | `Batch_copy ->
             let all_pkhs =
               List.map
