@@ -888,26 +888,93 @@ let offer_download_or_error ~action_label =
            action_label)
 
 (** Address entry for the pick-address modal. *)
-type address_entry = {label : string; pkh : string; category : string}
+type address_entry = {
+  label : string;
+  pkh : string;
+  category : string;
+  balance : string option;
+  is_delegate : bool;
+  delegate_alias : string option;
+  is_mine : bool;
+  last_used_at : float;
+}
+
+(** Look up the best wallet_data entry for a PKH (first network found). *)
+let lookup_wallet_data ~pkh =
+  match Keys_scheduler.get_wallet_data ~pkh with
+  | wd :: _ -> Some wd
+  | [] -> None
+
+(** Build delegate display string from wallet data. *)
+let delegate_alias_of_wd (wd : Keys_scheduler.wallet_data) =
+  match wd.delegate with
+  | Some d -> Tzkt_aliases.find ~network:wd.network ~pkh:d
+  | None ->
+      if wd.is_registered then Tzkt_aliases.find ~network:wd.network ~pkh:wd.pkh
+      else None
 
 (** Collect known addresses from wallet keys and MRU history.
     Excludes [exclude_pkh] (the source key) from the list. *)
 let collect_addresses ~exclude_pkh ~include_mru =
   let all_dirs = get_all_base_dirs () in
+  (* Build a set of all signable PKHs across all wallets *)
+  let signable_pkhs = Hashtbl.create 32 in
+  let mru_list = Transfer_mru.get () in
+  let mru_by_pkh = Hashtbl.create 16 in
+  List.iter
+    (fun (e : Transfer_mru.entry) ->
+      Hashtbl.replace mru_by_pkh e.pkh e.last_used_at)
+    mru_list ;
+  (* First pass: collect signable PKHs *)
+  List.iter
+    (fun dir ->
+      match Keys_reader.read_keys_full ~base_dir:dir with
+      | Ok keys ->
+          List.iter
+            (fun (k : Keys_reader.key_metadata) ->
+              if k.has_secret_key then Hashtbl.replace signable_pkhs k.pkh true)
+            keys
+      | Error _ -> ())
+    all_dirs ;
   let wallet_entries =
     List.concat_map
       (fun dir ->
-        match Keys_reader.read_public_key_hashes ~base_dir:dir with
+        match Keys_reader.read_keys_full ~base_dir:dir with
         | Ok keys ->
             List.filter_map
-              (fun (ki : Keys_reader.key_info) ->
-                if String.equal ki.value exclude_pkh then None
+              (fun (k : Keys_reader.key_metadata) ->
+                if String.equal k.pkh exclude_pkh then None
                 else
+                  let wd = lookup_wallet_data ~pkh:k.pkh in
+                  let balance =
+                    Option.map
+                      (fun (w : Keys_scheduler.wallet_data) ->
+                        w.spendable_balance)
+                      wd
+                  in
+                  let is_delegate =
+                    match wd with Some w -> w.is_registered | None -> false
+                  in
+                  let delegate_alias =
+                    match wd with
+                    | Some w -> delegate_alias_of_wd w
+                    | None -> None
+                  in
+                  let last_used_at =
+                    match Hashtbl.find_opt mru_by_pkh k.pkh with
+                    | Some t -> t
+                    | None -> 0.0
+                  in
                   Some
                     {
-                      label = Printf.sprintf "%s  %s" ki.name ki.value;
-                      pkh = ki.value;
+                      label = k.alias;
+                      pkh = k.pkh;
                       category = "Wallet";
+                      balance;
+                      is_delegate;
+                      delegate_alias;
+                      is_mine = k.has_secret_key;
+                      last_used_at;
                     })
               keys
         | Error _ -> [])
@@ -926,22 +993,122 @@ let collect_addresses ~exclude_pkh ~include_mru =
   in
   let mru_entries =
     if include_mru then
-      Transfer_mru.get ()
+      mru_list
       |> List.filter_map (fun (e : Transfer_mru.entry) ->
           if String.equal e.pkh exclude_pkh || Hashtbl.mem seen e.pkh then None
           else
-            let alias_part =
-              match e.alias with Some a -> a ^ "  " | None -> ""
+            let wd = lookup_wallet_data ~pkh:e.pkh in
+            let balance =
+              Option.map
+                (fun (w : Keys_scheduler.wallet_data) -> w.spendable_balance)
+                wd
             in
+            let is_delegate =
+              match wd with Some w -> w.is_registered | None -> false
+            in
+            let delegate_alias =
+              match wd with Some w -> delegate_alias_of_wd w | None -> None
+            in
+            let label = match e.alias with Some a -> a | None -> "" in
             Some
               {
-                label = Printf.sprintf "%s%s" alias_part e.pkh;
+                label;
                 pkh = e.pkh;
                 category = "Recent";
+                balance;
+                is_delegate;
+                delegate_alias;
+                is_mine = Hashtbl.mem signable_pkhs e.pkh;
+                last_used_at = e.last_used_at;
               })
     else []
   in
-  wallet_entries @ mru_entries
+  (* Combine and sort: MRU entries first (by recency), then alphabetically *)
+  let all = wallet_entries @ mru_entries in
+  List.sort
+    (fun a b ->
+      match (a.last_used_at > 0.0, b.last_used_at > 0.0) with
+      | true, true ->
+          (* Both have MRU timestamps: most recent first *)
+          Float.compare b.last_used_at a.last_used_at
+      | true, false -> -1
+      | false, true -> 1
+      | false, false ->
+          (* Both non-MRU: alphabetical by label *)
+          String.compare a.label b.label)
+    all
+
+(** Format a short PKH for display in the picker: first 7 + last 4 chars. *)
+let short_pkh pkh =
+  let len = String.length pkh in
+  if len <= 15 then pkh
+  else String.sub pkh 0 7 ^ ".." ^ String.sub pkh (len - 4) 4
+
+(** Render one address entry as a rich display string. *)
+let address_entry_to_string e =
+  let icon =
+    if String.equal e.category "Recent" && not e.is_mine then
+      "\xE2\x8F\xB1\xEF\xB8\x8F " (* ⏱️ *)
+    else if e.is_mine then "\xF0\x9F\x94\x91 " (* 🔑 *)
+    else "\xF0\x9F\x93\x8B "
+    (* 📋 *)
+  in
+  let name_part =
+    if String.length e.label > 0 then
+      let max_len = 14 in
+      let truncated =
+        if String.length e.label > max_len then
+          String.sub e.label 0 (max_len - 1) ^ "~"
+        else e.label
+      in
+      Printf.sprintf "%-14s" truncated
+    else Printf.sprintf "%-14s" (short_pkh e.pkh)
+  in
+  let bal_part =
+    match e.balance with Some b -> " " ^ format_tez b | None -> ""
+  in
+  let delegate_part =
+    if e.is_delegate then
+      match e.delegate_alias with
+      | Some a -> " \xF0\x9F\x8F\x9B\xEF\xB8\x8F " ^ a (* 🏛️ *)
+      | None -> " \xF0\x9F\x8F\x9B\xEF\xB8\x8F" (* 🏛️ *)
+    else
+      match e.delegate_alias with
+      | Some a -> " \xE2\x86\x92 " ^ a (* → *)
+      | None -> ""
+  in
+  Printf.sprintf "%s%s%s%s" icon name_part bal_part delegate_part
+
+(** Build describe lines for the hint panel. *)
+let address_entry_describe = function
+  | `Known e ->
+      let lines = [Printf.sprintf "Address: %s" e.pkh] in
+      let lines =
+        match e.balance with
+        | Some b -> lines @ [Printf.sprintf "Spendable: %s" (format_tez b)]
+        | None -> lines @ ["Balance: unknown"]
+      in
+      let lines =
+        if e.is_delegate then
+          lines
+          @ [
+              Printf.sprintf
+                "Registered delegate%s"
+                (match e.delegate_alias with
+                | Some a -> " (" ^ a ^ ")"
+                | None -> "");
+            ]
+        else
+          match e.delegate_alias with
+          | Some a -> lines @ [Printf.sprintf "Delegating to: %s" a]
+          | None -> lines
+      in
+      let lines =
+        if e.is_mine then lines @ ["Signable (secret key available)"]
+        else lines @ ["Read-only address"]
+      in
+      lines
+  | `Custom -> ["Enter a public key hash manually"]
 
 (** Open an address picker modal. Shows wallet keys and optionally MRU
     destinations, with a "Custom PKH" option at the end.
@@ -952,12 +1119,13 @@ let collect_addresses ~exclude_pkh ~include_mru =
 let pick_address ~title ~exclude_pkh ~include_mru ~on_select =
   let entries = collect_addresses ~exclude_pkh ~include_mru in
   let items = List.map (fun e -> `Known e) entries @ [`Custom] in
-  Modal_helpers.open_choice_modal
+  Modal_helpers.open_choice_modal_with_hint
     ~title
     ~items
     ~to_string:(function
-      | `Known e -> Printf.sprintf "[%s] %s" e.category e.label
-      | `Custom -> "Enter custom PKH...")
+      | `Known e -> address_entry_to_string e | `Custom -> "Enter custom PKH...")
+    ~hint:(fun _ -> ())
+    ~describe:address_entry_describe
     ~on_select:(function
       | `Known e -> on_select e.pkh
       | `Custom ->
@@ -1069,7 +1237,58 @@ let run_client_action ~base_dir ~description ~args ~on_success =
           | `Cancelled -> ())
         ()
 
-(** Transfer action: pick destination from known addresses, then amount. *)
+(** Parse the fee line from octez-client --dry-run output. *)
+let parse_fee_line output =
+  let lines = String.split_on_char '\n' output in
+  List.find_map
+    (fun line ->
+      let trimmed = String.trim line in
+      if contains_substring trimmed "Fee to the baker" then Some trimmed
+      else None)
+    lines
+
+(** Run a dry-run simulation first, show a recap with estimated fee,
+    then execute the real command on confirmation. *)
+let dry_run_and_confirm ~base_dir ~description ~make_recap ~dry_run_args
+    ~real_args ~on_success =
+  match find_octez_client ~base_dir with
+  | None -> offer_download_or_error ~action_label:description
+  | Some client ->
+      let full_dry =
+        (client :: "--base-dir" :: base_dir :: dry_run_args) @ ["--dry-run"]
+      in
+      let output_ref = ref "" in
+      Modal_helpers.show_spinner_modal
+        ~title:"Simulating..."
+        ~label:description
+        ~work:(fun () ->
+          match Cmd_runner.run_out_silent full_dry with
+          | Ok output ->
+              output_ref := output ;
+              Ok ()
+          | Error (`Msg e) -> Error (`Msg e))
+        ~on_complete:(function
+          | `Succeeded ->
+              let fee_line = parse_fee_line !output_ref in
+              let recap = make_recap ~fee_line in
+              Modal_helpers.confirm_modal
+                ~title:"Confirm"
+                ~message:recap
+                ~on_result:(fun confirmed ->
+                  if confirmed then
+                    run_client_action
+                      ~base_dir
+                      ~description
+                      ~args:real_args
+                      ~on_success)
+                ()
+          | `Failed msg ->
+              Context.toast_error (Printf.sprintf "Simulation failed: %s" msg)
+          | `Cancelled -> ())
+        ()
+
+(** Transfer action: pick destination from known addresses, then amount.
+    Uses dry-run to estimate fees before executing. *)
 let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
   pick_address
     ~title:"Transfer: Destination"
@@ -1098,13 +1317,22 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
                 in
                 match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
               in
-              run_client_action
+              let op_args =
+                endpoint_args
+                @ ["transfer"; amount_str; "from"; key.alias; "to"; dest_pkh]
+              in
+              dry_run_and_confirm
                 ~base_dir
                 ~description
-                ~args:
-                  (endpoint_args
-                  @ ["transfer"; amount_str; "from"; key.alias; "to"; dest_pkh]
-                  )
+                ~make_recap:(fun ~fee_line ->
+                  Printf.sprintf
+                    "From: %s\nTo: %s\nAmount: %s tez\n%s"
+                    key.alias
+                    (short_pkh dest_pkh)
+                    amount_str
+                    (match fee_line with Some f -> f | None -> "Fee: unknown"))
+                ~dry_run_args:op_args
+                ~real_args:op_args
                 ~on_success:(fun () ->
                   Transfer_mru.add ~pkh:dest_pkh () ;
                   Context.toast_success
@@ -1183,6 +1411,90 @@ let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
           ~on_success:(fun () ->
             Context.toast_success (Printf.sprintf "Undelegated '%s'" key.alias) ;
             Keys_scheduler.force_refresh ~pkh:key.pkh))
+    ()
+
+(** Stake action: stake tez for a key with dry-run confirmation. *)
+let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
+  Modal_helpers.prompt_text_modal
+    ~title:"Stake: Amount (tez)"
+    ~width:30
+    ~initial:""
+    ~placeholder:(Some "e.g. 1.5")
+    ~on_submit:(fun amount_str ->
+      let amount_str = String.trim amount_str in
+      match float_of_string_opt amount_str with
+      | None ->
+          Modal_helpers.show_error
+            ~title:"Invalid amount"
+            "Please enter a valid number."
+      | Some _ ->
+          let description =
+            Printf.sprintf "Stake %s tez for %s" amount_str key.alias
+          in
+          let endpoint_args =
+            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+          in
+          let op_args =
+            endpoint_args @ ["stake"; amount_str; "for"; key.alias]
+          in
+          dry_run_and_confirm
+            ~base_dir
+            ~description
+            ~make_recap:(fun ~fee_line ->
+              Printf.sprintf
+                "Source: %s\nStake amount: %s tez\n%s"
+                key.alias
+                amount_str
+                (match fee_line with Some f -> f | None -> "Fee: unknown"))
+            ~dry_run_args:op_args
+            ~real_args:op_args
+            ~on_success:(fun () ->
+              Context.toast_success
+                (Printf.sprintf "Staked %s tez for %s" amount_str key.alias) ;
+              Keys_scheduler.force_refresh ~pkh:key.pkh))
+    ()
+
+(** Unstake action: unstake tez for a key with dry-run confirmation. *)
+let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
+  Modal_helpers.prompt_text_modal
+    ~title:"Unstake: Amount (tez)"
+    ~width:30
+    ~initial:""
+    ~placeholder:(Some "e.g. 1.5")
+    ~on_submit:(fun amount_str ->
+      let amount_str = String.trim amount_str in
+      match float_of_string_opt amount_str with
+      | None ->
+          Modal_helpers.show_error
+            ~title:"Invalid amount"
+            "Please enter a valid number."
+      | Some _ ->
+          let description =
+            Printf.sprintf "Unstake %s tez for %s" amount_str key.alias
+          in
+          let endpoint_args =
+            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+          in
+          let op_args =
+            endpoint_args @ ["unstake"; amount_str; "for"; key.alias]
+          in
+          dry_run_and_confirm
+            ~base_dir
+            ~description
+            ~make_recap:(fun ~fee_line ->
+              Printf.sprintf
+                "Source: %s\nUnstake amount: %s tez\n%s"
+                key.alias
+                amount_str
+                (match fee_line with Some f -> f | None -> "Fee: unknown"))
+            ~dry_run_args:op_args
+            ~real_args:op_args
+            ~on_success:(fun () ->
+              Context.toast_success
+                (Printf.sprintf "Unstaked %s tez for %s" amount_str key.alias) ;
+              Keys_scheduler.force_refresh ~pkh:key.pkh))
     ()
 
 (** Create a new key via octez-client gen keys. *)
@@ -1323,6 +1635,8 @@ let open_key_action_modal ~(group : enriched_group)
   let actions =
     [("Copy PKH", `Copy)]
     @ (if key.has_secret_key then [("Transfer", `Transfer)] else [])
+    @ (if key.has_secret_key then [("Stake", `Stake)] else [])
+    @ (if key.has_secret_key then [("Unstake", `Unstake)] else [])
     @ (if key.has_secret_key && not is_registered then
          [("Register as delegate", `Register)]
        else [])
@@ -1342,6 +1656,8 @@ let open_key_action_modal ~(group : enriched_group)
     ~on_select:(function
       | `Copy -> copy_to_clipboard key.pkh
       | `Transfer -> action_transfer ~base_dir ~network key
+      | `Stake -> action_stake ~base_dir ~network key
+      | `Unstake -> action_unstake ~base_dir ~network key
       | `Register -> action_register_delegate ~base_dir ~network key
       | `Delegate_to -> action_delegate_to ~base_dir ~network key
       | `Undelegate -> action_undelegate ~base_dir ~network key
@@ -1626,7 +1942,21 @@ let handle_key ps key ~size =
     | Some (Keys.Char "r") -> force_refresh_keys ps
     | Some (Keys.Char "y") | Some (Keys.Char "c") -> copy_selected_pkh ps
     | Some (Keys.Char "?") -> show_help ps
-    | _ -> ps
+    | _ -> (
+        if Miaou_helpers.Mouse.is_wheel_up key then
+          move_cursor (-Miaou_helpers.Mouse.wheel_scroll_lines) ~size ps
+        else if Miaou_helpers.Mouse.is_wheel_down key then
+          move_cursor Miaou_helpers.Mouse.wheel_scroll_lines ~size ps
+        else
+          match Miaou_helpers.Mouse.parse_click key with
+          | Some {row; _} ->
+              let rows = size.LTerm_geom.rows - 5 in
+              let _ = rows in
+              let idx = row - 3 + ps.Navigation.s.scroll_offset in
+              if idx >= 0 && idx < List.length ps.Navigation.s.nav_items then
+                move_cursor (idx - ps.Navigation.s.cursor) ~size ps
+              else ps
+          | None -> ps)
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
