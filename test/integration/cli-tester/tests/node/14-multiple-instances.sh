@@ -70,7 +70,6 @@ echo "Different RPC ports configured"
 # Remove first, verify second still exists
 echo "Removing first instance..."
 om instance "$INSTANCE1" purge
-ensure_tezos_user
 
 if instance_exists "$INSTANCE1"; then
 	echo "ERROR: First instance not removed"
