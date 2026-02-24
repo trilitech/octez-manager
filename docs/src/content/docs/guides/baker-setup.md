@@ -38,30 +38,6 @@ See the [Octez documentation](https://octez.tezos.com/docs/introduction/howtorun
 
 For enhanced security, you can use [Signatory](https://github.com/ecadlabs/signatory) as a remote signer instead of storing keys locally. This separates key management from your baker and supports hardware security modules (HSMs) and cloud KMS backends.
 
-### Quick Setup with Signatory
-
-1. **Generate or import your baker keys** (as shown above)
-
-2. **Install Signatory via TUI:**
-   - Launch `octez-manager`
-   - Select **[ Install new instance ]** → **Signatory**
-   - Configure backend (file for development, HSM/cloud for production)
-   - Add your baker's public key hash to authorized keys
-
-3. **Import keys into Signatory:**
-   ```bash
-   # Determine keys directory
-   KEY_DIR=~/.local/share/octez/signatory/dev-signer/keys
-   
-   # Copy octez-client keys to Signatory
-   cp ~/.tezos-client/secret_keys $KEY_DIR/
-   chmod 600 $KEY_DIR/secret_keys
-   ```
-
-4. **Install baker with remote signer:**
-   - When installing the baker (via TUI or CLI), select your Signatory instance
-   - Or via CLI: add `--remote-signer dev-signer` flag
-
 For detailed Signatory setup instructions, backend options, security best practices, and troubleshooting, see the [Signatory Setup Guide](/guides/signatory-setup/).
 
 ## Installation via TUI
