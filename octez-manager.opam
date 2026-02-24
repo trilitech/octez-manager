@@ -6,21 +6,21 @@ description:
 maintainer: ["Nomadic Labs <contact@nomadic-labs.com>"]
 authors: ["Nomadic Labs <contact@nomadic-labs.com>"]
 license: "MIT"
-homepage: "https://gitlab.com/mbourgoin/octez-manager"
-bug-reports: "https://gitlab.com/mbourgoin/octez-manager/-/issues"
+homepage: "https://github.com/trilitech/octez-manager"
+bug-reports: "https://github.com/trilitech/octez-manager/issues"
 depends: [
   "dune" {>= "3.13"}
-  "ocaml" {>= "5.1"}
+  "ocaml" {>= "5.3"}
   "cmdliner"
   "rresult"
   "yojson"
   "yaml"
   "bos"
-  "miaou-core" {>= "0.3.0"}
-  "miaou-driver-term" {>= "0.3.0"}
-  "miaou-driver-matrix" {>= "0.3.0"}
-  "miaou-runner" {>= "0.3.0"}
-  "miaou-driver-web" {>= "0.3.0"}
+  "miaou-core" {>= "0.4.1"}
+  "miaou-driver-term" {>= "0.4.1"}
+  "miaou-driver-matrix" {>= "0.4.1"}
+  "miaou-runner" {>= "0.4.1"}
+  "miaou-driver-web" {>= "0.4.1"}
   "eio"
   "eio_main"
   "eio_posix"
@@ -55,4 +55,13 @@ build: [
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
+]
+dev-repo: "git+https://github.com/trilitech/octez-manager.git"
+pin-depends: [
+  ["ppx_forbid.dev" "git+https://github.com/atacama-dev/ppx_forbid.git"]
+  ["miaou-core.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
+  ["miaou-driver-term.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
+  ["miaou-driver-matrix.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
+  ["miaou-runner.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
+  ["miaou-driver-web.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
 ]

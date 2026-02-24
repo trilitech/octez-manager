@@ -1,6 +1,8 @@
 (lang dune 3.13)
 (name octez-manager)
 (generate_opam_files true)
+(license MIT)
+(source (github trilitech/octez-manager))
 
 (package
  (name octez-manager)
@@ -8,17 +10,17 @@
  (description
   "Small CLI that installs octez-node and companion systemd services without the full Octez Setup UI.")
  (depends
-  (ocaml (>= 5.1))
+  (ocaml (>= 5.3))
   cmdliner
   rresult
   yojson
   yaml
   bos
-  (miaou-core (>= 0.3.0))
-  (miaou-driver-term (>= 0.3.0))
-  (miaou-driver-matrix (>= 0.3.0))
-  (miaou-runner (>= 0.3.0))
-  (miaou-driver-web (>= 0.3.0))
+  (miaou-core (>= 0.4.1))
+  (miaou-driver-term (>= 0.4.1))
+  (miaou-driver-matrix (>= 0.4.1))
+  (miaou-runner (>= 0.4.1))
+  (miaou-driver-web (>= 0.4.1))
   eio
   eio_main
   eio_posix
@@ -28,18 +30,15 @@
   ca-certs
   domain-name
   mirage-crypto-rng
-   uri
-   lambda-term
-   linenoise
-    (ppx_deriving :build)
-    (ppx_forbid :build)
-    (ppxlib (>= 0.28.0))
-    (sqlite3 :with-dev-setup)
-   (alcotest :with-test)
-   (qcheck-alcotest :with-test)
-   (bisect_ppx :with-test))
- (license MIT)
+  uri
+  lambda-term
+  linenoise
+  (ppx_deriving :build)
+  (ppx_forbid :build)
+  (ppxlib (>= 0.28.0))
+  (sqlite3 :with-dev-setup)
+  (alcotest :with-test)
+  (qcheck-alcotest :with-test)
+  (bisect_ppx :with-test))
  (authors "Nomadic Labs <contact@nomadic-labs.com>")
- (maintainers "Nomadic Labs <contact@nomadic-labs.com>")
- (homepage "https://gitlab.com/mbourgoin/octez-manager")
- (bug_reports "https://gitlab.com/mbourgoin/octez-manager/-/issues"))
+ (maintainers "Nomadic Labs <contact@nomadic-labs.com>"))
