@@ -130,9 +130,9 @@ octez-manager install-accuser [OPTIONS]
 
 ### `install-signatory`
 
-Install a new Signatory remote signer service.
+Install a new Signatory remote signer service. [Signatory](https://github.com/ecadlabs/signatory) is a remote signing service for secure key management with bakers, supporting hardware security modules and cloud KMS backends.
 
-[Signatory](https://github.com/ecadlabs/signatory) is a remote signing service that enables secure key management for bakers. It separates private keys from baking infrastructure, supporting hardware security modules (HSMs) and cloud KMS backends.
+For detailed setup instructions, backend options, security best practices, and troubleshooting, see the [Signatory Setup Guide](/guides/signatory-setup/).
 
 ```bash
 octez-manager install-signatory [OPTIONS]
@@ -153,31 +153,7 @@ octez-manager install-signatory [OPTIONS]
 | `--app-bin-dir <PATH>` | Directory containing Signatory binary | auto |
 | `--no-enable` | Don't auto-start the service | false |
 
-**Authorized Keys Format:**
-
-The `--authorized-keys` parameter accepts space-separated public key hashes with optional operation permissions:
-
-```bash
-# Single key (all operations allowed)
---authorized-keys tz1abc123...
-
-# Multiple keys
---authorized-keys "tz1abc123... tz2def456..."
-
-# With specific operation permissions
---authorized-keys "tz1abc:block,attestation tz2def:generic"
-```
-
-**Operation types:**
-- `block`: Block production
-- `attestation`: Attestations (formerly endorsements)
-- `preattestation`: Pre-attestations
-- `attestation_with_dal`: DAL-enabled attestations
-- `generic`: Generic signing operations
-
-If no operations are specified, all operations are allowed by default.
-
-**Examples:**
+**Example:**
 
 ```bash
 # Development setup with file backend
@@ -186,26 +162,6 @@ octez-manager install-signatory \
   --backend file \
   --authorized-keys tz1abc123... \
   --signatory-version latest
-
-# Production setup with custom keys directory
-octez-manager install-signatory \
-  --instance prod-signer \
-  --backend file \
-  --keys-dir /mnt/secure/signatory-keys \
-  --authorized-keys "tz1prod:block,attestation" \
-  --watermark file \
-  --metrics-address 127.0.0.1:9090
-
-# Multiple delegates
-octez-manager install-signatory \
-  --instance multi-signer \
-  --authorized-keys "tz1baker1... tz2baker2... tz3baker3..."
-
-# Remote signer (accessible from other machines)
-octez-manager install-signatory \
-  --instance remote-signer \
-  --address 0.0.0.0:6732 \
-  --authorized-keys tz1abc...
 ```
 
 **Using with Baker:**
@@ -213,17 +169,10 @@ octez-manager install-signatory \
 After installing Signatory, reference it when installing a baker:
 
 ```bash
-# Using local Signatory instance
 octez-manager install-baker \
   --instance my-baker \
   --delegate tz1abc123... \
   --remote-signer dev-signer
-
-# Using remote Signatory URL
-octez-manager install-baker \
-  --instance my-baker \
-  --delegate tz1abc123... \
-  --remote-signer http://signatory-host:6732
 ```
 
 **Keys Directory:**
