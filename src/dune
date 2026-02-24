@@ -61,7 +61,8 @@
   check_prefs
   eio_process
   tzkt_aliases
-  transfer_mru)
+  transfer_mru
+  key_aliases)
  (libraries
   octez_manager_common
   rresult
