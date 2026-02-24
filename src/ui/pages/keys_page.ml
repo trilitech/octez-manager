@@ -617,9 +617,13 @@ let render_key_detail ~box_width (group : enriched_group)
               Desc_list.create ~key_width:14 ~items ()
               |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
             in
+            let color =
+              if String.equal wd.network "mainnet" then Some 208 else None
+            in
             Box.render
               ~title:("Balance: " ^ wd.network)
               ~style:Rounded
+              ?color
               ~width:box_width
               desc)
         |> String.concat "\n"
