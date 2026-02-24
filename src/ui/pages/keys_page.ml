@@ -1753,17 +1753,14 @@ let apply_pending_search ps =
       let s = rebuild_nav s in
       {ps with s}
 
-(** Force refresh all visible keys. *)
+(** Force refresh the currently selected key. *)
 let force_refresh_keys ps =
   let s = ps.Navigation.s in
-  List.iter
-    (fun (g : enriched_group) ->
-      List.iter
-        (fun (k : Keys_reader.key_metadata) ->
-          Keys_scheduler.force_refresh ~pkh:k.pkh)
-        g.keys)
-    s.groups ;
-  Context.toast_info "Refreshing key data..." ;
+  (match List.nth_opt s.nav_items s.cursor with
+  | Some (KeyItem (_, key)) ->
+      Keys_scheduler.force_refresh ~pkh:key.pkh ;
+      Context.toast_info (Printf.sprintf "Refreshing %s..." key.alias)
+  | _ -> Context.toast_info "Select a key to refresh") ;
   ps
 
 (** Toggle visual multi-select mode. *)
