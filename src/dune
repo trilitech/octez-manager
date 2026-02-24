@@ -59,7 +59,9 @@
   self_update_checker
   version_utils
   check_prefs
-  eio_process)
+  eio_process
+  tzkt_aliases
+  transfer_mru)
  (libraries
   octez_manager_common
   rresult

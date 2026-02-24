@@ -7,53 +7,73 @@
 
 open Octez_manager_lib
 module Widgets = Miaou_widgets_display.Widgets
+module Grid = Miaou_widgets_layout.Grid_layout
+module Box = Miaou_widgets_layout.Box_widget
+module Desc_list = Miaou_widgets_display.Description_list
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 
 let name = "keys"
 
-(** A group of keys from one base directory *)
-type dir_group = {
+(* ================================================================ *)
+(* Types                                                             *)
+(* ================================================================ *)
+
+module StringSet = Set.Make (String)
+
+(** A group of keys from one base directory, with enriched metadata. *)
+type enriched_group = {
   base_dir : string;
-  keys : Keys_reader.key_info list;
+  keys : Keys_reader.key_metadata list;
   error : string option;
+  services : string list;
+  networks : string list;
 }
 
-(** Page state *)
+(** Items in the flattened navigation list. *)
+type nav_item =
+  | GroupHeader of enriched_group
+  | KeyItem of enriched_group * Keys_reader.key_metadata
+
+type focus_panel = ListPanel | DetailPanel
+
+type sort_mode = SortAlias | SortBalance | SortNetwork
+
 type state = {
-  groups : dir_group list; (* Keys grouped by base directory *)
-  selected : int; (* Cursor position in flattened list *)
-  total_keys : int; (* Total number of keys across all groups *)
+  groups : enriched_group list;
+  nav_items : nav_item list;
+  cursor : int;
+  folded : StringSet.t;
+  focus_panel : focus_panel;
+  scroll_offset : int;
+  total_keys : int;
+  search_query : string;
+  sort_mode : sort_mode;
+  multi_select : bool;
+  selected : StringSet.t;
 }
+
+let sort_mode_label = function
+  | SortAlias -> "Alias A-Z"
+  | SortBalance -> "Balance"
+  | SortNetwork -> "Network"
 
 type msg = unit
 
 type pstate = state Navigation.t
 
-(** Get default Octez client base directory *)
+(* ================================================================ *)
+(* Data loading (I/O — called in init, not in view)                  *)
+(* ================================================================ *)
+
 let default_client_base_dir () =
   Filename.concat (Paths.home_dir ()) ".tezos-client"
 
-(** Count total number of keys across all groups *)
-let count_keys groups =
-  List.fold_left (fun acc g -> acc + List.length g.keys) 0 groups
-
-(** Load keys from a base directory *)
-let load_keys_from_dir base_dir =
-  match Keys_reader.read_public_key_hashes ~base_dir with
-  | Ok keys -> {base_dir; keys; error = None}
-  | Error (`Msg msg) ->
-      (* Only show error if directory exists but has read issues *)
-      if Sys.file_exists base_dir then {base_dir; keys = []; error = Some msg}
-      else {base_dir; keys = []; error = None}
-
-(** Remove trailing slash from path for normalization *)
 let normalize_path path =
   let len = String.length path in
   if len > 1 && String.get path (len - 1) = '/' then String.sub path 0 (len - 1)
   else path
 
-(** Get all base directories to scan for keys *)
 let get_all_base_dirs () =
   let default_dir = default_client_base_dir () in
   let managed_dirs =
@@ -64,14 +84,144 @@ let get_all_base_dirs () =
           entries
     | Error _ -> []
   in
-  (* Put default first, then managed dirs. Deduplicate in case default is also registered. *)
-  (* Normalize paths to handle trailing slash differences *)
   let all_dirs = default_dir :: managed_dirs in
   let normalized = List.map normalize_path all_dirs in
   List.sort_uniq String.compare normalized |> List.sort String.compare
 
-(** Get all keys from all base directories.
-    Returns (key_hash, alias, base_dir) tuples. *)
+(** Find registered services for a base directory path. *)
+let services_for_dir base_dir =
+  match Directory_registry.find_by_path base_dir with
+  | Ok (Some entry) -> entry.registered_services
+  | _ -> []
+
+(** Find networks used by services associated with a base directory. *)
+let networks_for_services service_names =
+  let services = Data.load_service_states () in
+  List.filter_map
+    (fun (st : Data.Service_state.t) ->
+      if List.exists (String.equal st.service.instance) service_names then
+        Some st.service.network
+      else None)
+    services
+  |> List.sort_uniq String.compare
+
+let load_enriched_group base_dir =
+  let services = services_for_dir base_dir in
+  let networks = networks_for_services services in
+  match Keys_reader.read_keys_full ~base_dir with
+  | Ok keys -> {base_dir; keys; error = None; services; networks}
+  | Error (`Msg msg) ->
+      if Sys.file_exists base_dir then
+        {base_dir; keys = []; error = Some msg; services; networks}
+      else {base_dir; keys = []; error = None; services; networks}
+
+(** Build the flat navigation list from groups and fold state. *)
+let build_nav_items ~folded groups =
+  List.concat_map
+    (fun group ->
+      let header = GroupHeader group in
+      if StringSet.mem group.base_dir folded then [header]
+      else header :: List.map (fun key -> KeyItem (group, key)) group.keys)
+    groups
+
+let count_keys groups =
+  List.fold_left (fun acc g -> acc + List.length g.keys) 0 groups
+
+(** Check if [haystack] contains [needle] as a substring. *)
+let contains_substring haystack needle =
+  let nlen = String.length needle in
+  let hlen = String.length haystack in
+  if nlen = 0 then true
+  else if nlen > hlen then false
+  else
+    let found = ref false in
+    let i = ref 0 in
+    while !i <= hlen - nlen && not !found do
+      if String.sub haystack !i nlen = needle then found := true ;
+      incr i
+    done ;
+    !found
+
+(** Filter groups by search query (case-insensitive match on alias or PKH). *)
+let filter_groups ~query groups =
+  if String.length query = 0 then groups
+  else
+    let q = String.lowercase_ascii query in
+    List.filter_map
+      (fun (g : enriched_group) ->
+        let matching_keys =
+          List.filter
+            (fun (k : Keys_reader.key_metadata) ->
+              let alias_match =
+                contains_substring (String.lowercase_ascii k.alias) q
+              in
+              let pkh_match =
+                contains_substring (String.lowercase_ascii k.pkh) q
+              in
+              alias_match || pkh_match)
+            g.keys
+        in
+        if matching_keys <> [] then Some {g with keys = matching_keys} else None)
+      groups
+
+(** Sort keys within groups by the given mode. *)
+let sort_groups ~mode groups =
+  List.map
+    (fun (g : enriched_group) ->
+      let keys =
+        match mode with
+        | SortAlias ->
+            List.sort
+              (fun (a : Keys_reader.key_metadata)
+                   (b : Keys_reader.key_metadata)
+                 -> String.compare a.alias b.alias)
+              g.keys
+        | SortBalance ->
+            List.sort
+              (fun (a : Keys_reader.key_metadata)
+                   (b : Keys_reader.key_metadata)
+                 ->
+                let bal_of k =
+                  match
+                    Keys_scheduler.get_wallet_data ~pkh:k.Keys_reader.pkh
+                  with
+                  | wd :: _ -> (
+                      match
+                        int_of_string_opt wd.Keys_scheduler.full_balance
+                      with
+                      | Some n -> n
+                      | None -> 0)
+                  | [] -> 0
+                in
+                Int.compare (bal_of b) (bal_of a))
+              g.keys
+        | SortNetwork ->
+            List.sort
+              (fun (a : Keys_reader.key_metadata)
+                   (b : Keys_reader.key_metadata)
+                 ->
+                let net_of k =
+                  match
+                    Keys_scheduler.get_wallet_data ~pkh:k.Keys_reader.pkh
+                  with
+                  | wd :: _ -> wd.Keys_scheduler.network
+                  | [] -> ""
+                in
+                String.compare (net_of a) (net_of b))
+              g.keys
+      in
+      {g with keys})
+    groups
+
+(** Rebuild nav_items applying current search and sort, preserving cursor. *)
+let rebuild_nav s =
+  let filtered = filter_groups ~query:s.search_query s.groups in
+  let sorted = sort_groups ~mode:s.sort_mode filtered in
+  let nav_items = build_nav_items ~folded:s.folded sorted in
+  let cursor = min s.cursor (max 0 (List.length nav_items - 1)) in
+  {s with nav_items; cursor}
+
+(** Backward-compatible: returns (pkh, alias, base_dir) tuples. *)
 let get_all_keys () =
   let all_dirs = get_all_base_dirs () in
   all_dirs
@@ -84,17 +234,47 @@ let get_all_keys () =
       | Error _ -> [])
   |> List.flatten
 
-(** Initialize page state by scanning all base directories *)
 let init () =
   let all_dirs = get_all_base_dirs () in
   let groups =
     all_dirs
-    |> List.map load_keys_from_dir
-    (* Only keep groups that have keys or errors *)
-    |> List.filter (fun g -> g.keys <> [] || g.error <> None)
+    |> List.map load_enriched_group
+    |> List.filter (fun g ->
+        g.keys <> [] || g.error <> None || g.services <> [])
   in
+  (* Register keys with the background scheduler *)
+  let keys_by_dir =
+    List.map
+      (fun (g : enriched_group) ->
+        ( g.base_dir,
+          List.map (fun (k : Keys_reader.key_metadata) -> k.pkh) g.keys ))
+      groups
+  in
+  Keys_scheduler.set_keys keys_by_dir ;
+  Keys_scheduler.start () ;
+  (* Load tzkt alias disk caches for known networks *)
+  let all_networks =
+    List.concat_map (fun (g : enriched_group) -> g.networks) groups
+    |> List.sort_uniq String.compare
+  in
+  List.iter (fun network -> Tzkt_aliases.load ~network) all_networks ;
+  let folded = StringSet.empty in
+  let nav_items = build_nav_items ~folded groups in
   let total_keys = count_keys groups in
-  Navigation.make {groups; selected = 0; total_keys}
+  Navigation.make
+    {
+      groups;
+      nav_items;
+      cursor = 0;
+      folded;
+      focus_panel = ListPanel;
+      scroll_offset = 0;
+      total_keys;
+      search_query = "";
+      sort_mode = SortAlias;
+      multi_select = false;
+      selected = StringSet.empty;
+    }
 
 let update ps _ = ps
 
@@ -117,7 +297,285 @@ let keymap _ =
   in
   [kb "Esc" "Back"; kb "?" "Help"]
 
-(** Render the page header *)
+(* ================================================================ *)
+(* Rendering helpers                                                 *)
+(* ================================================================ *)
+
+(** Short indicator for key kind. *)
+let key_kind_tag = function
+  | Keys_reader.Unencrypted -> ""
+  | Keys_reader.Encrypted -> Widgets.yellow "[enc]"
+  | Keys_reader.Ledger _ -> Widgets.cyan "[hw]"
+  | Keys_reader.Remote _ -> Widgets.themed_muted "[rmt]"
+
+(** Truncate a PKH to fit available space, keeping prefix and suffix. *)
+let truncate_pkh ~max_len pkh =
+  let len = String.length pkh in
+  if len <= max_len then pkh
+  else if max_len < 12 then String.sub pkh 0 max_len
+  else
+    let prefix_len = 8 in
+    let suffix_len = max_len - prefix_len - 2 in
+    String.sub pkh 0 prefix_len
+    ^ ".."
+    ^ String.sub pkh (len - suffix_len) suffix_len
+
+(** Render a single key row for the left panel. *)
+let render_key_row ~is_selected ~is_focused ~multi_selected ~cols
+    (key : Keys_reader.key_metadata) =
+  let select_indicator =
+    if multi_selected then Widgets.themed_accent "[*]" else ""
+  in
+  let marker =
+    if is_selected then
+      if is_focused then Widgets.themed_accent "> "
+      else Widgets.themed_muted "> "
+    else "  "
+  in
+  let kind_tag = key_kind_tag key.key_kind in
+  let watch_tag =
+    if not key.has_secret_key then Widgets.themed_muted "[ro]" else ""
+  in
+  let tags =
+    String.concat
+      ""
+      (List.filter (fun s -> not (String.equal s "")) [kind_tag; watch_tag])
+  in
+  let alias_width = min 20 (cols / 3) in
+  let raw_alias =
+    if String.length key.alias > alias_width then
+      String.sub key.alias 0 (alias_width - 1) ^ "~"
+    else key.alias
+  in
+  let alias = Printf.sprintf "%-*s" alias_width raw_alias in
+  let alias_styled =
+    if is_selected then Widgets.themed_emphasis alias else alias
+  in
+  let pkh_avail = cols - alias_width - 6 - String.length tags in
+  let pkh = truncate_pkh ~max_len:(max 10 pkh_avail) key.pkh in
+  let pkh_styled = Widgets.themed_muted pkh in
+  Printf.sprintf
+    "  %s%s%s %s %s"
+    marker
+    select_indicator
+    alias_styled
+    pkh_styled
+    tags
+
+(** Render a group header for the left panel. *)
+let render_group_header ~is_selected ~is_focused ~is_folded ~cols group =
+  let marker =
+    if is_selected then
+      if is_focused then Widgets.themed_accent "> "
+      else Widgets.themed_muted "> "
+    else "  "
+  in
+  let fold_indicator = if is_folded then "▸ " else "▾ " in
+  let dir_display =
+    let full = group.base_dir in
+    let max_dir_len = cols - 12 in
+    if String.length full <= max_dir_len then full
+    else
+      let home = Paths.home_dir () in
+      let home_len = String.length home in
+      if
+        String.length full > home_len
+        && String.equal (String.sub full 0 home_len) home
+      then "~" ^ String.sub full home_len (String.length full - home_len)
+      else full
+  in
+  let svc_dots =
+    if group.services = [] then ""
+    else
+      let svc_states = Data.load_service_states () in
+      let dots =
+        List.map
+          (fun svc_name ->
+            match
+              List.find_opt
+                (fun (st : Data.Service_state.t) ->
+                  String.equal st.service.instance svc_name)
+                svc_states
+            with
+            | Some st -> (
+                match st.status with
+                | Data.Service_state.Running -> Widgets.green "●"
+                | Stopped -> Widgets.red "●"
+                | Unknown _ -> Widgets.yellow "●")
+            | None -> Widgets.themed_muted "○")
+          group.services
+      in
+      " " ^ String.concat "" dots
+  in
+  let key_count =
+    let n = List.length group.keys in
+    Widgets.themed_muted
+      (Printf.sprintf " (%d key%s)" n (if n = 1 then "" else "s"))
+  in
+  Printf.sprintf
+    "%s%s%s%s%s"
+    marker
+    fold_indicator
+    (Widgets.themed_primary dir_display)
+    svc_dots
+    key_count
+
+(* ================================================================ *)
+(* Left panel: key list                                              *)
+(* ================================================================ *)
+
+let render_list_panel ~state ~focus ~cols ~rows =
+  let is_focused = focus && state.focus_panel = ListPanel in
+  let lines =
+    List.mapi
+      (fun idx item ->
+        let is_selected = idx = state.cursor in
+        match item with
+        | GroupHeader group ->
+            let is_folded = StringSet.mem group.base_dir state.folded in
+            render_group_header ~is_selected ~is_focused ~is_folded ~cols group
+        | KeyItem (_, key) ->
+            let multi_selected =
+              state.multi_select && StringSet.mem key.pkh state.selected
+            in
+            render_key_row ~is_selected ~is_focused ~multi_selected ~cols key)
+      state.nav_items
+  in
+  (* Apply scroll offset *)
+  let visible_lines =
+    let len = List.length lines in
+    if len <= rows then lines
+    else
+      let offset = state.scroll_offset in
+      let take_from = max 0 (min offset (len - rows)) in
+      List.filteri (fun i _ -> i >= take_from && i < take_from + rows) lines
+  in
+  (* Pad to fill height *)
+  let padded =
+    let n = List.length visible_lines in
+    if n >= rows then visible_lines
+    else visible_lines @ List.init (rows - n) (fun _ -> "")
+  in
+  String.concat "\n" padded
+
+(* ================================================================ *)
+(* Right panel: detail view                                          *)
+(* ================================================================ *)
+
+(** Format mutez as tez with 6 decimal places. *)
+let format_tez mutez_str =
+  match int_of_string_opt mutez_str with
+  | None -> mutez_str
+  | Some mutez ->
+      let tez = mutez / 1_000_000 in
+      let frac = abs (mutez mod 1_000_000) in
+      Printf.sprintf "%d.%06d ꜩ" tez frac
+
+let render_dir_detail ~box_width group =
+  let items =
+    [("Path", group.base_dir)]
+    @ (if group.services <> [] then
+         [("Services", String.concat ", " group.services)]
+       else [])
+    @ (if group.networks <> [] then
+         [("Networks", String.concat ", " group.networks)]
+       else [])
+    @ [("Keys", string_of_int (List.length group.keys))]
+    @
+    match group.error with
+    | Some err -> [("Error", Widgets.red err)]
+    | None -> []
+  in
+  let desc =
+    Desc_list.create ~key_width:12 ~items ()
+    |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+  in
+  Box.render ~title:"Directory" ~style:Rounded ~width:box_width desc
+
+let render_key_detail ~box_width (group : enriched_group)
+    (key : Keys_reader.key_metadata) =
+  let kind_str =
+    match key.key_kind with
+    | Unencrypted -> "Unencrypted"
+    | Encrypted -> "Encrypted"
+    | Ledger path -> "Ledger: " ^ path
+    | Remote endpoint -> "Remote: " ^ endpoint
+  in
+  let items =
+    [
+      ("Alias", key.alias);
+      ("PKH", key.pkh);
+      ("Key Type", kind_str);
+      ( "Secret Key",
+        if key.has_secret_key then Widgets.green "Yes"
+        else Widgets.red "No (watch-only)" );
+    ]
+    @ (match key.public_key with Some pk -> [("Public Key", pk)] | None -> [])
+    @ [("Base Dir", group.base_dir)]
+  in
+  let desc =
+    Desc_list.create ~key_width:14 ~items ()
+    |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+  in
+  let key_box =
+    Box.render ~title:"Key Details" ~style:Rounded ~width:box_width desc
+  in
+  (* Balance section from scheduler cache *)
+  let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+  let balance_section =
+    match wallet_data with
+    | [] -> Widgets.themed_muted "\n  No balance data yet. Fetching..."
+    | entries ->
+        entries
+        |> List.map (fun (wd : Keys_scheduler.wallet_data) ->
+            let items =
+              [
+                ("Network", wd.network);
+                ("Spendable", format_tez wd.spendable_balance);
+                ("Staked", format_tez wd.staked_balance);
+                ("Full Balance", format_tez wd.full_balance);
+              ]
+              @ (match wd.delegate with
+                | Some d ->
+                    let alias = Tzkt_aliases.find ~network:wd.network ~pkh:d in
+                    let label =
+                      match alias with
+                      | Some a -> Printf.sprintf "%s (%s)" d a
+                      | None -> d
+                    in
+                    [("Delegate", label)]
+                | None -> [])
+              @ (if wd.is_registered then
+                   [("Status", Widgets.green "Registered delegate")]
+                 else [])
+              @
+              match wd.active_consensus_key with
+              | Some ck -> [("Consensus Key", ck)]
+              | None -> []
+            in
+            let desc =
+              Desc_list.create ~key_width:14 ~items ()
+              |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+            in
+            Box.render
+              ~title:("Balance: " ^ wd.network)
+              ~style:Rounded
+              ~width:box_width
+              desc)
+        |> String.concat "\n"
+  in
+  key_box ^ "\n" ^ balance_section
+
+let render_detail_panel ~state ~box_width =
+  match List.nth_opt state.nav_items state.cursor with
+  | None -> Widgets.themed_muted "  No selection"
+  | Some (GroupHeader group) -> render_dir_detail ~box_width group
+  | Some (KeyItem (group, key)) -> render_key_detail ~box_width group key
+
+(* ================================================================ *)
+(* Page header                                                       *)
+(* ================================================================ *)
+
 let header s =
   let count_text =
     match s.total_keys with
@@ -132,115 +590,941 @@ let header s =
     | 1 -> " in 1 directory"
     | n -> Printf.sprintf " across %d directories" n
   in
+  let status_parts =
+    (if String.length s.search_query > 0 then
+       [Printf.sprintf "filter: %s" s.search_query]
+     else [])
+    @ match s.sort_mode with SortAlias -> [] | m -> [sort_mode_label m]
+  in
+  let status_suffix =
+    match status_parts with
+    | [] -> ""
+    | parts -> "  [" ^ String.concat " | " parts ^ "]"
+  in
   [
-    Widgets.themed_primary (Printf.sprintf " Keys · %s%s" count_text dir_text);
-    Widgets.themed_muted "k/j: navigate  Esc: back  ?: help";
+    Widgets.themed_primary
+      (Printf.sprintf " Keys . %s%s%s" count_text dir_text status_suffix);
+    Widgets.themed_muted
+      "j/k: navigate  Tab: panel  /: search  s: sort  +: add  ?: help";
   ]
 
-(** Render a single key entry *)
-let render_key ~is_selected (key : Keys_reader.key_info) =
-  let marker = if is_selected then Widgets.themed_emphasis "  > " else "    " in
-  let alias = Widgets.themed_emphasis (Printf.sprintf "%-20s" key.name) in
-  let hash = Widgets.themed_muted key.value in
-  Printf.sprintf "%s%s %s" marker alias hash
+(* ================================================================ *)
+(* Side-by-side layout                                               *)
+(* ================================================================ *)
 
-(** Render a directory group with its keys *)
-let render_group ~selected ~current_key (group : dir_group) =
-  let header_line =
-    Printf.sprintf "\n%s" (Widgets.themed_primary group.base_dir)
-  in
-  let content_lines =
-    match group.error with
-    | Some err ->
-        [
-          Printf.sprintf
-            "  %s"
-            (Widgets.themed_error (Printf.sprintf "Error: %s" err));
-        ]
-    | None ->
-        if group.keys = [] then
-          [Printf.sprintf "  %s" (Widgets.themed_muted "(no keys)")]
-        else
-          List.mapi
-            (fun _i key ->
-              let global_idx = !selected in
-              selected := !selected + 1 ;
-              render_key ~is_selected:(global_idx = current_key) key)
-            group.keys
-  in
-  header_line :: content_lines
+let side_by_side_min_width = 80
 
-(** Main view function - renders the entire page *)
-let view ps ~focus:_ ~size =
+let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
+  let separator = Widgets.themed_muted " │ " in
+  let sep_column = String.concat "\n" (List.init rows (fun _ -> separator)) in
+  let right_width = total_width - left_width - 3 in
+  let grid =
+    Grid.create
+      ~rows:[Grid.Fr 1.]
+      ~cols:[Grid.Px left_width; Grid.Px 3; Grid.Px right_width]
+      [
+        Grid.cell ~row:0 ~col:0 (fun ~size:_ -> left);
+        Grid.cell ~row:0 ~col:1 (fun ~size:_ -> sep_column);
+        Grid.cell ~row:0 ~col:2 (fun ~size:_ -> right);
+      ]
+  in
+  Grid.render grid ~size:{LTerm_geom.rows; cols = total_width}
+
+(* ================================================================ *)
+(* Main view                                                         *)
+(* ================================================================ *)
+
+let view ps ~focus ~size =
   let s = ps.Navigation.s in
   let body =
-    if s.groups = [] then
+    if s.groups = [] && String.length s.search_query = 0 then
       [
         "";
         Widgets.themed_muted "  No keys found in any base directory.";
         "";
         Widgets.themed_muted "  Keys are stored in:";
         Widgets.themed_muted
-          (Printf.sprintf "    • %s (default)" (default_client_base_dir ()));
+          (Printf.sprintf "    . %s (default)" (default_client_base_dir ()));
         Widgets.themed_muted
-          "    • Managed base directories from baker/accuser instances";
+          "    . Managed base directories from baker/accuser instances";
+        "";
+        Widgets.themed_muted "  To get started:";
+        Widgets.themed_muted
+          "    . Press + or n to create a new key or import an address";
+        Widgets.themed_muted
+          "    . Or install a baker/accuser to create a managed wallet";
       ]
+      |> String.concat "\n"
+    else if s.nav_items = [] && String.length s.search_query > 0 then
+      [
+        "";
+        Widgets.themed_muted
+          (Printf.sprintf "  No keys match filter: %s" s.search_query);
+        "";
+        Widgets.themed_muted "  Press Esc to clear the search filter.";
+      ]
+      |> String.concat "\n"
     else
-      let selected_counter = ref 0 in
-      s.groups
-      |> List.map
-           (render_group ~selected:selected_counter ~current_key:s.selected)
-      |> List.flatten
+      let cols = size.LTerm_geom.cols in
+      let content_rows = size.LTerm_geom.rows - 5 in
+      if cols >= side_by_side_min_width then
+        let left_width = min 60 (cols * 2 / 5) in
+        let right_width = cols - left_width - 3 in
+        let left =
+          render_list_panel ~state:s ~focus ~cols:left_width ~rows:content_rows
+        in
+        let right = render_detail_panel ~state:s ~box_width:right_width in
+        render_side_by_side
+          ~left
+          ~right
+          ~left_width
+          ~total_width:cols
+          ~rows:content_rows
+      else render_list_panel ~state:s ~focus ~cols ~rows:content_rows
   in
   Themed_page.render_layout ~size ~header:(header s) ~footer:[] ~child:(fun _ ->
-      String.concat "\n" body)
+      body)
+
+(* ================================================================ *)
+(* Modal handling                                                    *)
+(* ================================================================ *)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
   ps
 
-(** Move cursor by delta positions *)
-let move_selection ps delta =
+(* ================================================================ *)
+(* Navigation and keyboard handling                                  *)
+(* ================================================================ *)
+
+(* rebuild_nav defined earlier — applies search, sort, and fold. *)
+
+(** Ensure cursor is visible by adjusting scroll_offset. *)
+let ensure_visible ~rows state =
+  let offset = state.scroll_offset in
+  if state.cursor < offset then {state with scroll_offset = state.cursor}
+  else if state.cursor >= offset + rows then
+    {state with scroll_offset = state.cursor - rows + 1}
+  else state
+
+let move_cursor delta ~size ps =
+  let rows = size.LTerm_geom.rows - 5 in
   Navigation.update
     (fun s ->
-      if s.total_keys = 0 then s
+      let total = List.length s.nav_items in
+      if total = 0 then s
       else
-        let selected = max 0 (min (s.total_keys - 1) (s.selected + delta)) in
-        {s with selected})
+        let cursor = max 0 (min (total - 1) (s.cursor + delta)) in
+        ensure_visible ~rows {s with cursor})
     ps
 
-(** Jump to first key *)
-let jump_to_top ps = Navigation.update (fun s -> {s with selected = 0}) ps
+let jump_to_top ~size ps =
+  let rows = size.LTerm_geom.rows - 5 in
+  Navigation.update (fun s -> ensure_visible ~rows {s with cursor = 0}) ps
 
-(** Jump to last key *)
-let jump_to_bottom ps =
-  Navigation.update (fun s -> {s with selected = max 0 (s.total_keys - 1)}) ps
+let jump_to_bottom ~size ps =
+  let rows = size.LTerm_geom.rows - 5 in
+  Navigation.update
+    (fun s ->
+      let total = List.length s.nav_items in
+      ensure_visible ~rows {s with cursor = max 0 (total - 1)})
+    ps
 
-(** Handle keyboard input *)
-let handle_key ps key ~size:_ =
+let toggle_fold ~size ps =
+  let rows = size.LTerm_geom.rows - 5 in
+  Navigation.update
+    (fun s ->
+      match List.nth_opt s.nav_items s.cursor with
+      | Some (GroupHeader group) ->
+          let folded =
+            if StringSet.mem group.base_dir s.folded then
+              StringSet.remove group.base_dir s.folded
+            else StringSet.add group.base_dir s.folded
+          in
+          let s = {s with folded} in
+          let s = rebuild_nav s in
+          ensure_visible ~rows s
+      | _ -> s)
+    ps
+
+let switch_panel ps =
+  Navigation.update
+    (fun s ->
+      let focus_panel =
+        match s.focus_panel with
+        | ListPanel -> DetailPanel
+        | DetailPanel -> ListPanel
+      in
+      {s with focus_panel})
+    ps
+
+(* ================================================================ *)
+(* Key actions                                                       *)
+(* ================================================================ *)
+
+(** Find an octez-client binary for a base directory. Checks associated
+    services first, then falls back to PATH. *)
+let find_octez_client ~base_dir =
+  let from_service =
+    let svcs = services_for_dir base_dir in
+    let states = Data.load_service_states () in
+    List.find_map
+      (fun svc_name ->
+        match
+          List.find_opt
+            (fun (st : Data.Service_state.t) ->
+              String.equal st.service.instance svc_name)
+            states
+        with
+        | Some st ->
+            let path = Filename.concat st.service.app_bin_dir "octez-client" in
+            if Sys.file_exists path then Some path else None
+        | None -> None)
+      svcs
+  in
+  match from_service with
+  | Some path -> Some path
+  | None -> (
+      (* 2. Try managed binary downloads (latest version first) *)
+      let from_managed =
+        match Binary_registry.list_managed_versions () with
+        | Ok versions ->
+            List.find_map
+              (fun version ->
+                let dir = Binary_registry.managed_version_path version in
+                let path = Filename.concat dir "octez-client" in
+                if Sys.file_exists path then Some path else None)
+              versions
+        | Error _ -> None
+      in
+      match from_managed with
+      | Some path -> Some path
+      | None -> (
+          (* 3. Fall back to PATH *)
+          match Cmd_runner.run_out_silent ["which"; "octez-client"] with
+          | Ok path ->
+              let p = String.trim path in
+              if String.equal p "" then None else Some p
+          | Error _ -> None))
+
+(** Copy a PKH to clipboard. Tries system clipboard tools first,
+    then falls back to a toast with the full PKH for manual copy. *)
+let copy_to_clipboard pkh =
+  let try_clipboard () =
+    (* Try xclip, xsel, wl-copy, pbcopy in order *)
+    let tools =
+      [
+        ["xclip"; "-selection"; "clipboard"];
+        ["xsel"; "--clipboard"; "--input"];
+        ["wl-copy"];
+        ["pbcopy"];
+      ]
+    in
+    List.exists
+      (fun tool ->
+        match
+          Cmd_runner.run_out_silent
+            (["sh"; "-c"]
+            @ [
+                Printf.sprintf
+                  "echo -n %s | %s"
+                  (Cmd_runner.sh_quote pkh)
+                  (Cmd_runner.cmd_to_string tool);
+              ])
+        with
+        | Ok _ -> true
+        | Error _ -> false)
+      tools
+  in
+  if try_clipboard () then
+    Context.toast_success (Printf.sprintf "Copied: %s" pkh)
+  else Context.toast_info (Printf.sprintf "PKH: %s" pkh)
+
+(** When octez-client is not found, offer to download the latest Octez
+    version. Falls back to a plain error if no versions are available. *)
+let offer_download_or_error ~action_label =
+  match Versions_scheduler.get_cached () with
+  | Some (latest :: _) ->
+      Modal_helpers.confirm_modal
+        ~title:"octez-client not found"
+        ~message:
+          (Printf.sprintf
+             "Cannot %s without octez-client.\n\
+              Download Octez v%s (includes octez-client)?"
+             action_label
+             latest.Binary_downloader.version)
+        ~on_result:(fun confirmed ->
+          if confirmed then Binaries_actions.download_octez_version latest)
+        ()
+  | _ ->
+      Modal_helpers.show_error
+        ~title:"Error"
+        (Printf.sprintf
+           "octez-client not found. Cannot %s.\n\
+            Download Octez binaries from the Binaries page first."
+           action_label)
+
+(** Rename a key alias via octez-client. *)
+let action_rename ~base_dir (key : Keys_reader.key_metadata) =
+  Modal_helpers.prompt_text_modal
+    ~title:(Printf.sprintf "Rename '%s'" key.alias)
+    ~width:40
+    ~initial:key.alias
+    ~placeholder:(Some "New alias")
+    ~on_submit:(fun new_alias ->
+      let new_alias = String.trim new_alias in
+      if String.equal new_alias "" || String.equal new_alias key.alias then ()
+      else
+        match find_octez_client ~base_dir with
+        | None -> offer_download_or_error ~action_label:"rename key"
+        | Some client ->
+            let args =
+              [client; "--base-dir"; base_dir; "rename"; key.alias; new_alias]
+            in
+            Job_manager.submit
+              ~description:"Rename key alias"
+              (fun ~append_log:_ () -> Cmd_runner.run_silent args)
+              ~on_complete:(fun status ->
+                match status with
+                | Job_manager.Succeeded ->
+                    Context.toast_success
+                      (Printf.sprintf
+                         "Renamed '%s' to '%s'"
+                         key.alias
+                         new_alias) ;
+                    Context.mark_instances_dirty ()
+                | Job_manager.Failed msg ->
+                    Context.toast_error (Printf.sprintf "Rename failed: %s" msg)
+                | _ -> ()))
+    ()
+
+(** Forget (remove) a key from the wallet. *)
+let action_forget ~base_dir (key : Keys_reader.key_metadata) =
+  Modal_helpers.confirm_modal
+    ~title:(Printf.sprintf "Forget key '%s'?" key.alias)
+    ~message:
+      (Printf.sprintf
+         "PKH: %s\nThis removes the key from this wallet only."
+         key.pkh)
+    ~on_result:(fun confirmed ->
+      if confirmed then
+        match find_octez_client ~base_dir with
+        | None -> offer_download_or_error ~action_label:"forget key"
+        | Some client ->
+            let args =
+              [
+                client;
+                "--base-dir";
+                base_dir;
+                "forget";
+                "address";
+                key.alias;
+                "--force";
+              ]
+            in
+            Job_manager.submit
+              ~description:"Forget key"
+              (fun ~append_log:_ () -> Cmd_runner.run_silent args)
+              ~on_complete:(fun status ->
+                match status with
+                | Job_manager.Succeeded ->
+                    Context.toast_success
+                      (Printf.sprintf "Removed '%s' from wallet" key.alias) ;
+                    Context.mark_instances_dirty ()
+                | Job_manager.Failed msg ->
+                    Context.toast_error (Printf.sprintf "Forget failed: %s" msg)
+                | _ -> ()))
+    ()
+
+(** Execute an octez-client command with spinner and toast feedback. *)
+let run_client_action ~base_dir ~description ~args ~on_success =
+  match find_octez_client ~base_dir with
+  | None -> offer_download_or_error ~action_label:"perform operation"
+  | Some client ->
+      let full_args = client :: "--base-dir" :: base_dir :: args in
+      Modal_helpers.show_spinner_modal
+        ~title:description
+        ~label:description
+        ~work:(fun () -> Cmd_runner.run_silent full_args)
+        ~on_complete:(function
+          | `Succeeded ->
+              on_success () ;
+              Context.mark_instances_dirty ()
+          | `Failed msg ->
+              Context.toast_error
+                (Printf.sprintf "%s failed: %s" description msg)
+          | `Cancelled -> ())
+        ()
+
+(** Transfer action: prompts for destination and amount. *)
+let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
+  Modal_helpers.prompt_text_modal
+    ~title:"Transfer: Destination PKH"
+    ~width:50
+    ~initial:""
+    ~placeholder:(Some "tz1...")
+    ~on_submit:(fun dest_pkh ->
+      let dest_pkh = String.trim dest_pkh in
+      match Pkh_validator.validate_format dest_pkh with
+      | Pkh_validator.Invalid reason ->
+          Modal_helpers.show_error
+            ~title:"Invalid destination"
+            (Printf.sprintf "Invalid PKH: %s" reason)
+      | Pkh_validator.Valid ->
+          Modal_helpers.prompt_text_modal
+            ~title:"Transfer: Amount (tez)"
+            ~width:30
+            ~initial:""
+            ~placeholder:(Some "e.g. 1.5")
+            ~on_submit:(fun amount_str ->
+              let amount_str = String.trim amount_str in
+              match float_of_string_opt amount_str with
+              | None ->
+                  Modal_helpers.show_error
+                    ~title:"Invalid amount"
+                    "Please enter a valid number."
+              | Some _ ->
+                  let description =
+                    Printf.sprintf
+                      "Transfer %s tez from %s"
+                      amount_str
+                      key.alias
+                  in
+                  let endpoint_args =
+                    let endpoints =
+                      Keys_scheduler.get_endpoints_for_network ~network
+                    in
+                    match endpoints with
+                    | ep :: _ -> ["--endpoint"; ep]
+                    | [] -> []
+                  in
+                  run_client_action
+                    ~base_dir
+                    ~description
+                    ~args:
+                      (endpoint_args
+                      @ [
+                          "transfer";
+                          amount_str;
+                          "from";
+                          key.alias;
+                          "to";
+                          dest_pkh;
+                        ])
+                    ~on_success:(fun () ->
+                      Transfer_mru.add ~pkh:dest_pkh () ;
+                      Context.toast_success
+                        (Printf.sprintf
+                           "Transferred %s tez to %s"
+                           amount_str
+                           dest_pkh) ;
+                      Keys_scheduler.force_refresh ~pkh:key.pkh))
+            ())
+    ()
+
+(** Register as delegate action. *)
+let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
+    =
+  let description = Printf.sprintf "Register '%s' as delegate" key.alias in
+  let endpoint_args =
+    let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+    match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+  in
+  Modal_helpers.confirm_modal
+    ~title:(Printf.sprintf "Register '%s' as delegate?" key.alias)
+    ~message:"This will register your key as a delegate on the network."
+    ~on_result:(fun confirmed ->
+      if confirmed then
+        run_client_action
+          ~base_dir
+          ~description
+          ~args:
+            (endpoint_args @ ["register"; "key"; key.alias; "as"; "delegate"])
+          ~on_success:(fun () ->
+            Context.toast_success
+              (Printf.sprintf "'%s' registered as delegate" key.alias) ;
+            Keys_scheduler.force_refresh ~pkh:key.pkh))
+    ()
+
+(** Delegate to another baker. *)
+let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
+  Modal_helpers.prompt_text_modal
+    ~title:"Delegate to: Baker PKH"
+    ~width:50
+    ~initial:""
+    ~placeholder:(Some "tz1... (baker address)")
+    ~on_submit:(fun baker_pkh ->
+      let baker_pkh = String.trim baker_pkh in
+      match Pkh_validator.validate_format baker_pkh with
+      | Pkh_validator.Invalid reason ->
+          Modal_helpers.show_error
+            ~title:"Invalid baker PKH"
+            (Printf.sprintf "Invalid PKH: %s" reason)
+      | Pkh_validator.Valid ->
+          let description =
+            Printf.sprintf "Delegate '%s' to %s" key.alias baker_pkh
+          in
+          let endpoint_args =
+            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+          in
+          run_client_action
+            ~base_dir
+            ~description
+            ~args:
+              (endpoint_args
+              @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh])
+            ~on_success:(fun () ->
+              Context.toast_success
+                (Printf.sprintf "Delegated '%s' to %s" key.alias baker_pkh) ;
+              Keys_scheduler.force_refresh ~pkh:key.pkh))
+    ()
+
+(** Undelegate action. *)
+let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
+  let description = Printf.sprintf "Undelegate '%s'" key.alias in
+  let endpoint_args =
+    let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+    match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+  in
+  Modal_helpers.confirm_modal
+    ~title:(Printf.sprintf "Undelegate '%s'?" key.alias)
+    ~message:"This will withdraw the delegation."
+    ~on_result:(fun confirmed ->
+      if confirmed then
+        run_client_action
+          ~base_dir
+          ~description
+          ~args:(endpoint_args @ ["withdraw"; "delegate"; "from"; key.alias])
+          ~on_success:(fun () ->
+            Context.toast_success (Printf.sprintf "Undelegated '%s'" key.alias) ;
+            Keys_scheduler.force_refresh ~pkh:key.pkh))
+    ()
+
+(** Create a new key via octez-client gen keys. *)
+let action_create_key ~base_dir =
+  Modal_helpers.prompt_text_modal
+    ~title:"Create Key: Alias"
+    ~width:40
+    ~initial:""
+    ~placeholder:(Some "my_key")
+    ~on_submit:(fun alias ->
+      let alias = String.trim alias in
+      if String.length alias = 0 then
+        Modal_helpers.show_error ~title:"Error" "Alias cannot be empty."
+      else
+        let schemes =
+          [
+            ("Ed25519 (default)", "ed25519");
+            ("Secp256k1", "secp256k1");
+            ("P-256", "p256");
+            ("BLS", "bls");
+          ]
+        in
+        Modal_helpers.open_choice_modal
+          ~title:"Crypto scheme"
+          ~items:schemes
+          ~to_string:fst
+          ~on_select:(fun (_label, scheme) ->
+            let description =
+              Printf.sprintf "Generate '%s' key (%s)" alias scheme
+            in
+            run_client_action
+              ~base_dir
+              ~description
+              ~args:["gen"; "keys"; alias; "--sig"; scheme]
+              ~on_success:(fun () ->
+                Context.toast_success
+                  (Printf.sprintf "Key '%s' created (%s)" alias scheme)))
+          ())
+    ()
+
+(** Import a public key hash as watch-only address. *)
+let action_import_key ~base_dir =
+  Modal_helpers.prompt_text_modal
+    ~title:"Import Key: PKH"
+    ~width:50
+    ~initial:""
+    ~placeholder:(Some "tz1...")
+    ~on_submit:(fun pkh ->
+      let pkh = String.trim pkh in
+      match Pkh_validator.validate_format pkh with
+      | Pkh_validator.Invalid reason ->
+          Modal_helpers.show_error
+            ~title:"Invalid PKH"
+            (Printf.sprintf "Invalid PKH: %s" reason)
+      | Pkh_validator.Valid ->
+          Modal_helpers.prompt_text_modal
+            ~title:"Import Key: Alias"
+            ~width:40
+            ~initial:""
+            ~placeholder:(Some "my_contact")
+            ~on_submit:(fun alias ->
+              let alias = String.trim alias in
+              if String.length alias = 0 then
+                Modal_helpers.show_error ~title:"Error" "Alias cannot be empty."
+              else
+                let description = Printf.sprintf "Import '%s' (%s)" alias pkh in
+                run_client_action
+                  ~base_dir
+                  ~description
+                  ~args:["add"; "address"; alias; pkh]
+                  ~on_success:(fun () ->
+                    Context.toast_success
+                      (Printf.sprintf "Imported '%s' as watch-only" alias)))
+            ())
+    ()
+
+(** Show receive info modal with PKH and explorer link. *)
+let action_receive (key : Keys_reader.key_metadata) =
+  let network =
+    match Keys_scheduler.get_wallet_data ~pkh:key.pkh with
+    | wd :: _ -> Some wd.Keys_scheduler.network
+    | [] -> None
+  in
+  let explorer_url =
+    match network with
+    | Some net ->
+        let subdomain = if String.equal net "mainnet" then "" else net ^ "." in
+        Printf.sprintf "https://%stzkt.io/%s" subdomain key.pkh
+    | None -> Printf.sprintf "https://tzkt.io/%s" key.pkh
+  in
+  let message =
+    Printf.sprintf
+      "Alias: %s\n\nPKH:\n%s\n\nExplorer:\n%s\n\nPress y/c to copy PKH."
+      key.alias
+      key.pkh
+      explorer_url
+  in
+  Modal_helpers.show_error ~title:"Receive" message
+
+(** Show create/import modal for adding keys. *)
+let open_create_import_modal ~base_dir =
+  let items =
+    [("Create new key", `Create); ("Import address (watch-only)", `Import)]
+  in
+  Modal_helpers.open_choice_modal
+    ~title:"Add Key"
+    ~items:(List.map snd items)
+    ~to_string:(fun action ->
+      match List.find_opt (fun (_, a) -> a = action) items with
+      | Some (label, _) -> label
+      | None -> "?")
+    ~on_select:(function
+      | `Create -> action_create_key ~base_dir
+      | `Import -> action_import_key ~base_dir)
+    ()
+
+(** Show the action modal for a selected key. *)
+let open_key_action_modal ~(group : enriched_group)
+    (key : Keys_reader.key_metadata) =
+  let base_dir = group.base_dir in
+  (* Determine network from wallet data or associated services *)
+  let network =
+    match Keys_scheduler.get_wallet_data ~pkh:key.pkh with
+    | wd :: _ -> wd.network
+    | [] -> ( match group.networks with n :: _ -> n | [] -> "mainnet")
+  in
+  let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+  let is_delegating =
+    List.exists
+      (fun (wd : Keys_scheduler.wallet_data) -> Option.is_some wd.delegate)
+      wallet_data
+  in
+  let is_registered =
+    List.exists
+      (fun (wd : Keys_scheduler.wallet_data) -> wd.is_registered)
+      wallet_data
+  in
+  let actions =
+    [("Copy PKH", `Copy)]
+    @ (if key.has_secret_key then [("Transfer", `Transfer)] else [])
+    @ (if key.has_secret_key && not is_registered then
+         [("Register as delegate", `Register)]
+       else [])
+    @ (if key.has_secret_key then [("Delegate to", `Delegate_to)] else [])
+    @ (if key.has_secret_key && is_delegating then [("Undelegate", `Undelegate)]
+       else [])
+    @ [("Rename", `Rename)]
+    @ [("Forget", `Forget)]
+  in
+  Modal_helpers.open_choice_modal
+    ~title:(Printf.sprintf "Actions: %s" key.alias)
+    ~items:(List.map snd actions)
+    ~to_string:(fun action ->
+      match List.find_opt (fun (_, a) -> a = action) actions with
+      | Some (label, _) -> label
+      | None -> "?")
+    ~on_select:(function
+      | `Copy -> copy_to_clipboard key.pkh
+      | `Transfer -> action_transfer ~base_dir ~network key
+      | `Register -> action_register_delegate ~base_dir ~network key
+      | `Delegate_to -> action_delegate_to ~base_dir ~network key
+      | `Undelegate -> action_undelegate ~base_dir ~network key
+      | `Rename -> action_rename ~base_dir key
+      | `Forget -> action_forget ~base_dir key)
+    ()
+
+(** Handle Enter key: dispatch action for selected item. *)
+let action_on_selected ps =
+  let s = ps.Navigation.s in
+  (match List.nth_opt s.nav_items s.cursor with
+  | Some (KeyItem (group, key)) -> open_key_action_modal ~group key
+  | _ -> ()) ;
+  ps
+
+(** Open create/import modal for the currently selected group. *)
+let create_import_selected ps =
+  let s = ps.Navigation.s in
+  let base_dir =
+    match List.nth_opt s.nav_items s.cursor with
+    | Some (GroupHeader g) -> g.base_dir
+    | Some (KeyItem (g, _)) -> g.base_dir
+    | None -> (
+        match s.groups with
+        | g :: _ -> g.base_dir
+        | [] -> default_client_base_dir ())
+  in
+  open_create_import_modal ~base_dir ;
+  ps
+
+(** Cycle sort mode. *)
+let cycle_sort ~size ps =
+  let s = ps.Navigation.s in
+  let next_mode =
+    match s.sort_mode with
+    | SortAlias -> SortBalance
+    | SortBalance -> SortNetwork
+    | SortNetwork -> SortAlias
+  in
+  let s = {s with sort_mode = next_mode} in
+  let s = rebuild_nav s in
+  Context.toast_info (Printf.sprintf "Sort: %s" (sort_mode_label next_mode)) ;
+  let _ = size in
+  {ps with s}
+
+(** Pending search query set from modal callback. *)
+let pending_search_query : string option ref = ref None
+
+(** Start search: prompt for query. The query is stored in a mutable ref
+    and applied on the next key event via [apply_pending_search]. *)
+let start_search ps =
+  Modal_helpers.prompt_text_modal
+    ~title:"Search keys (empty to clear)"
+    ~width:40
+    ~initial:ps.Navigation.s.search_query
+    ~placeholder:(Some "alias or PKH...")
+    ~on_submit:(fun query ->
+      let query = String.trim query in
+      pending_search_query := Some query ;
+      if String.length query = 0 then Context.toast_info "Search cleared"
+      else Context.toast_info (Printf.sprintf "Filter: %s" query))
+    () ;
+  ps
+
+(** Apply pending search query if one was set by modal callback. *)
+let apply_pending_search ps =
+  match !pending_search_query with
+  | None -> ps
+  | Some query ->
+      pending_search_query := None ;
+      let s = {ps.Navigation.s with search_query = query} in
+      let s = rebuild_nav s in
+      {ps with s}
+
+(** Force refresh all visible keys. *)
+let force_refresh_keys ps =
+  let s = ps.Navigation.s in
+  List.iter
+    (fun (g : enriched_group) ->
+      List.iter
+        (fun (k : Keys_reader.key_metadata) ->
+          Keys_scheduler.force_refresh ~pkh:k.pkh)
+        g.keys)
+    s.groups ;
+  Context.toast_info "Refreshing key data..." ;
+  ps
+
+(** Toggle visual multi-select mode. *)
+let toggle_multi_select ps =
+  let s = ps.Navigation.s in
+  if s.multi_select then (
+    Context.toast_info "Multi-select off" ;
+    {ps with s = {s with multi_select = false; selected = StringSet.empty}})
+  else (
+    Context.toast_info "Multi-select: Space to toggle, Enter for batch action" ;
+    {ps with s = {s with multi_select = true}})
+
+(** Toggle selection of current key in multi-select mode. *)
+let toggle_selection ps =
+  let s = ps.Navigation.s in
+  match List.nth_opt s.nav_items s.cursor with
+  | Some (KeyItem (_, key)) ->
+      let selected =
+        if StringSet.mem key.pkh s.selected then
+          StringSet.remove key.pkh s.selected
+        else StringSet.add key.pkh s.selected
+      in
+      {ps with s = {s with selected}}
+  | _ -> ps
+
+(** Show receive/info modal for current key. *)
+let show_receive ps =
+  let s = ps.Navigation.s in
+  (match List.nth_opt s.nav_items s.cursor with
+  | Some (KeyItem (_, key)) -> action_receive key
+  | _ -> ()) ;
+  ps
+
+(** Collect selected keys for batch operations. *)
+let get_selected_keys s =
+  List.concat_map
+    (fun (g : enriched_group) ->
+      List.filter_map
+        (fun (k : Keys_reader.key_metadata) ->
+          if StringSet.mem k.pkh s.selected then Some (g, k) else None)
+        g.keys)
+    s.groups
+
+(** Show batch operations modal for selected keys. *)
+let open_batch_modal ps =
+  let s = ps.Navigation.s in
+  let selected_keys = get_selected_keys s in
+  let count = List.length selected_keys in
+  if count = 0 then (
+    Context.toast_info "No keys selected" ;
+    ps)
+  else
+    let items =
+      [
+        (Printf.sprintf "Register all %d as delegate" count, `Batch_register);
+        (Printf.sprintf "Delegate all %d to baker" count, `Batch_delegate);
+        (Printf.sprintf "Copy all %d PKHs" count, `Batch_copy);
+      ]
+    in
+    Modal_helpers.open_choice_modal
+      ~title:(Printf.sprintf "Batch: %d keys selected" count)
+      ~items:(List.map snd items)
+      ~to_string:(fun action ->
+        match List.find_opt (fun (_, a) -> a = action) items with
+        | Some (label, _) -> label
+        | None -> "?")
+      ~on_select:(function
+        | `Batch_register ->
+            List.iter
+              (fun (group, key) ->
+                let network =
+                  match group.networks with n :: _ -> n | [] -> "mainnet"
+                in
+                action_register_delegate ~base_dir:group.base_dir ~network key)
+              selected_keys
+        | `Batch_delegate ->
+            Modal_helpers.prompt_text_modal
+              ~title:"Delegate all to: Baker PKH"
+              ~width:50
+              ~initial:""
+              ~placeholder:(Some "tz1... (baker address)")
+              ~on_submit:(fun baker_pkh ->
+                let baker_pkh = String.trim baker_pkh in
+                match Pkh_validator.validate_format baker_pkh with
+                | Pkh_validator.Invalid reason ->
+                    Modal_helpers.show_error
+                      ~title:"Invalid baker PKH"
+                      (Printf.sprintf "Invalid PKH: %s" reason)
+                | Pkh_validator.Valid ->
+                    List.iter
+                      (fun (group, key) ->
+                        let network =
+                          match group.networks with
+                          | n :: _ -> n
+                          | [] -> "mainnet"
+                        in
+                        action_delegate_to ~base_dir:group.base_dir ~network key ;
+                        ignore baker_pkh)
+                      selected_keys)
+              ()
+        | `Batch_copy ->
+            let all_pkhs =
+              List.map
+                (fun (_, (k : Keys_reader.key_metadata)) -> k.pkh)
+                selected_keys
+              |> String.concat "\n"
+            in
+            copy_to_clipboard all_pkhs ;
+            Context.toast_success (Printf.sprintf "Copied %d PKHs" count))
+      () ;
+    ps
+
+let show_help ps =
+  Modal_helpers.show_error
+    ~title:"Keys Page Help"
+    "j/Down      Move down\n\
+     k/Up        Move up\n\
+     g           Jump to top\n\
+     G           Jump to bottom\n\
+     Space       Fold/unfold (or toggle select)\n\
+     Tab         Switch panel\n\
+     Enter       Key actions (or batch)\n\
+     v           Multi-select mode\n\
+     Q           Receive info\n\
+     +/n         Create/import key\n\
+     /           Search/filter\n\
+     s           Cycle sort mode\n\
+     r           Force refresh\n\
+     y/c         Copy PKH\n\
+     Esc/q       Back\n\
+     ?           This help" ;
+  ps
+
+(** Copy PKH of currently selected key. *)
+let copy_selected_pkh ps =
+  let s = ps.Navigation.s in
+  (match List.nth_opt s.nav_items s.cursor with
+  | Some (KeyItem (_, key)) -> copy_to_clipboard key.pkh
+  | _ -> ()) ;
+  ps
+
+let handle_key ps key ~size =
+  let ps = apply_pending_search ps in
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
   else
     match Keys.of_string key with
-    | Some Keys.Escape | Some (Keys.Char "q") -> Navigation.back ps
-    | Some Keys.Up | Some (Keys.Char "k") -> move_selection ps (-1)
-    | Some Keys.Down | Some (Keys.Char "j") -> move_selection ps 1
-    | Some (Keys.Char "g") -> jump_to_top ps
-    | Some (Keys.Char "G") -> jump_to_bottom ps
-    | Some (Keys.Char "?") ->
-        Modal_helpers.show_error
-          ~title:"Keys Page Help"
-          "j/Down      Move down\n\
-           k/Up        Move up\n\
-           g           Jump to top\n\
-           G           Jump to bottom\n\
-           Esc/q       Back\n\
-           ?           This help" ;
-        ps
+    | Some Keys.Escape | Some (Keys.Char "q") ->
+        if ps.Navigation.s.multi_select then toggle_multi_select ps
+        else if String.length ps.Navigation.s.search_query > 0 then (
+          let s = {ps.Navigation.s with search_query = ""} in
+          let s = rebuild_nav s in
+          Context.toast_info "Search cleared" ;
+          {ps with s})
+        else Navigation.back ps
+    | Some Keys.Up | Some (Keys.Char "k") -> move_cursor (-1) ~size ps
+    | Some Keys.Down | Some (Keys.Char "j") -> move_cursor 1 ~size ps
+    | Some (Keys.Char "g") -> jump_to_top ~size ps
+    | Some (Keys.Char "G") -> jump_to_bottom ~size ps
+    | Some (Keys.Char " ") ->
+        if ps.Navigation.s.multi_select then toggle_selection ps
+        else toggle_fold ~size ps
+    | Some Keys.Tab -> switch_panel ps
+    | Some Keys.Enter ->
+        if ps.Navigation.s.multi_select then open_batch_modal ps
+        else action_on_selected ps
+    | Some (Keys.Char "v") -> toggle_multi_select ps
+    | Some (Keys.Char "Q") -> show_receive ps
+    | Some (Keys.Char "+") | Some (Keys.Char "n") -> create_import_selected ps
+    | Some (Keys.Char "/") -> start_search ps
+    | Some (Keys.Char "s") -> cycle_sort ~size ps
+    | Some (Keys.Char "r") -> force_refresh_keys ps
+    | Some (Keys.Char "y") | Some (Keys.Char "c") -> copy_selected_pkh ps
+    | Some (Keys.Char "?") -> show_help ps
     | _ -> ps
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
+
+(* ================================================================ *)
+(* Page registration                                                 *)
+(* ================================================================ *)
 
 module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state
@@ -285,7 +1569,14 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   let key_hints _ps =
     Miaou.Core.Tui_page.
-      [{key = "Esc"; help = "Back"}; {key = "?"; help = "Help"}]
+      [
+        {key = "j/k"; help = "Navigate"};
+        {key = "Tab"; help = "Panel"};
+        {key = "Space"; help = "Fold"};
+        {key = "+/n"; help = "New key"};
+        {key = "Esc"; help = "Back"};
+        {key = "?"; help = "Help"};
+      ]
 
   let has_modal = has_modal
 end
@@ -297,5 +1588,4 @@ module Internal_for_tests = struct
   let get_all_base_dirs = get_all_base_dirs
 end
 
-(** Register the page in the global registry *)
 let register () = Miaou.Core.Registry.register name (module Page_Impl)

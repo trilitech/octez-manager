@@ -947,6 +947,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_pkh_validator)
+ (libraries alcotest octez-manager.ui)
+ (modules test_pkh_validator)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_signatory_validation)
  (libraries alcotest octez_manager_lib)
  (modules test_signatory_validation)
