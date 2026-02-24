@@ -79,6 +79,13 @@ type t = {
   fetched_at : float;
 }
 
+(** {2 JSON Parsing} *)
+
+(** Parse staking parameters from a JSON response.
+    Expects fields [limit_of_staking_over_baking_millionth] and
+    [edge_of_baking_over_staking_billionth]. *)
+val parse_staking_parameters : Yojson.Safe.t -> staking_parameters option
+
 (** {2 Fetching} *)
 
 (** Fetch wallet data from node RPC for a delegate address.

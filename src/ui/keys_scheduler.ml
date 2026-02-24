@@ -16,6 +16,8 @@ type wallet_data = {
   delegate : string option;
   is_registered : bool;
   active_consensus_key : string option;
+  delegate_staking_params : Baker_wallet_data.staking_parameters option;
+  delegate_apy : float option;
   fetched_at : float;
 }
 
@@ -113,6 +115,112 @@ let rpc_get_string endpoint path =
         | _ -> Some (String.trim body)
       with _ -> Some (String.trim body))
 
+(** Fetch JSON from an RPC endpoint. *)
+let rpc_get_json endpoint path =
+  let url = endpoint ^ path in
+  match Cmd_runner.run_out_silent ["curl"; "-sfL"; "--max-time"; "10"; url] with
+  | Error _ -> None
+  | Ok body -> ( try Some (Yojson.Safe.from_string body) with _ -> None)
+
+(** Build a tzkt API base URL for a given network. *)
+let tzkt_base_url ~network =
+  if String.equal network "mainnet" then "https://api.tzkt.io"
+  else Printf.sprintf "https://api.%s.tzkt.io" network
+
+(** Fetch estimated APY for a delegate from tzkt.
+    Averages return rate over recent completed cycles, then annualizes. *)
+let fetch_delegate_apy ~network ~delegate_pkh =
+  let base = tzkt_base_url ~network in
+  (* Fetch recent reward cycles *)
+  let rewards_url =
+    Printf.sprintf
+      "%s/v1/rewards/bakers/%s?limit=5&select=cycle,bakingPower,blockRewardsDelegated,blockRewardsStakedOwn,blockRewardsStakedEdge,blockRewardsStakedShared,attestationRewardsDelegated,attestationRewardsStakedOwn,attestationRewardsStakedEdge,attestationRewardsStakedShared"
+      base
+      delegate_pkh
+  in
+  let rewards_result =
+    Cmd_runner.run_out_silent ["curl"; "-sfL"; "--max-time"; "10"; rewards_url]
+  in
+  match rewards_result with
+  | Error _ -> None
+  | Ok rewards_body -> (
+      (* Fetch protocol constants for cycles_per_year *)
+      let constants_url =
+        Printf.sprintf
+          "%s/v1/protocols?limit=1&sort.desc=firstLevel&select=constants.blocksPerCycle,constants.timeBetweenBlocks"
+          base
+      in
+      let constants_result =
+        Cmd_runner.run_out_silent
+          ["curl"; "-sfL"; "--max-time"; "10"; constants_url]
+      in
+      match constants_result with
+      | Error _ -> None
+      | Ok constants_body -> (
+          try
+            let open Yojson.Safe.Util in
+            (* Parse protocol constants *)
+            let constants_json = Yojson.Safe.from_string constants_body in
+            let proto =
+              match constants_json with `List (h :: _) -> h | _ -> `Null
+            in
+            let blocks_per_cycle =
+              proto
+              |> member "constants.blocksPerCycle"
+              |> to_int_option |> Option.value ~default:0
+            in
+            let time_between_blocks =
+              proto
+              |> member "constants.timeBetweenBlocks"
+              |> to_int_option |> Option.value ~default:0
+            in
+            if blocks_per_cycle = 0 || time_between_blocks = 0 then None
+            else
+              let cycle_duration =
+                Float.of_int blocks_per_cycle
+                *. Float.of_int time_between_blocks
+              in
+              let cycles_per_year = 365.25 *. 86400.0 /. cycle_duration in
+              (* Parse rewards *)
+              let rewards_json = Yojson.Safe.from_string rewards_body in
+              let cycles = match rewards_json with `List l -> l | _ -> [] in
+              let rates =
+                List.filter_map
+                  (fun cycle ->
+                    let power =
+                      cycle |> member "bakingPower" |> to_float_option
+                      |> Option.value ~default:0.0
+                    in
+                    if Float.equal power 0.0 then None
+                    else
+                      let sum_field name =
+                        cycle |> member name |> to_float_option
+                        |> Option.value ~default:0.0
+                      in
+                      let total_rewards =
+                        sum_field "blockRewardsDelegated"
+                        +. sum_field "blockRewardsStakedOwn"
+                        +. sum_field "blockRewardsStakedEdge"
+                        +. sum_field "blockRewardsStakedShared"
+                        +. sum_field "attestationRewardsDelegated"
+                        +. sum_field "attestationRewardsStakedOwn"
+                        +. sum_field "attestationRewardsStakedEdge"
+                        +. sum_field "attestationRewardsStakedShared"
+                      in
+                      if Float.equal total_rewards 0.0 then None
+                      else Some (total_rewards /. power))
+                  cycles
+              in
+              match rates with
+              | [] -> None
+              | _ ->
+                  let avg_rate =
+                    List.fold_left ( +. ) 0.0 rates
+                    /. Float.of_int (List.length rates)
+                  in
+                  Some (avg_rate *. cycles_per_year *. 100.0)
+          with _ -> None))
+
 (** Fetch balance data for a pkh from a node endpoint. *)
 let fetch_wallet_data ~network ~endpoint ~pkh =
   let base =
@@ -126,6 +234,20 @@ let fetch_wallet_data ~network ~endpoint ~pkh =
     |> Option.value ~default:spendable
   in
   let delegate = rpc_get_string endpoint (base ^ "/delegate") in
+  (* Fetch delegate's active staking parameters if delegating *)
+  let delegate_staking_params =
+    match delegate with
+    | Some d -> (
+        let path =
+          Printf.sprintf
+            "/chains/main/blocks/head/context/delegates/%s/active_staking_parameters"
+            d
+        in
+        match rpc_get_json endpoint path with
+        | Some json -> Baker_wallet_data.parse_staking_parameters json
+        | None -> None)
+    | None -> None
+  in
   (* Check if this pkh is itself a registered delegate *)
   let delegate_path =
     Printf.sprintf "/chains/main/blocks/head/context/delegates/%s" pkh
@@ -158,6 +280,8 @@ let fetch_wallet_data ~network ~endpoint ~pkh =
     delegate;
     is_registered;
     active_consensus_key;
+    delegate_staking_params;
+    delegate_apy = None;
     fetched_at = Unix.gettimeofday ();
   }
 
@@ -168,7 +292,13 @@ let fetch_pkh_all_networks ~pkh =
     (fun (network, endpoint) ->
       if not (Atomic.get stop_flag) then
         let wd = fetch_wallet_data ~network ~endpoint ~pkh in
-        store_wallet_data wd)
+        (* Fetch delegate APY from tzkt if delegating *)
+        let delegate_apy =
+          match wd.delegate with
+          | Some d -> fetch_delegate_apy ~network ~delegate_pkh:d
+          | None -> None
+        in
+        store_wallet_data {wd with delegate_apy})
     endpoints
 
 (** Poll interval: 30 seconds. Data fresher than this is not re-fetched. *)
