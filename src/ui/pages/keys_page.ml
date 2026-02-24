@@ -284,7 +284,30 @@ let move ps _ = ps
 
 let service_select ps _ = ps
 
-let service_cycle ps _ = ps
+let service_cycle ps _ =
+  if Context.consume_keys_dirty () then (
+    let all_dirs = get_all_base_dirs () in
+    let groups =
+      all_dirs
+      |> List.map load_enriched_group
+      |> List.filter (fun g ->
+          g.keys <> [] || g.error <> None || g.services <> [])
+    in
+    let s = ps.Navigation.s in
+    let nav_items = build_nav_items ~folded:s.folded groups in
+    let total_keys = count_keys groups in
+    let cursor = min s.cursor (max 0 (List.length nav_items - 1)) in
+    (* Update scheduler with new key set *)
+    let keys_by_dir =
+      List.map
+        (fun (g : enriched_group) ->
+          ( g.base_dir,
+            List.map (fun (k : Keys_reader.key_metadata) -> k.pkh) g.keys ))
+        groups
+    in
+    Keys_scheduler.set_keys keys_by_dir ;
+    {ps with s = {s with groups; nav_items; total_keys; cursor}})
+  else ps
 
 let back ps = Navigation.back ps
 
@@ -892,7 +915,7 @@ let action_rename ~base_dir (key : Keys_reader.key_metadata) =
                          "Renamed '%s' to '%s'"
                          key.alias
                          new_alias) ;
-                    Context.mark_instances_dirty ()
+                    Context.mark_keys_dirty ()
                 | Job_manager.Failed msg ->
                     Context.toast_error (Printf.sprintf "Rename failed: %s" msg)
                 | _ -> ()))
@@ -930,7 +953,7 @@ let action_forget ~base_dir (key : Keys_reader.key_metadata) =
                 | Job_manager.Succeeded ->
                     Context.toast_success
                       (Printf.sprintf "Removed '%s' from wallet" key.alias) ;
-                    Context.mark_instances_dirty ()
+                    Context.mark_keys_dirty ()
                 | Job_manager.Failed msg ->
                     Context.toast_error (Printf.sprintf "Forget failed: %s" msg)
                 | _ -> ()))
@@ -949,7 +972,7 @@ let run_client_action ~base_dir ~description ~args ~on_success =
         ~on_complete:(function
           | `Succeeded ->
               on_success () ;
-              Context.mark_instances_dirty ()
+              Context.mark_keys_dirty ()
           | `Failed msg ->
               Context.toast_error
                 (Printf.sprintf "%s failed: %s" description msg)
