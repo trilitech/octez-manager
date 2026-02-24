@@ -36,4 +36,8 @@ missing_mli
 # for this validated string type. See signatory_validation.ml for validation logic.
 # created_at timestamp field appears in Group.t, Service.t, and directory_entry
 # Same semantic concept (creation timestamp) across domain record types
+# cmd_baker.ml has 37 functions — baker wallet operations add CLI subcommands
+# that push it past the god_modules threshold
+god_modules
+
 unsafe_string_fields
