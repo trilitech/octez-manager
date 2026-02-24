@@ -1284,32 +1284,82 @@ let run_client_action ~base_dir ~description ~args ~on_success () =
 (** Extract a human-readable error from Cmd_runner error messages.
     Cmd_runner returns ["Command failed: <full_path>\nOutput:\n<output>"].
     We look for ["Fatal error:"] or ["Error:"] lines and return from there. *)
+let is_boilerplate line =
+  let t = String.trim line in
+  t = ""
+  || contains_substring t "Command failed:"
+  || contains_substring t "Output:"
+  || contains_substring t "Node is bootstrapped"
+  || contains_substring t "Estimated gas:"
+  || contains_substring t "Estimated storage:"
+  || contains_substring t "This simulation failed"
+  || contains_substring t "Manager signed operations"
+  || contains_substring t "From:"
+  || contains_substring t "Fee to the"
+  || contains_substring t "Expected counter:"
+  || contains_substring t "Gas limit:"
+  || contains_substring t "Storage limit:"
+  || contains_substring t "Amount:"
+  || contains_substring t "Stake:"
+  || contains_substring t "Transfer:"
+  || contains_substring t "Delegation:"
+
 let extract_client_error raw_err =
   let lines = String.split_on_char '\n' raw_err in
-  let rec find_error_line = function
-    | [] -> None
-    | line :: rest ->
-        let trimmed = String.trim line in
-        if
-          contains_substring trimmed "Fatal error"
-          || contains_substring trimmed "Error:"
-        then
-          let tail = trimmed :: List.map String.trim rest in
-          Some (String.concat "\n" (List.filter (fun s -> s <> "") tail))
-        else find_error_line rest
+  (* Find the index of the "Fatal error" line *)
+  let fatal_idx =
+    let rec find i = function
+      | [] -> None
+      | line :: rest ->
+          if contains_substring (String.trim line) "Fatal error" then Some i
+          else find (i + 1) rest
+    in
+    find 0 lines
   in
-  match find_error_line lines with
-  | Some msg -> msg
-  | None ->
-      (* Fallback: strip "Command failed:" and "Output:" prefixes *)
-      let useful =
-        lines |> List.map String.trim
-        |> List.filter (fun l ->
-            (not (contains_substring l "Command failed:"))
-            && not (contains_substring l "Output:"))
-        |> List.filter (fun s -> s <> "")
+  match fatal_idx with
+  | Some fi ->
+      (* Scan backwards from Fatal error, collecting non-boilerplate
+         lines that describe the actual error. *)
+      let prev_desc =
+        let rec scan i acc =
+          if i < 0 then acc
+          else
+            let line = List.nth lines i in
+            if is_boilerplate line then acc
+            else scan (i - 1) (String.trim line :: acc)
+        in
+        scan (fi - 1) []
       in
-      if useful <> [] then String.concat "\n" useful else raw_err
+      let fatal_and_rest =
+        let rec drop n = function
+          | [] -> []
+          | _ :: rest when n > 0 -> drop (n - 1) rest
+          | l -> l
+        in
+        drop fi lines |> List.map String.trim |> List.filter (fun s -> s <> "")
+      in
+      let all = prev_desc @ fatal_and_rest in
+      if all <> [] then String.concat "\n" all else raw_err
+  | None -> (
+      (* Look for "Error:" lines *)
+      let rec find_error_line = function
+        | [] -> None
+        | line :: rest ->
+            let trimmed = String.trim line in
+            if contains_substring trimmed "Error:" then
+              let tail = trimmed :: List.map String.trim rest in
+              Some (String.concat "\n" (List.filter (fun s -> s <> "") tail))
+            else find_error_line rest
+      in
+      match find_error_line lines with
+      | Some msg -> msg
+      | None ->
+          (* Fallback: strip boilerplate prefixes *)
+          let useful =
+            lines |> List.map String.trim
+            |> List.filter (fun l -> not (is_boilerplate l))
+          in
+          if useful <> [] then String.concat "\n" useful else raw_err)
 
 (** Execute an on-chain octez-client operation with tracking modal.
     Shows a real-time checklist (submitting → included → confirmed → finalized).
@@ -1365,7 +1415,7 @@ let run_onchain_operation ~base_dir ~description ~args ~network
               Atomic.set step_ref (Instances_wallet.Failed clean_err) ;
               Context.toast_error
                 (Printf.sprintf "%s failed: %s" description clean_err) ;
-              Error (`Msg err))
+              Error (`Msg clean_err))
         ~on_complete:(fun _status -> ())
 
 (** Show a confirmation modal, then execute on-chain with tracking.
