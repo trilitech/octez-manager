@@ -33,7 +33,6 @@ export default defineConfig({
 					{ label: 'DAL Node Setup', slug: 'guides/dal-node-setup' },
 					{ label: 'Baker Setup', slug: 'guides/baker-setup' },
 					{ label: 'Signatory Setup', slug: 'guides/signatory-setup' },
-					{ label: 'Baking with Signatory', slug: 'guides/baker-with-signatory' },
 					{ label: 'Web Interface', slug: 'guides/web-interface' },
 					{ label: 'RPC Browser', slug: 'guides/rpc-browser' },
 				],
