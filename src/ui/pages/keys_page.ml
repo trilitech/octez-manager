@@ -1281,6 +1281,36 @@ let run_client_action ~base_dir ~description ~args ~on_success () =
           | `Cancelled -> ())
         ()
 
+(** Extract a human-readable error from Cmd_runner error messages.
+    Cmd_runner returns ["Command failed: <full_path>\nOutput:\n<output>"].
+    We look for ["Fatal error:"] or ["Error:"] lines and return from there. *)
+let extract_client_error raw_err =
+  let lines = String.split_on_char '\n' raw_err in
+  let rec find_error_line = function
+    | [] -> None
+    | line :: rest ->
+        let trimmed = String.trim line in
+        if
+          contains_substring trimmed "Fatal error"
+          || contains_substring trimmed "Error:"
+        then
+          let tail = trimmed :: List.map String.trim rest in
+          Some (String.concat "\n" (List.filter (fun s -> s <> "") tail))
+        else find_error_line rest
+  in
+  match find_error_line lines with
+  | Some msg -> msg
+  | None ->
+      (* Fallback: strip "Command failed:" and "Output:" prefixes *)
+      let useful =
+        lines |> List.map String.trim
+        |> List.filter (fun l ->
+            (not (contains_substring l "Command failed:"))
+            && not (contains_substring l "Output:"))
+        |> List.filter (fun s -> s <> "")
+      in
+      if useful <> [] then String.concat "\n" useful else raw_err
+
 (** Execute an on-chain octez-client operation with tracking modal.
     Shows a real-time checklist (submitting → included → confirmed → finalized).
     Adds [--burn-cap 1] automatically.
@@ -1331,9 +1361,10 @@ let run_onchain_operation ~base_dir ~description ~args ~network
                   Ok ())
           | Error (`Msg err) ->
               on_done () ;
-              Atomic.set step_ref (Instances_wallet.Failed err) ;
+              let clean_err = extract_client_error err in
+              Atomic.set step_ref (Instances_wallet.Failed clean_err) ;
               Context.toast_error
-                (Printf.sprintf "%s failed: %s" description err) ;
+                (Printf.sprintf "%s failed: %s" description clean_err) ;
               Error (`Msg err))
         ~on_complete:(fun _status -> ())
 
