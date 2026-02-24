@@ -59,6 +59,12 @@ val mark_instances_dirty : unit -> unit
 (** Consume and clear the dirty flag. Returns [true] if it was set. *)
 val consume_instances_dirty : unit -> bool
 
+(** Mark the keys list as needing a refresh (thread-safe via [Atomic]). *)
+val mark_keys_dirty : unit -> unit
+
+(** Consume and clear the keys dirty flag. Returns [true] if it was set. *)
+val consume_keys_dirty : unit -> bool
+
 (** Request navigation to the named page on the next tick. *)
 val navigate : string -> unit
 
