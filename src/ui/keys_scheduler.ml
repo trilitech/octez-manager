@@ -61,15 +61,28 @@ let pending_lock = Mutex.create ()
 let force_refresh ~pkh =
   Mutex.protect pending_lock (fun () -> Hashtbl.replace pending_refresh pkh ())
 
-(** Get all running node endpoints grouped by network. *)
+(** Get all running node endpoints grouped by network.
+    Falls back to public RPC nodes when no local nodes are running. *)
 let get_node_endpoints () =
-  Data.load_service_states ()
-  |> List.filter (fun (st : Data.Service_state.t) ->
-      String.equal st.service.role "node"
-      && match st.status with Running -> true | _ -> false)
-  |> List.map (fun (st : Data.Service_state.t) ->
-      (st.service.network, Rpc_addr.to_endpoint st.service.rpc_addr))
-  |> List.sort_uniq (fun (a, _) (b, _) -> String.compare a b)
+  let local =
+    Data.load_service_states ()
+    |> List.filter (fun (st : Data.Service_state.t) ->
+        String.equal st.service.role "node"
+        && match st.status with Running -> true | _ -> false)
+    |> List.map (fun (st : Data.Service_state.t) ->
+        (st.service.network, Rpc_addr.to_endpoint st.service.rpc_addr))
+  in
+  let result =
+    if local <> [] then local
+    else
+      (* No local nodes — fall back to public RPC nodes *)
+      Public_nodes_cache.get_nodes ()
+      |> List.filter_map (fun (n : Public_nodes_cache.node_info) ->
+          match n.network with
+          | Some net -> Some (net, n.rpc_addr)
+          | None -> None)
+  in
+  List.sort_uniq (fun (a, _) (b, _) -> String.compare a b) result
 
 (** Fetch a JSON string field from an RPC endpoint. *)
 let rpc_get_string endpoint path =
@@ -175,12 +188,22 @@ let process_pending () =
 (** Poll interval: 30 seconds *)
 let poll_interval = 30.0
 
+let refresh_tzkt_aliases () =
+  let networks =
+    get_node_endpoints () |> List.map fst |> List.sort_uniq String.compare
+  in
+  List.iter
+    (fun network ->
+      if Tzkt_aliases.needs_refresh ~network then Tzkt_aliases.refresh ~network)
+    networks
+
 let scheduler_loop () =
   Eio_unix.sleep 3.0 ;
   while not (Atomic.get stop_flag) do
     (try
        process_pending () ;
-       poll ()
+       poll () ;
+       refresh_tzkt_aliases ()
      with _ -> ()) ;
     Eio_unix.sleep poll_interval
   done
