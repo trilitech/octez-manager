@@ -1757,18 +1757,34 @@ let open_create_import_modal ~base_dir =
       | `Import -> action_import_key ~base_dir)
     ()
 
-(** Prompt for network if a key has balances on multiple networks.
-    Calls [action] with the chosen network. Skips the picker if only one. *)
+(** Prompt for network if a key has access to multiple networks.
+    Lists all networks with available endpoints (local instances or public
+    nodes), annotated with balance if known. Skips the picker if only one. *)
 let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
     ~action =
   let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
-  let networks =
-    List.map (fun (wd : Keys_scheduler.wallet_data) -> wd.network) wallet_data
+  (* All networks with running local nodes *)
+  let local_networks =
+    Data.load_service_states ()
+    |> List.filter (fun (st : Data.Service_state.t) ->
+        String.equal st.service.role "node"
+        && match st.status with Running -> true | _ -> false)
+    |> List.map (fun (st : Data.Service_state.t) -> st.service.network)
     |> List.sort_uniq String.compare
   in
+  (* All networks with public nodes *)
+  let public_networks =
+    Public_nodes_cache.get_nodes ()
+    |> List.filter_map (fun (n : Public_nodes_cache.node_info) -> n.network)
+    |> List.sort_uniq String.compare
+  in
+  let all_networks =
+    List.sort_uniq String.compare (local_networks @ public_networks)
+  in
+  (* Fallback to group networks if nothing else *)
   let networks =
-    if networks = [] then List.sort_uniq String.compare group.networks
-    else networks
+    if all_networks = [] then List.sort_uniq String.compare group.networks
+    else all_networks
   in
   match networks with
   | [] -> action ~network:"mainnet"
@@ -1778,19 +1794,24 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
         ~title:"Select network"
         ~items:multiple
         ~to_string:(fun net ->
-          let balance =
-            List.find_opt
-              (fun (wd : Keys_scheduler.wallet_data) ->
-                String.equal wd.network net)
-              wallet_data
+          let balance_str =
+            match
+              List.find_opt
+                (fun (wd : Keys_scheduler.wallet_data) ->
+                  String.equal wd.network net)
+                wallet_data
+            with
+            | Some wd ->
+                Printf.sprintf
+                  "  %s tez"
+                  (Baker_wallet_data.format_tez wd.spendable_balance)
+            | None -> ""
           in
-          match balance with
-          | Some wd ->
-              Printf.sprintf
-                "%s  (%s tez)"
-                net
-                (Baker_wallet_data.format_tez wd.spendable_balance)
-          | None -> net)
+          let source =
+            if List.exists (String.equal net) local_networks then "local"
+            else "public"
+          in
+          Printf.sprintf "%s  (%s)%s" net source balance_str)
         ~on_select:(fun net -> action ~network:net)
         ()
 
