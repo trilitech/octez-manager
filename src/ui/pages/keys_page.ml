@@ -324,12 +324,12 @@ let keymap _ =
 (* Rendering helpers                                                 *)
 (* ================================================================ *)
 
-(** Short indicator for key kind. *)
+(** Short indicator for key kind (emoji). *)
 let key_kind_tag = function
   | Keys_reader.Unencrypted -> ""
-  | Keys_reader.Encrypted -> Widgets.yellow "[enc]"
-  | Keys_reader.Ledger _ -> Widgets.cyan "[hw]"
-  | Keys_reader.Remote _ -> Widgets.themed_muted "[rmt]"
+  | Keys_reader.Encrypted -> "\xF0\x9F\x94\x92" (* 🔒 *)
+  | Keys_reader.Ledger _ -> "\xF0\x9F\x94\x90" (* 🔐 *)
+  | Keys_reader.Remote _ -> "\xE2\x9C\x92\xEF\xB8\x8F" (* ✒️  *)
 
 (** Truncate a PKH to fit available space, keeping prefix and suffix. *)
 let truncate_pkh ~max_len pkh =
@@ -355,14 +355,25 @@ let render_key_row ~is_selected ~is_focused ~multi_selected ~cols
       else Widgets.themed_muted "> "
     else "  "
   in
+  (* Ownership icon: 🔑 signable, 📋 watch-only *)
+  let own_icon =
+    if key.has_secret_key then "\xF0\x9F\x94\x91" (* 🔑 *)
+    else "\xF0\x9F\x93\x8B" (* 📋 *)
+  in
   let kind_tag = key_kind_tag key.key_kind in
-  let watch_tag =
-    if not key.has_secret_key then Widgets.themed_muted "[ro]" else ""
+  (* Baker icon: 🍞 if registered delegate on any network *)
+  let baker_icon =
+    let wd = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+    if List.exists (fun (w : Keys_scheduler.wallet_data) -> w.is_registered) wd
+    then "\xF0\x9F\x8D\x9E" (* 🍞 *)
+    else ""
   in
   let tags =
     String.concat
       ""
-      (List.filter (fun s -> not (String.equal s "")) [kind_tag; watch_tag])
+      (List.filter
+         (fun s -> not (String.equal s ""))
+         [own_icon; kind_tag; baker_icon])
   in
   let alias_width = min 20 (cols / 3) in
   let raw_alias =
@@ -628,7 +639,9 @@ let header s =
     Widgets.themed_primary
       (Printf.sprintf " Keys . %s%s%s" count_text dir_text status_suffix);
     Widgets.themed_muted
-      "j/k: navigate  Tab: panel  /: search  s: sort  +: add  ?: help";
+      "\xF0\x9F\x94\x91own \xF0\x9F\x93\x8Bwatch \xF0\x9F\x94\x92enc \
+       \xF0\x9F\x94\x90hw \xE2\x9C\x92\xEF\xB8\x8Frmt \xF0\x9F\x8D\x9Ebaker | \
+       j/k Tab / s +/n ?";
   ]
 
 (* ================================================================ *)
@@ -1070,8 +1083,8 @@ let address_entry_to_string e =
   let delegate_part =
     if e.is_delegate then
       match e.delegate_alias with
-      | Some a -> " \xF0\x9F\x8F\x9B\xEF\xB8\x8F " ^ a (* 🏛️ *)
-      | None -> " \xF0\x9F\x8F\x9B\xEF\xB8\x8F" (* 🏛️ *)
+      | Some a -> " \xF0\x9F\x8D\x9E " ^ a (* 🍞 *)
+      | None -> " \xF0\x9F\x8D\x9E" (* 🍞 *)
     else
       match e.delegate_alias with
       | Some a -> " \xE2\x86\x92 " ^ a (* → *)
@@ -1897,7 +1910,16 @@ let show_help ps =
      r           Force refresh\n\
      y/c         Copy PKH\n\
      Esc/q       Back\n\
-     ?           This help" ;
+     ?           This help\n\n\
+     \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80 Icons \
+     \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\
+     \xF0\x9F\x94\x91  Signable key         \xF0\x9F\x93\x8B  Watch-only [ro]\n\
+     \xF0\x9F\x94\x92  Encrypted [enc]      \xF0\x9F\x94\x90  Hardware wallet \
+     [hw]\n\
+     \xE2\x9C\x92\xEF\xB8\x8F   Remote signer [rmt]  \xF0\x9F\x8D\x9E  Baker \
+     (delegate)\n\
+     \xE2\x8F\xB1\xEF\xB8\x8F   Recent target        \xE2\x86\x92   Delegating \
+     to" ;
   ps
 
 (** Copy PKH of currently selected key. *)
