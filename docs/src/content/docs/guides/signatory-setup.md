@@ -102,28 +102,6 @@ octez-client -d $KEY_DIR gen keys my-baker
 octez-client -d $KEY_DIR import secret key my-baker unencrypted:edsk...
 ```
 
-### Verifying the Setup
-
-Check that Signatory is running and recognizes your keys:
-
-```bash
-# Check service status
-systemctl --user status signatory@dev-signer
-
-# Test Signatory endpoint (should return public keys)
-curl http://127.0.0.1:6732/keys
-```
-
-Expected output:
-```json
-[
-  {
-    "public_key": "edpk...",
-    "hash": "tz1abc123..."
-  }
-]
-```
-
 ## Backend Options
 
 Signatory supports multiple backends for key storage. Choose based on your security requirements and infrastructure:
