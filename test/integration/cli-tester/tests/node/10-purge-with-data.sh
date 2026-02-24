@@ -54,8 +54,4 @@ if [ -d "$ENV_DIR" ]; then
 fi
 echo "Env directory removed"
 
-# Recreate the tezos system user if purge deleted it.
-# Other parallel tests depend on this user existing.
-ensure_tezos_user
-
 echo "Purge test passed"

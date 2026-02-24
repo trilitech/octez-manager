@@ -57,6 +57,12 @@ ensure_tezos_user() {
 	fi
 }
 
+# Lock file used to serialize install and purge operations.
+# Purge can delete the tezos service user; install needs it for chown.
+# Without serialization, a parallel purge can delete the user between
+# install's ensure_service_account and its chown call.
+_OM_USER_LOCK="/tmp/om-service-user.lock"
+
 # Instance helpers
 instance_exists() {
 	local instance="$1"
@@ -81,6 +87,7 @@ inject_identity() {
 	local pregenerated="/etc/octez/pregenerated/identity.json"
 
 	if [ -f "$pregenerated" ]; then
+		ensure_tezos_user
 		cp "$pregenerated" "$data_dir/identity.json"
 		chown tezos:tezos "$data_dir/identity.json"
 		chmod 600 "$data_dir/identity.json"
@@ -170,8 +177,34 @@ wait_for_service_stopped() {
 }
 
 # octez-manager helpers
+#
+# Wraps octez-manager with a file lock for install and purge/remove
+# operations. This prevents a race where a parallel purge deletes the
+# tezos service user while an install needs it for chown.
 om() {
-	octez-manager "$@"
+	local _needs_lock=0
+	case "${1:-}" in
+	install-*) _needs_lock=1 ;;
+	instance)
+		local _arg
+		for _arg in "$@"; do
+			case "$_arg" in purge | remove) _needs_lock=1 && break ;; esac
+		done
+		;;
+	esac
+
+	if [ "$_needs_lock" -eq 1 ]; then
+		(
+			flock -w 60 200
+			case "${1:-}" in install-*) ensure_tezos_user ;; esac
+			octez-manager "$@"
+			_om_rc=$?
+			ensure_tezos_user
+			exit "$_om_rc"
+		) 200>"$_OM_USER_LOCK"
+	else
+		octez-manager "$@"
+	fi
 }
 
 om_install_node() {
@@ -204,12 +237,10 @@ cleanup_instance() {
 
 	# Stop service if running, ignore errors
 	om instance "$instance" stop 2>/dev/null || true
-	# Remove and purge
+	# Remove and purge (om() holds the user lock and recreates
+	# the tezos user after each purge/remove automatically)
 	om instance "$instance" remove 2>/dev/null || true
 	om instance "$instance" purge 2>/dev/null || true
-
-	# Purge may delete the service user; recreate for parallel tests
-	ensure_tezos_user
 }
 
 # RPC helpers
@@ -292,6 +323,7 @@ create_external_service() {
 
 	mkdir -p "$unit_dir"
 	mkdir -p "$data_dir"
+	ensure_tezos_user
 	chown -R tezos:tezos "$data_dir"
 
 	case "$role" in
@@ -383,7 +415,7 @@ start_unmanaged_process() {
 	local args="$@"
 	local octez_bin_path="/usr/local/bin"
 
-	su -s /bin/sh tezos -c "$octez_bin_path/$binary $args" &
+	runuser -s /bin/sh -c "$octez_bin_path/$binary $args" tezos &
 	echo $!
 }
 
