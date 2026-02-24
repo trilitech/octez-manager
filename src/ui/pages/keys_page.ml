@@ -605,6 +605,20 @@ let render_key_detail ~box_width (group : enriched_group)
                     in
                     [("Delegate", label)]
                 | None -> [])
+              @ (match wd.delegate_staking_params with
+                | Some params ->
+                    [
+                      ( "Staking Limit",
+                        Baker_wallet_data.format_staking_limit
+                          params.limit_of_staking_over_baking );
+                      ( "Baking Edge",
+                        Baker_wallet_data.format_baking_edge
+                          params.edge_of_baking_over_staking );
+                    ]
+                | None -> [])
+              @ (match wd.delegate_apy with
+                | Some apy -> [("Est. APY", Printf.sprintf "%.1f%%" apy)]
+                | None -> [])
               @ (if wd.is_registered then
                    [("Status", Widgets.green "Registered delegate")]
                  else [])
@@ -1203,7 +1217,15 @@ let action_rename ~base_dir (key : Keys_reader.key_metadata) =
         | None -> offer_download_or_error ~action_label:"rename key"
         | Some client ->
             let args =
-              [client; "--base-dir"; base_dir; "rename"; key.alias; new_alias]
+              [
+                client;
+                "--base-dir";
+                base_dir;
+                "rename";
+                key.alias;
+                "to";
+                new_alias;
+              ]
             in
             Job_manager.submit
               ~description:"Rename key alias"
@@ -2222,12 +2244,17 @@ let handle_key ps key ~size =
           move_cursor Miaou_helpers.Mouse.wheel_scroll_lines ~size ps
         else
           match Miaou_helpers.Mouse.parse_click key with
-          | Some {row; _} ->
-              let rows = size.LTerm_geom.rows - 5 in
-              let _ = rows in
-              let idx = row - 3 + ps.Navigation.s.scroll_offset in
-              if idx >= 0 && idx < List.length ps.Navigation.s.nav_items then
-                move_cursor (idx - ps.Navigation.s.cursor) ~size ps
+          | Some {row; col} ->
+              let cols = size.LTerm_geom.cols in
+              let left_width =
+                if cols >= side_by_side_min_width then min 60 (cols * 2 / 5)
+                else cols
+              in
+              if col < left_width then
+                let idx = row - 3 + ps.Navigation.s.scroll_offset in
+                if idx >= 0 && idx < List.length ps.Navigation.s.nav_items then
+                  move_cursor (idx - ps.Navigation.s.cursor) ~size ps
+                else ps
               else ps
           | None -> ps)
 
