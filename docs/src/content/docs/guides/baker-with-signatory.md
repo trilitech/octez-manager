@@ -29,35 +29,7 @@ Before you begin, ensure you have:
 
 ## Step-by-Step Setup
 
-### Step 1: Install and Sync Node
-
-If you don't already have a node running, install one first:
-
-**Via TUI:**
-1. Launch `octez-manager`
-2. Select **[ Install new instance ]** → **Node**
-3. Configure network (e.g., `shadownet` for testing)
-4. Choose **Snapshot** bootstrap method (faster)
-5. Wait for sync to complete
-
-**Via CLI:**
-```bash
-octez-manager install-node \
-  --instance shadownet \
-  --network shadownet \
-  --history-mode rolling \
-  --octez-version latest \
-  --snapshot
-```
-
-Verify sync status:
-```bash
-# In TUI: Node should show "Synced" status
-# Or check RPC:
-curl http://127.0.0.1:8732/chains/main/blocks/head | jq .header.level
-```
-
-### Step 2: Generate Baker Keys
+### Step 1: Generate Baker Keys
 
 Before installing Signatory, generate or import your baker keys. You'll need the **public key hash** (tz1...) to configure Signatory's authorized keys.
 
@@ -105,7 +77,7 @@ octez-client show address my-baker
 
 **Save your public key hash (tz1...)** — you'll need it for Signatory configuration.
 
-### Step 3: Install Signatory
+### Step 2: Install Signatory
 
 Now install Signatory with file-based keys (for development/testing) or hardware/cloud backend (for production).
 
@@ -139,7 +111,7 @@ For production, use YubiHSM or cloud KMS backends. These require additional setu
 - **AWS KMS**: See [Signatory Setup Guide - AWS KMS Backend](/guides/signatory-setup/#aws-kms)
 - **Azure/GCP KMS**: See [Signatory Setup Guide - Cloud KMS Backends](/guides/signatory-setup/#cloud-kms-backends-production-cloud)
 
-### Step 4: Import Keys into Signatory
+### Step 3: Import Keys into Signatory
 
 After Signatory is installed, import your baker keys into Signatory's keys directory.
 
@@ -165,11 +137,16 @@ chmod 600 $KEY_DIR/secret_keys
 octez-client -d $KEY_DIR import secret key my-baker unencrypted:edsk...
 ```
 
-### Step 5: Verify Signatory Configuration
+### Step 4: Verify Signatory Configuration
 
 Before installing the baker, verify Signatory is running and recognizes your keys.
 
-**Check service status:**
+**Check service status via TUI:**
+1. Launch `octez-manager`
+2. Navigate to your Signatory instance (e.g., `dev-signer`)
+3. Verify status shows "Running"
+
+**Or via CLI:**
 ```bash
 systemctl --user status octez-signatory-dev-signer
 ```
@@ -198,7 +175,7 @@ If you see your public key hash, Signatory is correctly configured!
 journalctl --user -u octez-signatory-dev-signer -f
 ```
 
-### Step 6: Install Baker with Remote Signer
+### Step 5: Install Baker with Remote Signer
 
 Now install the baker, configuring it to use Signatory for signing operations.
 
@@ -223,11 +200,17 @@ octez-manager install-baker \
 
 This creates a baker service configured to send signing requests to Signatory instead of using local keys.
 
-### Step 7: Verify Baker Connectivity
+### Step 6: Verify Baker Connectivity
 
 After installation, verify the baker can connect to Signatory and is operating correctly.
 
-**Check baker service status:**
+**Check baker service status via TUI:**
+1. Launch `octez-manager`
+2. Navigate to your baker instance
+3. Verify status shows "Running"
+4. Check logs for connection messages
+
+**Or via CLI:**
 ```bash
 systemctl --user status octez-baker-baker-shadownet
 ```
@@ -254,133 +237,11 @@ Look for:
 - ✅ "Authorized" messages for your delegate
 - ❌ No "Key not authorized" rejections
 
-### Step 8: Test Signing Operation
-
-The baker will automatically attempt to bake and attest when your turn comes. To verify signing works, watch the logs during a baking slot.
-
-**Monitor baker activity:**
-```bash
-journalctl --user -u octez-baker-baker-shadownet -f | grep -i "inject"
-```
-
-When your baker's turn arrives, you should see:
-```
-Injected block BL...
-Injected attestation op...
-```
-
-**Monitor Signatory signing:**
-```bash
-journalctl --user -u octez-signatory-dev-signer -f | grep -i "sign"
-```
-
-You should see:
-```
-Authorized signing request for tz1abc123...
-Signed block at level 12345
-Signed attestation for level 12345
-```
-
 If you see these messages, **your baker is successfully using Signatory!**
 
-### Step 9: Monitor and Maintain
-
-Once your baker is running, establish monitoring and maintenance procedures.
-
-#### Health Monitoring
-
-**Daily checks:**
-```bash
-# Check baker status
-systemctl --user status octez-baker-baker-shadownet
-
-# Check Signatory status
-systemctl --user status octez-signatory-dev-signer
-
-# Review recent logs for errors
-journalctl --user -u octez-baker-baker-shadownet --since "1 hour ago" | grep -i error
-journalctl --user -u octez-signatory-dev-signer --since "1 hour ago" | grep -i error
-```
-
-**TUI Monitoring:**
-
-Launch `octez-manager` to view real-time status:
-- Node sync status
-- Baker activity (blocks/attestations)
-- Signatory health
-
-#### Metrics and Alerting
-
-For production deployments, enable Signatory metrics:
-
-```bash
-# Reinstall with metrics enabled
-octez-manager install-signatory \
-  --instance prod-signer \
-  --metrics-address 127.0.0.1:9090 \
-  --backend file \
-  --authorized-keys tz1prod...
-```
-
-Scrape metrics with Prometheus:
-```yaml
-scrape_configs:
-  - job_name: 'signatory'
-    static_configs:
-      - targets: ['localhost:9090']
-```
-
-Key metrics to alert on:
-- `signatory_requests_rejected`: Unauthorized signing attempts
-- `signatory_request_duration_seconds`: High latency warnings
-- Service availability (systemd exporter)
-
-#### Backup and Recovery
-
-**File-based keys:**
-```bash
-# Backup keys (encrypted)
-tar czf signatory-backup-$(date +%Y%m%d).tar.gz \
-  ~/.local/share/octez/signatory/dev-signer/keys
-gpg -c signatory-backup-*.tar.gz
-
-# Store encrypted backup offline (USB drive, encrypted cloud storage, etc.)
-```
-
-**Recovery procedure:**
-```bash
-# Restore from backup
-gpg -d signatory-backup-20260223.tar.gz.gpg | tar xz -C ~/
-chmod 600 ~/.local/share/octez/signatory/dev-signer/keys/*
-systemctl --user restart octez-signatory-dev-signer
-```
-
-**Hardware/Cloud keys:**
-- Follow vendor backup procedures (YubiHSM backup, cloud KMS backup policies)
-- Test recovery procedures regularly
-
-#### Updates and Maintenance
-
-**Update Signatory:**
-```bash
-# Download new version
-octez-manager binaries download 4.1  # Example: Signatory 4.1
-
-# Reinstall with new version
-octez-manager install-signatory \
-  --instance dev-signer \
-  --signatory-version 4.1 \
-  --preserve-data  # Keeps existing keys and config
-```
-
-**Update Baker/Node:**
-```bash
-# Download new Octez version
-octez-manager binaries download 22.0
-
-# Update instances via TUI or CLI
-# Note: Baker/Signatory compatibility should be verified in release notes
-```
+For monitoring and maintenance procedures, see:
+- [Signatory Setup Guide - Monitoring and Maintenance](/guides/signatory-setup/#monitoring-and-maintenance)
+- [Baker Setup Guide](/guides/baker-setup/)
 
 ## Troubleshooting Common Issues
 
@@ -491,145 +352,11 @@ rm ~/.local/share/octez/signatory/dev-signer/watermark.db
 systemctl --user restart octez-signatory-dev-signer
 ```
 
-## Advanced Configurations
+## Advanced Topics
 
-### Multiple Delegates
-
-If you have multiple baking keys, configure Signatory to authorize all of them:
-
-```bash
-octez-manager install-signatory \
-  --instance multi-baker-signer \
-  --backend file \
-  --authorized-keys "tz1abc123... tz2def456... tz3ghi789..."
-```
-
-Then install multiple bakers, each using the same Signatory instance:
-
-```bash
-octez-manager install-baker \
-  --instance baker-1 \
-  --delegate tz1abc123... \
-  --remote-signer multi-baker-signer
-
-octez-manager install-baker \
-  --instance baker-2 \
-  --delegate tz2def456... \
-  --remote-signer multi-baker-signer
-```
-
-### Remote Signatory
-
-To run Signatory on a separate machine:
-
-**On Signatory host:**
-```bash
-octez-manager install-signatory \
-  --instance remote-signer \
-  --address 0.0.0.0:6732 \  # Listen on all interfaces
-  --authorized-keys tz1prod...
-```
-
-Configure firewall to allow baker's IP:
-```bash
-sudo ufw allow from <BAKER_IP> to any port 6732
-```
-
-**On Baker host:**
-```bash
-# Use remote signer URL instead of instance name
-octez-manager install-baker \
-  --instance remote-baker \
-  --delegate tz1prod... \
-  --remote-signer http://signatory-host.local:6732
-```
-
-**Security warning:** Use TLS for remote Signatory in production (requires manual configuration).
-
-### Signatory with DAL Node
-
-If your baker participates in the Data Availability Layer (DAL):
-
-```bash
-# Install DAL node
-octez-manager install-dal-node \
-  --instance dal-shadownet \
-  --node-instance shadownet
-
-# Install baker with DAL support
-octez-manager install-baker \
-  --instance baker-dal \
-  --delegate tz1abc... \
-  --remote-signer dev-signer \
-  --dal-node-instance dal-shadownet
-```
-
-Ensure Signatory authorizes DAL operations:
-```bash
---authorized-keys "tz1abc:block,attestation,attestation_with_dal"
-```
-
-### High Availability Signatory
-
-For production, consider redundant Signatory instances:
-
-**Architecture:**
-```
-         ┌──────────┐
-         │  Baker   │
-         └────┬─────┘
-              │
-    ┌─────────┴─────────┐
-    │                   │
-┌───▼────┐        ┌─────▼───┐
-│Signatory│◄──────►│Signatory│
-│Primary  │        │Standby  │
-└───┬────┘        └─────┬───┘
-    │                   │
-    └─────────┬─────────┘
-              │
-      ┌───────▼────────┐
-      │Shared Watermark│
-      │  (DynamoDB/etc)│
-      └────────────────┘
-```
-
-**Requirements:**
-- Shared watermark database (DynamoDB, Firestore, etc.)
-- Load balancer or baker-side failover
-- Synchronized key material (cloud KMS simplifies this)
-
-**Note:** This requires manual Signatory configuration. See [Signatory HA documentation](https://signatory.io/docs/high-availability).
-
-## Performance Tuning
-
-### Latency Optimization
-
-Baking requires low-latency signing (<100ms target). To optimize:
-
-1. **Co-locate services**: Run Signatory on same host as baker
-2. **Use SSD storage**: For file-based keys and watermark
-3. **Adequate resources**: CPU/RAM for Signatory (minimal: 1 CPU, 512MB RAM)
-4. **Monitor metrics**: Track signing duration and optimize bottlenecks
-
-Typical signing latencies:
-- **File backend**: 5-10ms
-- **YubiHSM**: 20-50ms
-- **Cloud KMS**: 50-200ms (network-dependent)
-
-### Resource Requirements
-
-**Signatory:**
-- CPU: 1 core (minimal), 2+ cores (production)
-- RAM: 512MB (minimal), 1GB+ (production)
-- Disk: 1GB (file backend), 10GB+ (logs, watermark history)
-- Network: 1Mbps (local), 10Mbps+ (remote)
-
-**Total system (Node + Baker + Signatory):**
-- CPU: 4+ cores
-- RAM: 8GB+
-- Disk: 100GB+ (rolling node)
-- Network: 100Mbps+
+For advanced configurations (multiple delegates, remote Signatory, DAL integration, high availability, performance tuning), see:
+- [Signatory Setup Guide - Advanced Configurations](/guides/signatory-setup/)
+- [Baker Setup Guide](/guides/baker-setup/)
 
 ## Security Checklist for Production
 
