@@ -593,7 +593,7 @@ For production baking, consider redundant Signatory instances:
 
 ## Next Steps
 
-- **Set up a baker with Signatory**: See [Baker with Signatory Guide](/guides/baker-with-signatory/)
+- **Set up a baker with Signatory**: See [Baker Setup Guide](/guides/baker-setup/)
 - **CLI reference**: Detailed command documentation in [CLI Reference](/reference/cli/)
 - **Official Signatory docs**: [https://signatory.io/docs/](https://signatory.io/docs/)
 - **Signatory GitHub**: [https://github.com/ecadlabs/signatory](https://github.com/ecadlabs/signatory)
