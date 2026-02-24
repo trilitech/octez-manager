@@ -1224,18 +1224,72 @@ let pick_address ~title ~exclude_pkh ~include_mru ~on_select =
             ())
     ()
 
+(** Build an alias validator for a given wallet directory.
+    Reads keys once and returns a validator closure.
+
+    @param exclude_pkh PKH to exclude from conflict checks (the key being
+    renamed). *)
+let make_alias_validator ~base_dir ?exclude_pkh () =
+  let keys =
+    match Keys_reader.read_keys_full ~base_dir with
+    | Ok ks -> ks
+    | Error _ -> []
+  in
+  let other_keys =
+    match exclude_pkh with
+    | Some pkh ->
+        List.filter
+          (fun (k : Keys_reader.key_metadata) -> not (String.equal k.pkh pkh))
+          keys
+    | None -> keys
+  in
+  fun alias ->
+    let alias = String.trim alias in
+    if String.length alias = 0 then Error "Alias cannot be empty"
+    else
+      let display_conflict =
+        List.find_opt
+          (fun (k : Keys_reader.key_metadata) ->
+            String.equal (display_alias ~base_dir k) alias)
+          other_keys
+      in
+      match display_conflict with
+      | Some k ->
+          Error
+            (Printf.sprintf
+               "Name '%s' is already used by key %s"
+               alias
+               (short_pkh k.pkh))
+      | None -> (
+          let hidden_conflict =
+            List.find_opt
+              (fun (k : Keys_reader.key_metadata) ->
+                String.equal k.alias alias
+                && not (String.equal (display_alias ~base_dir k) alias))
+              other_keys
+          in
+          match hidden_conflict with
+          | Some k ->
+              Error
+                (Printf.sprintf
+                   "Name '%s' exists in wallet files (shown as '%s')"
+                   alias
+                   (display_alias ~base_dir k))
+          | None -> Ok ())
+
 (** Rename a key alias (OM-level alias override). *)
 let action_rename ~base_dir (key : Keys_reader.key_metadata) =
   let current_display = display_alias ~base_dir key in
-  Modal_helpers.prompt_text_modal
+  let validator = make_alias_validator ~base_dir ~exclude_pkh:key.pkh () in
+  Modal_helpers.prompt_validated_text_modal
     ~title:(Printf.sprintf "Rename '%s'" current_display)
     ~width:40
     ~initial:current_display
     ~placeholder:(Some "New alias")
+    ~validator
     ~on_submit:(fun new_alias ->
       let new_alias = String.trim new_alias in
-      if String.equal new_alias "" || String.equal new_alias current_display
-      then ()
+      if String.equal new_alias current_display then ()
       else (
         Key_aliases.set ~base_dir ~pkh:key.pkh ~alias:new_alias ;
         Context.toast_success
@@ -1761,41 +1815,40 @@ let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
 
 (** Create a new key via octez-client gen keys. *)
 let action_create_key ~base_dir =
-  Modal_helpers.prompt_text_modal
+  let validator = make_alias_validator ~base_dir () in
+  Modal_helpers.prompt_validated_text_modal
     ~title:"Create Key: Alias"
     ~width:40
     ~initial:""
     ~placeholder:(Some "my_key")
+    ~validator
     ~on_submit:(fun alias ->
       let alias = String.trim alias in
-      if String.length alias = 0 then
-        Modal_helpers.show_error ~title:"Error" "Alias cannot be empty."
-      else
-        let schemes =
-          [
-            ("Ed25519 (default)", "ed25519");
-            ("Secp256k1", "secp256k1");
-            ("P-256", "p256");
-            ("BLS", "bls");
-          ]
-        in
-        Modal_helpers.open_choice_modal
-          ~title:"Crypto scheme"
-          ~items:schemes
-          ~to_string:fst
-          ~on_select:(fun (_label, scheme) ->
-            let description =
-              Printf.sprintf "Generate '%s' key (%s)" alias scheme
-            in
-            run_client_action
-              ~base_dir
-              ~description
-              ~args:["gen"; "keys"; alias; "--sig"; scheme]
-              ~on_success:(fun () ->
-                Context.toast_success
-                  (Printf.sprintf "Key '%s' created (%s)" alias scheme))
-              ())
-          ())
+      let schemes =
+        [
+          ("Ed25519 (default)", "ed25519");
+          ("Secp256k1", "secp256k1");
+          ("P-256", "p256");
+          ("BLS", "bls");
+        ]
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Crypto scheme"
+        ~items:schemes
+        ~to_string:fst
+        ~on_select:(fun (_label, scheme) ->
+          let description =
+            Printf.sprintf "Generate '%s' key (%s)" alias scheme
+          in
+          run_client_action
+            ~base_dir
+            ~description
+            ~args:["gen"; "keys"; alias; "--sig"; scheme]
+            ~on_success:(fun () ->
+              Context.toast_success
+                (Printf.sprintf "Key '%s' created (%s)" alias scheme))
+            ())
+        ())
     ()
 
 (** Import a public key hash as watch-only address. *)
@@ -1813,25 +1866,24 @@ let action_import_key ~base_dir =
             ~title:"Invalid PKH"
             (Printf.sprintf "Invalid PKH: %s" reason)
       | Pkh_validator.Valid ->
-          Modal_helpers.prompt_text_modal
+          let validator = make_alias_validator ~base_dir () in
+          Modal_helpers.prompt_validated_text_modal
             ~title:"Import Key: Alias"
             ~width:40
             ~initial:""
             ~placeholder:(Some "my_contact")
+            ~validator
             ~on_submit:(fun alias ->
               let alias = String.trim alias in
-              if String.length alias = 0 then
-                Modal_helpers.show_error ~title:"Error" "Alias cannot be empty."
-              else
-                let description = Printf.sprintf "Import '%s' (%s)" alias pkh in
-                run_client_action
-                  ~base_dir
-                  ~description
-                  ~args:["add"; "address"; alias; pkh]
-                  ~on_success:(fun () ->
-                    Context.toast_success
-                      (Printf.sprintf "Imported '%s' as watch-only" alias))
-                  ())
+              let description = Printf.sprintf "Import '%s' (%s)" alias pkh in
+              run_client_action
+                ~base_dir
+                ~description
+                ~args:["add"; "address"; alias; pkh]
+                ~on_success:(fun () ->
+                  Context.toast_success
+                    (Printf.sprintf "Imported '%s' as watch-only" alias))
+                ())
             ())
     ()
 
