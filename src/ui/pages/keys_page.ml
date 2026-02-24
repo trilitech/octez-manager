@@ -284,6 +284,13 @@ let move ps _ = ps
 
 let service_select ps _ = ps
 
+(** Tracks the PKH the cursor has been resting on, and since when. *)
+let focused_pkh : string option ref = ref None
+
+let focused_since : float ref = ref 0.0
+
+let focus_debounce = 2.0
+
 let service_cycle ps _ =
   let ps =
     if Context.consume_keys_dirty () then (
@@ -310,11 +317,22 @@ let service_cycle ps _ =
       {ps with s = {s with groups; nav_items; total_keys; cursor}})
     else ps
   in
-  (* Fetch data for the currently selected key *)
+  (* Auto-fetch for the focused key after debounce *)
   let s = ps.Navigation.s in
-  (match List.nth_opt s.nav_items s.cursor with
-  | Some (KeyItem (_, key)) -> Keys_scheduler.request_fetch ~pkh:key.pkh
-  | _ -> ()) ;
+  let current_pkh =
+    match List.nth_opt s.nav_items s.cursor with
+    | Some (KeyItem (_, key)) -> Some key.pkh
+    | _ -> None
+  in
+  let now = Unix.gettimeofday () in
+  (match (current_pkh, !focused_pkh) with
+  | Some pkh, Some prev when String.equal pkh prev ->
+      if now -. !focused_since >= focus_debounce then
+        Keys_scheduler.request_fetch ~pkh
+  | Some pkh, _ ->
+      focused_pkh := Some pkh ;
+      focused_since := now
+  | None, _ -> focused_pkh := None) ;
   ps
 
 let back ps = Navigation.back ps
