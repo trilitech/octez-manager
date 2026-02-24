@@ -100,3 +100,8 @@ val estimate_fee :
 (** Human-readable description of an operation for confirmation prompts.
     Example: ["Stake 1,000.000000 ꜩ"] *)
 val describe_operation : wallet_operation -> string
+
+(** Extract the operation hash from octez-client output.
+    Looks for ['oo...'] hashes in lines like ["Operation hash is 'oo...'"].
+    Returns [None] if no hash is found. *)
+val extract_op_hash : string -> string option
