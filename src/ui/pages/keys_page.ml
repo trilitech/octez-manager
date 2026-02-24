@@ -142,6 +142,13 @@ let contains_substring haystack needle =
     done ;
     !found
 
+(** Resolve the display alias for a key: OM alias if set, else octez-client
+    alias. *)
+let display_alias ~base_dir (key : Keys_reader.key_metadata) =
+  match Key_aliases.get ~base_dir ~pkh:key.pkh with
+  | Some alias -> alias
+  | None -> key.alias
+
 (** Filter groups by search query (case-insensitive match on alias or PKH). *)
 let filter_groups ~query groups =
   if String.length query = 0 then groups
@@ -153,7 +160,10 @@ let filter_groups ~query groups =
           List.filter
             (fun (k : Keys_reader.key_metadata) ->
               let alias_match =
-                contains_substring (String.lowercase_ascii k.alias) q
+                contains_substring
+                  (String.lowercase_ascii
+                     (display_alias ~base_dir:g.base_dir k))
+                  q
               in
               let pkh_match =
                 contains_substring (String.lowercase_ascii k.pkh) q
@@ -174,7 +184,10 @@ let sort_groups ~mode groups =
             List.sort
               (fun (a : Keys_reader.key_metadata)
                    (b : Keys_reader.key_metadata)
-                 -> String.compare a.alias b.alias)
+                 ->
+                String.compare
+                  (display_alias ~base_dir:g.base_dir a)
+                  (display_alias ~base_dir:g.base_dir b))
               g.keys
         | SortBalance ->
             List.sort
@@ -252,6 +265,8 @@ let init () =
   in
   Keys_scheduler.set_keys keys_by_dir ;
   Keys_scheduler.start () ;
+  (* Load OM key alias overrides from disk *)
+  Key_aliases.load () ;
   (* Load tzkt alias disk caches for known networks *)
   let all_networks =
     List.concat_map (fun (g : enriched_group) -> g.networks) groups
@@ -370,7 +385,7 @@ let truncate_pkh ~max_len pkh =
     ^ String.sub pkh (len - suffix_len) suffix_len
 
 (** Render a single key row for the left panel. *)
-let render_key_row ~is_selected ~is_focused ~multi_selected ~cols
+let render_key_row ~is_selected ~is_focused ~multi_selected ~cols ~base_dir
     (key : Keys_reader.key_metadata) =
   let select_indicator =
     if multi_selected then Widgets.themed_accent "[*]" else ""
@@ -402,10 +417,11 @@ let render_key_row ~is_selected ~is_focused ~multi_selected ~cols
          [own_icon; kind_tag; baker_icon])
   in
   let alias_width = min 20 (cols / 3) in
+  let name = display_alias ~base_dir key in
   let raw_alias =
-    if String.length key.alias > alias_width then
-      String.sub key.alias 0 (alias_width - 1) ^ "~"
-    else key.alias
+    if String.length name > alias_width then
+      String.sub name 0 (alias_width - 1) ^ "~"
+    else name
   in
   let alias = Printf.sprintf "%-*s" alias_width raw_alias in
   let alias_styled =
@@ -494,11 +510,17 @@ let render_list_panel ~state ~focus ~cols ~rows =
         | GroupHeader group ->
             let is_folded = StringSet.mem group.base_dir state.folded in
             render_group_header ~is_selected ~is_focused ~is_folded ~cols group
-        | KeyItem (_, key) ->
+        | KeyItem (group, key) ->
             let multi_selected =
               state.multi_select && StringSet.mem key.pkh state.selected
             in
-            render_key_row ~is_selected ~is_focused ~multi_selected ~cols key)
+            render_key_row
+              ~is_selected
+              ~is_focused
+              ~multi_selected
+              ~cols
+              ~base_dir:group.base_dir
+              key)
       state.nav_items
   in
   (* Apply scroll offset *)
@@ -563,7 +585,7 @@ let render_key_detail ~box_width (group : enriched_group)
   in
   let items =
     [
-      ("Alias", key.alias);
+      ("Alias", display_alias ~base_dir:group.base_dir key);
       ("PKH", key.pkh);
       ("Key Type", kind_str);
       ( "Secret Key",
@@ -1024,7 +1046,7 @@ let collect_addresses ~exclude_pkh ~include_mru =
                   in
                   Some
                     {
-                      label = k.alias;
+                      label = display_alias ~base_dir:dir k;
                       pkh = k.pkh;
                       category = "Wallet";
                       balance;
@@ -1202,52 +1224,29 @@ let pick_address ~title ~exclude_pkh ~include_mru ~on_select =
             ())
     ()
 
-(** Rename a key alias via octez-client. *)
+(** Rename a key alias (OM-level alias override). *)
 let action_rename ~base_dir (key : Keys_reader.key_metadata) =
+  let current_display = display_alias ~base_dir key in
   Modal_helpers.prompt_text_modal
-    ~title:(Printf.sprintf "Rename '%s'" key.alias)
+    ~title:(Printf.sprintf "Rename '%s'" current_display)
     ~width:40
-    ~initial:key.alias
+    ~initial:current_display
     ~placeholder:(Some "New alias")
     ~on_submit:(fun new_alias ->
       let new_alias = String.trim new_alias in
-      if String.equal new_alias "" || String.equal new_alias key.alias then ()
-      else
-        match find_octez_client ~base_dir with
-        | None -> offer_download_or_error ~action_label:"rename key"
-        | Some client ->
-            let args =
-              [
-                client;
-                "--base-dir";
-                base_dir;
-                "rename";
-                key.alias;
-                "to";
-                new_alias;
-              ]
-            in
-            Job_manager.submit
-              ~description:"Rename key alias"
-              (fun ~append_log:_ () -> Cmd_runner.run_silent args)
-              ~on_complete:(fun status ->
-                match status with
-                | Job_manager.Succeeded ->
-                    Context.toast_success
-                      (Printf.sprintf
-                         "Renamed '%s' to '%s'"
-                         key.alias
-                         new_alias) ;
-                    Context.mark_keys_dirty ()
-                | Job_manager.Failed msg ->
-                    Context.toast_error (Printf.sprintf "Rename failed: %s" msg)
-                | _ -> ()))
+      if String.equal new_alias "" || String.equal new_alias current_display
+      then ()
+      else (
+        Key_aliases.set ~base_dir ~pkh:key.pkh ~alias:new_alias ;
+        Context.toast_success
+          (Printf.sprintf "Renamed '%s' to '%s'" current_display new_alias) ;
+        Context.mark_keys_dirty ()))
     ()
 
 (** Forget (remove) a key from the wallet. *)
 let action_forget ~base_dir (key : Keys_reader.key_metadata) =
   Modal_helpers.confirm_modal
-    ~title:(Printf.sprintf "Forget key '%s'?" key.alias)
+    ~title:(Printf.sprintf "Forget key '%s'?" (display_alias ~base_dir key))
     ~message:
       (Printf.sprintf
          "PKH: %s\nThis removes the key from this wallet only."
@@ -1274,8 +1273,11 @@ let action_forget ~base_dir (key : Keys_reader.key_metadata) =
               ~on_complete:(fun status ->
                 match status with
                 | Job_manager.Succeeded ->
+                    Key_aliases.remove ~base_dir ~pkh:key.pkh ;
                     Context.toast_success
-                      (Printf.sprintf "Removed '%s' from wallet" key.alias) ;
+                      (Printf.sprintf
+                         "Removed '%s' from wallet"
+                         (display_alias ~base_dir key)) ;
                     Context.mark_keys_dirty ()
                 | Job_manager.Failed msg ->
                     Context.toast_error (Printf.sprintf "Forget failed: %s" msg)
@@ -1464,11 +1466,11 @@ let confirm_and_run ~base_dir ~title ~message ~args ~network
 (** If the key is encrypted, prompt for password and call [action] with
     extra [--password-filename] args. Otherwise call [action] directly.
     The temporary password file is cleaned up via [~on_done] in the action. *)
-let with_password_if_needed (key : Keys_reader.key_metadata) ~action =
+let with_password_if_needed ~base_dir (key : Keys_reader.key_metadata) ~action =
   match key.key_kind with
   | Encrypted ->
       Modal_helpers.prompt_password_modal
-        ~title:(Printf.sprintf "Password for %s" key.alias)
+        ~title:(Printf.sprintf "Password for %s" (display_alias ~base_dir key))
         ~on_submit:(fun password ->
           let tmp = Filename.temp_file "octez-pw" "" in
           let fd = Unix.openfile tmp [Unix.O_WRONLY; Unix.O_TRUNC] 0o600 in
@@ -1501,12 +1503,15 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
                 ~title:"Invalid amount"
                 "Please enter a valid number."
           | Some _ ->
-              with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+              with_password_if_needed
+                ~base_dir
+                key
+                ~action:(fun ~extra_args ~cleanup ->
                   let description =
                     Printf.sprintf
                       "Transfer %s tez from %s"
                       amount_str
-                      key.alias
+                      (display_alias ~base_dir key)
                   in
                   let endpoint_args =
                     let endpoints =
@@ -1528,7 +1533,7 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
                     ~message:
                       (Printf.sprintf
                          "From: %s\nTo: %s\nAmount: %s tez"
-                         key.alias
+                         (display_alias ~base_dir key)
                          (short_pkh dest_pkh)
                          amount_str)
                     ~args:op_args
@@ -1544,13 +1549,21 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
 let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
     =
   Modal_helpers.confirm_modal
-    ~title:(Printf.sprintf "Register '%s' as delegate?" key.alias)
+    ~title:
+      (Printf.sprintf
+         "Register '%s' as delegate?"
+         (display_alias ~base_dir key))
     ~message:"This will register your key as a delegate on the network."
     ~on_result:(fun confirmed ->
       if confirmed then
-        with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+        with_password_if_needed
+          ~base_dir
+          key
+          ~action:(fun ~extra_args ~cleanup ->
             let description =
-              Printf.sprintf "Register '%s' as delegate" key.alias
+              Printf.sprintf
+                "Register '%s' as delegate"
+                (display_alias ~base_dir key)
             in
             let endpoint_args =
               let endpoints =
@@ -1577,9 +1590,12 @@ let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
     ~exclude_pkh:key.pkh
     ~include_mru:false
     ~on_select:(fun baker_pkh ->
-      with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+      with_password_if_needed ~base_dir key ~action:(fun ~extra_args ~cleanup ->
           let description =
-            Printf.sprintf "Delegate '%s' to %s" key.alias baker_pkh
+            Printf.sprintf
+              "Delegate '%s' to %s"
+              (display_alias ~base_dir key)
+              baker_pkh
           in
           let endpoint_args =
             let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
@@ -1599,12 +1615,17 @@ let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
 (** Undelegate action. *)
 let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
   Modal_helpers.confirm_modal
-    ~title:(Printf.sprintf "Undelegate '%s'?" key.alias)
+    ~title:(Printf.sprintf "Undelegate '%s'?" (display_alias ~base_dir key))
     ~message:"This will withdraw the delegation."
     ~on_result:(fun confirmed ->
       if confirmed then
-        with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
-            let description = Printf.sprintf "Undelegate '%s'" key.alias in
+        with_password_if_needed
+          ~base_dir
+          key
+          ~action:(fun ~extra_args ~cleanup ->
+            let description =
+              Printf.sprintf "Undelegate '%s'" (display_alias ~base_dir key)
+            in
             let endpoint_args =
               let endpoints =
                 Keys_scheduler.get_endpoints_for_network ~network
@@ -1638,9 +1659,15 @@ let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
             ~title:"Invalid amount"
             "Please enter a valid number."
       | Some _ ->
-          with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+          with_password_if_needed
+            ~base_dir
+            key
+            ~action:(fun ~extra_args ~cleanup ->
               let description =
-                Printf.sprintf "Stake %s tez for %s" amount_str key.alias
+                Printf.sprintf
+                  "Stake %s tez for %s"
+                  amount_str
+                  (display_alias ~base_dir key)
               in
               let endpoint_args =
                 let endpoints =
@@ -1658,7 +1685,7 @@ let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
                 ~message:
                   (Printf.sprintf
                      "Source: %s\nStake amount: %s tez"
-                     key.alias
+                     (display_alias ~base_dir key)
                      amount_str)
                 ~args:op_args
                 ~network
@@ -1683,9 +1710,15 @@ let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
             ~title:"Invalid amount"
             "Please enter a valid number."
       | Some _ ->
-          with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+          with_password_if_needed
+            ~base_dir
+            key
+            ~action:(fun ~extra_args ~cleanup ->
               let description =
-                Printf.sprintf "Unstake %s tez for %s" amount_str key.alias
+                Printf.sprintf
+                  "Unstake %s tez for %s"
+                  amount_str
+                  (display_alias ~base_dir key)
               in
               let endpoint_args =
                 let endpoints =
@@ -1703,7 +1736,7 @@ let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
                 ~message:
                   (Printf.sprintf
                      "Source: %s\nUnstake amount: %s tez"
-                     key.alias
+                     (display_alias ~base_dir key)
                      amount_str)
                 ~args:op_args
                 ~network
@@ -1790,7 +1823,7 @@ let action_import_key ~base_dir =
     ()
 
 (** Show receive info modal with PKH and explorer link. *)
-let action_receive (key : Keys_reader.key_metadata) =
+let action_receive ~base_dir (key : Keys_reader.key_metadata) =
   let network =
     match Keys_scheduler.get_wallet_data ~pkh:key.pkh with
     | wd :: _ -> Some wd.Keys_scheduler.network
@@ -1806,7 +1839,7 @@ let action_receive (key : Keys_reader.key_metadata) =
   let message =
     Printf.sprintf
       "Alias: %s\n\nPKH:\n%s\n\nExplorer:\n%s\n\nPress y/c to copy PKH."
-      key.alias
+      (display_alias ~base_dir key)
       key.pkh
       explorer_url
   in
@@ -1917,7 +1950,7 @@ let open_key_action_modal ~(group : enriched_group)
     @ [("Forget", `Forget)]
   in
   Modal_helpers.open_choice_modal
-    ~title:(Printf.sprintf "Actions: %s" key.alias)
+    ~title:(Printf.sprintf "Actions: %s" (display_alias ~base_dir key))
     ~items:(List.map snd actions)
     ~to_string:(fun action ->
       match List.find_opt (fun (_, a) -> a = action) actions with
@@ -2018,9 +2051,12 @@ let apply_pending_search ps =
 let force_refresh_keys ps =
   let s = ps.Navigation.s in
   (match List.nth_opt s.nav_items s.cursor with
-  | Some (KeyItem (_, key)) ->
+  | Some (KeyItem (group, key)) ->
       Keys_scheduler.force_refresh ~pkh:key.pkh ;
-      Context.toast_info (Printf.sprintf "Refreshing %s..." key.alias)
+      Context.toast_info
+        (Printf.sprintf
+           "Refreshing %s..."
+           (display_alias ~base_dir:group.base_dir key))
   | _ -> Context.toast_info "Select a key to refresh") ;
   ps
 
@@ -2051,7 +2087,7 @@ let toggle_selection ps =
 let show_receive ps =
   let s = ps.Navigation.s in
   (match List.nth_opt s.nav_items s.cursor with
-  | Some (KeyItem (_, key)) -> action_receive key
+  | Some (KeyItem (group, key)) -> action_receive ~base_dir:group.base_dir key
   | _ -> ()) ;
   ps
 
@@ -2120,6 +2156,7 @@ let open_batch_modal ps =
                       match group.networks with n :: _ -> n | [] -> "mainnet"
                     in
                     with_password_if_needed
+                      ~base_dir:group.base_dir
                       key
                       ~action:(fun ~extra_args ~cleanup ->
                         let endpoint_args =
@@ -2135,7 +2172,7 @@ let open_batch_modal ps =
                           ~description:
                             (Printf.sprintf
                                "Delegate '%s' to %s"
-                               key.alias
+                               (display_alias ~base_dir:group.base_dir key)
                                baker_pkh)
                           ~args:
                             (extra_args @ endpoint_args
