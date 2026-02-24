@@ -210,30 +210,33 @@ let type_to_string ty = Format.asprintf "%a" Printtyp.type_expr ty
 (* Doc-comment extraction                                                     *)
 (* -------------------------------------------------------------------------- *)
 
-(** Extract the first doc-comment line from OCaml attributes.
-    Doc comments are stored as [\[@ocaml.doc "..."\]] attributes. *)
+(** Extract the first doc-comment string from OCaml attributes.
+    Doc comments are stored as [\[@ocaml.doc "..."\]] attributes.
+
+    Uses [Pprintast.expression] to extract the string portably across OCaml
+    versions, avoiding direct pattern matching on [Parsetree.constant] whose
+    representation changed between OCaml 5.2 and 5.3. *)
 let extract_doc (attrs : Parsetree.attributes) =
+  let extract_string_from_expr (expr : Parsetree.expression) =
+    match expr.pexp_desc with
+    | Pexp_constant _ ->
+        let s = Format.asprintf "%a" Pprintast.expression expr in
+        let len = String.length s in
+        if len >= 2 && s.[0] = '"' && s.[len - 1] = '"' then
+          Some (Scanf.unescaped (String.sub s 1 (len - 2)))
+        else None
+    | _ -> None
+  in
   List.find_map
     (fun (attr : Parsetree.attribute) ->
       if attr.attr_name.txt = "ocaml.doc" || attr.attr_name.txt = "doc" then
         match attr.attr_payload with
-        | PStr
-            [
-              {
-                pstr_desc =
-                  Pstr_eval
-                    ( {
-                        pexp_desc =
-                          Pexp_constant
-                            {pconst_desc = Pconst_string (s, _, _); _};
-                        _;
-                      },
-                      _ );
-                _;
-              };
-            ] ->
-            let trimmed = String.trim s in
-            if trimmed = "" then None else Some trimmed
+        | PStr [{pstr_desc = Pstr_eval (expr, _); _}] -> (
+            match extract_string_from_expr expr with
+            | Some s ->
+                let trimmed = String.trim s in
+                if String.equal trimmed "" then None else Some trimmed
+            | None -> None)
         | _ -> None
       else None)
     attrs
