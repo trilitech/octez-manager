@@ -63,8 +63,4 @@ if [ -d "$DATA_DIR" ]; then
 fi
 echo "Data deleted after purge"
 
-# Recreate the tezos system user if purge deleted it.
-# Other parallel tests depend on this user existing.
-ensure_tezos_user
-
 echo "Remove vs purge test passed"
