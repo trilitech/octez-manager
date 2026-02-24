@@ -21,10 +21,8 @@ Signatory is a remote signer that enables bakers to keep their private keys sepa
 
 | Scenario | Recommended Approach |
 |----------|---------------------|
-| **Testing/Development** | File-based Signatory or local keys |
-| **Production (Small)** | YubiHSM-backed Signatory |
-| **Production (Large/Cloud)** | Cloud KMS-backed Signatory |
-| **High Security Requirements** | Hardware-backed Signatory (YubiHSM or cloud HSM) |
+| **Testing/Development** | File-based Signatory (as described in this guide) |
+| **Production** | Hardware-backed Signatory (YubiHSM) or Cloud KMS<br/>See [Signatory documentation](https://signatory.io/docs/) for setup |
 
 ## Prerequisites
 
@@ -152,277 +150,7 @@ octez-manager install-signatory \
 - No protection against key extraction
 - **Never use for mainnet baking with significant stake**
 
-### YubiHSM Backend (Hardware Security)
-
-**Security Level**: High (keys stored in tamper-resistant hardware)  
-**Cost**: ~$650 USD (YubiHSM 2 device)  
-**Complexity**: Medium  
-**Use Case**: Production baking, high-security requirements
-
-YubiHSM provides hardware-based key storage where private keys never leave the device.
-
-#### Prerequisites
-
-1. **YubiHSM 2 device**: [Purchase from Yubico](https://www.yubico.com/product/yubihsm-2/)
-2. **YubiHSM connector**: Software that provides USB access to the device
-3. **Initial HSM setup**: Device must be initialized with authentication keys
-
-#### Installation
-
-```bash
-# Install YubiHSM connector (platform-dependent)
-# Ubuntu/Debian:
-sudo apt install yubihsm-connector
-
-# macOS:
-brew install yubihsm-connector
-
-# Start the connector
-sudo systemctl start yubihsm-connector
-```
-
-#### Signatory Setup with YubiHSM
-
-Currently, YubiHSM backend requires manual configuration of the Signatory config file. Support for `--backend yubihsm` in octez-manager is planned for a future release.
-
-**Manual configuration** (`~/.config/octez-manager/signatory/my-signer.yaml`):
-
-```yaml
-server:
-  address: 127.0.0.1:6732
-  utility_address: 127.0.0.1:9583
-
-yubihsm:
-  address: 127.0.0.1:12345  # YubiHSM connector address
-  password: "password"       # HSM authentication key password
-  auth_key_id: 1            # Authentication key ID in HSM
-
-policy:
-  authorized_keys:
-    - tz1abc...: ["block", "attestation", "preattestation"]
-```
-
-See [Signatory YubiHSM documentation](https://signatory.io/docs/yubihsm) for detailed setup instructions.
-
-### Cloud KMS Backends (Production Cloud)
-
-**Security Level**: High (keys managed by cloud HSM)  
-**Cost**: Variable (cloud provider pricing)  
-**Complexity**: Medium-High  
-**Use Case**: Cloud-based production deployments, scalable infrastructure
-
-Cloud KMS backends are planned for future releases of octez-manager. Currently, these require manual Signatory configuration.
-
-#### AWS KMS
-
-**Prerequisites**:
-- AWS account with KMS access
-- IAM permissions for KMS operations
-- DynamoDB table for watermark storage (optional but recommended)
-
-**Manual configuration example**:
-
-```yaml
-server:
-  address: 0.0.0.0:6732
-
-aws:
-  region: us-east-1
-  access_key_id: AKIA...
-  secret_access_key: secret...
-
-watermark:
-  type: dynamodb
-  table: signatory-watermarks
-
-policy:
-  authorized_keys:
-    - tz1prod...: ["block", "attestation"]
-```
-
-See [Signatory AWS documentation](https://signatory.io/docs/aws) for details.
-
-#### Azure Key Vault
-
-**Prerequisites**:
-- Azure subscription
-- Key Vault instance
-- Managed identity or service principal with Key Vault permissions
-
-**Manual configuration example**:
-
-```yaml
-server:
-  address: 0.0.0.0:6732
-
-azure:
-  vault: https://my-vault.vault.azure.net/
-  tenant_id: ...
-  client_id: ...
-  client_secret: ...
-
-policy:
-  authorized_keys:
-    - tz1prod...: ["block", "attestation"]
-```
-
-See [Signatory Azure documentation](https://signatory.io/docs/azure) for details.
-
-#### Google Cloud KMS
-
-**Prerequisites**:
-- Google Cloud project
-- Cloud KMS key ring and keys
-- Service account with KMS permissions
-- Firestore for watermark storage (optional)
-
-**Manual configuration example**:
-
-```yaml
-server:
-  address: 0.0.0.0:6732
-
-gcp:
-  project: my-project
-  location: us-east1
-  key_ring: tezos-keys
-  credentials_file: /path/to/service-account.json
-
-watermark:
-  type: firestore
-  collection: signatory-watermarks
-
-policy:
-  authorized_keys:
-    - tz1prod...: ["block", "attestation"]
-```
-
-See [Signatory GCP documentation](https://signatory.io/docs/gcp) for details.
-
-## Security Best Practices
-
-### Key Management
-
-1. **Generate keys securely**: Use hardware RNGs or HSMs when possible
-2. **Never share private keys**: Keys should exist in exactly one location
-3. **Backup carefully**: Encrypted backups stored offline, test recovery procedures
-4. **Rotate keys periodically**: Establish key rotation procedures (requires re-registration with Tezos network)
-5. **Use multi-signature**: For high-value accounts, consider multi-signature setups
-
-### Network Security
-
-#### TLS/HTTPS Configuration
-
-For production deployments, always use TLS to encrypt communication between baker and Signatory:
-
-```bash
-# Generate self-signed certificate (development)
-openssl req -x509 -newkey rsa:4096 -nodes \
-  -keyout signatory-key.pem \
-  -out signatory-cert.pem \
-  -days 365 \
-  -subj "/CN=signatory.local"
-
-# Configure Signatory to use TLS (manual config required)
-# Edit ~/.config/octez-manager/signatory/<instance>.yaml:
-server:
-  address: 0.0.0.0:6732
-  tls:
-    certificate: /path/to/signatory-cert.pem
-    key: /path/to/signatory-key.pem
-```
-
-For production, use certificates from a trusted CA (Let's Encrypt, etc.).
-
-#### Firewall Rules
-
-Restrict access to Signatory's HTTP port:
-
-```bash
-# Only allow connections from baker's IP
-sudo ufw allow from 192.168.1.100 to any port 6732 proto tcp
-
-# Or for local-only access
-sudo ufw deny 6732
-# (systemd socket activation handles local connections)
-```
-
-#### SSH Tunneling (Development)
-
-For remote development, use SSH tunnels instead of exposing Signatory ports:
-
-```bash
-# On your local machine
-ssh -L 6732:localhost:6732 user@remote-signatory-host
-
-# Your local baker can now connect to localhost:6732
-```
-
-### Access Control
-
-#### Authorized Keys Management
-
-Signatory's `--authorized-keys` parameter restricts which public key hashes can request signatures:
-
-```bash
-# Single key with all permissions (default)
---authorized-keys tz1abc123...
-
-# Multiple keys
---authorized-keys tz1abc123... tz2def456...
-
-# With specific operation permissions
---authorized-keys "tz1abc:block,attestation tz2def:generic"
-```
-
-**Operation types**:
-- `block`: Block production
-- `attestation`: Attestations (formerly endorsements)
-- `preattestation`: Pre-attestations
-- `attestation_with_dal`: DAL-enabled attestations
-- `generic`: Generic signing operations
-
-#### File System Permissions
-
-Ensure only the service user can access key files:
-
-```bash
-# Set restrictive permissions on keys directory
-chmod 700 ~/.local/share/octez/signatory/*/keys
-chmod 600 ~/.local/share/octez/signatory/*/keys/*
-
-# Verify ownership
-ls -la ~/.local/share/octez/signatory/*/keys
-```
-
-#### Audit Logging
-
-Enable Signatory logging to monitor signing requests:
-
-```bash
-# View Signatory logs
-journalctl --user -u signatory@dev-signer -f
-
-# Logs include:
-# - Incoming signing requests
-# - Authorized/rejected requests
-# - Signed operation hashes
-```
-
-### Production Deployment Checklist
-
-Before deploying Signatory for mainnet baking:
-
-- [ ] **Keys stored in HSM**: YubiHSM, cloud HSM, or equivalent
-- [ ] **TLS enabled**: All baker-signatory communication encrypted
-- [ ] **Firewall configured**: Minimal access, principle of least privilege
-- [ ] **Authorized keys configured**: Only known baker keys allowed
-- [ ] **Watermark enabled**: Prevents double-signing (file or database-backed)
-- [ ] **Backups tested**: Key backup and recovery procedures verified
-- [ ] **Monitoring enabled**: Alerting on Signatory unavailability
-- [ ] **Logs reviewed**: Regular audit log reviews
-- [ ] **Disaster recovery plan**: Documented procedures for key compromise or hardware failure
-- [ ] **High availability**: Consider redundant Signatory instances (advanced setup)
+For production deployments with hardware security modules (HSMs) or cloud KMS backends, see the [official Signatory documentation](https://signatory.io/docs/).
 
 ## Watermark Storage
 
@@ -504,8 +232,7 @@ Baking requires low-latency signing. To minimize latency:
 
 Typical signing latencies:
 - **File backend**: <10ms
-- **YubiHSM**: 20-50ms
-- **Cloud KMS**: 50-200ms (network-dependent)
+- **Hardware/cloud backends**: See [Signatory performance docs](https://signatory.io/docs/) for HSM and KMS latencies
 
 #### High Availability
 
@@ -565,9 +292,8 @@ For production baking, consider redundant Signatory instances:
 **Solutions**:
 1. Check Signatory metrics: `curl http://127.0.0.1:9090/metrics | grep signatory_request_duration`
 2. Monitor system load: `top`, `htop`
-3. For cloud KMS: Verify network connectivity and API quotas
-4. For YubiHSM: Ensure connector is running and responsive
-5. Consider co-locating baker and Signatory
+3. Consider co-locating baker and Signatory
+4. For production setups (HSM/cloud KMS), see [Signatory performance tuning docs](https://signatory.io/docs/)
 
 ### Watermark Issues
 
@@ -600,13 +326,9 @@ For production baking, consider redundant Signatory instances:
 
 ## External Resources
 
-- [Signatory Documentation](https://signatory.io/docs/) - Official Signatory documentation
+- [Signatory Documentation](https://signatory.io/docs/) - Official Signatory documentation (includes HSM and cloud KMS setup)
 - [Signatory GitHub](https://github.com/ecadlabs/signatory) - Source code and releases
 - [Octez Remote Signer Docs](https://octez.tezos.com/docs/introduction/remote_signer.html) - Tezos documentation on remote signers
-- [YubiHSM 2 Documentation](https://developers.yubico.com/YubiHSM2/) - YubiHSM setup and usage
-- [AWS KMS Documentation](https://docs.aws.amazon.com/kms/) - AWS KMS setup
-- [Azure Key Vault Documentation](https://docs.microsoft.com/en-us/azure/key-vault/) - Azure Key Vault setup
-- [Google Cloud KMS Documentation](https://cloud.google.com/kms/docs) - GCP KMS setup
 
 ---
 
