@@ -454,6 +454,77 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
     ~on_result:(function Some text -> on_submit text | None -> ())
     ()
 
+let prompt_password_modal ?title ?(width = 60) ~on_submit () =
+  let module Modal = struct
+    type state = Textbox_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "password modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size:_ = Textbox_widget.render ps.Navigation.s ~focus
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else Navigation.update (fun _ -> Textbox_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget =
+    Textbox_widget.open_centered
+      ?title
+      ~width
+      ~placeholder:(Some "Enter password")
+      ~mask:true
+      ()
+  in
+  let modal_title = Option.value ~default:"Password" title in
+  Miaou.Core.Modal_manager.prompt
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~title:modal_title
+    ~extract:(fun pstate -> Some (Textbox_widget.get_text pstate.Navigation.s))
+    ~on_result:(function Some text -> on_submit text | None -> ())
+    ()
+
 let prompt_textarea_modal ?title ?(width = 70) ?(height = 8) ?initial
     ?placeholder ~on_submit () =
   let module Modal = struct
