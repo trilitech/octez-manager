@@ -53,13 +53,8 @@ let stop_flag = Atomic.make false
 
 let started = ref false
 
-(** Pending force-refresh PKHs *)
-let pending_refresh : (string, unit) Hashtbl.t = Hashtbl.create 8
-
-let pending_lock = Mutex.create ()
-
-let force_refresh ~pkh =
-  Mutex.protect pending_lock (fun () -> Hashtbl.replace pending_refresh pkh ())
+(** Worker queue for per-key fetch requests with deduplication. *)
+let worker : unit Worker_queue.t = Worker_queue.create ~name:"keys" ()
 
 (** Get all node endpoints grouped by network.
     Starts with local running nodes, then supplements with public RPC nodes
@@ -85,7 +80,26 @@ let get_node_endpoints () =
             Some (net, n.rpc_addr)
         | _ -> None)
   in
-  List.sort_uniq (fun (a, _) (b, _) -> String.compare a b) (local @ public_extra)
+  local @ public_extra
+
+(** Pick one random endpoint per network, distributing load across providers. *)
+let pick_endpoints () =
+  let all = get_node_endpoints () in
+  let by_network : (string, string list) Hashtbl.t = Hashtbl.create 8 in
+  List.iter
+    (fun (net, ep) ->
+      let existing =
+        Hashtbl.find_opt by_network net |> Option.value ~default:[]
+      in
+      Hashtbl.replace by_network net (ep :: existing))
+    all ;
+  Hashtbl.fold
+    (fun net eps acc ->
+      let arr = Array.of_list eps in
+      let ep = arr.(Random.int (Array.length arr)) in
+      (net, ep) :: acc)
+    by_network
+    []
 
 (** Fetch a JSON string field from an RPC endpoint. *)
 let rpc_get_string endpoint path =
@@ -147,49 +161,36 @@ let fetch_wallet_data ~network ~endpoint ~pkh =
     fetched_at = Unix.gettimeofday ();
   }
 
-(** Poll all tracked keys across all running node networks. *)
-let poll () =
-  let endpoints = get_node_endpoints () in
-  let keys =
-    Mutex.protect keys_lock (fun () -> !tracked_keys)
-    |> List.concat_map snd
-    |> List.sort_uniq String.compare
-  in
+(** Fetch a pkh across all networks, storing results incrementally. *)
+let fetch_pkh_all_networks ~pkh =
+  let endpoints = pick_endpoints () in
   List.iter
-    (fun pkh ->
-      List.iter
-        (fun (network, endpoint) ->
-          if Atomic.get stop_flag then ()
-          else
-            let wd = fetch_wallet_data ~network ~endpoint ~pkh in
-            store_wallet_data wd)
-        endpoints)
-    keys
+    (fun (network, endpoint) ->
+      if not (Atomic.get stop_flag) then
+        let wd = fetch_wallet_data ~network ~endpoint ~pkh in
+        store_wallet_data wd)
+    endpoints
 
-(** Process any pending force-refresh requests. *)
-let process_pending () =
-  let pending =
-    Mutex.protect pending_lock (fun () ->
-        let entries =
-          Hashtbl.fold (fun pkh () acc -> pkh :: acc) pending_refresh []
-        in
-        Hashtbl.clear pending_refresh ;
-        entries)
-  in
-  if pending <> [] then
-    let endpoints = get_node_endpoints () in
-    List.iter
-      (fun pkh ->
-        List.iter
-          (fun (network, endpoint) ->
-            if not (Atomic.get stop_flag) then
-              let wd = fetch_wallet_data ~network ~endpoint ~pkh in
-              store_wallet_data wd)
-          endpoints)
-      pending
-
-(** Poll interval: 30 seconds *)
+(** Poll interval: 30 seconds. Data fresher than this is not re-fetched. *)
 let poll_interval = 30.0
+
+(** Request a fetch for a specific PKH. The request is dropped if the PKH is
+    already pending in the worker queue or its cached data is fresh enough
+    (< 30s old on all networks). *)
+let request_fetch ~pkh =
+  let dominated =
+    get_wallet_data ~pkh
+    |> List.for_all (fun (w : wallet_data) ->
+        Unix.gettimeofday () -. w.fetched_at < poll_interval)
+  in
+  if (not dominated) || List.length (get_wallet_data ~pkh) = 0 then
+    Worker_queue.submit_unit worker ~key:pkh ~work:(fun () ->
+        fetch_pkh_all_networks ~pkh)
+
+(** Force an immediate re-fetch for a specific PKH, bypassing staleness. *)
+let force_refresh ~pkh =
+  Worker_queue.submit_unit worker ~key:pkh ~work:(fun () ->
+      fetch_pkh_all_networks ~pkh)
 
 let refresh_tzkt_aliases () =
   let networks =
@@ -201,15 +202,13 @@ let refresh_tzkt_aliases () =
     networks
 
 let scheduler_loop () =
+  Worker_queue.start worker ;
   Eio_unix.sleep 3.0 ;
   while not (Atomic.get stop_flag) do
-    (try
-       process_pending () ;
-       poll () ;
-       refresh_tzkt_aliases ()
-     with _ -> ()) ;
+    (try refresh_tzkt_aliases () with _ -> ()) ;
     Eio_unix.sleep poll_interval
-  done
+  done ;
+  Worker_queue.stop worker
 
 let start () =
   if not !started then (
@@ -217,7 +216,9 @@ let start () =
     Atomic.set stop_flag false ;
     Domain_pool.submit scheduler_loop)
 
-let stop () = Atomic.set stop_flag true
+let stop () =
+  Atomic.set stop_flag true ;
+  Worker_queue.stop worker
 
 let get_endpoints_for_network ~network =
   get_node_endpoints ()
