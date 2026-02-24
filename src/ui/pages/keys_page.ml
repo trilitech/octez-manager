@@ -1757,16 +1757,47 @@ let open_create_import_modal ~base_dir =
       | `Import -> action_import_key ~base_dir)
     ()
 
+(** Prompt for network if a key has balances on multiple networks.
+    Calls [action] with the chosen network. Skips the picker if only one. *)
+let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
+    ~action =
+  let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+  let networks =
+    List.map (fun (wd : Keys_scheduler.wallet_data) -> wd.network) wallet_data
+    |> List.sort_uniq String.compare
+  in
+  let networks =
+    if networks = [] then List.sort_uniq String.compare group.networks
+    else networks
+  in
+  match networks with
+  | [] -> action ~network:"mainnet"
+  | [single] -> action ~network:single
+  | multiple ->
+      Modal_helpers.open_choice_modal
+        ~title:"Select network"
+        ~items:multiple
+        ~to_string:(fun net ->
+          let balance =
+            List.find_opt
+              (fun (wd : Keys_scheduler.wallet_data) ->
+                String.equal wd.network net)
+              wallet_data
+          in
+          match balance with
+          | Some wd ->
+              Printf.sprintf
+                "%s  (%s tez)"
+                net
+                (Baker_wallet_data.format_tez wd.spendable_balance)
+          | None -> net)
+        ~on_select:(fun net -> action ~network:net)
+        ()
+
 (** Show the action modal for a selected key. *)
 let open_key_action_modal ~(group : enriched_group)
     (key : Keys_reader.key_metadata) =
   let base_dir = group.base_dir in
-  (* Determine network from wallet data or associated services *)
-  let network =
-    match Keys_scheduler.get_wallet_data ~pkh:key.pkh with
-    | wd :: _ -> wd.network
-    | [] -> ( match group.networks with n :: _ -> n | [] -> "mainnet")
-  in
   let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
   let is_delegating =
     List.exists
@@ -1801,12 +1832,24 @@ let open_key_action_modal ~(group : enriched_group)
       | None -> "?")
     ~on_select:(function
       | `Copy -> copy_to_clipboard key.pkh
-      | `Transfer -> action_transfer ~base_dir ~network key
-      | `Stake -> action_stake ~base_dir ~network key
-      | `Unstake -> action_unstake ~base_dir ~network key
-      | `Register -> action_register_delegate ~base_dir ~network key
-      | `Delegate_to -> action_delegate_to ~base_dir ~network key
-      | `Undelegate -> action_undelegate ~base_dir ~network key
+      | `Transfer ->
+          with_network key ~group ~action:(fun ~network ->
+              action_transfer ~base_dir ~network key)
+      | `Stake ->
+          with_network key ~group ~action:(fun ~network ->
+              action_stake ~base_dir ~network key)
+      | `Unstake ->
+          with_network key ~group ~action:(fun ~network ->
+              action_unstake ~base_dir ~network key)
+      | `Register ->
+          with_network key ~group ~action:(fun ~network ->
+              action_register_delegate ~base_dir ~network key)
+      | `Delegate_to ->
+          with_network key ~group ~action:(fun ~network ->
+              action_delegate_to ~base_dir ~network key)
+      | `Undelegate ->
+          with_network key ~group ~action:(fun ~network ->
+              action_undelegate ~base_dir ~network key)
       | `Rename -> action_rename ~base_dir key
       | `Forget -> action_forget ~base_dir key)
     ()
