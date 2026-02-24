@@ -36,7 +36,12 @@ type wallet_data = {
     Fast, no I/O — reads from cache. *)
 val get_wallet_data : pkh:string -> wallet_data list
 
-(** Force an immediate re-fetch for a specific key.
+(** Request a fetch for a specific PKH. Deduplication and staleness checks
+    are handled internally: the request is dropped if the PKH is already
+    pending in the worker queue or its cached data is fresh (< 30s old). *)
+val request_fetch : pkh:string -> unit
+
+(** Force an immediate re-fetch for a specific key, bypassing staleness.
     The data will be available on the next cache read. *)
 val force_refresh : pkh:string -> unit
 

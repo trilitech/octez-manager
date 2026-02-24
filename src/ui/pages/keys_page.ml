@@ -284,30 +284,76 @@ let move ps _ = ps
 
 let service_select ps _ = ps
 
+(** Tracks when each PKH first became visible. Cleared when scrolled away. *)
+let visible_since : (string, float) Hashtbl.t = Hashtbl.create 32
+
+let visible_debounce = 1.0
+
 let service_cycle ps _ =
-  if Context.consume_keys_dirty () then (
-    let all_dirs = get_all_base_dirs () in
-    let groups =
-      all_dirs
-      |> List.map load_enriched_group
-      |> List.filter (fun g ->
-          g.keys <> [] || g.error <> None || g.services <> [])
-    in
-    let s = ps.Navigation.s in
-    let nav_items = build_nav_items ~folded:s.folded groups in
-    let total_keys = count_keys groups in
-    let cursor = min s.cursor (max 0 (List.length nav_items - 1)) in
-    (* Update scheduler with new key set *)
-    let keys_by_dir =
-      List.map
-        (fun (g : enriched_group) ->
-          ( g.base_dir,
-            List.map (fun (k : Keys_reader.key_metadata) -> k.pkh) g.keys ))
-        groups
-    in
-    Keys_scheduler.set_keys keys_by_dir ;
-    {ps with s = {s with groups; nav_items; total_keys; cursor}})
-  else ps
+  let ps =
+    if Context.consume_keys_dirty () then (
+      let all_dirs = get_all_base_dirs () in
+      let groups =
+        all_dirs
+        |> List.map load_enriched_group
+        |> List.filter (fun g ->
+            g.keys <> [] || g.error <> None || g.services <> [])
+      in
+      let s = ps.Navigation.s in
+      let nav_items = build_nav_items ~folded:s.folded groups in
+      let total_keys = count_keys groups in
+      let cursor = min s.cursor (max 0 (List.length nav_items - 1)) in
+      (* Update scheduler with new key set *)
+      let keys_by_dir =
+        List.map
+          (fun (g : enriched_group) ->
+            ( g.base_dir,
+              List.map (fun (k : Keys_reader.key_metadata) -> k.pkh) g.keys ))
+          groups
+      in
+      Keys_scheduler.set_keys keys_by_dir ;
+      {ps with s = {s with groups; nav_items; total_keys; cursor}})
+    else ps
+  in
+  (* Visibility-driven fetching: submit requests for keys on screen *)
+  let s = ps.Navigation.s in
+  let estimated_rows = 40 in
+  let visible_items =
+    let len = List.length s.nav_items in
+    let from_ = s.scroll_offset in
+    let to_ = min len (from_ + estimated_rows) in
+    List.filteri (fun i _ -> i >= from_ && i < to_) s.nav_items
+  in
+  let visible_pkhs =
+    List.filter_map
+      (function KeyItem (_, key) -> Some key.pkh | _ -> None)
+      visible_items
+    |> List.sort_uniq String.compare
+  in
+  let now = Unix.gettimeofday () in
+  (* Remove PKHs no longer visible *)
+  let to_remove =
+    Hashtbl.fold
+      (fun pkh _ acc ->
+        if not (List.exists (String.equal pkh) visible_pkhs) then pkh :: acc
+        else acc)
+      visible_since
+      []
+  in
+  List.iter (Hashtbl.remove visible_since) to_remove ;
+  (* Add newly visible PKHs *)
+  List.iter
+    (fun pkh ->
+      if not (Hashtbl.mem visible_since pkh) then
+        Hashtbl.replace visible_since pkh now)
+    visible_pkhs ;
+  (* Submit fetch for PKHs visible longer than the debounce threshold *)
+  Hashtbl.iter
+    (fun pkh first_seen ->
+      if now -. first_seen >= visible_debounce then
+        Keys_scheduler.request_fetch ~pkh)
+    visible_since ;
+  ps
 
 let back ps = Navigation.back ps
 
