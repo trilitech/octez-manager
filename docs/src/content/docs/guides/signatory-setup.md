@@ -57,7 +57,7 @@ octez-manager install-signatory \
   --signatory-version latest
 ```
 
-This creates a systemd service `octez-signatory-dev-signer` that starts automatically.
+This creates a systemd service `signatory@dev-signer` that starts automatically.
 
 ### Adding Keys to Signatory
 
@@ -110,7 +110,7 @@ Check that Signatory is running and recognizes your keys:
 
 ```bash
 # Check service status
-systemctl --user status octez-signatory-dev-signer
+systemctl --user status signatory@dev-signer
 
 # Test Signatory endpoint (should return public keys)
 curl http://127.0.0.1:6732/keys
@@ -401,7 +401,7 @@ Enable Signatory logging to monitor signing requests:
 
 ```bash
 # View Signatory logs
-journalctl --user -u octez-signatory-dev-signer -f
+journalctl --user -u signatory@dev-signer -f
 
 # Logs include:
 # - Incoming signing requests
@@ -469,10 +469,10 @@ Monitor Signatory availability:
 curl http://127.0.0.1:6732/keys
 
 # Check service status
-systemctl --user status octez-signatory-dev-signer
+systemctl --user status signatory@dev-signer
 
 # View recent logs
-journalctl --user -u octez-signatory-dev-signer --since "1 hour ago"
+journalctl --user -u signatory@dev-signer --since "1 hour ago"
 ```
 
 ### Metrics
@@ -524,9 +524,9 @@ For production baking, consider redundant Signatory instances:
 **Symptoms**: Baker logs "Failed to connect to remote signer"
 
 **Solutions**:
-1. Check service status: `systemctl --user status octez-signatory-<instance>`
+1. Check service status: `systemctl --user status signatory@<instance>`
 2. Verify port is listening: `ss -tlnp | grep 6732`
-3. Check Signatory logs: `journalctl --user -u octez-signatory-<instance> -f`
+3. Check Signatory logs: `journalctl --user -u signatory@<instance> -f`
 4. Test endpoint: `curl http://127.0.0.1:6732/keys`
 
 ### Baker Can't Connect to Signer
