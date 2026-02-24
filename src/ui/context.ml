@@ -84,6 +84,13 @@ let mark_instances_dirty () = Atomic.set instances_dirty true
 
 let consume_instances_dirty () = Atomic.exchange instances_dirty false
 
+(* Keys page dirty flag — set from background domains after key operations *)
+let keys_dirty = Atomic.make false
+
+let mark_keys_dirty () = Atomic.set keys_dirty true
+
+let consume_keys_dirty () = Atomic.exchange keys_dirty false
+
 type pending_navigation = Goto of string | Back | Quit
 
 let pending_navigation : pending_navigation option ref = ref None
