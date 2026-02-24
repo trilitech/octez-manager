@@ -64,6 +64,14 @@ val prompt_text_modal :
   unit ->
   unit
 
+(** Like {!prompt_text_modal} but with masked input (characters shown as ['*']).
+    Suitable for password entry. No [initial] parameter since passwords should
+    never be pre-filled.
+
+    @param on_submit Called with the entered password on Enter. *)
+val prompt_password_modal :
+  ?title:string -> ?width:int -> on_submit:(string -> unit) -> unit -> unit
+
 (** Like {!prompt_text_modal} but validates input before accepting.
     The [validator] returns [Ok ()] to allow submission or [Error msg]
     to show an inline error. *)
