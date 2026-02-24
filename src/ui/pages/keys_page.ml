@@ -1445,11 +1445,18 @@ let run_onchain_operation ~base_dir ~description ~args ~network
 (** Show a confirmation modal, then execute on-chain with tracking.
     Matches the baker wallet flow: confirm → execute → track.
     No dry-run simulation to avoid blocking the node RPC worker. *)
+let styled_network network =
+  if String.equal network "mainnet" then Widgets.themed_warning network
+  else network
+
 let confirm_and_run ~base_dir ~title ~message ~args ~network
     ?(on_done = fun () -> ()) ~on_success () =
+  let full_message =
+    Printf.sprintf "%s\nNetwork: %s" message (styled_network network)
+  in
   Modal_helpers.confirm_modal
     ~title
-    ~message
+    ~message:full_message
     ~on_result:(fun confirmed ->
       if confirmed then
         run_onchain_operation
@@ -1553,7 +1560,10 @@ let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
       (Printf.sprintf
          "Register '%s' as delegate?"
          (display_alias ~base_dir key))
-    ~message:"This will register your key as a delegate on the network."
+    ~message:
+      (Printf.sprintf
+         "This will register your key as a delegate.\nNetwork: %s"
+         (styled_network network))
     ~on_result:(fun confirmed ->
       if confirmed then
         with_password_if_needed
@@ -1616,7 +1626,10 @@ let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
 let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
   Modal_helpers.confirm_modal
     ~title:(Printf.sprintf "Undelegate '%s'?" (display_alias ~base_dir key))
-    ~message:"This will withdraw the delegation."
+    ~message:
+      (Printf.sprintf
+         "This will withdraw the delegation.\nNetwork: %s"
+         (styled_network network))
     ~on_result:(fun confirmed ->
       if confirmed then
         with_password_if_needed
@@ -1916,7 +1929,9 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
             if List.exists (String.equal net) local_networks then "local"
             else "public"
           in
-          Printf.sprintf "%s  (%s)%s" net source balance_str)
+          let label = Printf.sprintf "%s  (%s)%s" net source balance_str in
+          if String.equal net "mainnet" then Widgets.themed_warning label
+          else label)
         ~on_select:(fun net -> action ~network:net)
         ()
 
