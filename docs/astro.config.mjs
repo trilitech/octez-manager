@@ -26,16 +26,18 @@ export default defineConfig({
 						{ label: 'Using the TUI', slug: 'guides/tui-guide' },
 					],
 				},
-				{
-					label: 'Guides',
-					items: [
-						{ label: 'Node Setup', slug: 'guides/node-setup' },
-						{ label: 'DAL Node Setup', slug: 'guides/dal-node-setup' },
-						{ label: 'Baker Setup', slug: 'guides/baker-setup' },
-						{ label: 'Web Interface', slug: 'guides/web-interface' },
-						{ label: 'RPC Browser', slug: 'guides/rpc-browser' },
-					],
-				},
+			{
+				label: 'Guides',
+				items: [
+					{ label: 'Node Setup', slug: 'guides/node-setup' },
+					{ label: 'DAL Node Setup', slug: 'guides/dal-node-setup' },
+					{ label: 'Baker Setup', slug: 'guides/baker-setup' },
+					{ label: 'Signatory Setup', slug: 'guides/signatory-setup' },
+					{ label: 'Baking with Signatory', slug: 'guides/baker-with-signatory' },
+					{ label: 'Web Interface', slug: 'guides/web-interface' },
+					{ label: 'RPC Browser', slug: 'guides/rpc-browser' },
+				],
+			},
 				{
 					label: 'Reference',
 					items: [
