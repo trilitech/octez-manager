@@ -163,7 +163,7 @@ let test_build_set_delegate_params () =
       ~base_dir:None
       ~password_file:None
       ~alias
-      ~op:(Set_delegate_params {limit = 5000000; edge = 100000000})
+      ~op:(Set_delegate_params {limit = 5; edge = 10})
   in
   check
     (list string)
@@ -178,9 +178,9 @@ let test_build_set_delegate_params () =
       "for";
       alias;
       "--limit-of-staking-over-baking";
-      "5000000";
+      "5";
       "--edge-of-baking-over-staking";
-      "100000000";
+      "0.1";
       "--burn-cap";
       "1";
     ]
