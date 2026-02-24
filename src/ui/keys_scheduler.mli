@@ -28,6 +28,10 @@ type wallet_data = {
   delegate : string option;  (** Delegate PKH, if delegating *)
   is_registered : bool;  (** Is a registered delegate *)
   active_consensus_key : string option;  (** Current consensus key PKH *)
+  delegate_staking_params : Baker_wallet_data.staking_parameters option;
+      (** Delegate's active staking parameters, if delegating *)
+  delegate_apy : float option;
+      (** Estimated annual yield percentage for the delegate *)
   fetched_at : float;  (** Unix timestamp *)
 }
 
