@@ -1260,8 +1260,9 @@ let action_forget ~base_dir (key : Keys_reader.key_metadata) =
                 | _ -> ()))
     ()
 
-(** Execute an octez-client command with spinner and toast feedback. *)
-let run_client_action ~base_dir ~description ~args ~on_success =
+(** Execute an octez-client command with spinner and toast feedback.
+    For local operations (gen keys, add address) that don't go on-chain. *)
+let run_client_action ~base_dir ~description ~args ~on_success () =
   match find_octez_client ~base_dir with
   | None -> offer_download_or_error ~action_label:"perform operation"
   | Some client ->
@@ -1280,55 +1281,101 @@ let run_client_action ~base_dir ~description ~args ~on_success =
           | `Cancelled -> ())
         ()
 
-(** Parse the fee line from octez-client --dry-run output. *)
-let parse_fee_line output =
-  let lines = String.split_on_char '\n' output in
-  List.find_map
-    (fun line ->
-      let trimmed = String.trim line in
-      if contains_substring trimmed "Fee to the baker" then Some trimmed
-      else None)
-    lines
-
-(** Run a dry-run simulation first, show a recap with estimated fee,
-    then execute the real command on confirmation. *)
-let dry_run_and_confirm ~base_dir ~description ~make_recap ~dry_run_args
-    ~real_args ~on_success =
+(** Execute an on-chain octez-client operation with tracking modal.
+    Shows a real-time checklist (submitting → included → confirmed → finalized).
+    Adds [--burn-cap 1] automatically.
+    @param network Network name for explorer links in tracking modal.
+    @param on_done Optional cleanup callback invoked regardless of outcome. *)
+let run_onchain_operation ~base_dir ~description ~args ~network
+    ?(on_done = fun () -> ()) ~on_success () =
   match find_octez_client ~base_dir with
-  | None -> offer_download_or_error ~action_label:description
+  | None ->
+      on_done () ;
+      offer_download_or_error ~action_label:"perform operation"
   | Some client ->
-      let full_dry =
-        (client :: "--base-dir" :: base_dir :: dry_run_args) @ ["--dry-run"]
+      let full_args =
+        (client :: "--base-dir" :: base_dir :: args) @ ["--burn-cap"; "1"]
       in
-      let output_ref = ref "" in
-      Modal_helpers.show_spinner_modal
-        ~title:"Simulating..."
-        ~label:description
-        ~work:(fun () ->
-          match Cmd_runner.run_out_silent full_dry with
-          | Ok output ->
-              output_ref := output ;
-              Ok ()
-          | Error (`Msg e) -> Error (`Msg e))
-        ~on_complete:(function
-          | `Succeeded ->
-              let fee_line = parse_fee_line !output_ref in
-              let recap = make_recap ~fee_line in
-              Modal_helpers.confirm_modal
-                ~title:"Confirm"
-                ~message:recap
-                ~on_result:(fun confirmed ->
-                  if confirmed then
-                    run_client_action
-                      ~base_dir
-                      ~description
-                      ~args:real_args
-                      ~on_success)
-                ()
-          | `Failed msg ->
-              Context.toast_error (Printf.sprintf "Simulation failed: %s" msg)
-          | `Cancelled -> ())
+      let endpoint =
+        let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+        match endpoints with ep :: _ -> Some ep | [] -> None
+      in
+      let step_ref = Atomic.make Instances_wallet.Submitting in
+      Instances_wallet.open_tracking_modal ~title:description ~network ~step_ref ;
+      Job_manager.submit
+        ~timeout:None
+        ~description
+        (fun ~append_log:_ () ->
+          match Cmd_runner.run_out_with_timeout ~timeout:100.0 full_args with
+          | Ok output -> (
+              on_done () ;
+              Context.mark_keys_dirty () ;
+              match Baker_ops.extract_op_hash output with
+              | Some op_hash ->
+                  Atomic.set step_ref (Instances_wallet.Submitted {op_hash}) ;
+                  Context.toast_success (description ^ ": operation submitted") ;
+                  on_success () ;
+                  (match endpoint with
+                  | Some ep ->
+                      Instances_wallet.poll_operation
+                        ~endpoint:ep
+                        ~op_hash
+                        step_ref
+                  | None -> ()) ;
+                  Ok ()
+              | None ->
+                  Atomic.set
+                    step_ref
+                    (Instances_wallet.Failed "No operation hash returned") ;
+                  on_success () ;
+                  Ok ())
+          | Error (`Msg err) ->
+              on_done () ;
+              Atomic.set step_ref (Instances_wallet.Failed err) ;
+              Context.toast_error
+                (Printf.sprintf "%s failed: %s" description err) ;
+              Error (`Msg err))
+        ~on_complete:(fun _status -> ())
+
+(** Show a confirmation modal, then execute on-chain with tracking.
+    Matches the baker wallet flow: confirm → execute → track.
+    No dry-run simulation to avoid blocking the node RPC worker. *)
+let confirm_and_run ~base_dir ~title ~message ~args ~network
+    ?(on_done = fun () -> ()) ~on_success () =
+  Modal_helpers.confirm_modal
+    ~title
+    ~message
+    ~on_result:(fun confirmed ->
+      if confirmed then
+        run_onchain_operation
+          ~base_dir
+          ~description:title
+          ~args
+          ~network
+          ~on_done
+          ~on_success
+          ()
+      else on_done ())
+    ()
+
+(** If the key is encrypted, prompt for password and call [action] with
+    extra [--password-filename] args. Otherwise call [action] directly.
+    The temporary password file is cleaned up via [~on_done] in the action. *)
+let with_password_if_needed (key : Keys_reader.key_metadata) ~action =
+  match key.key_kind with
+  | Encrypted ->
+      Modal_helpers.prompt_password_modal
+        ~title:(Printf.sprintf "Password for %s" key.alias)
+        ~on_submit:(fun password ->
+          let tmp = Filename.temp_file "octez-pw" "" in
+          let fd = Unix.openfile tmp [Unix.O_WRONLY; Unix.O_TRUNC] 0o600 in
+          let oc = Unix.out_channel_of_descr fd in
+          output_string oc password ;
+          close_out oc ;
+          let cleanup () = try Sys.remove tmp with _ -> () in
+          action ~extra_args:["--password-filename"; tmp] ~cleanup)
         ()
+  | _ -> action ~extra_args:[] ~cleanup:(fun () -> ())
 
 (** Transfer action: pick destination from known addresses, then amount.
     Uses dry-run to estimate fees before executing. *)
@@ -1351,63 +1398,73 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
                 ~title:"Invalid amount"
                 "Please enter a valid number."
           | Some _ ->
-              let description =
-                Printf.sprintf "Transfer %s tez from %s" amount_str key.alias
-              in
-              let endpoint_args =
-                let endpoints =
-                  Keys_scheduler.get_endpoints_for_network ~network
-                in
-                match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
-              in
-              let op_args =
-                endpoint_args
-                @ ["transfer"; amount_str; "from"; key.alias; "to"; dest_pkh]
-              in
-              dry_run_and_confirm
-                ~base_dir
-                ~description
-                ~make_recap:(fun ~fee_line ->
-                  Printf.sprintf
-                    "From: %s\nTo: %s\nAmount: %s tez\n%s"
-                    key.alias
-                    (short_pkh dest_pkh)
-                    amount_str
-                    (match fee_line with Some f -> f | None -> "Fee: unknown"))
-                ~dry_run_args:op_args
-                ~real_args:op_args
-                ~on_success:(fun () ->
-                  Transfer_mru.add ~pkh:dest_pkh () ;
-                  Context.toast_success
-                    (Printf.sprintf
-                       "Transferred %s tez to %s"
-                       amount_str
-                       dest_pkh) ;
-                  Keys_scheduler.force_refresh ~pkh:key.pkh))
+              with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+                  let description =
+                    Printf.sprintf
+                      "Transfer %s tez from %s"
+                      amount_str
+                      key.alias
+                  in
+                  let endpoint_args =
+                    let endpoints =
+                      Keys_scheduler.get_endpoints_for_network ~network
+                    in
+                    match endpoints with
+                    | ep :: _ -> ["--endpoint"; ep]
+                    | [] -> []
+                  in
+                  let op_args =
+                    extra_args @ endpoint_args
+                    @ [
+                        "transfer"; amount_str; "from"; key.alias; "to"; dest_pkh;
+                      ]
+                  in
+                  confirm_and_run
+                    ~base_dir
+                    ~title:description
+                    ~message:
+                      (Printf.sprintf
+                         "From: %s\nTo: %s\nAmount: %s tez"
+                         key.alias
+                         (short_pkh dest_pkh)
+                         amount_str)
+                    ~args:op_args
+                    ~network
+                    ~on_done:cleanup
+                    ~on_success:(fun () ->
+                      Transfer_mru.add ~pkh:dest_pkh () ;
+                      Keys_scheduler.force_refresh ~pkh:key.pkh)
+                    ()))
         ())
 
 (** Register as delegate action. *)
 let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
     =
-  let description = Printf.sprintf "Register '%s' as delegate" key.alias in
-  let endpoint_args =
-    let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-    match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
-  in
   Modal_helpers.confirm_modal
     ~title:(Printf.sprintf "Register '%s' as delegate?" key.alias)
     ~message:"This will register your key as a delegate on the network."
     ~on_result:(fun confirmed ->
       if confirmed then
-        run_client_action
-          ~base_dir
-          ~description
-          ~args:
-            (endpoint_args @ ["register"; "key"; key.alias; "as"; "delegate"])
-          ~on_success:(fun () ->
-            Context.toast_success
-              (Printf.sprintf "'%s' registered as delegate" key.alias) ;
-            Keys_scheduler.force_refresh ~pkh:key.pkh))
+        with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+            let description =
+              Printf.sprintf "Register '%s' as delegate" key.alias
+            in
+            let endpoint_args =
+              let endpoints =
+                Keys_scheduler.get_endpoints_for_network ~network
+              in
+              match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+            in
+            run_onchain_operation
+              ~base_dir
+              ~description
+              ~args:
+                (extra_args @ endpoint_args
+                @ ["register"; "key"; key.alias; "as"; "delegate"])
+              ~network
+              ~on_done:cleanup
+              ~on_success:(fun () -> Keys_scheduler.force_refresh ~pkh:key.pkh)
+              ()))
     ()
 
 (** Delegate to another baker. *)
@@ -1417,43 +1474,50 @@ let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
     ~exclude_pkh:key.pkh
     ~include_mru:false
     ~on_select:(fun baker_pkh ->
-      let description =
-        Printf.sprintf "Delegate '%s' to %s" key.alias baker_pkh
-      in
-      let endpoint_args =
-        let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-        match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
-      in
-      run_client_action
-        ~base_dir
-        ~description
-        ~args:
-          (endpoint_args
-          @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh])
-        ~on_success:(fun () ->
-          Context.toast_success
-            (Printf.sprintf "Delegated '%s' to %s" key.alias baker_pkh) ;
-          Keys_scheduler.force_refresh ~pkh:key.pkh))
+      with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+          let description =
+            Printf.sprintf "Delegate '%s' to %s" key.alias baker_pkh
+          in
+          let endpoint_args =
+            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+          in
+          run_onchain_operation
+            ~base_dir
+            ~description
+            ~args:
+              (extra_args @ endpoint_args
+              @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh])
+            ~network
+            ~on_done:cleanup
+            ~on_success:(fun () -> Keys_scheduler.force_refresh ~pkh:key.pkh)
+            ()))
 
 (** Undelegate action. *)
 let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
-  let description = Printf.sprintf "Undelegate '%s'" key.alias in
-  let endpoint_args =
-    let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-    match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
-  in
   Modal_helpers.confirm_modal
     ~title:(Printf.sprintf "Undelegate '%s'?" key.alias)
     ~message:"This will withdraw the delegation."
     ~on_result:(fun confirmed ->
       if confirmed then
-        run_client_action
-          ~base_dir
-          ~description
-          ~args:(endpoint_args @ ["withdraw"; "delegate"; "from"; key.alias])
-          ~on_success:(fun () ->
-            Context.toast_success (Printf.sprintf "Undelegated '%s'" key.alias) ;
-            Keys_scheduler.force_refresh ~pkh:key.pkh))
+        with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+            let description = Printf.sprintf "Undelegate '%s'" key.alias in
+            let endpoint_args =
+              let endpoints =
+                Keys_scheduler.get_endpoints_for_network ~network
+              in
+              match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+            in
+            run_onchain_operation
+              ~base_dir
+              ~description
+              ~args:
+                (extra_args @ endpoint_args
+                @ ["withdraw"; "delegate"; "from"; key.alias])
+              ~network
+              ~on_done:cleanup
+              ~on_success:(fun () -> Keys_scheduler.force_refresh ~pkh:key.pkh)
+              ()))
     ()
 
 (** Stake action: stake tez for a key with dry-run confirmation. *)
@@ -1471,31 +1535,34 @@ let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
             ~title:"Invalid amount"
             "Please enter a valid number."
       | Some _ ->
-          let description =
-            Printf.sprintf "Stake %s tez for %s" amount_str key.alias
-          in
-          let endpoint_args =
-            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
-          in
-          let op_args =
-            endpoint_args @ ["stake"; amount_str; "for"; key.alias]
-          in
-          dry_run_and_confirm
-            ~base_dir
-            ~description
-            ~make_recap:(fun ~fee_line ->
-              Printf.sprintf
-                "Source: %s\nStake amount: %s tez\n%s"
-                key.alias
-                amount_str
-                (match fee_line with Some f -> f | None -> "Fee: unknown"))
-            ~dry_run_args:op_args
-            ~real_args:op_args
-            ~on_success:(fun () ->
-              Context.toast_success
-                (Printf.sprintf "Staked %s tez for %s" amount_str key.alias) ;
-              Keys_scheduler.force_refresh ~pkh:key.pkh))
+          with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+              let description =
+                Printf.sprintf "Stake %s tez for %s" amount_str key.alias
+              in
+              let endpoint_args =
+                let endpoints =
+                  Keys_scheduler.get_endpoints_for_network ~network
+                in
+                match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+              in
+              let op_args =
+                extra_args @ endpoint_args
+                @ ["stake"; amount_str; "for"; key.alias]
+              in
+              confirm_and_run
+                ~base_dir
+                ~title:description
+                ~message:
+                  (Printf.sprintf
+                     "Source: %s\nStake amount: %s tez"
+                     key.alias
+                     amount_str)
+                ~args:op_args
+                ~network
+                ~on_done:cleanup
+                ~on_success:(fun () ->
+                  Keys_scheduler.force_refresh ~pkh:key.pkh)
+                ()))
     ()
 
 (** Unstake action: unstake tez for a key with dry-run confirmation. *)
@@ -1513,31 +1580,34 @@ let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
             ~title:"Invalid amount"
             "Please enter a valid number."
       | Some _ ->
-          let description =
-            Printf.sprintf "Unstake %s tez for %s" amount_str key.alias
-          in
-          let endpoint_args =
-            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
-          in
-          let op_args =
-            endpoint_args @ ["unstake"; amount_str; "for"; key.alias]
-          in
-          dry_run_and_confirm
-            ~base_dir
-            ~description
-            ~make_recap:(fun ~fee_line ->
-              Printf.sprintf
-                "Source: %s\nUnstake amount: %s tez\n%s"
-                key.alias
-                amount_str
-                (match fee_line with Some f -> f | None -> "Fee: unknown"))
-            ~dry_run_args:op_args
-            ~real_args:op_args
-            ~on_success:(fun () ->
-              Context.toast_success
-                (Printf.sprintf "Unstaked %s tez for %s" amount_str key.alias) ;
-              Keys_scheduler.force_refresh ~pkh:key.pkh))
+          with_password_if_needed key ~action:(fun ~extra_args ~cleanup ->
+              let description =
+                Printf.sprintf "Unstake %s tez for %s" amount_str key.alias
+              in
+              let endpoint_args =
+                let endpoints =
+                  Keys_scheduler.get_endpoints_for_network ~network
+                in
+                match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+              in
+              let op_args =
+                extra_args @ endpoint_args
+                @ ["unstake"; amount_str; "for"; key.alias]
+              in
+              confirm_and_run
+                ~base_dir
+                ~title:description
+                ~message:
+                  (Printf.sprintf
+                     "Source: %s\nUnstake amount: %s tez"
+                     key.alias
+                     amount_str)
+                ~args:op_args
+                ~network
+                ~on_done:cleanup
+                ~on_success:(fun () ->
+                  Keys_scheduler.force_refresh ~pkh:key.pkh)
+                ()))
     ()
 
 (** Create a new key via octez-client gen keys. *)
@@ -1574,7 +1644,8 @@ let action_create_key ~base_dir =
               ~args:["gen"; "keys"; alias; "--sig"; scheme]
               ~on_success:(fun () ->
                 Context.toast_success
-                  (Printf.sprintf "Key '%s' created (%s)" alias scheme)))
+                  (Printf.sprintf "Key '%s' created (%s)" alias scheme))
+              ())
           ())
     ()
 
@@ -1610,7 +1681,8 @@ let action_import_key ~base_dir =
                   ~args:["add"; "address"; alias; pkh]
                   ~on_success:(fun () ->
                     Context.toast_success
-                      (Printf.sprintf "Imported '%s' as watch-only" alias)))
+                      (Printf.sprintf "Imported '%s' as watch-only" alias))
+                  ())
             ())
     ()
 
@@ -1880,32 +1952,39 @@ let open_batch_modal ps =
                     let network =
                       match group.networks with n :: _ -> n | [] -> "mainnet"
                     in
-                    let endpoint_args =
-                      let endpoints =
-                        Keys_scheduler.get_endpoints_for_network ~network
-                      in
-                      match endpoints with
-                      | ep :: _ -> ["--endpoint"; ep]
-                      | [] -> []
-                    in
-                    run_client_action
-                      ~base_dir:group.base_dir
-                      ~description:
-                        (Printf.sprintf
-                           "Delegate '%s' to %s"
-                           key.alias
-                           baker_pkh)
-                      ~args:
-                        (endpoint_args
-                        @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh]
-                        )
-                      ~on_success:(fun () ->
-                        Context.toast_success
-                          (Printf.sprintf
-                             "Delegated '%s' to %s"
-                             key.alias
-                             baker_pkh) ;
-                        Keys_scheduler.force_refresh ~pkh:key.pkh))
+                    with_password_if_needed
+                      key
+                      ~action:(fun ~extra_args ~cleanup ->
+                        let endpoint_args =
+                          let endpoints =
+                            Keys_scheduler.get_endpoints_for_network ~network
+                          in
+                          match endpoints with
+                          | ep :: _ -> ["--endpoint"; ep]
+                          | [] -> []
+                        in
+                        run_onchain_operation
+                          ~base_dir:group.base_dir
+                          ~description:
+                            (Printf.sprintf
+                               "Delegate '%s' to %s"
+                               key.alias
+                               baker_pkh)
+                          ~args:
+                            (extra_args @ endpoint_args
+                            @ [
+                                "set";
+                                "delegate";
+                                "for";
+                                key.alias;
+                                "to";
+                                baker_pkh;
+                              ])
+                          ~network
+                          ~on_done:cleanup
+                          ~on_success:(fun () ->
+                            Keys_scheduler.force_refresh ~pkh:key.pkh)
+                          ()))
                   selected_keys)
         | `Batch_copy ->
             let all_pkhs =
