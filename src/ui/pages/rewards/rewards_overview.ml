@@ -222,8 +222,15 @@ let render ~(state : Rewards_state.state) ~cols =
       in
       let recent = Rewards_scheduler.get_recent_cycles ~baker in
       let current_cycle = state.current_cycle in
-      (* Last completed = first recent cycle (they're sorted descending) *)
-      let last_completed = List.nth_opt recent 0 in
+      (* Last completed = most recent cycle strictly before the current one *)
+      let last_completed =
+        match current_cycle with
+        | Some cc ->
+            List.find_opt
+              (fun (cr : Rewards.cycle_rewards) -> cr.cycle < cc)
+              recent
+        | None -> List.nth_opt recent 0
+      in
       let network_line = render_network_badge network in
       let current_box =
         render_current_cycle_box ~box_width ~instance current_cycle
