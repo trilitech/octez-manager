@@ -34,8 +34,7 @@ let string_contains ~needle haystack =
     let found = ref false in
     let i = ref 0 in
     while (not !found) && !i <= hlen - nlen do
-      if String.equal (String.sub haystack !i nlen) needle then found := true
-      else incr i
+      if String.sub haystack !i nlen = needle then found := true else incr i
     done ;
     !found
 
@@ -46,8 +45,7 @@ let apply_filter filter (delegators : Rewards.delegator_reward list) =
   | Rewards_state.FilterAll -> delegators
   | Rewards_state.FilterEligible ->
       List.filter
-        (fun (d : Rewards.delegator_reward) ->
-          match d.status with Rewards.Eligible -> true | _ -> false)
+        (fun (d : Rewards.delegator_reward) -> d.status = Rewards.Eligible)
         delegators
   | Rewards_state.FilterExcluded ->
       List.filter
@@ -163,38 +161,13 @@ let render ~(state : Rewards_state.state) ~cols ~rows =
   let box_width = min (cols - 2) 72 in
   match state.blueprint with
   | None ->
-      let lines =
-        match state.selected_cycle with
-        | Some cycle ->
-            Context.tick_spinner () ;
-            [
-              "";
-              Printf.sprintf
-                "  %s"
-                (Context.render_spinner
-                   (Printf.sprintf "Loading cycle %d\xe2\x80\xa6" cycle));
-            ]
-        | None ->
-            [
-              "";
-              Widgets.themed_muted "  No delegator data available.";
-              Widgets.themed_muted
-                "  Select a baker and wait for cycle data to load.";
-            ]
-      in
-      String.concat "\n" lines
-  | Some bp
-    when bp.Rewards.delegator_rewards = [] && bp.Rewards.total_delegators > 0 ->
-      (* Blueprint exists but delegator details are still loading *)
-      Context.tick_spinner () ;
       String.concat
         "\n"
         [
           "";
-          Printf.sprintf
-            "  %s"
-            (Context.render_spinner
-               (Printf.sprintf "Loading cycle %d\xe2\x80\xa6" bp.Rewards.cycle));
+          Widgets.themed_muted "  No delegator data available.";
+          Widgets.themed_muted
+            "  Select a baker and wait for cycle data to load.";
         ]
   | Some bp ->
       let delegators = prepare_delegators state bp.Rewards.delegator_rewards in
