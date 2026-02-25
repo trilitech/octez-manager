@@ -209,6 +209,10 @@ let generate_blueprint ~config ~network ~cycle_rewards =
     Rewards.cycle = cr.cycle;
     baker = cr.baker;
     network;
+    own_staked_balance = cr.own_staked_balance;
+    own_delegated_balance = cr.own_delegated_balance;
+    external_staked_balance = cr.external_staked_balance;
+    external_delegated_balance = cr.external_delegated_balance;
     earned_rewards = total_rewards;
     earned_block_fees = cr.block_fees;
     total_delegators = List.length cr.delegators;

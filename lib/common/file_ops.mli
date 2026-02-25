@@ -7,6 +7,10 @@
 
 (** File and directory manipulation. *)
 
+(** Recursively create directories along [path] (like [mkdir -p]).
+    Uses mode [0o755]. No-op if the path already exists. *)
+val mkdir_p : string -> unit
+
 (** Create a directory tree, setting ownership and permissions.
     When running as root, sets the owner/group/mode on the final
     directory; otherwise ownership is set on a best-effort basis. *)
