@@ -74,6 +74,40 @@ let field_label = function
   | ContinualInterval -> "Continual Interval"
   | ContinualOffset -> "Continual Offset"
 
+let field_hint = function
+  | BakerFee ->
+      "Percentage fee deducted from delegator rewards as baker compensation."
+  | PayoutMode ->
+      "Actual: pay based on real rewards received. Ideal: pay based on \
+       expected rewards regardless of missed blocks."
+  | PayoutKeyAlias -> "octez-client key alias used to sign payout transactions."
+  | MinPayout ->
+      "Delegators whose reward is below this threshold will not receive a \
+       payout."
+  | MinBalance ->
+      "Delegators whose delegated balance is below this threshold are excluded."
+  | BelowMinDest ->
+      "What happens to rewards below the minimum: baker keeps them or they are \
+       redistributed to eligible delegators."
+  | OverdelegationProtect ->
+      "When enabled, caps rewards if total delegation exceeds the baker's \
+       staking capacity."
+  | BakerPaysTxFee ->
+      "When enabled, transaction fees are paid by the baker rather than \
+       deducted from delegator rewards."
+  | BakerPaysAllocFee ->
+      "When enabled, the baker pays the 0.06 tz allocation fee for new \
+       accounts."
+  | IgnoreContracts ->
+      "When enabled, smart contract delegators are excluded from payouts."
+  | ContinualEnabled ->
+      "Automatically trigger payouts when new cycles complete."
+  | ContinualInterval ->
+      "Pay every N cycles (e.g. 1 = every cycle, 2 = every other cycle)."
+  | ContinualOffset ->
+      "Offset within the interval to stagger payments (0 = first eligible \
+       cycle)."
+
 let tez_symbol = "\xEA\x9C\xA9"
 
 let field_value (config : Payout_config.t) = function
@@ -295,6 +329,24 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
           ~width:box_width
           general_content
       in
+      (* Hint panel: left-bordered block for the selected field *)
+      let hint_box =
+        if state.config_show_hint then
+          let field = List.nth all_fields state.config_cursor in
+          let bar = Widgets.themed_muted "\xe2\x94\x82 " in
+          let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
+          let hint_width = max 20 (box_width - 6) in
+          let wrapped =
+            Widgets.wrap_text ~width:hint_width (field_hint field)
+          in
+          let text_lines =
+            List.map (fun l -> bar ^ Widgets.themed_text l) wrapped
+          in
+          String.concat
+            "\n"
+            (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
+        else ""
+      in
       (* Delegator overrides section *)
       let override_count = List.length config.delegator_overrides in
       let override_content =
@@ -354,7 +406,11 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
         if state.config_dirty then Widgets.themed_warning "  * Unsaved changes"
         else ""
       in
-      let parts = [""; general_box; ""; override_box] in
+      let parts =
+        if String.length hint_box > 0 then
+          [""; general_box; hint_box; ""; override_box]
+        else [""; general_box; ""; override_box]
+      in
       let parts =
         if dirty_indicator <> "" then parts @ [dirty_indicator] else parts
       in
