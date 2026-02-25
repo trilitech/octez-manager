@@ -38,6 +38,7 @@ type state = {
   config : Payout_config.t option;  (** Loaded payout config for editing *)
   config_cursor : int;  (** Selected field in config tab *)
   config_dirty : bool;  (** True if config has unsaved changes *)
+  config_show_hint : bool;  (** True when field hint is displayed *)
   history_cursor : int;
   loading : bool;
   error : string option;
