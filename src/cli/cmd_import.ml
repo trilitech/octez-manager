@@ -67,7 +67,11 @@ let import_cmd =
                     (Printf.sprintf "Cannot import service: %s" msg)
               | Ok () -> (
                   (* 3. Check for missing required fields *)
-                  let missing = Import.missing_required_fields external_svc in
+                  let missing =
+                    Import.missing_required_fields
+                      ?network_override
+                      external_svc
+                  in
                   if missing <> [] && not dry_run then (
                     Format.eprintf
                       "Warning: Missing required fields: %s@."
