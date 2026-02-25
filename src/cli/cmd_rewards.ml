@@ -560,7 +560,7 @@ and execute_pay ~ctx ~blueprint ~dry_run ~cycle =
       ()
   with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok (results, _summary) ->
+  | Ok (results, summary) ->
       let succeeded =
         List.filter (fun (r : Rewards.payout_result) -> r.success) results
       in
@@ -571,10 +571,28 @@ and execute_pay ~ctx ~blueprint ~dry_run ~cycle =
         (if dry_run then "Dry-run" else "Payout")
         ok_count
         total ;
-      if not dry_run then
+      if not dry_run then (
         Printf.printf
           "Reports saved to: %s\n"
           (Payout_report.report_dir ~instance:ctx.instance ~cycle) ;
+        (* Send notifications *)
+        if ok_count > 0 then
+          let channels =
+            match Payout_config.load ~instance:ctx.instance with
+            | Ok c -> c.notifications
+            | Error _ -> []
+          in
+          if channels <> [] then (
+            Printf.printf "Sending notifications...\n%!" ;
+            let notify_results =
+              Payout_notifier.notify_all ~channels ~summary
+            in
+            List.iter
+              (fun (name, result) ->
+                match result with
+                | Ok () -> Printf.printf "  %s: sent\n" name
+                | Error msg -> Printf.printf "  %s: FAILED (%s)\n" name msg)
+              notify_results)) ;
       if ok_count = total then `Ok ()
       else
         `Error
@@ -643,8 +661,51 @@ let config_cmd =
   let info = Cmd.info "config" ~doc:"Manage payout configuration." in
   Cmd.group info [config_import_cmd]
 
+(* ── rewards notify test ──────────────────────────────────── *)
+
+let notify_test_run baker_opt =
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc ->
+      let instance = svc.Service.instance in
+      let channels =
+        match Payout_config.load ~instance with
+        | Ok c -> c.notifications
+        | Error _ -> []
+      in
+      if channels = [] then (
+        Printf.printf "No notification channels configured for %s.\n" instance ;
+        `Ok ())
+      else (
+        Printf.printf
+          "Sending test notifications to %d channel(s)...\n%!"
+          (List.length channels) ;
+        let results = Payout_notifier.send_test ~channels in
+        let all_ok = ref true in
+        List.iter
+          (fun (name, result) ->
+            match result with
+            | Ok () -> Printf.printf "  %s: sent\n" name
+            | Error msg ->
+                all_ok := false ;
+                Printf.printf "  %s: FAILED (%s)\n" name msg)
+          results ;
+        if !all_ok then `Ok () else `Error (false, "Some notifications failed"))
+
+let notify_test_cmd =
+  let info =
+    Cmd.info "test" ~doc:"Send a test notification to all configured channels."
+  in
+  Cmd.v info Term.(ret (const notify_test_run $ baker_arg))
+
+let notify_cmd =
+  let info = Cmd.info "notify" ~doc:"Manage payout notifications." in
+  Cmd.group info [notify_test_cmd]
+
 (* ── rewards command group ─────────────────────────────────── *)
 
 let rewards_cmd =
   let info = Cmd.info "rewards" ~doc:"Manage baker rewards and payouts." in
-  Cmd.group info [status_cmd; generate_cmd; history_cmd; pay_cmd; config_cmd]
+  Cmd.group
+    info
+    [status_cmd; generate_cmd; history_cmd; pay_cmd; config_cmd; notify_cmd]
