@@ -303,7 +303,11 @@ let spec =
             "Create sandbox %s"
             (Option.value ~default:"sandbox" sandbox_name)
         in
-        Job_manager.submit ~timeout:None ~description (fun ~append_log () ->
+        Job_manager.submit
+          ~timeout:None
+          ~description
+          ~on_complete:(fun _ -> Context.mark_instances_dirty ())
+          (fun ~append_log () ->
             Sandbox.create
               ~on_log:(fun msg -> append_log (msg ^ "\n"))
               ~network:model.network
