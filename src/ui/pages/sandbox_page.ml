@@ -14,6 +14,8 @@ module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 module Flex = Miaou_widgets_layout.Flex_layout
 module T = Themed_text
+module C = Miaou_canvas.Canvas
+module Style_context = Miaou_style.Style_context
 open Octez_manager_lib
 open Rresult
 
