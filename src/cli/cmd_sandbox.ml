@@ -54,6 +54,22 @@ let create_term =
     let doc = "Max delegates to impersonate via yes-wallet (default: 20)." in
     Arg.(value & opt int 20 & info ["max-delegates"] ~doc ~docv:"N")
   in
+  let num_nodes =
+    let doc =
+      "Number of nodes to create (default: 1). Nodes 2+ peer to node 1."
+    in
+    Arg.(value & opt int 1 & info ["num-nodes"] ~doc ~docv:"N")
+  in
+  let num_bakers =
+    let doc =
+      "Number of bakers to create (default: 1). Delegates split evenly."
+    in
+    Arg.(value & opt int 1 & info ["num-bakers"] ~doc ~docv:"N")
+  in
+  let accuser =
+    let doc = "Install an octez-accuser service (default: false)." in
+    Arg.(value & flag & info ["accuser"] ~doc)
+  in
   let app_bin_dir =
     let doc = "Path to directory containing Octez binaries." in
     Arg.(value & opt (some string) None & info ["app-bin-dir"] ~doc ~docv:"DIR")
@@ -74,8 +90,8 @@ let create_term =
     let doc = "System user for services (default: current user or 'tezos')." in
     Arg.(value & opt string "" & info ["service-user"] ~doc ~docv:"USER")
   in
-  let run network sandbox_name snapshot rpc_addr max_delegates app_bin_dir
-      octez_version bin_dir_alias service_user =
+  let run network sandbox_name snapshot rpc_addr max_delegates num_nodes
+      num_bakers accuser app_bin_dir octez_version bin_dir_alias service_user =
     let result =
       let* resolved_dir, bin_source =
         Cli_helpers.resolve_app_bin_dir
@@ -98,6 +114,9 @@ let create_term =
            ?rpc_addr
            ?snapshot
            ~max_delegates
+           ~num_nodes
+           ~num_bakers
+           ~accuser
            ~bin_source
            ~service_user
            ~app_bin_dir:resolved_dir
@@ -112,7 +131,8 @@ let create_term =
   Term.(
     ret
       (const run $ network $ sandbox_name $ snapshot $ rpc_addr $ max_delegates
-     $ app_bin_dir $ octez_version $ bin_dir_alias $ service_user))
+     $ num_nodes $ num_bakers $ accuser $ app_bin_dir $ octez_version
+     $ bin_dir_alias $ service_user))
 
 let create_cmd =
   let info =
