@@ -38,7 +38,7 @@ let default_rpc_addr () =
 
 let make_initial_model () =
   {
-    network = "https://teztnets.com/ghostnet";
+    network = "https://teztnets.com/shadownet";
     sandbox_name = Sandbox.unique_name ~base:"sandbox";
     app_bin_dir =
       Form_builder_common.default_app_bin_dir ~binary_name:"octez-node";
