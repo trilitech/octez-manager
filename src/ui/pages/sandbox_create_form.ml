@@ -150,14 +150,108 @@ let max_delegates_field =
          "Number of active delegates to impersonate via yes-wallet. Default: \
           20.")
 
+(* ─── Snapshot Cache ─────────────────────────────────────────────────────── *)
+
+let snapshot_cache =
+  Cache.create_safe_keyed ~name:"sandbox-snapshots" ~ttl:60.0 ()
+
+let snapshot_inflight : (string, unit) Hashtbl.t = Hashtbl.create 4
+
+let snapshot_inflight_lock = Mutex.create ()
+
+let schedule_snapshot_fetch slug =
+  let should_fetch =
+    Mutex.protect snapshot_inflight_lock (fun () ->
+        if not (Hashtbl.mem snapshot_inflight slug) then (
+          Hashtbl.add snapshot_inflight slug () ;
+          true)
+        else false)
+  in
+  if should_fetch then
+    Background_runner.submit_blocking (fun () ->
+        Fun.protect
+          ~finally:(fun () ->
+            Mutex.protect snapshot_inflight_lock (fun () ->
+                Hashtbl.remove snapshot_inflight slug))
+          (fun () ->
+            match Snapshots.list ~network_slug:slug with
+            | Ok entries -> Cache.set_safe_keyed snapshot_cache slug entries
+            | Error (`Msg msg) ->
+                Cmd_runner.append_debug_log
+                  (Printf.sprintf "Sandbox snapshot fetch: %s" msg)))
+
+let rolling_entries_for_network slug =
+  match Cache.get_safe_keyed_cached snapshot_cache slug with
+  | None -> None
+  | Some entries ->
+      let rolling =
+        List.filter
+          (fun (e : Snapshots.entry) ->
+            match e.history_mode with
+            | None -> true
+            | Some hm -> String.equal (String.lowercase_ascii hm) "rolling")
+          entries
+      in
+      Some rolling
+
 let snapshot_field =
-  Form_builder.(
-    text
-      ~label:"Snapshot URI"
-      ~get:(fun m -> m.snapshot)
-      ~set:(fun snapshot m -> {m with snapshot})
-    |> with_hint
-         "Optional snapshot URL or file path. Leave empty to auto-fetch.")
+  let open Form_builder in
+  custom
+    ~label:"Snapshot URI"
+    ~get:(fun m ->
+      match String.trim m.snapshot with "" -> "Auto-fetch" | url -> url)
+    ~edit:(fun model_ref ->
+      let slug_opt = Snapshots.slug_of_network !model_ref.network in
+      let entries_opt =
+        match slug_opt with
+        | None -> None
+        | Some slug -> (
+            match rolling_entries_for_network slug with
+            | Some _ as entries -> entries
+            | None ->
+                schedule_snapshot_fetch slug ;
+                None)
+      in
+      let items =
+        match (slug_opt, entries_opt) with
+        | Some _, None -> [`Auto; `Loading; `Custom]
+        | _, Some entries ->
+            (`Auto :: List.map (fun e -> `Entry e) entries) @ [`Custom]
+        | None, None -> [`Auto; `Custom]
+      in
+      let to_string = function
+        | `Loading -> Context.render_spinner "Loading snapshots..."
+        | `Auto -> "Auto-fetch (recommended)"
+        | `Custom -> "Custom URL or file path..."
+        | `Entry (e : Snapshots.entry) ->
+            Printf.sprintf "%s (%s)" e.label e.slug
+      in
+      let on_select = function
+        | `Loading -> ()
+        | `Auto -> model_ref := {!model_ref with snapshot = ""}
+        | `Custom ->
+            Modal_helpers.prompt_text_modal
+              ~title:"Snapshot URI"
+              ~placeholder:(Some "https://... or /path/to/snapshot.rolling")
+              ~initial:!model_ref.snapshot
+              ~on_submit:(fun snapshot ->
+                model_ref := {!model_ref with snapshot})
+              ()
+        | `Entry (e : Snapshots.entry) ->
+            let url = Option.value ~default:"" e.download_url in
+            model_ref := {!model_ref with snapshot = url}
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Snapshot"
+        ~items
+        ~to_string
+        ~on_tick:Context.tick_spinner
+        ~on_select
+        ())
+    ()
+  |> with_hint
+       "Rolling snapshot to import. Auto-fetch picks the best available. Press \
+        Enter to browse Teztnets downloads."
 
 (* ─── Spec ──────────────────────────────────────────────────────────────── *)
 
