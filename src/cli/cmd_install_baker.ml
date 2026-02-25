@@ -301,6 +301,7 @@ let install_baker_cmd =
           liquidity_baking_vote;
           signer_mode;
           extra_args;
+          extra_env = [];
           service_user;
           app_bin_dir;
           bin_source = Some bin_source;
