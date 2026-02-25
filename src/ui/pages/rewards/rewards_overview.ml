@@ -80,8 +80,18 @@ let render_last_completed_box ~box_width ~instance
         ~width:box_width
         (Widgets.themed_muted "No completed cycle data")
   | Some cr ->
-      let total_rewards = Int64.add cr.block_rewards cr.block_fees in
-      let delegator_count = List.length cr.delegators in
+      let total_rewards =
+        List.fold_left
+          Int64.add
+          0L
+          [
+            cr.block_rewards;
+            cr.attestation_rewards;
+            cr.other_rewards;
+            cr.block_fees;
+          ]
+      in
+      let delegator_count = cr.num_delegators in
       let status =
         Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
       in
@@ -99,6 +109,8 @@ let render_last_completed_box ~box_width ~instance
           ("Earned Rewards", Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9");
           ( "Block Rewards",
             Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
+          ( "Attestation",
+            Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
           ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
           ("Delegators", string_of_int delegator_count);
           ("Payout Status", status_label);
@@ -136,7 +148,16 @@ let render_recent_cycles_box ~box_width ~instance
         List.map
           (fun (cr : Rewards.cycle_rewards) ->
             let earned =
-              format_tez_short (Int64.add cr.block_rewards cr.block_fees)
+              format_tez_short
+                (List.fold_left
+                   Int64.add
+                   0L
+                   [
+                     cr.block_rewards;
+                     cr.attestation_rewards;
+                     cr.other_rewards;
+                     cr.block_fees;
+                   ])
               ^ " \xEA\x9C\xA9"
             in
             let status =
@@ -221,8 +242,18 @@ let render_cycle_detail ~box_width ~instance ~baker
           ~width:box_width
           (Widgets.themed_muted "No data available for this cycle")
     | Some cr ->
-        let total_rewards = Int64.add cr.block_rewards cr.block_fees in
-        let delegator_count = List.length cr.delegators in
+        let total_rewards =
+          List.fold_left
+            Int64.add
+            0L
+            [
+              cr.block_rewards;
+              cr.attestation_rewards;
+              cr.other_rewards;
+              cr.block_fees;
+            ]
+        in
+        let delegator_count = cr.num_delegators in
         let status =
           Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
         in
@@ -241,6 +272,8 @@ let render_cycle_detail ~box_width ~instance ~baker
               Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9" );
             ( "Block Rewards",
               Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
+            ( "Attestation",
+              Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
             ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
             ("Delegators", string_of_int delegator_count);
             ("Payout Status", status_label);

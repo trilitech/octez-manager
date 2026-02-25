@@ -31,7 +31,10 @@ let make_cycle_rewards ?(cycle = 100) ?(own_staked = 1_000_000_000L)
     external_staked_balance = 0L;
     external_delegated_balance = 0L;
     block_rewards;
+    attestation_rewards = 0L;
+    other_rewards = 0L;
     block_fees;
+    num_delegators = List.length delegators;
     delegators;
   }
 
@@ -56,7 +59,14 @@ let test_single_delegator_proportional_share () =
   Alcotest.(check int) "total delegators" 1 bp.total_delegators ;
   Alcotest.(check int) "eligible delegators" 1 bp.eligible_delegators ;
   (* With 50/50 stake, delegator gets ~half of total rewards *)
-  let total = Int64.add cr.block_rewards cr.block_fees in
+  let total =
+    List.fold_left
+      Int64.add
+      0L
+      [
+        cr.block_rewards; cr.attestation_rewards; cr.other_rewards; cr.block_fees;
+      ]
+  in
   let expected_gross = Int64.div total 2L in
   let dr = List.hd bp.delegator_rewards in
   (* Allow 1 mutez tolerance for rounding *)
