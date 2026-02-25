@@ -43,6 +43,10 @@ val get_current_cycle : unit -> int option
 val get_payout_status :
   instance:string -> cycle:int -> Octez_manager_rewards.Rewards.payout_status
 
+(** Get the auto-detected baker address for an instance.
+    Returns [None] if the scheduler hasn't detected the baker yet. *)
+val get_baker_for_instance : instance:string -> string option
+
 (** {1 Continual mode} *)
 
 (** Sync continual mode state from config (called after config changes). *)

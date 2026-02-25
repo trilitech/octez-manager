@@ -43,6 +43,15 @@ let get_payout_status ~instance ~cycle =
   if Payout_report.cycle_is_paid ~instance ~cycle then Rewards.Paid
   else Rewards.Unpaid
 
+(* Auto-detected baker address per instance *)
+let baker_instance_cache : (string, string) Hashtbl.t = Hashtbl.create 4
+
+let baker_instance_lock = Mutex.create ()
+
+let get_baker_for_instance ~instance =
+  Mutex.protect baker_instance_lock (fun () ->
+      Hashtbl.find_opt baker_instance_cache instance)
+
 (* ── Continual mode state ────────────────────────────── *)
 
 (* Track the last cycle we saw per instance (for cycle transition detection) *)
@@ -148,31 +157,109 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
 
 (* Polling logic *)
 
-let poll_baker ~instance =
-  (* Read config to get baker_pkh and tzkt_url *)
-  match Payout_config.load ~instance with
-  | Error _ -> ()
-  | Ok config -> (
-      let baker = config.baker_pkh in
-      let tzkt_url = config.tzkt_url in
-      (* Fetch recent cycles *)
-      (match Cycle_data.fetch_recent_cycles ~tzkt_url ~baker ~limit:10 with
-      | Error _ -> ()
-      | Ok cycles ->
-          Mutex.protect recent_lock (fun () ->
-              Hashtbl.replace recent_cache baker cycles) ;
-          (* Also populate individual cycle cache *)
-          Mutex.protect cycle_lock (fun () ->
-              List.iter
-                (fun (cr : Rewards.cycle_rewards) ->
-                  Hashtbl.replace cycle_cache (baker, cr.cycle) cr)
-                cycles)) ;
-      (* Fetch current cycle *)
-      match Cycle_data.fetch_current_cycle ~tzkt_url with
-      | Error _ -> ()
-      | Ok c -> Atomic.set current_cycle_ref (Some c))
+(** Try fetching recent cycles for [baker]. Returns [Some cycles] on success
+    with at least one cycle, [None] otherwise. *)
+let try_fetch_baker ~tzkt_url ~baker =
+  match Cycle_data.fetch_recent_cycles ~tzkt_url ~baker ~limit:10 with
+  | Ok (_ :: _ as cycles) -> Some cycles
+  | Ok [] | Error _ -> None
 
-let refresh_baker ~instance = poll_baker ~instance
+(** Cache cycles in both [recent_cache] and [cycle_cache]. *)
+let cache_cycles ~baker cycles =
+  Mutex.protect recent_lock (fun () ->
+      Hashtbl.replace recent_cache baker cycles) ;
+  Mutex.protect cycle_lock (fun () ->
+      List.iter
+        (fun (cr : Rewards.cycle_rewards) ->
+          Hashtbl.replace cycle_cache (baker, cr.cycle) cr)
+        cycles)
+
+let poll_baker ~instance ~network =
+  let delegates = Delegate_scheduler.get_baker_delegates ~instance in
+  let config_opt =
+    match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
+  in
+  let tzkt_url =
+    match config_opt with
+    | Some c -> c.tzkt_url
+    | None -> Payout_config.tzkt_base_url_for_network network
+  in
+  (* Try the configured baker first, then fall back to each delegate *)
+  let configured_baker =
+    match config_opt with Some c -> Some c.baker_pkh | None -> None
+  in
+  let result =
+    (* 1. Try the configured baker (if any) *)
+    let from_config =
+      match configured_baker with
+      | Some baker -> (
+          match try_fetch_baker ~tzkt_url ~baker with
+          | Some cycles -> Some (baker, cycles)
+          | None -> None)
+      | None -> None
+    in
+    match from_config with
+    | Some _ -> from_config
+    | None ->
+        (* 2. Try each delegate key to find the registered baker *)
+        let candidates =
+          match configured_baker with
+          | Some cb -> List.filter (fun d -> not (String.equal d cb)) delegates
+          | None -> delegates
+        in
+        List.find_map
+          (fun baker ->
+            match try_fetch_baker ~tzkt_url ~baker with
+            | Some cycles -> Some (baker, cycles)
+            | None -> None)
+          candidates
+  in
+  (match result with
+  | Some (baker, cycles) ->
+      cache_cycles ~baker cycles ;
+      (* Cache the detected baker for the page to read *)
+      Mutex.protect baker_instance_lock (fun () ->
+          Hashtbl.replace baker_instance_cache instance baker) ;
+      (* If no config exists or baker_pkh was wrong, save the correct one *)
+      let need_save =
+        match config_opt with
+        | None -> true
+        | Some c -> not (String.equal c.baker_pkh baker)
+      in
+      if need_save then begin
+        let config =
+          match config_opt with
+          | Some c -> {c with baker_pkh = baker; tzkt_url}
+          | None ->
+              {
+                (Payout_config.default ~baker_pkh:baker) with
+                tzkt_url;
+                explorer_url =
+                  (if String.equal network "mainnet" then "https://tzkt.io"
+                   else Printf.sprintf "https://%s.tzkt.io" network);
+              }
+        in
+        ignore (Payout_config.save ~instance config)
+      end
+  | None -> (
+      (* No delegate returned data — cache the first delegate as placeholder *)
+      match delegates with
+      | pkh :: _ ->
+          Mutex.protect baker_instance_lock (fun () ->
+              Hashtbl.replace baker_instance_cache instance pkh)
+      | [] -> ())) ;
+  (* Fetch current cycle *)
+  match Cycle_data.fetch_current_cycle ~tzkt_url with
+  | Error _ -> ()
+  | Ok c -> Atomic.set current_cycle_ref (Some c)
+
+let refresh_baker ~instance =
+  let network =
+    match Service_registry.find ~instance with
+    | Ok (Some svc) -> svc.Service.network
+    | _ -> "mainnet"
+  in
+  poll_baker ~instance ~network
 
 let tick () =
   let bakers =
@@ -183,7 +270,8 @@ let tick () =
   List.iter
     (fun (st : Data.Service_state.t) ->
       let instance = st.service.Service.instance in
-      poll_baker ~instance ;
+      let network = st.service.Service.network in
+      poll_baker ~instance ~network ;
       check_continual ~instance ~svc:st)
     bakers
 
@@ -210,6 +298,8 @@ let clear () =
   Mutex.protect cycle_lock (fun () -> Hashtbl.clear cycle_cache) ;
   Mutex.protect recent_lock (fun () -> Hashtbl.clear recent_cache) ;
   Atomic.set current_cycle_ref None ;
+  Mutex.protect baker_instance_lock (fun () ->
+      Hashtbl.clear baker_instance_cache) ;
   Mutex.protect continual_lock (fun () ->
       Hashtbl.clear continual_last_cycle ;
       Hashtbl.clear continual_delay_until)
