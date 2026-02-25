@@ -22,6 +22,14 @@ val find_sandbox_node :
 val find_sandbox_baker :
   group_name:string -> (Service.t option, Rresult.R.msg) result
 
+(** Find all node services belonging to a sandbox group. *)
+val find_sandbox_nodes :
+  group_name:string -> (Service.t list, Rresult.R.msg) result
+
+(** Find all baker services belonging to a sandbox group. *)
+val find_sandbox_bakers :
+  group_name:string -> (Service.t list, Rresult.R.msg) result
+
 (** Create a complete sandbox environment.
 
     Steps:
@@ -50,6 +58,36 @@ val create :
   app_bin_dir:string ->
   unit ->
   (Group.t, Rresult.R.msg) result
+
+(** Add a second (or Nth) node to an existing sandbox.
+
+    Exports a snapshot from node 1, allocates new RPC/P2P ports, and installs
+    the new node with [{--peer node1_p2p}] so it connects to the primary node.
+
+    @param on_log Optional callback for step-by-step progress messages
+    @param group_name Name of the sandbox group *)
+val add_node :
+  ?on_log:(string -> unit) ->
+  group_name:string ->
+  unit ->
+  (Service.t, Rresult.R.msg) result
+
+(** Add a baker to an existing sandbox.
+
+    Installs a new baker service with [--force-apply-from-round 0] and
+    yes-crypto env, using the sandbox wallet as base_dir.
+
+    @param on_log Optional callback for step-by-step progress messages
+    @param group_name Name of the sandbox group
+    @param node_instance Node instance the baker should connect to
+    @param delegates Consensus key aliases to assign to this baker *)
+val add_baker :
+  ?on_log:(string -> unit) ->
+  group_name:string ->
+  node_instance:string ->
+  delegates:string list ->
+  unit ->
+  (Service.t, Rresult.R.msg) result
 
 (** Destroy a sandbox: stop all services, remove them, delete wallet, remove group. *)
 val destroy :
