@@ -254,6 +254,34 @@ end)
 - Pages that need fine-grained control over all lifecycle functions
 - Existing pages that already use PAGE_SIG
 
+### CRITICAL RULE: No Manual String Layouts
+
+**All layouts must use Miaou layout widgets** (`Flex_layout`, `Grid_layout`, `Box_widget`, `Pane`). Never build layouts by manually concatenating strings, padding with spaces, or using `Printf.sprintf` to align columns.
+
+**Why:** Manual string layouts break on different terminal widths, are impossible to maintain, and bypass Miaou's responsive sizing. Layout widgets handle column alignment, overflow, and resizing automatically.
+
+**WRONG — manual string table:**
+```ocaml
+(* BAD: fragile, breaks on resize, unmaintainable *)
+let row addr balance reward =
+  Printf.sprintf "  %-20s  %12s  %10s" addr balance reward
+in
+String.concat "\n" (List.map (fun d -> row d.addr d.balance d.reward) delegators)
+```
+
+**CORRECT — Flex/Grid layout:**
+```ocaml
+(* GOOD: responsive, aligned, themed *)
+Grid_layout.render
+  ~tracks:[| Fr 1.; Px 14; Px 12 |]
+  ~gap:1
+  (List.map (fun d ->
+    [| Widgets.text d.addr; Widgets.text d.balance; Widgets.text d.reward |]
+  ) delegators)
+```
+
+This rule applies to all visual structures: tables, panels, side-by-side views, and any multi-column content. If you're tempted to use `String.make n ' '` or `Printf` width specifiers for alignment, use a layout widget instead.
+
 ### Recommended Miaou Widgets
 
 **Layout widgets** (`Miaou_widgets_layout`):
