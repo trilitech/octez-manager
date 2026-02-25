@@ -15,7 +15,8 @@ type simulation_result = {
   sufficient_balance : bool option;
 }
 
-let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress () =
+let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress
+    ?batch_size () =
   (* Check wallet balance *)
   let wallet_balance =
     match Payout_executor.fetch_wallet_balance ~ctx with
@@ -51,7 +52,13 @@ let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress () =
   in
   (* Run executor in dry-run mode *)
   match
-    Payout_executor.execute ~ctx ~blueprint ~dry_run:true ?on_progress ()
+    Payout_executor.execute
+      ~ctx
+      ~blueprint
+      ~dry_run:true
+      ?on_progress
+      ?batch_size
+      ()
   with
   | Ok (results, summary) ->
       Ok {results; summary; wallet_balance; total_needed; sufficient_balance}
