@@ -23,7 +23,9 @@ type state = Rewards_state.state
 
 type pstate = state Navigation.t
 
-(* Load baker instances from service registry *)
+(* Load baker instances from service registry.
+   Prefer the auto-detected baker address from the scheduler cache,
+   falling back to the first delegate if not yet detected. *)
 let load_baker_instances () =
   let bakers =
     Data.load_service_states ()
@@ -33,8 +35,11 @@ let load_baker_instances () =
   List.filter_map
     (fun (st : Data.Service_state.t) ->
       let instance = st.service.Service.instance in
-      let delegates = Delegate_scheduler.get_baker_delegates ~instance in
-      match delegates with pkh :: _ -> Some (instance, pkh) | [] -> None)
+      match Rewards_scheduler.get_baker_for_instance ~instance with
+      | Some pkh -> Some (instance, pkh)
+      | None ->
+          let delegates = Delegate_scheduler.get_baker_delegates ~instance in
+          List.nth_opt delegates 0 |> Option.map (fun pkh -> (instance, pkh)))
     bakers
 
 let init () =
