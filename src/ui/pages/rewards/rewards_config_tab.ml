@@ -36,6 +36,9 @@ type field_id =
   | BakerPaysTxFee
   | BakerPaysAllocFee
   | IgnoreContracts
+  | ContinualEnabled
+  | ContinualInterval
+  | ContinualOffset
 
 let all_fields =
   [
@@ -49,6 +52,9 @@ let all_fields =
     BakerPaysTxFee;
     BakerPaysAllocFee;
     IgnoreContracts;
+    ContinualEnabled;
+    ContinualInterval;
+    ContinualOffset;
   ]
 
 let field_count = List.length all_fields
@@ -64,6 +70,9 @@ let field_label = function
   | BakerPaysTxFee -> "Baker Pays TX Fee"
   | BakerPaysAllocFee -> "Baker Pays Alloc Fee"
   | IgnoreContracts -> "Ignore Contracts"
+  | ContinualEnabled -> "Continual Mode"
+  | ContinualInterval -> "Continual Interval"
+  | ContinualOffset -> "Continual Offset"
 
 let tez_symbol = "\xEA\x9C\xA9"
 
@@ -92,6 +101,11 @@ let field_value (config : Payout_config.t) = function
       else "\xe2\x9c\x97 No"
   | IgnoreContracts ->
       if config.ignore_contracts then "\xe2\x9c\x93 Yes" else "\xe2\x9c\x97 No"
+  | ContinualEnabled ->
+      if config.continual_enabled then "\xe2\x9c\x93 Enabled"
+      else "\xe2\x9c\x97 Disabled"
+  | ContinualInterval -> string_of_int config.continual_interval
+  | ContinualOffset -> string_of_int config.continual_offset
 
 (* {1 Field editing} *)
 
@@ -187,6 +201,43 @@ let edit_field (config : Payout_config.t) field =
   | IgnoreContracts ->
       pending_config :=
         Some {config with ignore_contracts = not config.ignore_contracts}
+  | ContinualEnabled ->
+      pending_config :=
+        Some {config with continual_enabled = not config.continual_enabled}
+  | ContinualInterval ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Continual Interval (cycles)"
+        ~initial:(string_of_int config.continual_interval)
+        ~validator:(fun s ->
+          match int_of_string_opt s with
+          | None -> Error "Must be a positive integer"
+          | Some i -> if i >= 1 then Ok () else Error "Must be >= 1")
+        ~on_submit:(fun s ->
+          match int_of_string_opt s with
+          | Some i when i >= 1 ->
+              pending_config := Some {config with continual_interval = i}
+          | _ -> ())
+        ()
+  | ContinualOffset ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Continual Offset (cycles)"
+        ~initial:(string_of_int config.continual_offset)
+        ~validator:(fun s ->
+          match int_of_string_opt s with
+          | None -> Error "Must be a non-negative integer"
+          | Some i ->
+              if i >= 0 && i < config.continual_interval then Ok ()
+              else
+                Error
+                  (Printf.sprintf
+                     "Must be in [0, %d)"
+                     config.continual_interval))
+        ~on_submit:(fun s ->
+          match int_of_string_opt s with
+          | Some i when i >= 0 ->
+              pending_config := Some {config with continual_offset = i}
+          | _ -> ())
+        ()
 
 (* {1 Save / Reset actions} *)
 

@@ -42,6 +42,9 @@ type t = {
   tzkt_url : string;
   explorer_url : string;
   notifications : Rewards.notification_channel list;
+  continual_enabled : bool;
+  continual_interval : int;
+  continual_offset : int;
 }
 
 (** {1 Defaults and construction} *)

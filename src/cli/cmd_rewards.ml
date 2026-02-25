@@ -702,10 +702,137 @@ let notify_cmd =
   let info = Cmd.info "notify" ~doc:"Manage payout notifications." in
   Cmd.group info [notify_test_cmd]
 
+(* ── rewards continual start/stop/status ──────────────────── *)
+
+let continual_start_run baker_opt interval offset =
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh -> (
+          let instance = svc.Service.instance in
+          let config =
+            match Payout_config.load ~instance with
+            | Ok c -> c
+            | Error _ -> Payout_config.default ~baker_pkh
+          in
+          let config =
+            {
+              config with
+              continual_enabled = true;
+              continual_interval = interval;
+              continual_offset = offset;
+            }
+          in
+          match Payout_config.validate config with
+          | Error msg -> Cli_helpers.cmdliner_error msg
+          | Ok () -> (
+              match Payout_config.save ~instance config with
+              | Error msg -> Cli_helpers.cmdliner_error msg
+              | Ok () ->
+                  Payout_continual.enable ~instance ;
+                  Printf.printf "Continual mode enabled for %s.\n" instance ;
+                  Printf.printf "  Interval: every %d cycle(s)\n" interval ;
+                  if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
+                  `Ok ())))
+
+let continual_stop_run baker_opt =
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh -> (
+          let instance = svc.Service.instance in
+          let config =
+            match Payout_config.load ~instance with
+            | Ok c -> c
+            | Error _ -> Payout_config.default ~baker_pkh
+          in
+          let config = {config with continual_enabled = false} in
+          match Payout_config.save ~instance config with
+          | Error msg -> Cli_helpers.cmdliner_error msg
+          | Ok () ->
+              Payout_continual.disable ~instance ;
+              Printf.printf "Continual mode disabled for %s.\n" instance ;
+              `Ok ()))
+
+let continual_status_run baker_opt =
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh ->
+          let instance = svc.Service.instance in
+          let config =
+            match Payout_config.load ~instance with
+            | Ok c -> c
+            | Error _ -> Payout_config.default ~baker_pkh
+          in
+          Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+          Printf.printf
+            "Continual mode: %s\n"
+            (if config.continual_enabled then "enabled" else "disabled") ;
+          Printf.printf
+            "Interval: every %d cycle(s)\n"
+            config.continual_interval ;
+          if config.continual_offset > 0 then
+            Printf.printf "Offset: %d\n" config.continual_offset ;
+          Printf.printf
+            "Delay: %d-%d blocks\n"
+            config.min_delay_blocks
+            config.max_delay_blocks ;
+          `Ok ())
+
+let continual_start_cmd =
+  let info =
+    Cmd.info
+      "start"
+      ~doc:
+        "Enable continual payouts. Automatically pays due cycles when the \
+         scheduler detects cycle transitions."
+  in
+  let interval_arg =
+    let doc = "Pay every N cycles (default: 1 = every cycle)." in
+    Arg.(value & opt int 1 & info ["interval"] ~doc ~docv:"N")
+  in
+  let offset_arg =
+    let doc = "Cycle offset within the interval (default: 0)." in
+    Arg.(value & opt int 0 & info ["offset"] ~doc ~docv:"N")
+  in
+  Cmd.v
+    info
+    Term.(
+      ret (const continual_start_run $ baker_arg $ interval_arg $ offset_arg))
+
+let continual_stop_cmd =
+  let info = Cmd.info "stop" ~doc:"Disable continual payouts." in
+  Cmd.v info Term.(ret (const continual_stop_run $ baker_arg))
+
+let continual_status_cmd =
+  let info = Cmd.info "status" ~doc:"Show continual mode status." in
+  Cmd.v info Term.(ret (const continual_status_run $ baker_arg))
+
+let continual_cmd =
+  let info =
+    Cmd.info "continual" ~doc:"Manage continual (automatic) payouts."
+  in
+  Cmd.group info [continual_start_cmd; continual_stop_cmd; continual_status_cmd]
+
 (* ── rewards command group ─────────────────────────────────── *)
 
 let rewards_cmd =
   let info = Cmd.info "rewards" ~doc:"Manage baker rewards and payouts." in
   Cmd.group
     info
-    [status_cmd; generate_cmd; history_cmd; pay_cmd; config_cmd; notify_cmd]
+    [
+      status_cmd;
+      generate_cmd;
+      history_cmd;
+      pay_cmd;
+      config_cmd;
+      notify_cmd;
+      continual_cmd;
+    ]

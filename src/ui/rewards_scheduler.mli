@@ -43,6 +43,11 @@ val get_current_cycle : unit -> int option
 val get_payout_status :
   instance:string -> cycle:int -> Octez_manager_rewards.Rewards.payout_status
 
+(** {1 Continual mode} *)
+
+(** Sync continual mode state from config (called after config changes). *)
+val sync_continual_from_config : instance:string -> unit
+
 (** {1 Refresh} *)
 
 (** Trigger an immediate refresh for a specific baker instance.
