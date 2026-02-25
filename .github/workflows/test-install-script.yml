@@ -61,6 +61,7 @@ jobs:
           fi
           
           # Run --version to ensure it works
+          echo "Testing octez-manager --version:"
           if "$HOME/.local/bin/octez-manager" --version; then
             echo "✓ Binary runs successfully"
           else
@@ -109,6 +110,7 @@ jobs:
           fi
           
           # Run --version to ensure it works
+          echo "Testing octez-manager --version:"
           if /tmp/custom-install/octez-manager --version; then
             echo "✓ Binary runs successfully"
           else
@@ -157,6 +159,7 @@ jobs:
           fi
           
           # Run --version to ensure it works
+          echo "Testing octez-manager --version:"
           if /usr/local/bin/octez-manager --version; then
             echo "✓ Binary runs successfully"
           else
