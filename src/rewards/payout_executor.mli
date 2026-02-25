@@ -7,8 +7,9 @@
 
 (** Payout executor: broadcasts transfer operations for a payout blueprint.
 
-    Builds individual [octez-client transfer] commands, broadcasts them
-    sequentially, collects operation hashes, and writes reports.
+    Groups transfers into batches using [octez-client multiple transfers],
+    collects operation hashes, and writes reports.
+    Aborts early after 2 consecutive failed batches.
     Supports both real execution and dry-run mode. *)
 
 (** {1 Execution context} *)
@@ -37,21 +38,26 @@ type progress = {
 
 (** Execute all payouts from a blueprint.
 
-    Iterates over eligible delegator rewards plus bond/fee payouts,
-    executes each as an individual [octez-client transfer] operation,
-    and writes reports to disk.
+    Groups eligible delegator rewards plus bond/fee payouts into batches
+    of [batch_size] and executes each batch as an
+    [octez-client multiple transfers] operation.
+    Writes reports to disk after all batches complete.
+
+    Returns [Error] immediately if [payout_key_alias] is empty.
+    Aborts remaining batches after 2 consecutive batch failures.
 
     The execution acquires a file lock on the cycle's report directory
     to prevent concurrent payout attempts.
 
     @param dry_run If true, uses [--dry-run] flag (no real broadcast).
-    @param on_progress Optional callback invoked after each operation.
-    @return The list of per-delegator results and a summary. *)
+    @param on_progress Optional callback invoked after each transfer.
+    @param batch_size Number of transfers per batch (default 80). *)
 val execute :
   ctx:context ->
   blueprint:Rewards.payout_blueprint ->
   ?dry_run:bool ->
   ?on_progress:(progress -> unit) ->
+  ?batch_size:int ->
   unit ->
   (Rewards.payout_result list * Rewards.cycle_summary, string) result
 
