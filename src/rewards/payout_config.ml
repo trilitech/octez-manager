@@ -76,6 +76,10 @@ let default ~baker_pkh =
     continual_offset = 0;
   }
 
+let tzkt_base_url_for_network network =
+  if String.equal network "mainnet" then "https://api.tzkt.io"
+  else Printf.sprintf "https://api.%s.tzkt.io" network
+
 (* Validation *)
 
 let is_valid_tz_address s =
