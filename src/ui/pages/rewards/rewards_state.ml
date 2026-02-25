@@ -33,6 +33,9 @@ type state = {
   search_active : bool;
   blueprint : Rewards.payout_blueprint option;
       (** Loaded blueprint for delegators tab *)
+  config : Payout_config.t option;  (** Loaded payout config for editing *)
+  config_cursor : int;  (** Selected field in config tab *)
+  config_dirty : bool;  (** True if config has unsaved changes *)
   history_cursor : int;
   loading : bool;
   error : string option;
