@@ -43,10 +43,41 @@ let find_page_or_default name default_name =
           Ok page
       | None -> Error (`Msg "Instances page missing from registry"))
 
+(** Open theme picker modal with live preview *)
+let open_theme_picker () =
+  let items = Theme_manager.list_available () in
+  (* Remember current theme to restore on cancel *)
+  let original_theme = Theme_manager.get_current () in
+  let load_theme name =
+    let theme, _warn = Theme_manager.load ~name () in
+    Theme_manager.set_current theme ;
+    Style_context.set_theme theme
+  in
+  Modal_helpers.open_theme_picker_modal
+    ~title:"Switch Theme (Ctrl+T)"
+    ~items
+    ~to_string:(fun s -> s)
+    ~load_theme
+    ~on_select:(fun name ->
+      (* Theme already applied via live preview, just save preference and notify *)
+      Theme_manager.save_preference name ;
+      Context.toast_info (Printf.sprintf "Switched to theme: %s" name))
+    ~on_cancel:(fun () ->
+      (* Restore the original theme on Esc *)
+      Theme_manager.set_current original_theme ;
+      Style_context.set_theme original_theme)
+    ()
+
+(** Register global key handler for Ctrl+T *)
+let register_global_keys () =
+  Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
+  Context.register_global_key "K" (fun () -> Context.navigate Keys_page.name)
+
 let register_and_init ?(log = false) ?logfile () =
   Capabilities.register () ;
   register_pages () ;
   Runtime.initialize ~log ?logfile () ;
+  register_global_keys () ;
   Binary_downloader.cleanup_stale_temp_dirs () ;
   Background_runner.enqueue (fun () ->
       match Version_checker.check_for_updates () with
@@ -89,36 +120,6 @@ let shutdown () =
   Domain_pool.shutdown () ;
   Download.kill_active_download ()
 
-(** Open theme picker modal with live preview *)
-let open_theme_picker () =
-  let items = Theme_manager.list_available () in
-  (* Remember current theme to restore on cancel *)
-  let original_theme = Theme_manager.get_current () in
-  let load_theme name =
-    let theme, _warn = Theme_manager.load ~name () in
-    Theme_manager.set_current theme ;
-    Style_context.set_theme theme
-  in
-  Modal_helpers.open_theme_picker_modal
-    ~title:"Switch Theme (Ctrl+T)"
-    ~items
-    ~to_string:(fun s -> s)
-    ~load_theme
-    ~on_select:(fun name ->
-      (* Theme already applied via live preview, just save preference and notify *)
-      Theme_manager.save_preference name ;
-      Context.toast_info (Printf.sprintf "Switched to theme: %s" name))
-    ~on_cancel:(fun () ->
-      (* Restore the original theme on Esc *)
-      Theme_manager.set_current original_theme ;
-      Style_context.set_theme original_theme)
-    ()
-
-(** Register global key handler for Ctrl+T *)
-let register_global_keys () =
-  Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
-  Context.register_global_key "K" (fun () -> Context.navigate Keys_page.name)
-
 let run ?page ?(log = false) ?logfile ?theme () =
   let initial_theme, warning = Theme_manager.load ?name:theme () in
   Theme_manager.set_current initial_theme ;
@@ -131,7 +132,6 @@ let run ?page ?(log = false) ?logfile ?theme () =
   Sys.set_signal Sys.sigint (Sys.Signal_handle handle_break) ;
   Sys.set_signal Sys.sigterm (Sys.Signal_handle handle_break) ;
   register_and_init ~log ?logfile () ;
-  register_global_keys () ;
   (match warning with Some msg -> Context.toast_warn msg | None -> ()) ;
   let start_name = Option.value ~default:Instances.name page in
   let rec loop history current_name =
