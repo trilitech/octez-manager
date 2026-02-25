@@ -85,9 +85,11 @@ val validate_importable :
     - Accuser: network, base_dir, node_endpoint
     - DAL: network, data_dir, node_endpoint
 
+    @param network_override Optional network override (will not be listed as missing if provided)
     @param external_svc External service
     @return List of missing field names *)
-val missing_required_fields : External_service.t -> string list
+val missing_required_fields :
+  ?network_override:string -> External_service.t -> string list
 
 (** {1 Import} *)
 
@@ -197,5 +199,6 @@ module For_tests : sig
   val resolve_net_addr :
     overrides:field_overrides -> external_svc:External_service.t -> string
 
-  val missing_required_fields : External_service.t -> string list
+  val missing_required_fields :
+    ?network_override:string -> External_service.t -> string list
 end

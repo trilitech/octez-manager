@@ -97,7 +97,7 @@ let validate_importable ?network_override external_svc =
   in
   Ok ()
 
-let missing_required_fields external_svc =
+let missing_required_fields ?network_override external_svc =
   let config = external_svc.External_service.config in
   let role_value = config.External_service.role.value in
   let required =
@@ -112,7 +112,11 @@ let missing_required_fields external_svc =
   List.filter
     (fun field ->
       match field with
-      | "network" -> not (External_service.is_known config.network)
+      | "network" -> (
+          (* Network is not missing if override is provided OR detected value is known *)
+          match network_override with
+          | Some _ -> false
+          | None -> not (External_service.is_known config.network))
       | "data_dir" -> not (External_service.is_known config.data_dir)
       | "base_dir" -> not (External_service.is_known config.base_dir)
       | "node_endpoint" -> not (External_service.is_known config.node_endpoint)
