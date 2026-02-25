@@ -163,13 +163,38 @@ let render ~(state : Rewards_state.state) ~cols ~rows =
   let box_width = min (cols - 2) 72 in
   match state.blueprint with
   | None ->
+      let lines =
+        match state.selected_cycle with
+        | Some cycle ->
+            Context.tick_spinner () ;
+            [
+              "";
+              Printf.sprintf
+                "  %s"
+                (Context.render_spinner
+                   (Printf.sprintf "Loading cycle %d\xe2\x80\xa6" cycle));
+            ]
+        | None ->
+            [
+              "";
+              Widgets.themed_muted "  No delegator data available.";
+              Widgets.themed_muted
+                "  Select a baker and wait for cycle data to load.";
+            ]
+      in
+      String.concat "\n" lines
+  | Some bp
+    when bp.Rewards.delegator_rewards = [] && bp.Rewards.total_delegators > 0 ->
+      (* Blueprint exists but delegator details are still loading *)
+      Context.tick_spinner () ;
       String.concat
         "\n"
         [
           "";
-          Widgets.themed_muted "  No delegator data available.";
-          Widgets.themed_muted
-            "  Select a baker and wait for cycle data to load.";
+          Printf.sprintf
+            "  %s"
+            (Context.render_spinner
+               (Printf.sprintf "Loading cycle %d\xe2\x80\xa6" bp.Rewards.cycle));
         ]
   | Some bp ->
       let delegators = prepare_delegators state bp.Rewards.delegator_rewards in
