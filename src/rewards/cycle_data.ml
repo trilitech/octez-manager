@@ -76,11 +76,7 @@ let parse_cycle_rewards ~baker json =
 
 let fetch_cycle ~tzkt_url ~baker ~cycle =
   let url =
-    Printf.sprintf
-      "%s/v1/rewards/bakers/%s/%d?delegators=true"
-      tzkt_url
-      baker
-      cycle
+    Printf.sprintf "%s/v1/rewards/split/%s/%d?limit=10000" tzkt_url baker cycle
   in
   match curl_fetch url with
   | Error (`Msg msg) -> Error (Printf.sprintf "TzKT fetch failed: %s" msg)
@@ -93,7 +89,7 @@ let fetch_cycle ~tzkt_url ~baker ~cycle =
 let fetch_recent_cycles ~tzkt_url ~baker ~limit =
   let url =
     Printf.sprintf
-      "%s/v1/rewards/bakers/%s?limit=%d&sort.desc=cycle&delegators=true"
+      "%s/v1/rewards/bakers/%s?limit=%d&sort.desc=cycle"
       tzkt_url
       baker
       limit
