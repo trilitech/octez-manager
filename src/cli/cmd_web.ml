@@ -73,6 +73,16 @@ let web_term =
            let result =
              Eio_posix.run @@ fun env ->
              Eio.Switch.run @@ fun sw ->
+             let pool =
+               Octez_manager_ui.Domain_pool.create
+                 ~sw
+                 ~domain_mgr:(Eio.Stdenv.domain_mgr env)
+                 ~num_domains:4
+             in
+             Octez_manager_ui.Domain_pool.set pool ;
+             Octez_manager_lib.Eio_process.init (Eio.Stdenv.process_mgr env) ;
+             Octez_manager_lib.Binary_downloader.set_parallel_submit
+               Octez_manager_ui.Domain_pool.submit ;
              Miaou_helpers.Fiber_runtime.init ~env ~sw ;
              Octez_manager_ui.Manager_app.register_and_init ~log ?logfile () ;
              (match warning with
