@@ -205,6 +205,99 @@ let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
   in
   Box.render ~title:"Payout Preview" ~style:Rounded ~width:box_width desc
 
+let render_cycle_detail ~box_width ~instance ~baker
+    (state : Rewards_state.state) cycle =
+  let cr = Rewards_scheduler.get_cycle_data ~baker ~cycle in
+  let header =
+    Widgets.themed_primary (Printf.sprintf " Cycle %d Detail " cycle)
+  in
+  let back_hint = Widgets.themed_muted "  Press Esc to return to dashboard" in
+  let detail_box =
+    match cr with
+    | None ->
+        Box.render
+          ~title:(Printf.sprintf "Cycle %d" cycle)
+          ~style:Rounded
+          ~width:box_width
+          (Widgets.themed_muted "No data available for this cycle")
+    | Some cr ->
+        let total_rewards = Int64.add cr.block_rewards cr.block_fees in
+        let delegator_count = List.length cr.delegators in
+        let status =
+          Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
+        in
+        let status_label =
+          if delegator_count = 0 then Widgets.themed_muted "N/A (no delegators)"
+          else
+            match status with
+            | Rewards.Paid -> Widgets.themed_success "Paid"
+            | Rewards.Unpaid -> Widgets.themed_warning "Unpaid"
+            | Rewards.Partial -> Widgets.themed_warning "Partial"
+            | Rewards.In_progress -> Widgets.themed_accent "In progress"
+        in
+        let items =
+          [
+            ( "Earned Rewards",
+              Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9" );
+            ( "Block Rewards",
+              Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
+            ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
+            ("Delegators", string_of_int delegator_count);
+            ("Payout Status", status_label);
+          ]
+        in
+        let desc =
+          Desc_list.create ~key_width:16 ~items ()
+          |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+        in
+        Box.render
+          ~title:(Printf.sprintf "Cycle %d" cycle)
+          ~style:Rounded
+          ~width:box_width
+          desc
+  in
+  let preview_box =
+    match state.blueprint with
+    | Some bp when bp.Rewards.cycle = cycle ->
+        render_blueprint_box ~box_width bp
+    | _ -> Widgets.themed_muted "  Press g to generate payout preview"
+  in
+  String.concat "\n" [header; back_hint; ""; detail_box; ""; preview_box]
+
+let render_dashboard ~box_width ~instance ~baker (state : Rewards_state.state) =
+  let network =
+    match Octez_manager_lib.Service_registry.find ~instance with
+    | Ok (Some svc) -> svc.Octez_manager_lib.Service.network
+    | _ -> "unknown"
+  in
+  let recent = Rewards_scheduler.get_recent_cycles ~baker in
+  let current_cycle = state.current_cycle in
+  let last_completed =
+    match current_cycle with
+    | Some cc ->
+        List.find_opt (fun (cr : Rewards.cycle_rewards) -> cr.cycle < cc) recent
+    | None -> List.nth_opt recent 0
+  in
+  let network_line = render_network_badge network in
+  let current_box =
+    render_current_cycle_box ~box_width ~instance current_cycle
+  in
+  let completed_box =
+    render_last_completed_box ~box_width ~instance last_completed
+  in
+  let recent_box = render_recent_cycles_box ~box_width ~instance recent in
+  let parts =
+    [network_line; ""; current_box; ""; completed_box; ""; recent_box]
+  in
+  let parts =
+    if state.overview_preview then
+      match state.blueprint with
+      | Some bp -> parts @ [""; render_blueprint_box ~box_width bp]
+      | None -> parts @ [""; Widgets.themed_muted "  Generating preview..."]
+    else parts
+  in
+  String.concat "\n" parts
+
 let render ~(state : Rewards_state.state) ~cols =
   let box_width = min (cols - 2) 72 in
   match Rewards_state.selected_baker_instance state with
@@ -216,39 +309,8 @@ let render ~(state : Rewards_state.state) ~cols =
           Widgets.themed_muted "  No baker instances configured.";
           Widgets.themed_muted "  Install a baker to view reward data.";
         ]
-  | Some (instance, baker) ->
-      let network =
-        match Octez_manager_lib.Service_registry.find ~instance with
-        | Ok (Some svc) -> svc.Octez_manager_lib.Service.network
-        | _ -> "unknown"
-      in
-      let recent = Rewards_scheduler.get_recent_cycles ~baker in
-      let current_cycle = state.current_cycle in
-      (* Last completed = most recent cycle strictly before the current one *)
-      let last_completed =
-        match current_cycle with
-        | Some cc ->
-            List.find_opt
-              (fun (cr : Rewards.cycle_rewards) -> cr.cycle < cc)
-              recent
-        | None -> List.nth_opt recent 0
-      in
-      let network_line = render_network_badge network in
-      let current_box =
-        render_current_cycle_box ~box_width ~instance current_cycle
-      in
-      let completed_box =
-        render_last_completed_box ~box_width ~instance last_completed
-      in
-      let recent_box = render_recent_cycles_box ~box_width ~instance recent in
-      let parts =
-        [network_line; ""; current_box; ""; completed_box; ""; recent_box]
-      in
-      let parts =
-        if state.overview_preview then
-          match state.blueprint with
-          | Some bp -> parts @ [""; render_blueprint_box ~box_width bp]
-          | None -> parts @ [""; Widgets.themed_muted "  Generating preview..."]
-        else parts
-      in
-      String.concat "\n" parts
+  | Some (instance, baker) -> (
+      match state.selected_cycle with
+      | Some cycle ->
+          render_cycle_detail ~box_width ~instance ~baker state cycle
+      | None -> render_dashboard ~box_width ~instance ~baker state)
