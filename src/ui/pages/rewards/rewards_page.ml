@@ -23,19 +23,51 @@ type state = Rewards_state.state
 
 type pstate = state Navigation.t
 
-(* Load baker instances from service registry *)
+(* Pending cycle selection from modal callback.
+   Written by on_select, consumed by refresh. *)
+let pending_cycle : int option ref = ref None
+
+(* Load baker instances from service registry.
+   Prefer the auto-detected baker address from the scheduler cache,
+   falling back to the first delegate if not yet detected.
+   Also includes test bakers from OM_TEST_BAKER env var. *)
 let load_baker_instances () =
-  let bakers =
-    Data.load_service_states ()
-    |> List.filter (fun (st : Data.Service_state.t) ->
-        String.equal st.service.Service.role "baker")
+  let from_services =
+    let bakers =
+      Data.load_service_states ()
+      |> List.filter (fun (st : Data.Service_state.t) ->
+          String.equal st.service.Service.role "baker")
+    in
+    List.filter_map
+      (fun (st : Data.Service_state.t) ->
+        let instance = st.service.Service.instance in
+        match Rewards_scheduler.get_baker_for_instance ~instance with
+        | Some pkh -> Some (instance, pkh)
+        | None ->
+            let delegates = Delegate_scheduler.get_baker_delegates ~instance in
+            List.nth_opt delegates 0 |> Option.map (fun pkh -> (instance, pkh)))
+      bakers
   in
-  List.filter_map
-    (fun (st : Data.Service_state.t) ->
-      let instance = st.service.Service.instance in
-      let delegates = Delegate_scheduler.get_baker_delegates ~instance in
-      match delegates with pkh :: _ -> Some (instance, pkh) | [] -> None)
-    bakers
+  let from_env =
+    match Sys.getenv_opt "OM_TEST_BAKER" with
+    | None | Some "" -> []
+    | Some s ->
+        String.split_on_char ',' s
+        |> List.filter_map (fun entry ->
+            let entry = String.trim entry in
+            match String.index_opt entry '/' with
+            | None -> None
+            | Some i ->
+                let network = String.sub entry 0 i in
+                let pkh =
+                  String.sub entry (i + 1) (String.length entry - i - 1)
+                in
+                if String.length network > 0 && String.length pkh > 0 then
+                  let instance = Printf.sprintf "test-%s" network in
+                  Some (instance, pkh)
+                else None)
+  in
+  from_services @ from_env
 
 let init () =
   let baker_instances = load_baker_instances () in
@@ -45,13 +77,18 @@ let init () =
       selected_baker = 0;
       active_tab = Rewards_state.Overview;
       selected_cycle = None;
-      current_cycle = Rewards_scheduler.get_current_cycle ();
+      current_cycle = None;
       delegator_cursor = 0;
       delegator_sort = Rewards_state.SortBalance;
       delegator_filter = Rewards_state.FilterAll;
       search_query = "";
       search_active = false;
       blueprint = None;
+      overview_preview = false;
+      config = None;
+      config_cursor = 0;
+      config_dirty = false;
+      config_show_hint = false;
       history_cursor = 0;
       loading = false;
       error = None;
@@ -61,9 +98,13 @@ let update ps _ = ps
 
 (** Compute a payout blueprint for the delegators tab if needed.
     Only runs when the tab is active and cached data is available.
-    Uses default payout config (no file I/O). *)
+    Uses the loaded config if available, otherwise default config. *)
+let needs_blueprint s =
+  s.active_tab = Rewards_state.Delegators
+  || (s.active_tab = Rewards_state.Overview && s.overview_preview)
+
 let maybe_compute_blueprint s =
-  if s.active_tab <> Rewards_state.Delegators then s
+  if not (needs_blueprint s) then s
   else
     match Rewards_state.selected_baker_instance s with
     | None -> {s with blueprint = None}
@@ -80,10 +121,20 @@ let maybe_compute_blueprint s =
         match cycle_opt with
         | None -> {s with blueprint = None}
         | Some cycle -> (
+            let cached = Rewards_scheduler.get_cycle_data ~baker ~cycle in
+            let stale_blueprint =
+              match (s.blueprint, cached) with
+              | Some bp, Some cr
+                when bp.Rewards.cycle = cycle
+                     && bp.Rewards.delegator_rewards = []
+                     && cr.Rewards.delegators <> [] ->
+                  true
+              | _ -> false
+            in
             match s.blueprint with
-            | Some bp when bp.Rewards.cycle = cycle -> s
+            | Some bp when bp.Rewards.cycle = cycle && not stale_blueprint -> s
             | _ -> (
-                match Rewards_scheduler.get_cycle_data ~baker ~cycle with
+                match cached with
                 | None -> {s with blueprint = None}
                 | Some cr ->
                     let network =
@@ -91,7 +142,11 @@ let maybe_compute_blueprint s =
                       | Ok (Some svc) -> svc.Service.network
                       | _ -> "unknown"
                     in
-                    let config = Payout_config.default ~baker_pkh:pkh in
+                    let config =
+                      match s.config with
+                      | Some c -> c
+                      | None -> Payout_config.default ~baker_pkh:pkh
+                    in
                     let bp =
                       Reward_calculator.generate_blueprint
                         ~config
@@ -99,6 +154,28 @@ let maybe_compute_blueprint s =
                         ~cycle_rewards:cr
                     in
                     {s with blueprint = Some bp; selected_cycle = Some cycle})))
+
+(** Load payout config from disk when first viewing the Configuration tab.
+    Only loads once; subsequent changes are in-memory until saved. *)
+let maybe_load_config s =
+  if s.active_tab <> Rewards_state.Configuration then s
+  else if Option.is_some s.config then s
+  else
+    match Rewards_state.selected_baker_instance s with
+    | None -> s
+    | Some (instance, pkh) ->
+        let config =
+          match Payout_config.load ~instance with
+          | Ok c -> c
+          | Error _ -> Payout_config.default ~baker_pkh:pkh
+        in
+        {s with config = Some config}
+
+(** Apply pending config edits from modal callbacks. *)
+let apply_pending_config s =
+  match Rewards_config_tab.consume_pending_config () with
+  | Some config -> {s with config = Some config; config_dirty = true}
+  | None -> s
 
 let refresh ps =
   match Context.consume_navigation () with
@@ -109,9 +186,26 @@ let refresh ps =
       Navigation.update
         (fun s ->
           let baker_instances = load_baker_instances () in
-          let current_cycle = Rewards_scheduler.get_current_cycle () in
+          let current_cycle =
+            match Rewards_state.selected_baker_instance s with
+            | Some (instance, _) ->
+                Rewards_scheduler.get_current_cycle ~instance
+            | None -> None
+          in
           let s = {s with baker_instances; current_cycle} in
-          maybe_compute_blueprint s)
+          let s = maybe_compute_blueprint s in
+          let s = maybe_load_config s in
+          let s = apply_pending_config s in
+          match !pending_cycle with
+          | Some c ->
+              pending_cycle := None ;
+              {
+                s with
+                selected_cycle = Some c;
+                blueprint = None;
+                delegator_cursor = 0;
+              }
+          | None -> s)
         ps
 
 let move ps _ = ps
@@ -149,32 +243,22 @@ let render_baker_header (s : Rewards_state.state) =
       Widgets.themed_primary
         (Printf.sprintf " Rewards - %s (%s) " instance short_pkh)
 
-let render_placeholder tab_name =
-  String.concat
-    "\n"
-    [
-      ""; Widgets.themed_muted (Printf.sprintf "  %s tab — coming soon" tab_name);
-    ]
-
-let hint_for_tab = function
-  | Rewards_state.Delegators ->
-      Widgets.themed_muted
-        "j/k nav \xc2\xb7 / search \xc2\xb7 s sort \xc2\xb7 f filter \xc2\xb7 \
-         c cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
-  | _ ->
-      Widgets.themed_muted
-        "1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc back"
+let hint_for_tab _tab = ""
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
+  Context.tick_spinner () ;
+  Context.tick_toasts () ;
   let header_line = render_baker_header s in
   let tab_bar = render_tab_bar s ~cols in
   let hint = hint_for_tab s.active_tab in
+  let toast = Context.render_toasts ~cols in
+  let footer = if String.length toast > 0 then [toast; hint] else [hint] in
   Themed_page.render_layout
     ~size
     ~header:[header_line; tab_bar; ""]
-    ~footer:[hint]
+    ~footer
     ~child:(fun avail ->
       let cols = avail.LTerm_geom.cols in
       let rows = avail.LTerm_geom.rows in
@@ -182,127 +266,9 @@ let view ps ~focus:_ ~size =
       | Rewards_state.Overview -> Rewards_overview.render ~state:s ~cols
       | Rewards_state.Delegators ->
           Rewards_delegators.render ~state:s ~cols ~rows
-      | Rewards_state.History -> render_placeholder "History"
-      | Rewards_state.Configuration -> render_placeholder "Configuration")
-
-(** Count filtered delegators for cursor bounds. *)
-let delegator_count s =
-  match s.blueprint with
-  | None -> 0
-  | Some bp ->
-      let ds = bp.Rewards.delegator_rewards in
-      let ds = Rewards_delegators.apply_filter s.delegator_filter ds in
-      let ds =
-        if s.search_active || String.length s.search_query > 0 then
-          Rewards_delegators.apply_search s.search_query ds
-        else ds
-      in
-      List.length ds
-
-(** Handle keys when search mode is active. *)
-let handle_search_key ps key =
-  match Keys.of_string key with
-  | Some Keys.Escape ->
-      Navigation.update
-        (fun s -> {s with search_active = false; search_query = ""})
-        ps
-  | Some Keys.Enter ->
-      Navigation.update (fun s -> {s with search_active = false}) ps
-  | Some Keys.Backspace ->
-      Navigation.update
-        (fun s ->
-          let len = String.length s.search_query in
-          let search_query =
-            if len > 0 then String.sub s.search_query 0 (len - 1)
-            else s.search_query
-          in
-          {s with search_query; delegator_cursor = 0})
-        ps
-  | Some (Keys.Char c) when String.length c = 1 ->
-      Navigation.update
-        (fun s ->
-          {s with search_query = s.search_query ^ c; delegator_cursor = 0})
-        ps
-  | _ -> ps
-
-(** Handle keys specific to the Delegators tab. *)
-let handle_delegator_key ps key =
-  let s = ps.Navigation.s in
-  match Keys.of_string key with
-  | Some (Keys.Char "j") | Some Keys.Down ->
-      let count = delegator_count s in
-      Navigation.update
-        (fun s ->
-          {
-            s with
-            delegator_cursor = min (s.delegator_cursor + 1) (max 0 (count - 1));
-          })
-        ps
-  | Some (Keys.Char "k") | Some Keys.Up ->
-      Navigation.update
-        (fun s -> {s with delegator_cursor = max (s.delegator_cursor - 1) 0})
-        ps
-  | Some (Keys.Char "g") ->
-      Navigation.update (fun s -> {s with delegator_cursor = 0}) ps
-  | Some (Keys.Char "G") ->
-      let count = delegator_count s in
-      Navigation.update
-        (fun s -> {s with delegator_cursor = max 0 (count - 1)})
-        ps
-  | Some (Keys.Char "/") ->
-      Navigation.update (fun s -> {s with search_active = true}) ps
-  | Some (Keys.Char "s") ->
-      Navigation.update
-        (fun s ->
-          {
-            s with
-            delegator_sort = Rewards_state.next_sort_column s.delegator_sort;
-            delegator_cursor = 0;
-          })
-        ps
-  | Some (Keys.Char "f") ->
-      Navigation.update
-        (fun s ->
-          {
-            s with
-            delegator_filter = Rewards_state.next_filter_mode s.delegator_filter;
-            delegator_cursor = 0;
-          })
-        ps
-  | Some (Keys.Char "c") -> (
-      (* Cycle through recent cycles *)
-      match Rewards_state.selected_baker_pkh s with
-      | None -> ps
-      | Some baker -> (
-          let recent = Rewards_scheduler.get_recent_cycles ~baker in
-          let cycles =
-            List.map (fun (cr : Rewards.cycle_rewards) -> cr.cycle) recent
-          in
-          match cycles with
-          | [] -> ps
-          | _ ->
-              let current =
-                match s.selected_cycle with
-                | Some c -> c
-                | None -> List.hd cycles
-              in
-              let rec find_next = function
-                | [] -> List.hd cycles
-                | [_] -> List.hd cycles
-                | x :: y :: _ when x = current -> y
-                | _ :: rest -> find_next rest
-              in
-              let next_cycle = find_next cycles in
-              Navigation.update
-                (fun s ->
-                  {
-                    s with
-                    selected_cycle = Some next_cycle;
-                    blueprint = None;
-                    delegator_cursor = 0;
-                  })
-                ps))
-  | _ -> ps
+      | Rewards_state.History -> Rewards_history.render ~state:s ~cols ~rows
+      | Rewards_state.Configuration ->
+          Rewards_config_tab.render ~state:s ~cols ~_rows:rows)
 
 (** Count filtered delegators for cursor bounds. *)
 let delegator_count s =
@@ -716,60 +682,268 @@ let handle_key ps key ~size:_ =
   (* Search mode captures all input *)
   if s.search_active then handle_search_key ps key
   else
-    match Keys.of_string key with
-    | Some Keys.Escape -> back ps
-    | Some (Keys.Char "1") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.Overview})
-          ps
-    | Some (Keys.Char "2") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.Delegators})
-          ps
-    | Some (Keys.Char "3") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.History})
-          ps
-    | Some (Keys.Char "4") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.Configuration})
-          ps
-    | Some (Keys.Char "b") ->
-        (* Cycle baker selection, reset blueprint *)
-        let n = List.length s.baker_instances in
-        if n > 1 then
-          Navigation.update
-            (fun s ->
-              {
-                s with
-                selected_baker = (s.selected_baker + 1) mod n;
-                blueprint = None;
-                selected_cycle = None;
-                delegator_cursor = 0;
-              })
-            ps
-        else ps
-    | Some (Keys.Char "r") -> refresh ps
-    | _ when s.active_tab = Rewards_state.Delegators ->
-        handle_delegator_key ps key
-    | _ -> ps
+    (* Check for mouse click on tab bar (row 2 = tab bar, 1-indexed) *)
+    match Miaou_helpers.Mouse.parse_click key with
+    | Some {row = 2; col} -> (
+        match tab_at_col col with
+        | Some idx ->
+            let tab = Rewards_state.tab_of_index idx in
+            Navigation.update (fun s -> {s with active_tab = tab}) ps
+        | None -> ps)
+    | Some _ -> ps (* other mouse clicks: ignore *)
+    | None -> (
+        match Keys.of_string key with
+        | Some Keys.Escape -> back ps
+        | Some Keys.Tab ->
+            Navigation.update
+              (fun s ->
+                let next_idx =
+                  (Rewards_state.tab_index s.active_tab + 1) mod 4
+                in
+                let next = Rewards_state.tab_of_index next_idx in
+                if next_idx = 0 then
+                  (* Wrapping from Configuration back to Overview: reset view state *)
+                  {
+                    s with
+                    active_tab = next;
+                    selected_cycle = None;
+                    blueprint = None;
+                    overview_preview = false;
+                    delegator_cursor = 0;
+                    history_cursor = 0;
+                  }
+                else {s with active_tab = next})
+              ps
+        | Some (Keys.Char "1") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.Overview})
+              ps
+        | Some (Keys.Char "2") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.Delegators})
+              ps
+        | Some (Keys.Char "3") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.History})
+              ps
+        | Some (Keys.Char "4") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.Configuration})
+              ps
+        | Some (Keys.Char "b") ->
+            (* Cycle baker selection, reset blueprint and config *)
+            let n = List.length s.baker_instances in
+            if n > 1 then
+              Navigation.update
+                (fun s ->
+                  {
+                    s with
+                    selected_baker = (s.selected_baker + 1) mod n;
+                    blueprint = None;
+                    overview_preview = false;
+                    config = None;
+                    config_dirty = false;
+                    selected_cycle = None;
+                    delegator_cursor = 0;
+                  })
+                ps
+            else ps
+        | Some (Keys.Char "p") when s.active_tab = Rewards_state.Overview -> (
+            (* Trigger payout confirmation *)
+            let s = ps.Navigation.s in
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, pkh) -> (
+                let cycle_opt =
+                  match s.selected_cycle with
+                  | Some c -> Some c
+                  | None -> (
+                      match Rewards_scheduler.get_recent_cycles ~baker:pkh with
+                      | cr :: _ -> Some cr.Rewards.cycle
+                      | [] -> None)
+                in
+                match cycle_opt with
+                | None ->
+                    Context.toast_warn "No cycle data available" ;
+                    ps
+                | Some cycle ->
+                    if Payout_blueprint.is_already_paid ~instance ~cycle then begin
+                      Context.toast_warn
+                        (Printf.sprintf "Cycle %d already paid" cycle) ;
+                      ps
+                    end
+                    else
+                      let network =
+                        match Service_registry.find ~instance with
+                        | Ok (Some svc) -> svc.Service.network
+                        | _ -> "unknown"
+                      in
+                      Modal_helpers.open_choice_modal
+                        ~title:
+                          (Printf.sprintf
+                             "Pay Cycle %d — %s (%s)"
+                             cycle
+                             instance
+                             network)
+                        ~items:["Execute payout"; "Dry-run only"; "Cancel"]
+                        ~to_string:Fun.id
+                        ~on_select:(fun choice ->
+                          let dry_run = String.equal choice "Dry-run only" in
+                          if
+                            String.equal choice "Execute payout"
+                            || String.equal choice "Dry-run only"
+                          then
+                            run_payout_in_background
+                              ~instance
+                              ~pkh
+                              ~network
+                              ~cycle
+                              ~dry_run)
+                        () ;
+                      ps))
+        | Some (Keys.Char "d") when s.active_tab = Rewards_state.Overview -> (
+            (* Direct dry-run without modal *)
+            let s = ps.Navigation.s in
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, pkh) -> (
+                let cycle_opt =
+                  match s.selected_cycle with
+                  | Some c -> Some c
+                  | None -> (
+                      match Rewards_scheduler.get_recent_cycles ~baker:pkh with
+                      | cr :: _ -> Some cr.Rewards.cycle
+                      | [] -> None)
+                in
+                match cycle_opt with
+                | None ->
+                    Context.toast_warn "No cycle data available" ;
+                    ps
+                | Some cycle ->
+                    let network =
+                      match Service_registry.find ~instance with
+                      | Ok (Some svc) -> svc.Service.network
+                      | _ -> "unknown"
+                    in
+                    run_payout_in_background
+                      ~instance
+                      ~pkh
+                      ~network
+                      ~cycle
+                      ~dry_run:true ;
+                    ps))
+        | Some (Keys.Char "t") when s.active_tab = Rewards_state.Overview -> (
+            (* Toggle continual mode *)
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, pkh) ->
+                let currently_active = Payout_continual.is_active ~instance in
+                if currently_active then (
+                  Payout_continual.disable ~instance ;
+                  let config =
+                    match Payout_config.load ~instance with
+                    | Ok c -> c
+                    | Error _ -> Payout_config.default ~baker_pkh:pkh
+                  in
+                  let config =
+                    {config with Payout_config.continual_enabled = false}
+                  in
+                  ignore (Payout_config.save ~instance config) ;
+                  Context.toast_info
+                    (Printf.sprintf "Continual mode disabled for %s" instance) ;
+                  ps)
+                else (
+                  Payout_continual.enable ~instance ;
+                  let config =
+                    match Payout_config.load ~instance with
+                    | Ok c -> c
+                    | Error _ -> Payout_config.default ~baker_pkh:pkh
+                  in
+                  let config =
+                    {config with Payout_config.continual_enabled = true}
+                  in
+                  ignore (Payout_config.save ~instance config) ;
+                  Rewards_scheduler.sync_continual_from_config ~instance ;
+                  Context.toast_info
+                    (Printf.sprintf "Continual mode enabled for %s" instance) ;
+                  ps))
+        | Some (Keys.Char "g") when s.active_tab = Rewards_state.Overview -> (
+            (* Generate payout preview on Overview tab *)
+            let s = ps.Navigation.s in
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, _) -> (
+                (* Check double-payment prevention *)
+                let cycle_opt =
+                  match s.selected_cycle with
+                  | Some c -> Some c
+                  | None -> s.current_cycle
+                in
+                match cycle_opt with
+                | None ->
+                    Context.toast_warn "No cycle data available" ;
+                    ps
+                | Some cycle ->
+                    if Payout_blueprint.is_already_paid ~instance ~cycle then begin
+                      Context.toast_warn
+                        (Printf.sprintf "Cycle %d already paid" cycle) ;
+                      ps
+                    end
+                    else
+                      Navigation.update
+                        (fun s ->
+                          {s with overview_preview = true; blueprint = None})
+                        ps))
+        | Some (Keys.Char "r") when s.active_tab <> Rewards_state.Configuration
+          ->
+            refresh ps
+        | _ when s.active_tab = Rewards_state.Delegators ->
+            handle_delegator_key ps key
+        | _ when s.active_tab = Rewards_state.Configuration ->
+            handle_config_key ps key
+        | _ when s.active_tab = Rewards_state.History ->
+            handle_history_key ps key
+        | _ -> ps)
 
-let keymap _ps =
+let keymap ps =
+  let s = ps.Navigation.s in
   let noop ps = ps in
   let kb key help =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  [
-    kb "1-4" "Switch tab";
-    kb "b" "Baker";
-    kb "r" "Refresh";
-    kb "j/k" "Navigate";
-    kb "/" "Search";
-    kb "s" "Sort";
-    kb "f" "Filter";
-    kb "c" "Cycle";
-    kb "Esc" "Back";
-  ]
+  let common = [kb "Tab" "Next tab"; kb "Esc" "Back"] in
+  let tab_keys =
+    match s.active_tab with
+    | Rewards_state.Overview ->
+        [
+          kb "g" "Generate";
+          kb "p" "Pay";
+          kb "d" "Dry-run";
+          kb "t" "Continual";
+          kb "b" "Baker";
+          kb "r" "Refresh";
+        ]
+    | Rewards_state.Delegators ->
+        [
+          kb "j/k" "Navigate";
+          kb "/" "Search";
+          kb "s" "Sort";
+          kb "f" "Filter";
+          kb "c" "Cycle";
+        ]
+    | Rewards_state.History -> [kb "j/k" "Navigate"; kb "Enter" "View"]
+    | Rewards_state.Configuration ->
+        [
+          kb "j/k" "Navigate";
+          kb "Enter" "Edit";
+          kb "?" "Hint";
+          kb "s" "Save";
+          kb "r" "Reset";
+          kb "i" "Import";
+          kb "n" "Notify";
+        ]
+  in
+  tab_keys @ common
 
 let handled_keys () =
   Keys.
@@ -777,6 +951,7 @@ let handled_keys () =
       Escape;
       Enter;
       Backspace;
+      Tab;
       Up;
       Down;
       Char "1";
@@ -793,6 +968,12 @@ let handled_keys () =
       Char "s";
       Char "f";
       Char "c";
+      Char "g";
+      Char "p";
+      Char "d";
+      Char "t";
+      Char "i";
+      Char "n";
     ]
 
 let has_modal _ = false
@@ -840,19 +1021,42 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps =
-    Miaou.Core.Tui_page.
-      [
-        {key = "1-4"; help = "Tab"};
-        {key = "b"; help = "Baker"};
-        {key = "r"; help = "Refresh"};
-        {key = "j/k"; help = "Navigate"};
-        {key = "/"; help = "Search"};
-        {key = "s"; help = "Sort"};
-        {key = "f"; help = "Filter"};
-        {key = "c"; help = "Cycle"};
-        {key = "Esc"; help = "Back"};
-      ]
+  let key_hints ps =
+    let s = ps.Navigation.s in
+    let kh key help = Miaou.Core.Tui_page.{key; help} in
+    let common = [kh "Tab" "Next tab"; kh "Esc" "Back"] in
+    let tab_keys =
+      match s.active_tab with
+      | Rewards_state.Overview ->
+          [
+            kh "g" "Generate";
+            kh "p" "Pay";
+            kh "d" "Dry-run";
+            kh "t" "Continual";
+            kh "b" "Baker";
+            kh "r" "Refresh";
+          ]
+      | Rewards_state.Delegators ->
+          [
+            kh "j/k" "Navigate";
+            kh "/" "Search";
+            kh "s" "Sort";
+            kh "f" "Filter";
+            kh "c" "Cycle";
+          ]
+      | Rewards_state.History -> [kh "j/k" "Navigate"; kh "Enter" "View"]
+      | Rewards_state.Configuration ->
+          [
+            kh "j/k" "Navigate";
+            kh "Enter" "Edit";
+            kh "?" "Hint";
+            kh "s" "Save";
+            kh "r" "Reset";
+            kh "i" "Import";
+            kh "n" "Notify";
+          ]
+    in
+    tab_keys @ common
 
   let has_modal = has_modal
 end
