@@ -28,6 +28,9 @@ type model = {
   rpc_addr : string;
   max_delegates : string;
   snapshot : string;
+  num_nodes : string;
+  num_bakers : string;
+  accuser : bool;
 }
 
 let default_rpc_addr () =
@@ -47,6 +50,9 @@ let make_initial_model () =
     rpc_addr = default_rpc_addr ();
     max_delegates = "20";
     snapshot = "";
+    num_nodes = "1";
+    num_bakers = "1";
+    accuser = false;
   }
 
 (* ─── Fields ─────────────────────────────────────────────────────────────── *)
@@ -194,6 +200,41 @@ let rolling_entries_for_network slug =
       in
       Some rolling
 
+let num_nodes_field =
+  Form_builder.(
+    validated_text
+      ~label:"Num Nodes"
+      ~get:(fun m -> m.num_nodes)
+      ~set:(fun num_nodes m -> {m with num_nodes})
+      ~validate:(fun m ->
+        match int_of_string_opt (String.trim m.num_nodes) with
+        | Some n when n >= 1 -> Ok ()
+        | _ -> Error "Must be an integer ≥ 1")
+    |> with_hint
+         "Number of nodes to create. Nodes 2+ will peer to node 1. Default: 1.")
+
+let num_bakers_field =
+  Form_builder.(
+    validated_text
+      ~label:"Num Bakers"
+      ~get:(fun m -> m.num_bakers)
+      ~set:(fun num_bakers m -> {m with num_bakers})
+      ~validate:(fun m ->
+        match int_of_string_opt (String.trim m.num_bakers) with
+        | Some n when n >= 1 -> Ok ()
+        | _ -> Error "Must be an integer ≥ 1")
+    |> with_hint
+         "Number of bakers to create. Delegates are split evenly. Default: 1.")
+
+let accuser_field =
+  Form_builder.(
+    toggle
+      ~label:"Install Accuser"
+      ~get:(fun m -> m.accuser)
+      ~set:(fun accuser m -> {m with accuser})
+    |> with_hint
+         "Install an octez-accuser service connected to node 1. Default: off.")
+
 let snapshot_field =
   let open Form_builder in
   custom
@@ -268,6 +309,9 @@ let spec =
           service_user_field;
           rpc_addr_field;
           max_delegates_field;
+          num_nodes_field;
+          num_bakers_field;
+          accuser_field;
           snapshot_field;
         ]);
     on_init = None;
@@ -285,6 +329,16 @@ let spec =
           match int_of_string_opt (String.trim model.max_delegates) with
           | Some n when n > 0 -> n
           | _ -> 20
+        in
+        let num_nodes =
+          match int_of_string_opt (String.trim model.num_nodes) with
+          | Some n when n >= 1 -> n
+          | _ -> 1
+        in
+        let num_bakers =
+          match int_of_string_opt (String.trim model.num_bakers) with
+          | Some n when n >= 1 -> n
+          | _ -> 1
         in
         let rpc_addr =
           let s = String.trim model.rpc_addr in
@@ -315,6 +369,9 @@ let spec =
               ?rpc_addr
               ?snapshot
               ~max_delegates
+              ~num_nodes
+              ~num_bakers
+              ~accuser:model.accuser
               ~bin_source
               ~service_user:model.service_user
               ~app_bin_dir:model.app_bin_dir

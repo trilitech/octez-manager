@@ -66,39 +66,64 @@ let wait_for_rpc ~endpoint ~timeout_seconds =
   loop timeout_seconds
 
 let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
-    ?(max_delegates = 20) ~bin_source ~service_user ~app_bin_dir () =
+    ?(max_delegates = 20) ?(num_nodes = 1) ?(num_bakers = 1) ?(accuser = false)
+    ~bin_source ~service_user ~app_bin_dir () =
+  let num_nodes = max 1 num_nodes in
+  let num_bakers = max 1 num_bakers in
   let sandbox_name =
     match name with
     | Some n -> n
     | None -> unique_name ~base:(Printf.sprintf "sandbox-%s" network)
   in
-  let node_instance = Printf.sprintf "%s-node" sandbox_name in
-  let baker_instance = Printf.sprintf "%s-baker" sandbox_name in
+  (* Instance naming: use indexed names when there are multiple of a kind *)
+  let node_instance_name k =
+    if num_nodes = 1 then Printf.sprintf "%s-node" sandbox_name
+    else Printf.sprintf "%s-node-%d" sandbox_name k
+  in
+  let baker_instance_name k =
+    if num_bakers = 1 then Printf.sprintf "%s-baker" sandbox_name
+    else Printf.sprintf "%s-baker-%d" sandbox_name k
+  in
+  let accuser_instance = Printf.sprintf "%s-accuser" sandbox_name in
   let wallet = wallet_dir ~sandbox_name in
 
-  (* Determine RPC and P2P addresses, avoiding all ports already in use *)
+  (* Total step count for progress messages *)
+  let total_steps = 3 + num_nodes + num_bakers + if accuser then 1 else 0 in
+  let step = ref 0 in
+  let log_step label =
+    incr step ;
+    on_log (Printf.sprintf "[%d/%d] %s" !step total_steps label)
+  in
+
+  (* Determine RPC and P2P addresses for node 1 *)
   let avoid_rpc, avoid_p2p = Port_validation.ports_from_services () in
-  let avoid_rpc_ports = List.map fst avoid_rpc in
-  let avoid_p2p_ports = List.map fst avoid_p2p in
+  let avoid_rpc_ports = ref (List.map fst avoid_rpc) in
+  let avoid_p2p_ports = ref (List.map fst avoid_p2p) in
+  let alloc_rpc_port () =
+    let port =
+      Port_validation.next_free_port ~start:18732 ~avoid:!avoid_rpc_ports
+    in
+    avoid_rpc_ports := port :: !avoid_rpc_ports ;
+    port
+  in
+  let alloc_p2p_port () =
+    let port =
+      Port_validation.next_free_port ~start:19732 ~avoid:!avoid_p2p_ports
+    in
+    avoid_p2p_ports := port :: !avoid_p2p_ports ;
+    port
+  in
   let rpc_addr_str =
     match rpc_addr with
     | Some addr -> addr
-    | None ->
-        let port =
-          Port_validation.next_free_port ~start:18732 ~avoid:avoid_rpc_ports
-        in
-        Printf.sprintf "127.0.0.1:%d" port
+    | None -> Printf.sprintf "127.0.0.1:%d" (alloc_rpc_port ())
   in
-  let p2p_addr_str =
-    let port =
-      Port_validation.next_free_port ~start:19732 ~avoid:avoid_p2p_ports
-    in
-    Printf.sprintf "0.0.0.0:%d" port
-  in
+  let p2p_addr_str = Printf.sprintf "0.0.0.0:%d" (alloc_p2p_port ()) in
   let endpoint = Config.endpoint_of_rpc rpc_addr_str in
+  let node1_instance = node_instance_name 1 in
 
   (* Step 1: Create group *)
-  on_log "[1/5] Creating group..." ;
+  log_step "Creating group..." ;
   let group =
     Group.make
       ~name:sandbox_name
@@ -131,16 +156,24 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
     ignore (Group_registry.remove ~name:sandbox_name)
   in
 
-  (* Step 2: Install node *)
-  on_log "[2/5] Installing node..." ;
+  let set_group ~instance =
+    match Service_registry.find ~instance with
+    | Ok (Some svc) ->
+        Service_registry.write {svc with group = Some sandbox_name}
+    | Ok None | Error _ -> Ok ()
+  in
+
   let bootstrap =
     match snapshot with
     | Some uri -> Snapshot {src = Some uri}
     | None -> Snapshot {src = None}
   in
-  let node_request : node_request =
+
+  (* Step 2: Install node 1 *)
+  log_step "Installing primary node..." ;
+  let node1_request : node_request =
     {
-      instance = node_instance;
+      instance = node1_instance;
       network;
       history_mode = History_mode.Rolling;
       data_dir = None;
@@ -166,25 +199,62 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       keep_snapshot = false;
     }
   in
-  let set_group ~instance =
-    match Service_registry.find ~instance with
-    | Ok (Some svc) ->
-        Service_registry.write {svc with group = Some sandbox_name}
-    | Ok None | Error _ -> Ok ()
-  in
   let result =
-    let* _node_svc = Node.install_node ~on_log node_request in
-    let* () = set_group ~instance:node_instance in
+    let* _node1_svc = Node.install_node ~on_log node1_request in
+    let* () = set_group ~instance:node1_instance in
 
-    (* Step 3: Wait for RPC *)
-    on_log "[3/5] Starting node, waiting for RPC..." ;
+    (* Step 3: Wait for RPC on node 1 *)
+    log_step "Starting primary node, waiting for RPC..." ;
     let* () = wait_for_rpc ~endpoint ~timeout_seconds:300 in
 
-    (* Step 4: Generate yes-wallet *)
-    on_log
-      (Printf.sprintf
-         "[4/5] Generating yes-wallet (%d delegates)..."
-         max_delegates) ;
+    (* Steps 4..(3+num_nodes-1): Install additional nodes 2..N *)
+    let* () =
+      List.fold_left
+        (fun acc k ->
+          let* () = acc in
+          log_step (Printf.sprintf "Installing node %d (peered to node 1)..." k) ;
+          let node_k_rpc = Printf.sprintf "127.0.0.1:%d" (alloc_rpc_port ()) in
+          let node_k_p2p = Printf.sprintf "0.0.0.0:%d" (alloc_p2p_port ()) in
+          let node_k_instance = node_instance_name k in
+          let node_k_request : node_request =
+            {
+              instance = node_k_instance;
+              network;
+              history_mode = History_mode.Rolling;
+              data_dir = None;
+              rpc_addr = Rpc_addr.of_string node_k_rpc;
+              net_addr = node_k_p2p;
+              service_user;
+              app_bin_dir;
+              bin_source = Some bin_source;
+              logging_mode = Logging_mode.Journald;
+              extra_args =
+                [
+                  "--no-bootstrap-peers";
+                  "--bootstrap-threshold";
+                  "0";
+                  "--allow-yes-crypto";
+                  "--peer";
+                  p2p_addr_str;
+                ];
+              extra_env = yes_crypto_env;
+              auto_enable = true;
+              bootstrap;
+              preserve_data = false;
+              snapshot_no_check = true;
+              tmp_dir = None;
+              keep_snapshot = false;
+            }
+          in
+          let* _svc = Node.install_node ~on_log node_k_request in
+          set_group ~instance:node_k_instance)
+        (Ok ())
+        (List.init (num_nodes - 1) (fun i -> i + 2))
+    in
+
+    (* Step (3+num_nodes): Generate yes-wallet *)
+    log_step
+      (Printf.sprintf "Generating yes-wallet (%d delegates)..." max_delegates) ;
     let* baker_delegates, all_wallet_entries =
       Yes_wallet_io.fetch_delegates ~endpoint ~max_delegates
     in
@@ -192,34 +262,85 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       Yes_wallet_io.write_wallet ~wallet_dir:wallet all_wallet_entries
     in
 
-    (* Step 5: Install baker *)
-    on_log "[5/5] Installing and starting baker..." ;
-    let delegate_aliases =
+    (* Split delegates evenly across bakers *)
+    let all_aliases =
       List.map (fun (d : Yes_wallet.delegate) -> d.alias) baker_delegates
     in
-    let baker_request : baker_request =
-      {
-        instance = baker_instance;
-        node_mode = Local_instance node_instance;
-        base_dir = Some wallet;
-        delegates = delegate_aliases;
-        dal_config = Dal_disabled;
-        dal_node = None;
-        liquidity_baking_vote = Some "pass";
-        signer_mode = Signer_types.Local_keys;
-        extra_args = ["--force-apply-from-round"; "0"];
-        extra_env = yes_crypto_env;
-        service_user;
-        app_bin_dir;
-        bin_source = Some bin_source;
-        logging_mode = Logging_mode.Journald;
-        auto_enable = true;
-        preserve_data = false;
-      }
+    let total_delegates = List.length all_aliases in
+    let chunk_size =
+      (total_delegates + num_bakers - 1) / num_bakers
+      (* ceiling division *)
     in
-    let* _baker_svc = Baker.install_baker baker_request in
-    let* () = set_group ~instance:baker_instance in
-    Ok (List.length baker_delegates)
+    let delegate_chunks =
+      List.init num_bakers (fun k ->
+          let start = k * chunk_size in
+          let len = min chunk_size (total_delegates - start) in
+          if len <= 0 then []
+          else
+            List.filteri (fun i _ -> i >= start && i < start + len) all_aliases)
+    in
+
+    (* Steps (3+num_nodes+1)..(3+num_nodes+num_bakers): Install bakers *)
+    let* () =
+      List.fold_left
+        (fun acc (k, delegates) ->
+          let* () = acc in
+          let baker_instance = baker_instance_name k in
+          (* Baker K uses node K if available, else node 1 *)
+          let node_for_baker =
+            if k <= num_nodes then node_instance_name k else node1_instance
+          in
+          log_step (Printf.sprintf "Installing baker %d..." k) ;
+          let baker_request : baker_request =
+            {
+              instance = baker_instance;
+              node_mode = Local_instance node_for_baker;
+              base_dir = Some wallet;
+              delegates;
+              dal_config = Dal_disabled;
+              dal_node = None;
+              liquidity_baking_vote = Some "pass";
+              signer_mode = Signer_types.Local_keys;
+              extra_args = ["--force-apply-from-round"; "0"];
+              extra_env = yes_crypto_env;
+              service_user;
+              app_bin_dir;
+              bin_source = Some bin_source;
+              logging_mode = Logging_mode.Journald;
+              auto_enable = true;
+              preserve_data = false;
+            }
+          in
+          let* _baker_svc = Baker.install_baker baker_request in
+          set_group ~instance:baker_instance)
+        (Ok ())
+        (List.mapi (fun i delegates -> (i + 1, delegates)) delegate_chunks)
+    in
+
+    (* Optional: Install accuser *)
+    let* () =
+      if not accuser then Ok ()
+      else begin
+        log_step "Installing accuser..." ;
+        let accuser_request : accuser_request =
+          {
+            instance = accuser_instance;
+            node_mode = Local_instance node1_instance;
+            base_dir = None;
+            extra_args = [];
+            service_user;
+            app_bin_dir;
+            bin_source = Some bin_source;
+            logging_mode = Logging_mode.Journald;
+            auto_enable = true;
+            preserve_data = false;
+          }
+        in
+        let* _acc_svc = Accuser.install_accuser accuser_request in
+        set_group ~instance:accuser_instance
+      end
+    in
+    Ok total_delegates
   in
   match result with
   | Error _ as err ->
@@ -230,10 +351,11 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
         (Printf.sprintf
            "Sandbox '%s' is ready.\n\
            \  Node RPC: %s\n\
-           \  Baker delegates: %d\n\
+           \  Bakers: %d (total delegates: %d)\n\
            \  Network: %s"
            sandbox_name
            endpoint
+           num_bakers
            delegate_count
            network) ;
       Ok group
