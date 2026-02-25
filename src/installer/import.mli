@@ -74,7 +74,8 @@ type import_result = {
 
     @param external_svc External service to validate
     @return Ok () if importable, Error with reason otherwise *)
-val validate_importable : External_service.t -> (unit, Rresult.R.msg) result
+val validate_importable :
+  ?network_override:string -> External_service.t -> (unit, Rresult.R.msg) result
 
 (** Get list of required fields that are missing or unknown.
 

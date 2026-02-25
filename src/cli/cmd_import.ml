@@ -59,7 +59,9 @@ let import_cmd =
                    external_name)
           | Some external_svc -> (
               (* 2. Validate importability *)
-              match Import.validate_importable external_svc with
+              match
+                Import.validate_importable ?network_override external_svc
+              with
               | Error (`Msg msg) ->
                   Cli_helpers.cmdliner_error
                     (Printf.sprintf "Cannot import service: %s" msg)
