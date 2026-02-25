@@ -596,7 +596,18 @@ let handle_key ps key ~size:_ =
   if s.search_active then handle_search_key ps key
   else
     match Keys.of_string key with
-    | Some Keys.Escape -> back ps
+    | Some Keys.Escape ->
+        if Option.is_some s.selected_cycle then
+          Navigation.update
+            (fun s ->
+              {
+                s with
+                selected_cycle = None;
+                blueprint = None;
+                overview_preview = false;
+              })
+            ps
+        else back ps
     | Some Keys.Tab ->
         Navigation.update
           (fun s ->
