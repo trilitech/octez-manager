@@ -21,6 +21,8 @@ type instance_action =
   | Logs
   | Edit
   | Export_logs
+  | Set_env
+  | Get_env
 
 (** Look up a service by instance name, or return a cmdliner error. *)
 let with_service ~instance f =
@@ -172,6 +174,8 @@ let instance_term =
         ("logs", Logs);
         ("edit", Edit);
         ("export-logs", Export_logs);
+        ("set-env", Set_env);
+        ("get-env", Get_env);
       ]
     in
     Arg.(value & pos 1 (some (enum actions)) None & info [] ~docv:"ACTION")
@@ -183,13 +187,17 @@ let instance_term =
           ["delete-data-dir"]
           ~doc:"Also delete the recorded data directory when removing.")
   in
-  let run instance action delete_data_dir =
+  let extra_args =
+    (* Additional positional args after ACTION (used by set-env) *)
+    Arg.(value & pos_right 1 string [] & info [] ~docv:"ARGS")
+  in
+  let run instance action delete_data_dir extra_args =
     match (instance, action) with
     | None, _ -> `Help (`Pager, None)
     | Some _, None ->
         Cli_helpers.cmdliner_error
           "ACTION required \
-           (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit)"
+           (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit|set-env|get-env)"
     | Some inst, Some action -> (
         match action with
         | Start ->
@@ -482,6 +490,7 @@ let instance_term =
                             app_bin_dir = svc.app_bin_dir;
                             bin_source = svc.bin_source;
                             extra_args = new_extra_args;
+                            extra_env = [];
                             auto_enable = true;
                             logging_mode = svc.logging_mode;
                             bootstrap = Installer_types.Genesis;
@@ -651,6 +660,7 @@ let instance_term =
                               (if new_lb_vote = "" then None
                                else Some new_lb_vote);
                             signer_mode = Signer_types.Local_keys;
+                            extra_env = [];
                             service_user = svc.service_user;
                             app_bin_dir = svc.app_bin_dir;
                             bin_source = svc.bin_source;
@@ -827,9 +837,71 @@ let instance_term =
                     `Ok ()
                 | Error (`Msg msg) ->
                     Cli_helpers.cmdliner_error
-                      (Printf.sprintf "Export failed: %s" msg)))
+                      (Printf.sprintf "Export failed: %s" msg))
+        | Get_env -> (
+            match Node_env.read ~inst with
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+            | Ok [] ->
+                Format.printf "No environment variables set for '%s'.@." inst ;
+                `Ok ()
+            | Ok pairs ->
+                List.iter (fun (k, v) -> Format.printf "%s=%s@." k v) pairs ;
+                `Ok ())
+        | Set_env -> (
+            if extra_args = [] then
+              Cli_helpers.cmdliner_error
+                "set-env requires at least one KEY=VALUE argument"
+            else
+              let parse_kv s =
+                match String.index_opt s '=' with
+                | None ->
+                    Error
+                      (Printf.sprintf
+                         "Invalid format '%s': expected KEY=VALUE"
+                         s)
+                | Some i ->
+                    let key = String.sub s 0 i in
+                    let value =
+                      String.sub s (i + 1) (String.length s - i - 1)
+                    in
+                    Ok (key, value)
+              in
+              let result =
+                let ( let* ) = Result.bind in
+                let* pairs =
+                  List.fold_left
+                    (fun acc s ->
+                      let* acc = acc in
+                      let* kv = parse_kv s in
+                      Ok (acc @ [kv]))
+                    (Ok [])
+                    extra_args
+                in
+                let* existing =
+                  Result.map_error msg_to_string (Node_env.read ~inst)
+                in
+                (* Merge: update existing keys, add new ones, remove those
+                   with empty value *)
+                let merged =
+                  List.fold_left
+                    (fun env (key, value) ->
+                      let env = List.remove_assoc key env in
+                      if String.equal value "" then env
+                      else env @ [(key, value)])
+                    existing
+                    pairs
+                in
+                Result.map_error
+                  msg_to_string
+                  (Node_env.write_pairs ~inst merged)
+              in
+              match result with
+              | Ok () ->
+                  Format.printf "Environment updated for '%s'.@." inst ;
+                  `Ok ()
+              | Error msg -> Cli_helpers.cmdliner_error msg))
   in
-  Term.(ret (const run $ instance $ action $ delete_data_dir))
+  Term.(ret (const run $ instance $ action $ delete_data_dir $ extra_args))
 
 let instance_cmd =
   let info = Cmd.info "instance" ~doc:"Manage existing Octez services." in

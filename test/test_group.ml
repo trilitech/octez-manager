@@ -58,6 +58,7 @@ let sample_group ?(name = "mainnet-prod") ?(network = "mainnet")
     service_user;
     app_bin_dir;
     created_at = "2026-01-01 00:00:00";
+    sandbox = false;
   }
 
 let group_equal (a : Group.t) (b : Group.t) =
@@ -67,6 +68,7 @@ let group_equal (a : Group.t) (b : Group.t) =
   && String.equal a.service_user b.service_user
   && String.equal a.app_bin_dir b.app_bin_dir
   && String.equal a.created_at b.created_at
+  && Bool.equal a.sandbox b.sandbox
 
 let check_group expected actual =
   Alcotest.(check bool) "group equality" true (group_equal expected actual)

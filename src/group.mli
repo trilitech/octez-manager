@@ -14,6 +14,7 @@ type t = {
   service_user : string;  (** Shared service user (e.g. "tezos") *)
   app_bin_dir : string;  (** Resolved binary directory *)
   created_at : string;
+  sandbox : bool;  (** Whether this group is a sandbox *)
 }
 
 (** Create a group configuration record. *)
@@ -23,6 +24,7 @@ val make :
   bin_source:Binary_registry.bin_source ->
   service_user:string ->
   app_bin_dir:string ->
+  ?sandbox:bool ->
   unit ->
   t
 

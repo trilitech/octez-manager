@@ -183,7 +183,8 @@ let install_baker ?(quiet = false) (request : baker_request) =
             ("OCTEZ_REMOTE_SIGNER_URI", Option.value ~default:"" signer_uri_opt);
             ( "OCTEZ_SIGNATORY_INSTANCE",
               Option.value ~default:"" signatory_instance );
-          ];
+          ]
+          @ request.extra_env;
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;
         depends_on;

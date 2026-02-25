@@ -244,6 +244,7 @@ let install_node_cmd =
               app_bin_dir;
               bin_source = Some bin_source;
               extra_args;
+              extra_env = [];
               auto_enable = not no_enable;
               logging_mode;
               bootstrap = Genesis;
@@ -374,6 +375,7 @@ let install_node_cmd =
               app_bin_dir;
               bin_source = Some bin_source;
               extra_args;
+              extra_env = [];
               auto_enable = not no_enable;
               logging_mode;
               bootstrap;
