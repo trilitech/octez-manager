@@ -994,3 +994,10 @@
  (modules test_reward_calculator)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_hjson_parser)
+ (libraries alcotest octez_manager_rewards)
+ (modules test_hjson_parser)
+ (instrumentation
+  (backend bisect_ppx)))
