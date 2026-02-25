@@ -924,6 +924,7 @@ let spec =
                else Some (String.trim model.liquidity_baking_vote));
             signer_mode;
             extra_args;
+            extra_env = [];
             service_user = model.core.service_user;
             app_bin_dir = model.core.app_bin_dir;
             bin_source = model.core.bin_source;

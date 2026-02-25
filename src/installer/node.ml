@@ -198,6 +198,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ("OCTEZ_SNAPSHOT_KIND", Option.value ~default:"" snapshot_meta.kind_slug);
       ("OCTEZ_SNAPSHOT_NO_CHECK", if snapshot_meta.no_check then "1" else "0");
     ]
+    @ request.extra_env
   in
   log "Writing node env...\n" ;
   let* () =

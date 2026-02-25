@@ -23,6 +23,7 @@ _octez-manager() {
     'purge-all:Purge all registered instances. This removes each service, deletes data directories, log files, and (when run as root) drops service users that are no longer referenced by other services.'
     'rewards:Manage baker rewards and payouts.'
     'rpc:Query RPC endpoints on node instances'
+    'sandbox:Manage sandbox environments.'
     'self-update:Check for and install octez-manager updates'
     'ui:Launch the interactive terminal UI (same as running without arguments)'
     'version:Show version information and check for updates'
@@ -41,6 +42,8 @@ _octez-manager() {
     'logs'
     'edit'
     'export-logs'
+    'set-env'
+    'get-env'
   )
 
   local -a history_modes
@@ -264,6 +267,12 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
+  local -a opts_sandbox
+  opts_sandbox=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
   local -a opts_self_update
   opts_self_update=(
     '-c[Only check for updates, don'\''t install]'
@@ -418,6 +427,10 @@ _octez-manager() {
         rpc)
           _arguments \
             $opts_rpc
+          ;;
+        sandbox)
+          _arguments \
+            $opts_sandbox
           ;;
         self-update)
           _arguments \

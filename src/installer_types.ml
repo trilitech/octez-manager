@@ -36,6 +36,7 @@ type node_request = {
   bin_source : Binary_registry.bin_source option;
   logging_mode : Logging_mode.t;
   extra_args : string list;
+  extra_env : (string * string) list;
   auto_enable : bool;
   bootstrap : bootstrap;
   preserve_data : bool;
@@ -90,6 +91,7 @@ type baker_request = {
   liquidity_baking_vote : string option;
   signer_mode : signer_mode;  (** Remote signer configuration *)
   extra_args : string list;
+  extra_env : (string * string) list;
   service_user : string;
   app_bin_dir : string;
   bin_source : Binary_registry.bin_source option;

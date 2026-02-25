@@ -24,6 +24,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_yes_wallet)
+ (libraries alcotest octez_manager_lib)
+ (modules test_yes_wallet)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_cli_progress)
  (libraries alcotest octez_manager_cli test_string_helpers_lib)
  (modules test_cli_progress)

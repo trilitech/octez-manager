@@ -21,3 +21,6 @@ val find : name:string -> (Group.t option, Rresult.R.msg) result
 
 (** Remove the registry entry for [name]. *)
 val remove : name:string -> (unit, Rresult.R.msg) result
+
+(** List only groups where [sandbox = true]. *)
+val list_sandboxes : unit -> (Group.t list, Rresult.R.msg) result
