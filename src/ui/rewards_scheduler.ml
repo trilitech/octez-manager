@@ -43,6 +43,109 @@ let get_payout_status ~instance ~cycle =
   if Payout_report.cycle_is_paid ~instance ~cycle then Rewards.Paid
   else Rewards.Unpaid
 
+(* ── Continual mode state ────────────────────────────── *)
+
+(* Track the last cycle we saw per instance (for cycle transition detection) *)
+let continual_last_cycle : (string, int) Hashtbl.t = Hashtbl.create 4
+
+(* The time at which we should trigger payouts (random delay) *)
+let continual_delay_until : (string, float) Hashtbl.t = Hashtbl.create 4
+
+let continual_lock = Mutex.create ()
+
+(** Sync continual mode from config (enable if config says so). *)
+let sync_continual_from_config ~instance =
+  match Payout_config.load ~instance with
+  | Ok c when c.continual_enabled -> Payout_continual.enable ~instance
+  | Ok _ -> ()
+  | Error _ -> ()
+
+(** Check for cycle transition and trigger continual payouts when due. *)
+let check_continual ~instance ~(svc : Data.Service_state.t) =
+  sync_continual_from_config ~instance ;
+  if not (Payout_continual.is_active ~instance) then ()
+  else
+    match (Atomic.get current_cycle_ref, Payout_config.load ~instance) with
+    | Some current_cycle, Ok config ->
+        let prev =
+          Mutex.protect continual_lock (fun () ->
+              Hashtbl.find_opt continual_last_cycle instance)
+        in
+        (* Detect cycle transition: new cycle appeared *)
+        (match prev with
+        | Some p when p >= current_cycle -> ()
+        | _ ->
+            Mutex.protect continual_lock (fun () ->
+                Hashtbl.replace continual_last_cycle instance current_cycle) ;
+            (* Schedule payout with random delay *)
+            let range = config.max_delay_blocks - config.min_delay_blocks in
+            let delay_blocks =
+              config.min_delay_blocks
+              + if range > 0 then Random.int (range + 1) else 0
+            in
+            (* ~15 seconds per block on Tezos *)
+            let delay_seconds = Float.of_int delay_blocks *. 15.0 in
+            let trigger_at = Unix.gettimeofday () +. delay_seconds in
+            Mutex.protect continual_lock (fun () ->
+                Hashtbl.replace continual_delay_until instance trigger_at)) ;
+        (* Check if the delay has expired *)
+        let ready =
+          Mutex.protect continual_lock (fun () ->
+              match Hashtbl.find_opt continual_delay_until instance with
+              | Some t when Unix.gettimeofday () >= t ->
+                  Hashtbl.remove continual_delay_until instance ;
+                  true
+              | _ -> false)
+        in
+        if ready then
+          let service = svc.service in
+          let octez_client_bin =
+            Filename.concat service.Service.app_bin_dir "octez-client"
+          in
+          let endpoint =
+            Delegate_scheduler.get_baker_node_endpoint ~instance
+            |> Option.value
+                 ~default:
+                   ("http://" ^ Rpc_addr.to_string service.Service.rpc_addr)
+          in
+          let ctx : Payout_executor.context =
+            {
+              octez_client_bin;
+              endpoint;
+              base_dir = None;
+              password_file = None;
+              payout_key_alias = config.payout_key_alias;
+              instance;
+            }
+          in
+          let results =
+            Payout_continual.pay_due_cycles
+              ~ctx
+              ~baker:config.baker_pkh
+              ~network:service.network
+              ~current_cycle
+              ~interval:config.continual_interval
+              ~offset:config.continual_offset
+          in
+          List.iter
+            (fun (cycle, result) ->
+              match result with
+              | Ok () ->
+                  Context.toast_info
+                    (Printf.sprintf
+                       "Continual: cycle %d paid for %s"
+                       cycle
+                       instance)
+              | Error msg ->
+                  Context.toast_warn
+                    (Printf.sprintf
+                       "Continual: cycle %d failed for %s: %s"
+                       cycle
+                       instance
+                       msg))
+            results
+    | _ -> ()
+
 (* Polling logic *)
 
 let poll_baker ~instance =
@@ -75,11 +178,13 @@ let tick () =
   let bakers =
     Data.load_service_states ()
     |> List.filter (fun (st : Data.Service_state.t) ->
-        st.service.Service.role = "baker")
+        String.equal st.service.Service.role "baker")
   in
   List.iter
     (fun (st : Data.Service_state.t) ->
-      poll_baker ~instance:st.service.Service.instance)
+      let instance = st.service.Service.instance in
+      poll_baker ~instance ;
+      check_continual ~instance ~svc:st)
     bakers
 
 let started = ref false
@@ -104,4 +209,7 @@ let shutdown () = Atomic.set shutdown_requested true
 let clear () =
   Mutex.protect cycle_lock (fun () -> Hashtbl.clear cycle_cache) ;
   Mutex.protect recent_lock (fun () -> Hashtbl.clear recent_cache) ;
-  Atomic.set current_cycle_ref None
+  Atomic.set current_cycle_ref None ;
+  Mutex.protect continual_lock (fun () ->
+      Hashtbl.clear continual_last_cycle ;
+      Hashtbl.clear continual_delay_until)
