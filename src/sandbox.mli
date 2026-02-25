@@ -14,6 +14,9 @@ val unique_name : base:string -> string
 (** Directory for sandbox wallet files. *)
 val wallet_dir : sandbox_name:string -> string
 
+(** Per-baker base directory (independent highwatermarks per baker). *)
+val baker_base_dir : sandbox_name:string -> baker_instance:string -> string
+
 (** Find the node service belonging to a sandbox group. *)
 val find_sandbox_node :
   group_name:string -> (Service.t option, Rresult.R.msg) result
