@@ -44,12 +44,25 @@ let render_network_badge network =
       (Printf.sprintf " %s " (String.uppercase_ascii network))
   else Widgets.themed_accent (Printf.sprintf " %s " network)
 
-let render_current_cycle_box ~box_width current_cycle =
-  let content =
+let render_current_cycle_box ~box_width ~instance current_cycle =
+  let cycle_line =
     match current_cycle with
     | Some _cycle -> Widgets.themed_text "Status: In progress"
     | None -> Widgets.themed_muted "Loading cycle data..."
   in
+  let continual_active = Payout_continual.is_active ~instance in
+  let continual_line =
+    if continual_active then
+      let interval_str =
+        match Payout_config.load ~instance with
+        | Ok c when c.continual_interval > 1 ->
+            Printf.sprintf " (every %d cycles)" c.continual_interval
+        | _ -> ""
+      in
+      Widgets.themed_success (Printf.sprintf "Continual: Active%s" interval_str)
+    else Widgets.themed_muted "Continual: Inactive"
+  in
+  let content = String.concat "\n" [cycle_line; continual_line] in
   let title =
     match current_cycle with
     | Some c -> Printf.sprintf "Current Cycle: %d" c
@@ -212,7 +225,9 @@ let render ~(state : Rewards_state.state) ~cols =
       (* Last completed = first recent cycle (they're sorted descending) *)
       let last_completed = List.nth_opt recent 0 in
       let network_line = render_network_badge network in
-      let current_box = render_current_cycle_box ~box_width current_cycle in
+      let current_box =
+        render_current_cycle_box ~box_width ~instance current_cycle
+      in
       let completed_box =
         render_last_completed_box ~box_width ~instance last_completed
       in
