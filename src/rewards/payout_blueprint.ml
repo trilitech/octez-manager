@@ -27,16 +27,10 @@ let generate ~instance ~baker ~network ~cycle ?(force = false) () =
     let config =
       match Payout_config.load ~instance with
       | Ok c -> c
-      | Error _ -> Payout_config.default ~network ~baker_pkh:baker ()
+      | Error _ -> Payout_config.default ~baker_pkh:baker
     in
-    match
-      Cycle_data.fetch_cycle
-        ~network
-        ~preferred_base:
-          (Some (Payout_config.effective_tzkt_url ~network config))
-        ~baker
-        ~cycle
-    with
+    let tzkt_url = config.tzkt_url in
+    match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle with
     | Error msg -> Error msg
     | Ok cycle_rewards ->
         Ok
