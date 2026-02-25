@@ -496,6 +496,7 @@ type action =
   | Add_account
   | Add_node
   | Add_baker
+  | Reallocate_stake
 
 let action_to_string = function
   | Start -> "Start"
@@ -505,6 +506,7 @@ let action_to_string = function
   | Add_account -> "Add Account"
   | Add_node -> "Add Node"
   | Add_baker -> "Add Baker"
+  | Reallocate_stake -> "Reallocate Stake"
 
 let do_start ps group_name =
   run_background (Printf.sprintf "Starting %s" group_name) (fun () ->
@@ -588,10 +590,13 @@ let do_add_baker ps group_name =
 let open_action_modal ps (sb : sandbox_info) =
   let group_name = sb.group.name in
   let has_node = not (List.is_empty sb.nodes) in
+  let has_bakers = not (List.is_empty sb.bakers) in
   let items =
     [Start; Stop]
     @ (if has_node then [Open_rpc] else [])
-    @ [Add_account; Add_node; Add_baker; Destroy]
+    @ [Add_account; Add_node; Add_baker]
+    @ (if has_bakers then [Reallocate_stake] else [])
+    @ [Destroy]
   in
   Modal_helpers.open_choice_modal
     ~title:(Printf.sprintf "Actions · %s" group_name)
@@ -605,7 +610,8 @@ let open_action_modal ps (sb : sandbox_info) =
       | Open_rpc -> ignore (do_open_rpc ps sb)
       | Add_account -> ignore (do_add_account ps group_name)
       | Add_node -> ignore (do_add_node ps group_name)
-      | Add_baker -> ignore (do_add_baker ps group_name))
+      | Add_baker -> ignore (do_add_baker ps group_name)
+      | Reallocate_stake -> ignore (do_add_baker ps group_name))
     () ;
   ps
 
