@@ -541,11 +541,11 @@ let rec pay_run baker_opt cycle_opt dry_run confirm =
                       Printf.printf "Aborted.\n" ;
                       `Ok ()
                     end
-                    else execute_pay ~ctx ~blueprint ~dry_run ~cycle
+                    else execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle
                   end
-                  else execute_pay ~ctx ~blueprint ~dry_run ~cycle)))
+                  else execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle)))
 
-and execute_pay ~ctx ~blueprint ~dry_run ~cycle =
+and execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle =
   let mode_str = if dry_run then "Dry-run" else "Broadcasting" in
   match
     Payout_executor.execute
@@ -575,6 +575,7 @@ and execute_pay ~ctx ~blueprint ~dry_run ~cycle =
             p.total
             p.delegator
             p.result.note)
+      ~batch_size:config.Payout_config.sim_batch_size
       ()
   with
   | Error msg -> Cli_helpers.cmdliner_error msg

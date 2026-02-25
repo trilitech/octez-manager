@@ -43,6 +43,11 @@ let cycles_due ~instance ~current_cycle ~interval ~offset =
 
 let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
   let instance = ctx.Payout_executor.instance in
+  let config =
+    match Payout_config.load ~instance with
+    | Ok c -> c
+    | Error _ -> Payout_config.default ~baker_pkh:baker
+  in
   let due = cycles_due ~instance ~current_cycle ~interval ~offset in
   List.map
     (fun cycle ->
@@ -58,7 +63,13 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
         with
         | Error msg -> Error msg
         | Ok blueprint -> (
-            match Payout_executor.execute ~ctx ~blueprint () with
+            match
+              Payout_executor.execute
+                ~ctx
+                ~blueprint
+                ~batch_size:config.sim_batch_size
+                ()
+            with
             | Error msg -> Error msg
             | Ok (_results, summary) ->
                 (* Send notifications *)
