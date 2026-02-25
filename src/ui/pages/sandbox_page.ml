@@ -228,6 +228,7 @@ let header = ["  Sandboxes"; ""]
 let key_hint_pairs =
   [
     ("c", "create");
+    ("Enter", "actions");
     ("s", "start");
     ("S", "stop");
     ("d", "destroy");
@@ -300,65 +301,138 @@ let run_background desc f =
       | Error (`Msg msg) ->
           Context.toast_error (T.text "%s failed: %s" desc msg))
 
+type action =
+  | Start
+  | Stop
+  | Destroy
+  | Open_rpc
+  | Add_account
+  | Add_node
+  | Add_baker
+
+let action_to_string = function
+  | Start -> "Start"
+  | Stop -> "Stop"
+  | Destroy -> "Destroy"
+  | Open_rpc -> "Open RPC Browser"
+  | Add_account -> "Add Account"
+  | Add_node -> "Add Node"
+  | Add_baker -> "Add Baker"
+
+let do_start ps group_name =
+  run_background (Printf.sprintf "Starting %s" group_name) (fun () ->
+      let* _started = Lifecycle.start_group ~quiet:true ~group_name () in
+      Ok ()) ;
+  ps
+
+let do_stop ps group_name =
+  run_background (Printf.sprintf "Stopping %s" group_name) (fun () ->
+      let* _stopped = Lifecycle.stop_group ~quiet:true ~group_name () in
+      Ok ()) ;
+  ps
+
+let do_destroy ps group_name =
+  let confirm () =
+    run_background (Printf.sprintf "Destroying %s" group_name) (fun () ->
+        Sandbox.destroy ~on_log:(fun _ -> ()) ~group_name ())
+  in
+  Modal_helpers.confirm_modal
+    ~title:(Printf.sprintf "Destroy Sandbox '%s'?" group_name)
+    ~message:
+      (Printf.sprintf
+         "Permanently delete sandbox '%s'?\n\
+          This removes all services, wallet files, and data and cannot be \
+          undone."
+         group_name)
+    ~on_result:(fun yes -> if yes then confirm ())
+    () ;
+  ps
+
+let do_open_rpc ps sb =
+  (match sb.node with
+  | Some svc ->
+      Context.set_pending_instance_detail svc.instance ;
+      Context.navigate "rpc-browser"
+  | None -> Context.toast_warn "No node found for this sandbox") ;
+  ps
+
+let do_add_account ps group_name =
+  let wallet = Sandbox.wallet_dir ~sandbox_name:group_name in
+  Modal_helpers.prompt_text_modal
+    ~title:"Add Account"
+    ~placeholder:(Some "tz1... or tz2... or tz3... or tz4...")
+    ~initial:""
+    ~on_submit:(fun address ->
+      let address = String.trim address in
+      match Yes_wallet.curve_of_address address with
+      | None ->
+          Context.toast_error
+            (T.text "Invalid address: must start with tz1/tz2/tz3/tz4")
+      | Some _ ->
+          run_background
+            (Printf.sprintf "Adding account to %s" group_name)
+            (fun () ->
+              Result.map
+                ignore
+                (Yes_wallet_io.add_account ~wallet_dir:wallet ~address ())))
+    () ;
+  ps
+
+let do_add_node ps group_name =
+  let desc = Printf.sprintf "Adding node to %s" group_name in
+  Context.toast_info (T.text "%s..." desc) ;
+  Job_manager.submit
+    ~timeout:None
+    ~description:desc
+    ~on_complete:(fun _ -> Context.mark_instances_dirty ())
+    (fun ~append_log () ->
+      Sandbox.add_node
+        ~on_log:(fun msg -> append_log (msg ^ "\n"))
+        ~group_name
+        ()
+      |> Result.map ignore) ;
+  ps
+
+let do_add_baker ps group_name =
+  Context.set_pending_sandbox_group group_name ;
+  Context.navigate "sandbox-key-alloc" ;
+  ps
+
+let open_action_modal ps (sb : sandbox_info) =
+  let group_name = sb.group.name in
+  let has_node = Option.is_some sb.node in
+  let items =
+    [Start; Stop]
+    @ (if has_node then [Open_rpc] else [])
+    @ [Add_account; Add_node; Add_baker; Destroy]
+  in
+  Modal_helpers.open_choice_modal
+    ~title:(Printf.sprintf "Actions · %s" group_name)
+    ~items
+    ~to_string:action_to_string
+    ~on_select:(fun action ->
+      match action with
+      | Start -> ignore (do_start ps group_name)
+      | Stop -> ignore (do_stop ps group_name)
+      | Destroy -> ignore (do_destroy ps group_name)
+      | Open_rpc -> ignore (do_open_rpc ps sb)
+      | Add_account -> ignore (do_add_account ps group_name)
+      | Add_node -> ignore (do_add_node ps group_name)
+      | Add_baker -> ignore (do_add_baker ps group_name))
+    () ;
+  ps
+
 (* ─── Key Handling ──────────────────────────────────────────────────────── *)
 
 let handle_sandbox_key ps sb key =
   let group_name = sb.group.name in
   match key with
-  | "s" ->
-      run_background (Printf.sprintf "Starting %s" group_name) (fun () ->
-          let* _started = Lifecycle.start_group ~quiet:true ~group_name () in
-          Ok ()) ;
-      ps
-  | "S" ->
-      run_background (Printf.sprintf "Stopping %s" group_name) (fun () ->
-          let* _stopped = Lifecycle.stop_group ~quiet:true ~group_name () in
-          Ok ()) ;
-      ps
-  | "d" ->
-      let confirm () =
-        run_background (Printf.sprintf "Destroying %s" group_name) (fun () ->
-            Sandbox.destroy ~on_log:(fun _ -> ()) ~group_name ())
-      in
-      Modal_helpers.confirm_modal
-        ~title:(Printf.sprintf "Destroy Sandbox '%s'?" group_name)
-        ~message:
-          (Printf.sprintf
-             "Permanently delete sandbox '%s'?\n\
-              This removes all services, wallet files, and data and cannot be \
-              undone."
-             group_name)
-        ~on_result:(fun yes -> if yes then confirm ())
-        () ;
-      ps
-  | "r" ->
-      (match sb.node with
-      | Some svc ->
-          Context.set_pending_instance_detail svc.instance ;
-          Context.navigate "rpc-browser"
-      | None -> Context.toast_warn "No node found for this sandbox") ;
-      ps
-  | "a" ->
-      let wallet = Sandbox.wallet_dir ~sandbox_name:group_name in
-      Modal_helpers.prompt_text_modal
-        ~title:"Add Account"
-        ~placeholder:(Some "tz1... or tz2... or tz3... or tz4...")
-        ~initial:""
-        ~on_submit:(fun address ->
-          let address = String.trim address in
-          match Yes_wallet.curve_of_address address with
-          | None ->
-              Context.toast_error
-                (T.text "Invalid address: must start with tz1/tz2/tz3/tz4")
-          | Some _ ->
-              run_background
-                (Printf.sprintf "Adding account to %s" group_name)
-                (fun () ->
-                  Result.map
-                    ignore
-                    (Yes_wallet_io.add_account ~wallet_dir:wallet ~address ())))
-        () ;
-      ps
+  | "Return" | "Enter" -> open_action_modal ps sb
+  | "s" -> do_start ps group_name
+  | "S" -> do_stop ps group_name
+  | "d" -> do_destroy ps group_name
+  | "r" -> do_open_rpc ps sb
+  | "a" -> do_add_account ps group_name
   | _ -> ps
 
 let handle_key ps key ~size:_ =
@@ -396,6 +470,7 @@ let handled_keys () =
       Down;
       Up;
       Char "c";
+      Enter;
       Char "s";
       Char "S";
       Char "d";
@@ -410,6 +485,7 @@ let keymap _ =
   in
   [
     kb "c" "Create";
+    kb "Enter" "Actions";
     kb "s" "Start";
     kb "S" "Stop";
     kb "d" "Destroy";

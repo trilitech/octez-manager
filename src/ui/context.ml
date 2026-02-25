@@ -7,6 +7,15 @@
 
 let pending_instance_detail : string option ref = ref None
 
+let pending_sandbox_group : string option ref = ref None
+
+let set_pending_sandbox_group group = pending_sandbox_group := Some group
+
+let take_pending_sandbox_group () =
+  let value = !pending_sandbox_group in
+  pending_sandbox_group := None ;
+  value
+
 (** Global key handlers - checked before page handles keys *)
 let global_key_handlers : (string, unit -> unit) Hashtbl.t = Hashtbl.create 8
 
