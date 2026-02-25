@@ -433,14 +433,15 @@ let import_notifications ~json =
 (* ── Main import ─────────────────────────────────────────── *)
 
 let import_from_json ~baker_pkh json =
-  let config = Payout_config.default ~baker_pkh () in
+  let config = Payout_config.default ~baker_pkh in
   let warnings = [] in
   let count = 0 in
   (* Check config version *)
   let warnings =
     match opt_int json "config_version" with
     | Some v when v <> 0 ->
-        Printf.sprintf "Unknown config_version: %d (expected 0)" v :: warnings
+        Printf.sprintf "Unknown config_version: %d (expected 0)" v
+        :: warnings
     | _ -> warnings
   in
   let config, warnings, count = import_payouts ~config ~json ~warnings ~count in
