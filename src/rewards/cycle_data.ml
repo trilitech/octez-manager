@@ -74,15 +74,47 @@ let parse_cycle_rewards ~baker json =
     delegators;
   }
 
-let fetch_cycle ~tzkt_url ~baker ~cycle =
-  let url =
-    Printf.sprintf "%s/v1/rewards/split/%s/%d?limit=10000" tzkt_url baker cycle
+let page_size = 10000
+
+(** Fetch additional delegator pages from the split endpoint.
+    Returns the concatenation of all delegator snapshots from
+    [offset] onward. Stops when a page returns fewer than [page_size]
+    entries or on error (best-effort). *)
+let fetch_remaining_delegators ~base_url offset =
+  let rec go off acc =
+    let url = Printf.sprintf "%s?limit=%d&offset=%d" base_url page_size off in
+    match curl_fetch url with
+    | Error _ -> acc
+    | Ok body -> (
+        match Yojson.Safe.from_string body with
+        | json ->
+            let open Yojson.Safe.Util in
+            let more =
+              match member "delegators" json with
+              | `List items -> List.map parse_delegator_snapshot items
+              | _ -> []
+            in
+            if List.length more < page_size then acc @ more
+            else go (off + page_size) (acc @ more)
+        | exception _ -> acc)
   in
+  go offset []
+
+let fetch_cycle ~tzkt_url ~baker ~cycle =
+  let base_url =
+    Printf.sprintf "%s/v1/rewards/split/%s/%d" tzkt_url baker cycle
+  in
+  let url = Printf.sprintf "%s?limit=%d" base_url page_size in
   match curl_fetch url with
   | Error (`Msg msg) -> Error (Printf.sprintf "TzKT fetch failed: %s" msg)
   | Ok body -> (
       match Yojson.Safe.from_string body with
-      | json -> Ok (parse_cycle_rewards ~baker json)
+      | json ->
+          let cr = parse_cycle_rewards ~baker json in
+          if cr.num_delegators <= page_size then Ok cr
+          else
+            let more = fetch_remaining_delegators ~base_url page_size in
+            Ok {cr with delegators = cr.delegators @ more}
       | exception Yojson.Json_error msg ->
           Error (Printf.sprintf "JSON parse error: %s" msg))
 
