@@ -107,7 +107,9 @@ let rec next_step ps =
         s
         (fun msg -> Navigation.update (fun s -> {s with error = Some msg}) ps)
         (fun svc ->
-          match Import.validate_importable svc with
+          match
+            Import.validate_importable ?network_override:s.network_override svc
+          with
           | Error (`Msg msg) ->
               Navigation.update (fun s -> {s with error = Some msg}) ps
           | Ok () ->
