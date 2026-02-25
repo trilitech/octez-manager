@@ -261,6 +261,26 @@ let refresh_baker ~instance =
   in
   poll_baker ~instance ~network
 
+(** Parse OM_TEST_BAKER env var: "network/pkh" or "network/pkh,network/pkh,..." *)
+let parse_test_bakers () =
+  match Sys.getenv_opt "OM_TEST_BAKER" with
+  | None | Some "" -> []
+  | Some s ->
+      String.split_on_char ',' s
+      |> List.filter_map (fun entry ->
+          let entry = String.trim entry in
+          match String.index_opt entry '/' with
+          | None -> None
+          | Some i ->
+              let network = String.sub entry 0 i in
+              let pkh =
+                String.sub entry (i + 1) (String.length entry - i - 1)
+              in
+              if String.length network > 0 && String.length pkh > 0 then
+                let instance = Printf.sprintf "test-%s" network in
+                Some (instance, network, pkh)
+              else None)
+
 let tick () =
   let bakers =
     Data.load_service_states ()
@@ -273,7 +293,14 @@ let tick () =
       let network = st.service.Service.network in
       poll_baker ~instance ~network ;
       check_continual ~instance ~svc:st)
-    bakers
+    bakers ;
+  (* Also poll any test bakers from OM_TEST_BAKER env var *)
+  List.iter
+    (fun (instance, network, pkh) ->
+      Mutex.protect baker_instance_lock (fun () ->
+          Hashtbl.replace baker_instance_cache instance pkh) ;
+      poll_baker ~instance ~network)
+    (parse_test_bakers ())
 
 let started = ref false
 
