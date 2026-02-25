@@ -16,8 +16,6 @@ module Desc_list = Miaou_widgets_display.Description_list
 
 let pending_config : Payout_config.t option ref = ref None
 
-let set_pending_config config = pending_config := Some config
-
 let consume_pending_config () =
   let v = !pending_config in
   pending_config := None ;
@@ -36,9 +34,6 @@ type field_id =
   | BakerPaysTxFee
   | BakerPaysAllocFee
   | IgnoreContracts
-  | ContinualEnabled
-  | ContinualInterval
-  | ContinualOffset
 
 let all_fields =
   [
@@ -52,9 +47,6 @@ let all_fields =
     BakerPaysTxFee;
     BakerPaysAllocFee;
     IgnoreContracts;
-    ContinualEnabled;
-    ContinualInterval;
-    ContinualOffset;
   ]
 
 let field_count = List.length all_fields
@@ -70,43 +62,6 @@ let field_label = function
   | BakerPaysTxFee -> "Baker Pays TX Fee"
   | BakerPaysAllocFee -> "Baker Pays Alloc Fee"
   | IgnoreContracts -> "Ignore Contracts"
-  | ContinualEnabled -> "Continual Mode"
-  | ContinualInterval -> "Continual Interval"
-  | ContinualOffset -> "Continual Offset"
-
-let field_hint = function
-  | BakerFee ->
-      "Percentage fee deducted from delegator rewards as baker compensation."
-  | PayoutMode ->
-      "Actual: pay based on real rewards received. Ideal: pay based on \
-       expected rewards regardless of missed blocks."
-  | PayoutKeyAlias -> "octez-client key alias used to sign payout transactions."
-  | MinPayout ->
-      "Delegators whose reward is below this threshold will not receive a \
-       payout."
-  | MinBalance ->
-      "Delegators whose delegated balance is below this threshold are excluded."
-  | BelowMinDest ->
-      "What happens to rewards below the minimum: baker keeps them or they are \
-       redistributed to eligible delegators."
-  | OverdelegationProtect ->
-      "When enabled, caps rewards if total delegation exceeds the baker's \
-       staking capacity."
-  | BakerPaysTxFee ->
-      "When enabled, transaction fees are paid by the baker rather than \
-       deducted from delegator rewards."
-  | BakerPaysAllocFee ->
-      "When enabled, the baker pays the 0.06 tz allocation fee for new \
-       accounts."
-  | IgnoreContracts ->
-      "When enabled, smart contract delegators are excluded from payouts."
-  | ContinualEnabled ->
-      "Automatically trigger payouts when new cycles complete."
-  | ContinualInterval ->
-      "Pay every N cycles (e.g. 1 = every cycle, 2 = every other cycle)."
-  | ContinualOffset ->
-      "Offset within the interval to stagger payments (0 = first eligible \
-       cycle)."
 
 let tez_symbol = "\xEA\x9C\xA9"
 
@@ -135,11 +90,6 @@ let field_value (config : Payout_config.t) = function
       else "\xe2\x9c\x97 No"
   | IgnoreContracts ->
       if config.ignore_contracts then "\xe2\x9c\x93 Yes" else "\xe2\x9c\x97 No"
-  | ContinualEnabled ->
-      if config.continual_enabled then "\xe2\x9c\x93 Enabled"
-      else "\xe2\x9c\x97 Disabled"
-  | ContinualInterval -> string_of_int config.continual_interval
-  | ContinualOffset -> string_of_int config.continual_offset
 
 (* {1 Field editing} *)
 
@@ -235,43 +185,6 @@ let edit_field (config : Payout_config.t) field =
   | IgnoreContracts ->
       pending_config :=
         Some {config with ignore_contracts = not config.ignore_contracts}
-  | ContinualEnabled ->
-      pending_config :=
-        Some {config with continual_enabled = not config.continual_enabled}
-  | ContinualInterval ->
-      Modal_helpers.prompt_validated_text_modal
-        ~title:"Continual Interval (cycles)"
-        ~initial:(string_of_int config.continual_interval)
-        ~validator:(fun s ->
-          match int_of_string_opt s with
-          | None -> Error "Must be a positive integer"
-          | Some i -> if i >= 1 then Ok () else Error "Must be >= 1")
-        ~on_submit:(fun s ->
-          match int_of_string_opt s with
-          | Some i when i >= 1 ->
-              pending_config := Some {config with continual_interval = i}
-          | _ -> ())
-        ()
-  | ContinualOffset ->
-      Modal_helpers.prompt_validated_text_modal
-        ~title:"Continual Offset (cycles)"
-        ~initial:(string_of_int config.continual_offset)
-        ~validator:(fun s ->
-          match int_of_string_opt s with
-          | None -> Error "Must be a non-negative integer"
-          | Some i ->
-              if i >= 0 && i < config.continual_interval then Ok ()
-              else
-                Error
-                  (Printf.sprintf
-                     "Must be in [0, %d)"
-                     config.continual_interval))
-        ~on_submit:(fun s ->
-          match int_of_string_opt s with
-          | Some i when i >= 0 ->
-              pending_config := Some {config with continual_offset = i}
-          | _ -> ())
-        ()
 
 (* {1 Save / Reset actions} *)
 
@@ -288,7 +201,7 @@ let reset_config ~baker_pkh =
     ~message:"Reset all settings to defaults?"
     ~on_result:(fun confirmed ->
       if confirmed then begin
-        pending_config := Some (Payout_config.default ~baker_pkh ()) ;
+        pending_config := Some (Payout_config.default ~baker_pkh) ;
         Context.toast_info "Configuration reset to defaults"
       end)
     ()
@@ -328,28 +241,6 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
           ~style:Rounded
           ~width:box_width
           general_content
-      in
-      (* Hint panel: left-bordered block for the selected field *)
-      let hint_box =
-        if state.config_show_hint then
-          let field =
-            match List.nth_opt all_fields state.config_cursor with
-            | Some f -> f
-            | None -> List.hd all_fields
-          in
-          let bar = Widgets.themed_muted "\xe2\x94\x82 " in
-          let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
-          let hint_width = max 20 (box_width - 6) in
-          let wrapped =
-            Widgets.wrap_text ~width:hint_width (field_hint field)
-          in
-          let text_lines =
-            List.map (fun l -> bar ^ Widgets.themed_text l) wrapped
-          in
-          String.concat
-            "\n"
-            (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
-        else ""
       in
       (* Delegator overrides section *)
       let override_count = List.length config.delegator_overrides in
@@ -410,11 +301,7 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
         if state.config_dirty then Widgets.themed_warning "  * Unsaved changes"
         else ""
       in
-      let parts =
-        if String.length hint_box > 0 then
-          [""; general_box; hint_box; ""; override_box]
-        else [""; general_box; ""; override_box]
-      in
+      let parts = [""; general_box; ""; override_box] in
       let parts =
         if dirty_indicator <> "" then parts @ [dirty_indicator] else parts
       in
