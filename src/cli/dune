@@ -20,7 +20,8 @@
   cmd_utils
   cmd_rpc
   cmd_web
-  cmd_baker)
+  cmd_baker
+  cmd_rewards)
  (libraries
   octez_manager_lib
   octez_manager_rewards
