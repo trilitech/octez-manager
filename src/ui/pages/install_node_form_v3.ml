@@ -984,6 +984,7 @@ let spec =
             bin_source = model.core.bin_source;
             logging_mode;
             extra_args;
+            extra_env = [];
             auto_enable = model.core.enable_on_boot;
             bootstrap;
             preserve_data = model.preserve_data = `Keep;

@@ -26,6 +26,9 @@
   directory_registry
   help_parser
   keys_reader
+  yes_wallet
+  yes_wallet_io
+  sandbox
   installer
   helpers
   snapshot
