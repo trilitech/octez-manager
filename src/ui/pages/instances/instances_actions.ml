@@ -393,21 +393,19 @@ let create_menu_modal state =
   let open Modal_helpers in
   open_choice_modal
     ~title:"Create"
-    ~items:[`Node; `DalNode; `Baker; `Accuser; `Signatory; `Sandbox]
+    ~items:[`Node; `DalNode; `Baker; `Accuser; `Signatory]
     ~to_string:(function
       | `Node -> "Node"
       | `DalNode -> "DAL Node"
       | `Baker -> "Baker"
       | `Accuser -> "Accuser"
-      | `Signatory -> "Signatory"
-      | `Sandbox -> "Sandbox")
+      | `Signatory -> "Signatory")
     ~on_select:(function
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
       | `Accuser -> Context.navigate Install_accuser_form_v3.name
       | `DalNode -> Context.navigate Install_dal_node_form_v3.name
-      | `Signatory -> Context.navigate Install_signatory_form.name
-      | `Sandbox -> Context.navigate Sandbox_page.name)
+      | `Signatory -> Context.navigate Install_signatory_form.name)
     () ;
   state
 
@@ -427,11 +425,16 @@ let go_to_rpc_browser state =
   Context.navigate Rpc_node_selection.name ;
   state
 
+let go_to_sandboxes state =
+  Context.navigate Sandbox_page.name ;
+  state
+
 let activate_selection s =
   match s.selected with
   | 0 -> create_menu_modal s
   | 1 -> go_to_binaries s
   | 2 -> go_to_rpc_browser s
+  | 3 -> go_to_sandboxes s
   | _ -> (
       match current_service s with
       | Some _ -> instance_actions_modal s
