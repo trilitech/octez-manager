@@ -234,6 +234,23 @@ let poll_baker ~instance ~network =
   (match result with
   | Some (baker, cycles) ->
       cache_cycles ~baker cycles ;
+      (* Backfill delegator details for cycles that lack them.
+         The list endpoint does not return the delegators array,
+         so we fetch each cycle individually via the split endpoint. *)
+      let to_backfill =
+        List.filteri
+          (fun i (cr : Rewards.cycle_rewards) ->
+            i < 5 && cr.num_delegators > 0 && cr.delegators = [])
+          cycles
+      in
+      List.iter
+        (fun (cr : Rewards.cycle_rewards) ->
+          match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle:cr.cycle with
+          | Ok full_cr ->
+              Mutex.protect cycle_lock (fun () ->
+                  Hashtbl.replace cycle_cache (baker, cr.cycle) full_cr)
+          | Error _ -> ())
+        to_backfill ;
       (* Cache the detected baker for the page to read *)
       Mutex.protect baker_instance_lock (fun () ->
           Hashtbl.replace baker_instance_cache instance baker) ;
