@@ -24,8 +24,10 @@ let recent_cache : (string, Rewards.cycle_rewards list) Hashtbl.t =
 
 let recent_lock = Mutex.create ()
 
-(* Current cycle *)
-let current_cycle_ref : int option Atomic.t = Atomic.make None
+(* Current cycle per instance *)
+let current_cycle_cache : (string, int) Hashtbl.t = Hashtbl.create 4
+
+let current_cycle_lock = Mutex.create ()
 
 (* Cache accessors — safe for view functions *)
 
@@ -37,7 +39,9 @@ let get_recent_cycles ~baker =
   Mutex.protect recent_lock (fun () ->
       Hashtbl.find_opt recent_cache baker |> Option.value ~default:[])
 
-let get_current_cycle () = Atomic.get current_cycle_ref
+let get_current_cycle ~instance =
+  Mutex.protect current_cycle_lock (fun () ->
+      Hashtbl.find_opt current_cycle_cache instance)
 
 let get_payout_status ~instance ~cycle =
   if Payout_report.cycle_is_paid ~instance ~cycle then Rewards.Paid
@@ -82,7 +86,7 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
   sync_continual_from_config ~instance ;
   if not (Payout_continual.is_active ~instance) then ()
   else
-    match (Atomic.get current_cycle_ref, Payout_config.load ~instance) with
+    match (get_current_cycle ~instance, Payout_config.load ~instance) with
     | Some current_cycle, Ok config ->
         let prev =
           Mutex.protect continual_lock (fun () ->
@@ -264,7 +268,9 @@ let poll_baker ~instance ~network =
   (* Fetch current cycle *)
   match Cycle_data.fetch_current_cycle ~tzkt_url with
   | Error _ -> ()
-  | Ok c -> Atomic.set current_cycle_ref (Some c)
+  | Ok c ->
+      Mutex.protect current_cycle_lock (fun () ->
+          Hashtbl.replace current_cycle_cache instance c)
 
 let refresh_baker ~instance =
   let network =
@@ -337,7 +343,7 @@ let shutdown () = Atomic.set shutdown_requested true
 let clear () =
   Mutex.protect cycle_lock (fun () -> Hashtbl.clear cycle_cache) ;
   Mutex.protect recent_lock (fun () -> Hashtbl.clear recent_cache) ;
-  Atomic.set current_cycle_ref None ;
+  Mutex.protect current_cycle_lock (fun () -> Hashtbl.clear current_cycle_cache) ;
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.clear baker_instance_cache) ;
   Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache) ;
