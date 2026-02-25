@@ -190,23 +190,7 @@ let render_baker_header (s : Rewards_state.state) =
       Widgets.themed_primary
         (Printf.sprintf " Rewards - %s (%s) " instance short_pkh)
 
-let hint_for_tab = function
-  | Rewards_state.Delegators ->
-      Widgets.themed_muted
-        "j/k nav \xc2\xb7 / search \xc2\xb7 s sort \xc2\xb7 f filter \xc2\xb7 \
-         c cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
-  | Rewards_state.Configuration ->
-      Widgets.themed_muted
-        "j/k nav \xc2\xb7 Enter edit \xc2\xb7 s save \xc2\xb7 r reset \xc2\xb7 \
-         i import \xc2\xb7 n notify \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
-  | Rewards_state.Overview ->
-      Widgets.themed_muted
-        "g generate \xc2\xb7 p pay \xc2\xb7 d dry-run \xc2\xb7 t continual \
-         \xc2\xb7 1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc \
-         back"
-  | Rewards_state.History ->
-      Widgets.themed_muted
-        "j/k nav \xc2\xb7 Enter view cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
+let hint_for_tab _tab = ""
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
@@ -802,22 +786,44 @@ let handle_key ps key ~size:_ =
     | _ when s.active_tab = Rewards_state.History -> handle_history_key ps key
     | _ -> ps
 
-let keymap _ps =
+let keymap ps =
+  let s = ps.Navigation.s in
   let noop ps = ps in
   let kb key help =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  [
-    kb "1-4" "Switch tab";
-    kb "b" "Baker";
-    kb "r" "Refresh";
-    kb "j/k" "Navigate";
-    kb "/" "Search";
-    kb "s" "Sort";
-    kb "f" "Filter";
-    kb "c" "Cycle";
-    kb "Esc" "Back";
-  ]
+  let common = [kb "1-4" "Tab"; kb "Esc" "Back"] in
+  let tab_keys =
+    match s.active_tab with
+    | Rewards_state.Overview ->
+        [
+          kb "g" "Generate";
+          kb "p" "Pay";
+          kb "d" "Dry-run";
+          kb "t" "Continual";
+          kb "b" "Baker";
+          kb "r" "Refresh";
+        ]
+    | Rewards_state.Delegators ->
+        [
+          kb "j/k" "Navigate";
+          kb "/" "Search";
+          kb "s" "Sort";
+          kb "f" "Filter";
+          kb "c" "Cycle";
+        ]
+    | Rewards_state.History -> [kb "j/k" "Navigate"; kb "Enter" "View"]
+    | Rewards_state.Configuration ->
+        [
+          kb "j/k" "Navigate";
+          kb "Enter" "Edit";
+          kb "s" "Save";
+          kb "r" "Reset";
+          kb "i" "Import";
+          kb "n" "Notify";
+        ]
+  in
+  tab_keys @ common
 
 let handled_keys () =
   Keys.
@@ -894,19 +900,41 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
     let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
     (ps', Miaou_interfaces.Key_event.Handled)
 
-  let key_hints _ps =
-    Miaou.Core.Tui_page.
-      [
-        {key = "1-4"; help = "Tab"};
-        {key = "b"; help = "Baker"};
-        {key = "r"; help = "Refresh"};
-        {key = "j/k"; help = "Navigate"};
-        {key = "/"; help = "Search"};
-        {key = "s"; help = "Sort"};
-        {key = "f"; help = "Filter"};
-        {key = "c"; help = "Cycle"};
-        {key = "Esc"; help = "Back"};
-      ]
+  let key_hints ps =
+    let s = ps.Navigation.s in
+    let kh key help = Miaou.Core.Tui_page.{key; help} in
+    let common = [kh "1-4" "Tab"; kh "Esc" "Back"] in
+    let tab_keys =
+      match s.active_tab with
+      | Rewards_state.Overview ->
+          [
+            kh "g" "Generate";
+            kh "p" "Pay";
+            kh "d" "Dry-run";
+            kh "t" "Continual";
+            kh "b" "Baker";
+            kh "r" "Refresh";
+          ]
+      | Rewards_state.Delegators ->
+          [
+            kh "j/k" "Navigate";
+            kh "/" "Search";
+            kh "s" "Sort";
+            kh "f" "Filter";
+            kh "c" "Cycle";
+          ]
+      | Rewards_state.History -> [kh "j/k" "Navigate"; kh "Enter" "View"]
+      | Rewards_state.Configuration ->
+          [
+            kh "j/k" "Navigate";
+            kh "Enter" "Edit";
+            kh "s" "Save";
+            kh "r" "Reset";
+            kh "i" "Import";
+            kh "n" "Notify";
+          ]
+    in
+    tab_keys @ common
 
   let has_modal = has_modal
 end
