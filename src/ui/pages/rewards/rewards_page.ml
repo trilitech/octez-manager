@@ -193,7 +193,7 @@ let hint_for_tab = function
   | Rewards_state.Configuration ->
       Widgets.themed_muted
         "j/k nav \xc2\xb7 Enter edit \xc2\xb7 s save \xc2\xb7 r reset \xc2\xb7 \
-         1-4 tabs \xc2\xb7 Esc back"
+         i import \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
   | Rewards_state.Overview ->
       Widgets.themed_muted
         "g generate \xc2\xb7 p pay \xc2\xb7 d dry-run \xc2\xb7 1-4 tabs \
@@ -378,6 +378,33 @@ let handle_config_key ps key =
           Rewards_config_tab.reset_config ~baker_pkh ;
           ps
       | None -> ps)
+  | Some (Keys.Char "i") -> (
+      (* Import external config.hjson *)
+      match Rewards_state.selected_baker_instance s with
+      | None -> ps
+      | Some (instance, baker_pkh) ->
+          Modal_helpers.open_file_browser_modal
+            ~dirs_only:false
+            ~require_writable:false
+            ~on_select:(fun path ->
+              match Config_import.import_file ~baker_pkh path with
+              | Error msg ->
+                  Context.toast_error (Printf.sprintf "Import failed: %s" msg)
+              | Ok result ->
+                  (match Payout_config.save ~instance result.config with
+                  | Ok () ->
+                      Rewards_config_tab.set_pending_config result.config ;
+                      let msg =
+                        Printf.sprintf
+                          "Imported %d fields from external config"
+                          result.imported_fields
+                      in
+                      Context.toast_info msg
+                  | Error msg ->
+                      Context.toast_error (Printf.sprintf "Save failed: %s" msg)) ;
+                  List.iter (fun w -> Context.toast_warn w) result.warnings)
+            () ;
+          ps)
   | _ -> ps
 
 (** Handle keys specific to the History tab. *)
@@ -713,6 +740,7 @@ let handled_keys () =
       Char "g";
       Char "p";
       Char "d";
+      Char "i";
     ]
 
 let has_modal _ = false
