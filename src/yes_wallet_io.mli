@@ -7,27 +7,18 @@
 
 (** I/O layer for yes-wallet: delegate fetching and wallet file writing. *)
 
-(** Fetch active delegates from a node RPC endpoint, including their
-    consensus and companion keys needed for signing.
+(** Fetch active delegates from a node RPC endpoint.
 
     Calls [/chains/main/blocks/head/context/delegates?active=true&with_minimal_stake=true],
-    takes the first [max_delegates], then fetches the consensus key and companion
-    key for each delegate (needed when delegates use BLS consensus keys).
-
-    Returns [(baker_delegates, all_wallet_entries)] where [baker_delegates] is
-    the consensus key aliases to pass as baker CLI args (the baker daemon uses
-    consensus key hashes to query attestation rights), and [all_wallet_entries]
-    is the full list to write to the wallet (includes consensus/companion keys).
-    For delegates without a distinct consensus key, the delegate alias is used.
+    takes the first [max_delegates], detects curve from address prefix, and
+    assigns sequential aliases [delegate-0], [delegate-1], etc.
 
     @param endpoint Node RPC endpoint (e.g. ["http://127.0.0.1:18732"])
     @param max_delegates Maximum number of delegates to return *)
 val fetch_delegates :
   endpoint:string ->
   max_delegates:int ->
-  ( Yes_wallet.delegate list * Yes_wallet.delegate list,
-    [> `Msg of string] )
-  result
+  (Yes_wallet.delegate list, [> `Msg of string]) result
 
 (** Write the three wallet JSON files to a directory.
 
@@ -39,13 +30,6 @@ val write_wallet :
   wallet_dir:string ->
   Yes_wallet.delegate list ->
   (unit, [> `Msg of string]) result
-
-(** Read the [public_key_hashs] file from a wallet directory.
-
-    Returns a list of [(alias, address)] pairs. Returns [[]] if the file does
-    not exist. Used to inspect wallet contents without rewriting. *)
-val read_wallet_pkhs :
-  wallet_dir:string -> ((string * string) list, [> `Msg of string]) result
 
 (** Add a single account to an existing wallet directory.
 
@@ -61,35 +45,3 @@ val add_account :
   ?alias:string ->
   unit ->
   (string, [> `Msg of string]) result
-
-(** Estimate what fraction of total network staking power the sandbox wallet
-    delegates hold, as a percentage (0.0–100.0).
-
-    Tries [/context/stake_distribution] for an accurate stake-weighted result.
-    Falls back to a count-based approximation if that endpoint is unavailable.
-    Performs blocking HTTP calls — call from a background thread only.
-
-    @param endpoint Node RPC endpoint (e.g. ["http://127.0.0.1:18732"])
-    @param wallet_dir Sandbox wallet directory *)
-val fetch_delegate_balances :
-  endpoint:string ->
-  wallet_dir:string ->
-  (float array * float, [> `Msg of string]) result
-(** Fetch the individual baking power for each base delegate in the wallet.
-
-    Returns [(powers, wallet_total)] where [powers.(i)] is the baking power
-    of the i-th base delegate and [wallet_total] is the sum across all wallet
-    delegates. Percentages derived from this are relative to the wallet total
-    (all bakers together = 100%).
-
-    Tries [/context/stake_distribution] first (one call), then falls back to
-    per-delegate [/context/delegates/{addr}] queries using [baking_power],
-    and finally to unit weights as a last resort.
-    Performs blocking HTTP calls — call from a background thread only. *)
-
-val fetch_stake_pct :
-  endpoint:string ->
-  ?only_addrs:string list ->
-  wallet_dir:string ->
-  unit ->
-  (float, [> `Msg of string]) result

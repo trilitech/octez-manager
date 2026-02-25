@@ -27,7 +27,9 @@ let register_pages () =
   Rpc_browser.register () ;
   Topology_page.register () ;
   Keys_page.register () ;
-  Rewards_page.register ()
+  Rewards_page.register () ;
+  Sandbox_page.register () ;
+  Sandbox_create_form.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in

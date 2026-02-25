@@ -157,6 +157,7 @@ let root_cmd =
       Cmd_web.web_cmd;
       Cmd_baker.baker_cmd;
       Cmd_rewards.rewards_cmd;
+      Cmd_sandbox.sandbox_cmd;
       ui_cmd;
     ]
 
