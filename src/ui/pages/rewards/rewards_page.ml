@@ -25,22 +25,45 @@ type pstate = state Navigation.t
 
 (* Load baker instances from service registry.
    Prefer the auto-detected baker address from the scheduler cache,
-   falling back to the first delegate if not yet detected. *)
+   falling back to the first delegate if not yet detected.
+   Also includes test bakers from OM_TEST_BAKER env var. *)
 let load_baker_instances () =
-  let bakers =
-    Data.load_service_states ()
-    |> List.filter (fun (st : Data.Service_state.t) ->
-        st.service.Service.role = "baker")
+  let from_services =
+    let bakers =
+      Data.load_service_states ()
+      |> List.filter (fun (st : Data.Service_state.t) ->
+          st.service.Service.role = "baker")
+    in
+    List.filter_map
+      (fun (st : Data.Service_state.t) ->
+        let instance = st.service.Service.instance in
+        match Rewards_scheduler.get_baker_for_instance ~instance with
+        | Some pkh -> Some (instance, pkh)
+        | None ->
+            let delegates = Delegate_scheduler.get_baker_delegates ~instance in
+            List.nth_opt delegates 0 |> Option.map (fun pkh -> (instance, pkh)))
+      bakers
   in
-  List.filter_map
-    (fun (st : Data.Service_state.t) ->
-      let instance = st.service.Service.instance in
-      match Rewards_scheduler.get_baker_for_instance ~instance with
-      | Some pkh -> Some (instance, pkh)
-      | None ->
-          let delegates = Delegate_scheduler.get_baker_delegates ~instance in
-          List.nth_opt delegates 0 |> Option.map (fun pkh -> (instance, pkh)))
-    bakers
+  let from_env =
+    match Sys.getenv_opt "OM_TEST_BAKER" with
+    | None | Some "" -> []
+    | Some s ->
+        String.split_on_char ',' s
+        |> List.filter_map (fun entry ->
+            let entry = String.trim entry in
+            match String.index_opt entry '/' with
+            | None -> None
+            | Some i ->
+                let network = String.sub entry 0 i in
+                let pkh =
+                  String.sub entry (i + 1) (String.length entry - i - 1)
+                in
+                if String.length network > 0 && String.length pkh > 0 then
+                  let instance = Printf.sprintf "test-%s" network in
+                  Some (instance, pkh)
+                else None)
+  in
+  from_services @ from_env
 
 let init () =
   let baker_instances = load_baker_instances () in
