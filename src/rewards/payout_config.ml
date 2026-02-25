@@ -35,16 +35,13 @@ type t = {
   tzkt_url : string;
   explorer_url : string;
   notifications : Rewards.notification_channel list;
-  continual_enabled : bool;
-  continual_interval : int;
-  continual_offset : int;
 }
 
-let default ?(network = "mainnet") ~baker_pkh () =
+let default ~baker_pkh =
   {
     version = 1;
     baker_pkh;
-    payout_key_alias = baker_pkh;
+    payout_key_alias = "";
     payout_mode = Rewards.Actual;
     baker_fee = 0.05;
     min_payout = 0L;
@@ -68,22 +65,10 @@ let default ?(network = "mainnet") ~baker_pkh () =
     bond_recipients = [];
     fee_recipients = [];
     rpc_fallback_pool = [];
-    tzkt_url = Indexer.tzkt_base_url ~network;
+    tzkt_url = "https://api.tzkt.io";
     explorer_url = "https://tzkt.io";
     notifications = [];
-    continual_enabled = false;
-    continual_interval = 1;
-    continual_offset = 0;
   }
-
-let effective_tzkt_url ~network config =
-  let correct = Indexer.tzkt_base_url ~network in
-  let mainnet_default = Indexer.tzkt_base_url ~network:"mainnet" in
-  if
-    String.equal config.tzkt_url mainnet_default
-    && not (String.equal correct mainnet_default)
-  then correct
-  else config.tzkt_url
 
 (* Validation *)
 
@@ -122,8 +107,6 @@ let validate_share_map label shares =
 let validate t =
   if t.version <> 1 then
     Error (Printf.sprintf "unsupported version: %d" t.version)
-  else if String.length (String.trim t.payout_key_alias) = 0 then
-    Error "payout_key_alias must not be empty"
   else if t.baker_fee < 0.0 || t.baker_fee > 1.0 then
     Error (Printf.sprintf "baker_fee %.4f out of range [0.0, 1.0]" t.baker_fee)
   else if t.min_payout < 0L then Error "min_payout must be >= 0"
@@ -137,9 +120,6 @@ let validate t =
   else if t.min_delay_blocks < 0 then Error "min_delay_blocks must be >= 0"
   else if t.max_delay_blocks < t.min_delay_blocks then
     Error "max_delay_blocks must be >= min_delay_blocks"
-  else if t.continual_interval < 1 then Error "continual_interval must be >= 1"
-  else if t.continual_offset < 0 || t.continual_offset >= t.continual_interval
-  then Error "continual_offset must be in [0, continual_interval)"
   else
     let bad_wl = List.filter (fun a -> not (is_valid_address a)) t.whitelist in
     match bad_wl with
@@ -342,9 +322,6 @@ let to_json t =
       ("tzkt_url", `String t.tzkt_url);
       ("explorer_url", `String t.explorer_url);
       ("notifications", `List (List.map notification_to_json t.notifications));
-      ("continual_enabled", `Bool t.continual_enabled);
-      ("continual_interval", `Int t.continual_interval);
-      ("continual_offset", `Int t.continual_offset);
     ]
 
 let of_json json =
@@ -425,15 +402,6 @@ let of_json json =
         tzkt_url = member "tzkt_url" json |> to_string;
         explorer_url = member "explorer_url" json |> to_string;
         notifications;
-        continual_enabled =
-          (try member "continual_enabled" json |> to_bool with _ -> false);
-        continual_interval =
-          (let v =
-             try member "continual_interval" json |> to_int with _ -> 1
-           in
-           if v >= 1 then v else 1);
-        continual_offset =
-          (try member "continual_offset" json |> to_int with _ -> 0);
       }
   with
   | Yojson.Safe.Util.Type_error (msg, _) -> Error msg
@@ -448,13 +416,21 @@ let rewards_dir ~instance =
 let config_path ~instance =
   Filename.concat (rewards_dir ~instance) "config.json"
 
+let rec mkdir_p path =
+  if Sys.file_exists path then ()
+  else (
+    mkdir_p (Filename.dirname path) ;
+    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+
 let load ~instance =
   let path = config_path ~instance in
   if not (Sys.file_exists path) then
     Error (Printf.sprintf "config not found: %s" path)
   else
     try
-      let content = In_channel.with_open_text path In_channel.input_all in
+      let ic = open_in path in
+      let content = In_channel.input_all ic in
+      close_in ic ;
       let json = Yojson.Safe.from_string content in
       of_json json
     with
@@ -464,12 +440,13 @@ let load ~instance =
 let save ~instance t =
   try
     let dir = rewards_dir ~instance in
-    File_ops.mkdir_p dir ;
+    mkdir_p dir ;
     let json = to_json t in
     let content = Yojson.Safe.pretty_to_string ~std:true json in
     let path = config_path ~instance in
-    Out_channel.with_open_text path (fun oc ->
-        output_string oc content ;
-        output_char oc '\n') ;
+    let oc = open_out path in
+    output_string oc content ;
+    output_char oc '\n' ;
+    close_out oc ;
     Ok ()
   with exn -> Error (Printexc.to_string exn)

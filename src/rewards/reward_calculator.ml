@@ -14,12 +14,8 @@ let get_override config delegator =
 let is_in_list addr = List.exists (String.equal addr)
 
 let delegator_status config delegator ~balance ~net_reward =
-  let has_whitelist =
-    match config.Payout_config.whitelist with [] -> false | _ -> true
-  in
-  let has_blacklist =
-    match config.Payout_config.blacklist with [] -> false | _ -> true
-  in
+  let has_whitelist = config.Payout_config.whitelist <> [] in
+  let has_blacklist = config.Payout_config.blacklist <> [] in
   if has_blacklist && is_in_list delegator config.blacklist then Rewards.Ignored
   else if has_whitelist && not (is_in_list delegator config.whitelist) then
     Rewards.Ignored
@@ -32,15 +28,7 @@ let delegator_status config delegator ~balance ~net_reward =
 let generate_blueprint ~config ~network ~cycle_rewards =
   let cr = cycle_rewards in
   let total_rewards =
-    List.fold_left
-      Int64.add
-      0L
-      [
-        cr.Rewards.block_rewards;
-        cr.Rewards.attestation_rewards;
-        cr.Rewards.other_rewards;
-        cr.Rewards.block_fees;
-      ]
+    Int64.add cr.Rewards.block_rewards cr.Rewards.block_fees
   in
   (* Compute the effective staking balance for overdelegation protection.
      The limit is 9x the baker's own staked balance. *)
@@ -221,13 +209,9 @@ let generate_blueprint ~config ~network ~cycle_rewards =
     Rewards.cycle = cr.cycle;
     baker = cr.baker;
     network;
-    own_staked_balance = cr.own_staked_balance;
-    own_delegated_balance = cr.own_delegated_balance;
-    external_staked_balance = cr.external_staked_balance;
-    external_delegated_balance = cr.external_delegated_balance;
     earned_rewards = total_rewards;
     earned_block_fees = cr.block_fees;
-    total_delegators = cr.num_delegators;
+    total_delegators = List.length cr.delegators;
     eligible_delegators;
     delegator_rewards;
     baker_bond_income = baker_share;

@@ -26,12 +26,8 @@ let register_pages () =
   Rpc_node_selection.register () ;
   Rpc_browser.register () ;
   Topology_page.register () ;
-  Wallets_page.register () ;
-  Rewards_page.register () ;
-  Sandbox_page.register () ;
-  Sandbox_create_form.register () ;
-  Sandbox_key_alloc_page.register () ;
-  Main_shell.register ()
+  Keys_page.register () ;
+  Rewards_page.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in
@@ -47,6 +43,54 @@ let find_page_or_default name default_name =
                default_name) ;
           Ok page
       | None -> Error (`Msg "Instances page missing from registry"))
+
+let register_and_init ?(log = false) ?logfile () =
+  Capabilities.register () ;
+  register_pages () ;
+  Runtime.initialize ~log ?logfile () ;
+  Binary_downloader.cleanup_stale_temp_dirs () ;
+  Background_runner.enqueue (fun () ->
+      match Version_checker.check_for_updates () with
+      | Version_checker.UpdateAvailable
+          {latest_version; current_version; should_notify}
+        when should_notify ->
+          let current_str =
+            match current_version with
+            | Some v -> Printf.sprintf "v%s" v
+            | None -> "none"
+          in
+          Context.toast_info
+            (Printf.sprintf
+               "Octez v%s is available (you have %s). Press B to manage \
+                binaries."
+               latest_version
+               current_str)
+      | _ -> ()) ;
+  Self_update_scheduler.start () ;
+  Rewards_scheduler.start () ;
+  Background_runner.enqueue (fun () ->
+      Self_update_scheduler.check_now () ;
+      if Self_update_scheduler.update_available () then
+        match Self_update_scheduler.get_latest_version () with
+        | Some version ->
+            Context.toast_info
+              (Printf.sprintf
+                 "octez-manager %s is available. Run 'octez-manager \
+                  self-update' to upgrade."
+                 version)
+        | None -> ())
+
+let shutdown () =
+  Background_runner.shutdown () ;
+  Rpc_scheduler.shutdown () ;
+  Delegate_scheduler.shutdown () ;
+  System_metrics_scheduler.shutdown () ;
+  External_services_scheduler.shutdown () ;
+  Rewards_scheduler.shutdown () ;
+  Versions_scheduler.shutdown () ;
+  Self_update_scheduler.stop () ;
+  Domain_pool.shutdown () ;
+  Download.kill_active_download ()
 
 (** Open theme picker modal with live preview *)
 let open_theme_picker () =
@@ -76,8 +120,7 @@ let open_theme_picker () =
 (** Register global key handler for Ctrl+T *)
 let register_global_keys () =
   Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
-  Context.register_global_key "K" (fun () ->
-      Context.set_pending_tab Context.Tab_wallets) ;
+  Context.register_global_key "K" (fun () -> Context.navigate Keys_page.name) ;
   Context.register_global_key "R" (fun () -> Context.navigate Rewards_page.name)
 
 let register_and_init ?(log = false) ?logfile () =

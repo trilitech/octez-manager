@@ -48,10 +48,7 @@ type cycle_rewards = {
   external_staked_balance : Int64.t;
   external_delegated_balance : Int64.t;
   block_rewards : Int64.t;
-  attestation_rewards : Int64.t;
-  other_rewards : Int64.t;
   block_fees : Int64.t;
-  num_delegators : int;
   delegators : delegator_snapshot list;
 }
 
@@ -79,10 +76,6 @@ type payout_blueprint = {
   cycle : int;
   baker : string;
   network : string;
-  own_staked_balance : Int64.t;
-  own_delegated_balance : Int64.t;
-  external_staked_balance : Int64.t;
-  external_delegated_balance : Int64.t;
   earned_rewards : Int64.t;
   earned_block_fees : Int64.t;
   total_delegators : int;
@@ -122,18 +115,6 @@ type cycle_summary = {
 }
 
 type payout_status = Unpaid | Paid | Partial | In_progress
-
-let total_earned (cr : cycle_rewards) =
-  List.fold_left
-    Int64.add
-    0L
-    [cr.block_rewards; cr.attestation_rewards; cr.other_rewards; cr.block_fees]
-
-let tez_of_mutez amount_mutez =
-  let s = Printf.sprintf "%Ld" amount_mutez in
-  let len = String.length s in
-  if len <= 6 then "0." ^ String.make (6 - len) '0' ^ s
-  else String.sub s 0 (len - 6) ^ "." ^ String.sub s (len - 6) 6
 
 let format_tez mutez =
   let tez = Int64.to_float mutez /. 1_000_000.0 in
