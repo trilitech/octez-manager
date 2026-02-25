@@ -234,6 +234,64 @@ let fetch_stake_pct ~endpoint ~wallet_dir =
         if n_total = 0 then Ok 0.0
         else Ok (float_of_int n_our /. float_of_int n_total *. 100.0)
 
+(** Fetch individual staking balances for each base delegate in the wallet.
+
+    Returns [(balances, total_network_stake)] where [balances.(i)] is the
+    staking balance of the i-th base delegate (alias index 3*i in the wallet).
+    Falls back to unit weights (1.0 each, total=n) if [stake_distribution]
+    is unavailable, keeping the proportions equal in that case. *)
+let fetch_delegate_balances ~endpoint ~wallet_dir =
+  let* pkhs = read_wallet_pkhs ~wallet_dir in
+  let base_addrs =
+    List.filter_map
+      (fun (alias, addr) ->
+        match String.split_on_char '-' alias with
+        | ["delegate"; ns] -> (
+            match int_of_string_opt ns with
+            | Some n when n mod 3 = 0 -> Some addr
+            | _ -> None)
+        | _ -> None)
+      pkhs
+    |> Array.of_list
+  in
+  let n = Array.length base_addrs in
+  if n = 0 then Ok ([||], 0.0)
+  else
+    match
+      fetch_json_from_rpc
+        ~endpoint
+        "/chains/main/blocks/head/context/stake_distribution"
+    with
+    | Ok (`List entries) ->
+        let stake_map = Hashtbl.create 64 in
+        let total = ref 0.0 in
+        List.iter
+          (fun entry ->
+            let open Yojson.Safe.Util in
+            try
+              let baker = entry |> member "baker" |> to_string in
+              let bal =
+                match entry |> member "staking_balance" with
+                | `String s -> ( try float_of_string s with _ -> 0.0)
+                | `Int v -> float_of_int v
+                | `Intlit s -> ( try float_of_string s with _ -> 0.0)
+                | _ -> 0.0
+              in
+              total := !total +. bal ;
+              Hashtbl.replace stake_map baker bal
+            with _ -> ())
+          entries ;
+        let balances =
+          Array.map
+            (fun addr ->
+              Option.value ~default:0.0 (Hashtbl.find_opt stake_map addr))
+            base_addrs
+        in
+        Ok (balances, !total)
+    | _ ->
+        (* Fallback: equal weight *)
+        Ok (Array.make n 1.0, float_of_int n)
+
 let add_account ~wallet_dir ~address ?alias () =
   let* curve =
     match Yes_wallet.curve_of_address address with
