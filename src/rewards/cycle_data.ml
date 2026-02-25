@@ -24,12 +24,37 @@ let parse_delegator_snapshot json =
     staked_balance = int64_of_json_field json "stakedBalance";
   }
 
+(** Sum the four reward-category sub-fields that TzKT provides for each
+    reward type (Delegated / StakedOwn / StakedEdge / StakedShared). *)
+let sum_reward_fields json prefix =
+  List.fold_left
+    (fun acc suffix ->
+      Int64.add acc (int64_of_json_field json (prefix ^ suffix)))
+    0L
+    ["Delegated"; "StakedOwn"; "StakedEdge"; "StakedShared"]
+
 let parse_cycle_rewards ~baker json =
   let open Yojson.Safe.Util in
   let delegators =
     match member "delegators" json with
     | `List items -> List.map parse_delegator_snapshot items
     | _ -> []
+  in
+  let num_delegators =
+    match member "delegatorsCount" json with
+    | `Int n -> n
+    | _ -> List.length delegators
+  in
+  let block_rewards = sum_reward_fields json "blockRewards" in
+  (* Attestation rewards — TzKT provides both attestation* and endorsement*
+     fields with identical values for backwards compatibility.
+     Use attestation* (the canonical name since Oxford). *)
+  let attestation_rewards = sum_reward_fields json "attestationRewards" in
+  let dal_rewards = sum_reward_fields json "dalAttestationRewards" in
+  let vdf_rewards = sum_reward_fields json "vdfRevelationRewards" in
+  let nonce_rewards = sum_reward_fields json "nonceRevelationRewards" in
+  let other_rewards =
+    List.fold_left Int64.add 0L [dal_rewards; vdf_rewards; nonce_rewards]
   in
   {
     Rewards.cycle = member "cycle" json |> to_int;
@@ -41,8 +66,11 @@ let parse_cycle_rewards ~baker json =
     external_staked_balance = int64_of_json_field json "externalStakedBalance";
     external_delegated_balance =
       int64_of_json_field json "externalDelegatedBalance";
-    block_rewards = int64_of_json_field json "blockRewards";
+    block_rewards;
+    attestation_rewards;
+    other_rewards;
     block_fees = int64_of_json_field json "blockFees";
+    num_delegators;
     delegators;
   }
 
