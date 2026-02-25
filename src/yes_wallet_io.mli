@@ -71,5 +71,16 @@ val add_account :
 
     @param endpoint Node RPC endpoint (e.g. ["http://127.0.0.1:18732"])
     @param wallet_dir Sandbox wallet directory *)
+val fetch_delegate_balances :
+  endpoint:string ->
+  wallet_dir:string ->
+  (float array * float, [> `Msg of string]) result
+(** Fetch the individual staking balance for each base delegate in the wallet.
+
+    Returns [(balances, total_network_stake)] where [balances.(i)] is the
+    staking balance of the i-th base delegate.  Falls back to unit weights if
+    the [stake_distribution] endpoint is unavailable.
+    Performs blocking HTTP calls — call from a background thread only. *)
+
 val fetch_stake_pct :
   endpoint:string -> wallet_dir:string -> (float, [> `Msg of string]) result
