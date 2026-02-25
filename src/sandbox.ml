@@ -207,7 +207,7 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
         dal_node = None;
         liquidity_baking_vote = Some "pass";
         signer_mode = Signer_types.Local_keys;
-        extra_args = [];
+        extra_args = ["--force-apply-from-round"; "0"];
         extra_env = yes_crypto_env;
         service_user;
         app_bin_dir;
