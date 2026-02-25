@@ -124,7 +124,7 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       auto_enable = true;
       bootstrap;
       preserve_data = false;
-      snapshot_no_check = false;
+      snapshot_no_check = true;
       tmp_dir = None;
       keep_snapshot = false;
     }
