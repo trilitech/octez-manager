@@ -52,6 +52,9 @@ let init () =
       search_query = "";
       search_active = false;
       blueprint = None;
+      config = None;
+      config_cursor = 0;
+      config_dirty = false;
       history_cursor = 0;
       loading = false;
       error = None;
@@ -61,7 +64,7 @@ let update ps _ = ps
 
 (** Compute a payout blueprint for the delegators tab if needed.
     Only runs when the tab is active and cached data is available.
-    Uses default payout config (no file I/O). *)
+    Uses the loaded config if available, otherwise default config. *)
 let maybe_compute_blueprint s =
   if s.active_tab <> Rewards_state.Delegators then s
   else
@@ -91,7 +94,11 @@ let maybe_compute_blueprint s =
                       | Ok (Some svc) -> svc.Service.network
                       | _ -> "unknown"
                     in
-                    let config = Payout_config.default ~baker_pkh:pkh in
+                    let config =
+                      match s.config with
+                      | Some c -> c
+                      | None -> Payout_config.default ~baker_pkh:pkh
+                    in
                     let bp =
                       Reward_calculator.generate_blueprint
                         ~config
@@ -99,6 +106,28 @@ let maybe_compute_blueprint s =
                         ~cycle_rewards:cr
                     in
                     {s with blueprint = Some bp; selected_cycle = Some cycle})))
+
+(** Load payout config from disk when first viewing the Configuration tab.
+    Only loads once; subsequent changes are in-memory until saved. *)
+let maybe_load_config s =
+  if s.active_tab <> Rewards_state.Configuration then s
+  else if Option.is_some s.config then s
+  else
+    match Rewards_state.selected_baker_instance s with
+    | None -> s
+    | Some (instance, pkh) ->
+        let config =
+          match Payout_config.load ~instance with
+          | Ok c -> c
+          | Error _ -> Payout_config.default ~baker_pkh:pkh
+        in
+        {s with config = Some config}
+
+(** Apply pending config edits from modal callbacks. *)
+let apply_pending_config s =
+  match Rewards_config_tab.consume_pending_config () with
+  | Some config -> {s with config = Some config; config_dirty = true}
+  | None -> s
 
 let refresh ps =
   match Context.consume_navigation () with
@@ -111,7 +140,9 @@ let refresh ps =
           let baker_instances = load_baker_instances () in
           let current_cycle = Rewards_scheduler.get_current_cycle () in
           let s = {s with baker_instances; current_cycle} in
-          maybe_compute_blueprint s)
+          let s = maybe_compute_blueprint s in
+          let s = maybe_load_config s in
+          apply_pending_config s)
         ps
 
 let move ps _ = ps
@@ -161,6 +192,10 @@ let hint_for_tab = function
       Widgets.themed_muted
         "j/k nav \xc2\xb7 / search \xc2\xb7 s sort \xc2\xb7 f filter \xc2\xb7 \
          c cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
+  | Rewards_state.Configuration ->
+      Widgets.themed_muted
+        "j/k nav \xc2\xb7 Enter edit \xc2\xb7 s save \xc2\xb7 r reset \xc2\xb7 \
+         1-4 tabs \xc2\xb7 Esc back"
   | _ ->
       Widgets.themed_muted
         "1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc back"
@@ -183,7 +218,8 @@ let view ps ~focus:_ ~size =
       | Rewards_state.Delegators ->
           Rewards_delegators.render ~state:s ~cols ~rows
       | Rewards_state.History -> render_placeholder "History"
-      | Rewards_state.Configuration -> render_placeholder "Configuration")
+      | Rewards_state.Configuration ->
+          Rewards_config_tab.render ~state:s ~cols ~_rows:rows)
 
 (** Count filtered delegators for cursor bounds. *)
 let delegator_count s =
@@ -304,6 +340,44 @@ let handle_delegator_key ps key =
                 ps))
   | _ -> ps
 
+(** Handle keys specific to the Configuration tab. *)
+let handle_config_key ps key =
+  let s = ps.Navigation.s in
+  match Keys.of_string key with
+  | Some (Keys.Char "j") | Some Keys.Down ->
+      Navigation.update
+        (fun s ->
+          {
+            s with
+            config_cursor =
+              min (s.config_cursor + 1) (Rewards_config_tab.field_count - 1);
+          })
+        ps
+  | Some (Keys.Char "k") | Some Keys.Up ->
+      Navigation.update
+        (fun s -> {s with config_cursor = max (s.config_cursor - 1) 0})
+        ps
+  | Some Keys.Enter -> (
+      match s.config with
+      | Some config ->
+          let field = List.nth Rewards_config_tab.all_fields s.config_cursor in
+          Rewards_config_tab.edit_field config field ;
+          ps
+      | None -> ps)
+  | Some (Keys.Char "s") -> (
+      match (s.config, Rewards_state.selected_instance_name s) with
+      | Some config, Some instance ->
+          Rewards_config_tab.save_config ~instance config ;
+          Navigation.update (fun s -> {s with config_dirty = false}) ps
+      | _ -> ps)
+  | Some (Keys.Char "r") -> (
+      match Rewards_state.selected_baker_pkh s with
+      | Some baker_pkh ->
+          Rewards_config_tab.reset_config ~baker_pkh ;
+          ps
+      | None -> ps)
+  | _ -> ps
+
 let handle_key ps key ~size:_ =
   let s = ps.Navigation.s in
   (* Search mode captures all input *)
@@ -328,7 +402,7 @@ let handle_key ps key ~size:_ =
           (fun s -> {s with active_tab = Rewards_state.Configuration})
           ps
     | Some (Keys.Char "b") ->
-        (* Cycle baker selection, reset blueprint *)
+        (* Cycle baker selection, reset blueprint and config *)
         let n = List.length s.baker_instances in
         if n > 1 then
           Navigation.update
@@ -337,14 +411,19 @@ let handle_key ps key ~size:_ =
                 s with
                 selected_baker = (s.selected_baker + 1) mod n;
                 blueprint = None;
+                config = None;
+                config_dirty = false;
                 selected_cycle = None;
                 delegator_cursor = 0;
               })
             ps
         else ps
-    | Some (Keys.Char "r") -> refresh ps
+    | Some (Keys.Char "r") when s.active_tab <> Rewards_state.Configuration ->
+        refresh ps
     | _ when s.active_tab = Rewards_state.Delegators ->
         handle_delegator_key ps key
+    | _ when s.active_tab = Rewards_state.Configuration ->
+        handle_config_key ps key
     | _ -> ps
 
 let keymap _ps =
