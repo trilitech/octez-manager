@@ -185,13 +185,6 @@ let render_baker_header (s : Rewards_state.state) =
       Widgets.themed_primary
         (Printf.sprintf " Rewards - %s (%s) " instance short_pkh)
 
-let render_placeholder tab_name =
-  String.concat
-    "\n"
-    [
-      ""; Widgets.themed_muted (Printf.sprintf "  %s tab — coming soon" tab_name);
-    ]
-
 let hint_for_tab = function
   | Rewards_state.Delegators ->
       Widgets.themed_muted
@@ -205,9 +198,9 @@ let hint_for_tab = function
       Widgets.themed_muted
         "g generate \xc2\xb7 1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \
          \xc2\xb7 Esc back"
-  | _ ->
+  | Rewards_state.History ->
       Widgets.themed_muted
-        "1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc back"
+        "j/k nav \xc2\xb7 Enter view cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
@@ -226,7 +219,7 @@ let view ps ~focus:_ ~size =
       | Rewards_state.Overview -> Rewards_overview.render ~state:s ~cols
       | Rewards_state.Delegators ->
           Rewards_delegators.render ~state:s ~cols ~rows
-      | Rewards_state.History -> render_placeholder "History"
+      | Rewards_state.History -> Rewards_history.render ~state:s ~cols ~rows
       | Rewards_state.Configuration ->
           Rewards_config_tab.render ~state:s ~cols ~_rows:rows)
 
@@ -387,6 +380,49 @@ let handle_config_key ps key =
       | None -> ps)
   | _ -> ps
 
+(** Handle keys specific to the History tab. *)
+let handle_history_key ps key =
+  let s = ps.Navigation.s in
+  let count =
+    match Rewards_state.selected_baker_pkh s with
+    | None -> 0
+    | Some baker ->
+        Rewards_history.cycle_count (Rewards_scheduler.get_recent_cycles ~baker)
+  in
+  match Keys.of_string key with
+  | Some (Keys.Char "j") | Some Keys.Down ->
+      Navigation.update
+        (fun s ->
+          {
+            s with
+            history_cursor = min (s.history_cursor + 1) (max 0 (count - 1));
+          })
+        ps
+  | Some (Keys.Char "k") | Some Keys.Up ->
+      Navigation.update
+        (fun s -> {s with history_cursor = max (s.history_cursor - 1) 0})
+        ps
+  | Some Keys.Enter -> (
+      (* Navigate to the selected cycle's Overview/Delegators view *)
+      match Rewards_state.selected_baker_pkh s with
+      | None -> ps
+      | Some baker -> (
+          let recent = Rewards_scheduler.get_recent_cycles ~baker in
+          match List.nth_opt recent s.history_cursor with
+          | None -> ps
+          | Some (cr : Rewards.cycle_rewards) ->
+              Navigation.update
+                (fun s ->
+                  {
+                    s with
+                    selected_cycle = Some cr.cycle;
+                    active_tab = Rewards_state.Overview;
+                    blueprint = None;
+                    overview_preview = false;
+                  })
+                ps))
+  | _ -> ps
+
 let handle_key ps key ~size:_ =
   let s = ps.Navigation.s in
   (* Search mode captures all input *)
@@ -461,6 +497,7 @@ let handle_key ps key ~size:_ =
         handle_delegator_key ps key
     | _ when s.active_tab = Rewards_state.Configuration ->
         handle_config_key ps key
+    | _ when s.active_tab = Rewards_state.History -> handle_history_key ps key
     | _ -> ps
 
 let keymap _ps =
