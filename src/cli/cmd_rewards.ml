@@ -129,9 +129,7 @@ let status_run baker_opt =
             | Error _ -> []
           in
           let delegator_count =
-            match recent with
-            | cr :: _ -> List.length cr.Rewards.delegators
-            | [] -> 0
+            match recent with cr :: _ -> cr.Rewards.num_delegators | [] -> 0
           in
           let pending =
             match (current_cycle, last_paid) with
@@ -339,7 +337,17 @@ let history_run baker_opt cycles_count json =
           | Ok cycles ->
               if json then
                 let cycle_json (cr : Rewards.cycle_rewards) =
-                  let earned = Int64.add cr.block_rewards cr.block_fees in
+                  let earned =
+                    List.fold_left
+                      Int64.add
+                      0L
+                      [
+                        cr.block_rewards;
+                        cr.attestation_rewards;
+                        cr.other_rewards;
+                        cr.block_fees;
+                      ]
+                  in
                   let status =
                     Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
                   in
@@ -362,7 +370,7 @@ let history_run baker_opt cycles_count json =
                       ("earned", `String (Int64.to_string earned));
                       ("distributed", distributed);
                       ("fee_income", fee_income);
-                      ("delegators", `Int (List.length cr.delegators));
+                      ("delegators", `Int cr.num_delegators);
                       ("status", `String (if status then "paid" else "unpaid"));
                     ]
                 in
@@ -387,7 +395,17 @@ let history_run baker_opt cycles_count json =
                   "STATUS" ;
                 List.iter
                   (fun (cr : Rewards.cycle_rewards) ->
-                    let earned = Int64.add cr.block_rewards cr.block_fees in
+                    let earned =
+                      List.fold_left
+                        Int64.add
+                        0L
+                        [
+                          cr.block_rewards;
+                          cr.attestation_rewards;
+                          cr.other_rewards;
+                          cr.block_fees;
+                        ]
+                    in
                     let is_paid =
                       Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
                     in
@@ -411,7 +429,7 @@ let history_run baker_opt cycles_count json =
                       (format_tez_short earned)
                       distributed
                       fee_income
-                      (List.length cr.delegators)
+                      cr.num_delegators
                       status_str)
                   cycles) ;
               `Ok ()))

@@ -73,7 +73,7 @@ let init () =
       selected_baker = 0;
       active_tab = Rewards_state.Overview;
       selected_cycle = None;
-      current_cycle = Rewards_scheduler.get_current_cycle ();
+      current_cycle = None;
       delegator_cursor = 0;
       delegator_sort = Rewards_state.SortBalance;
       delegator_filter = Rewards_state.FilterAll;
@@ -171,7 +171,12 @@ let refresh ps =
       Navigation.update
         (fun s ->
           let baker_instances = load_baker_instances () in
-          let current_cycle = Rewards_scheduler.get_current_cycle () in
+          let current_cycle =
+            match Rewards_state.selected_baker_instance s with
+            | Some (instance, _) ->
+                Rewards_scheduler.get_current_cycle ~instance
+            | None -> None
+          in
           let s = {s with baker_instances; current_cycle} in
           let s = maybe_compute_blueprint s in
           let s = maybe_load_config s in

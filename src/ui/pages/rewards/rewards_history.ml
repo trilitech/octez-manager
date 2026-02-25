@@ -29,13 +29,21 @@ let render_sparklines ~box_width (cycles : Rewards.cycle_rewards list) ~instance
   let earned_data =
     List.map
       (fun (cr : Rewards.cycle_rewards) ->
-        Int64.to_float (Int64.add cr.block_rewards cr.block_fees))
+        Int64.to_float
+          (List.fold_left
+             Int64.add
+             0L
+             [
+               cr.block_rewards;
+               cr.attestation_rewards;
+               cr.other_rewards;
+               cr.block_fees;
+             ]))
       sorted
   in
   let delegator_data =
     List.map
-      (fun (cr : Rewards.cycle_rewards) ->
-        Float.of_int (List.length cr.delegators))
+      (fun (cr : Rewards.cycle_rewards) -> Float.of_int cr.num_delegators)
       sorted
   in
   let distributed_data =
@@ -81,7 +89,16 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
     List.mapi
       (fun i (cr : Rewards.cycle_rewards) ->
         let earned =
-          format_tez_short (Int64.add cr.block_rewards cr.block_fees)
+          format_tez_short
+            (List.fold_left
+               Int64.add
+               0L
+               [
+                 cr.block_rewards;
+                 cr.attestation_rewards;
+                 cr.other_rewards;
+                 cr.block_fees;
+               ])
           ^ " \xEA\x9C\xA9"
         in
         let status =
@@ -106,7 +123,7 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
           | Rewards.Partial -> Widgets.themed_warning "partial"
           | Rewards.In_progress -> Widgets.themed_accent "active"
         in
-        let delegators = string_of_int (List.length cr.delegators) in
+        let delegators = string_of_int cr.num_delegators in
         let indicator =
           if i = state.history_cursor then "\xe2\x96\xb8" else " "
         in

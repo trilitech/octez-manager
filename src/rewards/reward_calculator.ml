@@ -28,7 +28,15 @@ let delegator_status config delegator ~balance ~net_reward =
 let generate_blueprint ~config ~network ~cycle_rewards =
   let cr = cycle_rewards in
   let total_rewards =
-    Int64.add cr.Rewards.block_rewards cr.Rewards.block_fees
+    List.fold_left
+      Int64.add
+      0L
+      [
+        cr.Rewards.block_rewards;
+        cr.Rewards.attestation_rewards;
+        cr.Rewards.other_rewards;
+        cr.Rewards.block_fees;
+      ]
   in
   (* Compute the effective staking balance for overdelegation protection.
      The limit is 9x the baker's own staked balance. *)
@@ -211,7 +219,7 @@ let generate_blueprint ~config ~network ~cycle_rewards =
     network;
     earned_rewards = total_rewards;
     earned_block_fees = cr.block_fees;
-    total_delegators = List.length cr.delegators;
+    total_delegators = cr.num_delegators;
     eligible_delegators;
     delegator_rewards;
     baker_bond_income = baker_share;
