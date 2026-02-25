@@ -873,6 +873,15 @@ let table_lines_single state =
     in
     Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
   in
+  let sandbox_row =
+    let marker =
+      if state.selected = 3 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf
+      "%s %s"
+      marker
+      (Widgets.themed_emphasis "[ Manage sandboxes ]")
+  in
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
     else
@@ -923,7 +932,7 @@ let table_lines_single state =
       let separator = Widgets.themed_muted (String.make 80 '-') in
       "" :: separator :: external_rows
   in
-  (install_row :: binaries_row :: rpc_row :: "" :: instance_rows)
+  (install_row :: binaries_row :: rpc_row :: sandbox_row :: "" :: instance_rows)
   @ external_rows
 
 (** Multi-column matrix layout *)
@@ -976,6 +985,15 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     in
     Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
   in
+  let sandbox_row =
+    let marker =
+      if state.selected = 3 then Widgets.themed_emphasis "➤" else " "
+    in
+    Printf.sprintf
+      "%s %s"
+      marker
+      (Widgets.themed_emphasis "[ Manage sandboxes ]")
+  in
   (* When selection is in menu area, use -1 to dim all columns equally *)
   let effective_active_column =
     if state.selected < services_start_idx then -1 else state.active_column
@@ -1002,7 +1020,8 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Append external services below the columnar grid *)
   let result =
-    install_row :: binaries_row :: rpc_row :: "" :: instance_rows_trimmed
+    install_row :: binaries_row :: rpc_row :: sandbox_row :: ""
+    :: instance_rows_trimmed
   in
   if external_line_count > 0 then
     let separator = Widgets.themed_muted (String.make (min cols 120) '-') in
@@ -1040,12 +1059,21 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
       in
       Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
     in
+    let sandbox_row =
+      let marker =
+        if state.selected = 3 then Widgets.themed_emphasis "➤" else " "
+      in
+      Printf.sprintf
+        "%s %s"
+        marker
+        (Widgets.themed_emphasis "[ Manage sandboxes ]")
+    in
     let external_rows = render_external_services_section state in
     let external_rows =
       if external_rows = [] then [] else "" :: external_rows
     in
-    install_row :: binaries_row :: rpc_row :: "" :: "  No managed instances."
-    :: external_rows
+    install_row :: binaries_row :: rpc_row :: sandbox_row :: ""
+    :: "  No managed instances." :: external_rows
   else if num_columns <= 1 then table_lines_single state
   else
     (* For matrix layout, subtract for menu rows (install + separator) *)
