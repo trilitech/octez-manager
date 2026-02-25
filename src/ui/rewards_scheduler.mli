@@ -39,9 +39,20 @@ val get_recent_cycles :
 (** Get the cached current cycle number for a specific instance. *)
 val get_current_cycle : instance:string -> int option
 
-(** Get payout status for a baker + cycle (paid/unpaid/partial). *)
+(** Get payout status for a baker + cycle (paid/unpaid/partial/in_progress).
+    Pure cache read — safe for view functions. *)
 val get_payout_status :
   instance:string -> cycle:int -> Octez_manager_rewards.Rewards.payout_status
+
+(** Refresh payout status from disk for a specific cycle.
+    Reads summary.json to determine Paid vs Partial. Does I/O. *)
+val refresh_payout_status : instance:string -> cycle:int -> unit
+
+(** Mark a cycle as having a payout in progress. *)
+val mark_in_progress : instance:string -> cycle:int -> unit
+
+(** Clear the in-progress marker for a cycle. *)
+val clear_in_progress : instance:string -> cycle:int -> unit
 
 (** Get the auto-detected baker address for an instance.
     Returns [None] if the scheduler hasn't detected the baker yet. *)
@@ -57,6 +68,11 @@ val get_network_for_instance : instance:string -> string option
 val sync_continual_from_config : instance:string -> unit
 
 (** {1 Refresh} *)
+
+(** Ensure delegator details are loaded for a specific cycle.
+    If the cycle data is missing or lacks delegators, fetches it
+    in the background via [Domain_pool]. Safe to call from key handlers. *)
+val ensure_cycle_detail : instance:string -> baker:string -> cycle:int -> unit
 
 (** Trigger an immediate refresh for a specific baker instance.
     Called after config changes or payout execution. *)
