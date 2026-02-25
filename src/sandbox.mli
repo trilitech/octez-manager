@@ -34,17 +34,22 @@ val find_sandbox_bakers :
 
     Steps:
     1. Create group (sandbox=true)
-    2. Install node with snapshot, --no-bootstrap-peers, --allow-yes-crypto, yes_crypto env
-    3. Start node and wait for RPC to become available
-    4. Generate yes-wallet with top N active delegates
-    5. Install and start baker with wallet as base_dir and yes_crypto env
+    2. Install node 1 with snapshot, --no-bootstrap-peers, --allow-yes-crypto
+    3. Start node 1 and wait for RPC to become available
+    4. (if num_nodes > 1) Install nodes 2..N peered to node 1
+    5. Generate yes-wallet with top N active delegates
+    6..6+num_bakers. Install bakers, splitting delegates evenly
+    7. (if accuser) Install one accuser connected to node 1
 
     @param on_log Optional callback for step-by-step progress messages
     @param network Network name (e.g., "mainnet", "ghostnet")
     @param name Sandbox name (default: generated from network)
-    @param rpc_addr Node RPC address (default: auto-assigned)
-    @param snapshot Optional snapshot URI
+    @param rpc_addr Node 1 RPC address (default: auto-assigned)
+    @param snapshot Optional snapshot URI (reused for all nodes)
     @param max_delegates Max delegates to impersonate (default: 20)
+    @param num_nodes Number of nodes to create (default: 1)
+    @param num_bakers Number of bakers to create (default: 1)
+    @param accuser Whether to install an accuser service (default: false)
     @param bin_source Binary source for node and baker *)
 val create :
   ?on_log:(string -> unit) ->
@@ -53,6 +58,9 @@ val create :
   ?rpc_addr:string ->
   ?snapshot:string ->
   ?max_delegates:int ->
+  ?num_nodes:int ->
+  ?num_bakers:int ->
+  ?accuser:bool ->
   bin_source:Binary_registry.bin_source ->
   service_user:string ->
   app_bin_dir:string ->
