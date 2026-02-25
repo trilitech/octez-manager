@@ -29,7 +29,8 @@ let register_pages () =
   Keys_page.register () ;
   Rewards_page.register () ;
   Sandbox_page.register () ;
-  Sandbox_create_form.register ()
+  Sandbox_create_form.register () ;
+  Sandbox_key_alloc_page.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in

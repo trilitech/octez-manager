@@ -40,6 +40,13 @@ val write_wallet :
   Yes_wallet.delegate list ->
   (unit, [> `Msg of string]) result
 
+(** Read the [public_key_hashs] file from a wallet directory.
+
+    Returns a list of [(alias, address)] pairs. Returns [[]] if the file does
+    not exist. Used to inspect wallet contents without rewriting. *)
+val read_wallet_pkhs :
+  wallet_dir:string -> ((string * string) list, [> `Msg of string]) result
+
 (** Add a single account to an existing wallet directory.
 
     Reads existing wallet files, appends the new delegate, and rewrites.
