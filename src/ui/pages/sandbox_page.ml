@@ -266,6 +266,153 @@ let port_of addr =
   | Some i -> String.sub addr (i + 1) (String.length addr - i - 1)
   | None -> addr
 
+(** Find the index of the first element satisfying [pred]; returns -1 if not found. *)
+let find_idx pred lst =
+  let rec aux i = function
+    | [] -> -1
+    | x :: rest -> if pred x then i else aux (i + 1) rest
+  in
+  aux 0 lst
+
+(* ─── Canvas Topology Helpers ───────────────────────────────────────────── *)
+
+let fg_of_style style fallback =
+  let resolved = Miaou_style.Style.to_resolved style in
+  if resolved.r_fg >= 0 then resolved.r_fg else fallback
+
+let canvas_dim_style = {C.default_style with dim = true}
+
+let canvas_status_style st =
+  let color =
+    match st with
+    | Data.Service_state.Running -> fg_of_style (Style_context.success ()) 10
+    | Data.Service_state.Stopped -> fg_of_style (Style_context.text_muted ()) 8
+    | Data.Service_state.Unknown _ -> fg_of_style (Style_context.warning ()) 9
+  in
+  {C.default_style with fg = color; bold = true}
+
+let canvas_status_char = function
+  | Data.Service_state.Running -> "●"
+  | Data.Service_state.Stopped -> "○"
+  | Data.Service_state.Unknown _ -> "?"
+
+(** Draw a compact service box [● Lbl] width=7, height=3. Returns center col. *)
+let draw_compact_box c ~row ~col ~label ~role ~st =
+  let box_w = 7 in
+  let border_color =
+    match role with
+    | "node" -> fg_of_style (Style_context.primary ()) 14
+    | _ -> fg_of_style (Style_context.accent ()) 12
+  in
+  C.draw_box
+    c
+    ~row
+    ~col
+    ~width:box_w
+    ~height:3
+    ~border:Rounded
+    ~style:{C.default_style with fg = border_color} ;
+  C.draw_text
+    c
+    ~row:(row + 1)
+    ~col:(col + 1)
+    ~style:(canvas_status_style st)
+    (canvas_status_char st) ;
+  C.draw_text
+    c
+    ~row:(row + 1)
+    ~col:(col + 3)
+    ~style:{C.default_style with fg = border_color; bold = true}
+    label ;
+  col + (box_w / 2)
+
+(** Build a compact canvas: nodes row, peer connections, baker row.
+    Uses short labels (N1/N2… for nodes, B1/B2… for bakers) to fit narrow panel. *)
+let render_sandbox_canvas (sb : sandbox_info) ~width =
+  let box_w = 7 in
+  let h_gap = 3 in
+  let slot_w = box_w + h_gap in
+  let node_h = 3 in
+  let v_gap = 3 in
+  let n_nodes = max 1 (List.length sb.nodes) in
+  let has_bakers = not (List.is_empty sb.bakers) in
+  let canvas_w = max width (n_nodes * slot_w) in
+  let canvas_h = node_h + if has_bakers then v_gap + node_h else 0 in
+  let c = C.create ~rows:canvas_h ~cols:canvas_w in
+  (* Draw nodes and collect their center columns *)
+  let node_centers =
+    List.mapi
+      (fun i (ni : node_info) ->
+        let col = i * slot_w in
+        let st =
+          match ni.state with
+          | Some s -> s.Data.Service_state.status
+          | None -> Data.Service_state.Unknown "?"
+        in
+        let label = Printf.sprintf "N%d" (i + 1) in
+        draw_compact_box c ~row:0 ~col ~label ~role:"node" ~st)
+      sb.nodes
+  in
+  (* Draw peer connections: horizontal line at mid-row between peered nodes.
+     Draw only from the rightmost endpoint (i = max(i,j)) to avoid duplicates. *)
+  List.iteri
+    (fun i (ni : node_info) ->
+      List.iter
+        (fun peer ->
+          let peer_port = port_of peer in
+          let j =
+            find_idx
+              (fun (ni2 : node_info) ->
+                let p = port_of ni2.svc.net_addr in
+                String.equal p peer_port && not (String.equal p ""))
+              sb.nodes
+          in
+          if j >= 0 && j <> i then begin
+            let left = min i j in
+            let right = max i j in
+            (* Only draw once: from the node with higher index *)
+            if i = right then begin
+              let left_center = List.nth node_centers left in
+              let right_edge = (right * slot_w) - 1 in
+              for cc = left_center + 1 to right_edge do
+                C.set_char c ~row:1 ~col:cc ~char:"─" ~style:canvas_dim_style
+              done
+            end
+          end)
+        ni.peers)
+    sb.nodes ;
+  (* Draw bakers under their parent nodes *)
+  let baker_row = node_h + v_gap in
+  List.iteri
+    (fun bi (baker : baker_info) ->
+      let parent_center =
+        match baker.svc.depends_on with
+        | None -> (bi mod n_nodes * slot_w) + (box_w / 2)
+        | Some parent ->
+            let i =
+              find_idx
+                (fun (ni : node_info) -> String.equal ni.svc.instance parent)
+                sb.nodes
+            in
+            if i >= 0 then List.nth node_centers i
+            else (bi mod n_nodes * slot_w) + (box_w / 2)
+      in
+      let col = max 0 (parent_center - (box_w / 2)) in
+      let st =
+        match baker.state with
+        | Some s -> s.Data.Service_state.status
+        | None -> Data.Service_state.Unknown "?"
+      in
+      let label = Printf.sprintf "B%d" (bi + 1) in
+      let _mid =
+        draw_compact_box c ~row:baker_row ~col ~label ~role:"baker" ~st
+      in
+      for r = node_h to baker_row - 1 do
+        C.set_char c ~row:r ~col:parent_center ~char:"│" ~style:canvas_dim_style
+      done)
+    sb.bakers ;
+  C.to_ansi c
+
 (** Match a configured --peer address to a node name by comparing P2P ports. *)
 let peer_to_node_name nodes peer_addr =
   let peer_port = port_of peer_addr in
@@ -379,11 +526,41 @@ let render_topology (sb : sandbox_info) ~stake_pct ~size =
     | None -> T.muted " stake: fetching..."
   in
   push (T.concat [T.muted "%d delegates" total_dels; stake_str]) ;
+  (* ── Legend for canvas ── *)
+  let node_legend =
+    List.mapi
+      (fun i (ni : node_info) -> T.muted "N%d=%s" (i + 1) ni.svc.instance)
+      sb.nodes
+  in
+  let baker_legend =
+    List.mapi
+      (fun i (bi : baker_info) -> T.muted "B%d=%s" (i + 1) bi.svc.instance)
+      sb.bakers
+  in
+  let legend_items = node_legend @ baker_legend in
+  if legend_items <> [] then (
+    push "" ;
+    push (String.concat (T.muted "  ") legend_items)) ;
   let content = Buffer.contents buf in
+  let avail_cols = size.LTerm_geom.cols - 4 in
   Flex.create
     ~direction:Flex.Column
     ~padding:{Flex.left = 2; right = 1; top = 1; bottom = 0}
-    [{Flex.render = (fun ~size:_ -> content); basis = Flex.Fill; cross = None}]
+    [
+      {
+        Flex.render = (fun ~size:_ -> content);
+        basis = Flex.Px (List.length (String.split_on_char '\n' content));
+        cross = None;
+      };
+      {
+        Flex.render =
+          (fun ~size:_ ->
+            if sb.nodes = [] then ""
+            else render_sandbox_canvas sb ~width:avail_cols);
+        basis = Flex.Fill;
+        cross = None;
+      };
+    ]
   |> Flex.render ~size
 
 let render_create_detail ~size =
