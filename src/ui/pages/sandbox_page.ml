@@ -5,7 +5,7 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(** Sandbox management page — list sandboxes, create, start, stop, destroy.
+(** Sandbox management page — list sandboxes, topology view, actions.
 
     LAYOUT RULE: All layouts use Flex_layout / Grid_layout / Box_widget.
     No manual string alignment, no Pane_layout. *)
@@ -13,7 +13,6 @@
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 module Flex = Miaou_widgets_layout.Flex_layout
-module DL = Miaou_widgets_display.Description_list
 module T = Themed_text
 open Octez_manager_lib
 open Rresult
@@ -24,12 +23,22 @@ let name = "sandbox"
 
 (* ─── State ────────────────────────────────────────────────────────────── *)
 
+type node_info = {
+  svc : Service.t;
+  state : Data.Service_state.t option;
+  peers : string list;  (** Configured --peer addresses from extra_args *)
+}
+
+type baker_info = {
+  svc : Service.t;
+  state : Data.Service_state.t option;
+  delegate_count : int;
+}
+
 type sandbox_info = {
   group : Group.t;
-  node : Service.t option;
-  baker : Service.t option;
-  node_state : Data.Service_state.t option;
-  baker_state : Data.Service_state.t option;
+  nodes : node_info list;
+  bakers : baker_info list;
 }
 
 type state = {sandboxes : sandbox_info list; cursor : int}
@@ -38,7 +47,60 @@ type msg = unit
 
 type pstate = state Navigation.t
 
+(* ─── Async stake% cache ────────────────────────────────────────────────── *)
+
+(** Two-table approach to prevent duplicate background fetches while allowing
+    retry on failure. [stake_fetching] tracks in-progress fetches. *)
+let stake_fetching : (string, unit) Hashtbl.t = Hashtbl.create 4
+
+let stake_results : (string, float) Hashtbl.t = Hashtbl.create 4
+
+let stake_lock = Mutex.create ()
+
+let get_stake_pct group_name =
+  Mutex.protect stake_lock (fun () -> Hashtbl.find_opt stake_results group_name)
+
+let schedule_stake_fetch ~group_name ~endpoint ~wallet_dir =
+  let should_fetch =
+    Mutex.protect stake_lock (fun () ->
+        if
+          Hashtbl.mem stake_fetching group_name
+          || Hashtbl.mem stake_results group_name
+        then false
+        else (
+          Hashtbl.replace stake_fetching group_name () ;
+          true))
+  in
+  if should_fetch then
+    Background_runner.enqueue (fun () ->
+        let result = Yes_wallet_io.fetch_stake_pct ~endpoint ~wallet_dir in
+        Mutex.protect stake_lock (fun () ->
+            Hashtbl.remove stake_fetching group_name ;
+            match result with
+            | Ok pct -> Hashtbl.replace stake_results group_name pct
+            | Error _ -> ()) ;
+        Context.mark_instances_dirty ())
+
 (* ─── Data Loading ──────────────────────────────────────────────────────── *)
+
+let parse_peers (svc : Service.t) =
+  let rec loop = function
+    | "--peer" :: addr :: rest -> addr :: loop rest
+    | _ :: rest -> loop rest
+    | [] -> []
+  in
+  loop svc.extra_args
+
+let load_baker_delegate_count instance =
+  match Node_env.read ~inst:instance with
+  | Error _ -> 0
+  | Ok pairs -> (
+      match List.assoc_opt "OCTEZ_BAKER_DELEGATES_CSV" pairs with
+      | None | Some "" -> 0
+      | Some csv ->
+          csv |> String.split_on_char ',' |> List.map String.trim
+          |> List.filter (fun s -> not (String.equal s ""))
+          |> List.length)
 
 let load_sandboxes () =
   let service_states = Data.load_service_states () in
@@ -58,23 +120,23 @@ let load_sandboxes () =
             | Ok l -> l
             | Error _ -> []
           in
-          let node =
-            List.find_opt
-              (fun (s : Service.t) -> String.equal s.role "node")
-              services
+          let nodes =
+            services
+            |> List.filter (fun (s : Service.t) -> String.equal s.role "node")
+            |> List.map (fun svc ->
+                {svc; state = find_state svc.instance; peers = parse_peers svc})
           in
-          let baker =
-            List.find_opt
-              (fun (s : Service.t) -> String.equal s.role "baker")
-              services
+          let bakers =
+            services
+            |> List.filter (fun (s : Service.t) -> String.equal s.role "baker")
+            |> List.map (fun svc ->
+                {
+                  svc;
+                  state = find_state svc.instance;
+                  delegate_count = load_baker_delegate_count svc.instance;
+                })
           in
-          {
-            group = g;
-            node;
-            baker;
-            node_state = Option.bind node (fun s -> find_state s.instance);
-            baker_state = Option.bind baker (fun s -> find_state s.instance);
-          })
+          {group = g; nodes; bakers})
         groups
 
 let clamp_cursor sandboxes cursor =
@@ -95,17 +157,35 @@ let init () =
 
 let update ps _ = ps
 
+let maybe_schedule_stake_fetch s =
+  match selected_sandbox s with
+  | None -> ()
+  | Some sb -> (
+      match sb.nodes with
+      | [] -> ()
+      | first :: _ ->
+          let endpoint = Rpc_addr.to_endpoint first.svc.rpc_addr in
+          let wallet = Sandbox.wallet_dir ~sandbox_name:sb.group.name in
+          schedule_stake_fetch
+            ~group_name:sb.group.name
+            ~endpoint
+            ~wallet_dir:wallet)
+
 let refresh ps =
   match Context.consume_navigation () with
   | Some (Context.Goto p) -> Navigation.goto p ps
   | Some Context.Back -> Navigation.back ps
   | Some Context.Quit -> Navigation.quit ps
   | None ->
-      if Context.consume_instances_dirty () then
-        let sandboxes = load_sandboxes () in
-        let cursor = clamp_cursor sandboxes ps.Navigation.s.cursor in
-        Navigation.update (fun _s -> {sandboxes; cursor}) ps
-      else ps
+      let ps' =
+        if Context.consume_instances_dirty () then
+          let sandboxes = load_sandboxes () in
+          let cursor = clamp_cursor sandboxes ps.Navigation.s.cursor in
+          Navigation.update (fun _s -> {sandboxes; cursor}) ps
+        else ps
+      in
+      maybe_schedule_stake_fetch ps'.Navigation.s ;
+      ps'
 
 let move ps _ = ps
 
@@ -115,7 +195,7 @@ let service_cycle ps _ = refresh ps
 
 let back ps = Navigation.back ps
 
-(* ─── Rendering ─────────────────────────────────────────────────────────── *)
+(* ─── List Panel ────────────────────────────────────────────────────────── *)
 
 let status_badge (st : Data.Service_state.t option) =
   match st with
@@ -124,17 +204,6 @@ let status_badge (st : Data.Service_state.t option) =
   | Some {status = Stopped; _} -> T.error "○"
   | Some _ -> T.muted "?"
 
-let render_list_item ~selected ~sb =
-  let node_dot = status_badge sb.node_state in
-  let baker_dot = status_badge sb.baker_state in
-  let arrow = if selected then T.warning "▶" else " " in
-  let label =
-    T.concat
-      [arrow; " "; node_dot; " "; baker_dot; "  "; T.text "%s" sb.group.name]
-  in
-  let net = T.muted "  %s" sb.group.network in
-  T.concat [label; "\n"; net]
-
 let render_create_item ~selected =
   let arrow = if selected then T.warning "▶" else " " in
   let label =
@@ -142,6 +211,25 @@ let render_create_item ~selected =
   in
   let hint = T.muted "   Create a sandbox" in
   T.concat [label; "\n"; hint]
+
+let render_list_item ~selected ~(sb : sandbox_info) =
+  let node_dot =
+    match sb.nodes with
+    | first :: _ -> status_badge first.state
+    | [] -> T.muted "?"
+  in
+  let baker_dot =
+    match sb.bakers with
+    | first :: _ -> status_badge first.state
+    | [] -> T.muted "?"
+  in
+  let arrow = if selected then T.warning "▶" else " " in
+  let label =
+    T.concat
+      [arrow; " "; node_dot; " "; baker_dot; "  "; T.text "%s" sb.group.name]
+  in
+  let net = T.muted "  %s" sb.group.network in
+  T.concat [label; "\n"; net]
 
 let render_list ~sandboxes ~cursor ~size =
   let rows_per_item = 2 in
@@ -169,49 +257,132 @@ let render_list ~sandboxes ~cursor ~size =
     (create_row :: sandbox_rows)
   |> fun f -> Flex.render f ~size
 
-let rpc_metrics_for (sb : sandbox_info) =
-  match sb.node with
-  | None -> None
-  | Some svc -> Rpc_metrics.get ~instance:svc.instance
+(* ─── Topology Panel ────────────────────────────────────────────────────── *)
 
-let render_detail ~sb ~size =
-  let cols = size.LTerm_geom.cols in
-  let g = sb.group in
-  let metrics = rpc_metrics_for sb in
-  let head_level =
-    match metrics with
-    | Some {head_level = Some n; _} -> string_of_int n
-    | _ -> "–"
+let port_of addr =
+  match String.rindex_opt addr ':' with
+  | Some i -> String.sub addr (i + 1) (String.length addr - i - 1)
+  | None -> addr
+
+(** Match a configured --peer address to a node name by comparing P2P ports. *)
+let peer_to_node_name nodes peer_addr =
+  let peer_port = port_of peer_addr in
+  List.find_map
+    (fun (ni : node_info) ->
+      let node_port = port_of ni.svc.net_addr in
+      if String.equal node_port peer_port && not (String.equal node_port "")
+      then Some ni.svc.instance
+      else None)
+    nodes
+
+let render_dot (state : Data.Service_state.t option) =
+  match state with
+  | Some {status = Running; _} -> T.success "●"
+  | Some {status = Stopped; _} -> T.error "○"
+  | Some _ | None -> T.muted "?"
+
+let render_topology (sb : sandbox_info) ~stake_pct ~size =
+  let buf = Buffer.create 512 in
+  let push s =
+    Buffer.add_string buf s ;
+    Buffer.add_char buf '\n'
   in
-  let synced =
-    match metrics with
-    | Some {bootstrapped = Some true; _} -> T.success "Yes"
-    | Some {bootstrapped = Some false; _} -> T.warning "Syncing"
-    | _ -> T.muted "–"
+  push (T.muted "Base Configuration Topology") ;
+  push "" ;
+  (* ── Nodes ── *)
+  push (T.text "Nodes — %d" (List.length sb.nodes)) ;
+  (match sb.nodes with
+  | [] -> push (T.muted "  (none)")
+  | nodes ->
+      List.iter
+        (fun (ni : node_info) ->
+          let metrics = Rpc_metrics.get ~instance:ni.svc.instance in
+          let level_str =
+            match metrics with
+            | Some {head_level = Some l; _} -> T.muted " L%d" l
+            | _ -> T.muted " –"
+          in
+          let sync_str =
+            match metrics with
+            | Some {bootstrapped = Some true; _} -> T.success " synced"
+            | Some {bootstrapped = Some false; _} -> T.warning " syncing"
+            | _ -> ""
+          in
+          let rpc_port = port_of (Rpc_addr.to_string ni.svc.rpc_addr) in
+          let p2p_port = port_of ni.svc.net_addr in
+          push
+            (T.concat
+               [
+                 " ";
+                 render_dot ni.state;
+                 T.text " %s" ni.svc.instance;
+                 T.muted "  rpc :%s  p2p :%s" rpc_port p2p_port;
+                 level_str;
+                 sync_str;
+               ]) ;
+          List.iter
+            (fun peer ->
+              let label =
+                match peer_to_node_name nodes peer with
+                | Some inst ->
+                    T.concat [T.muted "%s" peer; T.muted " (→ %s)" inst]
+                | None -> T.muted "%s" peer
+              in
+              push (T.concat [T.muted "   └─ peer: "; label]))
+            ni.peers)
+        nodes) ;
+  push "" ;
+  (* ── Bakers ── *)
+  push (T.text "Bakers — %d" (List.length sb.bakers)) ;
+  (match sb.bakers with
+  | [] -> push (T.muted "  (none)")
+  | bakers ->
+      List.iter
+        (fun (bi : baker_info) ->
+          let node_label =
+            match bi.svc.depends_on with
+            | Some n -> T.muted "  → %s" n
+            | None -> ""
+          in
+          let del_str =
+            if bi.delegate_count > 0 then
+              T.text "  %d delegates" bi.delegate_count
+            else T.muted "  0 delegates"
+          in
+          let failed_str =
+            match bi.state with
+            | Some {status = Unknown _; _} -> T.error "  [failed]"
+            | _ -> ""
+          in
+          push
+            (T.concat
+               [
+                 " ";
+                 render_dot bi.state;
+                 T.text " %s" bi.svc.instance;
+                 del_str;
+                 node_label;
+                 failed_str;
+               ]))
+        bakers) ;
+  push "" ;
+  (* ── Summary ── *)
+  let total_dels =
+    List.fold_left (fun a bi -> a + bi.delegate_count) 0 sb.bakers
   in
-  let node_ep =
-    match sb.node with
-    | None -> "–"
-    | Some svc -> Rpc_addr.to_endpoint svc.rpc_addr
+  let stake_str =
+    match stake_pct with
+    | Some pct ->
+        T.concat [T.success " %.1f%%" pct; T.muted " of network stake"]
+    | None -> T.muted " stake: fetching..."
   in
-  let items =
-    [
-      ("Name", g.name);
-      ("Network", g.network);
-      ( "Node",
-        Option.fold ~none:"–" ~some:(fun (s : Service.t) -> s.instance) sb.node
-      );
-      ( "Baker",
-        Option.fold ~none:"–" ~some:(fun (s : Service.t) -> s.instance) sb.baker
-      );
-      ("RPC Endpoint", node_ep);
-      ("Head Level", head_level);
-      ("Synced", synced);
-      ("Created", g.created_at);
-    ]
-  in
-  let dl = DL.create ~title:"Sandbox Details" ~key_width:14 ~items () in
-  DL.render ~cols ~wrap:true dl ~focus:false
+  push (T.concat [T.muted "%d delegates" total_dels; stake_str]) ;
+  let content = Buffer.contents buf in
+  Flex.create
+    ~direction:Flex.Column
+    ~padding:{Flex.left = 2; right = 1; top = 1; bottom = 0}
+    [{Flex.render = (fun ~size:_ -> content); basis = Flex.Fill; cross = None}]
+  |> Flex.render ~size
 
 let render_create_detail ~size =
   Flex.create
@@ -233,18 +404,7 @@ let render_create_detail ~size =
     ]
   |> fun f -> Flex.render f ~size
 
-let render_empty_detail ~size =
-  Flex.create
-    ~direction:Flex.Column
-    ~padding:{Flex.left = 2; right = 1; top = 2; bottom = 0}
-    [
-      {
-        Flex.render = (fun ~size:_ -> T.muted "Select a sandbox.");
-        basis = Flex.Px 1;
-        cross = None;
-      };
-    ]
-  |> fun f -> Flex.render f ~size
+(* ─── Page Layout ───────────────────────────────────────────────────────── *)
 
 let header = ["  Sandboxes"; ""]
 
@@ -290,10 +450,12 @@ let render_content s ~size =
           Flex.render =
             (fun ~size ->
               match selected_sandbox s with
-              | Some sb -> render_detail ~sb ~size
+              | Some sb ->
+                  let stake_pct = get_stake_pct sb.group.name in
+                  render_topology sb ~stake_pct ~size
               | None ->
                   if s.cursor = 0 then render_create_detail ~size
-                  else render_empty_detail ~size);
+                  else render_create_detail ~size);
           basis = Flex.Fill;
           cross = None;
         };
@@ -373,12 +535,12 @@ let do_destroy ps group_name =
     () ;
   ps
 
-let do_open_rpc ps sb =
-  (match sb.node with
-  | Some svc ->
-      Context.set_pending_instance_detail svc.instance ;
+let do_open_rpc ps (sb : sandbox_info) =
+  (match sb.nodes with
+  | svc :: _ ->
+      Context.set_pending_instance_detail svc.svc.instance ;
       Context.navigate "rpc-browser"
-  | None -> Context.toast_warn "No node found for this sandbox") ;
+  | [] -> Context.toast_warn "No node found for this sandbox") ;
   ps
 
 let do_add_account ps group_name =
@@ -425,7 +587,7 @@ let do_add_baker ps group_name =
 
 let open_action_modal ps (sb : sandbox_info) =
   let group_name = sb.group.name in
-  let has_node = Option.is_some sb.node in
+  let has_node = not (List.is_empty sb.nodes) in
   let items =
     [Start; Stop]
     @ (if has_node then [Open_rpc] else [])
