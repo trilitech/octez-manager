@@ -240,7 +240,7 @@ let poll_baker ~instance ~network =
       let to_backfill =
         List.filteri
           (fun i (cr : Rewards.cycle_rewards) ->
-            i < 5 && cr.num_delegators > 0 && cr.delegators = [])
+            i < 3 && cr.num_delegators > 0 && cr.delegators = [])
           cycles
       in
       List.iter
