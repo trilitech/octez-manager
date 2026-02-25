@@ -33,6 +33,8 @@ type state = {
   group_name : string;
   rows : baker_row list;
   total_delegates : int;
+  network_stake_pct : float option;
+      (** Total sandbox stake as % of network; fetched async. None = loading. *)
   cursor : int;
   editing : (int * string) option;
       (** (row_idx, text_being_typed) when inline editing *)
@@ -41,6 +43,44 @@ type state = {
 type msg = unit
 
 type pstate = state Navigation.t
+
+(* ─── Async Stake Fetch ──────────────────────────────────────────────────── *)
+
+(** Module-level cache: prevents duplicate fetches across refresh ticks. *)
+let kap_stake_fetching : (string, unit) Hashtbl.t = Hashtbl.create 2
+
+let kap_stake_results : (string, float) Hashtbl.t = Hashtbl.create 2
+
+let kap_stake_lock = Mutex.create ()
+
+let get_cached_stake ~group_name =
+  Mutex.protect kap_stake_lock (fun () ->
+      Hashtbl.find_opt kap_stake_results group_name)
+
+let maybe_fetch_stake ~group_name =
+  let already =
+    Mutex.protect kap_stake_lock (fun () ->
+        Hashtbl.mem kap_stake_fetching group_name)
+  in
+  if not already then begin
+    Mutex.protect kap_stake_lock (fun () ->
+        Hashtbl.replace kap_stake_fetching group_name ()) ;
+    Background_runner.submit_blocking
+      ~on_complete:(fun () -> Context.mark_instances_dirty ())
+      (fun () ->
+        let wallet_dir = Sandbox.wallet_dir ~sandbox_name:group_name in
+        let endpoint =
+          match Sandbox.find_sandbox_node ~group_name with
+          | Ok (Some svc) ->
+              Printf.sprintf "http://%s" (Rpc_addr.to_string svc.rpc_addr)
+          | _ -> "http://127.0.0.1:18732"
+        in
+        match Yes_wallet_io.fetch_stake_pct ~endpoint ~wallet_dir with
+        | Ok pct ->
+            Mutex.protect kap_stake_lock (fun () ->
+                Hashtbl.replace kap_stake_results group_name pct)
+        | Error _ -> ())
+  end
 
 (* ─── Data Loading ──────────────────────────────────────────────────────── *)
 
@@ -87,21 +127,38 @@ let init () =
   let rows = load_rows ~group_name in
   let total_delegates = count_baker_delegates ~group_name in
   Navigation.make
-    {group_name; rows; total_delegates; cursor = 0; editing = None}
+    {
+      group_name;
+      rows;
+      total_delegates;
+      network_stake_pct = None;
+      cursor = 0;
+      editing = None;
+    }
 
 let update ps _ = ps
 
 let refresh ps =
+  let s = ps.Navigation.s in
+  maybe_fetch_stake ~group_name:s.group_name ;
+  let new_stake = get_cached_stake ~group_name:s.group_name in
   match Context.consume_navigation () with
   | Some (Context.Goto p) -> Navigation.goto p ps
   | Some Context.Back -> Navigation.back ps
   | Some Context.Quit -> Navigation.quit ps
   | None ->
+      let stake_changed =
+        not (Option.equal Float.equal new_stake s.network_stake_pct)
+      in
       if Context.consume_instances_dirty () then
-        let s = ps.Navigation.s in
         let rows = load_rows ~group_name:s.group_name in
         let total_delegates = count_baker_delegates ~group_name:s.group_name in
-        Navigation.update (fun _s -> {s with rows; total_delegates}) ps
+        Navigation.update
+          (fun _s ->
+            {s with rows; total_delegates; network_stake_pct = new_stake})
+          ps
+      else if stake_changed then
+        Navigation.update (fun s -> {s with network_stake_pct = new_stake}) ps
       else ps
 
 let move ps _ = ps
@@ -235,16 +292,18 @@ let render_baker_row s ~row_idx row ~total_allocated =
     | None ->
         if row.key_count = 0 then T.muted "0" else T.text "%d" row.key_count
   in
-  (* Share of total allocated keys — sums to 100% across all bakers *)
-  let share_str =
+  (* Actual network stake% for this baker = baker_share * total_sandbox_stake *)
+  let stake_str =
     if total_allocated <= 0 || row.key_count = 0 then T.muted "–"
     else
-      let pct =
-        float_of_int row.key_count /. float_of_int total_allocated *. 100.0
+      let baker_share =
+        float_of_int row.key_count /. float_of_int total_allocated
       in
-      T.text "%.1f%%" pct
+      match s.network_stake_pct with
+      | None -> T.muted "…"
+      | Some total_pct -> T.text "%.1f%%" (baker_share *. total_pct)
   in
-  (instance_str, key_str, share_str)
+  (instance_str, key_str, stake_str)
 
 let render_baker_table s ~size =
   let nrows = List.length s.rows in
@@ -255,7 +314,7 @@ let render_baker_table s ~size =
       [
         Grid.cell ~row:0 ~col:0 (fun ~size:_ -> T.muted "Baker");
         Grid.cell ~row:0 ~col:1 (fun ~size:_ -> T.muted "Keys");
-        Grid.cell ~row:0 ~col:2 (fun ~size:_ -> T.muted "Share%%");
+        Grid.cell ~row:0 ~col:2 (fun ~size:_ -> T.muted "Stake%%");
       ]
     in
     let data_children =
