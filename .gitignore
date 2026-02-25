@@ -14,6 +14,10 @@ octez-manager
 # Internal/private docs
 internal_docs/
 
+# Feature specs (contain proprietary research/references)
+specs/
+.specify/
+
 # Docs site build output
 docs/dist/
 docs/node_modules/
