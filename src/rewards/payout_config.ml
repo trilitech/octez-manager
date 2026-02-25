@@ -44,7 +44,7 @@ let default ~baker_pkh =
   {
     version = 1;
     baker_pkh;
-    payout_key_alias = "";
+    payout_key_alias = baker_pkh;
     payout_mode = Rewards.Actual;
     baker_fee = 0.05;
     min_payout = 0L;
@@ -117,6 +117,8 @@ let validate_share_map label shares =
 let validate t =
   if t.version <> 1 then
     Error (Printf.sprintf "unsupported version: %d" t.version)
+  else if String.length (String.trim t.payout_key_alias) = 0 then
+    Error "payout_key_alias must not be empty"
   else if t.baker_fee < 0.0 || t.baker_fee > 1.0 then
     Error (Printf.sprintf "baker_fee %.4f out of range [0.0, 1.0]" t.baker_fee)
   else if t.min_payout < 0L then Error "min_payout must be >= 0"
