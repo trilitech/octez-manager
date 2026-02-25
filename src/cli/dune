@@ -23,6 +23,7 @@
   cmd_baker)
  (libraries
   octez_manager_lib
+  octez_manager_rewards
   octez-manager.ui
   miaou-core.lib
   miaou-driver-web.runner
