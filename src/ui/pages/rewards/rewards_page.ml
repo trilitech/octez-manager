@@ -8,6 +8,7 @@
 (** Rewards page: TUI dashboard for reward distribution. *)
 
 open Octez_manager_lib
+open Octez_manager_rewards
 module Widgets = Miaou_widgets_display.Widgets
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
@@ -58,6 +59,47 @@ let init () =
 
 let update ps _ = ps
 
+(** Compute a payout blueprint for the delegators tab if needed.
+    Only runs when the tab is active and cached data is available.
+    Uses default payout config (no file I/O). *)
+let maybe_compute_blueprint s =
+  if s.active_tab <> Rewards_state.Delegators then s
+  else
+    match Rewards_state.selected_baker_instance s with
+    | None -> {s with blueprint = None}
+    | Some (instance, pkh) -> (
+        let baker = pkh in
+        let cycle_opt =
+          match s.selected_cycle with
+          | Some c -> Some c
+          | None -> (
+              match Rewards_scheduler.get_recent_cycles ~baker with
+              | cr :: _ -> Some cr.Rewards.cycle
+              | [] -> None)
+        in
+        match cycle_opt with
+        | None -> {s with blueprint = None}
+        | Some cycle -> (
+            match s.blueprint with
+            | Some bp when bp.Rewards.cycle = cycle -> s
+            | _ -> (
+                match Rewards_scheduler.get_cycle_data ~baker ~cycle with
+                | None -> {s with blueprint = None}
+                | Some cr ->
+                    let network =
+                      match Service_registry.find ~instance with
+                      | Ok (Some svc) -> svc.Service.network
+                      | _ -> "unknown"
+                    in
+                    let config = Payout_config.default ~baker_pkh:pkh in
+                    let bp =
+                      Reward_calculator.generate_blueprint
+                        ~config
+                        ~network
+                        ~cycle_rewards:cr
+                    in
+                    {s with blueprint = Some bp; selected_cycle = Some cycle})))
+
 let refresh ps =
   match Context.consume_navigation () with
   | Some (Context.Goto page) -> Navigation.goto page ps
@@ -68,7 +110,8 @@ let refresh ps =
         (fun s ->
           let baker_instances = load_baker_instances () in
           let current_cycle = Rewards_scheduler.get_current_cycle () in
-          {s with baker_instances; current_cycle})
+          let s = {s with baker_instances; current_cycle} in
+          maybe_compute_blueprint s)
         ps
 
 let move ps _ = ps
@@ -113,24 +156,153 @@ let render_placeholder tab_name =
       ""; Widgets.themed_muted (Printf.sprintf "  %s tab — coming soon" tab_name);
     ]
 
+let hint_for_tab = function
+  | Rewards_state.Delegators ->
+      Widgets.themed_muted
+        "j/k nav \xc2\xb7 / search \xc2\xb7 s sort \xc2\xb7 f filter \xc2\xb7 \
+         c cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
+  | _ ->
+      Widgets.themed_muted
+        "1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc back"
+
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
   let header_line = render_baker_header s in
   let tab_bar = render_tab_bar s ~cols in
-  let content =
-    match s.active_tab with
-    | Rewards_state.Overview -> Rewards_overview.render ~state:s ~cols
-    | Rewards_state.Delegators -> render_placeholder "Delegators"
-    | Rewards_state.History -> render_placeholder "History"
-    | Rewards_state.Configuration -> render_placeholder "Configuration"
-  in
-  let hint = Widgets.themed_muted "1-4 tabs · b baker · r refresh · Esc back" in
+  let hint = hint_for_tab s.active_tab in
   Themed_page.render_layout
     ~size
     ~header:[header_line; tab_bar; ""]
     ~footer:[hint]
-    ~child:(fun _ -> content)
+    ~child:(fun avail ->
+      let cols = avail.LTerm_geom.cols in
+      let rows = avail.LTerm_geom.rows in
+      match s.active_tab with
+      | Rewards_state.Overview -> Rewards_overview.render ~state:s ~cols
+      | Rewards_state.Delegators ->
+          Rewards_delegators.render ~state:s ~cols ~rows
+      | Rewards_state.History -> render_placeholder "History"
+      | Rewards_state.Configuration -> render_placeholder "Configuration")
+
+(** Count filtered delegators for cursor bounds. *)
+let delegator_count s =
+  match s.blueprint with
+  | None -> 0
+  | Some bp ->
+      let ds = bp.Rewards.delegator_rewards in
+      let ds = Rewards_delegators.apply_filter s.delegator_filter ds in
+      let ds =
+        if s.search_active || String.length s.search_query > 0 then
+          Rewards_delegators.apply_search s.search_query ds
+        else ds
+      in
+      List.length ds
+
+(** Handle keys when search mode is active. *)
+let handle_search_key ps key =
+  match Keys.of_string key with
+  | Some Keys.Escape ->
+      Navigation.update
+        (fun s -> {s with search_active = false; search_query = ""})
+        ps
+  | Some Keys.Enter ->
+      Navigation.update (fun s -> {s with search_active = false}) ps
+  | Some Keys.Backspace ->
+      Navigation.update
+        (fun s ->
+          let len = String.length s.search_query in
+          let search_query =
+            if len > 0 then String.sub s.search_query 0 (len - 1)
+            else s.search_query
+          in
+          {s with search_query; delegator_cursor = 0})
+        ps
+  | Some (Keys.Char c) when String.length c = 1 ->
+      Navigation.update
+        (fun s ->
+          {s with search_query = s.search_query ^ c; delegator_cursor = 0})
+        ps
+  | _ -> ps
+
+(** Handle keys specific to the Delegators tab. *)
+let handle_delegator_key ps key =
+  let s = ps.Navigation.s in
+  match Keys.of_string key with
+  | Some (Keys.Char "j") | Some Keys.Down ->
+      let count = delegator_count s in
+      Navigation.update
+        (fun s ->
+          {
+            s with
+            delegator_cursor = min (s.delegator_cursor + 1) (max 0 (count - 1));
+          })
+        ps
+  | Some (Keys.Char "k") | Some Keys.Up ->
+      Navigation.update
+        (fun s -> {s with delegator_cursor = max (s.delegator_cursor - 1) 0})
+        ps
+  | Some (Keys.Char "g") ->
+      Navigation.update (fun s -> {s with delegator_cursor = 0}) ps
+  | Some (Keys.Char "G") ->
+      let count = delegator_count s in
+      Navigation.update
+        (fun s -> {s with delegator_cursor = max 0 (count - 1)})
+        ps
+  | Some (Keys.Char "/") ->
+      Navigation.update (fun s -> {s with search_active = true}) ps
+  | Some (Keys.Char "s") ->
+      Navigation.update
+        (fun s ->
+          {
+            s with
+            delegator_sort = Rewards_state.next_sort_column s.delegator_sort;
+            delegator_cursor = 0;
+          })
+        ps
+  | Some (Keys.Char "f") ->
+      Navigation.update
+        (fun s ->
+          {
+            s with
+            delegator_filter = Rewards_state.next_filter_mode s.delegator_filter;
+            delegator_cursor = 0;
+          })
+        ps
+  | Some (Keys.Char "c") -> (
+      (* Cycle through recent cycles *)
+      match Rewards_state.selected_baker_pkh s with
+      | None -> ps
+      | Some baker -> (
+          let recent = Rewards_scheduler.get_recent_cycles ~baker in
+          let cycles =
+            List.map (fun (cr : Rewards.cycle_rewards) -> cr.cycle) recent
+          in
+          match cycles with
+          | [] -> ps
+          | _ ->
+              let current =
+                match s.selected_cycle with
+                | Some c -> c
+                | None -> List.hd cycles
+              in
+              let rec find_next = function
+                | [] -> List.hd cycles
+                | [_] -> List.hd cycles
+                | x :: y :: _ when x = current -> y
+                | _ :: rest -> find_next rest
+              in
+              let next_cycle = find_next cycles in
+              Navigation.update
+                (fun s ->
+                  {
+                    s with
+                    selected_cycle = Some next_cycle;
+                    blueprint = None;
+                    delegator_cursor = 0;
+                  })
+                ps))
+  | _ -> ps
 
 (** Count filtered delegators for cursor bounds. *)
 let delegator_count s =
@@ -541,44 +713,87 @@ let tab_at_col col =
 
 let handle_key ps key ~size:_ =
   let s = ps.Navigation.s in
-  match Keys.of_string key with
-  | Some Keys.Escape -> back ps
-  | Some (Keys.Char "1") ->
-      Navigation.update
-        (fun s -> {s with active_tab = Rewards_state.Overview})
-        ps
-  | Some (Keys.Char "2") ->
-      Navigation.update
-        (fun s -> {s with active_tab = Rewards_state.Delegators})
-        ps
-  | Some (Keys.Char "3") ->
-      Navigation.update
-        (fun s -> {s with active_tab = Rewards_state.History})
-        ps
-  | Some (Keys.Char "4") ->
-      Navigation.update
-        (fun s -> {s with active_tab = Rewards_state.Configuration})
-        ps
-  | Some (Keys.Char "b") ->
-      (* Cycle baker selection *)
-      let n = List.length s.baker_instances in
-      if n > 1 then
+  (* Search mode captures all input *)
+  if s.search_active then handle_search_key ps key
+  else
+    match Keys.of_string key with
+    | Some Keys.Escape -> back ps
+    | Some (Keys.Char "1") ->
         Navigation.update
-          (fun s -> {s with selected_baker = (s.selected_baker + 1) mod n})
+          (fun s -> {s with active_tab = Rewards_state.Overview})
           ps
-      else ps
-  | Some (Keys.Char "r") -> refresh ps
-  | _ -> ps
+    | Some (Keys.Char "2") ->
+        Navigation.update
+          (fun s -> {s with active_tab = Rewards_state.Delegators})
+          ps
+    | Some (Keys.Char "3") ->
+        Navigation.update
+          (fun s -> {s with active_tab = Rewards_state.History})
+          ps
+    | Some (Keys.Char "4") ->
+        Navigation.update
+          (fun s -> {s with active_tab = Rewards_state.Configuration})
+          ps
+    | Some (Keys.Char "b") ->
+        (* Cycle baker selection, reset blueprint *)
+        let n = List.length s.baker_instances in
+        if n > 1 then
+          Navigation.update
+            (fun s ->
+              {
+                s with
+                selected_baker = (s.selected_baker + 1) mod n;
+                blueprint = None;
+                selected_cycle = None;
+                delegator_cursor = 0;
+              })
+            ps
+        else ps
+    | Some (Keys.Char "r") -> refresh ps
+    | _ when s.active_tab = Rewards_state.Delegators ->
+        handle_delegator_key ps key
+    | _ -> ps
 
 let keymap _ps =
   let noop ps = ps in
   let kb key help =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  [kb "1-4" "Switch tab"; kb "b" "Baker"; kb "r" "Refresh"; kb "Esc" "Back"]
+  [
+    kb "1-4" "Switch tab";
+    kb "b" "Baker";
+    kb "r" "Refresh";
+    kb "j/k" "Navigate";
+    kb "/" "Search";
+    kb "s" "Sort";
+    kb "f" "Filter";
+    kb "c" "Cycle";
+    kb "Esc" "Back";
+  ]
 
 let handled_keys () =
-  Keys.[Escape; Char "1"; Char "2"; Char "3"; Char "4"; Char "b"; Char "r"]
+  Keys.
+    [
+      Escape;
+      Enter;
+      Backspace;
+      Up;
+      Down;
+      Char "1";
+      Char "2";
+      Char "3";
+      Char "4";
+      Char "b";
+      Char "r";
+      Char "j";
+      Char "k";
+      Char "g";
+      Char "G";
+      Char "/";
+      Char "s";
+      Char "f";
+      Char "c";
+    ]
 
 let has_modal _ = false
 
@@ -631,6 +846,11 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
         {key = "1-4"; help = "Tab"};
         {key = "b"; help = "Baker"};
         {key = "r"; help = "Refresh"};
+        {key = "j/k"; help = "Navigate"};
+        {key = "/"; help = "Search"};
+        {key = "s"; help = "Sort"};
+        {key = "f"; help = "Filter"};
+        {key = "c"; help = "Cycle"};
         {key = "Esc"; help = "Back"};
       ]
 
