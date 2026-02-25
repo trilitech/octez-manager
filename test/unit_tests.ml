@@ -183,6 +183,7 @@ let sample_node_request ?data_dir ?(bootstrap = Genesis)
     bin_source = None;
     logging_mode;
     extra_args;
+    extra_env = [];
     auto_enable;
     bootstrap;
     preserve_data;

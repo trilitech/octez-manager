@@ -27,8 +27,8 @@ _octez_manager() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="baker binaries cleanup-dependencies cleanup-orphans group import install-accuser install-baker install-dal-node install-node install-signatory instance list list-available-networks list-snapshots purge-all rewards rpc self-update ui version web"
-  local instance_actions="start stop restart remove purge show show-service logs edit export-logs"
+  local commands="baker binaries cleanup-dependencies cleanup-orphans group import install-accuser install-baker install-dal-node install-node install-signatory instance list list-available-networks list-snapshots purge-all rewards rpc sandbox self-update ui version web"
+  local instance_actions="start stop restart remove purge show show-service logs edit export-logs set-env get-env"
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
   local lb_votes="on off pass"
@@ -221,6 +221,13 @@ _octez_manager() {
       return 0
       ;;
     rpc)
+      if [[ $cur == -* ]]; then
+        opts="--help --version"
+        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      fi
+      return 0
+      ;;
+    sandbox)
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
