@@ -103,6 +103,7 @@ let root_cmd =
       Cmd_rpc.rpc_cmd;
       Cmd_web.web_cmd;
       Cmd_baker.baker_cmd;
+      Cmd_rewards.rewards_cmd;
       ui_cmd;
     ]
 
