@@ -111,6 +111,11 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
   in
   let* () = Group_registry.write group in
 
+  let rollback () =
+    on_log "Rolling back: removing group registry entry..." ;
+    ignore (Group_registry.remove ~name:sandbox_name)
+  in
+
   (* Step 2: Install node *)
   on_log "[2/5] Installing node..." ;
   let bootstrap =
@@ -140,58 +145,65 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       keep_snapshot = false;
     }
   in
-  let* _node_svc = Node.install_node ~on_log node_request in
+  let result =
+    let* _node_svc = Node.install_node ~on_log node_request in
 
-  (* Step 3: Wait for RPC *)
-  on_log "[3/5] Starting node, waiting for RPC..." ;
-  let* () = wait_for_rpc ~endpoint ~timeout_seconds:300 in
+    (* Step 3: Wait for RPC *)
+    on_log "[3/5] Starting node, waiting for RPC..." ;
+    let* () = wait_for_rpc ~endpoint ~timeout_seconds:300 in
 
-  (* Step 4: Generate yes-wallet *)
-  on_log
-    (Printf.sprintf
-       "[4/5] Generating yes-wallet (%d delegates)..."
-       max_delegates) ;
-  let* delegates = Yes_wallet_io.fetch_delegates ~endpoint ~max_delegates in
-  let* () = Yes_wallet_io.write_wallet ~wallet_dir:wallet delegates in
+    (* Step 4: Generate yes-wallet *)
+    on_log
+      (Printf.sprintf
+         "[4/5] Generating yes-wallet (%d delegates)..."
+         max_delegates) ;
+    let* delegates = Yes_wallet_io.fetch_delegates ~endpoint ~max_delegates in
+    let* () = Yes_wallet_io.write_wallet ~wallet_dir:wallet delegates in
 
-  (* Step 5: Install baker *)
-  on_log "[5/5] Installing and starting baker..." ;
-  let delegate_aliases =
-    List.map (fun (d : Yes_wallet.delegate) -> d.alias) delegates
+    (* Step 5: Install baker *)
+    on_log "[5/5] Installing and starting baker..." ;
+    let delegate_aliases =
+      List.map (fun (d : Yes_wallet.delegate) -> d.alias) delegates
+    in
+    let baker_request : baker_request =
+      {
+        instance = baker_instance;
+        node_mode = Local_instance node_instance;
+        base_dir = Some wallet;
+        delegates = delegate_aliases;
+        dal_config = Dal_disabled;
+        dal_node = None;
+        liquidity_baking_vote = None;
+        signer_mode = Signer_types.Local_keys;
+        extra_args = [];
+        extra_env = yes_crypto_env;
+        service_user;
+        app_bin_dir;
+        bin_source = Some bin_source;
+        logging_mode = Logging_mode.Journald;
+        auto_enable = true;
+        preserve_data = false;
+      }
+    in
+    let* _baker_svc = Baker.install_baker baker_request in
+    Ok (List.length delegates)
   in
-  let baker_request : baker_request =
-    {
-      instance = baker_instance;
-      node_mode = Local_instance node_instance;
-      base_dir = Some wallet;
-      delegates = delegate_aliases;
-      dal_config = Dal_disabled;
-      dal_node = None;
-      liquidity_baking_vote = None;
-      signer_mode = Signer_types.Local_keys;
-      extra_args = [];
-      extra_env = yes_crypto_env;
-      service_user;
-      app_bin_dir;
-      bin_source = Some bin_source;
-      logging_mode = Logging_mode.Journald;
-      auto_enable = true;
-      preserve_data = false;
-    }
-  in
-  let* _baker_svc = Baker.install_baker baker_request in
-
-  on_log
-    (Printf.sprintf
-       "Sandbox '%s' is ready.\n\
-       \  Node RPC: %s\n\
-       \  Baker delegates: %d\n\
-       \  Network: %s"
-       sandbox_name
-       endpoint
-       (List.length delegates)
-       network) ;
-  Ok group
+  match result with
+  | Error _ as err ->
+      rollback () ;
+      err
+  | Ok delegate_count ->
+      on_log
+        (Printf.sprintf
+           "Sandbox '%s' is ready.\n\
+           \  Node RPC: %s\n\
+           \  Baker delegates: %d\n\
+           \  Network: %s"
+           sandbox_name
+           endpoint
+           delegate_count
+           network) ;
+      Ok group
 
 let destroy ?(on_log = fun _ -> ()) ~group_name () =
   on_log (Printf.sprintf "Destroying sandbox '%s'..." group_name) ;
