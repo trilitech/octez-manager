@@ -138,53 +138,55 @@ let delegate_aliases_for_slice ~start ~count =
 
 (* ─── Redistribution ─────────────────────────────────────────────────────── *)
 
-(** Redistribute unallocated delegates across rows with key_count=0. *)
+(** Redistribute all delegates evenly across all rows.
+    Ceiling allocation goes to the first rows. Resets all key counts. *)
 let redistribute s =
   let rows = s.rows in
-  let zero_rows = List.filter (fun r -> r.key_count = 0) rows in
-  let n_zero = List.length zero_rows in
-  if n_zero = 0 then s
+  let n = List.length rows in
+  if n = 0 then s
   else
-    let remaining = unallocated rows s.total_delegates in
-    if remaining <= 0 then s
-    else
-      let base = remaining / n_zero in
-      let extra = remaining mod n_zero in
-      let zero_idx = ref 0 in
-      let new_rows =
-        List.map
-          (fun r ->
-            if r.key_count > 0 then r
-            else
-              let alloc = base + if !zero_idx < extra then 1 else 0 in
-              incr zero_idx ;
-              {r with key_count = alloc})
-          rows
-      in
-      {s with rows = new_rows}
+    let total = s.total_delegates in
+    let base = total / n in
+    let extra = total mod n in
+    let new_rows =
+      List.mapi
+        (fun i r -> {r with key_count = (base + if i < extra then 1 else 0)})
+        rows
+    in
+    {s with rows = new_rows}
 
 (* ─── Apply Allocation ───────────────────────────────────────────────────── *)
+
+(** Update an existing baker's delegate list in its env file and restart it. *)
+let update_baker_delegates ~on_log ~instance ~delegates =
+  on_log (Printf.sprintf "[%s] Updating delegate list...\n" instance) ;
+  let* pairs = Node_env.read ~inst:instance in
+  let new_pairs =
+    List.map
+      (fun (k, v) ->
+        if String.equal k "OCTEZ_BAKER_DELEGATES_CSV" then
+          (k, String.concat "," delegates)
+        else (k, v))
+      pairs
+  in
+  let* () = Node_env.write_pairs ~inst:instance new_pairs in
+  on_log (Printf.sprintf "[%s] Restarting baker...\n" instance) ;
+  Systemd.restart ~role:"baker" ~instance ()
 
 let apply_allocation s =
   let group_name = s.group_name in
   let node_instance = primary_node_instance ~group_name in
-  (* Compute delegate slice starts: existing bakers already have delegates.
-     For new bakers, we offset by the total currently allocated to existing ones. *)
-  let existing_allocated =
-    List.fold_left
-      (fun acc r -> if r.is_new then acc else acc + r.key_count)
-      0
-      s.rows
-  in
-  let _, new_bakers_work =
+  (* Compute delegate slices for ALL bakers in order, then:
+     - existing bakers: update env + restart
+     - new bakers: install via Sandbox.add_baker *)
+  let _, all_work =
     List.fold_left
       (fun (offset, acc) r ->
-        if not r.is_new then (offset + r.key_count, acc)
-        else (offset + r.key_count, (offset, r.key_count) :: acc))
-      (existing_allocated, [])
+        (offset + r.key_count, (r, offset, r.key_count) :: acc))
+      (0, [])
       s.rows
   in
-  let new_bakers_work = List.rev new_bakers_work in
+  let all_work = List.rev all_work in
   let desc = Printf.sprintf "Apply key allocation for %s" group_name in
   Context.toast_info (T.text "%s..." desc) ;
   Job_manager.submit
@@ -193,18 +195,24 @@ let apply_allocation s =
     ~on_complete:(fun _ -> Context.mark_instances_dirty ())
     (fun ~append_log () ->
       List.fold_left
-        (fun acc (start, count) ->
+        (fun acc (row, start, count) ->
           let* () = acc in
           let delegates = delegate_aliases_for_slice ~start ~count in
-          Sandbox.add_baker
-            ~on_log:(fun msg -> append_log (msg ^ "\n"))
-            ~group_name
-            ~node_instance
-            ~delegates
-            ()
-          |> Result.map ignore)
+          if row.is_new then
+            Sandbox.add_baker
+              ~on_log:(fun msg -> append_log (msg ^ "\n"))
+              ~group_name
+              ~node_instance
+              ~delegates
+              ()
+            |> Result.map ignore
+          else
+            update_baker_delegates
+              ~on_log:append_log
+              ~instance:row.instance
+              ~delegates)
         (Ok ())
-        new_bakers_work) ;
+        all_work) ;
   Context.navigate_back ()
 
 (* ─── Rendering ─────────────────────────────────────────────────────────── *)
@@ -387,13 +395,10 @@ let handle_key ps key ~size:_ =
               (fun s -> {s with cursor = clamp_cursor s.rows (s.cursor - 1)})
               ps
         | "Return" | "Enter" ->
-            (* Start editing the key_count of the selected row *)
+            (* Start editing: empty buffer so user types a fresh value *)
             let cur = s.cursor in
             if cur < List.length s.rows then
-              let current_val = string_of_int (List.nth s.rows cur).key_count in
-              Navigation.update
-                (fun s -> {s with editing = Some (cur, current_val)})
-                ps
+              Navigation.update (fun s -> {s with editing = Some (cur, "")}) ps
             else ps
         | "a" ->
             (* Append new baker row *)
