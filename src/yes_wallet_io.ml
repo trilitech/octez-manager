@@ -21,6 +21,33 @@ let fetch_json_from_rpc ~endpoint path =
   with Yojson.Json_error msg ->
     Error (`Msg (Printf.sprintf "JSON parse error from %s: %s" url msg))
 
+(** Fetch consensus key and companion key pkhs for a delegate address.
+    Returns additional (address, curve) pairs to include in the wallet.
+    Keys already equal to [addr] are excluded. Returns [] on any fetch failure. *)
+let fetch_extra_signing_keys ~endpoint addr =
+  let path =
+    Printf.sprintf "/chains/main/blocks/head/context/delegates/%s" addr
+  in
+  match fetch_json_from_rpc ~endpoint path with
+  | Error _ -> []
+  | Ok json ->
+      let open Yojson.Safe.Util in
+      let extract_pkh field =
+        try
+          let pkh =
+            json |> member field |> member "active" |> member "pkh" |> to_string
+          in
+          if String.equal pkh addr then None
+          else
+            match Yes_wallet.curve_of_address pkh with
+            | Some curve -> Some (pkh, curve)
+            | None -> None
+        with _ -> None
+      in
+      List.filter_map
+        Fun.id
+        [extract_pkh "consensus_key"; extract_pkh "companion_key"]
+
 let fetch_delegates ~endpoint ~max_delegates =
   let* json =
     fetch_json_from_rpc
@@ -29,7 +56,7 @@ let fetch_delegates ~endpoint ~max_delegates =
   in
   match json with
   | `List addresses ->
-      let delegates =
+      let delegate_addrs =
         addresses
         |> List.filter_map (fun j ->
             match j with
@@ -39,11 +66,57 @@ let fetch_delegates ~endpoint ~max_delegates =
                 | None -> None)
             | _ -> None)
         |> List.filteri (fun i _ -> i < max_delegates)
-        |> List.mapi (fun i (addr, curve) ->
+      in
+      (* Collect consensus/companion keys for each delegate.
+         Also tracks the consensus key address for each delegate, so the baker
+         receives consensus key aliases rather than delegate address aliases.
+         (The baker daemon identifies delegates by their consensus key hash, so
+         passing delegate address aliases causes empty attestation rights.) *)
+      let seen = Hashtbl.create 64 in
+      let consensus_keys = Hashtbl.create 32 in
+      let add_unique (addr, curve) acc =
+        if Hashtbl.mem seen addr then acc
+        else (
+          Hashtbl.add seen addr () ;
+          (addr, curve) :: acc)
+      in
+      let all_addrs =
+        List.fold_left
+          (fun acc ((addr, _) as entry) ->
+            let extra = fetch_extra_signing_keys ~endpoint addr in
+            (* First extra key (if any) is the consensus key for this delegate *)
+            (match extra with
+            | (ck_addr, _) :: _ -> Hashtbl.replace consensus_keys addr ck_addr
+            | [] -> ()) ;
+            add_unique entry acc |> fun acc ->
+            List.fold_left (fun a e -> add_unique e a) acc extra)
+          []
+          delegate_addrs
+        |> List.rev
+      in
+      (* baker_delegates: consensus key aliases for baker CLI args *)
+      let baker_set = Hashtbl.create 32 in
+      List.iter
+        (fun (addr, _) ->
+          let ck =
+            Option.value ~default:addr (Hashtbl.find_opt consensus_keys addr)
+          in
+          Hashtbl.replace baker_set ck ())
+        delegate_addrs ;
+      (* All wallet entries indexed sequentially *)
+      let all_entries =
+        List.mapi
+          (fun i (addr, curve) ->
             Yes_wallet.
               {alias = Printf.sprintf "delegate-%d" i; address = addr; curve})
+          all_addrs
       in
-      Ok delegates
+      let baker_delegates =
+        List.filter
+          (fun (d : Yes_wallet.delegate) -> Hashtbl.mem baker_set d.address)
+          all_entries
+      in
+      Ok (baker_delegates, all_entries)
   | _ -> Error (`Msg "Expected JSON array from delegates RPC endpoint")
 
 let write_wallet ~wallet_dir delegates =
