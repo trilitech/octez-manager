@@ -10,9 +10,10 @@
     Fetches baker reward data and delegator snapshots from TzKT API
     using [Cmd_runner.run_out_silent] + curl. *)
 
-(** Fetch reward data for a specific baker and cycle.
+(** Fetch reward data with delegator details for a specific baker and cycle.
 
-    Uses [GET /v1/rewards/bakers/{baker}/cycles/{cycle}]. *)
+    Uses [GET /v1/rewards/split/{baker}/{cycle}] with automatic pagination
+    for bakers with more than 10,000 delegators. *)
 val fetch_cycle :
   tzkt_url:string ->
   baker:string ->
