@@ -14,8 +14,12 @@ let get_override config delegator =
 let is_in_list addr = List.exists (String.equal addr)
 
 let delegator_status config delegator ~balance ~net_reward =
-  let has_whitelist = config.Payout_config.whitelist <> [] in
-  let has_blacklist = config.Payout_config.blacklist <> [] in
+  let has_whitelist =
+    match config.Payout_config.whitelist with [] -> false | _ -> true
+  in
+  let has_blacklist =
+    match config.Payout_config.blacklist with [] -> false | _ -> true
+  in
   if has_blacklist && is_in_list delegator config.blacklist then Rewards.Ignored
   else if has_whitelist && not (is_in_list delegator config.whitelist) then
     Rewards.Ignored
