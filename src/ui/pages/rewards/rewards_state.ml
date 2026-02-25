@@ -71,3 +71,27 @@ let selected_instance_name st =
   match selected_baker_instance st with
   | Some (name, _) -> Some name
   | None -> None
+
+let next_sort_column = function
+  | SortBalance -> SortReward
+  | SortReward -> SortAddress
+  | SortAddress -> SortStatus
+  | SortStatus -> SortBalance
+
+let next_filter_mode = function
+  | FilterAll -> FilterEligible
+  | FilterEligible -> FilterExcluded
+  | FilterExcluded -> FilterBelowMin
+  | FilterBelowMin -> FilterAll
+
+let sort_label = function
+  | SortAddress -> "Address"
+  | SortBalance -> "Balance"
+  | SortReward -> "Reward"
+  | SortStatus -> "Status"
+
+let filter_label = function
+  | FilterAll -> "All"
+  | FilterEligible -> "Eligible"
+  | FilterExcluded -> "Excluded"
+  | FilterBelowMin -> "Below Min"
