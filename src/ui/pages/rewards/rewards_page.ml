@@ -196,8 +196,9 @@ let hint_for_tab = function
          i import \xc2\xb7 n notify \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
   | Rewards_state.Overview ->
       Widgets.themed_muted
-        "g generate \xc2\xb7 p pay \xc2\xb7 d dry-run \xc2\xb7 1-4 tabs \
-         \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc back"
+        "g generate \xc2\xb7 p pay \xc2\xb7 d dry-run \xc2\xb7 t continual \
+         \xc2\xb7 1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc \
+         back"
   | Rewards_state.History ->
       Widgets.themed_muted
         "j/k nav \xc2\xb7 Enter view cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
@@ -725,6 +726,41 @@ let handle_key ps key ~size:_ =
                   ~cycle
                   ~dry_run:true ;
                 ps))
+    | Some (Keys.Char "t") when s.active_tab = Rewards_state.Overview -> (
+        (* Toggle continual mode *)
+        match Rewards_state.selected_baker_instance s with
+        | None -> ps
+        | Some (instance, pkh) ->
+            let currently_active = Payout_continual.is_active ~instance in
+            if currently_active then (
+              Payout_continual.disable ~instance ;
+              let config =
+                match Payout_config.load ~instance with
+                | Ok c -> c
+                | Error _ -> Payout_config.default ~baker_pkh:pkh
+              in
+              let config =
+                {config with Payout_config.continual_enabled = false}
+              in
+              ignore (Payout_config.save ~instance config) ;
+              Context.toast_info
+                (Printf.sprintf "Continual mode disabled for %s" instance) ;
+              ps)
+            else (
+              Payout_continual.enable ~instance ;
+              let config =
+                match Payout_config.load ~instance with
+                | Ok c -> c
+                | Error _ -> Payout_config.default ~baker_pkh:pkh
+              in
+              let config =
+                {config with Payout_config.continual_enabled = true}
+              in
+              ignore (Payout_config.save ~instance config) ;
+              Rewards_scheduler.sync_continual_from_config ~instance ;
+              Context.toast_info
+                (Printf.sprintf "Continual mode enabled for %s" instance) ;
+              ps))
     | Some (Keys.Char "g") when s.active_tab = Rewards_state.Overview -> (
         (* Generate payout preview on Overview tab *)
         let s = ps.Navigation.s in
@@ -803,6 +839,7 @@ let handled_keys () =
       Char "g";
       Char "p";
       Char "d";
+      Char "t";
       Char "i";
       Char "n";
     ]

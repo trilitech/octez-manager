@@ -26,23 +26,6 @@ val enable : instance:string -> unit
 (** Disable continual mode for a baker instance. *)
 val disable : instance:string -> unit
 
-(** {1 Delay file persistence}
-
-    File-based delay state for CLI tick mode. Each tick is a separate process,
-    so the random delay window must be persisted on disk. *)
-
-(** Path to the delay file for an instance. *)
-val delay_file : instance:string -> string
-
-(** Read the delay-until Unix timestamp, if present and valid. *)
-val read_delay_until : instance:string -> float option
-
-(** Write a delay-until Unix timestamp to disk. *)
-val write_delay_until : instance:string -> float -> unit
-
-(** Remove the delay file for an instance. *)
-val clear_delay_until : instance:string -> unit
-
 (** {1 Cycle check} *)
 
 (** Check if a cycle should be paid based on interval/offset configuration.
