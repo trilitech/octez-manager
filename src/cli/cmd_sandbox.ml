@@ -33,7 +33,8 @@ let with_sandbox ~name f =
 let create_term =
   let network =
     let doc = "Tezos network (e.g. ghostnet, mainnet, or a teztnets URL)." in
-    Arg.(value & opt string "ghostnet" & info ["network"; "n"] ~doc ~docv:"NET")
+    Arg.(
+      value & opt string "shadownet" & info ["network"; "n"] ~doc ~docv:"NET")
   in
   let sandbox_name =
     let doc = "Sandbox name (default: auto-generated from network)." in

@@ -112,6 +112,21 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
   let* () = Group_registry.write group in
 
   let rollback () =
+    on_log "Rolling back: removing installed services..." ;
+    let services =
+      match Lifecycle.group_services ~group_name:sandbox_name () with
+      | Ok l -> l
+      | Error _ -> []
+    in
+    List.iter
+      (fun (svc : Service.t) ->
+        ignore
+          (Removal.remove_service
+             ~quiet:true
+             ~delete_data_dir:true
+             ~instance:svc.instance
+             ()))
+      services ;
     on_log "Rolling back: removing group registry entry..." ;
     ignore (Group_registry.remove ~name:sandbox_name)
   in
@@ -135,7 +150,13 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       app_bin_dir;
       bin_source = Some bin_source;
       logging_mode = Logging_mode.Journald;
-      extra_args = ["--no-bootstrap-peers"; "--allow-yes-crypto"];
+      extra_args =
+        [
+          "--no-bootstrap-peers";
+          "--bootstrap-threshold";
+          "0";
+          "--allow-yes-crypto";
+        ];
       extra_env = yes_crypto_env;
       auto_enable = true;
       bootstrap;
@@ -145,8 +166,15 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       keep_snapshot = false;
     }
   in
+  let set_group ~instance =
+    match Service_registry.find ~instance with
+    | Ok (Some svc) ->
+        Service_registry.write {svc with group = Some sandbox_name}
+    | Ok None | Error _ -> Ok ()
+  in
   let result =
     let* _node_svc = Node.install_node ~on_log node_request in
+    let* () = set_group ~instance:node_instance in
 
     (* Step 3: Wait for RPC *)
     on_log "[3/5] Starting node, waiting for RPC..." ;
@@ -157,13 +185,17 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       (Printf.sprintf
          "[4/5] Generating yes-wallet (%d delegates)..."
          max_delegates) ;
-    let* delegates = Yes_wallet_io.fetch_delegates ~endpoint ~max_delegates in
-    let* () = Yes_wallet_io.write_wallet ~wallet_dir:wallet delegates in
+    let* baker_delegates, all_wallet_entries =
+      Yes_wallet_io.fetch_delegates ~endpoint ~max_delegates
+    in
+    let* () =
+      Yes_wallet_io.write_wallet ~wallet_dir:wallet all_wallet_entries
+    in
 
     (* Step 5: Install baker *)
     on_log "[5/5] Installing and starting baker..." ;
     let delegate_aliases =
-      List.map (fun (d : Yes_wallet.delegate) -> d.alias) delegates
+      List.map (fun (d : Yes_wallet.delegate) -> d.alias) baker_delegates
     in
     let baker_request : baker_request =
       {
@@ -173,7 +205,7 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
         delegates = delegate_aliases;
         dal_config = Dal_disabled;
         dal_node = None;
-        liquidity_baking_vote = None;
+        liquidity_baking_vote = Some "pass";
         signer_mode = Signer_types.Local_keys;
         extra_args = [];
         extra_env = yes_crypto_env;
@@ -186,7 +218,8 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       }
     in
     let* _baker_svc = Baker.install_baker baker_request in
-    Ok (List.length delegates)
+    let* () = set_group ~instance:baker_instance in
+    Ok (List.length baker_delegates)
   in
   match result with
   | Error _ as err ->
