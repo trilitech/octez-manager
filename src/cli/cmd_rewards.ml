@@ -424,8 +424,187 @@ let history_cmd =
   in
   Cmd.v info Term.(ret (const history_run $ baker_arg $ cycles_arg $ json_flag))
 
+(* ── rewards pay ───────────────────────────────────────────── *)
+
+let rec pay_run baker_opt cycle_opt dry_run confirm =
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh -> (
+          let instance = svc.instance in
+          let network = svc.network in
+          let cycle =
+            match cycle_opt with
+            | Some c -> Some c
+            | None -> (
+                let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+                match Cycle_data.fetch_current_cycle ~tzkt_url with
+                | Ok cur -> Some (cur - 1)
+                | Error _ -> None)
+          in
+          match cycle with
+          | None ->
+              Cli_helpers.cmdliner_error
+                "Cannot determine current cycle. Use --cycle to specify."
+          | Some cycle -> (
+              match
+                Payout_blueprint.generate
+                  ~instance
+                  ~baker:baker_pkh
+                  ~network
+                  ~cycle
+                  ~force:dry_run
+                  ()
+              with
+              | Error msg -> Cli_helpers.cmdliner_error msg
+              | Ok blueprint ->
+                  let config =
+                    match Payout_config.load ~instance with
+                    | Ok c -> c
+                    | Error _ -> Payout_config.default ~baker_pkh
+                  in
+                  let octez_client_bin =
+                    Filename.concat svc.Service.app_bin_dir "octez-client"
+                  in
+                  let endpoint =
+                    "http://" ^ Rpc_addr.to_string svc.Service.rpc_addr
+                  in
+                  let ctx : Payout_executor.context =
+                    {
+                      octez_client_bin;
+                      endpoint;
+                      base_dir = None;
+                      password_file = None;
+                      payout_key_alias = config.payout_key_alias;
+                      instance;
+                    }
+                  in
+                  (* Interactive confirmation unless --confirm is set *)
+                  if (not confirm) && not dry_run then begin
+                    let distributable =
+                      List.fold_left
+                        (fun acc (r : Rewards.delegator_reward) ->
+                          match r.status with
+                          | Rewards.Eligible -> Int64.add acc r.net_reward
+                          | _ -> acc)
+                        0L
+                        blueprint.delegator_rewards
+                    in
+                    Printf.printf "=== PAYOUT CONFIRMATION ===\n" ;
+                    Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+                    Printf.printf
+                      "Network: %s\n"
+                      (String.uppercase_ascii network) ;
+                    Printf.printf "Cycle: %d\n" cycle ;
+                    Printf.printf
+                      "Total to distribute: %s\n"
+                      (format_tez_short distributable) ;
+                    Printf.printf
+                      "Eligible delegators: %d\n"
+                      blueprint.eligible_delegators ;
+                    Printf.printf
+                      "Estimated tx fees: %s\n"
+                      (format_tez_short blueprint.estimated_tx_fees) ;
+                    Printf.printf "\n" ;
+                    if String.equal (String.lowercase_ascii network) "mainnet"
+                    then
+                      Printf.printf "This action is IRREVERSIBLE on mainnet.\n" ;
+                    Printf.printf "Proceed? [y/N]: %!" ;
+                    let response =
+                      try input_line stdin with End_of_file -> "n"
+                    in
+                    let answer =
+                      String.lowercase_ascii (String.trim response)
+                    in
+                    if not (String.equal answer "y" || String.equal answer "yes")
+                    then begin
+                      Printf.printf "Aborted.\n" ;
+                      `Ok ()
+                    end
+                    else execute_pay ~ctx ~blueprint ~dry_run ~cycle
+                  end
+                  else execute_pay ~ctx ~blueprint ~dry_run ~cycle)))
+
+and execute_pay ~ctx ~blueprint ~dry_run ~cycle =
+  let mode_str = if dry_run then "Dry-run" else "Broadcasting" in
+  match
+    Payout_executor.execute
+      ~ctx
+      ~blueprint
+      ~dry_run
+      ~on_progress:(fun (p : Payout_executor.progress) ->
+        if p.result.Rewards.success then
+          Printf.printf
+            "%s %d/%d: %s -> %s... done%s\n%!"
+            mode_str
+            p.current
+            p.total
+            p.delegator
+            (String.sub
+               p.result.recipient
+               0
+               (min 12 (String.length p.result.recipient)))
+            (match p.result.op_hash with
+            | Some h -> Printf.sprintf " (op: %s)" h
+            | None -> "")
+        else
+          Printf.printf
+            "%s %d/%d: %s... FAILED (%s)\n%!"
+            mode_str
+            p.current
+            p.total
+            p.delegator
+            p.result.note)
+      ()
+  with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok (results, _summary) ->
+      let succeeded =
+        List.filter (fun (r : Rewards.payout_result) -> r.success) results
+      in
+      let total = List.length results in
+      let ok_count = List.length succeeded in
+      Printf.printf
+        "\n%s complete: %d/%d succeeded.\n"
+        (if dry_run then "Dry-run" else "Payout")
+        ok_count
+        total ;
+      if not dry_run then
+        Printf.printf
+          "Reports saved to: %s\n"
+          (Payout_report.report_dir ~instance:ctx.instance ~cycle) ;
+      if ok_count = total then `Ok ()
+      else
+        `Error
+          ( false,
+            Printf.sprintf
+              "Partial success: %d/%d failed"
+              (total - ok_count)
+              total )
+
+let pay_cmd =
+  let info = Cmd.info "pay" ~doc:"Execute payout for a specific cycle." in
+  let cycle_arg =
+    let doc = "Target cycle number (default: latest completed)." in
+    Arg.(value & opt (some int) None & info ["cycle"] ~doc ~docv:"N")
+  in
+  let dry_run_flag =
+    let doc = "Simulate without broadcasting." in
+    Arg.(value & flag & info ["dry-run"] ~doc)
+  in
+  let confirm_flag =
+    let doc = "Skip interactive confirmation (for automation)." in
+    Arg.(value & flag & info ["confirm"] ~doc)
+  in
+  Cmd.v
+    info
+    Term.(
+      ret (const pay_run $ baker_arg $ cycle_arg $ dry_run_flag $ confirm_flag))
+
 (* ── rewards command group ─────────────────────────────────── *)
 
 let rewards_cmd =
   let info = Cmd.info "rewards" ~doc:"Manage baker rewards and payouts." in
-  Cmd.group info [status_cmd; generate_cmd; history_cmd]
+  Cmd.group info [status_cmd; generate_cmd; history_cmd; pay_cmd]

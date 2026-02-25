@@ -416,12 +416,6 @@ let rewards_dir ~instance =
 let config_path ~instance =
   Filename.concat (rewards_dir ~instance) "config.json"
 
-let rec mkdir_p path =
-  if Sys.file_exists path then ()
-  else (
-    mkdir_p (Filename.dirname path) ;
-    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
-
 let load ~instance =
   let path = config_path ~instance in
   if not (Sys.file_exists path) then
@@ -438,7 +432,7 @@ let load ~instance =
 let save ~instance t =
   try
     let dir = rewards_dir ~instance in
-    mkdir_p dir ;
+    File_ops.mkdir_p dir ;
     let json = to_json t in
     let content = Yojson.Safe.pretty_to_string ~std:true json in
     let path = config_path ~instance in

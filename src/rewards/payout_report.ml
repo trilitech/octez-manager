@@ -5,12 +5,6 @@
 (*                                                                            *)
 (******************************************************************************)
 
-let rec mkdir_p path =
-  if Sys.file_exists path then ()
-  else (
-    mkdir_p (Filename.dirname path) ;
-    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
-
 let report_dir ~instance ~cycle =
   let base = Payout_config.rewards_dir ~instance in
   Filename.concat (Filename.concat base "reports") (string_of_int cycle)
@@ -32,7 +26,7 @@ let escape_csv_field s =
 
 let write_payouts_csv ~dir ~baker ~cycle results =
   try
-    mkdir_p dir ;
+    File_ops.mkdir_p dir ;
     let path = Filename.concat dir "payouts.csv" in
     Out_channel.with_open_text path (fun oc ->
         output_string oc csv_header ;
@@ -75,7 +69,7 @@ let write_payouts_csv ~dir ~baker ~cycle results =
 
 let write_invalid_csv ~dir ~baker ~cycle rewards =
   try
-    mkdir_p dir ;
+    File_ops.mkdir_p dir ;
     let path = Filename.concat dir "invalid.csv" in
     Out_channel.with_open_text path (fun oc ->
         output_string oc csv_header ;
@@ -127,7 +121,7 @@ let summary_to_json (s : Rewards.cycle_summary) =
 
 let write_summary_json ~dir summary =
   try
-    mkdir_p dir ;
+    File_ops.mkdir_p dir ;
     let path = Filename.concat dir "summary.json" in
     let json = summary_to_json summary in
     let content = Yojson.Safe.pretty_to_string ~std:true json in

@@ -9,13 +9,14 @@ open Rresult
 
 let ( let* ) = Result.bind
 
+let rec mkdir_p path =
+  if path = "/" || path = "." then ()
+  else if Sys.file_exists path then ()
+  else (
+    mkdir_p (Filename.dirname path) ;
+    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+
 let ensure_dir_path ~owner ~group ~mode path =
-  let rec mkdir_p p =
-    if p = "/" || p = "." then ()
-    else (
-      mkdir_p (Filename.dirname p) ;
-      try Unix.mkdir p mode with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
-  in
   mkdir_p path ;
   if Paths.is_root () then
     try
