@@ -85,3 +85,7 @@ let remove ~name =
       Ok ()
     with Sys_error msg -> Error (`Msg msg)
   else Ok ()
+
+let list_sandboxes () =
+  let* groups = list () in
+  Ok (List.filter (fun (g : Group.t) -> g.sandbox) groups)

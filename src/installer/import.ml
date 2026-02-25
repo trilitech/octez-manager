@@ -237,6 +237,7 @@ let create_node_from_external ~instance ~external_svc ~network ~data_dir
       (* No bin_source for imported services *)
       logging_mode = Logging_mode.Journald;
       extra_args;
+      extra_env = [];
       auto_enable = true;
       bootstrap = Genesis;
       (* No bootstrap - data already exists *)
@@ -411,6 +412,7 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       liquidity_baking_vote;
       signer_mode = Signer_types.Local_keys;
       extra_args;
+      extra_env = [];
       service_user;
       app_bin_dir = bin_dir;
       bin_source = None;

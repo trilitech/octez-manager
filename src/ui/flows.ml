@@ -72,6 +72,7 @@ let create_node_flow ~on_success =
                         bin_source = None;
                         logging_mode = Logging_mode.Journald;
                         extra_args = [];
+                        extra_env = [];
                         auto_enable = true;
                         preserve_data = false;
                         bootstrap;
@@ -142,6 +143,7 @@ let create_baker_flow ~services ~on_success =
                       liquidity_baking_vote = None;
                       signer_mode = Signer_types.Local_keys;
                       extra_args = [];
+                      extra_env = [];
                       service_user = "octez";
                       app_bin_dir =
                         Form_builder_common.default_app_bin_dir
