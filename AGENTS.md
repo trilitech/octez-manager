@@ -301,6 +301,8 @@ Consolidated list of mistakes agents repeatedly make. Check this before submitti
 
 12. **Polymorphic equality on structured types.** Using `(=)` instead of typed comparators like `String.equal`. Polymorphic equality can produce wrong results on abstract types.
 
+13. **Manual string layouts instead of Miaou widgets.** Using `Printf.sprintf` width specifiers or `String.make n ' '` to align columns. Use `Flex_layout`, `Grid_layout`, or `Box_widget` — they handle terminal resizing and overflow automatically. (See: [src/ui/AGENTS.md](src/ui/AGENTS.md))
+
 ---
 
 ## Subdirectory Guides
