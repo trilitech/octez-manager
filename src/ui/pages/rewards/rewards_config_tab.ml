@@ -16,6 +16,8 @@ module Desc_list = Miaou_widgets_display.Description_list
 
 let pending_config : Payout_config.t option ref = ref None
 
+let set_pending_config config = pending_config := Some config
+
 let consume_pending_config () =
   let v = !pending_config in
   pending_config := None ;
