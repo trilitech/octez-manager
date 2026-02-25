@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Opam package metadata**: Added explicit homepage and bug-reports fields to `dune-project` to ensure opam package lists the correct GitHub repository (trilitech/octez-manager)
 - **Keys page duplicate wallets**: Fixed bug where wallets appeared twice in the key management page (press 'K') when the default `~/.tezos-client` directory was also registered in the directory registry. The page now deduplicates directories before scanning for keys, handling both exact matches and paths with/without trailing slashes.
 - **Coverage workflow cache**: Fixed main branch CI failure by including `octez-manager.opam` in the coverage workflow cache key. The workflow was using a stale opam cache that didn't include new dependencies (like yaml), causing "Library not found" build errors. (fixes #742)
 - **Signatory config location**: Signatory YAML configuration files (`signatory.yaml`) are now stored alongside keys in `~/.local/share/octez/signatory/<instance>/` instead of split across two directories. Previously, configs were incorrectly placed in `~/.local/share/octez/instances/<instance>/` (or `~/.config/octez/instances/` briefly). This consolidates all signatory-specific files (configs + keys) in one directory, simplifying backup and management. Purging the last signatory instance now also cleans up the empty `signatory/` parent directory. Users with existing signatory instances should move `signatory.yaml` to the signatory data directory.

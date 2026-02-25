@@ -9,6 +9,8 @@
  (synopsis "Minimal Octez service installer")
  (description
   "Small CLI that installs octez-node and companion systemd services without the full Octez Setup UI.")
+ (homepage "https://github.com/trilitech/octez-manager")
+ (bug_reports "https://github.com/trilitech/octez-manager/issues")
  (depends
   (ocaml (>= 5.3))
   cmdliner
