@@ -25,6 +25,8 @@ let handle_global_key key =
 let pending_external_service : Octez_manager_lib.External_service.t option ref =
   ref None
 
+let pending_import_network : string option ref = ref None
+
 (* Use Atomic for cross-domain visibility - mark_instances_dirty can be called
    from background worker domains via Job_manager.on_complete *)
 let instances_dirty = Atomic.make false
@@ -41,6 +43,13 @@ let set_pending_external_service svc = pending_external_service := Some svc
 let take_pending_external_service () =
   let value = !pending_external_service in
   pending_external_service := None ;
+  value
+
+let set_pending_import_network network = pending_import_network := Some network
+
+let take_pending_import_network () =
+  let value = !pending_import_network in
+  pending_import_network := None ;
   value
 
 (* Edit mode: service being edited and list of stopped dependents *)
