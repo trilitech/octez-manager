@@ -78,10 +78,14 @@ let load_sandboxes () =
         groups
 
 let clamp_cursor sandboxes cursor =
-  let n = List.length sandboxes in
-  if n = 0 then 0 else max 0 (min cursor (n - 1))
+  (* +1 for the synthetic "New sandbox" item always at position 0 *)
+  let n = 1 + List.length sandboxes in
+  max 0 (min cursor (n - 1))
 
-let selected_sandbox s = List.nth_opt s.sandboxes s.cursor
+(** Returns the sandbox at the cursor, or [None] when cursor is on the
+    "New sandbox" create-item (position 0). *)
+let selected_sandbox s =
+  if s.cursor = 0 then None else List.nth_opt s.sandboxes (s.cursor - 1)
 
 (* ─── Init / Lifecycle ──────────────────────────────────────────────────── *)
 
@@ -131,38 +135,39 @@ let render_list_item ~selected ~sb =
   let net = T.muted "  %s" sb.group.network in
   T.concat [label; "\n"; net]
 
+let render_create_item ~selected =
+  let arrow = if selected then T.warning "▶" else " " in
+  let label =
+    T.concat [arrow; " "; T.success "+"; "  "; T.text "New sandbox"]
+  in
+  let hint = T.muted "   Create a sandbox" in
+  T.concat [label; "\n"; hint]
+
 let render_list ~sandboxes ~cursor ~size =
-  if sandboxes = [] then
-    Flex.create
-      ~direction:Flex.Column
-      ~padding:{Flex.left = 2; right = 1; top = 1; bottom = 0}
-      [
+  let rows_per_item = 2 in
+  let create_row =
+    {
+      Flex.render = (fun ~size:_ -> render_create_item ~selected:(cursor = 0));
+      basis = Flex.Px rows_per_item;
+      cross = None;
+    }
+  in
+  let sandbox_rows =
+    List.mapi
+      (fun i sb ->
+        let selected = cursor = i + 1 in
         {
-          Flex.render =
-            (fun ~size:_ -> T.muted "No sandboxes. Press [c] to create.");
-          basis = Flex.Px 1;
+          Flex.render = (fun ~size:_ -> render_list_item ~selected ~sb);
+          basis = Flex.Px rows_per_item;
           cross = None;
-        };
-      ]
-    |> fun f -> Flex.render f ~size
-  else
-    let rows_per_item = 2 in
-    let items =
-      List.mapi
-        (fun i sb ->
-          let selected = i = cursor in
-          {
-            Flex.render = (fun ~size:_ -> render_list_item ~selected ~sb);
-            basis = Flex.Px rows_per_item;
-            cross = None;
-          })
-        sandboxes
-    in
-    Flex.create
-      ~direction:Flex.Column
-      ~padding:{Flex.left = 1; right = 1; top = 0; bottom = 0}
-      items
-    |> fun f -> Flex.render f ~size
+        })
+      sandboxes
+  in
+  Flex.create
+    ~direction:Flex.Column
+    ~padding:{Flex.left = 1; right = 1; top = 0; bottom = 0}
+    (create_row :: sandbox_rows)
+  |> fun f -> Flex.render f ~size
 
 let rpc_metrics_for (sb : sandbox_info) =
   match sb.node with
@@ -208,15 +213,33 @@ let render_detail ~sb ~size =
   let dl = DL.create ~title:"Sandbox Details" ~key_width:14 ~items () in
   DL.render ~cols ~wrap:true dl ~focus:false
 
+let render_create_detail ~size =
+  Flex.create
+    ~direction:Flex.Column
+    ~padding:{Flex.left = 2; right = 1; top = 2; bottom = 0}
+    [
+      {
+        Flex.render = (fun ~size:_ -> T.text "New Sandbox");
+        basis = Flex.Px 1;
+        cross = None;
+      };
+      {
+        Flex.render =
+          (fun ~size:_ ->
+            T.muted "Press Enter to open the sandbox creation wizard.");
+        basis = Flex.Px 1;
+        cross = None;
+      };
+    ]
+  |> fun f -> Flex.render f ~size
+
 let render_empty_detail ~size =
   Flex.create
     ~direction:Flex.Column
     ~padding:{Flex.left = 2; right = 1; top = 2; bottom = 0}
     [
       {
-        Flex.render =
-          (fun ~size:_ ->
-            T.muted "Select a sandbox or press [c] to create one.");
+        Flex.render = (fun ~size:_ -> T.muted "Select a sandbox.");
         basis = Flex.Px 1;
         cross = None;
       };
@@ -268,7 +291,9 @@ let render_content s ~size =
             (fun ~size ->
               match selected_sandbox s with
               | Some sb -> render_detail ~sb ~size
-              | None -> render_empty_detail ~size);
+              | None ->
+                  if s.cursor = 0 then render_create_detail ~size
+                  else render_empty_detail ~size);
           basis = Flex.Fill;
           cross = None;
         };
@@ -451,6 +476,9 @@ let handle_key ps key ~size:_ =
           (fun s -> {s with cursor = clamp_cursor s.sandboxes (s.cursor - 1)})
           ps
     | "c" ->
+        Context.navigate "sandbox-create" ;
+        ps
+    | ("Return" | "Enter") when ps.Navigation.s.cursor = 0 ->
         Context.navigate "sandbox-create" ;
         ps
     | _ -> (
