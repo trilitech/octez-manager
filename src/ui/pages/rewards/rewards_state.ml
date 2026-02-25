@@ -32,7 +32,9 @@ type state = {
   search_query : string;
   search_active : bool;
   blueprint : Rewards.payout_blueprint option;
-      (** Loaded blueprint for delegators tab *)
+      (** Loaded blueprint for delegators/overview tabs *)
+  overview_preview : bool;
+      (** True when the overview tab should display the payout preview *)
   config : Payout_config.t option;  (** Loaded payout config for editing *)
   config_cursor : int;  (** Selected field in config tab *)
   config_dirty : bool;  (** True if config has unsaved changes *)
