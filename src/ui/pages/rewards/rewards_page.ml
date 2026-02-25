@@ -193,7 +193,7 @@ let hint_for_tab = function
   | Rewards_state.Configuration ->
       Widgets.themed_muted
         "j/k nav \xc2\xb7 Enter edit \xc2\xb7 s save \xc2\xb7 r reset \xc2\xb7 \
-         i import \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
+         i import \xc2\xb7 n notify \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
   | Rewards_state.Overview ->
       Widgets.themed_muted
         "g generate \xc2\xb7 p pay \xc2\xb7 d dry-run \xc2\xb7 1-4 tabs \
@@ -405,6 +405,47 @@ let handle_config_key ps key =
                   List.iter (fun w -> Context.toast_warn w) result.warnings)
             () ;
           ps)
+  | Some (Keys.Char "n") -> (
+      (* Notification channel test *)
+      match Rewards_state.selected_instance_name s with
+      | None -> ps
+      | Some instance ->
+          let channels =
+            match Payout_config.load ~instance with
+            | Ok c -> c.notifications
+            | Error _ -> []
+          in
+          if channels = [] then (
+            Context.toast_info "No notification channels configured" ;
+            ps)
+          else (
+            Modal_helpers.open_choice_modal
+              ~title:"Notification Channels"
+              ~items:
+                (List.map
+                   (fun ch ->
+                     match ch with
+                     | Rewards.Discord _ -> "Test Discord"
+                     | Rewards.Telegram _ -> "Test Telegram"
+                     | Rewards.Webhook _ -> "Test Webhook"
+                     | Rewards.External _ -> "Test External")
+                   channels
+                @ ["Cancel"])
+              ~to_string:Fun.id
+              ~on_select:(fun choice ->
+                if not (String.equal choice "Cancel") then
+                  let results = Payout_notifier.send_test ~channels in
+                  List.iter
+                    (fun (name, result) ->
+                      match result with
+                      | Ok () ->
+                          Context.toast_info
+                            (Printf.sprintf "%s: test sent" name)
+                      | Error msg ->
+                          Context.toast_warn (Printf.sprintf "%s: %s" name msg))
+                    results)
+              () ;
+            ps))
   | _ -> ps
 
 (** Handle keys specific to the History tab. *)
@@ -509,7 +550,7 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
                            (Printf.sprintf "Progress: %d/%d" p.current p.total))
                      ()
                  with
-                 | Ok (results, _summary) ->
+                 | Ok (results, summary) ->
                      let ok =
                        List.filter
                          (fun (r : Rewards.payout_result) -> r.success)
@@ -531,6 +572,28 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
                             (if dry_run then "Dry-run" else "Payout")
                             succeeded
                             total) ;
+                     (* Send notifications for real payouts *)
+                     (if (not dry_run) && succeeded > 0 then
+                        let channels =
+                          match Payout_config.load ~instance with
+                          | Ok c -> c.notifications
+                          | Error _ -> []
+                        in
+                        if channels <> [] then
+                          let results =
+                            Payout_notifier.notify_all ~channels ~summary
+                          in
+                          List.iter
+                            (fun (name, result) ->
+                              match result with
+                              | Error msg ->
+                                  Context.toast_warn
+                                    (Printf.sprintf
+                                       "Notification %s failed: %s"
+                                       name
+                                       msg)
+                              | Ok () -> ())
+                            results) ;
                      Rewards_scheduler.refresh_baker ~instance
                  | Error msg ->
                      Context.toast_error
@@ -741,6 +804,7 @@ let handled_keys () =
       Char "p";
       Char "d";
       Char "i";
+      Char "n";
     ]
 
 let has_modal _ = false
