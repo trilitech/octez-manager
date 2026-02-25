@@ -166,6 +166,74 @@ let read_wallet_pkhs ~wallet_dir =
     | Sys_error msg -> Error (`Msg msg)
     | Yojson.Json_error msg -> Error (`Msg msg)
 
+(** Fetch what percentage of total network staking power our wallet delegates
+    hold. Tries [/context/stake_distribution] (one call, exact) then falls back
+    to a count-based approximation against the full active-delegate list.
+
+    Our delegates are entries at alias indices divisible by 3 (the base
+    addresses; indices 1 and 2 are consensus/companion keys). *)
+let fetch_stake_pct ~endpoint ~wallet_dir =
+  let* pkhs = read_wallet_pkhs ~wallet_dir in
+  let our_delegates =
+    List.filter_map
+      (fun (alias, addr) ->
+        match String.split_on_char '-' alias with
+        | ["delegate"; ns] -> (
+            match int_of_string_opt ns with
+            | Some n when n mod 3 = 0 -> Some addr
+            | _ -> None)
+        | _ -> None)
+      pkhs
+  in
+  let n_our = List.length our_delegates in
+  if n_our = 0 then Ok 0.0
+  else
+    let our_set = Hashtbl.create 32 in
+    List.iter (fun addr -> Hashtbl.replace our_set addr ()) our_delegates ;
+    (* Attempt: stake_distribution (1 call, has per-baker staking balance) *)
+    let try_stake_distribution () =
+      match
+        fetch_json_from_rpc
+          ~endpoint
+          "/chains/main/blocks/head/context/stake_distribution"
+      with
+      | Ok (`List entries) ->
+          let total = ref 0.0 in
+          let ours = ref 0.0 in
+          List.iter
+            (fun entry ->
+              let open Yojson.Safe.Util in
+              try
+                let baker = entry |> member "baker" |> to_string in
+                let bal =
+                  match entry |> member "staking_balance" with
+                  | `String s -> ( try float_of_string s with _ -> 0.0)
+                  | `Int n -> float_of_int n
+                  | `Intlit s -> ( try float_of_string s with _ -> 0.0)
+                  | _ -> 0.0
+                in
+                total := !total +. bal ;
+                if Hashtbl.mem our_set baker then ours := !ours +. bal
+              with _ -> ())
+            entries ;
+          if !total > 0.0 then Some (!ours /. !total *. 100.0) else None
+      | _ -> None
+    in
+    match try_stake_distribution () with
+    | Some pct -> Ok pct
+    | None ->
+        (* Fallback: count-based approximation *)
+        let* all_json =
+          fetch_json_from_rpc
+            ~endpoint
+            "/chains/main/blocks/head/context/delegates?active=true&with_minimal_stake=true"
+        in
+        let n_total =
+          match all_json with `List all -> List.length all | _ -> 0
+        in
+        if n_total = 0 then Ok 0.0
+        else Ok (float_of_int n_our /. float_of_int n_total *. 100.0)
+
 let add_account ~wallet_dir ~address ?alias () =
   let* curve =
     match Yes_wallet.curve_of_address address with
