@@ -217,7 +217,7 @@ let apply_allocation s =
 
 (* ─── Rendering ─────────────────────────────────────────────────────────── *)
 
-let render_baker_row s ~row_idx row =
+let render_baker_row s ~row_idx row ~total_allocated =
   let selected = row_idx = s.cursor in
   let editing_text =
     match s.editing with
@@ -235,25 +235,27 @@ let render_baker_row s ~row_idx row =
     | None ->
         if row.key_count = 0 then T.muted "0" else T.text "%d" row.key_count
   in
-  let stake_str =
-    if s.total_delegates <= 0 || row.key_count = 0 then T.muted "–"
+  (* Share of total allocated keys — sums to 100% across all bakers *)
+  let share_str =
+    if total_allocated <= 0 || row.key_count = 0 then T.muted "–"
     else
       let pct =
-        float_of_int row.key_count /. float_of_int s.total_delegates *. 100.0
+        float_of_int row.key_count /. float_of_int total_allocated *. 100.0
       in
       T.text "%.1f%%" pct
   in
-  (instance_str, key_str, stake_str)
+  (instance_str, key_str, share_str)
 
 let render_baker_table s ~size =
   let nrows = List.length s.rows in
   if nrows = 0 then T.muted "No bakers. Press [a] to add one."
   else
+    let total_allocated = allocated_keys s.rows in
     let header_row =
       [
         Grid.cell ~row:0 ~col:0 (fun ~size:_ -> T.muted "Baker");
         Grid.cell ~row:0 ~col:1 (fun ~size:_ -> T.muted "Keys");
-        Grid.cell ~row:0 ~col:2 (fun ~size:_ -> T.muted "Stake%%");
+        Grid.cell ~row:0 ~col:2 (fun ~size:_ -> T.muted "Share%%");
       ]
     in
     let data_children =
@@ -262,11 +264,13 @@ let render_baker_table s ~size =
            (fun i row ->
              let r = i + 1 in
              (* +1 for header row *)
-             let inst, key, stake = render_baker_row s ~row_idx:i row in
+             let inst, key, share =
+               render_baker_row s ~row_idx:i row ~total_allocated
+             in
              [
                Grid.cell ~row:r ~col:0 (fun ~size:_ -> inst);
                Grid.cell ~row:r ~col:1 (fun ~size:_ -> key);
-               Grid.cell ~row:r ~col:2 (fun ~size:_ -> stake);
+               Grid.cell ~row:r ~col:2 (fun ~size:_ -> share);
              ])
            s.rows)
     in
@@ -428,12 +432,49 @@ let handle_key ps key ~size:_ =
                   ps
             | _ -> ps)
         | "\t" | "Tab" ->
-            (* Redistribute unallocated delegates across zero-count rows *)
+            (* Redistribute all delegates evenly across all baker rows *)
             Navigation.update redistribute ps
         | "c" ->
-            (* Apply & Close *)
-            apply_allocation s ;
-            ps
+            (* Validate then show confirmation before applying *)
+            let allocated = allocated_keys s.rows in
+            let total = s.total_delegates in
+            if allocated > total then (
+              Context.toast_error
+                (T.text
+                   "Overallocated by %d key(s) — use Tab to redistribute"
+                   (allocated - total)) ;
+              ps)
+            else
+              let change_lines =
+                List.map
+                  (fun r ->
+                    if r.is_new then
+                      Printf.sprintf
+                        "  install %s: %d keys"
+                        r.instance
+                        r.key_count
+                    else
+                      Printf.sprintf
+                        "  update %s: %d keys (restart)"
+                        r.instance
+                        r.key_count)
+                  s.rows
+              in
+              let unalloc = total - allocated in
+              let summary =
+                Printf.sprintf
+                  "\n%d / %d delegates allocated, %d unallocated"
+                  allocated
+                  total
+                  unalloc
+              in
+              let message = String.concat "\n" (change_lines @ [summary]) in
+              Modal_helpers.confirm_modal
+                ~title:"Apply Key Allocation?"
+                ~message
+                ~on_result:(fun yes -> if yes then apply_allocation s)
+                () ;
+              ps
         | _ -> ps)
 
 (* ─── PAGE_SIG ──────────────────────────────────────────────────────────── *)
