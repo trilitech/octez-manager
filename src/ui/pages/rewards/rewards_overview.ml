@@ -264,12 +264,16 @@ let render_cycle_detail ~box_width ~instance ~baker
   in
   String.concat "\n" [header; back_hint; ""; detail_box; ""; preview_box]
 
+let resolve_network ~instance =
+  match Octez_manager_lib.Service_registry.find ~instance with
+  | Ok (Some svc) -> svc.Octez_manager_lib.Service.network
+  | _ -> (
+      match Rewards_scheduler.get_network_for_instance ~instance with
+      | Some n -> n
+      | None -> "unknown")
+
 let render_dashboard ~box_width ~instance ~baker (state : Rewards_state.state) =
-  let network =
-    match Octez_manager_lib.Service_registry.find ~instance with
-    | Ok (Some svc) -> svc.Octez_manager_lib.Service.network
-    | _ -> "unknown"
-  in
+  let network = resolve_network ~instance in
   let recent = Rewards_scheduler.get_recent_cycles ~baker in
   let current_cycle = state.current_cycle in
   let last_completed =

@@ -47,6 +47,10 @@ val get_payout_status :
     Returns [None] if the scheduler hasn't detected the baker yet. *)
 val get_baker_for_instance : instance:string -> string option
 
+(** Get the cached network name for an instance.
+    Useful for test bakers that don't have a service registry entry. *)
+val get_network_for_instance : instance:string -> string option
+
 (** {1 Continual mode} *)
 
 (** Sync continual mode state from config (called after config changes). *)

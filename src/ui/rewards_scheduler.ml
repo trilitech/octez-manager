@@ -52,6 +52,14 @@ let get_baker_for_instance ~instance =
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.find_opt baker_instance_cache instance)
 
+(* Network per instance (for test bakers that lack a service registry entry) *)
+let network_cache : (string, string) Hashtbl.t = Hashtbl.create 4
+
+let network_lock = Mutex.create ()
+
+let get_network_for_instance ~instance =
+  Mutex.protect network_lock (fun () -> Hashtbl.find_opt network_cache instance)
+
 (* ── Continual mode state ────────────────────────────── *)
 
 (* Track the last cycle we saw per instance (for cycle transition detection) *)
@@ -175,6 +183,8 @@ let cache_cycles ~baker cycles =
         cycles)
 
 let poll_baker ~instance ~network =
+  Mutex.protect network_lock (fun () ->
+      Hashtbl.replace network_cache instance network) ;
   let delegates = Delegate_scheduler.get_baker_delegates ~instance in
   let config_opt =
     match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
@@ -184,9 +194,12 @@ let poll_baker ~instance ~network =
     | Some c -> c.tzkt_url
     | None -> Payout_config.tzkt_base_url_for_network network
   in
-  (* Try the configured baker first, then fall back to each delegate *)
+  (* Try the configured baker first, then fall back to each delegate,
+     then the cached baker (for test bakers from OM_TEST_BAKER). *)
   let configured_baker =
-    match config_opt with Some c -> Some c.baker_pkh | None -> None
+    match config_opt with
+    | Some c -> Some c.baker_pkh
+    | None -> get_baker_for_instance ~instance
   in
   let result =
     (* 1. Try the configured baker (if any) *)
@@ -327,6 +340,7 @@ let clear () =
   Atomic.set current_cycle_ref None ;
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.clear baker_instance_cache) ;
+  Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache) ;
   Mutex.protect continual_lock (fun () ->
       Hashtbl.clear continual_last_cycle ;
       Hashtbl.clear continual_delay_until)
