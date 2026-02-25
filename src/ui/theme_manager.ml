@@ -54,19 +54,22 @@ let get_current () = !current_theme
 
 (** Set current theme and export to MIAOU_THEME env var.
     The Miaou Matrix driver reads theme from MIAOU_THEME, so we write
-    our theme JSON to a temp file and set the env var to point to it. *)
+    our theme JSON to a persistent file and set the env var to point to it. *)
 let set_current theme =
   current_theme := theme ;
-  (* Write theme to temp file for Miaou driver to pick up *)
+  (* Write theme to persistent file for Miaou driver to pick up *)
   let json = Theme.to_yojson theme in
   let json_str = Yojson.Safe.pretty_to_string json in
-  let tmp_path =
-    Filename.concat (Filename.get_temp_dir_name ()) "octez-manager-theme.json"
+  let theme_path =
+    Filename.concat (Paths.registry_root ()) "octez-manager-theme.json"
   in
-  let oc = open_out tmp_path in
+  (* Ensure the registry directory exists *)
+  let registry_dir = Paths.registry_root () in
+  if not (Sys.file_exists registry_dir) then Unix.mkdir registry_dir 0o755 ;
+  let oc = open_out theme_path in
   output_string oc json_str ;
   close_out oc ;
-  Unix.putenv "MIAOU_THEME" tmp_path
+  Unix.putenv "MIAOU_THEME" theme_path
 
 (** List available themes: built-ins + Miaou built-ins + files in themes dir *)
 let list_available () =
