@@ -36,8 +36,8 @@ val get_cycle_data :
 val get_recent_cycles :
   baker:string -> Octez_manager_rewards.Rewards.cycle_rewards list
 
-(** Get the cached current cycle number. *)
-val get_current_cycle : unit -> int option
+(** Get the cached current cycle number for a specific instance. *)
+val get_current_cycle : instance:string -> int option
 
 (** Get payout status for a baker + cycle (paid/unpaid/partial). *)
 val get_payout_status :
