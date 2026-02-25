@@ -52,6 +52,7 @@ let init () =
       search_query = "";
       search_active = false;
       blueprint = None;
+      overview_preview = false;
       config = None;
       config_cursor = 0;
       config_dirty = false;
@@ -65,8 +66,12 @@ let update ps _ = ps
 (** Compute a payout blueprint for the delegators tab if needed.
     Only runs when the tab is active and cached data is available.
     Uses the loaded config if available, otherwise default config. *)
+let needs_blueprint s =
+  s.active_tab = Rewards_state.Delegators
+  || (s.active_tab = Rewards_state.Overview && s.overview_preview)
+
 let maybe_compute_blueprint s =
-  if s.active_tab <> Rewards_state.Delegators then s
+  if not (needs_blueprint s) then s
   else
     match Rewards_state.selected_baker_instance s with
     | None -> {s with blueprint = None}
@@ -196,6 +201,10 @@ let hint_for_tab = function
       Widgets.themed_muted
         "j/k nav \xc2\xb7 Enter edit \xc2\xb7 s save \xc2\xb7 r reset \xc2\xb7 \
          1-4 tabs \xc2\xb7 Esc back"
+  | Rewards_state.Overview ->
+      Widgets.themed_muted
+        "g generate \xc2\xb7 1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \
+         \xc2\xb7 Esc back"
   | _ ->
       Widgets.themed_muted
         "1-4 tabs \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc back"
@@ -411,6 +420,7 @@ let handle_key ps key ~size:_ =
                 s with
                 selected_baker = (s.selected_baker + 1) mod n;
                 blueprint = None;
+                overview_preview = false;
                 config = None;
                 config_dirty = false;
                 selected_cycle = None;
@@ -418,6 +428,33 @@ let handle_key ps key ~size:_ =
               })
             ps
         else ps
+    | Some (Keys.Char "g") when s.active_tab = Rewards_state.Overview -> (
+        (* Generate payout preview on Overview tab *)
+        let s = ps.Navigation.s in
+        match Rewards_state.selected_baker_instance s with
+        | None -> ps
+        | Some (instance, _) -> (
+            (* Check double-payment prevention *)
+            let cycle_opt =
+              match s.selected_cycle with
+              | Some c -> Some c
+              | None -> s.current_cycle
+            in
+            match cycle_opt with
+            | None ->
+                Context.toast_warn "No cycle data available" ;
+                ps
+            | Some cycle ->
+                if Payout_blueprint.is_already_paid ~instance ~cycle then begin
+                  Context.toast_warn
+                    (Printf.sprintf "Cycle %d already paid" cycle) ;
+                  ps
+                end
+                else
+                  Navigation.update
+                    (fun s ->
+                      {s with overview_preview = true; blueprint = None})
+                    ps))
     | Some (Keys.Char "r") when s.active_tab <> Rewards_state.Configuration ->
         refresh ps
     | _ when s.active_tab = Rewards_state.Delegators ->
@@ -465,6 +502,7 @@ let handled_keys () =
       Char "s";
       Char "f";
       Char "c";
+      Char "g";
     ]
 
 let has_modal _ = false
