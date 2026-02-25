@@ -23,6 +23,10 @@ type state = Rewards_state.state
 
 type pstate = state Navigation.t
 
+(* Pending cycle selection from modal callback.
+   Written by on_select, consumed by refresh. *)
+let pending_cycle : int option ref = ref None
+
 (* Load baker instances from service registry.
    Prefer the auto-detected baker address from the scheduler cache,
    falling back to the first delegate if not yet detected.
@@ -116,10 +120,20 @@ let maybe_compute_blueprint s =
         match cycle_opt with
         | None -> {s with blueprint = None}
         | Some cycle -> (
+            let cached = Rewards_scheduler.get_cycle_data ~baker ~cycle in
+            let stale_blueprint =
+              match (s.blueprint, cached) with
+              | Some bp, Some cr
+                when bp.Rewards.cycle = cycle
+                     && bp.Rewards.delegator_rewards = []
+                     && cr.Rewards.delegators <> [] ->
+                  true
+              | _ -> false
+            in
             match s.blueprint with
-            | Some bp when bp.Rewards.cycle = cycle -> s
+            | Some bp when bp.Rewards.cycle = cycle && not stale_blueprint -> s
             | _ -> (
-                match Rewards_scheduler.get_cycle_data ~baker ~cycle with
+                match cached with
                 | None -> {s with blueprint = None}
                 | Some cr ->
                     let network =
@@ -180,7 +194,17 @@ let refresh ps =
           let s = {s with baker_instances; current_cycle} in
           let s = maybe_compute_blueprint s in
           let s = maybe_load_config s in
-          apply_pending_config s)
+          let s = apply_pending_config s in
+          match !pending_cycle with
+          | Some c ->
+              pending_cycle := None ;
+              {
+                s with
+                selected_cycle = Some c;
+                blueprint = None;
+                delegator_cursor = 0;
+              }
+          | None -> s)
         ps
 
 let move ps _ = ps
@@ -223,13 +247,17 @@ let hint_for_tab _tab = ""
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
+  Context.tick_spinner () ;
+  Context.tick_toasts () ;
   let header_line = render_baker_header s in
   let tab_bar = render_tab_bar s ~cols in
   let hint = hint_for_tab s.active_tab in
+  let toast = Context.render_toasts ~cols in
+  let footer = if String.length toast > 0 then [toast; hint] else [hint] in
   Themed_page.render_layout
     ~size
     ~header:[header_line; tab_bar; ""]
-    ~footer:[hint]
+    ~footer
     ~child:(fun avail ->
       let cols = avail.LTerm_geom.cols in
       let rows = avail.LTerm_geom.rows in
@@ -326,10 +354,10 @@ let handle_delegator_key ps key =
           })
         ps
   | Some (Keys.Char "c") -> (
-      (* Cycle through recent cycles *)
-      match Rewards_state.selected_baker_pkh s with
+      (* Open cycle selector modal *)
+      match Rewards_state.selected_baker_instance s with
       | None -> ps
-      | Some baker -> (
+      | Some (instance, baker) -> (
           let recent = Rewards_scheduler.get_recent_cycles ~baker in
           let cycles =
             List.map (fun (cr : Rewards.cycle_rewards) -> cr.cycle) recent
@@ -337,27 +365,22 @@ let handle_delegator_key ps key =
           match cycles with
           | [] -> ps
           | _ ->
-              let current =
-                match s.selected_cycle with
-                | Some c -> c
-                | None -> List.hd cycles
+              let current_cycle =
+                Rewards_scheduler.get_current_cycle ~instance
               in
-              let rec find_next = function
-                | [] -> List.hd cycles
-                | [_] -> List.hd cycles
-                | x :: y :: _ when x = current -> y
-                | _ :: rest -> find_next rest
-              in
-              let next_cycle = find_next cycles in
-              Navigation.update
-                (fun s ->
-                  {
-                    s with
-                    selected_cycle = Some next_cycle;
-                    blueprint = None;
-                    delegator_cursor = 0;
-                  })
-                ps))
+              Modal_helpers.open_choice_modal
+                ~title:"Select Cycle"
+                ~items:cycles
+                ~to_string:(fun c ->
+                  match current_cycle with
+                  | Some cc when Int.equal c cc ->
+                      Printf.sprintf "Cycle %d  (current)" c
+                  | _ -> Printf.sprintf "Cycle %d" c)
+                ~on_select:(fun cycle ->
+                  Rewards_scheduler.ensure_cycle_detail ~instance ~baker ~cycle ;
+                  pending_cycle := Some cycle)
+                () ;
+              ps))
   | _ -> ps
 
 (** Handle keys specific to the Configuration tab. *)
@@ -497,6 +520,15 @@ let handle_history_key ps key =
           match List.nth_opt recent s.history_cursor with
           | None -> ps
           | Some (cr : Rewards.cycle_rewards) ->
+              let instance =
+                match Rewards_state.selected_instance_name s with
+                | Some i -> i
+                | None -> ""
+              in
+              Rewards_scheduler.ensure_cycle_detail
+                ~instance
+                ~baker
+                ~cycle:cr.cycle ;
               Navigation.update
                 (fun s ->
                   {
@@ -555,6 +587,8 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
                "%s cycle %d..."
                (if dry_run then "Dry-running" else "Paying")
                cycle) ;
+          if not dry_run then
+            Rewards_scheduler.mark_in_progress ~instance ~cycle ;
           ignore
             (Domain_pool.submit (fun () ->
                  match
@@ -612,227 +646,256 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
                                        msg)
                               | Ok () -> ())
                             results) ;
+                     Rewards_scheduler.clear_in_progress ~instance ~cycle ;
+                     Rewards_scheduler.refresh_payout_status ~instance ~cycle ;
                      Rewards_scheduler.refresh_baker ~instance
                  | Error msg ->
+                     Rewards_scheduler.clear_in_progress ~instance ~cycle ;
+                     Rewards_scheduler.refresh_payout_status ~instance ~cycle ;
                      Context.toast_error
                        (Printf.sprintf "Payout failed: %s" msg))))
   | _ -> Context.toast_error "Cannot resolve baker service"
+
+(** Given a column position in the tab bar (1-indexed), return the tab index.
+    Each tab has width [String.length label + 4] (for padding/brackets). *)
+let tab_at_col col =
+  let rec find idx pos = function
+    | [] -> None
+    | tab :: rest ->
+        let label = Rewards_state.tab_label tab in
+        let w = String.length label + 4 in
+        if col >= pos && col < pos + w then Some idx
+        else find (idx + 1) (pos + w) rest
+  in
+  find 0 1 Rewards_state.all_tabs
 
 let handle_key ps key ~size:_ =
   let s = ps.Navigation.s in
   (* Search mode captures all input *)
   if s.search_active then handle_search_key ps key
   else
-    match Keys.of_string key with
-    | Some Keys.Escape ->
-        if Option.is_some s.selected_cycle then
-          Navigation.update
-            (fun s ->
-              {
-                s with
-                selected_cycle = None;
-                blueprint = None;
-                overview_preview = false;
-              })
-            ps
-        else back ps
-    | Some Keys.Tab ->
-        Navigation.update
-          (fun s ->
-            let next =
-              Rewards_state.tab_of_index
-                ((Rewards_state.tab_index s.active_tab + 1) mod 4)
-            in
-            {s with active_tab = next})
-          ps
-    | Some (Keys.Char "1") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.Overview})
-          ps
-    | Some (Keys.Char "2") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.Delegators})
-          ps
-    | Some (Keys.Char "3") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.History})
-          ps
-    | Some (Keys.Char "4") ->
-        Navigation.update
-          (fun s -> {s with active_tab = Rewards_state.Configuration})
-          ps
-    | Some (Keys.Char "b") ->
-        (* Cycle baker selection, reset blueprint and config *)
-        let n = List.length s.baker_instances in
-        if n > 1 then
-          Navigation.update
-            (fun s ->
-              {
-                s with
-                selected_baker = (s.selected_baker + 1) mod n;
-                blueprint = None;
-                overview_preview = false;
-                config = None;
-                config_dirty = false;
-                selected_cycle = None;
-                delegator_cursor = 0;
-              })
-            ps
-        else ps
-    | Some (Keys.Char "p") when s.active_tab = Rewards_state.Overview -> (
-        (* Trigger payout confirmation *)
-        let s = ps.Navigation.s in
-        match Rewards_state.selected_baker_instance s with
-        | None -> ps
-        | Some (instance, pkh) -> (
-            let cycle_opt =
-              match s.selected_cycle with
-              | Some c -> Some c
-              | None -> (
-                  match Rewards_scheduler.get_recent_cycles ~baker:pkh with
-                  | cr :: _ -> Some cr.Rewards.cycle
-                  | [] -> None)
-            in
-            match cycle_opt with
-            | None ->
-                Context.toast_warn "No cycle data available" ;
-                ps
-            | Some cycle ->
-                if Payout_blueprint.is_already_paid ~instance ~cycle then begin
-                  Context.toast_warn
-                    (Printf.sprintf "Cycle %d already paid" cycle) ;
-                  ps
-                end
-                else
-                  let network =
-                    match Service_registry.find ~instance with
-                    | Ok (Some svc) -> svc.Service.network
-                    | _ -> "unknown"
-                  in
-                  Modal_helpers.open_choice_modal
-                    ~title:
-                      (Printf.sprintf
-                         "Pay Cycle %d — %s (%s)"
-                         cycle
-                         instance
-                         network)
-                    ~items:["Execute payout"; "Dry-run only"; "Cancel"]
-                    ~to_string:Fun.id
-                    ~on_select:(fun choice ->
-                      let dry_run = String.equal choice "Dry-run only" in
-                      if
-                        String.equal choice "Execute payout"
-                        || String.equal choice "Dry-run only"
-                      then
-                        run_payout_in_background
-                          ~instance
-                          ~pkh
-                          ~network
-                          ~cycle
-                          ~dry_run)
-                    () ;
-                  ps))
-    | Some (Keys.Char "d") when s.active_tab = Rewards_state.Overview -> (
-        (* Direct dry-run without modal *)
-        let s = ps.Navigation.s in
-        match Rewards_state.selected_baker_instance s with
-        | None -> ps
-        | Some (instance, pkh) -> (
-            let cycle_opt =
-              match s.selected_cycle with
-              | Some c -> Some c
-              | None -> (
-                  match Rewards_scheduler.get_recent_cycles ~baker:pkh with
-                  | cr :: _ -> Some cr.Rewards.cycle
-                  | [] -> None)
-            in
-            match cycle_opt with
-            | None ->
-                Context.toast_warn "No cycle data available" ;
-                ps
-            | Some cycle ->
-                let network =
-                  match Service_registry.find ~instance with
-                  | Ok (Some svc) -> svc.Service.network
-                  | _ -> "unknown"
+    (* Check for mouse click on tab bar (row 2 = tab bar, 1-indexed) *)
+    match Miaou_helpers.Mouse.parse_click key with
+    | Some {row = 2; col} -> (
+        match tab_at_col col with
+        | Some idx ->
+            let tab = Rewards_state.tab_of_index idx in
+            Navigation.update (fun s -> {s with active_tab = tab}) ps
+        | None -> ps)
+    | Some _ -> ps (* other mouse clicks: ignore *)
+    | None -> (
+        match Keys.of_string key with
+        | Some Keys.Escape -> back ps
+        | Some Keys.Tab ->
+            Navigation.update
+              (fun s ->
+                let next_idx =
+                  (Rewards_state.tab_index s.active_tab + 1) mod 4
                 in
-                run_payout_in_background
-                  ~instance
-                  ~pkh
-                  ~network
-                  ~cycle
-                  ~dry_run:true ;
-                ps))
-    | Some (Keys.Char "t") when s.active_tab = Rewards_state.Overview -> (
-        (* Toggle continual mode *)
-        match Rewards_state.selected_baker_instance s with
-        | None -> ps
-        | Some (instance, pkh) ->
-            let currently_active = Payout_continual.is_active ~instance in
-            if currently_active then (
-              Payout_continual.disable ~instance ;
-              let config =
-                match Payout_config.load ~instance with
-                | Ok c -> c
-                | Error _ -> Payout_config.default ~baker_pkh:pkh
-              in
-              let config =
-                {config with Payout_config.continual_enabled = false}
-              in
-              ignore (Payout_config.save ~instance config) ;
-              Context.toast_info
-                (Printf.sprintf "Continual mode disabled for %s" instance) ;
-              ps)
-            else (
-              Payout_continual.enable ~instance ;
-              let config =
-                match Payout_config.load ~instance with
-                | Ok c -> c
-                | Error _ -> Payout_config.default ~baker_pkh:pkh
-              in
-              let config =
-                {config with Payout_config.continual_enabled = true}
-              in
-              ignore (Payout_config.save ~instance config) ;
-              Rewards_scheduler.sync_continual_from_config ~instance ;
-              Context.toast_info
-                (Printf.sprintf "Continual mode enabled for %s" instance) ;
-              ps))
-    | Some (Keys.Char "g") when s.active_tab = Rewards_state.Overview -> (
-        (* Generate payout preview on Overview tab *)
-        let s = ps.Navigation.s in
-        match Rewards_state.selected_baker_instance s with
-        | None -> ps
-        | Some (instance, _) -> (
-            (* Check double-payment prevention *)
-            let cycle_opt =
-              match s.selected_cycle with
-              | Some c -> Some c
-              | None -> s.current_cycle
-            in
-            match cycle_opt with
-            | None ->
-                Context.toast_warn "No cycle data available" ;
+                let next = Rewards_state.tab_of_index next_idx in
+                if next_idx = 0 then
+                  (* Wrapping from Configuration back to Overview: reset view state *)
+                  {
+                    s with
+                    active_tab = next;
+                    selected_cycle = None;
+                    blueprint = None;
+                    overview_preview = false;
+                    delegator_cursor = 0;
+                    history_cursor = 0;
+                  }
+                else {s with active_tab = next})
+              ps
+        | Some (Keys.Char "1") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.Overview})
+              ps
+        | Some (Keys.Char "2") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.Delegators})
+              ps
+        | Some (Keys.Char "3") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.History})
+              ps
+        | Some (Keys.Char "4") ->
+            Navigation.update
+              (fun s -> {s with active_tab = Rewards_state.Configuration})
+              ps
+        | Some (Keys.Char "b") ->
+            (* Cycle baker selection, reset blueprint and config *)
+            let n = List.length s.baker_instances in
+            if n > 1 then
+              Navigation.update
+                (fun s ->
+                  {
+                    s with
+                    selected_baker = (s.selected_baker + 1) mod n;
+                    blueprint = None;
+                    overview_preview = false;
+                    config = None;
+                    config_dirty = false;
+                    selected_cycle = None;
+                    delegator_cursor = 0;
+                  })
                 ps
-            | Some cycle ->
-                if Payout_blueprint.is_already_paid ~instance ~cycle then begin
-                  Context.toast_warn
-                    (Printf.sprintf "Cycle %d already paid" cycle) ;
-                  ps
-                end
-                else
-                  Navigation.update
-                    (fun s ->
-                      {s with overview_preview = true; blueprint = None})
+            else ps
+        | Some (Keys.Char "p") when s.active_tab = Rewards_state.Overview -> (
+            (* Trigger payout confirmation *)
+            let s = ps.Navigation.s in
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, pkh) -> (
+                let cycle_opt =
+                  match s.selected_cycle with
+                  | Some c -> Some c
+                  | None -> (
+                      match Rewards_scheduler.get_recent_cycles ~baker:pkh with
+                      | cr :: _ -> Some cr.Rewards.cycle
+                      | [] -> None)
+                in
+                match cycle_opt with
+                | None ->
+                    Context.toast_warn "No cycle data available" ;
+                    ps
+                | Some cycle ->
+                    if Payout_blueprint.is_already_paid ~instance ~cycle then begin
+                      Context.toast_warn
+                        (Printf.sprintf "Cycle %d already paid" cycle) ;
+                      ps
+                    end
+                    else
+                      let network =
+                        match Service_registry.find ~instance with
+                        | Ok (Some svc) -> svc.Service.network
+                        | _ -> "unknown"
+                      in
+                      Modal_helpers.open_choice_modal
+                        ~title:
+                          (Printf.sprintf
+                             "Pay Cycle %d — %s (%s)"
+                             cycle
+                             instance
+                             network)
+                        ~items:["Execute payout"; "Dry-run only"; "Cancel"]
+                        ~to_string:Fun.id
+                        ~on_select:(fun choice ->
+                          let dry_run = String.equal choice "Dry-run only" in
+                          if
+                            String.equal choice "Execute payout"
+                            || String.equal choice "Dry-run only"
+                          then
+                            run_payout_in_background
+                              ~instance
+                              ~pkh
+                              ~network
+                              ~cycle
+                              ~dry_run)
+                        () ;
+                      ps))
+        | Some (Keys.Char "d") when s.active_tab = Rewards_state.Overview -> (
+            (* Direct dry-run without modal *)
+            let s = ps.Navigation.s in
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, pkh) -> (
+                let cycle_opt =
+                  match s.selected_cycle with
+                  | Some c -> Some c
+                  | None -> (
+                      match Rewards_scheduler.get_recent_cycles ~baker:pkh with
+                      | cr :: _ -> Some cr.Rewards.cycle
+                      | [] -> None)
+                in
+                match cycle_opt with
+                | None ->
+                    Context.toast_warn "No cycle data available" ;
+                    ps
+                | Some cycle ->
+                    let network =
+                      match Service_registry.find ~instance with
+                      | Ok (Some svc) -> svc.Service.network
+                      | _ -> "unknown"
+                    in
+                    run_payout_in_background
+                      ~instance
+                      ~pkh
+                      ~network
+                      ~cycle
+                      ~dry_run:true ;
                     ps))
-    | Some (Keys.Char "r") when s.active_tab <> Rewards_state.Configuration ->
-        refresh ps
-    | _ when s.active_tab = Rewards_state.Delegators ->
-        handle_delegator_key ps key
-    | _ when s.active_tab = Rewards_state.Configuration ->
-        handle_config_key ps key
-    | _ when s.active_tab = Rewards_state.History -> handle_history_key ps key
-    | _ -> ps
+        | Some (Keys.Char "t") when s.active_tab = Rewards_state.Overview -> (
+            (* Toggle continual mode *)
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, pkh) ->
+                let currently_active = Payout_continual.is_active ~instance in
+                if currently_active then (
+                  Payout_continual.disable ~instance ;
+                  let config =
+                    match Payout_config.load ~instance with
+                    | Ok c -> c
+                    | Error _ -> Payout_config.default ~baker_pkh:pkh
+                  in
+                  let config =
+                    {config with Payout_config.continual_enabled = false}
+                  in
+                  ignore (Payout_config.save ~instance config) ;
+                  Context.toast_info
+                    (Printf.sprintf "Continual mode disabled for %s" instance) ;
+                  ps)
+                else (
+                  Payout_continual.enable ~instance ;
+                  let config =
+                    match Payout_config.load ~instance with
+                    | Ok c -> c
+                    | Error _ -> Payout_config.default ~baker_pkh:pkh
+                  in
+                  let config =
+                    {config with Payout_config.continual_enabled = true}
+                  in
+                  ignore (Payout_config.save ~instance config) ;
+                  Rewards_scheduler.sync_continual_from_config ~instance ;
+                  Context.toast_info
+                    (Printf.sprintf "Continual mode enabled for %s" instance) ;
+                  ps))
+        | Some (Keys.Char "g") when s.active_tab = Rewards_state.Overview -> (
+            (* Generate payout preview on Overview tab *)
+            let s = ps.Navigation.s in
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, _) -> (
+                (* Check double-payment prevention *)
+                let cycle_opt =
+                  match s.selected_cycle with
+                  | Some c -> Some c
+                  | None -> s.current_cycle
+                in
+                match cycle_opt with
+                | None ->
+                    Context.toast_warn "No cycle data available" ;
+                    ps
+                | Some cycle ->
+                    if Payout_blueprint.is_already_paid ~instance ~cycle then begin
+                      Context.toast_warn
+                        (Printf.sprintf "Cycle %d already paid" cycle) ;
+                      ps
+                    end
+                    else
+                      Navigation.update
+                        (fun s ->
+                          {s with overview_preview = true; blueprint = None})
+                        ps))
+        | Some (Keys.Char "r") when s.active_tab <> Rewards_state.Configuration
+          ->
+            refresh ps
+        | _ when s.active_tab = Rewards_state.Delegators ->
+            handle_delegator_key ps key
+        | _ when s.active_tab = Rewards_state.Configuration ->
+            handle_config_key ps key
+        | _ when s.active_tab = Rewards_state.History ->
+            handle_history_key ps key
+        | _ -> ps)
 
 let keymap ps =
   let s = ps.Navigation.s in
