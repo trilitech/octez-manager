@@ -610,37 +610,12 @@ let render_key_detail ~box_width (group : enriched_group)
     | entries ->
         entries
         |> List.map (fun (wd : Keys_scheduler.wallet_data) ->
-            let items =
+            let account_items =
               [
-                ("Network", wd.network);
                 ("Spendable", format_tez wd.spendable_balance);
                 ("Staked", format_tez wd.staked_balance);
                 ("Full Balance", format_tez wd.full_balance);
               ]
-              @ (match wd.delegate with
-                | Some d ->
-                    let alias = Tzkt_aliases.find ~network:wd.network ~pkh:d in
-                    let label =
-                      match alias with
-                      | Some a -> Printf.sprintf "%s (%s)" d a
-                      | None -> d
-                    in
-                    [("Delegate", label)]
-                | None -> [])
-              @ (match wd.delegate_staking_params with
-                | Some params ->
-                    [
-                      ( "Staking Limit",
-                        Baker_wallet_data.format_staking_limit
-                          params.limit_of_staking_over_baking );
-                      ( "Baking Edge",
-                        Baker_wallet_data.format_baking_edge
-                          params.edge_of_baking_over_staking );
-                    ]
-                | None -> [])
-              @ (match wd.delegate_apy with
-                | Some apy -> [("Est. APY", Printf.sprintf "%.1f%%" apy)]
-                | None -> [])
               @ (if wd.is_registered then
                    [("Status", Widgets.green "Registered delegate")]
                  else [])
@@ -649,9 +624,58 @@ let render_key_detail ~box_width (group : enriched_group)
               | Some ck -> [("Consensus Key", ck)]
               | None -> []
             in
-            let desc =
-              Desc_list.create ~key_width:14 ~items ()
+            let account_desc =
+              Desc_list.create ~key_width:14 ~items:account_items ()
               |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+            in
+            let delegate_box =
+              match wd.delegate with
+              | Some d ->
+                  let alias = Tzkt_aliases.find ~network:wd.network ~pkh:d in
+                  let delegate_label =
+                    match alias with
+                    | Some a -> Printf.sprintf "%s (%s)" d a
+                    | None -> d
+                  in
+                  let delegate_items =
+                    [("Address", delegate_label)]
+                    @ (match wd.delegate_staking_params with
+                      | Some params ->
+                          [
+                            ( "Staking Limit",
+                              Baker_wallet_data.format_staking_limit
+                                params.limit_of_staking_over_baking );
+                            ( "Baking Edge",
+                              Baker_wallet_data.format_baking_edge
+                                params.edge_of_baking_over_staking );
+                          ]
+                      | None -> [])
+                    @
+                    match wd.delegate_apy with
+                    | Some apy -> [("Est. APY", Printf.sprintf "%.1f%%" apy)]
+                    | None -> []
+                  in
+                  let inner_w = box_width - 4 in
+                  let inner_desc =
+                    Desc_list.create ~key_width:14 ~items:delegate_items ()
+                    |> Desc_list.render ~cols:inner_w ~wrap:true ~focus:false
+                  in
+                  let bg =
+                    let style =
+                      Miaou_style.Style_context.background_secondary ()
+                    in
+                    match style.bg with
+                    | Some (Miaou_style.Style.Fixed c) when c >= 0 -> Some c
+                    | _ -> None
+                  in
+                  "\n"
+                  ^ Box.render
+                      ~title:"Delegate"
+                      ~style:Single
+                      ?bg
+                      ~width:(box_width - 2)
+                      inner_desc
+              | None -> ""
             in
             let color =
               if String.equal wd.network "mainnet" then Some 208 else None
@@ -661,7 +685,7 @@ let render_key_detail ~box_width (group : enriched_group)
               ~style:Rounded
               ?color
               ~width:box_width
-              desc)
+              (account_desc ^ delegate_box))
         |> String.concat "\n"
   in
   key_box ^ "\n" ^ balance_section
