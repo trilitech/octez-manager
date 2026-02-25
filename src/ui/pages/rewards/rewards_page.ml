@@ -597,6 +597,15 @@ let handle_key ps key ~size:_ =
   else
     match Keys.of_string key with
     | Some Keys.Escape -> back ps
+    | Some Keys.Tab ->
+        Navigation.update
+          (fun s ->
+            let next =
+              Rewards_state.tab_of_index
+                ((Rewards_state.tab_index s.active_tab + 1) mod 4)
+            in
+            {s with active_tab = next})
+          ps
     | Some (Keys.Char "1") ->
         Navigation.update
           (fun s -> {s with active_tab = Rewards_state.Overview})
@@ -792,7 +801,7 @@ let keymap ps =
   let kb key help =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  let common = [kb "1-4" "Tab"; kb "Esc" "Back"] in
+  let common = [kb "Tab" "Next tab"; kb "Esc" "Back"] in
   let tab_keys =
     match s.active_tab with
     | Rewards_state.Overview ->
@@ -831,6 +840,7 @@ let handled_keys () =
       Escape;
       Enter;
       Backspace;
+      Tab;
       Up;
       Down;
       Char "1";
@@ -903,7 +913,7 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
   let key_hints ps =
     let s = ps.Navigation.s in
     let kh key help = Miaou.Core.Tui_page.{key; help} in
-    let common = [kh "1-4" "Tab"; kh "Esc" "Back"] in
+    let common = [kh "Tab" "Next tab"; kh "Esc" "Back"] in
     let tab_keys =
       match s.active_tab with
       | Rewards_state.Overview ->
