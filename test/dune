@@ -1015,3 +1015,10 @@
  (modules test_hjson_parser)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_payout_report)
+ (libraries alcotest octez_manager_rewards unix)
+ (modules test_payout_report)
+ (instrumentation
+  (backend bisect_ppx)))
