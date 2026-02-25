@@ -76,13 +76,24 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
   let baker_instance = Printf.sprintf "%s-baker" sandbox_name in
   let wallet = wallet_dir ~sandbox_name in
 
-  (* Determine RPC address *)
+  (* Determine RPC and P2P addresses, avoiding all ports already in use *)
+  let avoid_rpc, avoid_p2p = Port_validation.ports_from_services () in
+  let avoid_rpc_ports = List.map fst avoid_rpc in
+  let avoid_p2p_ports = List.map fst avoid_p2p in
   let rpc_addr_str =
     match rpc_addr with
     | Some addr -> addr
     | None ->
-        let port = Port_validation.next_free_port ~start:18732 ~avoid:[] in
+        let port =
+          Port_validation.next_free_port ~start:18732 ~avoid:avoid_rpc_ports
+        in
         Printf.sprintf "127.0.0.1:%d" port
+  in
+  let p2p_addr_str =
+    let port =
+      Port_validation.next_free_port ~start:19732 ~avoid:avoid_p2p_ports
+    in
+    Printf.sprintf "0.0.0.0:%d" port
   in
   let endpoint = Config.endpoint_of_rpc rpc_addr_str in
 
@@ -114,7 +125,7 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       history_mode = History_mode.Rolling;
       data_dir = None;
       rpc_addr = Rpc_addr.of_string rpc_addr_str;
-      net_addr = "0.0.0.0:9732";
+      net_addr = p2p_addr_str;
       service_user;
       app_bin_dir;
       bin_source = Some bin_source;
