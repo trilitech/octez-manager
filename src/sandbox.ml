@@ -17,6 +17,36 @@ let sandboxes_root () = Paths.default_data_dir "sandboxes"
 let wallet_dir ~sandbox_name =
   Filename.concat (sandboxes_root ()) (Filename.concat sandbox_name "wallet")
 
+(** Per-baker base directory: [<sandboxes_root>/<sandbox_name>/<baker_instance>/].
+    Each baker gets its own base dir so highwatermarks are independent. *)
+let baker_base_dir ~sandbox_name ~baker_instance =
+  Filename.concat
+    (sandboxes_root ())
+    (Filename.concat sandbox_name baker_instance)
+
+(** Copy the three wallet JSON files into a baker-specific base directory.
+    Creates the directory if it does not exist. *)
+let copy_wallet_to_base_dir ~wallet_dir ~base_dir =
+  (try Unix.mkdir base_dir 0o750 with Unix.Unix_error _ -> ()) ;
+  List.fold_left
+    (fun acc file ->
+      let* () = acc in
+      let src = Filename.concat wallet_dir file in
+      let dst = Filename.concat base_dir file in
+      if not (Sys.file_exists src) then Ok ()
+      else
+        try
+          let ic = open_in src in
+          let content = really_input_string ic (in_channel_length ic) in
+          close_in ic ;
+          let oc = open_out dst in
+          output_string oc content ;
+          close_out oc ;
+          Ok ()
+        with Sys_error msg -> Error (`Msg msg))
+    (Ok ())
+    ["public_key_hashs"; "public_keys"; "secret_keys"]
+
 let unique_name ~base =
   let rec try_name n =
     let candidate = if n = 0 then base else Printf.sprintf "%s-%d" base n in
@@ -291,11 +321,15 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
             if k <= num_nodes then node_instance_name k else node1_instance
           in
           log_step (Printf.sprintf "Installing baker %d..." k) ;
+          let baker_base = baker_base_dir ~sandbox_name ~baker_instance in
+          let* () =
+            copy_wallet_to_base_dir ~wallet_dir:wallet ~base_dir:baker_base
+          in
           let baker_request : baker_request =
             {
               instance = baker_instance;
               node_mode = Local_instance node_for_baker;
-              base_dir = Some wallet;
+              base_dir = Some baker_base;
               delegates;
               dal_config = Dal_disabled;
               dal_node = None;
@@ -481,12 +515,14 @@ let add_baker ?(on_log = fun _ -> ()) ~group_name ~node_instance ~delegates () =
   let* existing_bakers = find_sandbox_bakers ~group_name in
   let baker_idx = List.length existing_bakers + 1 in
   let baker_instance = Printf.sprintf "%s-baker-%d" group_name baker_idx in
+  let baker_base = baker_base_dir ~sandbox_name:group_name ~baker_instance in
+  let* () = copy_wallet_to_base_dir ~wallet_dir:wallet ~base_dir:baker_base in
   on_log (Printf.sprintf "Installing baker %s..." baker_instance) ;
   let baker_request : baker_request =
     {
       instance = baker_instance;
       node_mode = Local_instance node_instance;
-      base_dir = Some wallet;
+      base_dir = Some baker_base;
       delegates;
       dal_config = Dal_disabled;
       dal_node = None;
