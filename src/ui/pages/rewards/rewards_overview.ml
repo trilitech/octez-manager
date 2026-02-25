@@ -86,11 +86,13 @@ let render_last_completed_box ~box_width ~instance
         Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
       in
       let status_label =
-        match status with
-        | Rewards.Paid -> Widgets.themed_success "Paid"
-        | Rewards.Unpaid -> Widgets.themed_warning "Unpaid"
-        | Rewards.Partial -> Widgets.themed_warning "Partial"
-        | Rewards.In_progress -> Widgets.themed_accent "In progress"
+        if delegator_count = 0 then Widgets.themed_muted "N/A (no delegators)"
+        else
+          match status with
+          | Rewards.Paid -> Widgets.themed_success "Paid"
+          | Rewards.Unpaid -> Widgets.themed_warning "Unpaid"
+          | Rewards.Partial -> Widgets.themed_warning "Partial"
+          | Rewards.In_progress -> Widgets.themed_accent "In progress"
       in
       let items =
         [
