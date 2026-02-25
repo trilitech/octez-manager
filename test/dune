@@ -980,3 +980,10 @@
  (modules test_baker_ops)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_payout_config)
+ (libraries alcotest octez_manager_rewards)
+ (modules test_payout_config)
+ (instrumentation
+  (backend bisect_ppx)))
