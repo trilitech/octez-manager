@@ -603,8 +603,48 @@ let pay_cmd =
     Term.(
       ret (const pay_run $ baker_arg $ cycle_arg $ dry_run_flag $ confirm_flag))
 
+(* ── rewards config import ─────────────────────────────────── *)
+
+let config_import_run baker_opt path =
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh -> (
+          match Config_import.import_file ~baker_pkh path with
+          | Error msg ->
+              Printf.eprintf "Error: %s\n" msg ;
+              `Error (false, msg)
+          | Ok result ->
+              let instance = svc.Service.instance in
+              (* Save imported config *)
+              (match Payout_config.save ~instance result.config with
+              | Ok () ->
+                  Printf.printf "Configuration imported successfully.\n" ;
+                  Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+                  Printf.printf "Fields imported: %d\n" result.imported_fields
+              | Error msg ->
+                  Printf.eprintf "Warning: failed to save config: %s\n" msg) ;
+              if result.warnings <> [] then (
+                Printf.printf "\nWarnings:\n" ;
+                List.iter (fun w -> Printf.printf "  - %s\n" w) result.warnings) ;
+              `Ok ()))
+
+let config_import_cmd =
+  let info = Cmd.info "import" ~doc:"Import an external config.hjson file." in
+  let path_arg =
+    let doc = "Path to the external config.hjson file." in
+    Arg.(required & pos 0 (some string) None & info [] ~doc ~docv:"PATH")
+  in
+  Cmd.v info Term.(ret (const config_import_run $ baker_arg $ path_arg))
+
+let config_cmd =
+  let info = Cmd.info "config" ~doc:"Manage payout configuration." in
+  Cmd.group info [config_import_cmd]
+
 (* ── rewards command group ─────────────────────────────────── *)
 
 let rewards_cmd =
   let info = Cmd.info "rewards" ~doc:"Manage baker rewards and payouts." in
-  Cmd.group info [status_cmd; generate_cmd; history_cmd; pay_cmd]
+  Cmd.group info [status_cmd; generate_cmd; history_cmd; pay_cmd; config_cmd]
