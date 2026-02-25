@@ -160,6 +160,36 @@ let render_recent_cycles_box ~box_width ~instance
       in
       Box.render ~title:"Recent Cycles" ~style:Rounded ~width:box_width content
 
+let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
+  let total_distributable =
+    List.fold_left
+      (fun acc (r : Rewards.delegator_reward) ->
+        match r.status with
+        | Rewards.Eligible -> Int64.add acc r.net_reward
+        | _ -> acc)
+      0L
+      bp.delegator_rewards
+  in
+  let items =
+    [
+      ("Cycle", string_of_int bp.cycle);
+      ("Total Delegators", string_of_int bp.total_delegators);
+      ("Eligible Delegators", string_of_int bp.eligible_delegators);
+      ( "Total Distributable",
+        format_tez_short total_distributable ^ " \xEA\x9C\xA9" );
+      ( "Baker Bond Income",
+        format_tez_short bp.baker_bond_income ^ " \xEA\x9C\xA9" );
+      ( "Baker Fee Income",
+        format_tez_short bp.baker_fee_income ^ " \xEA\x9C\xA9" );
+      ("Est. TX Fees", format_tez_short bp.estimated_tx_fees ^ " \xEA\x9C\xA9");
+    ]
+  in
+  let desc =
+    Desc_list.create ~key_width:20 ~items ()
+    |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+  in
+  Box.render ~title:"Payout Preview" ~style:Rounded ~width:box_width desc
+
 let render ~(state : Rewards_state.state) ~cols =
   let box_width = min (cols - 2) 72 in
   match Rewards_state.selected_baker_instance state with
@@ -187,6 +217,14 @@ let render ~(state : Rewards_state.state) ~cols =
         render_last_completed_box ~box_width ~instance last_completed
       in
       let recent_box = render_recent_cycles_box ~box_width ~instance recent in
-      String.concat
-        "\n"
+      let parts =
         [network_line; ""; current_box; ""; completed_box; ""; recent_box]
+      in
+      let parts =
+        if state.overview_preview then
+          match state.blueprint with
+          | Some bp -> parts @ [""; render_blueprint_box ~box_width bp]
+          | None -> parts @ [""; Widgets.themed_muted "  Generating preview..."]
+        else parts
+      in
+      String.concat "\n" parts
