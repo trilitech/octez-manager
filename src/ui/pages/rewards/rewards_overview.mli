@@ -5,11 +5,7 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(** Rewards page: TUI dashboard for reward distribution.
+(** Overview tab rendering for the Rewards page. *)
 
-    Provides 4 tabs: Overview, Delegators, History, Configuration.
-    Implements [PAGE_SIG] for registration in [manager_app.ml]. *)
-
-val name : string
-
-val register : unit -> unit
+(** Render the overview tab content. No I/O — reads from scheduler caches. *)
+val render : state:Rewards_state.state -> cols:int -> string

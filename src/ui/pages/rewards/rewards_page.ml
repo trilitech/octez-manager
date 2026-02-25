@@ -106,52 +106,6 @@ let render_baker_header (s : Rewards_state.state) =
       Widgets.themed_primary
         (Printf.sprintf " Rewards - %s (%s) " instance short_pkh)
 
-let render_overview (s : Rewards_state.state) =
-  match Rewards_state.selected_baker_pkh s with
-  | None -> Widgets.themed_muted "Select a baker to view rewards"
-  | Some baker -> (
-      let current =
-        match s.current_cycle with
-        | Some c -> Printf.sprintf "Current cycle: %d" c
-        | None -> "Current cycle: loading..."
-      in
-      let recent = Rewards_scheduler.get_recent_cycles ~baker in
-      match recent with
-      | [] ->
-          String.concat
-            "\n"
-            [
-              Widgets.themed_text current;
-              "";
-              Widgets.themed_muted "No cycle data available yet";
-              Widgets.themed_muted "Waiting for data from TzKT...";
-            ]
-      | _ ->
-          let cycle_lines =
-            List.map
-              (fun (cr : Octez_manager_rewards.Rewards.cycle_rewards) ->
-                let rewards =
-                  Octez_manager_rewards.Rewards.format_tez
-                    (Int64.add cr.block_rewards cr.block_fees)
-                in
-                let delegators = List.length cr.delegators in
-                Printf.sprintf
-                  "  %d    %s    %d delegators"
-                  cr.cycle
-                  rewards
-                  delegators)
-              recent
-          in
-          String.concat
-            "\n"
-            ([
-               Widgets.themed_text current;
-               "";
-               Widgets.themed_accent "Recent Cycles:";
-               Widgets.themed_muted "  CYCLE  EARNED           DELEGATORS";
-             ]
-            @ List.map Widgets.themed_text cycle_lines))
-
 let render_placeholder tab_name =
   String.concat
     "\n"
@@ -166,7 +120,7 @@ let view ps ~focus:_ ~size =
   let tab_bar = render_tab_bar s ~cols in
   let content =
     match s.active_tab with
-    | Rewards_state.Overview -> render_overview s
+    | Rewards_state.Overview -> Rewards_overview.render ~state:s ~cols
     | Rewards_state.Delegators -> render_placeholder "Delegators"
     | Rewards_state.History -> render_placeholder "History"
     | Rewards_state.Configuration -> render_placeholder "Configuration"
