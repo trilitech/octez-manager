@@ -119,7 +119,7 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
       app_bin_dir;
       bin_source = Some bin_source;
       logging_mode = Logging_mode.Journald;
-      extra_args = ["--no-bootstrap-peers"];
+      extra_args = ["--no-bootstrap-peers"; "--allow-yes-crypto"];
       extra_env = yes_crypto_env;
       auto_enable = true;
       bootstrap;
