@@ -34,6 +34,5 @@ val simulate :
   ctx:Payout_executor.context ->
   blueprint:Rewards.payout_blueprint ->
   ?on_progress:(Payout_executor.progress -> unit) ->
-  ?batch_size:int ->
   unit ->
   (simulation_result, string) result
