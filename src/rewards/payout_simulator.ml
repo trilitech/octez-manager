@@ -15,8 +15,7 @@ type simulation_result = {
   sufficient_balance : bool option;
 }
 
-let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress
-    ?batch_size () =
+let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress () =
   (* Check wallet balance *)
   let wallet_balance =
     match Payout_executor.fetch_wallet_balance ~ctx with
@@ -26,10 +25,9 @@ let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress
   let total_needed =
     List.fold_left
       (fun acc (r : Rewards.delegator_reward) ->
-        match r.status with
-        | Rewards.Eligible when Int64.compare r.net_reward 0L > 0 ->
-            Int64.add acc r.net_reward
-        | _ -> acc)
+        if r.status = Rewards.Eligible && Int64.compare r.net_reward 0L > 0 then
+          Int64.add acc r.net_reward
+        else acc)
       0L
       blueprint.delegator_rewards
   in
@@ -52,13 +50,7 @@ let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress
   in
   (* Run executor in dry-run mode *)
   match
-    Payout_executor.execute
-      ~ctx
-      ~blueprint
-      ~dry_run:true
-      ?on_progress
-      ?batch_size
-      ()
+    Payout_executor.execute ~ctx ~blueprint ~dry_run:true ?on_progress ()
   with
   | Ok (results, summary) ->
       Ok {results; summary; wallet_balance; total_needed; sufficient_balance}
