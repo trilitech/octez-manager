@@ -196,8 +196,8 @@ let hint_for_tab = function
          1-4 tabs \xc2\xb7 Esc back"
   | Rewards_state.Overview ->
       Widgets.themed_muted
-        "g generate \xc2\xb7 p pay \xc2\xb7 1-4 tabs \xc2\xb7 b baker \xc2\xb7 \
-         r refresh \xc2\xb7 Esc back"
+        "g generate \xc2\xb7 p pay \xc2\xb7 d dry-run \xc2\xb7 1-4 tabs \
+         \xc2\xb7 b baker \xc2\xb7 r refresh \xc2\xb7 Esc back"
   | Rewards_state.History ->
       Widgets.themed_muted
         "j/k nav \xc2\xb7 Enter view cycle \xc2\xb7 1-4 tabs \xc2\xb7 Esc back"
@@ -423,6 +423,93 @@ let handle_history_key ps key =
                 ps))
   | _ -> ps
 
+(* ── Payout execution helper ──────────────────────────────── *)
+
+let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
+  let svc_opt = Service_registry.find ~instance in
+  match svc_opt with
+  | Ok (Some svc) -> (
+      let octez_client_bin =
+        Filename.concat svc.Service.app_bin_dir "octez-client"
+      in
+      let node_endpoint =
+        Delegate_scheduler.get_baker_node_endpoint ~instance
+        |> Option.value
+             ~default:("http://" ^ Rpc_addr.to_string svc.Service.rpc_addr)
+      in
+      let config =
+        match Payout_config.load ~instance with
+        | Ok c -> c
+        | Error _ -> Payout_config.default ~baker_pkh:pkh
+      in
+      let ctx : Payout_executor.context =
+        {
+          octez_client_bin;
+          endpoint = node_endpoint;
+          base_dir = None;
+          password_file = None;
+          payout_key_alias = config.payout_key_alias;
+          instance;
+        }
+      in
+      match
+        Payout_blueprint.generate
+          ~instance
+          ~baker:pkh
+          ~network
+          ~cycle
+          ~force:dry_run
+          ()
+      with
+      | Error msg ->
+          Context.toast_error (Printf.sprintf "Generate failed: %s" msg)
+      | Ok blueprint ->
+          Context.toast_info
+            (Printf.sprintf
+               "%s cycle %d..."
+               (if dry_run then "Dry-running" else "Paying")
+               cycle) ;
+          ignore
+            (Domain_pool.submit (fun () ->
+                 match
+                   Payout_executor.execute
+                     ~ctx
+                     ~blueprint
+                     ~dry_run
+                     ~on_progress:(fun p ->
+                       if p.current mod 10 = 0 || p.current = p.total then
+                         Context.toast_info
+                           (Printf.sprintf "Progress: %d/%d" p.current p.total))
+                     ()
+                 with
+                 | Ok (results, _summary) ->
+                     let ok =
+                       List.filter
+                         (fun (r : Rewards.payout_result) -> r.success)
+                         results
+                     in
+                     let total = List.length results in
+                     let succeeded = List.length ok in
+                     if succeeded = total then
+                       Context.toast_info
+                         (Printf.sprintf
+                            "%s complete: %d/%d succeeded"
+                            (if dry_run then "Dry-run" else "Payout")
+                            succeeded
+                            total)
+                     else
+                       Context.toast_warn
+                         (Printf.sprintf
+                            "%s partial: %d/%d succeeded"
+                            (if dry_run then "Dry-run" else "Payout")
+                            succeeded
+                            total) ;
+                     Rewards_scheduler.refresh_baker ~instance
+                 | Error msg ->
+                     Context.toast_error
+                       (Printf.sprintf "Payout failed: %s" msg))))
+  | _ -> Context.toast_error "Cannot resolve baker service"
+
 let handle_key ps key ~size:_ =
   let s = ps.Navigation.s in
   (* Search mode captures all input *)
@@ -508,116 +595,46 @@ let handle_key ps key ~size:_ =
                       if
                         String.equal choice "Execute payout"
                         || String.equal choice "Dry-run only"
-                      then begin
-                        (* Build execution context and run in background *)
-                        let svc_opt = Service_registry.find ~instance in
-                        match svc_opt with
-                        | Ok (Some svc) -> (
-                            let octez_client_bin =
-                              Filename.concat
-                                svc.Service.app_bin_dir
-                                "octez-client"
-                            in
-                            let node_endpoint =
-                              Delegate_scheduler.get_baker_node_endpoint
-                                ~instance
-                              |> Option.value
-                                   ~default:
-                                     ("http://"
-                                     ^ Rpc_addr.to_string svc.Service.rpc_addr)
-                            in
-                            let config =
-                              match Payout_config.load ~instance with
-                              | Ok c -> c
-                              | Error _ -> Payout_config.default ~baker_pkh:pkh
-                            in
-                            let ctx : Payout_executor.context =
-                              {
-                                octez_client_bin;
-                                endpoint = node_endpoint;
-                                base_dir = None;
-                                password_file = None;
-                                payout_key_alias = config.payout_key_alias;
-                                instance;
-                              }
-                            in
-                            (* Generate blueprint *)
-                            match
-                              Payout_blueprint.generate
-                                ~instance
-                                ~baker:pkh
-                                ~network
-                                ~cycle
-                                ~force:dry_run
-                                ()
-                            with
-                            | Error msg ->
-                                Context.toast_error
-                                  (Printf.sprintf "Generate failed: %s" msg)
-                            | Ok blueprint ->
-                                Context.toast_info
-                                  (Printf.sprintf
-                                     "%s cycle %d..."
-                                     (if dry_run then "Dry-running"
-                                      else "Paying")
-                                     cycle) ;
-                                (* Run payout in background domain *)
-                                ignore
-                                  (Domain_pool.submit (fun () ->
-                                       match
-                                         Payout_executor.execute
-                                           ~ctx
-                                           ~blueprint
-                                           ~dry_run
-                                           ~on_progress:(fun p ->
-                                             if
-                                               p.current mod 10 = 0
-                                               || p.current = p.total
-                                             then
-                                               Context.toast_info
-                                                 (Printf.sprintf
-                                                    "Progress: %d/%d"
-                                                    p.current
-                                                    p.total))
-                                           ()
-                                       with
-                                       | Ok (results, _summary) ->
-                                           let ok =
-                                             List.filter
-                                               (fun (r : Rewards.payout_result)
-                                                  -> r.success)
-                                               results
-                                           in
-                                           let total = List.length results in
-                                           let succeeded = List.length ok in
-                                           if succeeded = total then
-                                             Context.toast_info
-                                               (Printf.sprintf
-                                                  "%s complete: %d/%d succeeded"
-                                                  (if dry_run then "Dry-run"
-                                                   else "Payout")
-                                                  succeeded
-                                                  total)
-                                           else
-                                             Context.toast_warn
-                                               (Printf.sprintf
-                                                  "%s partial: %d/%d succeeded"
-                                                  (if dry_run then "Dry-run"
-                                                   else "Payout")
-                                                  succeeded
-                                                  total) ;
-                                           Rewards_scheduler.refresh_baker
-                                             ~instance
-                                       | Error msg ->
-                                           Context.toast_error
-                                             (Printf.sprintf
-                                                "Payout failed: %s"
-                                                msg))))
-                        | _ ->
-                            Context.toast_error "Cannot resolve baker service"
-                      end)
+                      then
+                        run_payout_in_background
+                          ~instance
+                          ~pkh
+                          ~network
+                          ~cycle
+                          ~dry_run)
                     () ;
                   ps))
+    | Some (Keys.Char "d") when s.active_tab = Rewards_state.Overview -> (
+        (* Direct dry-run without modal *)
+        let s = ps.Navigation.s in
+        match Rewards_state.selected_baker_instance s with
+        | None -> ps
+        | Some (instance, pkh) -> (
+            let cycle_opt =
+              match s.selected_cycle with
+              | Some c -> Some c
+              | None -> (
+                  match Rewards_scheduler.get_recent_cycles ~baker:pkh with
+                  | cr :: _ -> Some cr.Rewards.cycle
+                  | [] -> None)
+            in
+            match cycle_opt with
+            | None ->
+                Context.toast_warn "No cycle data available" ;
+                ps
+            | Some cycle ->
+                let network =
+                  match Service_registry.find ~instance with
+                  | Ok (Some svc) -> svc.Service.network
+                  | _ -> "unknown"
+                in
+                run_payout_in_background
+                  ~instance
+                  ~pkh
+                  ~network
+                  ~cycle
+                  ~dry_run:true ;
+                ps))
     | Some (Keys.Char "g") when s.active_tab = Rewards_state.Overview -> (
         (* Generate payout preview on Overview tab *)
         let s = ps.Navigation.s in
@@ -695,6 +712,7 @@ let handled_keys () =
       Char "c";
       Char "g";
       Char "p";
+      Char "d";
     ]
 
 let has_modal _ = false
