@@ -52,7 +52,7 @@ type import_result = {
 
 (** {1 Validation} *)
 
-let validate_importable external_svc =
+let validate_importable ?network_override external_svc =
   (* 1. Check it's systemd-managed, not a standalone process *)
   let* () =
     if
@@ -85,14 +85,15 @@ let validate_importable external_svc =
   let* () =
     match
       ( role_field.External_service.value,
-        External_service.is_known network_field )
+        External_service.is_known network_field,
+        network_override )
     with
-    | Some External_service.Node, false ->
+    | Some External_service.Node, false, None ->
         Error
           (`Msg
              "Network could not be detected (RPC not accessible). Please \
               specify --network")
-    | _, _ -> Ok ()
+    | _, _, _ -> Ok ()
   in
   Ok ()
 
@@ -985,7 +986,9 @@ let import_service ?(on_log = fun _ -> ())
   let config = external_svc.External_service.config in
   (* 1. Validate *)
   log "Validating service is importable..." ;
-  let* () = validate_importable external_svc in
+  let* () =
+    validate_importable ?network_override:options.overrides.network external_svc
+  in
   (* 2. Determine instance name *)
   let instance_name =
     match options.new_instance_name with
