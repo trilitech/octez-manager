@@ -15,6 +15,14 @@
 (** Convert an [Rresult] to a plain [result] by extracting the error message. *)
 val of_rresult : ('a, [< `Msg of string]) result -> ('a, string) result
 
+(** Get the cached list of available networks (deduplicated, 5-minute TTL). *)
+val get_network_infos :
+  unit -> (Octez_manager_lib.Teztnets.network_info list, string) result
+
+(** Format a network choice for display in modals.
+    Returns "{human_name}" if network_url matches alias, otherwise "{human_name} · {network_url}". *)
+val format_network_choice : Octez_manager_lib.Teztnets.network_info -> string
+
 (** {1 Group Field} *)
 
 (** Generate a group selection field.
