@@ -61,3 +61,15 @@ val add_account :
   ?alias:string ->
   unit ->
   (string, [> `Msg of string]) result
+
+(** Estimate what fraction of total network staking power the sandbox wallet
+    delegates hold, as a percentage (0.0–100.0).
+
+    Tries [/context/stake_distribution] for an accurate stake-weighted result.
+    Falls back to a count-based approximation if that endpoint is unavailable.
+    Performs blocking HTTP calls — call from a background thread only.
+
+    @param endpoint Node RPC endpoint (e.g. ["http://127.0.0.1:18732"])
+    @param wallet_dir Sandbox wallet directory *)
+val fetch_stake_pct :
+  endpoint:string -> wallet_dir:string -> (float, [> `Msg of string]) result
