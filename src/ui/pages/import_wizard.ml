@@ -48,11 +48,14 @@ let init () =
 
 let update ps _ =
   (* Check for pending navigation (e.g., from job completion callback) *)
-  match Context.consume_navigation () with
-  | Some (Context.Goto page) -> Navigation.goto page ps
-  | Some Context.Back -> Navigation.back ps
-  | Some Context.Quit -> Navigation.quit ps
-  | None -> ps
+  let ps =
+    match Context.consume_navigation () with
+    | Some (Context.Goto page) -> Navigation.goto page ps
+    | Some Context.Back -> Navigation.back ps
+    | Some Context.Quit -> Navigation.quit ps
+    | None -> ps
+  in
+  ps
 
 let refresh ps =
   (* Check for pending navigation (e.g., from job completion callback) *)
@@ -63,13 +66,49 @@ let refresh ps =
     | Some Context.Quit -> Navigation.quit ps
     | None -> ps
   in
+  (* Check for pending network override from modal *)
+  let ps =
+    match Context.take_pending_import_network () with
+    | Some network -> (
+        (* Set the network override in state *)
+        let ps' =
+          Navigation.update
+            (fun s -> {s with network_override = Some network; error = None})
+            ps
+        in
+        (* Automatically validate and proceed to next step *)
+        let s = ps'.Navigation.s in
+        match s.selected_service with
+        | Some svc -> (
+            match
+              Import.validate_importable
+                ?network_override:s.network_override
+                svc
+            with
+            | Ok () ->
+                (* Validation succeeded - proceed to ConfigureImport step *)
+                Navigation.update
+                  (fun s ->
+                    {
+                      s with
+                      step = ConfigureImport;
+                      selected_service = Some svc;
+                      error = None;
+                    })
+                  ps'
+            | Error (`Msg msg) ->
+                (* Should not happen since we validated in modal, but handle it *)
+                Navigation.update (fun s -> {s with error = Some msg}) ps')
+        | None -> ps')
+    | None -> ps
+  in
   Navigation.update
     (fun s ->
       let external_services = External_services_scheduler.get () in
       let selected_idx =
         min s.selected_idx (max 0 (List.length external_services - 1))
       in
-      {s with external_services; selected_idx; error = None})
+      {s with external_services; selected_idx})
     ps
 
 let move ps _ = ps
@@ -110,6 +149,18 @@ let rec next_step ps =
           match
             Import.validate_importable ?network_override:s.network_override svc
           with
+          | Error (`Msg msg)
+            when String.starts_with ~prefix:"Network could not be detected" msg
+            ->
+              (* Network detection failed - show network selection modal *)
+              (* Set selected_service so refresh can use it after modal closes *)
+              let ps' =
+                Navigation.update
+                  (fun s -> {s with selected_service = Some svc})
+                  ps
+              in
+              show_network_override_modal svc ;
+              ps'
           | Error (`Msg msg) ->
               Navigation.update (fun s -> {s with error = Some msg}) ps
           | Ok () ->
@@ -126,6 +177,53 @@ let rec next_step ps =
       Navigation.update (fun s -> {s with step = ReviewImport; error = None}) ps
   | ReviewImport -> start_import ps
   | Importing -> ps
+
+and show_network_override_modal svc =
+  (* Use the exact same network list as node installation form *)
+  let network_infos =
+    match Form_builder_bundles.get_network_infos () with
+    | Ok infos -> infos
+    | Error _ -> []
+  in
+  let normalize s = String.lowercase_ascii (String.trim s) in
+  let sorted =
+    network_infos
+    |> List.sort (fun (a : Teztnets.network_info) (b : Teztnets.network_info) ->
+        String.compare (normalize a.human_name) (normalize b.human_name))
+  in
+  let items = (sorted |> List.map (fun n -> `Net n)) @ [`Custom] in
+  let to_string = function
+    | `Net n -> Form_builder_bundles.format_network_choice n
+    | `Custom -> "Custom URL or slug..."
+  in
+  let on_select = function
+    | `Net n -> (
+        let network = n.Teztnets.network_url in
+        (* Validate with the selected network *)
+        match Import.validate_importable ~network_override:network svc with
+        | Ok () ->
+            (* Store network override and proceed automatically *)
+            Context.set_pending_import_network network
+        | Error (`Msg msg) ->
+            Context.toast_error (Printf.sprintf "Validation failed: %s" msg))
+    | `Custom ->
+        Modal_helpers.prompt_text_modal
+          ~title:"Network"
+          ~initial:""
+          ~placeholder:(Some "Network URL or slug")
+          ~on_submit:(fun network ->
+            match Import.validate_importable ~network_override:network svc with
+            | Ok () -> Context.set_pending_import_network network
+            | Error (`Msg msg) ->
+                Context.toast_error (Printf.sprintf "Validation failed: %s" msg))
+          ()
+  in
+  Modal_helpers.open_choice_modal
+    ~title:"Network Override Required"
+    ~items
+    ~to_string
+    ~on_select
+    ()
 
 and start_import ps =
   let s = ps.Navigation.s in
@@ -168,6 +266,7 @@ and start_import ps =
           match status with
           | Job_manager.Succeeded ->
               Cache.invalidate_all () ;
+              Context.mark_instances_dirty () ;
               Context.toast_success "Service imported successfully!" ;
               Context.navigate_instances ()
           | Job_manager.Failed msg ->
@@ -314,7 +413,11 @@ let view ps ~focus:_ ~size =
                         svc.config.network));
               "";
             ]
-            @ (let missing = Import.missing_required_fields svc in
+            @ (let missing =
+                 Import.missing_required_fields
+                   ?network_override:s.network_override
+                   svc
+               in
                if missing <> [] then
                  [
                    Widgets.themed_warning "⚠ Missing fields:";

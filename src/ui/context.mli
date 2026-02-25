@@ -25,6 +25,12 @@ val set_pending_external_service : Octez_manager_lib.External_service.t -> unit
 val take_pending_external_service :
   unit -> Octez_manager_lib.External_service.t option
 
+(** Store a network override for the import wizard. *)
+val set_pending_import_network : string -> unit
+
+(** Take pending import network override (clears after retrieval) *)
+val take_pending_import_network : unit -> string option
+
 (** Edit mode context *)
 type edit_context = {
   service : Octez_manager_lib.Service.t;
