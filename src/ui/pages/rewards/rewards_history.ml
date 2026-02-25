@@ -29,22 +29,21 @@ let render_sparklines ~box_width (cycles : Rewards.cycle_rewards list) ~instance
   let earned_data =
     List.map
       (fun (cr : Rewards.cycle_rewards) ->
-        Int64.to_float (Rewards.total_earned cr))
+        Int64.to_float (Int64.add cr.block_rewards cr.block_fees))
       sorted
   in
   let delegator_data =
     List.map
-      (fun (cr : Rewards.cycle_rewards) -> Float.of_int cr.num_delegators)
+      (fun (cr : Rewards.cycle_rewards) ->
+        Float.of_int (List.length cr.delegators))
       sorted
   in
   let distributed_data =
     List.map
       (fun (cr : Rewards.cycle_rewards) ->
-        match
-          Rewards_scheduler.get_payout_summary ~instance ~cycle:cr.cycle
-        with
-        | Some s -> Int64.to_float s.distributed_rewards
-        | None -> 0.0)
+        match Payout_report.read_summary_json ~instance ~cycle:cr.cycle with
+        | Ok s -> Int64.to_float s.distributed_rewards
+        | Error _ -> 0.0)
       sorted
   in
   let earned_spark = make_sparkline ~width earned_data in
@@ -82,19 +81,23 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
     List.mapi
       (fun i (cr : Rewards.cycle_rewards) ->
         let earned =
-          format_tez_short (Rewards.total_earned cr) ^ " \xEA\x9C\xA9"
+          format_tez_short (Int64.add cr.block_rewards cr.block_fees)
+          ^ " \xEA\x9C\xA9"
         in
         let status =
           Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
         in
         let distributed, fee_income =
-          match
-            Rewards_scheduler.get_payout_summary ~instance ~cycle:cr.cycle
-          with
-          | Some s ->
-              ( format_tez_short s.distributed_rewards ^ " \xEA\x9C\xA9",
-                format_tez_short s.fee_income ^ " \xEA\x9C\xA9" )
-          | None -> ("\xe2\x80\x94", "\xe2\x80\x94")
+          match status with
+          | Rewards.Paid -> (
+              match
+                Payout_report.read_summary_json ~instance ~cycle:cr.cycle
+              with
+              | Ok s ->
+                  ( format_tez_short s.distributed_rewards ^ " \xEA\x9C\xA9",
+                    format_tez_short s.fee_income ^ " \xEA\x9C\xA9" )
+              | Error _ -> ("\xe2\x80\x94", "\xe2\x80\x94"))
+          | _ -> ("\xe2\x80\x94", "\xe2\x80\x94")
         in
         let status_str =
           match status with
@@ -103,7 +106,7 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
           | Rewards.Partial -> Widgets.themed_warning "partial"
           | Rewards.In_progress -> Widgets.themed_accent "active"
         in
-        let delegators = string_of_int cr.num_delegators in
+        let delegators = string_of_int (List.length cr.delegators) in
         let indicator =
           if i = state.history_cursor then "\xe2\x96\xb8" else " "
         in
