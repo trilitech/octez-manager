@@ -26,7 +26,8 @@ let register_pages () =
   Rpc_node_selection.register () ;
   Rpc_browser.register () ;
   Topology_page.register () ;
-  Keys_page.register ()
+  Keys_page.register () ;
+  Rewards_page.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in
@@ -66,6 +67,7 @@ let register_and_init ?(log = false) ?logfile () =
                current_str)
       | _ -> ()) ;
   Self_update_scheduler.start () ;
+  Rewards_scheduler.start () ;
   Background_runner.enqueue (fun () ->
       Self_update_scheduler.check_now () ;
       if Self_update_scheduler.update_available () then
@@ -84,6 +86,7 @@ let shutdown () =
   Delegate_scheduler.shutdown () ;
   System_metrics_scheduler.shutdown () ;
   External_services_scheduler.shutdown () ;
+  Rewards_scheduler.shutdown () ;
   Versions_scheduler.shutdown () ;
   Self_update_scheduler.stop () ;
   Domain_pool.shutdown () ;
@@ -117,7 +120,8 @@ let open_theme_picker () =
 (** Register global key handler for Ctrl+T *)
 let register_global_keys () =
   Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
-  Context.register_global_key "K" (fun () -> Context.navigate Keys_page.name)
+  Context.register_global_key "K" (fun () -> Context.navigate Keys_page.name) ;
+  Context.register_global_key "R" (fun () -> Context.navigate Rewards_page.name)
 
 let run ?page ?(log = false) ?logfile ?theme () =
   let initial_theme, warning = Theme_manager.load ?name:theme () in
