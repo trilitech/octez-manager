@@ -13,7 +13,7 @@ module Desc_list = Miaou_widgets_display.Description_list
 module Keys = Miaou.Core.Keys
 module Navigation = Miaou.Core.Navigation
 
-let name = "keys"
+let name = "wallets"
 
 (* ================================================================ *)
 (* Types                                                             *)
