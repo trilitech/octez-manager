@@ -30,7 +30,8 @@ let register_pages () =
   Rewards_page.register () ;
   Sandbox_page.register () ;
   Sandbox_create_form.register () ;
-  Sandbox_key_alloc_page.register ()
+  Sandbox_key_alloc_page.register () ;
+  Main_shell.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in
@@ -123,7 +124,8 @@ let open_theme_picker () =
 (** Register global key handler for Ctrl+T *)
 let register_global_keys () =
   Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
-  Context.register_global_key "K" (fun () -> Context.navigate Wallets_page.name) ;
+  Context.register_global_key "K" (fun () ->
+      Context.set_pending_tab Context.Tab_wallets) ;
   Context.register_global_key "R" (fun () -> Context.navigate Rewards_page.name)
 
 let run ?page ?(log = false) ?logfile ?theme () =
@@ -140,7 +142,7 @@ let run ?page ?(log = false) ?logfile ?theme () =
   register_and_init ~log ?logfile () ;
   register_global_keys () ;
   (match warning with Some msg -> Context.toast_warn msg | None -> ()) ;
-  let start_name = Option.value ~default:Instances.name page in
+  let start_name = Option.value ~default:Main_shell.name page in
   let rec loop history current_name =
     if !quit_requested then raise Exit
     else

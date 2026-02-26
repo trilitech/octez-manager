@@ -2554,4 +2554,6 @@ module Internal_for_tests = struct
   let get_all_base_dirs = get_all_base_dirs
 end
 
-let register () = Miaou.Core.Registry.register name (module Page_Impl)
+module Page = Page_Impl
+
+let register () = Miaou.Core.Registry.register name (module Page)
