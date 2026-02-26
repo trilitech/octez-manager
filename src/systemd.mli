@@ -80,6 +80,12 @@ val write_dropin_node :
 (** Remove the drop-in directory for a service instance. *)
 val remove_dropin : role:string -> instance:string -> unit
 
+(** Clear the [StartLimitHit] failure state for a service.
+    Safe to call on healthy services — silently ignored if not in failed state.
+    Must be called before {!restart} when a service hit its restart limit. *)
+val reset_failed :
+  role:string -> instance:string -> unit -> (unit, [`Msg of string]) result
+
 (** Return the list of filesystem paths (unit file, drop-in, env file)
     associated with a service instance as [(description, path)] pairs. *)
 val get_service_paths : role:string -> instance:string -> (string * string) list

@@ -35,12 +35,17 @@ type baker_info = {
   svc : Service.t;
   state : Data.Service_state.t option;
   delegate_count : int;
+  baker_ck_aliases : string list;
+      (** Consensus-key aliases from OCTEZ_BAKER_DELEGATES_CSV. *)
 }
+
+type accuser_info = {svc : Service.t; state : Data.Service_state.t option}
 
 type sandbox_info = {
   group : Group.t;
   nodes : node_info list;
   bakers : baker_info list;
+  accusers : accuser_info list;
 }
 
 type state = {sandboxes : sandbox_info list; cursor : int}
@@ -51,8 +56,12 @@ type pstate = state Navigation.t
 
 (* ─── Async stake% cache ────────────────────────────────────────────────── *)
 
-(** Two-table approach to prevent duplicate background fetches while allowing
-    retry on failure. [stake_fetching] tracks in-progress fetches. *)
+(** Stake fetch uses two tables.
+    [stake_fetching] prevents duplicate in-flight fetches.
+    [stake_results] is the cached result; it is read directly by [view] via
+    [get_stake_pct] on every render frame, so no dirty-flag signal is needed
+    when a new result arrives.  The cache is only cleared when the baker
+    allocation changes (detected by comparing aliases before/after a reload). *)
 let stake_fetching : (string, unit) Hashtbl.t = Hashtbl.create 4
 
 let stake_results : (string, float) Hashtbl.t = Hashtbl.create 4
@@ -62,7 +71,17 @@ let stake_lock = Mutex.create ()
 let get_stake_pct group_name =
   Mutex.protect stake_lock (fun () -> Hashtbl.find_opt stake_results group_name)
 
-let schedule_stake_fetch ~group_name ~endpoint ~wallet_dir =
+(** Map a consensus-key alias [delegate-(3n+1)] to its base alias [delegate-(3n)].
+    Returns [None] for non-CK aliases or unrecognised formats. *)
+let ck_alias_to_base_alias alias =
+  match String.split_on_char '-' alias with
+  | ["delegate"; ns] -> (
+      match int_of_string_opt ns with
+      | Some n when n mod 3 = 1 -> Some (Printf.sprintf "delegate-%d" (n - 1))
+      | _ -> None)
+  | _ -> None
+
+let schedule_stake_fetch ~group_name ~endpoint ~wallet_dir ~baker_ck_aliases =
   let should_fetch =
     Mutex.protect stake_lock (fun () ->
         if
@@ -75,13 +94,30 @@ let schedule_stake_fetch ~group_name ~endpoint ~wallet_dir =
   in
   if should_fetch then
     Background_runner.enqueue (fun () ->
-        let result = Yes_wallet_io.fetch_stake_pct ~endpoint ~wallet_dir in
+        (* Compute baker-controlled base-delegate addresses from wallet. *)
+        let only_addrs =
+          match Yes_wallet_io.read_wallet_pkhs ~wallet_dir with
+          | Error _ -> []
+          | Ok pkhs ->
+              let pkh_map = Hashtbl.create 64 in
+              List.iter
+                (fun (alias, addr) -> Hashtbl.replace pkh_map alias addr)
+                pkhs ;
+              baker_ck_aliases
+              |> List.filter_map ck_alias_to_base_alias
+              |> List.filter_map (Hashtbl.find_opt pkh_map)
+              |> List.sort_uniq String.compare
+        in
+        let result =
+          Yes_wallet_io.fetch_stake_pct ~endpoint ~only_addrs ~wallet_dir ()
+        in
+        (* The view reads stake% directly from get_stake_pct on every frame,
+           so no dirty signal is needed — just update the cache. *)
         Mutex.protect stake_lock (fun () ->
             Hashtbl.remove stake_fetching group_name ;
             match result with
             | Ok pct -> Hashtbl.replace stake_results group_name pct
-            | Error _ -> ()) ;
-        Context.mark_instances_dirty ())
+            | Error _ -> ()))
 
 (* ─── Data Loading ──────────────────────────────────────────────────────── *)
 
@@ -93,16 +129,18 @@ let parse_peers (svc : Service.t) =
   in
   loop svc.extra_args
 
-let load_baker_delegate_count instance =
+let load_baker_delegate_info instance =
   match Node_env.read ~inst:instance with
-  | Error _ -> 0
+  | Error _ -> (0, [])
   | Ok pairs -> (
       match List.assoc_opt "OCTEZ_BAKER_DELEGATES_CSV" pairs with
-      | None | Some "" -> 0
+      | None | Some "" -> (0, [])
       | Some csv ->
-          csv |> String.split_on_char ',' |> List.map String.trim
-          |> List.filter (fun s -> not (String.equal s ""))
-          |> List.length)
+          let aliases =
+            csv |> String.split_on_char ',' |> List.map String.trim
+            |> List.filter (fun s -> not (String.equal s ""))
+          in
+          (List.length aliases, aliases))
 
 let load_sandboxes () =
   let service_states = Data.load_service_states () in
@@ -131,14 +169,24 @@ let load_sandboxes () =
           let bakers =
             services
             |> List.filter (fun (s : Service.t) -> String.equal s.role "baker")
-            |> List.map (fun svc ->
+            |> List.map (fun (svc : Service.t) ->
+                let delegate_count, baker_ck_aliases =
+                  load_baker_delegate_info svc.instance
+                in
                 {
                   svc;
                   state = find_state svc.instance;
-                  delegate_count = load_baker_delegate_count svc.instance;
+                  delegate_count;
+                  baker_ck_aliases;
                 })
           in
-          {group = g; nodes; bakers})
+          let accusers =
+            services
+            |> List.filter (fun (s : Service.t) ->
+                String.equal s.role "accuser")
+            |> List.map (fun svc -> {svc; state = find_state svc.instance})
+          in
+          {group = g; nodes; bakers; accusers})
         groups
 
 let clamp_cursor sandboxes cursor =
@@ -168,10 +216,14 @@ let maybe_schedule_stake_fetch s =
       | first :: _ ->
           let endpoint = Rpc_addr.to_endpoint first.svc.rpc_addr in
           let wallet = Sandbox.wallet_dir ~sandbox_name:sb.group.name in
+          let baker_ck_aliases =
+            List.concat_map (fun bi -> bi.baker_ck_aliases) sb.bakers
+          in
           schedule_stake_fetch
             ~group_name:sb.group.name
             ~endpoint
-            ~wallet_dir:wallet)
+            ~wallet_dir:wallet
+            ~baker_ck_aliases)
 
 let refresh ps =
   match Context.consume_navigation () with
@@ -180,10 +232,37 @@ let refresh ps =
   | Some Context.Quit -> Navigation.quit ps
   | None ->
       let ps' =
-        if Context.consume_instances_dirty () then
+        if Context.consume_instances_dirty () then begin
           let sandboxes = load_sandboxes () in
           let cursor = clamp_cursor sandboxes ps.Navigation.s.cursor in
+          (* Only invalidate stake cache for sandboxes whose baker allocation
+             changed (avoids re-fetching on unrelated dirty signals). *)
+          let old_sandboxes = ps.Navigation.s.sandboxes in
+          let baker_aliases (sb : sandbox_info) =
+            List.concat_map (fun bi -> bi.baker_ck_aliases) sb.bakers
+            |> List.sort String.compare
+          in
+          Mutex.protect stake_lock (fun () ->
+              List.iter
+                (fun (sb : sandbox_info) ->
+                  let old_aliases =
+                    match
+                      List.find_opt
+                        (fun (o : sandbox_info) ->
+                          String.equal o.group.name sb.group.name)
+                        old_sandboxes
+                    with
+                    | Some o -> baker_aliases o
+                    | None -> []
+                  in
+                  if
+                    not (List.equal String.equal old_aliases (baker_aliases sb))
+                  then (
+                    Hashtbl.remove stake_results sb.group.name ;
+                    Hashtbl.remove stake_fetching sb.group.name))
+                sandboxes) ;
           Navigation.update (fun _s -> {sandboxes; cursor}) ps
+        end
         else ps
       in
       maybe_schedule_stake_fetch ps'.Navigation.s ;
@@ -302,6 +381,7 @@ let draw_compact_box c ~row ~col ~label ~role ~st =
   let border_color =
     match role with
     | "node" -> fg_of_style (Style_context.primary ()) 14
+    | "accuser" -> fg_of_style (Style_context.warning ()) 11
     | _ -> fg_of_style (Style_context.accent ()) 12
   in
   C.draw_box
@@ -326,8 +406,8 @@ let draw_compact_box c ~row ~col ~label ~role ~st =
     label ;
   col + (box_w / 2)
 
-(** Build a compact canvas: nodes row, peer connections, baker row.
-    Uses short labels (N1/N2… for nodes, B1/B2… for bakers) to fit narrow panel. *)
+(** Build a compact canvas: nodes row, peer connections, baker row, accuser row.
+    Uses short labels (N1/N2… nodes, B1/B2… bakers, A1/A2… accusers). *)
 let render_sandbox_canvas (sb : sandbox_info) ~width =
   let box_w = 7 in
   let h_gap = 3 in
@@ -335,9 +415,21 @@ let render_sandbox_canvas (sb : sandbox_info) ~width =
   let node_h = 3 in
   let v_gap = 3 in
   let n_nodes = max 1 (List.length sb.nodes) in
-  let has_bakers = not (List.is_empty sb.bakers) in
-  let canvas_w = max width (n_nodes * slot_w) in
-  let canvas_h = node_h + if has_bakers then v_gap + node_h else 0 in
+  let n_bakers = List.length sb.bakers in
+  let n_accusers = List.length sb.accusers in
+  let has_bakers = n_bakers > 0 in
+  let has_accusers = n_accusers > 0 in
+  (* Each baker/accuser gets its own sequential slot to avoid overlap. *)
+  let canvas_w =
+    max
+      width
+      (max (n_nodes * slot_w) (max (n_bakers * slot_w) (n_accusers * slot_w)))
+  in
+  let canvas_h =
+    node_h
+    + (if has_bakers then v_gap + node_h else 0)
+    + if has_accusers then v_gap + node_h else 0
+  in
   let c = C.create ~rows:canvas_h ~cols:canvas_w in
   (* Draw nodes and collect their center columns *)
   let node_centers =
@@ -372,16 +464,19 @@ let render_sandbox_canvas (sb : sandbox_info) ~width =
             let right = max i j in
             (* Only draw once: from the node with higher index *)
             if i = right then begin
-              let left_center = List.nth node_centers left in
-              let right_edge = (right * slot_w) - 1 in
-              for cc = left_center + 1 to right_edge do
+              let line_start = (left * slot_w) + box_w in
+              let line_end = (right * slot_w) - 1 in
+              for cc = line_start to line_end do
                 C.set_char c ~row:1 ~col:cc ~char:"─" ~style:canvas_dim_style
               done
             end
           end)
         ni.peers)
     sb.nodes ;
-  (* Draw bakers under their parent nodes *)
+  (* Draw bakers in sequential columns (one slot each) to avoid overlap when
+     multiple bakers share a node.  Connect each baker to its parent via a
+     vertical line from the baker's top to node_h, with a horizontal segment
+     when baker column differs from parent node column. *)
   let baker_row = node_h + v_gap in
   List.iteri
     (fun bi (baker : baker_info) ->
@@ -397,7 +492,9 @@ let render_sandbox_canvas (sb : sandbox_info) ~width =
             if i >= 0 then List.nth node_centers i
             else (bi mod n_nodes * slot_w) + (box_w / 2)
       in
-      let col = max 0 (parent_center - (box_w / 2)) in
+      (* Sequential column: each baker gets its own slot *)
+      let baker_col = bi * slot_w in
+      let baker_center = baker_col + (box_w / 2) in
       let st =
         match baker.state with
         | Some s -> s.Data.Service_state.status
@@ -405,12 +502,90 @@ let render_sandbox_canvas (sb : sandbox_info) ~width =
       in
       let label = Printf.sprintf "B%d" (bi + 1) in
       let _mid =
-        draw_compact_box c ~row:baker_row ~col ~label ~role:"baker" ~st
+        draw_compact_box
+          c
+          ~row:baker_row
+          ~col:baker_col
+          ~label
+          ~role:"baker"
+          ~st
       in
-      for r = node_h to baker_row - 1 do
+      (* Vertical down from baker top *)
+      for r = baker_row - (v_gap / 2) to baker_row - 1 do
+        C.set_char c ~row:r ~col:baker_center ~char:"│" ~style:canvas_dim_style
+      done ;
+      (* Vertical down from node bottom to mid-row *)
+      let mid_row = baker_row - (v_gap / 2) - 1 in
+      for r = node_h to mid_row do
         C.set_char c ~row:r ~col:parent_center ~char:"│" ~style:canvas_dim_style
-      done)
+      done ;
+      (* Horizontal segment at mid_row if baker and parent differ *)
+      if baker_center <> parent_center then begin
+        let lo = min baker_center parent_center in
+        let hi = max baker_center parent_center in
+        for cc = lo to hi do
+          C.set_char c ~row:mid_row ~col:cc ~char:"─" ~style:canvas_dim_style
+        done
+      end)
     sb.bakers ;
+  (* Draw accusers: sequential slots below bakers (or below nodes if no bakers).
+     Connect each accuser to its parent node with an L-shaped line. *)
+  let accuser_row =
+    node_h + (if has_bakers then v_gap + node_h else 0) + v_gap
+  in
+  List.iteri
+    (fun ai (accuser : accuser_info) ->
+      let parent_center =
+        match accuser.svc.depends_on with
+        | None -> box_w / 2
+        | Some parent ->
+            let i =
+              find_idx
+                (fun (ni : node_info) -> String.equal ni.svc.instance parent)
+                sb.nodes
+            in
+            if i >= 0 then List.nth node_centers i else box_w / 2
+      in
+      let accuser_col = ai * slot_w in
+      let accuser_center = accuser_col + (box_w / 2) in
+      let st =
+        match accuser.state with
+        | Some s -> s.Data.Service_state.status
+        | None -> Data.Service_state.Unknown "?"
+      in
+      let label = Printf.sprintf "A%d" (ai + 1) in
+      let _ =
+        draw_compact_box
+          c
+          ~row:accuser_row
+          ~col:accuser_col
+          ~label
+          ~role:"accuser"
+          ~st
+      in
+      (* Vertical up from accuser top *)
+      for r = accuser_row - (v_gap / 2) to accuser_row - 1 do
+        C.set_char
+          c
+          ~row:r
+          ~col:accuser_center
+          ~char:"│"
+          ~style:canvas_dim_style
+      done ;
+      (* Vertical from node/baker level down to mid-row *)
+      let anchor_row = node_h + if has_bakers then v_gap + node_h else 0 in
+      let mid_row = accuser_row - (v_gap / 2) - 1 in
+      for r = anchor_row to mid_row do
+        C.set_char c ~row:r ~col:parent_center ~char:"│" ~style:canvas_dim_style
+      done ;
+      if accuser_center <> parent_center then begin
+        let lo = min accuser_center parent_center in
+        let hi = max accuser_center parent_center in
+        for cc = lo to hi do
+          C.set_char c ~row:mid_row ~col:cc ~char:"─" ~style:canvas_dim_style
+        done
+      end)
+    sb.accusers ;
   C.to_ansi c
 
 (** Match a configured --peer address to a node name by comparing P2P ports. *)
@@ -514,6 +689,34 @@ let render_topology (sb : sandbox_info) ~stake_pct ~size =
                  failed_str;
                ]))
         bakers) ;
+  (* ── Accusers ── *)
+  (match sb.accusers with
+  | [] -> ()
+  | accusers ->
+      push "" ;
+      push (T.text "Accusers — %d" (List.length accusers)) ;
+      List.iter
+        (fun (ai : accuser_info) ->
+          let node_label =
+            match ai.svc.depends_on with
+            | Some n -> T.muted "  → %s" n
+            | None -> ""
+          in
+          let failed_str =
+            match ai.state with
+            | Some {status = Unknown _; _} -> T.error "  [failed]"
+            | _ -> ""
+          in
+          push
+            (T.concat
+               [
+                 " ";
+                 render_dot ai.state;
+                 T.text " %s" ai.svc.instance;
+                 node_label;
+                 failed_str;
+               ]))
+        accusers) ;
   push "" ;
   (* ── Summary ── *)
   let total_dels =
@@ -527,20 +730,44 @@ let render_topology (sb : sandbox_info) ~stake_pct ~size =
   in
   push (T.concat [T.muted "%d delegates" total_dels; stake_str]) ;
   (* ── Legend for canvas ── *)
+  (* Build legend items as (visible_width, colored_string) pairs for wrapping. *)
+  let make_legend prefix idx inst =
+    let label = Printf.sprintf "%s%d=%s" prefix idx inst in
+    (String.length label, T.muted "%s" label)
+  in
   let node_legend =
     List.mapi
-      (fun i (ni : node_info) -> T.muted "N%d=%s" (i + 1) ni.svc.instance)
+      (fun i (ni : node_info) -> make_legend "N" (i + 1) ni.svc.instance)
       sb.nodes
   in
   let baker_legend =
     List.mapi
-      (fun i (bi : baker_info) -> T.muted "B%d=%s" (i + 1) bi.svc.instance)
+      (fun i (bi : baker_info) -> make_legend "B" (i + 1) bi.svc.instance)
       sb.bakers
   in
-  let legend_items = node_legend @ baker_legend in
-  if legend_items <> [] then (
+  let accuser_legend =
+    List.mapi
+      (fun i (ai : accuser_info) -> make_legend "A" (i + 1) ai.svc.instance)
+      sb.accusers
+  in
+  let legend_items = node_legend @ baker_legend @ accuser_legend in
+  if legend_items <> [] then begin
+    let sep = T.muted "  " in
+    let sep_len = 2 in
+    let max_cols = max 40 (size.LTerm_geom.cols - 4) in
+    (* Word-wrap legend items into lines fitting avail_cols. *)
+    let rec build acc_items acc_len = function
+      | [] -> [List.rev acc_items]
+      | (w, item) :: rest ->
+          let needed = acc_len + (if acc_items = [] then 0 else sep_len) + w in
+          if acc_items <> [] && needed > max_cols then
+            List.rev acc_items :: build [item] w rest
+          else build (item :: acc_items) needed rest
+    in
+    let lines = build [] 0 legend_items in
     push "" ;
-    push (String.concat (T.muted "  ") legend_items)) ;
+    List.iter (fun line -> push (String.concat sep line)) lines
+  end ;
   let content = Buffer.contents buf in
   let avail_cols = size.LTerm_geom.cols - 4 in
   Flex.create

@@ -207,6 +207,9 @@ let stop_unit ~unit_name =
   (* Stop needs time for graceful shutdown. *)
   run_systemctl_timeout ~quiet:false ~duration:"30s" ["stop"; unit_name]
 
+let reset_failed_unit ~unit_name =
+  run_systemctl_timeout ~quiet:true ~duration:"5s" ["reset-failed"; unit_name]
+
 let restart_unit ~unit_name =
   (* Restart = stop + start. *)
   run_systemctl_timeout ~quiet:false ~duration:"60s" ["restart"; unit_name]
@@ -223,7 +226,12 @@ let start ?quiet:_ ~role ~instance () =
 let stop ?quiet:_ ~role ~instance () =
   stop_unit ~unit_name:(unit_name role instance)
 
+let reset_failed ~role ~instance () =
+  reset_failed_unit ~unit_name:(unit_name role instance)
+
 let restart ?quiet:_ ~role ~instance () =
+  (* Clear StartLimitHit before restarting so a prior failure doesn't block. *)
+  let _ = reset_failed ~role ~instance () in
   restart_unit ~unit_name:(unit_name role instance)
 
 let remove_dropin ~role ~instance =

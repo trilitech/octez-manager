@@ -166,7 +166,7 @@ let move_selection_menu s delta =
       first_service_in_column
         ~num_columns:s.num_columns
         ~sections
-        ~services:s.services
+        ~services:(display_ordered_services s)
         0
     in
     {s with selected = first_svc + services_start_idx; active_column = 0}
@@ -184,7 +184,7 @@ let move_selection_external s delta =
         services_in_column
           ~num_columns:s.num_columns
           ~sections
-          ~services:s.services
+          ~services:(display_ordered_services s)
           0
       in
       match List.rev col_indices with
@@ -210,7 +210,7 @@ let move_selection_managed s delta =
     services_in_column
       ~num_columns:s.num_columns
       ~sections
-      ~services:s.services
+      ~services:(display_ordered_services s)
       s.active_column
   in
   let current_pos =
@@ -234,7 +234,7 @@ let move_selection_managed s delta =
       service_line_position
         ~num_columns:s.num_columns
         ~sections
-        ~services:s.services
+        ~services:(display_ordered_services s)
         ~folded:s.folded
         new_idx
         s.active_column
@@ -821,11 +821,12 @@ Press **Enter** to open instance menu.|}
       (* In services area: move to same position in target column *)
       let current_idx = s.selected - services_start_idx in
       let sections = sections_of_state s in
+      let ordered = display_ordered_services s in
       let current_col_indices =
         services_in_column
           ~num_columns:num_cols
           ~sections
-          ~services:s.services
+          ~services:ordered
           s.active_column
       in
       let current_pos =
@@ -839,7 +840,7 @@ Press **Enter** to open instance menu.|}
         services_in_column
           ~num_columns:num_cols
           ~sections
-          ~services:s.services
+          ~services:ordered
           new_col
       in
       if target_col_indices = [] then
@@ -920,7 +921,7 @@ Press **Enter** to open instance menu.|}
             column_for_service
               ~num_columns:s.num_columns
               ~sections
-              ~services:s.services
+              ~services:(display_ordered_services s)
               svc_idx
           in
           Navigation.update (fun s -> {s with active_column = col}) ps
