@@ -14,6 +14,7 @@
   miaou-core.widgets.display
   miaou-core.widgets.input
   miaou-core.widgets.layout
+  miaou-core.widgets.navigation
   miaou-core.canvas
   miaou-core.style
   miaou-runner.tui
