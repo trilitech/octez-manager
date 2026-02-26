@@ -29,7 +29,9 @@ let register_pages () =
   Wallets_page.register () ;
   Rewards_page.register () ;
   Sandbox_page.register () ;
-  Sandbox_create_form.register ()
+  Sandbox_create_form.register () ;
+  Sandbox_key_alloc_page.register () ;
+  Main_shell.register ()
 
 let find_page_or_default name default_name =
   let module Registry = Miaou.Core.Registry in
@@ -122,7 +124,8 @@ let open_theme_picker () =
 (** Register global key handler for Ctrl+T *)
 let register_global_keys () =
   Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
-  Context.register_global_key "K" (fun () -> Context.navigate Wallets_page.name) ;
+  Context.register_global_key "K" (fun () ->
+      Context.set_pending_tab Context.Tab_wallets) ;
   Context.register_global_key "R" (fun () -> Context.navigate Rewards_page.name)
 
 let register_and_init ?(log = false) ?logfile () =

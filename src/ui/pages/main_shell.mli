@@ -5,17 +5,15 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(** Main application shell with 7-tab navigation.
+(** Main application shell with 5-tab navigation.
 
-    Manages tab state for Instances, Wallets, Binaries, RPCs, Sandboxes,
-    Diagnostics, and Topology. Each tab preserves its inner state across tab
-    switches within a single session. Sub-page navigations (forms, detail pages)
-    propagate to the runner as [SwitchTo] events.
+    Manages tab state for Instances, Wallets, Diagnostics, Topology, and
+    Sandboxes. Each tab preserves its inner state across tab switches within
+    a single session. Sub-page navigations (forms, detail pages) propagate to
+    the runner as [SwitchTo] events.
 
     Tab switching:
-    - Number keys [1]-[7] switch directly to a named tab
-    - Pressing the current tab's number triggers the tab's primary action
-      (e.g., pressing [1] on the Instances tab opens the create dropdown)
+    - Number keys [1]-[5] switch directly to a named tab
     - [Context.set_pending_tab] triggers a switch on the next [refresh] cycle
     - Navigation to a registered tab page name is intercepted and converted
       to a tab switch rather than a page push *)
@@ -25,10 +23,3 @@ val name : string
 
 (** Register the shell page in the global registry. *)
 val register : unit -> unit
-
-(**/**)
-
-(** PAGE_SIG module for use with the headless driver in tests. *)
-module Page : Miaou.Core.Tui_page.PAGE_SIG
-
-(**/**)
