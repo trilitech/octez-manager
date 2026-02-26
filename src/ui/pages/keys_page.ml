@@ -28,6 +28,7 @@ type enriched_group = {
   error : string option;
   services : string list;
   networks : string list;
+  sandbox_name : string option;
 }
 
 (** Items in the flattened navigation list. *)
@@ -109,11 +110,61 @@ let load_enriched_group base_dir =
   let services = services_for_dir base_dir in
   let networks = networks_for_services services in
   match Keys_reader.read_keys_full ~base_dir with
-  | Ok keys -> {base_dir; keys; error = None; services; networks}
+  | Ok keys ->
+      {base_dir; keys; error = None; services; networks; sandbox_name = None}
   | Error (`Msg msg) ->
       if Sys.file_exists base_dir then
-        {base_dir; keys = []; error = Some msg; services; networks}
-      else {base_dir; keys = []; error = None; services; networks}
+        {
+          base_dir;
+          keys = [];
+          error = Some msg;
+          services;
+          networks;
+          sandbox_name = None;
+        }
+      else
+        {
+          base_dir;
+          keys = [];
+          error = None;
+          services;
+          networks;
+          sandbox_name = None;
+        }
+
+(** Load a sandbox's canonical wallet directory as an [enriched_group]. Returns
+    [None] if the wallet directory does not exist yet. *)
+let load_sandbox_wallet_group (group : Group.t) =
+  let base_dir = Sandbox.wallet_dir ~sandbox_name:group.name in
+  if not (Sys.file_exists base_dir) then None
+  else
+    match Keys_reader.read_keys_full ~base_dir with
+    | Ok keys ->
+        Some
+          {
+            base_dir;
+            keys;
+            error = None;
+            services = [];
+            networks = [group.network];
+            sandbox_name = Some group.name;
+          }
+    | Error (`Msg msg) ->
+        Some
+          {
+            base_dir;
+            keys = [];
+            error = Some msg;
+            services = [];
+            networks = [group.network];
+            sandbox_name = Some group.name;
+          }
+
+(** Return [enriched_group] entries for all sandbox wallet directories. *)
+let get_sandbox_wallet_groups () =
+  match Group_registry.list_sandboxes () with
+  | Error _ -> []
+  | Ok sandboxes -> List.filter_map load_sandbox_wallet_group sandboxes
 
 (** Build the flat navigation list from groups and fold state. *)
 let build_nav_items ~folded groups =
@@ -249,12 +300,14 @@ let get_all_keys () =
 
 let init () =
   let all_dirs = get_all_base_dirs () in
-  let groups =
+  let regular_groups =
     all_dirs
     |> List.map load_enriched_group
     |> List.filter (fun g ->
         g.keys <> [] || g.error <> None || g.services <> [])
   in
+  let sandbox_groups = get_sandbox_wallet_groups () in
+  let groups = regular_groups @ sandbox_groups in
   (* Register keys with the background scheduler *)
   let keys_by_dir =
     List.map
@@ -310,12 +363,14 @@ let service_cycle ps _ =
   let ps =
     if Context.consume_keys_dirty () then (
       let all_dirs = get_all_base_dirs () in
-      let groups =
+      let regular_groups =
         all_dirs
         |> List.map load_enriched_group
         |> List.filter (fun g ->
             g.keys <> [] || g.error <> None || g.services <> [])
       in
+      let sandbox_groups = get_sandbox_wallet_groups () in
+      let groups = regular_groups @ sandbox_groups in
       let s = ps.Navigation.s in
       let nav_items = build_nav_items ~folded:s.folded groups in
       let total_keys = count_keys groups in
@@ -488,13 +543,15 @@ let render_group_header ~is_selected ~is_focused ~is_folded ~cols group =
     Widgets.themed_muted
       (Printf.sprintf " (%d key%s)" n (if n = 1 then "" else "s"))
   in
-  Printf.sprintf
-    "%s%s%s%s%s"
-    marker
-    fold_indicator
-    (Widgets.themed_primary dir_display)
-    svc_dots
-    key_count
+  let label =
+    match group.sandbox_name with
+    | None -> Widgets.themed_primary dir_display
+    | Some name ->
+        Widgets.themed_accent (Printf.sprintf "Sandbox · %s" name)
+        ^ "  "
+        ^ Widgets.themed_muted dir_display
+  in
+  Printf.sprintf "%s%s%s%s%s" marker fold_indicator label svc_dots key_count
 
 (* ================================================================ *)
 (* Left panel: key list                                              *)
@@ -544,6 +601,15 @@ let render_list_panel ~state ~focus ~cols ~rows =
 (* Right panel: detail view                                          *)
 (* ================================================================ *)
 
+(** Strip URL scheme/host from network identifiers for display.
+    "https://teztnets.com/shadownet" → "shadownet", "ghostnet" → "ghostnet". *)
+let pretty_network_name network =
+  if contains_substring network "://" then
+    match List.rev (String.split_on_char '/' network) with
+    | name :: _ when String.length name > 0 -> name
+    | _ -> network
+  else network
+
 (** Format mutez as tez with 6 decimal places. *)
 let format_tez mutez_str =
   match int_of_string_opt mutez_str with
@@ -556,11 +622,17 @@ let format_tez mutez_str =
 let render_dir_detail ~box_width group =
   let items =
     [("Path", group.base_dir)]
+    @ (match group.sandbox_name with
+      | None -> []
+      | Some name -> [("Sandbox", Widgets.themed_accent name)])
     @ (if group.services <> [] then
          [("Services", String.concat ", " group.services)]
        else [])
     @ (if group.networks <> [] then
-         [("Networks", String.concat ", " group.networks)]
+         [
+           ( "Networks",
+             String.concat ", " (List.map pretty_network_name group.networks) );
+         ]
        else [])
     @ [("Keys", string_of_int (List.length group.keys))]
     @
@@ -602,8 +674,19 @@ let render_key_detail ~box_width (group : enriched_group)
   let key_box =
     Box.render ~title:"Key Details" ~style:Rounded ~width:box_width desc
   in
-  (* Balance section from scheduler cache *)
-  let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+  (* Balance section from scheduler cache.
+     For sandbox wallets, restrict to the sandbox's own network so that
+     balances from public nodes (mainnet, ghostnet, etc.) are not shown. *)
+  let wallet_data =
+    let all = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+    match group.sandbox_name with
+    | None -> all
+    | Some _ ->
+        List.filter
+          (fun (wd : Keys_scheduler.wallet_data) ->
+            List.exists (String.equal wd.network) group.networks)
+          all
+  in
   let balance_section =
     match wallet_data with
     | [] -> Widgets.themed_muted "\n  No balance data yet. Fetching..."
@@ -686,7 +769,7 @@ let render_key_detail ~box_width (group : enriched_group)
               if String.equal wd.network "mainnet" then Some 208 else None
             in
             Box.render
-              ~title:("Balance: " ^ wd.network)
+              ~title:("Balance: " ^ pretty_network_name wd.network)
               ~style:Rounded
               ?color
               ~width:box_width
@@ -1972,70 +2055,87 @@ let open_create_import_modal ~base_dir =
 
 (** Prompt for network if a key has access to multiple networks.
     Lists all networks with available endpoints (local instances or public
-    nodes), annotated with balance if known. Skips the picker if only one. *)
+    nodes), annotated with balance if known. Skips the picker if only one.
+    For sandbox wallet groups, always uses the sandbox's own network without
+    prompting — sandbox keys must not be used on other networks. *)
 let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
     ~action =
-  let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
-  (* All networks with running local nodes *)
-  let local_networks =
-    Data.load_service_states ()
-    |> List.filter (fun (st : Data.Service_state.t) ->
-        String.equal st.service.role "node"
-        && match st.status with Running -> true | _ -> false)
-    |> List.map (fun (st : Data.Service_state.t) ->
-        Network_name.normalize st.service.network)
-    |> List.sort_uniq String.compare
-  in
-  (* All networks with public nodes *)
-  let public_networks =
-    Public_nodes_cache.get_nodes ()
-    |> List.filter_map (fun (n : Public_nodes_cache.node_info) -> n.network)
-    |> List.sort_uniq String.compare
-  in
-  let all_networks =
-    List.sort_uniq String.compare (local_networks @ public_networks)
-  in
-  (* Fallback to group networks if nothing else *)
-  let networks =
-    if all_networks = [] then List.sort_uniq String.compare group.networks
-    else all_networks
-  in
-  match networks with
-  | [] -> action ~network:"mainnet"
-  | [single] -> action ~network:single
-  | multiple ->
-      Modal_helpers.open_choice_modal
-        ~title:"Select network"
-        ~items:multiple
-        ~to_string:(fun net ->
-          let balance_str =
-            match
-              List.find_opt
-                (fun (wd : Keys_scheduler.wallet_data) ->
-                  String.equal wd.network net)
-                wallet_data
-            with
-            | Some wd ->
-                Printf.sprintf
-                  "  %s tez"
-                  (Baker_wallet_data.format_tez wd.spendable_balance)
-            | None -> ""
-          in
-          let source =
-            if List.exists (String.equal net) local_networks then "local"
-            else "public"
-          in
-          let label = Printf.sprintf "%s  (%s)%s" net source balance_str in
-          if String.equal net "mainnet" then Widgets.themed_warning label
-          else label)
-        ~on_select:(fun net -> action ~network:net)
-        ()
+  match group.sandbox_name with
+  | Some _ ->
+      let network = match group.networks with n :: _ -> n | [] -> "mainnet" in
+      action ~network
+  | None -> (
+      let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+      (* All networks with running local nodes *)
+      let local_networks =
+        Data.load_service_states ()
+        |> List.filter (fun (st : Data.Service_state.t) ->
+            String.equal st.service.role "node"
+            && match st.status with Running -> true | _ -> false)
+        |> List.map (fun (st : Data.Service_state.t) ->
+            Network_name.normalize st.service.network)
+        |> List.sort_uniq String.compare
+      in
+      (* All networks with public nodes *)
+      let public_networks =
+        Public_nodes_cache.get_nodes ()
+        |> List.filter_map (fun (n : Public_nodes_cache.node_info) -> n.network)
+        |> List.sort_uniq String.compare
+      in
+      let all_networks =
+        List.sort_uniq String.compare (local_networks @ public_networks)
+      in
+      (* Fallback to group networks if nothing else *)
+      let networks =
+        if all_networks = [] then List.sort_uniq String.compare group.networks
+        else all_networks
+      in
+      match networks with
+      | [] -> action ~network:"mainnet"
+      | [single] -> action ~network:single
+      | multiple ->
+          Modal_helpers.open_choice_modal
+            ~title:"Select network"
+            ~items:multiple
+            ~to_string:(fun net ->
+              let balance_str =
+                match
+                  List.find_opt
+                    (fun (wd : Keys_scheduler.wallet_data) ->
+                      String.equal wd.network net)
+                    wallet_data
+                with
+                | Some wd ->
+                    Printf.sprintf
+                      "  %s tez"
+                      (Baker_wallet_data.format_tez wd.spendable_balance)
+                | None -> ""
+              in
+              let source =
+                if List.exists (String.equal net) local_networks then "local"
+                else "public"
+              in
+              let label = Printf.sprintf "%s  (%s)%s" net source balance_str in
+              if String.equal net "mainnet" then Widgets.themed_warning label
+              else label)
+            ~on_select:(fun net -> action ~network:net)
+            ())
 
 (** Show the action modal for a selected key. *)
 let open_key_action_modal ~(group : enriched_group)
     (key : Keys_reader.key_metadata) =
   let base_dir = group.base_dir in
-  let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+  (* For sandbox wallets, restrict wallet_data checks to the sandbox network. *)
+  let wallet_data =
+    let all = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
+    match group.sandbox_name with
+    | None -> all
+    | Some _ ->
+        List.filter
+          (fun (wd : Keys_scheduler.wallet_data) ->
+            List.exists (String.equal wd.network) group.networks)
+          all
+  in
   let is_delegating =
     List.exists
       (fun (wd : Keys_scheduler.wallet_data) -> Option.is_some wd.delegate)
