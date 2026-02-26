@@ -389,7 +389,7 @@ let authorized_keys_field =
                       ()
                 | `SelectExisting ->
                     (* Get all keys from all base directories *)
-                    let all_keys = Keys_page.get_all_keys () in
+                    let all_keys = Wallets_page.get_all_keys () in
                     if all_keys = [] then (
                       Context.toast_warn "No keys found in any base directory" ;
                       open_menu ())
