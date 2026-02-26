@@ -5,15 +5,15 @@
 (*                                                                            *)
 (******************************************************************************)
 
-(** Tests for Keys_page module
-    
+(** Tests for Wallets_page module
+
     Tests cover:
     - Deduplication of base directories (prevents duplicate wallet display)
 *)
 
 open Alcotest
 open Octez_manager_lib
-module Keys_page = Octez_manager_ui.Keys_page
+module Keys_page = Octez_manager_ui.Wallets_page
 
 (* ============================================================ *)
 (* Base Directory Deduplication Tests *)
@@ -125,4 +125,5 @@ let base_dir_tests =
       test_get_all_base_dirs_trailing_slash );
   ]
 
-let () = Alcotest.run "Keys_page" [("base_dir_deduplication", base_dir_tests)]
+let () =
+  Alcotest.run "Wallets_page" [("base_dir_deduplication", base_dir_tests)]
