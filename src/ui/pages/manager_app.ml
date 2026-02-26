@@ -26,7 +26,7 @@ let register_pages () =
   Rpc_node_selection.register () ;
   Rpc_browser.register () ;
   Topology_page.register () ;
-  Keys_page.register () ;
+  Wallets_page.register () ;
   Rewards_page.register () ;
   Sandbox_page.register () ;
   Sandbox_create_form.register ()
@@ -122,7 +122,7 @@ let open_theme_picker () =
 (** Register global key handler for Ctrl+T *)
 let register_global_keys () =
   Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
-  Context.register_global_key "K" (fun () -> Context.navigate Keys_page.name) ;
+  Context.register_global_key "K" (fun () -> Context.navigate Wallets_page.name) ;
   Context.register_global_key "R" (fun () -> Context.navigate Rewards_page.name)
 
 let register_and_init ?(log = false) ?logfile () =
