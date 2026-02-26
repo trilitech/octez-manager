@@ -47,6 +47,9 @@ type state = {
   column_scroll : int array;
   view_mode : view_mode;
   groups : Octez_manager_lib.Group.t list;
+  btn_install : Miaou_widgets_input.Button_widget.t;
+  btn_binaries : Miaou_widgets_input.Button_widget.t;
+  btn_rpcs : Miaou_widgets_input.Button_widget.t;
 }
 
 type msg = unit

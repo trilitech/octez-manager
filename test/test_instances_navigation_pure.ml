@@ -25,6 +25,9 @@ let services_start_idx = Instances_state.services_start_idx
 let make_state ?(selected = 0) ?(num_columns = 1) ?(active_column = 0)
     ?(external_services = []) services =
   let column_scroll = Array.make (max 1 num_columns) 0 in
+  let mk_btn label =
+    Miaou_widgets_input.Button_widget.create ~label ~on_click:(fun () -> ()) ()
+  in
   {
     Instances_state.services;
     external_services;
@@ -37,6 +40,9 @@ let make_state ?(selected = 0) ?(num_columns = 1) ?(active_column = 0)
     column_scroll;
     view_mode = Instances_state.By_role;
     groups = [];
+    btn_install = mk_btn "Install new instance";
+    btn_binaries = mk_btn "Manage binaries";
+    btn_rpcs = mk_btn "Browse RPCs";
   }
 
 let move = Instances.For_tests.move_selection
