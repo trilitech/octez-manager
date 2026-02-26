@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (* SPDX-License-Identifier: MIT                                               *)
-(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
 (*                                                                            *)
 (******************************************************************************)
 
@@ -17,6 +17,9 @@
 
 (** Page name for navigation *)
 val name : string
+
+(** Page implementation satisfying the Miaou TUI page signature. *)
+module Page : Miaou.Core.Tui_page.PAGE_SIG
 
 (** Register the page in the global page registry *)
 val register : unit -> unit
