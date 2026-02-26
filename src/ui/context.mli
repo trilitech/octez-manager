@@ -71,6 +71,21 @@ val mark_keys_dirty : unit -> unit
 (** Consume and clear the keys dirty flag. Returns [true] if it was set. *)
 val consume_keys_dirty : unit -> bool
 
+(** Pending tab switch requested by global key handlers. *)
+type pending_tab =
+  | Tab_instances
+  | Tab_wallets
+  | Tab_diagnostics
+  | Tab_topology
+  | Tab_sandboxes
+
+(** Request a tab switch. Consumed once by [Main_shell] on the next frame.
+    Safe to call from global key handlers in [Manager_app]. *)
+val set_pending_tab : pending_tab -> unit
+
+(** Returns and clears the pending tab switch, if any. *)
+val consume_tab_switch : unit -> pending_tab option
+
 (** Request navigation to the named page on the next tick. *)
 val navigate : string -> unit
 
