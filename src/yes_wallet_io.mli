@@ -45,3 +45,35 @@ val add_account :
   ?alias:string ->
   unit ->
   (string, [> `Msg of string]) result
+
+(** Estimate what fraction of total network staking power the sandbox wallet
+    delegates hold, as a percentage (0.0–100.0).
+
+    Tries [/context/stake_distribution] for an accurate stake-weighted result.
+    Falls back to a count-based approximation if that endpoint is unavailable.
+    Performs blocking HTTP calls — call from a background thread only.
+
+    @param endpoint Node RPC endpoint (e.g. ["http://127.0.0.1:18732"])
+    @param wallet_dir Sandbox wallet directory *)
+val fetch_delegate_balances :
+  endpoint:string ->
+  wallet_dir:string ->
+  (float array * float, [> `Msg of string]) result
+(** Fetch the individual baking power for each base delegate in the wallet.
+
+    Returns [(powers, wallet_total)] where [powers.(i)] is the baking power
+    of the i-th base delegate and [wallet_total] is the sum across all wallet
+    delegates. Percentages derived from this are relative to the wallet total
+    (all bakers together = 100%).
+
+    Tries [/context/stake_distribution] first (one call), then falls back to
+    per-delegate [/context/delegates/{addr}] queries using [baking_power],
+    and finally to unit weights as a last resort.
+    Performs blocking HTTP calls — call from a background thread only. *)
+
+val fetch_stake_pct :
+  endpoint:string ->
+  ?only_addrs:string list ->
+  wallet_dir:string ->
+  unit ->
+  (float, [> `Msg of string]) result
