@@ -559,7 +559,7 @@ let delegates_field =
       in
       (* Build alias lookup map for displaying keys with aliases *)
       let alias_map =
-        let all_keys = Keys_page.get_all_keys () in
+        let all_keys = Wallets_page.get_all_keys () in
         List.fold_left
           (fun acc (hash, alias, _base_dir) -> (hash, alias) :: acc)
           []
