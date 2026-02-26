@@ -75,12 +75,21 @@ val fetch_delegate_balances :
   endpoint:string ->
   wallet_dir:string ->
   (float array * float, [> `Msg of string]) result
-(** Fetch the individual staking balance for each base delegate in the wallet.
+(** Fetch the individual baking power for each base delegate in the wallet.
 
-    Returns [(balances, total_network_stake)] where [balances.(i)] is the
-    staking balance of the i-th base delegate.  Falls back to unit weights if
-    the [stake_distribution] endpoint is unavailable.
+    Returns [(powers, wallet_total)] where [powers.(i)] is the baking power
+    of the i-th base delegate and [wallet_total] is the sum across all wallet
+    delegates. Percentages derived from this are relative to the wallet total
+    (all bakers together = 100%).
+
+    Tries [/context/stake_distribution] first (one call), then falls back to
+    per-delegate [/context/delegates/{addr}] queries using [baking_power],
+    and finally to unit weights as a last resort.
     Performs blocking HTTP calls — call from a background thread only. *)
 
 val fetch_stake_pct :
-  endpoint:string -> wallet_dir:string -> (float, [> `Msg of string]) result
+  endpoint:string ->
+  ?only_addrs:string list ->
+  wallet_dir:string ->
+  unit ->
+  (float, [> `Msg of string]) result
