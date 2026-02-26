@@ -91,6 +91,22 @@ let mark_keys_dirty () = Atomic.set keys_dirty true
 
 let consume_keys_dirty () = Atomic.exchange keys_dirty false
 
+type pending_tab =
+  | Tab_instances
+  | Tab_wallets
+  | Tab_diagnostics
+  | Tab_topology
+  | Tab_sandboxes
+
+let pending_tab : pending_tab option ref = ref None
+
+let set_pending_tab tab = pending_tab := Some tab
+
+let consume_tab_switch () =
+  let value = !pending_tab in
+  pending_tab := None ;
+  value
+
 type pending_navigation = Goto of string | Back | Quit
 
 let pending_navigation : pending_navigation option ref = ref None
