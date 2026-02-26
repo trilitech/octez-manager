@@ -13,6 +13,7 @@ module Grid = Miaou_widgets_layout.Grid_layout
 module Box = Miaou_widgets_layout.Box_widget
 module Metrics = Rpc_metrics
 module Style_context = Miaou_style.Style_context
+module Button_widget = Miaou_widgets_input.Button_widget
 open Octez_manager_lib
 open Instances_state
 open Instances_layout
@@ -854,37 +855,13 @@ let render_external_services_section state =
 (** Single-column layout (original) *)
 let table_lines_single state =
   let install_row =
-    let marker =
-      if state.selected = 0 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf
-      "%s %s"
-      marker
-      (Widgets.themed_emphasis "[ Install new instance ]")
+    Button_widget.render state.btn_install ~focus:(state.selected = 0)
   in
   let binaries_row =
-    let marker =
-      if state.selected = 1 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf
-      "%s %s"
-      marker
-      (Widgets.themed_emphasis "[ Manage binaries ]")
+    Button_widget.render state.btn_binaries ~focus:(state.selected = 1)
   in
   let rpc_row =
-    let marker =
-      if state.selected = 2 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
-  in
-  let sandbox_row =
-    let marker =
-      if state.selected = 3 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf
-      "%s %s"
-      marker
-      (Widgets.themed_emphasis "[ Manage sandboxes ]")
+    Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
   in
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
@@ -936,7 +913,7 @@ let table_lines_single state =
       let separator = Widgets.themed_muted (String.make 80 '-') in
       "" :: separator :: external_rows
   in
-  (install_row :: binaries_row :: rpc_row :: sandbox_row :: "" :: instance_rows)
+  (install_row :: binaries_row :: rpc_row :: "" :: "" :: instance_rows)
   @ external_rows
 
 (** Multi-column matrix layout *)
@@ -964,39 +941,15 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Reduce available height for columns to make room for external services *)
   let columns_visible_height = max 5 (visible_height - reserved_for_external) in
-  (* Header row (install, binaries, rpcs) spans full width in single line *)
+  (* Header row (install, binaries, rpcs) spans full width *)
   let install_row =
-    let marker =
-      if state.selected = 0 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf
-      "%s %s"
-      marker
-      (Widgets.themed_emphasis "[ Install new instance ]")
+    Button_widget.render state.btn_install ~focus:(state.selected = 0)
   in
   let binaries_row =
-    let marker =
-      if state.selected = 1 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf
-      "%s %s"
-      marker
-      (Widgets.themed_emphasis "[ Manage binaries ]")
+    Button_widget.render state.btn_binaries ~focus:(state.selected = 1)
   in
   let rpc_row =
-    let marker =
-      if state.selected = 2 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
-  in
-  let sandbox_row =
-    let marker =
-      if state.selected = 3 then Widgets.themed_emphasis "➤" else " "
-    in
-    Printf.sprintf
-      "%s %s"
-      marker
-      (Widgets.themed_emphasis "[ Manage sandboxes ]")
+    Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
   in
   (* When selection is in menu area, use -1 to dim all columns equally *)
   let effective_active_column =
@@ -1024,8 +977,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Append external services below the columnar grid *)
   let result =
-    install_row :: binaries_row :: rpc_row :: sandbox_row :: ""
-    :: instance_rows_trimmed
+    install_row :: binaries_row :: rpc_row :: "" :: "" :: instance_rows_trimmed
   in
   if external_line_count > 0 then
     let separator = Widgets.themed_muted (String.make (min cols 120) '-') in
@@ -1040,43 +992,19 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
   in
   if state.services = [] then
     let install_row =
-      let marker =
-        if state.selected = 0 then Widgets.themed_emphasis "➤" else " "
-      in
-      Printf.sprintf
-        "%s %s"
-        marker
-        (Widgets.themed_emphasis "[ Install new instance ]")
+      Button_widget.render state.btn_install ~focus:(state.selected = 0)
     in
     let binaries_row =
-      let marker =
-        if state.selected = 1 then Widgets.themed_emphasis "➤" else " "
-      in
-      Printf.sprintf
-        "%s %s"
-        marker
-        (Widgets.themed_emphasis "[ Manage binaries ]")
+      Button_widget.render state.btn_binaries ~focus:(state.selected = 1)
     in
     let rpc_row =
-      let marker =
-        if state.selected = 2 then Widgets.themed_emphasis "➤" else " "
-      in
-      Printf.sprintf "%s %s" marker (Widgets.themed_emphasis "[ Browse RPCs ]")
-    in
-    let sandbox_row =
-      let marker =
-        if state.selected = 3 then Widgets.themed_emphasis "➤" else " "
-      in
-      Printf.sprintf
-        "%s %s"
-        marker
-        (Widgets.themed_emphasis "[ Manage sandboxes ]")
+      Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
     in
     let external_rows = render_external_services_section state in
     let external_rows =
       if external_rows = [] then [] else "" :: external_rows
     in
-    install_row :: binaries_row :: rpc_row :: sandbox_row :: ""
+    install_row :: binaries_row :: rpc_row :: "" :: ""
     :: "  No managed instances." :: external_rows
   else if num_columns <= 1 then table_lines_single state
   else
