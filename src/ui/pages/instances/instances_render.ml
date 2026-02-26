@@ -521,7 +521,11 @@ let role_key_of_header = function
 
 (** Render a single column's content - returns list of lines *)
 let render_column ~col_width ~state ~column_groups =
-  let items = column_items ~column_groups ~global_services:state.services in
+  let items =
+    column_items
+      ~column_groups
+      ~global_services:(display_ordered_services state)
+  in
   let empty_line = String.make col_width ' ' in
   (* Group items into (header, instances) pairs *)
   let groups =
