@@ -314,9 +314,9 @@
   (backend bisect_ppx)))
 
 (test
- (name test_keys_page)
+ (name test_wallets_page)
  (libraries alcotest octez_manager_lib octez-manager.ui)
- (modules test_keys_page)
+ (modules test_wallets_page)
  (instrumentation
   (backend bisect_ppx)))
 

@@ -26,7 +26,7 @@ let register_pages () =
   Rpc_node_selection.register () ;
   Rpc_browser.register () ;
   Topology_page.register () ;
-  Keys_page.register () ;
+  Wallets_page.register () ;
   Rewards_page.register () ;
   Sandbox_page.register () ;
   Sandbox_create_form.register () ;
