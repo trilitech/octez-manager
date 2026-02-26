@@ -12,6 +12,7 @@ module Metrics = Rpc_metrics
 module Navigation = Miaou.Core.Navigation
 module Style = Miaou_style.Style
 module Style_context = Miaou_style.Style_context
+module Button_widget = Miaou_widgets_input.Button_widget
 open Octez_manager_lib
 open Rresult
 
@@ -61,6 +62,21 @@ let init_state () =
       (* max practical columns based on terminal width; 10 is a safe upper bound *)
       view_mode;
       groups;
+      btn_install =
+        Button_widget.create
+          ~label:"Install new instance"
+          ~on_click:Instances_actions.open_create_menu
+          ();
+      btn_binaries =
+        Button_widget.create
+          ~label:"Manage binaries"
+          ~on_click:(fun () -> Context.navigate Binaries.name)
+          ();
+      btn_rpcs =
+        Button_widget.create
+          ~label:"Browse RPCs"
+          ~on_click:(fun () -> Context.navigate Rpc_node_selection.name)
+          ();
     }
 
 let force_refresh state =
@@ -148,9 +164,11 @@ open Instances_actions
 let move_selection_single_column s delta =
   let raw = s.selected + delta in
   let selected = clamp_selection s.services s.external_services raw in
-  (* Skip separator during navigation *)
+  (* Skip the non-navigable zone (radio row + separator) between buttons and services *)
   let selected =
-    if selected = menu_item_count then selected + delta else selected
+    if selected >= menu_item_count && selected < services_start_idx then
+      if delta > 0 then services_start_idx else menu_item_count - 1
+    else selected
   in
   let selected = clamp_selection s.services s.external_services selected in
   {s with selected}
@@ -909,7 +927,25 @@ Press **Enter** to open instance menu.|}
         | Some (Keys.Char "q")
         | Some (Keys.Char "C-c") ->
             back ps
-        | _ -> ps
+        | _ ->
+            (* Pass unrecognised keys (including mouse clicks) to the focused
+               button so Button_widget can handle click events. *)
+            if s.selected < menu_item_count then
+              Navigation.update
+                (fun s ->
+                  match s.selected with
+                  | 0 ->
+                      let b, _ = Button_widget.on_key s.btn_install ~key in
+                      {s with btn_install = b}
+                  | 1 ->
+                      let b, _ = Button_widget.on_key s.btn_binaries ~key in
+                      {s with btn_binaries = b}
+                  | 2 ->
+                      let b, _ = Button_widget.on_key s.btn_rpcs ~key in
+                      {s with btn_rpcs = b}
+                  | _ -> s)
+                ps
+            else ps
       in
       (* Keep active_column in sync with selection *)
       let ps =

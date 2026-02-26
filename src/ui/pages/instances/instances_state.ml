@@ -31,11 +31,12 @@ let get_recent_failure ~instance =
       None
   | None -> None
 
-(** Number of menu items before services (Install, Binaries, RPCs, Sandboxes buttons) *)
-let menu_item_count = 4
+(** Number of button menu items before services (Install, Binaries, RPCs) *)
+let menu_item_count = 3
 
-(** Index where services start (after menu items + separator line) *)
-let services_start_idx = menu_item_count + 1
+(** Index where services start (after buttons + radio row + separator).
+    Layout: 0-2 buttons, 3 radio row, 4 separator, 5+ services. *)
+let services_start_idx = menu_item_count + 2
 
 type state = {
   services : Service_state.t list;
@@ -50,6 +51,10 @@ type state = {
   column_scroll : int array; (* scroll offset per column *)
   view_mode : view_mode;
   groups : Octez_manager_lib.Group.t list;
+  (* Action buttons for the top button bar *)
+  btn_install : Miaou_widgets_input.Button_widget.t;
+  btn_binaries : Miaou_widgets_input.Button_widget.t;
+  btn_rpcs : Miaou_widgets_input.Button_widget.t;
 }
 
 type msg = unit
