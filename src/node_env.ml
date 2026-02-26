@@ -135,3 +135,56 @@ let write ~inst ~data_dir ~run_args ~extra_env ?(with_comments = false) () =
     ("OCTEZ_DATA_DIR", data_dir) :: ("OCTEZ_NODE_ARGS", run_args) :: extra_env
   in
   write_pairs ~with_comments ~inst env_pairs
+
+let patch_keys ~inst ~updates =
+  if updates = [] then Ok ()
+  else
+    let base = Paths.env_instances_base_dir () in
+    let path = Filename.concat (Filename.concat base inst) "node.env" in
+    let* lines =
+      if not (Sys.file_exists path) then Ok []
+      else
+        try
+          let ic = open_in path in
+          Fun.protect
+            ~finally:(fun () -> close_in ic)
+            (fun () ->
+              let n = in_channel_length ic in
+              let buf = Bytes.create n in
+              really_input ic buf 0 n ;
+              Ok (String.split_on_char '\n' (Bytes.to_string buf)))
+        with Sys_error msg -> Error (`Msg msg)
+    in
+    let update_map = Hashtbl.create (List.length updates) in
+    List.iter (fun (k, v) -> Hashtbl.replace update_map k v) updates ;
+    let seen = Hashtbl.create (List.length updates) in
+    let patched =
+      List.map
+        (fun line ->
+          let trimmed = String.trim line in
+          if trimmed = "" || String.starts_with ~prefix:"#" trimmed then line
+          else
+            match String.split_on_char '=' trimmed with
+            | key :: _ when Hashtbl.mem update_map key ->
+                Hashtbl.replace seen key () ;
+                Printf.sprintf
+                  "%s=%s"
+                  key
+                  (escape_env_value (Hashtbl.find update_map key))
+            | _ -> line)
+        lines
+    in
+    (* Append any keys that were not already present in the file *)
+    let extra =
+      List.filter_map
+        (fun (k, v) ->
+          if Hashtbl.mem seen k then None
+          else Some (Printf.sprintf "%s=%s" k (escape_env_value v)))
+        updates
+    in
+    let body = String.concat "\n" (patched @ extra) in
+    let owner, group =
+      if Paths.is_root () then ("root", "root")
+      else Paths.current_user_group_names ()
+    in
+    File_ops.write_file ~mode:0o644 ~owner ~group path body

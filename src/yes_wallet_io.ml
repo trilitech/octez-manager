@@ -21,6 +21,14 @@ let fetch_json_from_rpc ~endpoint path =
   with Yojson.Json_error msg ->
     Error (`Msg (Printf.sprintf "JSON parse error from %s: %s" url msg))
 
+(** Parse a mutez-like field (String/Int/Intlit) from a JSON value. *)
+let parse_mutez json_val =
+  match json_val with
+  | `String s -> ( try float_of_string s with _ -> 0.0)
+  | `Int n -> float_of_int n
+  | `Intlit s -> ( try float_of_string s with _ -> 0.0)
+  | _ -> 0.0
+
 (** Fetch consensus key and companion key pkhs for a delegate address.
     Returns additional (address, curve) pairs to include in the wallet.
     Keys already equal to [addr] are excluded. Returns [] on any fetch failure. *)
@@ -56,7 +64,7 @@ let fetch_delegates ~endpoint ~max_delegates =
   in
   match json with
   | `List addresses ->
-      let delegate_addrs =
+      let delegate_addrs_unsorted =
         addresses
         |> List.filter_map (fun j ->
             match j with
@@ -66,6 +74,37 @@ let fetch_delegates ~endpoint ~max_delegates =
                 | None -> None)
             | _ -> None)
         |> List.filteri (fun i _ -> i < max_delegates)
+      in
+      (* Sort delegates by staking balance descending so that equal key-count
+         splits in the allocation page produce equal-stake splits.  One RPC
+         call (stake_distribution); silently keeps original order on failure. *)
+      let delegate_addrs =
+        let stake_map =
+          match
+            fetch_json_from_rpc
+              ~endpoint
+              "/chains/main/blocks/head/context/stake_distribution"
+          with
+          | Ok (`List entries) ->
+              let tbl = Hashtbl.create 64 in
+              List.iter
+                (fun entry ->
+                  let open Yojson.Safe.Util in
+                  try
+                    let baker = entry |> member "baker" |> to_string in
+                    let bal = parse_mutez (entry |> member "staking_balance") in
+                    Hashtbl.replace tbl baker bal
+                  with _ -> ())
+                entries ;
+              tbl
+          | _ -> Hashtbl.create 0
+        in
+        let stake_of (addr, _) =
+          Option.value ~default:0.0 (Hashtbl.find_opt stake_map addr)
+        in
+        List.sort
+          (fun a b -> Float.compare (stake_of b) (stake_of a))
+          delegate_addrs_unsorted
       in
       (* Collect consensus/companion keys for each delegate.
          Also tracks the consensus key address for each delegate, so the baker
@@ -172,7 +211,7 @@ let read_wallet_pkhs ~wallet_dir =
 
     Our delegates are entries at alias indices divisible by 3 (the base
     addresses; indices 1 and 2 are consensus/companion keys). *)
-let fetch_stake_pct ~endpoint ~wallet_dir =
+let fetch_stake_pct ~endpoint ?(only_addrs = []) ~wallet_dir () =
   let* pkhs = read_wallet_pkhs ~wallet_dir in
   let our_delegates =
     List.filter_map
@@ -180,7 +219,13 @@ let fetch_stake_pct ~endpoint ~wallet_dir =
         match String.split_on_char '-' alias with
         | ["delegate"; ns] -> (
             match int_of_string_opt ns with
-            | Some n when n mod 3 = 0 -> Some addr
+            | Some n when n mod 3 = 0 ->
+                (* When only_addrs is provided, restrict to that set. *)
+                if
+                  only_addrs <> []
+                  && not (List.exists (String.equal addr) only_addrs)
+                then None
+                else Some addr
             | _ -> None)
         | _ -> None)
       pkhs
@@ -234,12 +279,35 @@ let fetch_stake_pct ~endpoint ~wallet_dir =
         if n_total = 0 then Ok 0.0
         else Ok (float_of_int n_our /. float_of_int n_total *. 100.0)
 
-(** Fetch individual staking balances for each base delegate in the wallet.
+(** Fetch baking power for a single delegate via its individual RPC.
+    Uses [baking_power] if available and non-zero, else [total_staked].
+    Returns 0.0 on any failure. *)
+let fetch_delegate_baking_power ~endpoint addr =
+  let path =
+    Printf.sprintf "/chains/main/blocks/head/context/delegates/%s" addr
+  in
+  match fetch_json_from_rpc ~endpoint path with
+  | Error _ -> 0.0
+  | Ok json ->
+      let open Yojson.Safe.Util in
+      let field name = try parse_mutez (json |> member name) with _ -> 0.0 in
+      let bp = field "baking_power" in
+      if bp > 0.0 then bp else field "total_staked"
 
-    Returns [(balances, total_network_stake)] where [balances.(i)] is the
-    staking balance of the i-th base delegate (alias index 3*i in the wallet).
-    Falls back to unit weights (1.0 each, total=n) if [stake_distribution]
-    is unavailable, keeping the proportions equal in that case. *)
+(** Fetch individual baking power for each base delegate in the wallet.
+
+    Returns [(powers, wallet_total)] where [powers.(i)] is the baking power
+    of the i-th base delegate and [wallet_total] is the sum across all wallet
+    delegates. Percentages are relative to the wallet total (so all bakers
+    together sum to 100%).
+
+    Tries [/context/stake_distribution] first (one call). Falls back to
+    per-delegate [/context/delegates/{addr}] queries (one call per delegate).
+    Last resort: unit weights (proportional to key count).
+    Performs blocking HTTP calls — call from a background thread only.
+
+    @param endpoint Node RPC endpoint (e.g. http://127.0.0.1:18732)
+    @param wallet_dir Sandbox wallet directory *)
 let fetch_delegate_balances ~endpoint ~wallet_dir =
   let* pkhs = read_wallet_pkhs ~wallet_dir in
   let base_addrs =
@@ -257,40 +325,50 @@ let fetch_delegate_balances ~endpoint ~wallet_dir =
   let n = Array.length base_addrs in
   if n = 0 then Ok ([||], 0.0)
   else
-    match
-      fetch_json_from_rpc
-        ~endpoint
-        "/chains/main/blocks/head/context/stake_distribution"
-    with
-    | Ok (`List entries) ->
-        let stake_map = Hashtbl.create 64 in
-        let total = ref 0.0 in
-        List.iter
-          (fun entry ->
-            let open Yojson.Safe.Util in
-            try
-              let baker = entry |> member "baker" |> to_string in
-              let bal =
-                match entry |> member "staking_balance" with
-                | `String s -> ( try float_of_string s with _ -> 0.0)
-                | `Int v -> float_of_int v
-                | `Intlit s -> ( try float_of_string s with _ -> 0.0)
-                | _ -> 0.0
-              in
-              total := !total +. bal ;
-              Hashtbl.replace stake_map baker bal
-            with _ -> ())
-          entries ;
-        let balances =
-          Array.map
-            (fun addr ->
-              Option.value ~default:0.0 (Hashtbl.find_opt stake_map addr))
-            base_addrs
-        in
-        Ok (balances, !total)
-    | _ ->
-        (* Fallback: equal weight *)
-        Ok (Array.make n 1.0, float_of_int n)
+    (* Try stake_distribution first (single RPC call) *)
+    let from_stake_distribution () =
+      match
+        fetch_json_from_rpc
+          ~endpoint
+          "/chains/main/blocks/head/context/stake_distribution"
+      with
+      | Ok (`List entries) ->
+          let stake_map = Hashtbl.create 64 in
+          List.iter
+            (fun entry ->
+              let open Yojson.Safe.Util in
+              try
+                let baker = entry |> member "baker" |> to_string in
+                let bal = parse_mutez (entry |> member "staking_balance") in
+                Hashtbl.replace stake_map baker bal
+              with _ -> ())
+            entries ;
+          let balances =
+            Array.map
+              (fun addr ->
+                Option.value ~default:0.0 (Hashtbl.find_opt stake_map addr))
+              base_addrs
+          in
+          let total = Array.fold_left ( +. ) 0.0 balances in
+          if total > 0.0 then Some (balances, total) else None
+      | _ -> None
+    in
+    (* Fallback: per-delegate baking_power queries (n HTTP calls) *)
+    let from_individual_queries () =
+      let balances =
+        Array.map (fetch_delegate_baking_power ~endpoint) base_addrs
+      in
+      let total = Array.fold_left ( +. ) 0.0 balances in
+      if total > 0.0 then Some (balances, total) else None
+    in
+    match from_stake_distribution () with
+    | Some result -> Ok result
+    | None -> (
+        match from_individual_queries () with
+        | Some result -> Ok result
+        | None ->
+            (* Last resort: equal weights *)
+            Ok (Array.make n 1.0, float_of_int n))
 
 let add_account ~wallet_dir ~address ?alias () =
   let* curve =
