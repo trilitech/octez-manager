@@ -7,9 +7,15 @@
 
 (** Pure unit tests for instances page navigation (move_selection).
 
-    Tests the multi-column and single-column navigation logic,
-    verifying that moving up from managed services goes to the
-    correct menu item (Browse RPCs, not Install). *)
+    Tests the multi-column and single-column navigation logic.
+
+    Layout: 0-2 = buttons (Install, Binaries, RPCs),
+            3   = radio row (navigable, view mode toggle),
+            4   = separator (skipped automatically),
+            5+  = services.
+
+    The radio row at index [menu_item_count] IS navigable.
+    Only the separator at index [menu_item_count+1] is skipped. *)
 
 open Alcotest
 open Octez_manager_ui
@@ -53,21 +59,23 @@ let move = Instances.For_tests.move_selection
 
 let test_single_column_up_from_first_service () =
   (* In single column, moving up from the first service (services_start_idx=5)
-     should skip the non-navigable zone [radio-row(3), separator(4)] and land
-     on Browse RPCs (menu_item_count-1=2). *)
+     should skip only the separator (index 4) and land on the radio row
+     (menu_item_count=3). *)
   let services = [running_service ~instance:"node-1" ()] in
   let s = make_state ~selected:services_start_idx ~num_columns:1 services in
   let s' = move s (-1) in
-  check int "lands on Browse RPCs" (menu_item_count - 1) s'.selected
+  check int "lands on radio row" menu_item_count s'.selected
 
 let test_single_column_down_from_browse_rpcs () =
-  (* Moving down from Browse RPCs (menu_item_count-1=2) should skip the
-     non-navigable zone [radio-row(3), separator(4)] and land on the
-     first service (services_start_idx=5). *)
+  (* Moving down from Browse RPCs (menu_item_count-1=2) should land on the
+     radio row (menu_item_count=3).  A second press skips the separator and
+     reaches the first service (services_start_idx=5). *)
   let services = [running_service ~instance:"node-1" ()] in
   let s = make_state ~selected:(menu_item_count - 1) ~num_columns:1 services in
   let s' = move s 1 in
-  check int "lands on first service" services_start_idx s'.selected
+  check int "lands on radio row" menu_item_count s'.selected ;
+  let s'' = move s' 1 in
+  check int "second j -> first service" services_start_idx s''.selected
 
 let test_single_column_navigate_through_menu () =
   let services = [running_service ~instance:"node-1" ()] in
@@ -78,18 +86,20 @@ let test_single_column_navigate_through_menu () =
   (* Down from Manage binaries -> Browse RPCs *)
   let s' = move s' 1 in
   check int "Manage binaries -> Browse RPCs" 2 s'.selected ;
-  (* Down from Browse RPCs -> first service (skip radio-row + separator) *)
+  (* Down from Browse RPCs -> radio row (index 3) *)
   let s' = move s' 1 in
-  check int "Browse RPCs -> first service" services_start_idx s'.selected
+  check int "Browse RPCs -> radio row" menu_item_count s'.selected ;
+  (* Down from radio row -> first service (skip separator at 4) *)
+  let s' = move s' 1 in
+  check int "radio row -> first service" services_start_idx s'.selected
 
 (* ============================================================ *)
 (* Multi-column navigation tests                                *)
 (* ============================================================ *)
 
-let test_multi_column_up_from_first_service_to_browse_rpcs () =
-  (* BUG FIX: In multi-column mode, moving up from the first service
-     in a column should go to Browse RPCs (last menu item),
-     not Install new instance (first menu item) *)
+let test_multi_column_up_from_first_service_to_radio_row () =
+  (* Moving up from the first service in a column should land on the radio
+     row (menu_item_count=3), the last navigable pre-service item. *)
   let services = multi_role_services () in
   let s =
     make_state
@@ -99,14 +109,10 @@ let test_multi_column_up_from_first_service_to_browse_rpcs () =
       services
   in
   let s' = move s (-1) in
-  check
-    int
-    "lands on Browse RPCs (last menu item)"
-    (menu_item_count - 1)
-    s'.selected
+  check int "lands on radio row" menu_item_count s'.selected
 
-let test_multi_column_up_from_second_column_to_browse_rpcs () =
-  (* Same fix applies when navigating up from column 1 *)
+let test_multi_column_up_from_second_column_to_radio_row () =
+  (* Same applies when navigating up from column 1 *)
   let services = multi_role_services () in
   (* Find the first service index in column 1 *)
   let sections = Instances_layout.group_by_role services in
@@ -124,37 +130,37 @@ let test_multi_column_up_from_second_column_to_browse_rpcs () =
           services
       in
       let s' = move s (-1) in
-      check
-        int
-        "from column 1, lands on Browse RPCs"
-        (menu_item_count - 1)
-        s'.selected
+      check int "from column 1, lands on radio row" menu_item_count s'.selected
 
-let test_multi_column_down_from_menu_to_service () =
-  (* Down from last menu item should go to first service in column 0 *)
+let test_multi_column_down_from_radio_row_to_service () =
+  (* Down from radio row (menu_item_count=3) should jump to first service in
+     column 0, skipping the separator at index 4. *)
   let services = multi_role_services () in
   let s =
     make_state
-      ~selected:(menu_item_count - 1)
+      ~selected:menu_item_count
       ~num_columns:2
       ~active_column:0
       services
   in
   let s' = move s 1 in
-  (* Should land on a service (index >= services_start_idx) *)
   check bool "lands on a service" true (s'.selected >= services_start_idx) ;
   check int "active_column is 0" 0 s'.active_column
 
 let test_multi_column_menu_navigation () =
-  (* Within the menu area, up/down should work linearly *)
+  (* Within the menu+radio area, up/down should work linearly *)
   let services = multi_role_services () in
   let s = make_state ~selected:0 ~num_columns:2 services in
-  (* Down through menu *)
+  (* Down through menu and radio row *)
   let s' = move s 1 in
   check int "0 -> 1" 1 s'.selected ;
   let s' = move s' 1 in
   check int "1 -> 2" 2 s'.selected ;
-  (* Up through menu *)
+  let s' = move s' 1 in
+  check int "2 -> 3 (radio row)" menu_item_count s'.selected ;
+  (* Up through radio row and menu *)
+  let s' = move s' (-1) in
+  check int "3 -> 2" 2 s'.selected ;
   let s' = move s' (-1) in
   check int "2 -> 1" 1 s'.selected ;
   let s' = move s' (-1) in
@@ -168,8 +174,8 @@ let test_multi_column_up_does_not_overshoot_menu () =
   check int "stays at 0" 0 s'.selected
 
 let test_multi_column_roundtrip () =
-  (* Down from Browse RPCs to first service, then back up should return
-     to Browse RPCs *)
+  (* From Browse RPCs (2): 2 -> radio row (3) -> first service (5),
+     then back: service -> radio row (3) -> Browse RPCs (2). *)
   let services = multi_role_services () in
   let s =
     make_state
@@ -178,12 +184,18 @@ let test_multi_column_roundtrip () =
       ~active_column:0
       services
   in
-  (* Down to first service *)
+  (* Down to radio row *)
   let s' = move s 1 in
+  check int "Browse RPCs -> radio row" menu_item_count s'.selected ;
+  (* Down to first service (skip separator) *)
+  let s' = move s' 1 in
   check bool "now on a service" true (s'.selected >= services_start_idx) ;
-  (* Back up to menu *)
+  (* Back up to radio row *)
   let s' = move s' (-1) in
-  check int "roundtrip returns to Browse RPCs" (menu_item_count - 1) s'.selected
+  check int "service -> radio row" menu_item_count s'.selected ;
+  (* Back up to Browse RPCs *)
+  let s' = move s' (-1) in
+  check int "radio row -> Browse RPCs" (menu_item_count - 1) s'.selected
 
 (* ============================================================ *)
 (* Empty state tests                                            *)
@@ -211,34 +223,34 @@ let () =
     [
       ( "single-column",
         [
-          ( "up from first service -> Browse RPCs",
+          ( "up from first service -> radio row",
             `Quick,
             test_single_column_up_from_first_service );
-          ( "down from Browse RPCs -> first service",
+          ( "down from Browse RPCs -> radio row -> first service",
             `Quick,
             test_single_column_down_from_browse_rpcs );
-          ( "navigate through menu items",
+          ( "navigate through menu items and radio row",
             `Quick,
             test_single_column_navigate_through_menu );
         ] );
       ( "multi-column",
         [
-          ( "up from first service -> Browse RPCs (bug fix)",
+          ( "up from first service -> radio row",
             `Quick,
-            test_multi_column_up_from_first_service_to_browse_rpcs );
-          ( "up from column 1 -> Browse RPCs",
+            test_multi_column_up_from_first_service_to_radio_row );
+          ( "up from column 1 -> radio row",
             `Quick,
-            test_multi_column_up_from_second_column_to_browse_rpcs );
-          ( "down from menu -> first service",
+            test_multi_column_up_from_second_column_to_radio_row );
+          ( "down from radio row -> first service",
             `Quick,
-            test_multi_column_down_from_menu_to_service );
-          ( "menu navigation is linear",
+            test_multi_column_down_from_radio_row_to_service );
+          ( "menu navigation is linear through radio row",
             `Quick,
             test_multi_column_menu_navigation );
           ( "up does not overshoot menu",
             `Quick,
             test_multi_column_up_does_not_overshoot_menu );
-          ( "roundtrip Browse RPCs <-> service",
+          ( "roundtrip Browse RPCs <-> radio row <-> service",
             `Quick,
             test_multi_column_roundtrip );
         ] );
