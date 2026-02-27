@@ -122,37 +122,25 @@ let rpc_get_json endpoint path =
   | Error _ -> None
   | Ok body -> ( try Some (Yojson.Safe.from_string body) with _ -> None)
 
-(** Build a tzkt API base URL for a given network. *)
-let tzkt_base_url ~network =
-  if String.equal network "mainnet" then "https://api.tzkt.io"
-  else Printf.sprintf "https://api.%s.tzkt.io" network
-
-(** Fetch estimated APY for a delegate from tzkt.
+(** Fetch estimated APY for a delegate from the indexer.
     Averages return rate over recent completed cycles, then annualizes. *)
 let fetch_delegate_apy ~network ~delegate_pkh =
-  let base = tzkt_base_url ~network in
   (* Fetch recent reward cycles *)
-  let rewards_url =
+  let rewards_path =
     Printf.sprintf
-      "%s/v1/rewards/bakers/%s?limit=5&select=cycle,bakingPower,blockRewardsDelegated,blockRewardsStakedOwn,blockRewardsStakedEdge,blockRewardsStakedShared,attestationRewardsDelegated,attestationRewardsStakedOwn,attestationRewardsStakedEdge,attestationRewardsStakedShared"
-      base
+      "/v1/rewards/bakers/%s?limit=5&select=cycle,bakingPower,blockRewardsDelegated,blockRewardsStakedOwn,blockRewardsStakedEdge,blockRewardsStakedShared,attestationRewardsDelegated,attestationRewardsStakedOwn,attestationRewardsStakedEdge,attestationRewardsStakedShared"
       delegate_pkh
   in
-  let rewards_result =
-    Cmd_runner.run_out_silent ["curl"; "-sfL"; "--max-time"; "10"; rewards_url]
-  in
+  let rewards_result = Indexer.fetch ~network ~timeout:10.0 rewards_path in
   match rewards_result with
   | Error _ -> None
   | Ok rewards_body -> (
       (* Fetch protocol constants for cycles_per_year *)
-      let constants_url =
-        Printf.sprintf
-          "%s/v1/protocols?limit=1&sort.desc=firstLevel&select=constants.blocksPerCycle,constants.timeBetweenBlocks"
-          base
+      let constants_path =
+        "/v1/protocols?limit=1&sort.desc=firstLevel&select=constants.blocksPerCycle,constants.timeBetweenBlocks"
       in
       let constants_result =
-        Cmd_runner.run_out_silent
-          ["curl"; "-sfL"; "--max-time"; "10"; constants_url]
+        Indexer.fetch ~network ~timeout:10.0 constants_path
       in
       match constants_result with
       | Error _ -> None

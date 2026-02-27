@@ -68,17 +68,13 @@ let default ~baker_pkh =
     bond_recipients = [];
     fee_recipients = [];
     rpc_fallback_pool = [];
-    tzkt_url = "https://api.tzkt.io";
+    tzkt_url = Indexer.tzkt_base_url ~network:"mainnet";
     explorer_url = "https://tzkt.io";
     notifications = [];
     continual_enabled = false;
     continual_interval = 1;
     continual_offset = 0;
   }
-
-let tzkt_base_url_for_network network =
-  if String.equal network "mainnet" then "https://api.tzkt.io"
-  else Printf.sprintf "https://api.%s.tzkt.io" network
 
 (* Validation *)
 

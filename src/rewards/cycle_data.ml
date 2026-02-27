@@ -5,9 +5,6 @@
 (*                                                                            *)
 (******************************************************************************)
 
-let curl_fetch url =
-  Cmd_runner.run_out_silent ["curl"; "-fsSL"; "--max-time"; "15"; url]
-
 let int64_of_json_field json field =
   let open Yojson.Safe.Util in
   match member field json with
@@ -80,10 +77,17 @@ let page_size = 10000
     Returns the concatenation of all delegator snapshots from
     [offset] onward. Stops when a page returns fewer than [page_size]
     entries or on error (best-effort). *)
-let fetch_remaining_delegators ~base_url offset =
+let fetch_remaining_delegators ~network ~preferred_base ~baker ~cycle offset =
   let rec go off acc =
-    let url = Printf.sprintf "%s?limit=%d&offset=%d" base_url page_size off in
-    match curl_fetch url with
+    let path =
+      Printf.sprintf
+        "/v1/rewards/split/%s/%d?limit=%d&offset=%d"
+        baker
+        cycle
+        page_size
+        off
+    in
+    match Indexer.fetch ~network ?preferred_base path with
     | Error _ -> acc
     | Ok body -> (
         match Yojson.Safe.from_string body with
@@ -100,12 +104,11 @@ let fetch_remaining_delegators ~base_url offset =
   in
   go offset []
 
-let fetch_cycle ~tzkt_url ~baker ~cycle =
-  let base_url =
-    Printf.sprintf "%s/v1/rewards/split/%s/%d" tzkt_url baker cycle
+let fetch_cycle ~network ~preferred_base ~baker ~cycle =
+  let path =
+    Printf.sprintf "/v1/rewards/split/%s/%d?limit=%d" baker cycle page_size
   in
-  let url = Printf.sprintf "%s?limit=%d" base_url page_size in
-  match curl_fetch url with
+  match Indexer.fetch ~network ?preferred_base path with
   | Error (`Msg msg) -> Error (Printf.sprintf "TzKT fetch failed: %s" msg)
   | Ok body -> (
       match Yojson.Safe.from_string body with
@@ -113,20 +116,23 @@ let fetch_cycle ~tzkt_url ~baker ~cycle =
           let cr = parse_cycle_rewards ~baker json in
           if cr.num_delegators <= page_size then Ok cr
           else
-            let more = fetch_remaining_delegators ~base_url page_size in
+            let more =
+              fetch_remaining_delegators
+                ~network
+                ~preferred_base
+                ~baker
+                ~cycle
+                page_size
+            in
             Ok {cr with delegators = cr.delegators @ more}
       | exception Yojson.Json_error msg ->
           Error (Printf.sprintf "JSON parse error: %s" msg))
 
-let fetch_recent_cycles ~tzkt_url ~baker ~limit =
-  let url =
-    Printf.sprintf
-      "%s/v1/rewards/bakers/%s?limit=%d&sort.desc=cycle"
-      tzkt_url
-      baker
-      limit
+let fetch_recent_cycles ~network ~preferred_base ~baker ~limit =
+  let path =
+    Printf.sprintf "/v1/rewards/bakers/%s?limit=%d&sort.desc=cycle" baker limit
   in
-  match curl_fetch url with
+  match Indexer.fetch ~network ?preferred_base path with
   | Error (`Msg msg) -> Error (Printf.sprintf "TzKT fetch failed: %s" msg)
   | Ok body -> (
       match Yojson.Safe.from_string body with
@@ -135,9 +141,8 @@ let fetch_recent_cycles ~tzkt_url ~baker ~limit =
       | exception Yojson.Json_error msg ->
           Error (Printf.sprintf "JSON parse error: %s" msg))
 
-let fetch_current_cycle ~tzkt_url =
-  let url = Printf.sprintf "%s/v1/head" tzkt_url in
-  match curl_fetch url with
+let fetch_current_cycle ~network ~preferred_base =
+  match Indexer.fetch ~network ?preferred_base "/v1/head" with
   | Error (`Msg msg) -> Error (Printf.sprintf "TzKT fetch failed: %s" msg)
   | Ok body -> (
       match Yojson.Safe.from_string body with
