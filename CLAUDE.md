@@ -9,6 +9,8 @@ Read and follow the guidelines in @AGENTS.md for all development work on this pr
 - JSON files (payout config), CSV + JSON (reports), in-memory Hashtbl + Mutex (scheduler caches) (002-rewards-payouts)
 - OCaml 5 / Dune 3.15+ + Miaou TUI framework, Eio (structured concurrency), Yojson.Safe, cmdliner (003-sandbox-mode)
 - JSON files (group registry, wallet files, service registry), systemd env files (003-sandbox-mode)
+- OCaml 5.3.0 / Dune 3.20.2 + Miaou (`miaou_widgets_input`: Button_widget, Radio_button_widget; (003-sandbox-mode)
+- N/A — no new storage; existing JSON/systemd state unchanged (003-sandbox-mode)
 
 ## Recent Changes
 - 001-keys-wallet-manager: Added OCaml 5 / Dune 3.15+ + Miaou TUI framework (widgets: Pane_layout, List_widget, Description_list, Box_widget, Select_widget, Validated_textbox_widget, Tabs_widget, Qr_code_widget, Spinner_widget, Toast_widget, Modal_manager, Focus_ring)
