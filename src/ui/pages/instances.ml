@@ -475,10 +475,14 @@ Press **Enter** to open instance menu.|}
               (get_recent_failure ~instance:st.service.Service.instance)
       in
       let hint_short, hint_long =
-        if s.selected < services_start_idx then
+        if s.selected < menu_item_count then
           ( "Enter: Open  G: Groups  K: Wallets  ?: Help",
             "Enter: Open  G: Group actions  K: Wallets  d: Diagnostics  t: \
              Topology  Space: Refresh  ?: Help" )
+        else if s.selected = menu_item_count then
+          ( "←/→: Switch view  g: Toggle view  K: Wallets  ?: Help",
+            "←/h: By Role  →/l: By Group  g: Toggle view  K: Wallets  d: \
+             Diagnostics  ?: Help" )
         else if has_failure_at_selected () then
           ( "Enter: Actions  Tab: Fold  x: Dismiss  K: Wallets  ?: Help",
             "Enter: Actions  Tab: Fold/unfold  x: Clear failure  G: Group \
