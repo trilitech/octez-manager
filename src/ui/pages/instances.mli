@@ -11,7 +11,15 @@ val name : string
 (** Register this page with the global page registry. *)
 val register : unit -> unit
 
-module Page : Miaou.Core.Tui_page.PAGE_SIG
+type state = Instances_state.state
+
+type pstate = Instances_state.pstate
+
+module Page :
+  Miaou.Core.Tui_page.PAGE_SIG
+    with type state = state
+     and type msg = Instances_state.msg
+     and type pstate = pstate
 
 (** Functions exposed for testing. *)
 module For_tests : sig
@@ -19,4 +27,8 @@ module For_tests : sig
       Handles menu items, separator skipping, single-column linear navigation,
       and multi-column column-constrained navigation. *)
   val move_selection : Instances_state.state -> int -> Instances_state.state
+
+  (** Open the inline create-instance dropdown.
+      Returns an updated pstate with [create_menu_open = true]. *)
+  val open_create_menu : pstate -> pstate
 end
