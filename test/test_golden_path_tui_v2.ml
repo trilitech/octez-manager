@@ -218,12 +218,12 @@ let golden_path_script =
         "Resize to single-column (60x80) for predictable navigation. Use Home \
          to reset selection to 0, then j keys (not Down, which the headless \
          driver routes to P.move, a no-op on instances) to reach \
-         node-shadownet (selected=5, skipping radio-row+separator at indices \
-         3-4).";
+         node-shadownet (selected=5). Path: 0->1->2->3(radio row)->5(skip sep \
+         at 4). Requires 4 j presses.";
       Resize (60, 80);
       Key "Home";
     ]
-  @ keys_j 3
+  @ keys_j 4
   @ [
       Comment "Open action modal for node-shadownet";
       Key "Enter";
