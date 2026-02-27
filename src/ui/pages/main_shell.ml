@@ -5,7 +5,6 @@
 (*                                                                            *)
 (******************************************************************************)
 
-module Tabs_widget = Miaou_widgets_navigation.Tabs_widget
 module Navigation = Miaou.Core.Navigation
 module Keys = Miaou.Core.Keys
 
@@ -16,6 +15,10 @@ let tab_instances = Instances.name
 
 let tab_wallets = Wallets_page.name
 
+let tab_binaries = Binaries.name
+
+let tab_rpcs = Rpc_node_selection.name
+
 let tab_diagnostics = Diagnostics.name
 
 let tab_topology = Topology_page.name
@@ -23,9 +26,11 @@ let tab_topology = Topology_page.name
 let tab_sandbox = Sandbox_page.name
 
 type state = {
-  tabs : Tabs_widget.t;
+  tabs : Responsive_tabs_widget.t;
   instances_ps : Instances.Page.pstate;
   wallets_ps : Wallets_page.Page.pstate;
+  binaries_ps : Binaries.Page.pstate;
+  rpc_ps : Rpc_node_selection.Page.pstate;
   diagnostics_ps : Diagnostics.Page.pstate;
   topology_ps : Topology_page.Page.pstate;
   sandbox_ps : Sandbox_page.Page.pstate;
@@ -36,13 +41,25 @@ type msg = unit
 type pstate = state Navigation.t
 
 let initial_tabs =
-  Tabs_widget.make
+  Responsive_tabs_widget.make
     [
-      Tabs_widget.tab ~id:tab_instances ~label:"1 Instances";
-      Tabs_widget.tab ~id:tab_wallets ~label:"2 Wallets";
-      Tabs_widget.tab ~id:tab_diagnostics ~label:"3 Diagnostics";
-      Tabs_widget.tab ~id:tab_topology ~label:"4 Topology";
-      Tabs_widget.tab ~id:tab_sandbox ~label:"5 Sandboxes";
+      Responsive_tabs_widget.tab
+        ~id:tab_instances
+        ~labels:["1 Instances"; "1 Inst"];
+      Responsive_tabs_widget.tab ~id:tab_wallets ~labels:["2 Wallets"; "2 Wall"];
+      Responsive_tabs_widget.tab
+        ~id:tab_binaries
+        ~labels:["3 Binaries"; "3 Bins"];
+      Responsive_tabs_widget.tab ~id:tab_rpcs ~labels:["4 RPCs"];
+      Responsive_tabs_widget.tab
+        ~id:tab_sandbox
+        ~labels:["5 Sandboxes"; "5 Sand"];
+      Responsive_tabs_widget.tab
+        ~id:tab_diagnostics
+        ~labels:["6 Diagnostics"; "6 Diag"];
+      Responsive_tabs_widget.tab
+        ~id:tab_topology
+        ~labels:["7 Topology"; "7 Topo"];
     ]
 
 let init () =
@@ -51,6 +68,8 @@ let init () =
       tabs = initial_tabs;
       instances_ps = Instances.Page.init ();
       wallets_ps = Wallets_page.Page.init ();
+      binaries_ps = Binaries.Page.init ();
+      rpc_ps = Rpc_node_selection.Page.init ();
       diagnostics_ps = Diagnostics.Page.init ();
       topology_ps = Topology_page.Page.init ();
       sandbox_ps = Sandbox_page.Page.init ();
@@ -61,6 +80,8 @@ let update ps _ = ps
 let tab_id_of_context_tab = function
   | Context.Tab_instances -> tab_instances
   | Context.Tab_wallets -> tab_wallets
+  | Context.Tab_binaries -> tab_binaries
+  | Context.Tab_rpcs -> tab_rpcs
   | Context.Tab_diagnostics -> tab_diagnostics
   | Context.Tab_topology -> tab_topology
   | Context.Tab_sandboxes -> tab_sandbox
@@ -68,6 +89,8 @@ let tab_id_of_context_tab = function
 let is_tab_target t =
   String.equal t tab_instances
   || String.equal t tab_wallets
+  || String.equal t tab_binaries
+  || String.equal t tab_rpcs
   || String.equal t tab_diagnostics
   || String.equal t tab_topology
   || String.equal t tab_sandbox
@@ -77,7 +100,7 @@ let is_tab_target t =
 let route_nav ~shell_ps ~shell_s target =
   let ps = {shell_ps with Navigation.s = shell_s} in
   if is_tab_target target then
-    let tabs' = Tabs_widget.select shell_s.tabs ~id:target in
+    let tabs' = Responsive_tabs_widget.select shell_s.tabs ~id:target in
     {ps with Navigation.s = {shell_s with tabs = tabs'}}
   else Navigation.goto target ps
 
@@ -92,13 +115,14 @@ let apply_sub_nav ~shell_ps ~shell_s nav_result =
   | Some (Navigation.Goto target) -> route_nav ~shell_ps:ps ~shell_s target
 
 let current_tab_id s =
-  match Tabs_widget.current s.tabs with
+  match Responsive_tabs_widget.current s.tabs with
   | None -> ""
-  | Some tab -> Tabs_widget.id tab
+  | Some tab -> tab.Responsive_tabs_widget.id
 
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
-  let tab_bar = Tabs_widget.render s.tabs ~focus in
+  let cols = size.LTerm_geom.cols in
+  let tab_bar = Responsive_tabs_widget.render s.tabs ~focus ~cols in
   let tab_bar_size = {size with LTerm_geom.rows = 1} in
   let tab_bar_themed =
     Themed_page.apply_themed_background ~size:tab_bar_size tab_bar
@@ -111,6 +135,10 @@ let view ps ~focus ~size =
         Instances.Page.view s.instances_ps ~focus ~size:content_size
     | id when String.equal id tab_wallets ->
         Wallets_page.Page.view s.wallets_ps ~focus ~size:content_size
+    | id when String.equal id tab_binaries ->
+        Binaries.Page.view s.binaries_ps ~focus ~size:content_size
+    | id when String.equal id tab_rpcs ->
+        Rpc_node_selection.Page.view s.rpc_ps ~focus ~size:content_size
     | id when String.equal id tab_diagnostics ->
         Diagnostics.Page.view s.diagnostics_ps ~focus ~size:content_size
     | id when String.equal id tab_topology ->
@@ -129,7 +157,7 @@ let refresh ps =
     | None -> s
     | Some ctx_tab ->
         let id = tab_id_of_context_tab ctx_tab in
-        {s with tabs = Tabs_widget.select s.tabs ~id}
+        {s with tabs = Responsive_tabs_widget.select s.tabs ~id}
   in
   let ps = {ps with Navigation.s} in
   let s = ps.Navigation.s in
@@ -144,6 +172,14 @@ let refresh ps =
     let wp' = Wallets_page.Page.refresh s.wallets_ps in
     let shell_s = {s with wallets_ps = Navigation.make wp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending wp')
+  else if String.equal tab tab_binaries then
+    let bp' = Binaries.Page.refresh s.binaries_ps in
+    let shell_s = {s with binaries_ps = Navigation.make bp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending bp')
+  else if String.equal tab tab_rpcs then
+    let rp' = Rpc_node_selection.Page.refresh s.rpc_ps in
+    let shell_s = {s with rpc_ps = Navigation.make rp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
   else if String.equal tab tab_diagnostics then
     let dp' = Diagnostics.Page.refresh s.diagnostics_ps in
     let shell_s = {s with diagnostics_ps = Navigation.make dp'.Navigation.s} in
@@ -169,6 +205,14 @@ let dispatch_key ps key ~size =
     let wp' = Wallets_page.Page.handle_key s.wallets_ps key ~size in
     let shell_s = {s with wallets_ps = Navigation.make wp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending wp')
+  else if String.equal tab tab_binaries then
+    let bp' = Binaries.Page.handle_key s.binaries_ps key ~size in
+    let shell_s = {s with binaries_ps = Navigation.make bp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending bp')
+  else if String.equal tab tab_rpcs then
+    let rp' = Rpc_node_selection.Page.handle_key s.rpc_ps key ~size in
+    let shell_s = {s with rpc_ps = Navigation.make rp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
   else if String.equal tab tab_diagnostics then
     let dp' = Diagnostics.Page.handle_key s.diagnostics_ps key ~size in
     let shell_s = {s with diagnostics_ps = Navigation.make dp'.Navigation.s} in
@@ -194,6 +238,14 @@ let dispatch_modal_key ps key ~size =
     let wp' = Wallets_page.Page.handle_modal_key s.wallets_ps key ~size in
     let shell_s = {s with wallets_ps = Navigation.make wp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending wp')
+  else if String.equal tab tab_binaries then
+    let bp' = Binaries.Page.handle_modal_key s.binaries_ps key ~size in
+    let shell_s = {s with binaries_ps = Navigation.make bp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending bp')
+  else if String.equal tab tab_rpcs then
+    let rp' = Rpc_node_selection.Page.handle_modal_key s.rpc_ps key ~size in
+    let shell_s = {s with rpc_ps = Navigation.make rp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
   else if String.equal tab tab_diagnostics then
     let dp' = Diagnostics.Page.handle_modal_key s.diagnostics_ps key ~size in
     let shell_s = {s with diagnostics_ps = Navigation.make dp'.Navigation.s} in
@@ -212,7 +264,16 @@ let dispatch_modal_key ps key ~size =
 
 let switch_tab ps id =
   let s = ps.Navigation.s in
-  {ps with Navigation.s = {s with tabs = Tabs_widget.select s.tabs ~id}}
+  {
+    ps with
+    Navigation.s = {s with tabs = Responsive_tabs_widget.select s.tabs ~id};
+  }
+
+(** Open the create-instance dropdown on the instances tab. *)
+let open_instances_create_menu ps =
+  let s = ps.Navigation.s in
+  let instances_ps = Instances.For_tests.open_create_menu s.instances_ps in
+  {ps with Navigation.s = {s with instances_ps}}
 
 let handle_key ps key ~size =
   if Miaou.Core.Modal_manager.has_active () then dispatch_modal_key ps key ~size
@@ -220,12 +281,20 @@ let handle_key ps key ~size =
     match Global_shortcuts.handle key with
     | Global_shortcuts.Handled -> ps
     | Global_shortcuts.NotGlobal -> (
+        let s = ps.Navigation.s in
+        let current = current_tab_id s in
         match key with
-        | "1" -> switch_tab ps tab_instances
+        | "1" ->
+            if String.equal current tab_instances then
+              (* Pressing current tab number triggers create menu *)
+              open_instances_create_menu ps
+            else switch_tab ps tab_instances
         | "2" -> switch_tab ps tab_wallets
-        | "3" -> switch_tab ps tab_diagnostics
-        | "4" -> switch_tab ps tab_topology
+        | "3" -> switch_tab ps tab_binaries
+        | "4" -> switch_tab ps tab_rpcs
         | "5" -> switch_tab ps tab_sandbox
+        | "6" -> switch_tab ps tab_diagnostics
+        | "7" -> switch_tab ps tab_topology
         | _ -> dispatch_key ps key ~size)
 
 let handle_modal_key ps key ~size = dispatch_modal_key ps key ~size
