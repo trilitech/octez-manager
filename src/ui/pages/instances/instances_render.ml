@@ -13,7 +13,6 @@ module Grid = Miaou_widgets_layout.Grid_layout
 module Box = Miaou_widgets_layout.Box_widget
 module Metrics = Rpc_metrics
 module Style_context = Miaou_style.Style_context
-module Button_widget = Miaou_widgets_input.Button_widget
 module Radio_button_widget = Miaou_widgets_input.Radio_button_widget
 open Octez_manager_lib
 open Instances_state
@@ -828,32 +827,61 @@ let render_external_service ~selected_idx ~current_idx ~folded
 let render_external_services_section state =
   if state.external_services = [] then []
   else
-    let header = Widgets.themed_emphasis "Unmanaged Instances" in
-    (* Calculate base index for external services (after menu and managed services) *)
-    let external_start_idx = services_start_idx + List.length state.services in
-    let service_lines =
-      List.mapi
-        (fun idx ext ->
-          let current_idx = external_start_idx + idx in
-          let is_folded =
-            StringSet.mem
-              ext.External_service.suggested_instance_name
-              state.external_folded
-          in
-          let lines =
-            render_external_service
-              ~selected_idx:state.selected
-              ~current_idx
-              ~folded:is_folded
-              ext
-          in
-          lines)
-        state.external_services
-      |> List.concat
-    in
-    header :: service_lines
+    let n = List.length state.external_services in
+    if state.external_section_folded then
+      (* Collapsed: single header line showing count and fold indicator *)
+      let header =
+        Widgets.themed_emphasis
+          (Printf.sprintf "+ Unmanaged Instances (%d)  [u: expand]" n)
+      in
+      [header]
+    else
+      let header =
+        Widgets.themed_emphasis (Printf.sprintf "− Unmanaged Instances (%d)" n)
+      in
+      (* Calculate base index for external services (after menu and managed services) *)
+      let external_start_idx =
+        services_start_idx + List.length state.services
+      in
+      let service_lines =
+        List.mapi
+          (fun idx ext ->
+            let current_idx = external_start_idx + idx in
+            let is_folded =
+              StringSet.mem
+                ext.External_service.suggested_instance_name
+                state.external_folded
+            in
+            let lines =
+              render_external_service
+                ~selected_idx:state.selected
+                ~current_idx
+                ~folded:is_folded
+                ext
+            in
+            lines)
+          state.external_services
+        |> List.concat
+      in
+      header :: service_lines
 
-(** Render the view-mode radio row at index [menu_item_count].
+(** Render the inline create-instance dropdown at the top of the content area.
+    [cursor] is 0-4 for Node/Baker/DAL Node/Accuser/Signatory. *)
+let render_create_dropdown cursor =
+  let items = ["Node"; "Baker"; "DAL Node"; "Accuser"; "Signatory"] in
+  let item_lines =
+    List.mapi
+      (fun i label ->
+        let marker = if Int.equal i cursor then "▶ " else "  " in
+        let line = Printf.sprintf "║ %s%-18s║" marker label in
+        if Int.equal i cursor then Widgets.themed_emphasis line else line)
+      items
+  in
+  let top = "╔══ + New Instance ═════╗" in
+  let bot = "╚═══════════════════════╝" in
+  String.concat "\n" ([top] @ item_lines @ [bot])
+
+(** Render the view-mode radio row at index [menu_item_count] (= 0).
     The focused radio (bold label) is the one matching [view_mode] when the
     row is selected.  Widgets are created fresh from state — not stored. *)
 let radio_row ~selected view_mode =
@@ -878,15 +906,6 @@ let radio_row ~selected view_mode =
 
 (** Single-column layout (original) *)
 let table_lines_single state =
-  let install_row =
-    Button_widget.render state.btn_install ~focus:(state.selected = 0)
-  in
-  let binaries_row =
-    Button_widget.render state.btn_binaries ~focus:(state.selected = 1)
-  in
-  let rpc_row =
-    Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
-  in
   let view_row =
     radio_row ~selected:(state.selected = menu_item_count) state.view_mode
   in
@@ -940,8 +959,7 @@ let table_lines_single state =
       let separator = Widgets.themed_muted (String.make 80 '-') in
       "" :: separator :: external_rows
   in
-  (install_row :: binaries_row :: rpc_row :: view_row :: "" :: instance_rows)
-  @ external_rows
+  (view_row :: "" :: instance_rows) @ external_rows
 
 (** Multi-column matrix layout *)
 let table_lines_matrix ~cols ~visible_height ~column_scroll state =
@@ -968,16 +986,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Reduce available height for columns to make room for external services *)
   let columns_visible_height = max 5 (visible_height - reserved_for_external) in
-  (* Header row (install, binaries, rpcs, view-mode radio) spans full width *)
-  let install_row =
-    Button_widget.render state.btn_install ~focus:(state.selected = 0)
-  in
-  let binaries_row =
-    Button_widget.render state.btn_binaries ~focus:(state.selected = 1)
-  in
-  let rpc_row =
-    Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
-  in
+  (* Header row (view-mode radio) spans full width *)
   let view_row =
     radio_row ~selected:(state.selected = menu_item_count) state.view_mode
   in
@@ -1006,10 +1015,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
     trim_end instance_rows
   in
   (* Append external services below the columnar grid *)
-  let result =
-    install_row :: binaries_row :: rpc_row :: view_row :: ""
-    :: instance_rows_trimmed
-  in
+  let result = view_row :: "" :: instance_rows_trimmed in
   if external_line_count > 0 then
     let separator = Widgets.themed_muted (String.make (min cols 120) '-') in
     result @ [""; separator] @ external_lines
@@ -1022,15 +1028,6 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
     calc_num_columns ~cols ~min_column_width ~column_separator
   in
   if state.services = [] then
-    let install_row =
-      Button_widget.render state.btn_install ~focus:(state.selected = 0)
-    in
-    let binaries_row =
-      Button_widget.render state.btn_binaries ~focus:(state.selected = 1)
-    in
-    let rpc_row =
-      Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
-    in
     let view_row =
       radio_row ~selected:(state.selected = menu_item_count) state.view_mode
     in
@@ -1038,8 +1035,7 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
     let external_rows =
       if external_rows = [] then [] else "" :: external_rows
     in
-    install_row :: binaries_row :: rpc_row :: view_row :: ""
-    :: "  No managed instances." :: external_rows
+    view_row :: "" :: "  No managed instances." :: external_rows
   else if num_columns <= 1 then table_lines_single state
   else
     (* For matrix layout, subtract for menu rows (install + separator) *)

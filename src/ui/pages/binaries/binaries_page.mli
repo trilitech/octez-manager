@@ -66,6 +66,10 @@ val register : unit -> unit
 module Page_Impl :
   Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg
 
+(** Full page module (themed wrapper around [Page_Impl]). *)
+module Page :
+  Miaou.Core.Tui_page.PAGE_SIG with type state = state and type msg = msg
+
 (** Testing interface exposing internal helpers. *)
 module For_tests : sig
   (** Filter a version list to keep only the [n] latest major version families. *)
