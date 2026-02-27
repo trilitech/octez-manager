@@ -145,6 +145,11 @@ jobs:
           echo "Checking copyright headers..."
           ./scripts/check-copyright.sh
 
+      - name: Check no direct TzKT URL literals
+        run: |
+          echo "Checking for direct TzKT URL literals outside indexer module..."
+          ./scripts/check-direct-tzkt.sh
+
       - name: Build
         run: |
           eval $(opam env)

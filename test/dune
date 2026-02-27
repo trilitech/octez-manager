@@ -1,4 +1,11 @@
 (test
+ (name test_indexer)
+ (libraries alcotest octez_manager_common)
+ (modules test_indexer)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name unit_tests)
  (libraries
   alcotest
