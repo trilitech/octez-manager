@@ -461,17 +461,45 @@ Press **Enter** to open instance menu.|}
 
   let view ps ~focus:_ ~size =
     let s = ps.Navigation.s in
-    (* Set contextual help hint based on selection *)
-    (match current_service s with
-    | Some st when st.service.Service.role = "node" ->
-        Miaou.Core.Help_hint.set (Some node_help_hint)
-    | Some st when st.service.Service.role = "baker" ->
-        Miaou.Core.Help_hint.set (Some baker_help_hint)
-    | Some st when st.service.Service.role = "dal-node" ->
-        Miaou.Core.Help_hint.set (Some dal_help_hint)
-    | Some st when st.service.Service.role = "accuser" ->
-        Miaou.Core.Help_hint.set (Some accuser_help_hint)
-    | _ -> Miaou.Core.Help_hint.set (Some "Press Enter to select, ? for help")) ;
+    (* Set zone-conditional help hints.  Skipped while a modal is active
+       because modals manage their own hints via push/pop. *)
+    if not (Miaou.Core.Modal_manager.has_active ()) then (
+      let has_failure_at_selected () =
+        match current_service s with
+        | None -> false
+        | Some st ->
+            Option.is_some
+              (get_recent_failure ~instance:st.service.Service.instance)
+      in
+      let hint_short, hint_long =
+        if s.selected < services_start_idx then
+          ( "Enter: Open  G: Groups  K: Wallets  ?: Help",
+            "Enter: Open  G: Group actions  K: Wallets  d: Diagnostics  t: \
+             Topology  Space: Refresh  ?: Help" )
+        else if has_failure_at_selected () then
+          ( "Enter: Actions  Tab: Fold  x: Dismiss  K: Wallets  ?: Help",
+            "Enter: Actions  Tab: Fold/unfold  x: Clear failure  G: Group \
+             actions  K: Wallets  ?: Help" )
+        else
+          let long_hint =
+            match current_service s with
+            | Some st when String.equal st.service.Service.role "node" ->
+                node_help_hint
+            | Some st when String.equal st.service.Service.role "baker" ->
+                baker_help_hint
+            | Some st when String.equal st.service.Service.role "dal-node" ->
+                dal_help_hint
+            | Some st when String.equal st.service.Service.role "accuser" ->
+                accuser_help_hint
+            | _ ->
+                "Enter: Actions  Tab: Fold/unfold  G: Group actions  K: \
+                 Wallets  d: Diagnostics  ?: Help"
+          in
+          ( "Enter: Actions  Tab: Fold  G: Groups  K: Wallets  ?: Help",
+            long_hint )
+      in
+      Miaou.Core.Help_hint.clear () ;
+      Miaou.Core.Help_hint.push ~short:hint_short ~long:hint_long ()) ;
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
     Context.tick_toasts () ;
@@ -527,52 +555,6 @@ Press **Enter** to open instance menu.|}
     let header_lines = header s in
     let header_block = String.concat "\n" header_lines in
     let separator = Widgets.themed_border (Widgets.hr ~width:cols ()) in
-    let footer_pairs =
-      [
-        ("Enter", "Open");
-        ("c", "Create");
-        ("g", "Group/Role");
-        ("G", "Group actions");
-        ("K", "Keys");
-        ("d", "Diagnostics");
-        ("t", "Topology");
-        ("b", "Binaries");
-        ("r", "RPC Browser");
-        ("x", "Clear failure");
-        ("?", "Help");
-      ]
-    in
-    let footer_segments =
-      List.map
-        (fun (k, v) ->
-          Widgets.themed_secondary (k ^ ": ") ^ Widgets.themed_text v)
-        footer_pairs
-    in
-    let footer_lines =
-      let space = "    " in
-      let lines = ref [] in
-      let current = ref "" in
-      let add_line () =
-        if !current <> "" then (
-          lines := !current :: !lines ;
-          current := "")
-      in
-      List.iter
-        (fun seg ->
-          if !current = "" then current := seg
-          else
-            let candidate = !current ^ space ^ seg in
-            if Widgets.visible_chars_count candidate > cols then (
-              add_line () ;
-              current := seg)
-            else current := candidate)
-        footer_segments ;
-      add_line () ;
-      let max_lines = 2 in
-      let lines = List.rev !lines in
-      if List.length lines <= max_lines then lines else take max_lines lines
-    in
-    let footer_block = String.concat "\n" footer_lines in
     let render_body ~size:inner_size =
       (* Available rows for content (reserve space for progress/toasts/logs) *)
       let progress_lines =
@@ -749,12 +731,6 @@ Press **Enter** to open instance menu.|}
           };
           {render = (fun ~size:_ -> separator); basis = Flex.Px 1; cross = None};
           {render = render_body; basis = Flex.Fill; cross = None};
-          {render = (fun ~size:_ -> separator); basis = Flex.Px 1; cross = None};
-          {
-            render = (fun ~size:_ -> footer_block);
-            basis = Flex.Px (List.length footer_lines);
-            cross = None;
-          };
         ]
     in
     let rendered = Flex.render layout ~size in
