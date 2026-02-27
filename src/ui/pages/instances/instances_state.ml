@@ -31,11 +31,11 @@ let get_recent_failure ~instance =
       None
   | None -> None
 
-(** Number of button menu items before services (Install, Binaries, RPCs) *)
-let menu_item_count = 3
+(** Number of button menu items before services (none after UI revamp) *)
+let menu_item_count = 0
 
-(** Index where services start (after buttons + radio row + separator).
-    Layout: 0-2 buttons, 3 radio row, 4 separator, 5+ services. *)
+(** Index where services start (after radio row + separator).
+    Layout: 0 radio row, 1 separator, 2+ services. *)
 let services_start_idx = menu_item_count + 2
 
 type state = {
@@ -44,6 +44,8 @@ type state = {
   selected : int;
   folded : StringSet.t; (* managed instance names that are folded *)
   external_folded : StringSet.t; (* external instance names that are folded *)
+  external_section_folded : bool;
+      (* when true, Unmanaged section collapses to a single header line *)
   last_updated : float;
   (* Matrix layout state *)
   num_columns : int; (* number of columns based on terminal width *)
@@ -51,10 +53,9 @@ type state = {
   column_scroll : int array; (* scroll offset per column *)
   view_mode : view_mode;
   groups : Octez_manager_lib.Group.t list;
-  (* Action buttons for the top button bar *)
-  btn_install : Miaou_widgets_input.Button_widget.t;
-  btn_binaries : Miaou_widgets_input.Button_widget.t;
-  btn_rpcs : Miaou_widgets_input.Button_widget.t;
+  (* Inline create-instance dropdown *)
+  create_menu_open : bool;
+  create_menu_cursor : int; (* 0-4: Node, Baker, DAL Node, Accuser, Signatory *)
 }
 
 type msg = unit
