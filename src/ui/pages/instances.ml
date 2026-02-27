@@ -12,7 +12,6 @@ module Metrics = Rpc_metrics
 module Navigation = Miaou.Core.Navigation
 module Style = Miaou_style.Style
 module Style_context = Miaou_style.Style_context
-module Button_widget = Miaou_widgets_input.Button_widget
 open Octez_manager_lib
 open Rresult
 
@@ -55,6 +54,7 @@ let init_state () =
       selected = 0;
       folded = all_folded;
       external_folded = all_external_folded;
+      external_section_folded = true;
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
@@ -62,21 +62,8 @@ let init_state () =
       (* max practical columns based on terminal width; 10 is a safe upper bound *)
       view_mode;
       groups;
-      btn_install =
-        Button_widget.create
-          ~label:"Install new instance"
-          ~on_click:Instances_actions.open_create_menu
-          ();
-      btn_binaries =
-        Button_widget.create
-          ~label:"Manage binaries"
-          ~on_click:(fun () -> Context.navigate Binaries.name)
-          ();
-      btn_rpcs =
-        Button_widget.create
-          ~label:"Browse RPCs"
-          ~on_click:(fun () -> Context.navigate Rpc_node_selection.name)
-          ();
+      create_menu_open = false;
+      create_menu_cursor = 0;
     }
 
 let force_refresh state =
@@ -85,7 +72,27 @@ let force_refresh state =
   let services = load_services_fresh () in
   let external_services = External_services_scheduler.get () in
   let groups = load_groups () in
-  let selected = clamp_selection services external_services state.selected in
+  let ext_for_clamp =
+    if state.external_section_folded then [] else external_services
+  in
+  let selected = clamp_selection services ext_for_clamp state.selected in
+  (* Auto-fold newly discovered external services (not seen in previous state).
+     Services already known keep their user-set fold state unchanged. *)
+  let prev_names =
+    List.fold_left
+      (fun acc (ext : External_service.t) ->
+        StringSet.add ext.suggested_instance_name acc)
+      StringSet.empty
+      state.external_services
+  in
+  let external_folded =
+    List.fold_left
+      (fun acc (ext : External_service.t) ->
+        let name = ext.suggested_instance_name in
+        if StringSet.mem name prev_names then acc else StringSet.add name acc)
+      state.external_folded
+      external_services
+  in
   let state =
     {
       state with
@@ -94,6 +101,7 @@ let force_refresh state =
       groups;
       selected;
       last_updated = Unix.gettimeofday ();
+      external_folded;
     }
   in
   ensure_valid_column state
@@ -164,8 +172,9 @@ open Instances_actions
     Layout: 0-2 = buttons, 3 = radio row (navigable), 4 = separator (skipped),
     5+ = services. *)
 let move_selection_single_column s delta =
+  let ext = if s.external_section_folded then [] else s.external_services in
   let raw = s.selected + delta in
-  let selected = clamp_selection s.services s.external_services raw in
+  let selected = clamp_selection s.services ext raw in
   (* Skip only the separator (index menu_item_count+1 = 4); the radio row (3) is navigable *)
   let sep_idx = menu_item_count + 1 in
   let selected =
@@ -173,7 +182,7 @@ let move_selection_single_column s delta =
       if delta > 0 then services_start_idx else menu_item_count
     else selected
   in
-  let selected = clamp_selection s.services s.external_services selected in
+  let selected = clamp_selection s.services ext selected in
   {s with selected}
 
 (** Multi-column: navigate within the menu area (indices 0..menu_item_count).
@@ -217,8 +226,9 @@ let move_selection_external s delta =
       {s with selected = last_managed}
     else {s with selected = menu_item_count}
   else
+    let ext = if s.external_section_folded then [] else s.external_services in
     let raw = s.selected + delta in
-    let selected = clamp_selection s.services s.external_services raw in
+    let selected = clamp_selection s.services ext raw in
     {s with selected}
 
 (** Multi-column: navigate within managed services, constrained to the
@@ -282,6 +292,11 @@ let move_selection s delta =
 
 module For_tests = struct
   let move_selection = move_selection
+
+  let open_create_menu ps =
+    Navigation.update
+      (fun s -> {s with create_menu_open = true; create_menu_cursor = 0})
+      ps
 end
 
 module Page_Impl :
@@ -307,24 +322,10 @@ struct
 
   let service_cycle ps _ = refresh ps
 
-  let back ps =
-    (* Instances is the home page - back/Esc should quit the TUI. *)
-    Navigation.quit ps
+  let back ps = Navigation.back ps
 
   let handled_keys () =
-    Miaou.Core.Keys.
-      [
-        Enter;
-        Char "b";
-        Char "c";
-        Char "g";
-        Char "G";
-        Char "r";
-        Char "R";
-        Char "d";
-        Char "t";
-        Char "x";
-      ]
+    Miaou.Core.Keys.[Enter; Char "g"; Char "G"; Char "d"; Char "t"; Char "x"]
 
   let keymap _ps =
     let noop ps = ps in
@@ -333,12 +334,9 @@ struct
     in
     [
       kb "Enter" "Open";
-      kb "c" "Create";
       kb "g" "Group/Role view";
       kb "G" "Group actions";
       kb "d" "Diagnostics";
-      kb "b" "Binaries";
-      kb "r" "RPC Browser";
       kb "x" "Clear failure";
       kb "?" "Help";
     ]
@@ -348,16 +346,11 @@ struct
       if Paths.is_root () then Widgets.themed_error "● SYSTEM"
       else Widgets.themed_success "● USER"
     in
-    let hint =
-      "Hint: c create · g group/role · b binaries · K keys · d diagnostics · t \
-       topology · r rpc · ? help"
-    in
     [
       Printf.sprintf
-        "%s   %s    %s"
+        "%s   %s"
         (Widgets.themed_primary " octez-manager ")
-        privilege
-        (Widgets.themed_secondary hint);
+        privilege;
       Widgets.themed_secondary (summary_line s);
     ]
 
@@ -475,14 +468,13 @@ Press **Enter** to open instance menu.|}
               (get_recent_failure ~instance:st.service.Service.instance)
       in
       let hint_short, hint_long =
-        if s.selected < menu_item_count then
-          ( "Enter: Open  G: Groups  K: Wallets  ?: Help",
-            "Enter: Open  G: Group actions  K: Wallets  d: Diagnostics  t: \
-             Topology  Space: Refresh  ?: Help" )
+        if s.create_menu_open then
+          ( "↑↓: select  ·  Enter: open  ·  Esc: cancel",
+            "↑↓: select  ·  Enter: open install form  ·  Esc: cancel" )
         else if s.selected = menu_item_count then
-          ( "←/→: Switch view  g: Toggle view  K: Wallets  ?: Help",
-            "←/h: By Role  →/l: By Group  g: Toggle view  K: Wallets  d: \
-             Diagnostics  ?: Help" )
+          ( "1: ⊕ new  ·  ←/→: Switch view  g: Toggle  K: Wallets  ?: Help",
+            "1: new instance  ←/h: By Role  →/l: By Group  g: Toggle view  K: \
+             Wallets  d: Diagnostics  ?: Help" )
         else if has_failure_at_selected () then
           ( "Enter: Actions  Tab: Fold  x: Dismiss  K: Wallets  ?: Help",
             "Enter: Actions  Tab: Fold/unfold  x: Clear failure  G: Group \
@@ -502,8 +494,15 @@ Press **Enter** to open instance menu.|}
                 "Enter: Actions  Tab: Fold/unfold  G: Group actions  K: \
                  Wallets  d: Diagnostics  ?: Help"
           in
-          ( "Enter: Actions  Tab: Fold  G: Groups  K: Wallets  ?: Help",
-            long_hint )
+          let unmanaged_hint =
+            if s.external_services <> [] then
+              if s.external_section_folded then "  u: Show unmanaged"
+              else "  u: Hide unmanaged"
+            else ""
+          in
+          ( "Enter: Actions  Tab: Fold  G: Groups  K: Wallets  ?: Help"
+            ^ unmanaged_hint,
+            long_hint ^ unmanaged_hint )
       in
       Miaou.Core.Help_hint.clear () ;
       Miaou.Core.Help_hint.push ~short:hint_short ~long:hint_long ()) ;
@@ -591,6 +590,11 @@ Press **Enter** to open instance menu.|}
         let table = table_lines ~cols ~visible_height:avail_rows s in
         let body = String.concat "\n" table in
         let body =
+          if s.create_menu_open then
+            render_create_dropdown s.create_menu_cursor ^ "\n" ^ body
+          else body
+        in
+        let body =
           if String.trim progress = "" then body else progress ^ "\n" ^ body
         in
         let body = if job_logs = "" then body else body ^ job_logs in
@@ -599,18 +603,26 @@ Press **Enter** to open instance menu.|}
       else
         (* Single column: use global scrolling *)
         let table = table_lines ~cols ~visible_height:avail_rows s in
+        let dropdown_lines =
+          if s.create_menu_open then
+            String.split_on_char
+              '\n'
+              (render_create_dropdown s.create_menu_cursor)
+          else []
+        in
         let all_lines =
-          List.concat_map (fun s -> String.split_on_char '\n' s) table
+          dropdown_lines
+          @ List.concat_map (fun s -> String.split_on_char '\n' s) table
         in
         let total_lines = List.length all_lines in
         (* Calculate line index where current selection starts.
            s.selected meanings:
-             0 -> install menu
+             0 -> radio row (view mode)
              1 -> separator (skipped in navigation)
              2+ -> service at index (s.selected - services_start_idx)
 
            Table structure from table_lines_single:
-             [install; ""; ...instance_rows...]
+             [view_row; ""; ...instance_rows...]
            where instance_rows = headers interleaved with services.
 
            We need to find where the selected item starts in all_lines.
@@ -857,6 +869,18 @@ Press **Enter** to open instance menu.|}
           selected = target_idx + services_start_idx;
         }
 
+  let create_menu_items =
+    [|"Node"; "Baker"; "DAL Node"; "Accuser"; "Signatory"|]
+
+  let navigate_create_item cursor =
+    match cursor with
+    | 0 -> Context.navigate Install_node_form_v3.name
+    | 1 -> Context.navigate Install_baker_form_v3.name
+    | 2 -> Context.navigate Install_dal_node_form_v3.name
+    | 3 -> Context.navigate Install_accuser_form_v3.name
+    | 4 -> Context.navigate Install_signatory_form.name
+    | _ -> ()
+
   let handle_key ps key ~size =
     let s = ps.Navigation.s in
     (* Update num_columns based on current terminal size *)
@@ -869,6 +893,32 @@ Press **Enter** to open instance menu.|}
     if Miaou.Core.Modal_manager.has_active () then (
       Miaou.Core.Modal_manager.handle_key key ;
       check_navigation ps)
+    else if s.create_menu_open then
+      (* Create dropdown is open: handle its navigation *)
+      let max_cursor = Array.length create_menu_items - 1 in
+      let ps =
+        match Keys.of_string key with
+        | Some Keys.Up | Some (Keys.Char "k") ->
+            Navigation.update
+              (fun s ->
+                {s with create_menu_cursor = max 0 (s.create_menu_cursor - 1)})
+              ps
+        | Some Keys.Down | Some (Keys.Char "j") ->
+            Navigation.update
+              (fun s ->
+                {
+                  s with
+                  create_menu_cursor = min max_cursor (s.create_menu_cursor + 1);
+                })
+              ps
+        | Some Keys.Enter ->
+            navigate_create_item s.create_menu_cursor ;
+            Navigation.update (fun s -> {s with create_menu_open = false}) ps
+        | Some Keys.Escape ->
+            Navigation.update (fun s -> {s with create_menu_open = false}) ps
+        | _ -> ps
+      in
+      check_navigation ps
     else if is_quit_key key then back ps
     else
       let ps =
@@ -920,37 +970,38 @@ Press **Enter** to open instance menu.|}
                 {s with view_mode})
               ps
         | Some (Keys.Char "G") -> Navigation.update group_actions_modal ps
-        | Some (Keys.Char "c") -> Navigation.update create_menu_modal ps
-        | Some (Keys.Char "b") -> Navigation.update go_to_binaries ps
+        | Some (Keys.Char "b") ->
+            (* b still works as a shortcut to Binaries tab *)
+            Context.set_pending_tab Context.Tab_binaries ;
+            ps
         | Some (Keys.Char "d") -> Navigation.update go_to_diagnostics ps
         | Some (Keys.Char "t") -> Navigation.update go_to_topology ps
-        | Some (Keys.Char "r") -> Navigation.update go_to_rpc_browser ps
+        | Some (Keys.Char "r") ->
+            (* r still works as a shortcut to RPCs tab *)
+            Context.set_pending_tab Context.Tab_rpcs ;
+            ps
+        | Some (Keys.Char "u") ->
+            (* Toggle the Unmanaged Instances section fold *)
+            Navigation.update
+              (fun s ->
+                if s.external_services = [] then s
+                else
+                  let ext_section_folded = not s.external_section_folded in
+                  (* When folding, clamp cursor away from now-hidden external items *)
+                  let ext =
+                    if ext_section_folded then [] else s.external_services
+                  in
+                  let selected = clamp_selection s.services ext s.selected in
+                  {
+                    s with
+                    external_section_folded = ext_section_folded;
+                    selected;
+                  })
+              ps
         | Some (Keys.Char "x") -> Navigation.update dismiss_failure ps
         | Some (Keys.Char " ") -> Navigation.update force_refresh_cmd ps
-        | Some (Keys.Char "Esc")
-        | Some (Keys.Char "Escape")
-        | Some (Keys.Char "q")
-        | Some (Keys.Char "C-c") ->
-            back ps
-        | _ ->
-            (* Pass unrecognised keys (including mouse clicks) to the focused
-               button so Button_widget can handle click events. *)
-            if s.selected < menu_item_count then
-              Navigation.update
-                (fun s ->
-                  match s.selected with
-                  | 0 ->
-                      let b, _ = Button_widget.on_key s.btn_install ~key in
-                      {s with btn_install = b}
-                  | 1 ->
-                      let b, _ = Button_widget.on_key s.btn_binaries ~key in
-                      {s with btn_binaries = b}
-                  | 2 ->
-                      let b, _ = Button_widget.on_key s.btn_rpcs ~key in
-                      {s with btn_rpcs = b}
-                  | _ -> s)
-                ps
-            else ps
+        | Some (Keys.Char "q") | Some (Keys.Char "C-c") -> back ps
+        | _ -> ps
       in
       (* Keep active_column in sync with selection *)
       let ps =
