@@ -42,7 +42,14 @@ if ! dune build @check 2>&1; then
     exit 1
 fi
 
-# 4. Quick unit tests (skip slow integration tests)
+# 4. Check no direct TzKT URL literals outside Indexer module
+echo "🌐 Checking for direct TzKT URL literals..."
+if ! ./scripts/check-direct-tzkt.sh; then
+    echo "❌ Direct TzKT URL found outside indexer module. Fix before committing."
+    exit 1
+fi
+
+# 5. Quick unit tests (skip slow integration tests)
 echo "🧪 Running quick unit tests..."
 if ! dune runtest --force test/test_common_utils.exe test/test_port_validation.exe 2>&1; then
     echo "⚠️  Some tests failed, but allowing commit (full CI will catch issues)"

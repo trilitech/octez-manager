@@ -1,0 +1,11 @@
+; Lint rule: no direct TzKT URL literals outside the Indexer module.
+; Runs as part of `dune runtest`.
+
+(rule
+ (alias runtest)
+ (deps
+  (source_tree src)
+  (source_tree lib)
+  scripts/check-direct-tzkt.sh)
+ (action
+  (run bash scripts/check-direct-tzkt.sh)))
