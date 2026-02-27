@@ -38,11 +38,11 @@ type pstate = state Navigation.t
 let initial_tabs =
   Tabs_widget.make
     [
-      Tabs_widget.tab ~id:tab_instances ~label:"Instances";
-      Tabs_widget.tab ~id:tab_wallets ~label:"Wallets";
-      Tabs_widget.tab ~id:tab_diagnostics ~label:"Diagnostics";
-      Tabs_widget.tab ~id:tab_topology ~label:"Topology";
-      Tabs_widget.tab ~id:tab_sandbox ~label:"Sandboxes";
+      Tabs_widget.tab ~id:tab_instances ~label:"1 Instances";
+      Tabs_widget.tab ~id:tab_wallets ~label:"2 Wallets";
+      Tabs_widget.tab ~id:tab_diagnostics ~label:"3 Diagnostics";
+      Tabs_widget.tab ~id:tab_topology ~label:"4 Topology";
+      Tabs_widget.tab ~id:tab_sandbox ~label:"5 Sandboxes";
     ]
 
 let init () =
