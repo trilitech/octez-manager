@@ -218,7 +218,8 @@ let golden_path_script =
         "Resize to single-column (60x80) for predictable navigation. Use Home \
          to reset selection to 0, then j keys (not Down, which the headless \
          driver routes to P.move, a no-op on instances) to reach \
-         node-shadownet (selected=4, skipping separator at index 3).";
+         node-shadownet (selected=5, skipping radio-row+separator at indices \
+         3-4).";
       Resize (60, 80);
       Key "Home";
     ]
@@ -294,7 +295,7 @@ let golden_path_script =
   @ [
       Comment "=== Step 8: Remove node from group ===";
       Comment
-        "selected=4 preserved through Steps 6-7, By_role mode. Open action \
+        "selected=5 preserved through Steps 6-7, By_role mode. Open action \
          modal for node-shadownet (now has group).";
       Key "Enter";
       WaitFor [ModalActive; MaxIterations 50];
