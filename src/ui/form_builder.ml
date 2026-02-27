@@ -554,8 +554,9 @@ struct
                 Context.mark_instances_dirty () ;
                 (* Reset form to fresh initial values for next use *)
                 s.model_ref := S.spec.initial_model () ;
-                (* Navigate back to instances page via Context. *)
-                Context.navigate_instances () ;
+                (* Return to the shell; instances tab will refresh via dirty flag *)
+                Context.set_pending_tab Context.Tab_instances ;
+                Context.navigate_back () ;
                 s
             | Error (`Msg msg) ->
                 Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -574,8 +575,9 @@ struct
             Context.mark_instances_dirty () ;
             (* Reset form to fresh initial values for next use *)
             s.model_ref := S.spec.initial_model () ;
-            (* Navigate back to instances page via Context. *)
-            Context.navigate_instances () ;
+            (* Return to the shell; instances tab will refresh via dirty flag *)
+            Context.set_pending_tab Context.Tab_instances ;
+            Context.navigate_back () ;
             s
         | Error (`Msg msg) ->
             Modal_helpers.show_error ~title:"Installation Failed" msg ;
@@ -715,11 +717,7 @@ struct
       | `Handled -> Navigation.update (fun s -> {s with focus}) ps
       | `Bubble -> (
           match Miaou.Core.Keys.of_string key with
-          | Some Miaou.Core.Keys.Escape ->
-              (* Go to instances page directly - Navigation.back would go to
-                 details page which may have stale/consumed context. *)
-              Context.navigate_instances () ;
-              ps
+          | Some Miaou.Core.Keys.Escape -> Navigation.back ps
           | Some Miaou.Core.Keys.Up ->
               Navigation.update (fun s -> move_state s (-1)) ps
           | Some Miaou.Core.Keys.Down ->
@@ -733,9 +731,7 @@ struct
 
   let service_cycle ps _ = refresh ps
 
-  let back ps =
-    Context.navigate_instances () ;
-    ps
+  let back ps = Navigation.back ps
 
   let move ps delta = Navigation.update (fun s -> move_state s delta) ps
 
@@ -772,8 +768,7 @@ struct
           | `Bubble -> (
               match key with
               | Miaou.Core.Keys.Escape ->
-                  Context.navigate_instances () ;
-                  (ps, Miaou_interfaces.Key_event.Handled)
+                  (Navigation.back ps, Miaou_interfaces.Key_event.Handled)
               | Miaou.Core.Keys.Up ->
                   ( Navigation.update (fun s -> move_state s (-1)) ps,
                     Miaou_interfaces.Key_event.Handled )

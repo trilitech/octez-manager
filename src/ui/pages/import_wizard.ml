@@ -268,7 +268,8 @@ and start_import ps =
               Cache.invalidate_all () ;
               Context.mark_instances_dirty () ;
               Context.toast_success "Service imported successfully!" ;
-              Context.navigate_instances ()
+              Context.set_pending_tab Context.Tab_instances ;
+              Context.navigate_back ()
           | Job_manager.Failed msg ->
               Context.toast_error (Printf.sprintf "Import failed: %s" msg)
           | Job_manager.Pending | Job_manager.Running -> ())
