@@ -41,15 +41,15 @@ type state = {
   selected : int;
   folded : StringSet.t; (* managed instance names that are folded *)
   external_folded : StringSet.t; (* external instance names that are folded *)
+  external_section_folded : bool;
   last_updated : float;
   num_columns : int;
   active_column : int;
   column_scroll : int array;
   view_mode : view_mode;
   groups : Octez_manager_lib.Group.t list;
-  btn_install : Miaou_widgets_input.Button_widget.t;
-  btn_binaries : Miaou_widgets_input.Button_widget.t;
-  btn_rpcs : Miaou_widgets_input.Button_widget.t;
+  create_menu_open : bool;
+  create_menu_cursor : int;
 }
 
 type msg = unit
