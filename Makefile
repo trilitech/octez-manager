@@ -60,7 +60,10 @@ completions-check:
 lint-sync-io:
 	@./scripts/check-sync-io.sh
 
-test: fmt-check completions-check lint-sync-io
+lint-indexer:
+	@./scripts/check-direct-tzkt.sh
+
+test: fmt-check completions-check lint-sync-io lint-indexer
 	$(DUNE) runtest
 
 arch-index:
