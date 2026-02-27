@@ -196,8 +196,8 @@ let build_display_items ~public_nodes ~local_instances : display_item list =
              NetworkHeader network :: List.map (fun item -> NodeItem item) nodes)
            grouped
   in
-  build_section_items "PUBLIC NODES" public_nodes
-  @ build_section_items "LOCAL INSTANCES" local_instances
+  build_section_items "LOCAL INSTANCES" local_instances
+  @ build_section_items "PUBLIC NODES" public_nodes
 
 let init () =
   let public_nodes, error = fetch_public_nodes () in
