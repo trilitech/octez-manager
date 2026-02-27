@@ -94,6 +94,8 @@ let consume_keys_dirty () = Atomic.exchange keys_dirty false
 type pending_tab =
   | Tab_instances
   | Tab_wallets
+  | Tab_binaries
+  | Tab_rpcs
   | Tab_diagnostics
   | Tab_topology
   | Tab_sandboxes

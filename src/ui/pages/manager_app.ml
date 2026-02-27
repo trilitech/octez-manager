@@ -146,7 +146,7 @@ let run ?page ?(log = false) ?logfile ?theme () =
   let rec loop history current_name =
     if !quit_requested then raise Exit
     else
-      let* current_page = find_page_or_default current_name Instances.name in
+      let* current_page = find_page_or_default current_name Main_shell.name in
       let result =
         Miaou_runner_tui.Runner_tui.run
           ~enable_mouse:true
