@@ -52,16 +52,18 @@ let move = Instances.For_tests.move_selection
 (* ============================================================ *)
 
 let test_single_column_up_from_first_service () =
-  (* In single column, moving up from the first service (index 4)
-     should skip the separator (index 3) and land on Browse RPCs (index 2) *)
+  (* In single column, moving up from the first service (services_start_idx=5)
+     should skip the non-navigable zone [radio-row(3), separator(4)] and land
+     on Browse RPCs (menu_item_count-1=2). *)
   let services = [running_service ~instance:"node-1" ()] in
   let s = make_state ~selected:services_start_idx ~num_columns:1 services in
   let s' = move s (-1) in
   check int "lands on Browse RPCs" (menu_item_count - 1) s'.selected
 
 let test_single_column_down_from_browse_rpcs () =
-  (* Moving down from Browse RPCs (index 2) should skip separator and
-     land on first service (index 4) *)
+  (* Moving down from Browse RPCs (menu_item_count-1=2) should skip the
+     non-navigable zone [radio-row(3), separator(4)] and land on the
+     first service (services_start_idx=5). *)
   let services = [running_service ~instance:"node-1" ()] in
   let s = make_state ~selected:(menu_item_count - 1) ~num_columns:1 services in
   let s' = move s 1 in
@@ -76,7 +78,7 @@ let test_single_column_navigate_through_menu () =
   (* Down from Manage binaries -> Browse RPCs *)
   let s' = move s' 1 in
   check int "Manage binaries -> Browse RPCs" 2 s'.selected ;
-  (* Down from Browse RPCs -> first service (skip separator) *)
+  (* Down from Browse RPCs -> first service (skip radio-row + separator) *)
   let s' = move s' 1 in
   check int "Browse RPCs -> first service" services_start_idx s'.selected
 
