@@ -223,8 +223,10 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
 
 (** Try fetching recent cycles for [baker]. Returns [Some cycles] on success
     with at least one cycle, [None] otherwise. *)
-let try_fetch_baker ~tzkt_url ~baker =
-  match Cycle_data.fetch_recent_cycles ~tzkt_url ~baker ~limit:10 with
+let try_fetch_baker ~network ~preferred_base ~baker =
+  match
+    Cycle_data.fetch_recent_cycles ~network ~preferred_base ~baker ~limit:10
+  with
   | Ok (_ :: _ as cycles) -> Some cycles
   | Ok [] | Error _ -> None
 
@@ -245,10 +247,8 @@ let poll_baker ~instance ~network =
   let config_opt =
     match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
   in
-  let tzkt_url =
-    match config_opt with
-    | Some c -> c.tzkt_url
-    | None -> Payout_config.tzkt_base_url_for_network network
+  let preferred_base =
+    Option.map (fun c -> c.Payout_config.tzkt_url) config_opt
   in
   (* Try the configured baker first, then fall back to each delegate,
      then the cached baker (for test bakers from OM_TEST_BAKER). *)
@@ -262,7 +262,7 @@ let poll_baker ~instance ~network =
     let from_config =
       match configured_baker with
       | Some baker -> (
-          match try_fetch_baker ~tzkt_url ~baker with
+          match try_fetch_baker ~network ~preferred_base ~baker with
           | Some cycles -> Some (baker, cycles)
           | None -> None)
       | None -> None
@@ -278,7 +278,7 @@ let poll_baker ~instance ~network =
         in
         List.find_map
           (fun baker ->
-            match try_fetch_baker ~tzkt_url ~baker with
+            match try_fetch_baker ~network ~preferred_base ~baker with
             | Some cycles -> Some (baker, cycles)
             | None -> None)
           candidates
@@ -297,7 +297,13 @@ let poll_baker ~instance ~network =
       in
       List.iter
         (fun (cr : Rewards.cycle_rewards) ->
-          match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle:cr.cycle with
+          match
+            Cycle_data.fetch_cycle
+              ~network
+              ~preferred_base
+              ~baker
+              ~cycle:cr.cycle
+          with
           | Ok full_cr ->
               Mutex.protect cycle_lock (fun () ->
                   Hashtbl.replace cycle_cache (baker, cr.cycle) full_cr)
@@ -313,13 +319,14 @@ let poll_baker ~instance ~network =
         | Some c -> not (String.equal c.baker_pkh baker)
       in
       if need_save then begin
+        let default_tzkt_url = Indexer.tzkt_base_url ~network in
         let config =
           match config_opt with
-          | Some c -> {c with baker_pkh = baker; tzkt_url}
+          | Some c -> {c with baker_pkh = baker}
           | None ->
               {
                 (Payout_config.default ~baker_pkh:baker) with
-                tzkt_url;
+                tzkt_url = default_tzkt_url;
                 explorer_url =
                   (if String.equal network "mainnet" then "https://tzkt.io"
                    else Printf.sprintf "https://%s.tzkt.io" network);
@@ -343,7 +350,7 @@ let poll_baker ~instance ~network =
         cycles
   | None -> ()) ;
   (* Fetch current cycle *)
-  match Cycle_data.fetch_current_cycle ~tzkt_url with
+  match Cycle_data.fetch_current_cycle ~network ~preferred_base with
   | Error _ -> ()
   | Ok c ->
       Mutex.protect current_cycle_lock (fun () ->
@@ -361,17 +368,16 @@ let ensure_cycle_detail ~instance ~baker ~cycle =
           Hashtbl.find_opt network_cache instance)
       |> Option.value ~default:"mainnet"
     in
-    let config_opt =
-      match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
-    in
-    let tzkt_url =
-      match config_opt with
-      | Some c -> c.tzkt_url
-      | None -> Payout_config.tzkt_base_url_for_network network
+    let preferred_base =
+      match Payout_config.load ~instance with
+      | Ok c -> Some c.tzkt_url
+      | Error _ -> None
     in
     ignore
       (Domain_pool.submit (fun () ->
-           match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle with
+           match
+             Cycle_data.fetch_cycle ~network ~preferred_base ~baker ~cycle
+           with
            | Ok full_cr ->
                Mutex.protect cycle_lock (fun () ->
                    Hashtbl.replace cycle_cache (baker, cycle) full_cr)

@@ -52,11 +52,6 @@ type t = {
 (** Default configuration for a given baker address. *)
 val default : baker_pkh:string -> t
 
-(** Return the TzKT API base URL for a network.
-    Mainnet uses [https://api.tzkt.io], testnets use
-    [https://api.{network}.tzkt.io]. *)
-val tzkt_base_url_for_network : string -> string
-
 (** {1 Validation} *)
 
 (** Validate a configuration. Returns [Ok ()] or [Error msg]. *)
