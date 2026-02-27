@@ -896,12 +896,34 @@ Press **Enter** to open instance menu.|}
             Navigation.update (fun s -> move_selection s (-1)) ps
         | Some (Keys.Char "j") ->
             Navigation.update (fun s -> move_selection s 1) ps
-        | Some Keys.Left -> Navigation.update (fun s -> move_column s (-1)) ps
-        | Some Keys.Right -> Navigation.update (fun s -> move_column s 1) ps
+        | Some Keys.Left ->
+            Navigation.update
+              (fun s ->
+                if s.selected = menu_item_count then
+                  {s with view_mode = By_role}
+                else move_column s (-1))
+              ps
+        | Some Keys.Right ->
+            Navigation.update
+              (fun s ->
+                if s.selected = menu_item_count then
+                  {s with view_mode = By_group}
+                else move_column s 1)
+              ps
         | Some (Keys.Char "h") ->
-            Navigation.update (fun s -> move_column s (-1)) ps
+            Navigation.update
+              (fun s ->
+                if s.selected = menu_item_count then
+                  {s with view_mode = By_role}
+                else move_column s (-1))
+              ps
         | Some (Keys.Char "l") ->
-            Navigation.update (fun s -> move_column s 1) ps
+            Navigation.update
+              (fun s ->
+                if s.selected = menu_item_count then
+                  {s with view_mode = By_group}
+                else move_column s 1)
+              ps
         | Some Keys.Tab -> Navigation.update toggle_fold ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
         | Some (Keys.Char "g") ->

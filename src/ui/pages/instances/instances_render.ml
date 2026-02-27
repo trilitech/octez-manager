@@ -14,6 +14,7 @@ module Box = Miaou_widgets_layout.Box_widget
 module Metrics = Rpc_metrics
 module Style_context = Miaou_style.Style_context
 module Button_widget = Miaou_widgets_input.Button_widget
+module Radio_button_widget = Miaou_widgets_input.Radio_button_widget
 open Octez_manager_lib
 open Instances_state
 open Instances_layout
@@ -852,6 +853,29 @@ let render_external_services_section state =
     in
     header :: service_lines
 
+(** Render the view-mode radio row at index [menu_item_count].
+    The focused radio (bold label) is the one matching [view_mode] when the
+    row is selected.  Widgets are created fresh from state — not stored. *)
+let radio_row ~selected view_mode =
+  let by_role =
+    Radio_button_widget.create
+      ~label:"By Role"
+      ~selected:(view_mode = By_role)
+      ()
+  in
+  let by_group =
+    Radio_button_widget.create
+      ~label:"By Group"
+      ~selected:(view_mode = By_group)
+      ()
+  in
+  let role_focus = selected && view_mode = By_role in
+  let group_focus = selected && view_mode = By_group in
+  "View: "
+  ^ Radio_button_widget.render by_role ~focus:role_focus
+  ^ "   "
+  ^ Radio_button_widget.render by_group ~focus:group_focus
+
 (** Single-column layout (original) *)
 let table_lines_single state =
   let install_row =
@@ -862,6 +886,9 @@ let table_lines_single state =
   in
   let rpc_row =
     Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
+  in
+  let view_row =
+    radio_row ~selected:(state.selected = menu_item_count) state.view_mode
   in
   let instance_rows =
     if state.services = [] then ["  No managed instances."]
@@ -913,7 +940,7 @@ let table_lines_single state =
       let separator = Widgets.themed_muted (String.make 80 '-') in
       "" :: separator :: external_rows
   in
-  (install_row :: binaries_row :: rpc_row :: "" :: "" :: instance_rows)
+  (install_row :: binaries_row :: rpc_row :: view_row :: "" :: instance_rows)
   @ external_rows
 
 (** Multi-column matrix layout *)
@@ -941,7 +968,7 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Reduce available height for columns to make room for external services *)
   let columns_visible_height = max 5 (visible_height - reserved_for_external) in
-  (* Header row (install, binaries, rpcs) spans full width *)
+  (* Header row (install, binaries, rpcs, view-mode radio) spans full width *)
   let install_row =
     Button_widget.render state.btn_install ~focus:(state.selected = 0)
   in
@@ -950,6 +977,9 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   let rpc_row =
     Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
+  in
+  let view_row =
+    radio_row ~selected:(state.selected = menu_item_count) state.view_mode
   in
   (* When selection is in menu area, use -1 to dim all columns equally *)
   let effective_active_column =
@@ -977,7 +1007,8 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   in
   (* Append external services below the columnar grid *)
   let result =
-    install_row :: binaries_row :: rpc_row :: "" :: "" :: instance_rows_trimmed
+    install_row :: binaries_row :: rpc_row :: view_row :: ""
+    :: instance_rows_trimmed
   in
   if external_line_count > 0 then
     let separator = Widgets.themed_muted (String.make (min cols 120) '-') in
@@ -1000,11 +1031,14 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
     let rpc_row =
       Button_widget.render state.btn_rpcs ~focus:(state.selected = 2)
     in
+    let view_row =
+      radio_row ~selected:(state.selected = menu_item_count) state.view_mode
+    in
     let external_rows = render_external_services_section state in
     let external_rows =
       if external_rows = [] then [] else "" :: external_rows
     in
-    install_row :: binaries_row :: rpc_row :: "" :: ""
+    install_row :: binaries_row :: rpc_row :: view_row :: ""
     :: "  No managed instances." :: external_rows
   else if num_columns <= 1 then table_lines_single state
   else
