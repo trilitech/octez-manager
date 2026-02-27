@@ -160,25 +160,28 @@ include Instances_render
 (* Action handlers extracted to instances/instances_actions.ml *)
 open Instances_actions
 
-(** Single-column navigation: linear up/down with separator skipping. *)
+(** Single-column navigation: linear up/down with separator skipping.
+    Layout: 0-2 = buttons, 3 = radio row (navigable), 4 = separator (skipped),
+    5+ = services. *)
 let move_selection_single_column s delta =
   let raw = s.selected + delta in
   let selected = clamp_selection s.services s.external_services raw in
-  (* Skip the non-navigable zone (radio row + separator) between buttons and services *)
+  (* Skip only the separator (index menu_item_count+1 = 4); the radio row (3) is navigable *)
+  let sep_idx = menu_item_count + 1 in
   let selected =
-    if selected >= menu_item_count && selected < services_start_idx then
-      if delta > 0 then services_start_idx else menu_item_count - 1
+    if selected >= sep_idx && selected < services_start_idx then
+      if delta > 0 then services_start_idx else menu_item_count
     else selected
   in
   let selected = clamp_selection s.services s.external_services selected in
   {s with selected}
 
-(** Multi-column: navigate within the menu area (indices 0..menu_item_count-1).
-    When pressing Down past the last menu item, jump to first service in
-    column 0. *)
+(** Multi-column: navigate within the menu area (indices 0..menu_item_count).
+    The radio row at menu_item_count is the last "menu-like" navigable item.
+    When pressing Down past the radio row, jump to first service in column 0. *)
 let move_selection_menu s delta =
-  let selected = max 0 (min menu_item_count (s.selected + delta)) in
-  if selected >= menu_item_count && delta > 0 then
+  let selected = max 0 (min (menu_item_count + 1) (s.selected + delta)) in
+  if selected >= menu_item_count + 1 && delta > 0 then
     let sections = sections_of_state s in
     let first_svc =
       first_service_in_column
@@ -206,13 +209,13 @@ let move_selection_external s delta =
           0
       in
       match List.rev col_indices with
-      | [] -> {s with selected = menu_item_count - 1; active_column = 0}
+      | [] -> {s with selected = menu_item_count; active_column = 0}
       | last_idx :: _ ->
           {s with selected = last_idx + services_start_idx; active_column = 0}
     else if List.length s.services > 0 then
       let last_managed = services_start_idx + List.length s.services - 1 in
       {s with selected = last_managed}
-    else {s with selected = menu_item_count - 1}
+    else {s with selected = menu_item_count}
   else
     let raw = s.selected + delta in
     let selected = clamp_selection s.services s.external_services raw in
@@ -240,7 +243,7 @@ let move_selection_managed s delta =
   let new_pos = current_pos + delta in
   if new_pos < 0 then (
     s.column_scroll.(s.active_column) <- 0 ;
-    {s with selected = menu_item_count - 1})
+    {s with selected = menu_item_count})
   else if new_pos >= List.length col_indices then
     if List.length s.external_services > 0 then
       let first_external = services_start_idx + List.length s.services in
