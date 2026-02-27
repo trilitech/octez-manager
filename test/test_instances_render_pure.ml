@@ -121,9 +121,6 @@ let test_pad_exact_line () =
 (* ================================================================== *)
 
 let empty_state () =
-  let mk_btn label =
-    Miaou_widgets_input.Button_widget.create ~label ~on_click:(fun () -> ()) ()
-  in
   State.
     {
       services = [];
@@ -131,15 +128,15 @@ let empty_state () =
       selected = 0;
       folded = State.StringSet.empty;
       external_folded = State.StringSet.empty;
+      external_section_folded = false;
       last_updated = 0.0;
       num_columns = 1;
       column_scroll = [||];
       active_column = 0;
       view_mode = State.By_role;
       groups = [];
-      btn_install = mk_btn "Install new instance";
-      btn_binaries = mk_btn "Manage binaries";
-      btn_rpcs = mk_btn "Browse RPCs";
+      create_menu_open = false;
+      create_menu_cursor = 0;
     }
 
 let test_summary_empty () =

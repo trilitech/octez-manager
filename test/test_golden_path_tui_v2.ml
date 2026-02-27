@@ -41,11 +41,12 @@ let keys_down n = List.init n (fun _ -> Key "Down")
     [handle_key] and properly calls [move_selection]. *)
 let keys_j n = List.init n (fun _ -> Key "j")
 
-(** Open the create menu ('c') and select the nth item (0-indexed).
-    Menu order: Node=0, DAL Node=1, Baker=2, Accuser=3, Signatory=4. *)
+(** Open the create dropdown ('1' when on instances tab) and select the nth
+    item (0-indexed).
+    Menu order: Node=0, Baker=1, DAL Node=2, Accuser=3, Signatory=4. *)
 let open_create_menu ~menu_index ~target_page =
-  [Key "c"; WaitFor [ModalActive; MaxIterations 50]]
-  @ keys_down menu_index
+  [Key "1"; WaitFor [ScreenContains "New Instance"; MaxIterations 50]]
+  @ keys_j menu_index
   @ [Key "Enter"; WaitFor [PageSwitched target_page; MaxIterations 50]]
 
 (** Select the first node in a node-selection modal.
@@ -78,9 +79,9 @@ let submit_form ~downs = keys_down downs @ [Key "Enter"]
 (** Wait for sync install to complete and return to instances page.
     Sync forms (DAL, Baker, Accuser) block on send_key until done,
     then the framework navigates to instances via Context.navigate.
-    We wait for the instances page hint text to confirm we're there. *)
+    We wait for the instances page header text to confirm we're there. *)
 let wait_for_sync_install =
-  [WaitFor [ScreenContains "Hint: c create"; MaxIterations 500]]
+  [WaitFor [ScreenContains "octez-manager"; MaxIterations 500]]
 
 (* ============================================================ *)
 (* Test Script *)
@@ -107,7 +108,7 @@ let golden_path_script =
   @ submit_form ~downs:14
   @ [
       Comment "Node install is async (Job_manager). Wait for instances page.";
-      WaitFor [ScreenContains "Hint: c create"; MaxIterations 100];
+      WaitFor [ScreenContains "octez-manager"; MaxIterations 100];
       Screenshot "02_node_installing";
       Comment "Wait for install to complete (toast appears).";
       WaitFor [ScreenContains "installed successfully"; MaxIterations 6000];
@@ -116,7 +117,7 @@ let golden_path_script =
     ]
   (* ── Step 2: Install DAL Node ─────────────────────────────── *)
   @ [Comment "=== Step 2: Install DAL Node ==="]
-  @ open_create_menu ~menu_index:1 ~target_page:"install_dal_node_form_v3"
+  @ open_create_menu ~menu_index:2 ~target_page:"install_dal_node_form_v3"
   @ [
       WaitFor [ScreenContains "DAL RPC"; MaxIterations 10];
       Comment "Cursor is on Node field (first). Select our node.";
@@ -129,7 +130,7 @@ let golden_path_script =
   @ [Screenshot "05_dal_installed"; AssertService "dal-shadownet"]
   (* ── Step 3: Install Baker ────────────────────────────────── *)
   @ [Comment "=== Step 3: Install Baker ==="]
-  @ open_create_menu ~menu_index:2 ~target_page:"install_baker_form_v3"
+  @ open_create_menu ~menu_index:1 ~target_page:"install_baker_form_v3"
   @ [
       WaitFor [ScreenContains "Liquidity Baking"; MaxIterations 10];
       Comment "Cursor on Parent Node (first). Select our node (second item).";
@@ -218,12 +219,12 @@ let golden_path_script =
         "Resize to single-column (60x80) for predictable navigation. Use Home \
          to reset selection to 0, then j keys (not Down, which the headless \
          driver routes to P.move, a no-op on instances) to reach \
-         node-shadownet (selected=5). Path: 0->1->2->3(radio row)->5(skip sep \
-         at 4). Requires 4 j presses.";
+         node-shadownet (selected=2). Path: 0(radio row)->2(skip sep at 1). \
+         Requires 1 j press.";
       Resize (60, 80);
       Key "Home";
     ]
-  @ keys_j 4
+  @ keys_j 1
   @ [
       Comment "Open action modal for node-shadownet";
       Key "Enter";
