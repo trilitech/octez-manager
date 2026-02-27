@@ -75,6 +75,8 @@ val consume_keys_dirty : unit -> bool
 type pending_tab =
   | Tab_instances
   | Tab_wallets
+  | Tab_binaries
+  | Tab_rpcs
   | Tab_diagnostics
   | Tab_topology
   | Tab_sandboxes
