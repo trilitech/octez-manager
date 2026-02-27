@@ -815,7 +815,7 @@ let header s =
   in
   [
     Widgets.themed_primary
-      (Printf.sprintf " Keys . %s%s%s" count_text dir_text status_suffix);
+      (Printf.sprintf " Wallets . %s%s%s" count_text dir_text status_suffix);
     Widgets.themed_muted
       "\xF0\x9F\x94\x91own \xF0\x9F\x93\x8Bwatch \xF0\x9F\x94\x92enc \
        \xF0\x9F\x94\x90hw \xE2\x9C\x92\xEF\xB8\x8Frmt \xF0\x9F\x8D\x9Ebaker | \
@@ -2415,7 +2415,7 @@ let open_batch_modal ps =
 
 let show_help ps =
   Modal_helpers.show_error
-    ~title:"Keys Page Help"
+    ~title:"Wallets Page Help"
     "j/Down      Move down\n\
      k/Up        Move up\n\
      g           Jump to top\n\
