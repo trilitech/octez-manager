@@ -18,15 +18,8 @@ let last_refresh : (string, float) Hashtbl.t = Hashtbl.create 7
 
 let last_refresh_lock = Mutex.create ()
 
-(** Map network name to tzkt API subdomain.
-    Mainnet uses [api.tzkt.io], testnets use [api.{network}.tzkt.io]. *)
-let tzkt_url ~network =
-  if String.equal network "mainnet" then
-    "https://api.tzkt.io/v1/accounts?type=delegate&select=address,alias&limit=10000&alias.null=false"
-  else
-    Printf.sprintf
-      "https://api.%s.tzkt.io/v1/accounts?type=delegate&select=address,alias&limit=10000&alias.null=false"
-      network
+let aliases_path =
+  "/v1/accounts?type=delegate&select=address,alias&limit=10000&alias.null=false"
 
 let find ~network ~pkh =
   Mutex.protect cache_lock (fun () ->
@@ -98,10 +91,7 @@ let load_from_disk ~network =
   else None
 
 let refresh ~network =
-  let url = tzkt_url ~network in
-  let result =
-    Cmd_runner.run_out_silent ["curl"; "-fsSL"; "--max-time"; "15"; url]
-  in
+  let result = Indexer.fetch ~network aliases_path in
   match result with
   | Ok body -> (
       match parse_aliases_json body with

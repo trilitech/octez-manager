@@ -79,11 +79,11 @@ let baker_delegate (svc : Service.t) =
                    svc.instance)
           | first :: _ -> Ok first))
 
-(** Load TzKT URL from payout config, falling back to default. *)
-let tzkt_url_for ~instance ~baker_pkh =
+(** Load preferred TzKT base URL from payout config, if available. *)
+let preferred_base_for ~instance =
   match Payout_config.load ~instance with
-  | Ok c -> c.tzkt_url
-  | Error _ -> (Payout_config.default ~baker_pkh).tzkt_url
+  | Ok c -> Some c.tzkt_url
+  | Error _ -> None
 
 (** Format a mutez amount as a short tez string with ꜩ suffix. *)
 let format_tez_short mutez = Rewards.format_tez mutez ^ " \xEA\x9C\xA9"
@@ -111,9 +111,9 @@ let status_run baker_opt =
       | Ok baker_pkh ->
           let instance = svc.instance in
           let network = svc.network in
-          let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+          let preferred_base = preferred_base_for ~instance in
           let current_cycle =
-            match Cycle_data.fetch_current_cycle ~tzkt_url with
+            match Cycle_data.fetch_current_cycle ~network ~preferred_base with
             | Ok c -> Some c
             | Error _ -> None
           in
@@ -123,7 +123,11 @@ let status_run baker_opt =
           in
           let recent =
             match
-              Cycle_data.fetch_recent_cycles ~tzkt_url ~baker:baker_pkh ~limit:5
+              Cycle_data.fetch_recent_cycles
+                ~network
+                ~preferred_base
+                ~baker:baker_pkh
+                ~limit:5
             with
             | Ok cycles -> cycles
             | Error _ -> []
@@ -262,9 +266,11 @@ let generate_run baker_opt cycle_opt json force =
             match cycle_opt with
             | Some c -> Some c
             | None -> (
-                let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+                let preferred_base = preferred_base_for ~instance in
                 (* Use the latest completed cycle (current - 1) *)
-                match Cycle_data.fetch_current_cycle ~tzkt_url with
+                match
+                  Cycle_data.fetch_current_cycle ~network ~preferred_base
+                with
                 | Ok cur -> Some (cur - 1)
                 | Error _ -> None)
           in
@@ -326,10 +332,12 @@ let history_run baker_opt cycles_count json =
       | Error msg -> Cli_helpers.cmdliner_error msg
       | Ok baker_pkh -> (
           let instance = svc.instance in
-          let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+          let network = svc.network in
+          let preferred_base = preferred_base_for ~instance in
           match
             Cycle_data.fetch_recent_cycles
-              ~tzkt_url
+              ~network
+              ~preferred_base
               ~baker:baker_pkh
               ~limit:cycles_count
           with
@@ -457,8 +465,10 @@ let rec pay_run baker_opt cycle_opt dry_run confirm =
             match cycle_opt with
             | Some c -> Some c
             | None -> (
-                let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
-                match Cycle_data.fetch_current_cycle ~tzkt_url with
+                let preferred_base = preferred_base_for ~instance in
+                match
+                  Cycle_data.fetch_current_cycle ~network ~preferred_base
+                with
                 | Ok cur -> Some (cur - 1)
                 | Error _ -> None)
           in
