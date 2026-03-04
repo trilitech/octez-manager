@@ -286,8 +286,6 @@ let poll_operation ~endpoint ~op_hash (step_ref : tracking_step Atomic.t) =
   in
   wait_included 0
 
-module Qr = Miaou_widgets_display.Qr_code_widget
-
 let render_tracking_checklist ~step ~network ~cols =
   let done_sym = Widgets.themed_success "✓"
   and spin_sym = Context.render_spinner ""
@@ -366,12 +364,7 @@ let render_tracking_checklist ~step ~network ~cols =
             (Widgets.themed_muted
                (Printf.sprintf "%s  (Ctrl+click to open)" short_hash))
         in
-        let qr_lines =
-          match Qr.create ~data:url () with
-          | Ok qr -> [Qr.render qr ~focus:false]
-          | Error _ -> []
-        in
-        [""; osc8_link] @ qr_lines
+        [""; osc8_link]
     | None -> []
   in
   let hint_line =
