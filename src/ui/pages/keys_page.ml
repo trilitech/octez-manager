@@ -100,7 +100,7 @@ let networks_for_services service_names =
   List.filter_map
     (fun (st : Data.Service_state.t) ->
       if List.exists (String.equal st.service.instance) service_names then
-        Some st.service.network
+        Some (Network_name.normalize st.service.network)
       else None)
     services
   |> List.sort_uniq String.compare
@@ -1968,7 +1968,8 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
     |> List.filter (fun (st : Data.Service_state.t) ->
         String.equal st.service.role "node"
         && match st.status with Running -> true | _ -> false)
-    |> List.map (fun (st : Data.Service_state.t) -> st.service.network)
+    |> List.map (fun (st : Data.Service_state.t) ->
+        Network_name.normalize st.service.network)
     |> List.sort_uniq String.compare
   in
   (* All networks with public nodes *)
