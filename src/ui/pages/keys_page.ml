@@ -938,19 +938,20 @@ let find_octez_client ~base_dir =
               if String.equal p "" then None else Some p
           | Error _ -> None))
 
-(** Copy a PKH to clipboard. Tries system clipboard tools first,
-    then falls back to a toast with the full PKH for manual copy. *)
-let copy_to_clipboard pkh =
-  let try_clipboard () =
-    (* Try xclip, xsel, wl-copy, pbcopy in order *)
-    let tools =
-      [
-        ["xclip"; "-selection"; "clipboard"];
-        ["xsel"; "--clipboard"; "--input"];
-        ["wl-copy"];
-        ["pbcopy"];
-      ]
-    in
+(** Try to copy text to system clipboard using available tools.
+    Returns Ok if successful, Error if no clipboard tool worked.
+    This function runs in a background domain to avoid blocking the TUI. *)
+let try_copy_to_system_clipboard text =
+  (* Try xclip, xsel, wl-copy, pbcopy in order *)
+  let tools =
+    [
+      ["xclip"; "-selection"; "clipboard"];
+      ["xsel"; "--clipboard"; "--input"];
+      ["wl-copy"];
+      ["pbcopy"];
+    ]
+  in
+  let success =
     List.exists
       (fun tool ->
         match
@@ -959,7 +960,7 @@ let copy_to_clipboard pkh =
             @ [
                 Printf.sprintf
                   "echo -n %s | %s"
-                  (Cmd_runner.sh_quote pkh)
+                  (Cmd_runner.sh_quote text)
                   (Cmd_runner.cmd_to_string tool);
               ])
         with
@@ -967,9 +968,22 @@ let copy_to_clipboard pkh =
         | Error _ -> false)
       tools
   in
-  if try_clipboard () then
-    Context.toast_success (Printf.sprintf "Copied: %s" pkh)
-  else Context.toast_info (Printf.sprintf "PKH: %s" pkh)
+  if success then Ok () else Error (`Msg "No clipboard tool available")
+
+(** Copy PKH to clipboard using background job to avoid blocking the TUI.
+    Shows a success toast if copied, or an info toast with the PKH if clipboard
+    tools are not available. *)
+let copy_to_clipboard pkh =
+  Job_manager.submit
+    ~timeout:(Some 2.0)
+    ~description:"Copy to clipboard"
+    (fun ~append_log:_ () -> try_copy_to_system_clipboard pkh)
+    ~on_complete:(fun status ->
+      match status with
+      | Job_manager.Succeeded ->
+          Context.toast_success (Printf.sprintf "Copied: %s" pkh)
+      | Job_manager.Failed _ | Job_manager.Pending | Job_manager.Running ->
+          Context.toast_info (Printf.sprintf "PKH: %s" pkh))
 
 (** When octez-client is not found, offer to download the latest Octez
     version. Falls back to a plain error if no versions are available. *)
