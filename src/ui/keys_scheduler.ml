@@ -58,18 +58,6 @@ let started = ref false
 (** Worker queue for per-key fetch requests with deduplication. *)
 let worker : unit Worker_queue.t = Worker_queue.create ~name:"keys" ()
 
-(** Normalize network identifier to canonical name.
-    Uses [Public_nodes_cache.extract_network_from_url] for known networks,
-    preserving custom URLs that aren't recognized.
-    Examples:
-    - "https://teztnets.com/tallinnnet" -> "tallinnnet"
-    - "tallinnnet" -> "tallinnnet"
-    - "https://custom-rpc.com/privatenet" -> "https://custom-rpc.com/privatenet" (preserved) *)
-let normalize_network_name (network : string) : string =
-  match Public_nodes_cache.extract_network_from_url network with
-  | Some canonical -> canonical
-  | None -> network (* Keep custom URLs as-is *)
-
 (** Get all node endpoints grouped by network.
     Starts with local running nodes, then supplements with public RPC nodes
     for any networks not already covered locally.  This ensures that a key
@@ -81,7 +69,7 @@ let get_node_endpoints () =
         String.equal st.service.role "node"
         && match st.status with Running -> true | _ -> false)
     |> List.map (fun (st : Data.Service_state.t) ->
-        ( normalize_network_name st.service.network,
+        ( Network_name.normalize st.service.network,
           Rpc_addr.to_endpoint st.service.rpc_addr ))
   in
   let local_networks = List.map fst local |> List.sort_uniq String.compare in
@@ -286,7 +274,7 @@ let fetch_wallet_data ~network ~endpoint ~pkh =
   in
   {
     pkh;
-    network = normalize_network_name network;
+    network = Network_name.normalize network;
     spendable_balance = spendable;
     staked_balance;
     full_balance;
@@ -367,11 +355,3 @@ let get_endpoints_for_network ~network =
   get_node_endpoints ()
   |> List.filter_map (fun (net, endpoint) ->
       if String.equal net network then Some endpoint else None)
-
-(**/**)
-
-module Internal_for_tests = struct
-  let normalize_network_name = normalize_network_name
-end
-
-(**/**)
