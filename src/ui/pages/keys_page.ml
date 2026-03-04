@@ -609,6 +609,11 @@ let render_key_detail ~box_width (group : enriched_group)
     | [] -> Widgets.themed_muted "\n  No balance data yet. Fetching..."
     | entries ->
         entries
+        |> List.sort
+             (fun
+               (a : Keys_scheduler.wallet_data)
+               (b : Keys_scheduler.wallet_data)
+             -> String.compare a.network b.network)
         |> List.map (fun (wd : Keys_scheduler.wallet_data) ->
             let account_items =
               [
