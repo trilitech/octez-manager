@@ -5899,64 +5899,62 @@ let signatory_cli_keys_dir_custom () =
   in
   Alcotest.(check string) "custom keys directory" "/custom/path/keys" keys_path
 
-(* Keys scheduler network normalization tests *)
+(* Network name normalization tests *)
 
-let keys_scheduler_normalize_known_urls () =
-  let module KS = Octez_manager_ui.Keys_scheduler.Internal_for_tests in
+let network_name_normalize_known_urls () =
   (* Test known network URLs are normalized to canonical names *)
   Alcotest.(check string)
     "tallinnnet URL normalized"
     "tallinnnet"
-    (KS.normalize_network_name "https://teztnets.com/tallinnnet") ;
+    (Octez_manager_ui.Network_name.normalize "https://teztnets.com/tallinnnet") ;
   Alcotest.(check string)
     "shadownet URL normalized"
     "shadownet"
-    (KS.normalize_network_name "https://teztnets.com/shadownet") ;
+    (Octez_manager_ui.Network_name.normalize "https://teztnets.com/shadownet") ;
   Alcotest.(check string)
     "mainnet URL normalized"
     "mainnet"
-    (KS.normalize_network_name "https://teztnets.com/mainnet")
+    (Octez_manager_ui.Network_name.normalize "https://teztnets.com/mainnet")
 
-let keys_scheduler_normalize_canonical_names () =
-  let module KS = Octez_manager_ui.Keys_scheduler.Internal_for_tests in
+let network_name_normalize_canonical_names () =
   (* Test canonical names pass through unchanged *)
   Alcotest.(check string)
     "tallinnnet canonical"
     "tallinnnet"
-    (KS.normalize_network_name "tallinnnet") ;
+    (Octez_manager_ui.Network_name.normalize "tallinnnet") ;
   Alcotest.(check string)
     "shadownet canonical"
     "shadownet"
-    (KS.normalize_network_name "shadownet") ;
+    (Octez_manager_ui.Network_name.normalize "shadownet") ;
   Alcotest.(check string)
     "mainnet canonical"
     "mainnet"
-    (KS.normalize_network_name "mainnet")
+    (Octez_manager_ui.Network_name.normalize "mainnet")
 
-let keys_scheduler_normalize_custom_urls () =
-  let module KS = Octez_manager_ui.Keys_scheduler.Internal_for_tests in
+let network_name_normalize_custom_urls () =
   (* Test custom URLs that aren't recognized are preserved as-is *)
   Alcotest.(check string)
     "custom URL preserved"
     "https://custom-rpc.com/privatenet"
-    (KS.normalize_network_name "https://custom-rpc.com/privatenet") ;
+    (Octez_manager_ui.Network_name.normalize
+       "https://custom-rpc.com/privatenet") ;
   Alcotest.(check string)
     "another custom URL preserved"
     "https://my-node.example.com/testnet"
-    (KS.normalize_network_name "https://my-node.example.com/testnet")
+    (Octez_manager_ui.Network_name.normalize
+       "https://my-node.example.com/testnet")
 
-let keys_scheduler_normalize_whitespace () =
-  let module KS = Octez_manager_ui.Keys_scheduler.Internal_for_tests in
+let network_name_normalize_whitespace () =
   (* Test that extract_network_from_url finds known networks even with whitespace
      via substring matching *)
   Alcotest.(check string)
     "known network found despite whitespace"
     "tallinnnet"
-    (KS.normalize_network_name "  tallinnnet  ") ;
+    (Octez_manager_ui.Network_name.normalize "  tallinnnet  ") ;
   Alcotest.(check string)
     "recognized URL normalized"
     "tallinnnet"
-    (KS.normalize_network_name "https://teztnets.com/tallinnnet")
+    (Octez_manager_ui.Network_name.normalize "https://teztnets.com/tallinnnet")
 
 let () =
   Alcotest.run
@@ -6957,23 +6955,23 @@ let () =
             `Quick
             signatory_cli_keys_dir_custom;
         ] );
-      ( "keys_scheduler",
+      ( "network_name",
         [
           Alcotest.test_case
             "normalize_known_urls"
             `Quick
-            keys_scheduler_normalize_known_urls;
+            network_name_normalize_known_urls;
           Alcotest.test_case
             "normalize_canonical_names"
             `Quick
-            keys_scheduler_normalize_canonical_names;
+            network_name_normalize_canonical_names;
           Alcotest.test_case
             "normalize_custom_urls"
             `Quick
-            keys_scheduler_normalize_custom_urls;
+            network_name_normalize_custom_urls;
           Alcotest.test_case
             "normalize_whitespace"
             `Quick
-            keys_scheduler_normalize_whitespace;
+            network_name_normalize_whitespace;
         ] );
     ]
