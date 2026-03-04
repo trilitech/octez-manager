@@ -61,11 +61,3 @@ val stop : unit -> unit
 (** Get running node endpoints for a specific network.
     Returns a list of endpoint URLs. Fast, reads from service state cache. *)
 val get_endpoints_for_network : network:string -> string list
-
-(**/**)
-
-module Internal_for_tests : sig
-  val normalize_network_name : string -> string
-end
-
-(**/**)
