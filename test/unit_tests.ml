@@ -4392,8 +4392,11 @@ let execstart_parser_parse_with_variables () =
     "binary with variable"
     (Some "${APP_BIN_DIR}/octez-node")
     parsed.binary_path ;
-  (* data_dir should be None because it contains unexpanded variable *)
-  Alcotest.(check (option string)) "data dir with variable" None parsed.data_dir ;
+  (* data_dir should contain the variable - expansion happens later in detector *)
+  Alcotest.(check (option string))
+    "data dir with variable"
+    (Some "${OCTEZ_DATA_DIR}")
+    parsed.data_dir ;
   (* Should have warning *)
   Alcotest.(check bool) "has warnings" true (List.length parsed.warnings > 0)
 

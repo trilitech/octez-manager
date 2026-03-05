@@ -145,10 +145,13 @@ let parse_flag_value ~flag_name ~setter word rest acc =
   in
   match value_result with
   | Some (cleaned, new_rest) ->
+      (* Always store the value, even if it contains variables.
+         The detector will expand them later using environment files. *)
+      let new_acc = setter acc cleaned in
       if contains_variable cleaned then
         let warning = flag_name ^ " contains unexpanded variable: " ^ cleaned in
-        (new_rest, {acc with warnings = warning :: acc.warnings})
-      else (new_rest, setter acc cleaned)
+        (new_rest, {new_acc with warnings = warning :: new_acc.warnings})
+      else (new_rest, new_acc)
   | None -> (rest, acc)
 
 (** Parse --flag=value or --flag value patterns *)
