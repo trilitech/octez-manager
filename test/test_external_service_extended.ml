@@ -223,6 +223,97 @@ let chain_id_tests =
 
 let systemctl_tests = [("systemctl_cmd", `Quick, test_systemctl_cmd)]
 
+(* ============================================================ *)
+(* Config.json Network Reading Tests *)
+(* ============================================================ *)
+
+let test_read_network_string_format () =
+  (* Create temp directory with config.json containing "network": "shadownet" *)
+  let tmpdir = Filename.temp_file "octez-test-" ".dir" in
+  Unix.unlink tmpdir ;
+  Unix.mkdir tmpdir 0o755 ;
+  let config_path = Filename.concat tmpdir "config.json" in
+  let oc = open_out config_path in
+  output_string oc {|{"network": "shadownet", "data-dir": "/tmp/test"}|} ;
+  close_out oc ;
+
+  let result = ESD.read_network_from_config_json tmpdir in
+
+  (* Cleanup *)
+  Sys.remove config_path ;
+  Unix.rmdir tmpdir ;
+
+  check (option string) "reads network string" (Some "shadownet") result
+
+let test_read_network_object_format () =
+  (* Create temp directory with config.json containing network object *)
+  let tmpdir = Filename.temp_file "octez-test-" ".dir" in
+  Unix.unlink tmpdir ;
+  Unix.mkdir tmpdir 0o755 ;
+  let config_path = Filename.concat tmpdir "config.json" in
+  let oc = open_out config_path in
+  output_string oc {|{"network": {"chain_name": "TEZOS_MAINNET"}}|} ;
+  close_out oc ;
+
+  let result = ESD.read_network_from_config_json tmpdir in
+
+  (* Cleanup *)
+  Sys.remove config_path ;
+  Unix.rmdir tmpdir ;
+
+  check (option string) "reads network object" (Some "mainnet") result
+
+let test_read_network_missing_file () =
+  let result = ESD.read_network_from_config_json "/nonexistent/dir" in
+  check (option string) "missing file returns None" None result
+
+let test_read_network_malformed_json () =
+  (* Create temp directory with malformed JSON - should raise exception *)
+  let tmpdir = Filename.temp_file "octez-test-" ".dir" in
+  Unix.unlink tmpdir ;
+  Unix.mkdir tmpdir 0o755 ;
+  let config_path = Filename.concat tmpdir "config.json" in
+  let oc = open_out config_path in
+  output_string oc {|{invalid json}|} ;
+  close_out oc ;
+
+  let raised_exception = ref false in
+  (try ESD.read_network_from_config_json tmpdir |> ignore
+   with Yojson.Json_error _ -> raised_exception := true) ;
+
+  (* Cleanup *)
+  Sys.remove config_path ;
+  Unix.rmdir tmpdir ;
+
+  check bool "malformed JSON raises Yojson.Json_error" true !raised_exception
+
+let test_read_network_missing_field () =
+  (* Create temp directory with config.json without network field *)
+  let tmpdir = Filename.temp_file "octez-test-" ".dir" in
+  Unix.unlink tmpdir ;
+  Unix.mkdir tmpdir 0o755 ;
+  let config_path = Filename.concat tmpdir "config.json" in
+  let oc = open_out config_path in
+  output_string oc {|{"data-dir": "/tmp/test"}|} ;
+  close_out oc ;
+
+  let result = ESD.read_network_from_config_json tmpdir in
+
+  (* Cleanup *)
+  Sys.remove config_path ;
+  Unix.rmdir tmpdir ;
+
+  check (option string) "missing network field returns None" None result
+
+let config_json_tests =
+  [
+    ("read network string format", `Quick, test_read_network_string_format);
+    ("read network object format", `Quick, test_read_network_object_format);
+    ("read network missing file", `Quick, test_read_network_missing_file);
+    ("read network malformed json", `Quick, test_read_network_malformed_json);
+    ("read network missing field", `Quick, test_read_network_missing_field);
+  ]
+
 let () =
   Alcotest.run
     "External_service_detector_extended"
@@ -232,4 +323,5 @@ let () =
       ("extract_command", extract_command_tests);
       ("chain_id_mapping", chain_id_tests);
       ("systemctl", systemctl_tests);
+      ("config_json_network", config_json_tests);
     ]
