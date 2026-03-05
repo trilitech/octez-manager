@@ -441,11 +441,20 @@ let build_external_service ~unit_name ~exec_start ~properties =
 
   (* Get environment files *)
   let environment_files =
-    match List.assoc_opt "EnvironmentFile" properties with
+    match List.assoc_opt "EnvironmentFiles" properties with
     | Some files_str ->
-        (* Can be multiple files separated by spaces or ; *)
+        (* Format: "/path/to/file.env (ignore_errors=no)" or multiple separated by spaces
+           Extract just the file paths, removing the (ignore_errors=...) suffix *)
         String.split_on_char ' ' files_str
-        |> List.filter (fun s -> String.trim s <> "")
+        |> List.filter_map (fun s ->
+            let trimmed = String.trim s in
+            if trimmed = "" || String.starts_with ~prefix:"(" trimmed then None
+            else if String.contains trimmed '(' then
+              (* Remove (ignore_errors=...) suffix *)
+              match String.index_opt trimmed '(' with
+              | Some idx -> Some (String.trim (String.sub trimmed 0 idx))
+              | None -> Some trimmed
+            else Some trimmed)
     | None -> []
   in
 
@@ -559,14 +568,16 @@ let build_external_service ~unit_name ~exec_start ~properties =
                 External_service.inferred ~source:"RPC probe" network_name
             | _result -> parsed_network)
         | None -> parsed_network)
-    | None, _, Some External_service.Node, Some data_dir -> (
-        (* Node with unknown network and known data_dir: try config.json *)
+    | None, _, Some External_service.Node, Some data_dir
+      when not (String.contains data_dir '$') -> (
+        (* Node with unknown network and known data_dir (fully resolved): try config.json *)
         match read_network_from_config_json data_dir with
         | Some network ->
             External_service.detected ~source:"config.json" network
         | None -> parsed_network)
-    | None, _, Some External_service.Dal_node, Some data_dir -> (
-        (* DAL node with unknown network and known data_dir: try config.json *)
+    | None, _, Some External_service.Dal_node, Some data_dir
+      when not (String.contains data_dir '$') -> (
+        (* DAL node with unknown network and known data_dir (fully resolved): try config.json *)
         match read_network_from_config_json data_dir with
         | Some network ->
             External_service.detected ~source:"config.json" network
@@ -844,7 +855,7 @@ let detect () =
                         "ActiveState";
                         "SubState";
                         "UnitFileState";
-                        "EnvironmentFile";
+                        "EnvironmentFiles";
                       ]
                 in
                 Some (build_external_service ~unit_name ~exec_start ~properties)
