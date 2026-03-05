@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Opam package now includes explicit homepage and bug-reports fields pointing to GitHub repository (fixes #729)
+
 ### Added
 
 - **Comprehensive Signatory documentation**: Added detailed setup guides covering all aspects of Signatory integration. New documentation includes [Signatory Setup Guide](/guides/signatory-setup/) with backend comparisons (file, YubiHSM, AWS/Azure/GCP KMS), security best practices (key management, network security, access control), troubleshooting procedures, performance tuning, and monitoring guidance. Added [Baker with Signatory Guide](/guides/baker-with-signatory/) with step-by-step baker setup using remote signers, including key generation, Signatory configuration, baker installation, connectivity verification, and production deployment checklist. CLI reference updated with complete `install-signatory` command documentation and examples for all backends. (closes #706)
