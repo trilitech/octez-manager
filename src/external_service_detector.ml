@@ -279,6 +279,49 @@ let probe_rpc_chain_id rpc_addr =
       with _ -> None)
   | Error _ -> None
 
+(** Read network from node's config.json file.
+    The network field can be either:
+    - A string: "network": "shadownet"
+    - An object: "network": {"chain_name": "TEZOS_MAINNET", ...}
+    
+    Returns the network alias (e.g., "mainnet", "shadownet") if found.
+    Returns None if:
+    - config.json doesn't exist
+    - Network field is missing
+    - Network field has unexpected format
+    - Permission denied
+    
+    Raises exception if JSON parsing fails (malformed JSON). *)
+let read_network_from_config_json data_dir =
+  let config_path = Filename.concat data_dir "config.json" in
+  if not (Sys.file_exists config_path) then None
+  else
+    try
+      let json = Yojson.Safe.from_file config_path in
+      let open Yojson.Safe.Util in
+      match member "network" json with
+      | `String s ->
+          (* Built-in network: "network": "shadownet" *)
+          Some (String.trim s)
+      | `Assoc _ as obj -> (
+          (* Custom network: "network": {"chain_name": "TEZOS_MAINNET", ...} *)
+          match member "chain_name" obj with
+          | `String chain_name -> (
+              (* Resolve chain_name to network alias *)
+              match
+                Teztnets.resolve_network_from_node_chain
+                  (String.trim chain_name)
+              with
+              | Ok network_info ->
+                  (* Normalize to lowercase for consistency *)
+                  Some (String.lowercase_ascii network_info.Teztnets.alias)
+              | Error _ -> None)
+          | _ -> None)
+      | _ -> None
+    with
+    | Sys_error _ -> None
+    | Yojson.Safe.Util.Type_error _ -> None
+
 (** {1 Process Inspection} *)
 
 (** Read /proc/PID/cmdline for a running process.
@@ -483,9 +526,14 @@ let build_external_service ~unit_name ~exec_start ~properties =
   (* Try to detect network via RPC probe if not already known *)
   let network_field =
     let parsed_network = build_field parsed.network in
-    match (parsed_network.value, active_state, role_field.value) with
-    | None, "active", Some role -> (
-        (* No network but service is active - try probe *)
+    match
+      ( parsed_network.value,
+        active_state,
+        role_field.value,
+        data_dir_field.value )
+    with
+    | None, "active", Some role, _ -> (
+        (* No network but service is active - try RPC probe *)
         let probe_addr =
           match role with
           | External_service.Node ->
@@ -510,6 +558,18 @@ let build_external_service ~unit_name ~exec_start ~properties =
             | Some (_chain_id, Some network_name) ->
                 External_service.inferred ~source:"RPC probe" network_name
             | _result -> parsed_network)
+        | None -> parsed_network)
+    | None, _, Some External_service.Node, Some data_dir -> (
+        (* Node with unknown network and known data_dir: try config.json *)
+        match read_network_from_config_json data_dir with
+        | Some network ->
+            External_service.detected ~source:"config.json" network
+        | None -> parsed_network)
+    | None, _, Some External_service.Dal_node, Some data_dir -> (
+        (* DAL node with unknown network and known data_dir: try config.json *)
+        match read_network_from_config_json data_dir with
+        | Some network ->
+            External_service.detected ~source:"config.json" network
         | None -> parsed_network)
     | _ -> parsed_network
   in
@@ -836,4 +896,6 @@ module For_tests = struct
   let systemctl_cmd = Systemd.systemctl_cmd
 
   let contains_octez_binary = contains_octez_binary
+
+  let read_network_from_config_json = read_network_from_config_json
 end
