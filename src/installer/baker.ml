@@ -36,7 +36,11 @@ let install_baker ?(quiet = false) (request : baker_request) =
         (match node_mode with
         | Remote _ -> "Remote"
         | Local_unmanaged _ -> "Local_unmanaged"
-        | Local _ -> "Local")
+        | Local svc ->
+            Printf.sprintf
+              "Local(instance=%s, data_dir=%s)"
+              svc.Service.instance
+              svc.Service.data_dir)
   in
   let history_mode =
     match node_mode with
@@ -153,30 +157,35 @@ let install_baker ?(quiet = false) (request : baker_request) =
         logging_mode = request.logging_mode;
         service_args = request.extra_args;
         extra_env =
-          [
-            ("OCTEZ_BAKER_BASE_DIR", base_dir);
-            ("OCTEZ_NODE_DATA_DIR", node_data_dir);
-            ("OCTEZ_NODE_ENDPOINT", node_endpoint);
-            ( "OCTEZ_NODE_INSTANCE",
-              match node_mode with
-              | Local svc -> svc.Service.instance
-              | Local_unmanaged _ | Remote _ -> "" );
-            ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
-            ( "OCTEZ_DAL_CONFIG",
-              match dal_config with
-              | Dal_disabled -> "disabled"
-              | Dal_endpoint ep -> ep
-              | Dal_auto -> "" );
-            ("OCTEZ_DAL_INSTANCE", Option.value ~default:"" request.dal_node);
-            ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
-            ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
-            ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
-            ("OCTEZ_BAKER_GLOBAL_ARGS", global_args_str);
-            ("OCTEZ_BAKER_COMMAND_ARGS", command_args_str);
-            ("OCTEZ_REMOTE_SIGNER_URI", Option.value ~default:"" signer_uri_opt);
-            ( "OCTEZ_SIGNATORY_INSTANCE",
-              Option.value ~default:"" signatory_instance );
-          ];
+          (let env =
+             [
+               ("OCTEZ_BAKER_BASE_DIR", base_dir);
+               ("OCTEZ_NODE_DATA_DIR", node_data_dir);
+               ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+               ( "OCTEZ_NODE_INSTANCE",
+                 match node_mode with
+                 | Local svc -> svc.Service.instance
+                 | Local_unmanaged _ | Remote _ -> "" );
+               ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
+               ( "OCTEZ_DAL_CONFIG",
+                 match dal_config with
+                 | Dal_disabled -> "disabled"
+                 | Dal_endpoint ep -> ep
+                 | Dal_auto -> "" );
+               ("OCTEZ_DAL_INSTANCE", Option.value ~default:"" request.dal_node);
+               ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
+               ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
+               ("OCTEZ_BAKER_LB_VOTE", liquidity_baking_vote);
+               ("OCTEZ_BAKER_GLOBAL_ARGS", global_args_str);
+               ("OCTEZ_BAKER_COMMAND_ARGS", command_args_str);
+             ]
+           in
+           if not quiet then (
+             Printf.eprintf
+               "[DEBUG baker.ml] extra_env for %s:\n%!"
+               request.instance ;
+             List.iter (fun (k, v) -> Printf.eprintf "  %s='%s'\n%!" k v) env) ;
+           env);
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;
         depends_on;
