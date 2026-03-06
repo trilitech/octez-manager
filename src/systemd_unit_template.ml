@@ -42,7 +42,7 @@ let exec_line role =
        --base-dir \\\"${OCTEZ_BAKER_BASE_DIR}\\\" --endpoint \
        \\\"${OCTEZ_NODE_ENDPOINT}\\\"\"; if [ \"$MODE\" = \"remote\" ]; then \
        CMD=\"$CMD run remotely\"; else CMD=\"$CMD run with local node \
-       \\\"${OCTEZ_DATA_DIR}\\\"\"; fi; CMD=\"$CMD \
+       \\\"${OCTEZ_NODE_DATA_DIR}\\\"\"; fi; CMD=\"$CMD \
        ${OCTEZ_BAKER_DELEGATES_ARGS:-}\"; DAL_CFG=\"${OCTEZ_DAL_CONFIG:-}\"; \
        if [ \"$DAL_CFG\" = \"disabled\" ]; then CMD=\"$CMD --without-dal\"; \
        elif [ -n \"$DAL_CFG\" ]; then CMD=\"$CMD --dal-node \
