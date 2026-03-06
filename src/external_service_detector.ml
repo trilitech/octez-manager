@@ -291,14 +291,14 @@ let probe_network_from_config data_dir =
       let open Yojson.Safe.Util in
       (* Network can be:
          - Missing/null (mainnet): no network field
-         - String (built-in networks): {"network": "ghostnet"}
+         - String (built-in networks): {"network": "shadownet"}
          - Object (custom networks): {"network": {"chain_name": "TEZOS_..."}} *)
       match member "network" json with
       | `Null ->
           (* No network field means mainnet *)
           Some "mainnet"
       | `String network_alias ->
-          (* Built-in network: {"network": "ghostnet"} *)
+          (* Built-in network: {"network": "shadownet"} *)
           Some network_alias
       | `Assoc _ as network_obj -> (
           (* Custom network: {"network": {"chain_name": "TEZOS_..."}} *)
