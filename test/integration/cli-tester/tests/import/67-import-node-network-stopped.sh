@@ -21,14 +21,14 @@ register_instance "$INSTANCE"
 register_external_service "node" "$INSTANCE"
 register_data_dir "$EXTERNAL_DATA"
 
-echo "Creating external node service (STOPPED) with ghostnet network..."
+echo "Creating external node service (STOPPED) with shadownet network..."
 
 # Create data directory
 mkdir -p "$EXTERNAL_DATA"
 
-# Initialize node config for ghostnet
+# Initialize node config for shadownet
 octez-node config init --data-dir="$EXTERNAL_DATA" \
-	--network=ghostnet \
+	--network=shadownet \
 	--history-mode=rolling \
 	--net-addr="127.0.0.1:$P2P_PORT" \
 	--rpc-addr="127.0.0.1:$RPC_PORT" >/dev/null 2>&1
@@ -38,12 +38,12 @@ chown -R tezos:tezos "$EXTERNAL_DATA"
 
 CONFIG_FILE="$EXTERNAL_DATA/config.json"
 
-# Verify network is ghostnet in config
+# Verify network is shadownet in config
 NETWORK_IN_CONFIG=$(jq -r '.network // empty' "$CONFIG_FILE")
 if [ -z "$NETWORK_IN_CONFIG" ]; then
 	CHAIN_NAME=$(jq -r '.["chain-name"] // .network."chain-name" // empty' "$CONFIG_FILE")
-	if [[ "$CHAIN_NAME" =~ GHOSTNET|ghostnet ]]; then
-		NETWORK_IN_CONFIG="ghostnet"
+	if [[ "$CHAIN_NAME" =~ SHADOWNET|shadownet ]]; then
+		NETWORK_IN_CONFIG="shadownet"
 	fi
 fi
 
@@ -91,8 +91,8 @@ fi
 META=$(om info "$INSTANCE" --json)
 DETECTED_NETWORK=$(echo "$META" | jq -r '.network')
 
-if [ "$DETECTED_NETWORK" != "ghostnet" ]; then
-	echo "ERROR: Network not correctly detected: got '$DETECTED_NETWORK', expected 'ghostnet'"
+if [ "$DETECTED_NETWORK" != "shadownet" ]; then
+	echo "ERROR: Network not correctly detected: got '$DETECTED_NETWORK', expected 'shadownet'"
 	echo "Metadata: $META"
 	exit 1
 fi
@@ -103,8 +103,8 @@ echo "✓ Network correctly detected: $DETECTED_NETWORK"
 NETWORK_AFTER=$(jq -r '.network // empty' "$CONFIG_FILE")
 if [ -z "$NETWORK_AFTER" ]; then
 	CHAIN_NAME=$(jq -r '.["chain-name"] // .network."chain-name" // empty' "$CONFIG_FILE")
-	if [[ "$CHAIN_NAME" =~ GHOSTNET|ghostnet ]]; then
-		NETWORK_AFTER="ghostnet"
+	if [[ "$CHAIN_NAME" =~ SHADOWNET|shadownet ]]; then
+		NETWORK_AFTER="shadownet"
 	fi
 fi
 
@@ -122,9 +122,9 @@ om start "$INSTANCE"
 # Wait for node to be responsive
 wait_for_node_rpc "$INSTANCE" 60
 
-# Verify node is actually on ghostnet
+# Verify node is actually on shadownet
 CHAIN_ID=$(curl -s "http://127.0.0.1:$RPC_PORT/chains/main/chain_id" | tr -d '"')
-# Ghostnet chain ID starts with NetX
+# Shadownet chain ID starts with NetX
 if [[ ! "$CHAIN_ID" =~ ^NetX ]]; then
 	echo "ERROR: Node not on expected network. Chain ID: $CHAIN_ID"
 	exit 1
