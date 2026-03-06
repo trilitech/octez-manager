@@ -359,14 +359,34 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
         Local_instance instance
     | None -> (
         (* No managed instance - check if original was "with local node" *)
+        let () =
+          Printf.eprintf
+            "[DEBUG import.ml] Baker %s: parsed.run_mode=%s, parsed.data_dir=%s\n\
+             %!"
+            instance
+            (Option.value ~default:"None" parsed.run_mode)
+            (Option.value ~default:"None" parsed.data_dir)
+        in
         match parsed.run_mode with
         | Some "with local node" -> (
             match parsed.data_dir with
             | Some data_dir ->
                 (* Use Local_datadir to preserve "with local node" behavior *)
+                let () =
+                  Printf.eprintf
+                    "[DEBUG import.ml] Creating Local_datadir with data_dir='%s'\n\
+                     %!"
+                    data_dir
+                in
                 Local_datadir (node_endpoint, data_dir)
             | None ->
                 (* Shouldn't happen, but fallback to remote *)
+                let () =
+                  Printf.eprintf
+                    "[DEBUG import.ml] ERROR: run_mode is 'with local node' \
+                     but data_dir is None!\n\
+                     %!"
+                in
                 Remote_endpoint node_endpoint)
         | _ ->
             (* Original was remote or unknown mode *)

@@ -27,6 +27,17 @@ let install_baker ?(quiet = false) (request : baker_request) =
     | Local_unmanaged (_, data_dir) -> data_dir
     | Local svc -> svc.Service.data_dir
   in
+  let () =
+    if not quiet then
+      Printf.eprintf
+        "[DEBUG baker.ml] node_data_dir='%s' for instance=%s mode=%s\n%!"
+        node_data_dir
+        request.instance
+        (match node_mode with
+        | Remote _ -> "Remote"
+        | Local_unmanaged _ -> "Local_unmanaged"
+        | Local _ -> "Local")
+  in
   let history_mode =
     match node_mode with
     | Local svc -> svc.Service.history_mode
