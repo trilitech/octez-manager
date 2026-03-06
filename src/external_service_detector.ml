@@ -289,11 +289,20 @@ let probe_network_from_config data_dir =
     try
       let json = Yojson.Safe.from_file config_path in
       let open Yojson.Safe.Util in
-      match member "network" json |> member "chain_name" with
-      | `String s -> (
-          match Teztnets.resolve_network_from_node_chain s with
-          | Ok network -> Some network.alias
-          | Error _ -> None)
+      (* Network can be either a string (built-in networks like "ghostnet")
+         or an object with chain_name field (custom networks) *)
+      match member "network" json with
+      | `String network_alias ->
+          (* Built-in network: {"network": "ghostnet"} *)
+          Some network_alias
+      | `Assoc _ as network_obj -> (
+          (* Custom network: {"network": {"chain_name": "TEZOS_..."}} *)
+          match member "chain_name" network_obj with
+          | `String chain_name -> (
+              match Teztnets.resolve_network_from_node_chain chain_name with
+              | Ok network -> Some network.alias
+              | Error _ -> None)
+          | _ -> None)
       | _ -> None
     with _ -> None
 
