@@ -63,4 +63,59 @@ if ! service_is_managed "$BAKER_INSTANCE"; then
 	exit 1
 fi
 
-echo "Cascade import test passed"
+echo "Services imported successfully, now verifying they start correctly..."
+
+# Start the node
+echo "Starting node..."
+om instance "$NODE_INSTANCE" start
+
+# Wait for node to become active
+if ! wait_for_service_active "node" "$NODE_INSTANCE" 30; then
+	echo "ERROR: Node service did not start after import"
+	show_service_logs "node" "$NODE_INSTANCE" 50
+	exit 1
+fi
+
+# Wait for node RPC to be ready
+if ! wait_for_node_ready "$NODE_RPC" 60; then
+	echo "ERROR: Node RPC not ready after import"
+	show_service_logs "node" "$NODE_INSTANCE" 50
+	exit 1
+fi
+
+echo "Node is running and RPC is ready"
+
+# Start the baker
+echo "Starting baker..."
+om instance "$BAKER_INSTANCE" start
+
+# Wait for baker to become active
+if ! wait_for_service_active "baker" "$BAKER_INSTANCE" 30; then
+	echo "ERROR: Baker service did not start after import"
+	show_service_logs "baker" "$BAKER_INSTANCE" 50
+	exit 1
+fi
+
+echo "Baker is running"
+
+# Give services a moment to stabilize
+sleep 5
+
+# Verify services are still active (didn't crash immediately)
+if ! service_is_active "node" "$NODE_INSTANCE"; then
+	echo "ERROR: Node service crashed after starting"
+	show_service_logs "node" "$NODE_INSTANCE" 50
+	exit 1
+fi
+
+if ! service_is_active "baker" "$BAKER_INSTANCE"; then
+	echo "ERROR: Baker service crashed after starting"
+	show_service_logs "baker" "$BAKER_INSTANCE" 50
+	exit 1
+fi
+
+# Stop services to avoid long sync
+systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
+systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
+
+echo "Cascade import test passed - services imported and started successfully"
