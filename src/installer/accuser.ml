@@ -21,6 +21,12 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         let* svc = lookup_node_service inst in
         Ok (Local svc)
   in
+  let node_data_dir =
+    match node_mode with
+    | Remote _ -> ""
+    | Local_unmanaged (_, data_dir) -> data_dir
+    | Local svc -> svc.Service.data_dir
+  in
   let history_mode =
     match node_mode with
     | Local svc -> svc.Service.history_mode
@@ -74,6 +80,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         extra_env =
           [
             ("OCTEZ_CLIENT_BASE_DIR", base_dir);
+            ("OCTEZ_NODE_DATA_DIR", node_data_dir);
             ("OCTEZ_NODE_ENDPOINT", node_endpoint);
             ( "OCTEZ_NODE_INSTANCE",
               match node_mode with
