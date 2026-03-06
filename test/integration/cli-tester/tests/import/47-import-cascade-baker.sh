@@ -43,12 +43,13 @@ create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "
 # Import baker with cascade
 echo "Importing baker with cascade (should also import node)..."
 om import "octez-baker@${BAKER_INSTANCE}" --cascade --network shadownet 2>&1 || {
+	echo "ERROR: Import command failed"
 	# Stop services to avoid long sync
 	systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
 	systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
 	# Clean up any partially imported instances
-	om instance "$BAKER_INSTANCE" remove --yes 2>/dev/null || true
-	om instance "$NODE_INSTANCE" remove --yes 2>/dev/null || true
+	om instance "$BAKER_INSTANCE" remove --yes 2>&1 || true
+	om instance "$NODE_INSTANCE" remove --yes 2>&1 || true
 	echo "Import command failed, checking what was imported..."
 	om list 2>&1
 	exit 1
@@ -119,11 +120,13 @@ if ! service_is_active "baker" "$BAKER_INSTANCE"; then
 fi
 
 # Stop services to avoid long sync
+echo "Stopping services..."
 systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
 systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
 
 # Clean up imported instances
-om instance "$BAKER_INSTANCE" remove --yes 2>/dev/null || true
-om instance "$NODE_INSTANCE" remove --yes 2>/dev/null || true
+echo "Removing imported instances..."
+om instance "$BAKER_INSTANCE" remove --yes 2>&1 || echo "WARNING: Failed to remove $BAKER_INSTANCE"
+om instance "$NODE_INSTANCE" remove --yes 2>&1 || echo "WARNING: Failed to remove $NODE_INSTANCE"
 
 echo "Cascade import test passed - services imported and started successfully"
