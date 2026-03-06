@@ -61,7 +61,7 @@ ensure_tezos_user
 SERVICE_NAME="octez-node-${INSTANCE}"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-sudo tee "$SERVICE_FILE" >/dev/null <<EOF
+cat >"$SERVICE_FILE" <<EOF
 [Unit]
 Description=Octez Node - ${INSTANCE}
 After=network.target
@@ -82,19 +82,19 @@ echo "ExecStart does NOT specify --network flag"
 echo "Network must be detected from config.json or data directory"
 
 # Set ownership
-sudo chown -R tezos:tezos "$DATA_DIR"
+chown -R tezos:tezos "$DATA_DIR"
 
 # Reload systemd but DON'T start the service
-sudo systemctl daemon-reload
+systemctl daemon-reload
 
 # Ensure service is stopped
-sudo systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+systemctl stop "$SERVICE_NAME" 2>/dev/null || true
 
 echo "Service is STOPPED (not running)"
 
 echo "Importing STOPPED external service with takeover..."
-expect_success octez-manager import detect
-expect_success octez-manager import takeover "$SERVICE_NAME" "$INSTANCE"
+octez-manager import detect
+octez-manager import takeover "$SERVICE_NAME" "$INSTANCE"
 
 echo "Verifying network detected and preserved..."
 
@@ -128,7 +128,7 @@ if [ -n "$NETWORK_IN_CONFIG" ]; then
 fi
 
 echo "Verifying imported service can start with preserved network..."
-expect_success octez-manager start "$INSTANCE"
+octez-manager start "$INSTANCE"
 
 # Wait for node to be responsive
 wait_for_node_rpc "$INSTANCE" 60
@@ -143,7 +143,7 @@ fi
 
 echo "✓ Node started on correct network (chain_id: $CHAIN_ID)"
 
-expect_success octez-manager stop "$INSTANCE"
+octez-manager stop "$INSTANCE"
 
 echo "✓ Test passed: Network preserved when importing stopped node"
 echo "  - Network detected from config.json"
