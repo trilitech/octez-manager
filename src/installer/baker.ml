@@ -28,19 +28,18 @@ let install_baker ?(quiet = false) (request : baker_request) =
     | Local svc -> svc.Service.data_dir
   in
   let () =
-    if not quiet then
-      Printf.eprintf
-        "[DEBUG baker.ml] node_data_dir='%s' for instance=%s mode=%s\n%!"
-        node_data_dir
-        request.instance
-        (match node_mode with
-        | Remote _ -> "Remote"
-        | Local_unmanaged _ -> "Local_unmanaged"
-        | Local svc ->
-            Printf.sprintf
-              "Local(instance=%s, data_dir=%s)"
-              svc.Service.instance
-              svc.Service.data_dir)
+    Printf.eprintf
+      "[DEBUG baker.ml] node_data_dir='%s' for instance=%s mode=%s\n%!"
+      node_data_dir
+      request.instance
+      (match node_mode with
+      | Remote _ -> "Remote"
+      | Local_unmanaged _ -> "Local_unmanaged"
+      | Local svc ->
+          Printf.sprintf
+            "Local(instance=%s, data_dir=%s)"
+            svc.Service.instance
+            svc.Service.data_dir)
   in
   let history_mode =
     match node_mode with
@@ -180,11 +179,10 @@ let install_baker ?(quiet = false) (request : baker_request) =
                ("OCTEZ_BAKER_COMMAND_ARGS", command_args_str);
              ]
            in
-           if not quiet then (
-             Printf.eprintf
-               "[DEBUG baker.ml] extra_env for %s:\n%!"
-               request.instance ;
-             List.iter (fun (k, v) -> Printf.eprintf "  %s='%s'\n%!" k v) env) ;
+           Printf.eprintf
+             "[DEBUG baker.ml] extra_env for %s:\n%!"
+             request.instance ;
+           List.iter (fun (k, v) -> Printf.eprintf "  %s='%s'\n%!" k v) env ;
            env);
         extra_paths = [base_dir];
         auto_enable = request.auto_enable;
