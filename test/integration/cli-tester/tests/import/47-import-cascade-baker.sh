@@ -34,7 +34,7 @@ wait_for_node_ready "$NODE_RPC" 30
 
 # Create external baker service that depends on node
 echo "Creating external baker service that depends on node..."
-create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "http://$NODE_RPC" "$BAKER_DATA" "$NODE_INSTANCE"
+create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "http://$NODE_RPC" "$BAKER_DATA" "$NODE_INSTANCE" "$NODE_DATA"
 
 # Note: Baker service should have After= and Requires= for node
 # Don't enable the baker yet - let the import command handle that

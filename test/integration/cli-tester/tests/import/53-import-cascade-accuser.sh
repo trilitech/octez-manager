@@ -36,7 +36,7 @@ wait_for_node_ready "$NODE_RPC" 30
 
 # Create external accuser service that depends on node
 echo "Creating external accuser service that depends on node..."
-create_external_service "accuser" "$ACCUSER_INSTANCE" "$ACCUSER_DATA" "" "shadownet" "http://$NODE_RPC" "$ACCUSER_DATA" "$NODE_INSTANCE"
+create_external_service "accuser" "$ACCUSER_INSTANCE" "$ACCUSER_DATA" "" "shadownet" "http://$NODE_RPC" "$ACCUSER_DATA" "$NODE_INSTANCE" "$NODE_DATA"
 
 # Import accuser with cascade
 # Prior to fix #512, this would fail because:
