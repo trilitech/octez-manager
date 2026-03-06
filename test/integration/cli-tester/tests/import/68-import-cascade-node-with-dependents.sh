@@ -39,11 +39,11 @@ wait_for_node_ready "$NODE_RPC" 30
 
 # Create external baker service that depends on node
 echo "Creating external baker service that depends on node..."
-create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "http://$NODE_RPC" "$BAKER_DATA" "$NODE_INSTANCE"
+create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "http://$NODE_RPC" "$BAKER_DATA" "$NODE_INSTANCE" "$NODE_DATA"
 
 # Create external accuser service that depends on node
 echo "Creating external accuser service that depends on node..."
-create_external_service "accuser" "$ACCUSER_INSTANCE" "$ACCUSER_DATA" "" "shadownet" "http://$NODE_RPC" "$ACCUSER_DATA" "$NODE_INSTANCE"
+create_external_service "accuser" "$ACCUSER_INSTANCE" "$ACCUSER_DATA" "" "shadownet" "http://$NODE_RPC" "$ACCUSER_DATA" "$NODE_INSTANCE" "$NODE_DATA"
 
 # Import node with cascade (should import node + baker + accuser)
 echo "Importing node with cascade (should also import baker and accuser dependents)..."
