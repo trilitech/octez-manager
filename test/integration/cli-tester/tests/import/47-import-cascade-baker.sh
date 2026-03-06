@@ -46,8 +46,12 @@ om import "octez-baker@${BAKER_INSTANCE}" --cascade --network shadownet 2>&1 || 
 	# Stop services to avoid long sync
 	systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
 	systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
+	# Clean up any partially imported instances
+	om instance "$BAKER_INSTANCE" remove --yes 2>/dev/null || true
+	om instance "$NODE_INSTANCE" remove --yes 2>/dev/null || true
 	echo "Import command failed, checking what was imported..."
 	om list 2>&1
+	exit 1
 }
 
 # Verify both node and baker are now managed
@@ -117,5 +121,9 @@ fi
 # Stop services to avoid long sync
 systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
 systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
+
+# Clean up imported instances
+om instance "$BAKER_INSTANCE" remove --yes 2>/dev/null || true
+om instance "$NODE_INSTANCE" remove --yes 2>/dev/null || true
 
 echo "Cascade import test passed - services imported and started successfully"
