@@ -47,9 +47,9 @@ om import "octez-baker@${BAKER_INSTANCE}" --cascade --network shadownet 2>&1 || 
 	# Stop services to avoid long sync
 	systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
 	systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
-	# Clean up any partially imported instances
-	om instance "$BAKER_INSTANCE" remove --yes 2>&1 || true
-	om instance "$NODE_INSTANCE" remove --yes 2>&1 || true
+	# Clean up any partially imported instances (remove dependent first)
+	om instance "$BAKER_INSTANCE" remove 2>&1 || true
+	om instance "$NODE_INSTANCE" remove 2>&1 || true
 	echo "Import command failed, checking what was imported..."
 	om list 2>&1
 	exit 1
@@ -124,9 +124,9 @@ echo "Stopping services..."
 systemctl stop "octez-baker@${BAKER_INSTANCE}.service" 2>/dev/null || true
 systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
 
-# Clean up imported instances
+# Clean up imported instances (remove dependent first)
 echo "Removing imported instances..."
-om instance "$BAKER_INSTANCE" remove --yes 2>&1 || echo "WARNING: Failed to remove $BAKER_INSTANCE"
-om instance "$NODE_INSTANCE" remove --yes 2>&1 || echo "WARNING: Failed to remove $NODE_INSTANCE"
+om instance "$BAKER_INSTANCE" remove 2>&1 || echo "WARNING: Failed to remove $BAKER_INSTANCE"
+om instance "$NODE_INSTANCE" remove 2>&1 || echo "WARNING: Failed to remove $NODE_INSTANCE"
 
 echo "Cascade import test passed - services imported and started successfully"
