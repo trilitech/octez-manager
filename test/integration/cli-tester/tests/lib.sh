@@ -358,7 +358,7 @@ Requires=octez-node@${node_instance}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=$octez_bin_path/octez-baker-PsParisC run --endpoint $node_endpoint --base-dir $base_dir --liquidity-baking-toggle-vote pass with local node $node_data_dir
+ExecStart=$octez_bin_path/octez-baker run with local node $node_data_dir for shadownet --endpoint $node_endpoint --base-dir $base_dir --liquidity-baking-toggle-vote pass
 Restart=on-failure
 RestartSec=5
 
@@ -380,7 +380,7 @@ Requires=octez-node@${node_instance}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=$octez_bin_path/octez-accuser-PsParisC run --endpoint $node_endpoint --base-dir $base_dir
+ExecStart=$octez_bin_path/octez-accuser run for shadownet --endpoint $node_endpoint --base-dir $base_dir
 Restart=on-failure
 RestartSec=5
 
