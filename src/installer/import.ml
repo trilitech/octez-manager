@@ -1362,6 +1362,14 @@ let import_service ?(on_log = fun _ -> ())
       in
       (* 8. Start managed service *)
       log (Printf.sprintf "[5/6] Starting managed service: %s" instance_name) ;
+      (* Debug: show the actual systemd unit file content *)
+      (match
+         Systemd.cat_unit ~role:created_svc.Service.role ~instance:instance_name
+       with
+      | Ok content ->
+          log (Printf.sprintf "DEBUG: Systemd unit file content:\n%s" content)
+      | Error (`Msg err) ->
+          log (Printf.sprintf "DEBUG: Failed to read unit file: %s" err)) ;
       let* () =
         Lifecycle.start_service ~quiet:true ~instance:instance_name ()
       in
@@ -1376,11 +1384,37 @@ let import_service ?(on_log = fun _ -> ())
       let* () =
         if unit_state.active_state = "active" then Ok ()
         else
+          (* Capture journalctl logs to diagnose the failure *)
+          let unit_name =
+            match created_svc.Service.role with
+            | "signatory" -> Printf.sprintf "signatory@%s.service" instance_name
+            | _ ->
+                Printf.sprintf
+                  "octez-%s@%s.service"
+                  created_svc.Service.role
+                  instance_name
+          in
+          let systemctl_prefix = if Paths.is_root () then [] else ["--user"] in
+          let journalctl_args =
+            systemctl_prefix
+            @ ["journalctl"; "-u"; unit_name; "-n"; "50"; "--no-pager"]
+          in
+          let journal_output =
+            match Cmd_runner.run_out journalctl_args with
+            | Ok logs -> logs
+            | Error (`Msg err) ->
+                Printf.sprintf "(failed to retrieve journal logs: %s)" err
+          in
+          log
+            (Printf.sprintf
+               "Service journal logs (last 50 lines):\n%s"
+               journal_output) ;
           Error
             (`Msg
                (Printf.sprintf
-                  "Service failed to start (state: %s)"
-                  unit_state.active_state))
+                  "Service failed to start (state: %s)\nJournal logs:\n%s"
+                  unit_state.active_state
+                  journal_output))
       in
       log "Import successful!" ;
       (* Build preserved paths list *)
