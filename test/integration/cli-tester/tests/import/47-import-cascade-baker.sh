@@ -126,29 +126,7 @@ systemctl stop "octez-node@${NODE_INSTANCE}.service" 2>/dev/null || true
 
 # Clean up imported instances (remove dependent first, then parent)
 echo "Removing imported instances..."
-
-# Show what instances exist before cleanup
-echo "Instances before cleanup:"
-om list 2>&1 || true
-
-# Remove baker first (it depends on node, but has no dependents)
-echo "Removing baker..."
-if ! om instance "$BAKER_INSTANCE" remove 2>&1; then
-	echo "WARNING: Failed to remove $BAKER_INSTANCE"
-	echo "Checking if baker has dependents:"
-	om instance "$BAKER_INSTANCE" show 2>&1 || true
-fi
-
-# Remove node (should work now that baker is gone)
-echo "Removing node..."
-if ! om instance "$NODE_INSTANCE" remove 2>&1; then
-	echo "WARNING: Failed to remove $NODE_INSTANCE"
-	echo "Checking if node still has dependents:"
-	om instance "$NODE_INSTANCE" show 2>&1 || true
-fi
-
-# Verify cleanup
-echo "Instances after cleanup:"
-om list 2>&1 || true
+cleanup_instance "$BAKER_INSTANCE"
+cleanup_instance "$NODE_INSTANCE"
 
 echo "Cascade import test passed - services imported and started successfully"
