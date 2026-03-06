@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_at": "2026-02-23T10:00:00.000000",
-    "generated_by": "manual update - added group tests + signatory tests",
-    "total_tests": 72,
-    "total_duration": 569.04,
+    "generated_at": "2026-03-06T17:00:00.000000",
+    "generated_by": "manual update - added test 67 (import stopped node)",
+    "total_tests": 73,
+    "total_duration": 571.04,
     "shard_count": 5,
-    "mean_shard_duration": 113.81,
+    "mean_shard_duration": 114.21,
     "max_shard_duration": 123.66,
     "min_shard_duration": 110.61,
     "duration_std_dev": 4.5,
@@ -61,6 +61,7 @@
       "import/46-import-clone-node.sh",
       "import/50-import-field-overrides.sh",
       "import/43-import-detect-service-based.sh",
+      "import/67-import-node-network-stopped.sh",
       "baker/34-baker-multiple-instances.sh",
       "baker/26-baker-basic-install.sh",
       "accuser/38-accuser-show-service.sh",
@@ -68,8 +69,8 @@
       "node/06-install-custom-rpc-net.sh",
       "node/09-install-no-snapshot.sh"
     ],
-    "test_count": 14,
-    "total_duration": 118.0
+    "test_count": 15,
+    "total_duration": 120.0
   },
   "shard-4": {
     "tests": [
