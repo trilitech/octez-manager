@@ -21,12 +21,6 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         let* svc = lookup_node_service inst in
         Ok (Local svc)
   in
-  let node_data_dir =
-    match node_mode with
-    | Remote _ -> ""
-    | Local_unmanaged (_, data_dir) -> data_dir
-    | Local svc -> svc.Service.data_dir
-  in
   let history_mode =
     match node_mode with
     | Local svc -> svc.Service.history_mode
@@ -68,7 +62,7 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         instance = request.instance;
         network;
         history_mode;
-        data_dir = node_data_dir;
+        data_dir = base_dir;
         rpc_addr = Rpc_addr.of_string node_endpoint;
         net_addr = "";
         service_user = request.service_user;
