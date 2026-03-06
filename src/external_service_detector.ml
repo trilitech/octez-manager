@@ -289,9 +289,14 @@ let probe_network_from_config data_dir =
     try
       let json = Yojson.Safe.from_file config_path in
       let open Yojson.Safe.Util in
-      (* Network can be either a string (built-in networks like "ghostnet")
-         or an object with chain_name field (custom networks) *)
+      (* Network can be:
+         - Missing/null (mainnet): no network field
+         - String (built-in networks): {"network": "ghostnet"}
+         - Object (custom networks): {"network": {"chain_name": "TEZOS_..."}} *)
       match member "network" json with
+      | `Null ->
+          (* No network field means mainnet *)
+          Some "mainnet"
       | `String network_alias ->
           (* Built-in network: {"network": "ghostnet"} *)
           Some network_alias
