@@ -279,6 +279,24 @@ let probe_rpc_chain_id rpc_addr =
       with _ -> None)
   | Error _ -> None
 
+(** Try to infer network from data_dir/config.json.
+    Returns Some network_name if the config file exists and contains a valid network.
+    This is used as a fallback when RPC is not accessible (e.g., stopped nodes). *)
+let probe_network_from_config data_dir =
+  let config_path = Filename.concat data_dir "config.json" in
+  if not (Sys.file_exists config_path) then None
+  else
+    try
+      let json = Yojson.Safe.from_file config_path in
+      let open Yojson.Safe.Util in
+      match member "network" json |> member "chain_name" with
+      | `String s -> (
+          match Teztnets.resolve_network_from_node_chain s with
+          | Ok network -> Some network.alias
+          | Error _ -> None)
+      | _ -> None
+    with _ -> None
+
 (** {1 Process Inspection} *)
 
 (** Read /proc/PID/cmdline for a running process.
@@ -480,17 +498,35 @@ let build_external_service ~unit_name ~exec_start ~properties =
   let dal_endpoint_field = build_field parsed.dal_endpoint in
   let history_mode_field = build_field parsed.history_mode in
 
-  (* Try to detect network via RPC probe if not already known *)
+  (* Try to detect network if not already known from command-line parsing *)
   let network_field =
     let parsed_network = build_field parsed.network in
-    match (parsed_network.value, active_state, role_field.value) with
-    | None, "active", Some role -> (
-        (* No network but service is active - try probe *)
+    match (parsed_network.value, role_field.value) with
+    | None, Some External_service.Node -> (
+        (* Network unknown for node - try fallbacks in priority order:
+           1. Read from config.json (no network I/O, works for stopped nodes)
+           2. RPC probe (only if service is active) *)
+        let from_config =
+          match data_dir_field.value with
+          | Some data_dir -> probe_network_from_config data_dir
+          | None -> None
+        in
+        match from_config with
+        | Some network_name ->
+            External_service.inferred ~source:"config.json" network_name
+        | None -> (
+            (* Fallback to RPC probe if service is active *)
+            match (active_state, rpc_addr_field.value) with
+            | "active", Some addr -> (
+                match probe_rpc_chain_id addr with
+                | Some (_chain_id, Some network_name) ->
+                    External_service.inferred ~source:"RPC probe" network_name
+                | _ -> parsed_network)
+            | _ -> parsed_network))
+    | None, Some role when active_state = "active" -> (
+        (* For other roles (baker/accuser/dal/signatory), only try RPC probe if active *)
         let probe_addr =
           match role with
-          | External_service.Node ->
-              (* Nodes: probe their own RPC endpoint *)
-              rpc_addr_field.value
           | External_service.Baker | External_service.Accuser
           | External_service.Dal_node ->
               (* Baker/Accuser/DAL: probe their connected node's endpoint *)
@@ -503,13 +539,16 @@ let build_external_service ~unit_name ~exec_start ~properties =
               match rpc_addr_field.value with
               | Some addr -> Some addr
               | None -> endpoint_field.value)
+          | External_service.Node ->
+              (* Already handled above *)
+              None
         in
         match probe_addr with
         | Some addr -> (
             match probe_rpc_chain_id addr with
             | Some (_chain_id, Some network_name) ->
                 External_service.inferred ~source:"RPC probe" network_name
-            | _result -> parsed_network)
+            | _ -> parsed_network)
         | None -> parsed_network)
     | _ -> parsed_network
   in
@@ -836,4 +875,6 @@ module For_tests = struct
   let systemctl_cmd = Systemd.systemctl_cmd
 
   let contains_octez_binary = contains_octez_binary
+
+  let probe_network_from_config = probe_network_from_config
 end

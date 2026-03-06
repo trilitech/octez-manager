@@ -77,4 +77,6 @@ module For_tests : sig
   val systemctl_cmd : unit -> string list
 
   val contains_octez_binary : string -> bool
+
+  val probe_network_from_config : string -> string option
 end
