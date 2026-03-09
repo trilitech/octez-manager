@@ -224,6 +224,8 @@ _octez-manager() {
     '--all[Show both managed and external services]'
     '-e[Show only external (unmanaged) services]'
     '--external[Show only external (unmanaged) services]'
+    '-i[List only managed services (no external detection)]'
+    '--internal[List only managed services (no external detection)]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
