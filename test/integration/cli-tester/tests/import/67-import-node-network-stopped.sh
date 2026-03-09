@@ -116,7 +116,7 @@ fi
 echo "✓ Config.json network unchanged"
 
 echo "Verifying imported service can start with preserved network..."
-om start "$INSTANCE"
+systemctl start "octez-node@${INSTANCE}"
 
 # Wait for node to be responsive
 wait_for_node_rpc "$INSTANCE" 60
@@ -131,6 +131,6 @@ fi
 
 echo "✓ Node started on correct network (chain_id: $CHAIN_ID)"
 
-om stop "$INSTANCE"
+systemctl stop "octez-node@${INSTANCE}"
 
 echo "✓ Test passed: Network preserved when importing stopped node"
