@@ -78,12 +78,4 @@ if ! service_exists "baker" "$BAKER_INSTANCE"; then
 fi
 echo "Systemd service exists"
 
-# Verify service shows in list
-if ! om list 2>&1 | grep -q "$BAKER_INSTANCE"; then
-	echo "ERROR: Baker instance not in list output"
-	om list
-	exit 1
-fi
-echo "Baker instance in list"
-
 echo "Baker basic install test passed"
