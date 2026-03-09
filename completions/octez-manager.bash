@@ -187,7 +187,7 @@ _octez_manager() {
       ;;
     list)
       if [[ $cur == -* ]]; then
-        opts="-a --all -e --external --help --version"
+        opts="-a --all -e --external -i --internal --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
