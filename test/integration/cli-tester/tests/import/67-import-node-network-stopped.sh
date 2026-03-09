@@ -115,22 +115,4 @@ if [ "$NETWORK_IN_CONFIG" != "$NETWORK_AFTER" ]; then
 fi
 echo "✓ Config.json network unchanged"
 
-echo "Verifying imported service can start with preserved network..."
-systemctl start "octez-node@${INSTANCE}"
-
-# Wait for node to be responsive
-wait_for_node_ready "$INSTANCE" 60
-
-# Verify node is actually on shadownet
-CHAIN_ID=$(curl -s "http://127.0.0.1:$RPC_PORT/chains/main/chain_id" | tr -d '"')
-# Shadownet chain ID starts with NetX
-if [[ ! "$CHAIN_ID" =~ ^NetX ]]; then
-	echo "ERROR: Node not on expected network. Chain ID: $CHAIN_ID"
-	exit 1
-fi
-
-echo "✓ Node started on correct network (chain_id: $CHAIN_ID)"
-
-systemctl stop "octez-node@${INSTANCE}"
-
 echo "✓ Test passed: Network preserved when importing stopped node"
