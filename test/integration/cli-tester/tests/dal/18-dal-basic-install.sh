@@ -84,4 +84,12 @@ if ! service_exists "dal-node" "$DAL_INSTANCE"; then
 fi
 echo "Systemd service exists"
 
+# Verify service shows in list (using --internal for robustness)
+if ! om list --internal 2>&1 | grep -q "$DAL_INSTANCE"; then
+	echo "ERROR: DAL instance not in list output"
+	om list --internal
+	exit 1
+fi
+echo "DAL instance in list"
+
 echo "DAL basic install test passed"
