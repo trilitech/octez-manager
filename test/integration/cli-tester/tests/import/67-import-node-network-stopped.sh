@@ -119,7 +119,7 @@ echo "Verifying imported service can start with preserved network..."
 systemctl start "octez-node@${INSTANCE}"
 
 # Wait for node to be responsive
-wait_for_node_rpc "$INSTANCE" 60
+wait_for_node_ready "$INSTANCE" 60
 
 # Verify node is actually on shadownet
 CHAIN_ID=$(curl -s "http://127.0.0.1:$RPC_PORT/chains/main/chain_id" | tr -d '"')
