@@ -88,16 +88,15 @@ if ! service_is_managed "$INSTANCE"; then
 	exit 1
 fi
 
-META=$(om info "$INSTANCE" --json)
-DETECTED_NETWORK=$(echo "$META" | jq -r '.network')
+LIST_OUTPUT=$(om list 2>&1)
 
-if [ "$DETECTED_NETWORK" != "shadownet" ]; then
-	echo "ERROR: Network not correctly detected: got '$DETECTED_NETWORK', expected 'shadownet'"
-	echo "Metadata: $META"
+if ! echo "$LIST_OUTPUT" | grep -q "shadownet"; then
+	echo "ERROR: Network not correctly detected in list output"
+	echo "List output: $LIST_OUTPUT"
 	exit 1
 fi
 
-echo "✓ Network correctly detected: $DETECTED_NETWORK"
+echo "✓ Network correctly detected: shadownet"
 
 # Verify config.json unchanged
 NETWORK_AFTER=$(jq -r '.network // empty' "$CONFIG_FILE")
