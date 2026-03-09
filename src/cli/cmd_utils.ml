@@ -11,10 +11,11 @@ module S = Service
 
 let list_cmd =
   let term =
-    let run show_all show_external =
+    let run show_all show_external show_internal =
       Capabilities.register () ;
-      (* Get managed services *)
-      let managed_services =
+
+      (* Internal flag: only list managed services, ignore all/external flags *)
+      if show_internal then (
         match
           Miaou_interfaces.Capability.get
             Manager_interfaces.Service_manager_capability.key
@@ -22,44 +23,64 @@ let list_cmd =
         | Some cap -> (
             let module SM = (val cap : Manager_interfaces.Service_manager) in
             match SM.list () with
-            | Ok services -> services
+            | Ok services ->
+                Cli_output.print_services services ;
+                `Ok ()
             | Error (`Msg msg) ->
+                Format.eprintf "Failed to list managed services: %s@." msg ;
+                `Error (false, msg))
+        | None ->
+            Format.eprintf "Service manager capability not available@." ;
+            `Error (false, "Service manager capability not available"))
+      else
+        (* Get managed services *)
+        let managed_services =
+          match
+            Miaou_interfaces.Capability.get
+              Manager_interfaces.Service_manager_capability.key
+          with
+          | Some cap -> (
+              let module SM = (val cap : Manager_interfaces.Service_manager) in
+              match SM.list () with
+              | Ok services -> services
+              | Error (`Msg msg) ->
+                  Format.eprintf
+                    "Warning: Failed to list managed services: %s@."
+                    msg ;
+                  [])
+          | None ->
+              Format.eprintf
+                "Warning: Service manager capability not available@." ;
+              []
+        in
+
+        (* Get external services if requested *)
+        let external_services =
+          if show_all || show_external then (
+            match External_service_detector.detect () with
+            | Ok services -> services
+            | Error msg ->
                 Format.eprintf
-                  "Warning: Failed to list managed services: %s@."
+                  "Warning: Failed to detect external services: %s@."
                   msg ;
                 [])
-        | None ->
-            Format.eprintf "Warning: Service manager capability not available@." ;
-            []
-      in
+          else []
+        in
 
-      (* Get external services if requested *)
-      let external_services =
-        if show_all || show_external then (
-          match External_service_detector.detect () with
-          | Ok services -> services
-          | Error msg ->
-              Format.eprintf
-                "Warning: Failed to detect external services: %s@."
-                msg ;
-              [])
-        else []
-      in
+        (* Display based on flags *)
+        if show_external then
+          (* Only external services *)
+          Cli_output.print_external_services external_services
+        else if show_all then
+          (* Both managed and external *)
+          Cli_output.print_all_services
+            ~managed:managed_services
+            ~external_:external_services
+        else
+          (* Only managed services (default) *)
+          Cli_output.print_services managed_services ;
 
-      (* Display based on flags *)
-      if show_external then
-        (* Only external services *)
-        Cli_output.print_external_services external_services
-      else if show_all then
-        (* Both managed and external *)
-        Cli_output.print_all_services
-          ~managed:managed_services
-          ~external_:external_services
-      else
-        (* Only managed services (default) *)
-        Cli_output.print_services managed_services ;
-
-      `Ok ()
+        `Ok ()
     in
     let all_flag =
       let doc = "Show both managed and external services" in
@@ -69,7 +90,13 @@ let list_cmd =
       let doc = "Show only external (unmanaged) services" in
       Arg.(value & flag & info ["external"; "e"] ~doc)
     in
-    Term.(ret (const run $ all_flag $ external_flag))
+    let internal_flag =
+      let doc =
+        "List only managed services (fast, robust for parallel execution)"
+      in
+      Arg.(value & flag & info ["internal"; "i"] ~doc)
+    in
+    Term.(ret (const run $ all_flag $ external_flag $ internal_flag))
   in
   let info =
     Cmd.info
@@ -81,6 +108,10 @@ let list_cmd =
           `P "List Octez services. By default, shows only managed services.";
           `P "Use --all to include external services detected on the system.";
           `P "Use --external to show only external services.";
+          `P
+            "Use --internal for a fast, robust listing of only managed \
+             services. This flag skips external service detection and is \
+             recommended for automated tools and parallel test execution.";
         ]
   in
   Cmd.v info term
