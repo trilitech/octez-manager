@@ -328,6 +328,7 @@ create_external_service() {
 
 	case "$role" in
 	node)
+		local p2p_addr="127.0.0.1:$(alloc_port)"
 		cat >"$unit_dir/$unit_name" <<SERVICE
 [Unit]
 Description=External Octez Node - $instance
@@ -336,7 +337,7 @@ After=network.target
 [Service]
 Type=simple
 User=tezos
-ExecStart=$octez_bin_path/octez-node run --data-dir $data_dir --network $network --rpc-addr $rpc_addr
+ExecStart=$octez_bin_path/octez-node run --data-dir $data_dir --network $network --rpc-addr $rpc_addr --net-addr $p2p_addr
 Restart=on-failure
 RestartSec=5
 
