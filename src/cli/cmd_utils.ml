@@ -9,32 +9,16 @@ open Cmdliner
 open Octez_manager_lib
 module S = Service
 
+type list_mode = Internal | External | All | Default
+
 let list_cmd =
   let term =
-    let run show_all show_external show_internal =
+    let run list_mode =
       Capabilities.register () ;
 
-      (* Internal flag: only list managed services, ignore all/external flags *)
-      if show_internal then (
-        match
-          Miaou_interfaces.Capability.get
-            Manager_interfaces.Service_manager_capability.key
-        with
-        | Some cap -> (
-            let module SM = (val cap : Manager_interfaces.Service_manager) in
-            match SM.list () with
-            | Ok services ->
-                Cli_output.print_services services ;
-                `Ok ()
-            | Error (`Msg msg) ->
-                Format.eprintf "Failed to list managed services: %s@." msg ;
-                `Error (false, msg))
-        | None ->
-            Format.eprintf "Service manager capability not available@." ;
-            `Error (false, "Service manager capability not available"))
-      else
-        (* Get managed services *)
-        let managed_services =
+      match list_mode with
+      | Internal -> (
+          (* Only list managed services, skip external detection *)
           match
             Miaou_interfaces.Capability.get
               Manager_interfaces.Service_manager_capability.key
@@ -42,61 +26,91 @@ let list_cmd =
           | Some cap -> (
               let module SM = (val cap : Manager_interfaces.Service_manager) in
               match SM.list () with
-              | Ok services -> services
+              | Ok services ->
+                  Cli_output.print_services services ;
+                  `Ok ()
               | Error (`Msg msg) ->
+                  Format.eprintf "Failed to list managed services: %s@." msg ;
+                  `Error (false, msg))
+          | None ->
+              Format.eprintf "Service manager capability not available@." ;
+              `Error (false, "Service manager capability not available"))
+      | External | All | Default ->
+          (* Get managed services *)
+          let managed_services =
+            match
+              Miaou_interfaces.Capability.get
+                Manager_interfaces.Service_manager_capability.key
+            with
+            | Some cap -> (
+                let module SM = (val cap : Manager_interfaces.Service_manager)
+                in
+                match SM.list () with
+                | Ok services -> services
+                | Error (`Msg msg) ->
+                    Format.eprintf
+                      "Warning: Failed to list managed services: %s@."
+                      msg ;
+                    [])
+            | None ->
+                Format.eprintf
+                  "Warning: Service manager capability not available@." ;
+                []
+          in
+
+          (* Get external services if requested *)
+          let external_services =
+            if list_mode = All || list_mode = External then (
+              match External_service_detector.detect () with
+              | Ok services -> services
+              | Error msg ->
                   Format.eprintf
-                    "Warning: Failed to list managed services: %s@."
+                    "Warning: Failed to detect external services: %s@."
                     msg ;
                   [])
-          | None ->
-              Format.eprintf
-                "Warning: Service manager capability not available@." ;
-              []
-        in
+            else []
+          in
 
-        (* Get external services if requested *)
-        let external_services =
-          if show_all || show_external then (
-            match External_service_detector.detect () with
-            | Ok services -> services
-            | Error msg ->
-                Format.eprintf
-                  "Warning: Failed to detect external services: %s@."
-                  msg ;
-                [])
-          else []
-        in
+          (* Display based on mode *)
+          (match list_mode with
+          | External ->
+              (* Only external services *)
+              Cli_output.print_external_services external_services
+          | All ->
+              (* Both managed and external *)
+              Cli_output.print_all_services
+                ~managed:managed_services
+                ~external_:external_services
+          | Default ->
+              (* Only managed services *)
+              Cli_output.print_services managed_services
+          | Internal -> assert false (* handled above *)) ;
 
-        (* Display based on flags *)
-        if show_external then
-          (* Only external services *)
-          Cli_output.print_external_services external_services
-        else if show_all then
-          (* Both managed and external *)
-          Cli_output.print_all_services
-            ~managed:managed_services
-            ~external_:external_services
-        else
-          (* Only managed services (default) *)
-          Cli_output.print_services managed_services ;
-
-        `Ok ()
+          `Ok ()
     in
-    let all_flag =
-      let doc = "Show both managed and external services" in
-      Arg.(value & flag & info ["all"; "a"] ~doc)
-    in
-    let external_flag =
-      let doc = "Show only external (unmanaged) services" in
-      Arg.(value & flag & info ["external"; "e"] ~doc)
-    in
-    let internal_flag =
-      let doc =
-        "List only managed services (fast, robust for parallel execution)"
+    let mode_term =
+      let all_flag =
+        let doc = "Show both managed and external services" in
+        Arg.(value & flag & info ["all"; "a"] ~doc)
       in
-      Arg.(value & flag & info ["internal"; "i"] ~doc)
+      let external_flag =
+        let doc = "Show only external (unmanaged) services" in
+        Arg.(value & flag & info ["external"; "e"] ~doc)
+      in
+      let internal_flag =
+        let doc = "List only managed services (no external detection)" in
+        Arg.(value & flag & info ["internal"; "i"] ~doc)
+      in
+      let determine_mode all external_ internal =
+        match (all, external_, internal) with
+        | true, _, _ -> All
+        | _, true, _ -> External
+        | _, _, true -> Internal
+        | false, false, false -> Default
+      in
+      Term.(const determine_mode $ all_flag $ external_flag $ internal_flag)
     in
-    Term.(ret (const run $ all_flag $ external_flag $ internal_flag))
+    Term.(ret (const run $ mode_term))
   in
   let info =
     Cmd.info
