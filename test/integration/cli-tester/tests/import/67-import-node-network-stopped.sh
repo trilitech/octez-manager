@@ -62,7 +62,7 @@ After=network.target
 [Service]
 Type=simple
 User=tezos
-ExecStart=/usr/bin/octez-node run --data-dir=${EXTERNAL_DATA} --history-mode=rolling
+ExecStart=/usr/local/bin/octez-node run --data-dir=${EXTERNAL_DATA} --history-mode=rolling
 Restart=on-failure
 StandardOutput=journal
 StandardError=journal
