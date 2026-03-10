@@ -24,7 +24,7 @@ log "Creating external node with specific ownership/permissions..."
 
 # Create data directory
 DATA_DIR="/tmp/octez-external-perms-$$"
-register_datadir "$DATA_DIR"
+register_data_dir "$DATA_DIR"
 mkdir -p "$DATA_DIR"
 
 # Initialize node config and identity

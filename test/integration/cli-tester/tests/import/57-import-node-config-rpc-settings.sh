@@ -24,7 +24,7 @@ log "Creating external Octez node service with custom RPC settings..."
 
 # Create data directory
 DATA_DIR="/tmp/octez-external-rpc-test-$$"
-register_datadir "$DATA_DIR"
+register_data_dir "$DATA_DIR"
 mkdir -p "$DATA_DIR"
 
 # Initialize node config and identity
