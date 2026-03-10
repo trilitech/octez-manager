@@ -2,14 +2,14 @@
   "metadata": {
     "generated_at": "2026-03-10T00:00:00.000000",
     "generated_by": "incremental registration - adding unregistered tests",
-    "total_tests": 74,
-    "total_duration": 581.0,
+    "total_tests": 75,
+    "total_duration": 589.0,
     "shard_count": 5,
-    "mean_shard_duration": 116.2,
+    "mean_shard_duration": 117.8,
     "max_shard_duration": 123.66,
-    "min_shard_duration": 110.61,
-    "duration_std_dev": 5.0,
-    "balance_coefficient": 1.30
+    "min_shard_duration": 118.61,
+    "duration_std_dev": 2.0,
+    "balance_coefficient": 1.04
   },
   "shard-1": {
     "tests": [
@@ -88,10 +88,11 @@
       "node/23-rename-updates-dependents.sh",
       "node/22-list-status-display.sh",
       "binaries/02-list-remote-major-versions.sh",
-      "signatory/05-multiple-instances.sh"
+      "signatory/05-multiple-instances.sh",
+      "baker/43-baker-purge-preserves-node-data.sh"
     ],
-    "test_count": 15,
-    "total_duration": 110.61
+    "test_count": 16,
+    "total_duration": 118.61
   },
   "shard-5": {
     "tests": [
