@@ -2,14 +2,14 @@
   "metadata": {
     "generated_at": "2026-03-10T00:00:00.000000",
     "generated_by": "incremental registration - adding unregistered tests",
-    "total_tests": 94,
-    "total_duration": 705.0,
+    "total_tests": 95,
+    "total_duration": 712.0,
     "shard_count": 5,
-    "mean_shard_duration": 141.0,
+    "mean_shard_duration": 142.4,
     "max_shard_duration": 158.0,
-    "min_shard_duration": 132.0,
-    "duration_std_dev": 10.1,
-    "balance_coefficient": 1.19
+    "min_shard_duration": 136.66,
+    "duration_std_dev": 8.3,
+    "balance_coefficient": 1.16
   },
   "shard-1": {
     "tests": [
@@ -75,10 +75,11 @@
       "node/06-install-custom-rpc-net.sh",
       "node/09-install-no-snapshot.sh",
       "group/57-group-add-network-mismatch.sh",
-      "import/53-import-cascade-accuser.sh"
+      "import/53-import-cascade-accuser.sh",
+      "import/61-import-cascade-all-configs-preserved.sh"
     ],
-    "test_count": 17,
-    "total_duration": 132.0
+    "test_count": 18,
+    "total_duration": 139.0
   },
   "shard-4": {
     "tests": [
