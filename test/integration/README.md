@@ -41,10 +41,51 @@ docker compose exec cli-tester /tests/node/01-install.sh
 ### In CI
 
 Integration tests run automatically on pull requests via GitHub Actions. The workflow:
-1. Builds a static octez-manager binary
-2. Starts the sandbox and cli-tester containers
-3. Runs all tests in order
-4. Reports results
+1. Checks that all tests are registered in shards.json (fails fast if not)
+2. Builds a static octez-manager binary
+3. Starts the sandbox and cli-tester containers
+4. Runs tests in parallel across 5 shards for speed
+5. Reports results
+
+**Important**: All tests must be registered in `cli-tester/tests/shards.json` to run in CI. See [Shard Registration](#shard-registration) below.
+
+## Shard Registration
+
+Tests are distributed across 5 parallel shards in CI for faster execution. **Every test file must be registered in `cli-tester/tests/shards.json`** or it will not run in CI.
+
+### Checking Registration
+
+Before committing, verify all tests are registered:
+
+```bash
+cd test/integration/cli-tester
+./selftest-shard-registration.sh
+```
+
+This check runs automatically in CI and will fail if any tests are unregistered.
+
+### Registering a New Test
+
+When you add a new test (e.g., `node/26-my-test.sh`):
+
+1. Run it locally to measure duration:
+   ```bash
+   ./run-tests.sh node/26-my-test.sh
+   # Note the duration, e.g., "12.3s"
+   ```
+
+2. Add it to a shard in `tests/shards.json`:
+   - Choose the shard with the lowest `total_duration`
+   - Add your test path to that shard's `tests` array
+   - Update `test_count` and `total_duration` for that shard
+   - Update `metadata.total_tests` at the top level
+
+3. Verify registration:
+   ```bash
+   ./selftest-shard-registration.sh
+   ```
+
+See [test/integration/AGENTS.md](AGENTS.md#shard-registration) for detailed instructions.
 
 ## Test Organization
 
