@@ -2,14 +2,14 @@
   "metadata": {
     "generated_at": "2026-03-10T00:00:00.000000",
     "generated_by": "incremental registration - adding unregistered tests",
-    "total_tests": 88,
-    "total_duration": 669.0,
+    "total_tests": 93,
+    "total_duration": 699.0,
     "shard_count": 5,
-    "mean_shard_duration": 133.8,
-    "max_shard_duration": 150.61,
-    "min_shard_duration": 128.0,
-    "duration_std_dev": 8.3,
-    "balance_coefficient": 1.17
+    "mean_shard_duration": 139.8,
+    "max_shard_duration": 158.0,
+    "min_shard_duration": 130.66,
+    "duration_std_dev": 10.4,
+    "balance_coefficient": 1.20
   },
   "shard-1": {
     "tests": [
@@ -124,9 +124,14 @@
       "node/07-install-extra-args.sh",
       "node/15-list-format.sh",
       "signatory/06-restart-cascade.sh",
-      "group/59-group-delete-cascade-ungroup.sh"
+      "group/59-group-delete-cascade-ungroup.sh",
+      "import/62-import-node-config-vs-cli-args.sh",
+      "import/63-import-node-config-with-extra-args.sh",
+      "import/64-import-node-corrupted-config.sh",
+      "import/65-import-node-config-permissions.sh",
+      "import/66-import-node-duplicate-setting-conflict.sh"
     ],
-    "test_count": 17,
-    "total_duration": 128.0
+    "test_count": 22,
+    "total_duration": 158.0
   }
 }
