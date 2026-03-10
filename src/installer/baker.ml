@@ -103,6 +103,29 @@ let install_baker ?(quiet = false) (request : baker_request) =
     String.concat " " global_args_with_signer |> String.trim
   in
   let command_args_str = String.concat " " command_args |> String.trim in
+  (* Resolve DAL endpoint for Dal_auto mode *)
+  let dal_config_env =
+    match dal_config with
+    | Dal_disabled -> "disabled"
+    | Dal_endpoint ep -> ep
+    | Dal_auto -> (
+        (* Look up the DAL instance to get its RPC endpoint *)
+        match request.dal_node with
+        | Some dal_instance_name -> (
+            match Service_registry.find ~instance:dal_instance_name with
+            | Ok (Some dal_svc) ->
+                (* Convert RPC addr to http://host:port format *)
+                let rpc_str = Rpc_addr.to_string dal_svc.Service.rpc_addr in
+                if
+                  String.starts_with ~prefix:"http://" rpc_str
+                  || String.starts_with ~prefix:"https://" rpc_str
+                then rpc_str
+                else "http://" ^ rpc_str
+            | _ ->
+                (* DAL instance not found - this shouldn't happen in cascade import *)
+                "")
+        | None -> "")
+  in
   let depends_on =
     match node_mode with
     | Local svc -> Some svc.Service.instance
@@ -150,11 +173,7 @@ let install_baker ?(quiet = false) (request : baker_request) =
               | Local svc -> svc.Service.instance
               | Local_unmanaged _ | Remote _ -> "" );
             ("OCTEZ_BAKER_NODE_MODE", node_mode_env);
-            ( "OCTEZ_DAL_CONFIG",
-              match dal_config with
-              | Dal_disabled -> "disabled"
-              | Dal_endpoint ep -> ep
-              | Dal_auto -> "" );
+            ("OCTEZ_DAL_CONFIG", dal_config_env);
             ("OCTEZ_DAL_INSTANCE", Option.value ~default:"" request.dal_node);
             ("OCTEZ_BAKER_DELEGATES_ARGS", delegate_args);
             ("OCTEZ_BAKER_DELEGATES_CSV", String.concat "," request.delegates);
