@@ -27,7 +27,7 @@ log "Creating external node (required for DAL)..."
 
 # Create node data directory
 NODE_DATA_DIR="/tmp/octez-node-dal-test-$$"
-register_datadir "$NODE_DATA_DIR"
+register_data_dir "$NODE_DATA_DIR"
 mkdir -p "$NODE_DATA_DIR"
 
 # Initialize and start node
@@ -54,7 +54,7 @@ log "Creating external DAL node service with custom config..."
 
 # Create DAL data directory
 DAL_DATA_DIR="/tmp/octez-dal-external-test-$$"
-register_datadir "$DAL_DATA_DIR"
+register_data_dir "$DAL_DATA_DIR"
 mkdir -p "$DAL_DATA_DIR"
 
 # Initialize DAL config

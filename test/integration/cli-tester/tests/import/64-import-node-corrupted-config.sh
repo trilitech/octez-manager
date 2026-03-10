@@ -24,7 +24,7 @@ log "Creating external node with corrupted config.json..."
 
 # Create data directory
 DATA_DIR="/tmp/octez-external-corrupted-$$"
-register_datadir "$DATA_DIR"
+register_data_dir "$DATA_DIR"
 mkdir -p "$DATA_DIR"
 
 # Initialize node config and identity
