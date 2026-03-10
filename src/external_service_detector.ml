@@ -428,13 +428,56 @@ let build_external_service ~unit_name ~exec_start ~properties =
     {active_state; sub_state; enabled}
   in
 
+  (* Helper to check if a string contains unexpanded variables *)
+  let contains_unexpanded_vars value =
+    (* Check for ${VAR} or $VAR patterns *)
+    try
+      let idx = String.index value '$' in
+      (* Found a $, check if it looks like a variable *)
+      if idx + 1 < String.length value then
+        let next_char = value.[idx + 1] in
+        match next_char with
+        | '{' -> true (* ${VAR} format *)
+        | 'A' .. 'Z' | 'a' .. 'z' | '_' -> true (* $VAR format *)
+        | _ -> false (* Just a lone $ *)
+      else false
+    with Not_found -> false
+  in
+
+  (* Parse environment files from systemd property value.
+     Handles multiple formats:
+     - Space-separated: "/etc/foo /etc/bar"
+     - Semicolon-separated: "/etc/foo;/etc/bar"
+     - Optional files with - prefix: "-/etc/optional"
+     - Mixed: "/etc/foo;-/etc/bar /etc/baz" *)
+  let parse_environment_files files_str =
+    let split_on_delimiters str =
+      (* Split on space, semicolon, or newline *)
+      let delimiters = [' '; ';'; '\n'; '\t'] in
+      let rec split acc current = function
+        | [] -> if current = "" then List.rev acc else List.rev (current :: acc)
+        | c :: rest ->
+            if List.mem c delimiters then
+              if current = "" then split acc "" rest
+              else split (current :: acc) "" rest
+            else split acc (current ^ String.make 1 c) rest
+      in
+      split [] "" (List.init (String.length str) (String.get str))
+    in
+    split_on_delimiters files_str |> List.filter (fun s -> String.trim s <> "")
+  in
+
   (* Get environment files *)
   let environment_files =
-    match List.assoc_opt "EnvironmentFile" properties with
+    match List.assoc_opt "EnvironmentFiles" properties with
     | Some files_str ->
-        (* Can be multiple files separated by spaces or ; *)
-        String.split_on_char ' ' files_str
-        |> List.filter (fun s -> String.trim s <> "")
+        (* Strip any (ignore_errors=...) suffix that systemd adds *)
+        let cleaned =
+          match String.index_opt files_str '(' with
+          | Some idx -> String.sub files_str 0 idx |> String.trim
+          | None -> files_str
+        in
+        parse_environment_files cleaned
     | None -> []
   in
 
@@ -452,45 +495,85 @@ let build_external_service ~unit_name ~exec_start ~properties =
 
   (* Read environment files if parsing found unexpanded variables *)
   let env_vars =
-    if List.length parsed.warnings > 0 && List.length environment_files > 0 then
+    if List.length parsed.warnings > 0 && List.length environment_files > 0 then (
       (* Try to read env files to expand variables *)
-      List.fold_left
-        (fun acc file_path ->
-          (* Handle optional files (prefixed with -) *)
-          let actual_path =
-            if String.starts_with ~prefix:"-" file_path then
-              String.sub file_path 1 (String.length file_path - 1)
-            else file_path
-          in
-          match Env_file_parser.parse_file actual_path with
-          | Ok pairs -> acc @ pairs
-          | Error _ -> acc)
-        []
-        environment_files
+      Logs.debug (fun m ->
+          m
+            "Attempting to read %d environment file(s) to expand variables"
+            (List.length environment_files)) ;
+      let result =
+        List.fold_left
+          (fun acc file_path ->
+            (* Handle optional files (prefixed with -) *)
+            let is_optional = String.starts_with ~prefix:"-" file_path in
+            let actual_path =
+              if is_optional then
+                String.sub file_path 1 (String.length file_path - 1)
+              else file_path
+            in
+            match Env_file_parser.parse_file actual_path with
+            | Ok pairs ->
+                Logs.debug (fun m ->
+                    m
+                      "Read %d variable(s) from environment file: %s"
+                      (List.length pairs)
+                      actual_path) ;
+                acc @ pairs
+            | Error msg ->
+                if is_optional then
+                  Logs.debug (fun m ->
+                      m "Optional environment file not found: %s" actual_path)
+                else
+                  Logs.warn (fun m ->
+                      m "Failed to read environment file %s: %s" actual_path msg) ;
+                acc)
+          []
+          environment_files
+      in
+      result)
     else []
   in
 
   (* Helper to build a field, handling variable expansion *)
-  let build_field parsed_value =
+  let build_field field_name parsed_value =
     match parsed_value with
     | None -> External_service.unknown ()
     | Some value ->
-        if env_vars = [] then
-          (* No env vars available, use value as-is *)
-          External_service.detected ~source:command_source value
-        else
-          (* Try to expand variables *)
-          let expanded = Env_file_parser.expand_vars ~env:env_vars value in
-          if expanded = value then
-            (* No expansion happened (no variables or not found) *)
-            External_service.detected ~source:command_source value
+        if contains_unexpanded_vars value then
+          (* Value contains variables that need expansion *)
+          if env_vars = [] then (
+            (* No env vars available to expand - mark as unknown *)
+            Logs.warn (fun m ->
+                m
+                  "Field %s contains unexpanded variable but no environment \
+                   files available: %s"
+                  field_name
+                  value) ;
+            External_service.unknown ())
           else
-            (* Expansion happened - mark as inferred from env file *)
-            External_service.inferred ~source:"EnvironmentFile" expanded
+            (* Try to expand variables *)
+            let expanded = Env_file_parser.expand_vars ~env:env_vars value in
+            if String.equal expanded value || contains_unexpanded_vars expanded
+            then (
+              (* Expansion failed or incomplete - mark as unknown *)
+              Logs.warn (fun m ->
+                  m
+                    "Failed to fully expand variables in field %s: %s"
+                    field_name
+                    value) ;
+              External_service.unknown ())
+            else (
+              (* Expansion succeeded *)
+              Logs.debug (fun m ->
+                  m "Expanded %s: %s -> %s" field_name value expanded) ;
+              External_service.inferred ~source:"EnvironmentFile" expanded)
+        else
+          (* No variables to expand, use value as-is *)
+          External_service.detected ~source:command_source value
   in
 
   (* Build fields from parsed data *)
-  let binary_field = build_field parsed.binary_path in
+  let binary_field = build_field "binary_path" parsed.binary_path in
 
   let role_field =
     match binary_field.value with
@@ -504,17 +587,17 @@ let build_external_service ~unit_name ~exec_start ~properties =
     | None -> External_service.unknown ()
   in
 
-  let data_dir_field = build_field parsed.data_dir in
-  let base_dir_field = build_field parsed.base_dir in
-  let rpc_addr_field = build_field parsed.rpc_addr in
-  let net_addr_field = build_field parsed.net_addr in
-  let endpoint_field = build_field parsed.endpoint in
-  let dal_endpoint_field = build_field parsed.dal_endpoint in
-  let history_mode_field = build_field parsed.history_mode in
+  let data_dir_field = build_field "data_dir" parsed.data_dir in
+  let base_dir_field = build_field "base_dir" parsed.base_dir in
+  let rpc_addr_field = build_field "rpc_addr" parsed.rpc_addr in
+  let net_addr_field = build_field "net_addr" parsed.net_addr in
+  let endpoint_field = build_field "endpoint" parsed.endpoint in
+  let dal_endpoint_field = build_field "dal_endpoint" parsed.dal_endpoint in
+  let history_mode_field = build_field "history_mode" parsed.history_mode in
 
   (* Try to detect network if not already known from command-line parsing *)
   let network_field =
-    let parsed_network = build_field parsed.network in
+    let parsed_network = build_field "network" parsed.network in
     match (parsed_network.value, role_field.value) with
     | None, Some External_service.Node -> (
         (* Network unknown for node - try fallbacks in priority order:
@@ -837,7 +920,7 @@ let detect () =
                         "ActiveState";
                         "SubState";
                         "UnitFileState";
-                        "EnvironmentFile";
+                        "EnvironmentFiles";
                       ]
                 in
                 Some (build_external_service ~unit_name ~exec_start ~properties)
