@@ -1,15 +1,15 @@
 {
   "metadata": {
-    "generated_at": "2026-03-06T17:00:00.000000",
-    "generated_by": "manual update - added test 67 (import stopped node)",
-    "total_tests": 73,
-    "total_duration": 571.04,
+    "generated_at": "2026-03-10T00:00:00.000000",
+    "generated_by": "incremental registration - adding unregistered tests",
+    "total_tests": 74,
+    "total_duration": 581.0,
     "shard_count": 5,
-    "mean_shard_duration": 114.21,
+    "mean_shard_duration": 116.2,
     "max_shard_duration": 123.66,
     "min_shard_duration": 110.61,
-    "duration_std_dev": 4.5,
-    "balance_coefficient": 1.28
+    "duration_std_dev": 5.0,
+    "balance_coefficient": 1.30
   },
   "shard-1": {
     "tests": [
@@ -97,6 +97,7 @@
     "tests": [
       "node/17-preserve-data-resume.sh",
       "accuser/37-accuser-extra-args.sh",
+      "accuser/24-accuser-purge-preserves-node-data.sh",
       "baker/41-baker-with-dal-node.sh",
       "baker/40-baker-remote-endpoint.sh",
       "node/24-export-logs.sh",
@@ -111,7 +112,7 @@
       "node/15-list-format.sh",
       "signatory/06-restart-cascade.sh"
     ],
-    "test_count": 15,
-    "total_duration": 111.99
+    "test_count": 16,
+    "total_duration": 122.0
   }
 }
