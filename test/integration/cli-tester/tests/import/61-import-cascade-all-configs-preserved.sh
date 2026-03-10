@@ -63,7 +63,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=tezos
+User=octez
 ExecStart=/usr/local/bin/octez-node run --data-dir=${NODE_DATA_DIR} --network=shadownet --rpc-addr=127.0.0.1:${NODE_RPC_PORT}
 Restart=on-failure
 RestartSec=5
@@ -72,7 +72,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-chown -R tezos:tezos "$NODE_DATA_DIR"
+chown -R octez:octez "$NODE_DATA_DIR"
 
 # === DAL ===
 echo "Creating external DAL with custom config..."
@@ -102,7 +102,7 @@ Requires=${NODE_SERVICE}.service
 
 [Service]
 Type=simple
-User=tezos
+User=octez
 ExecStart=/usr/local/bin/octez-dal-node run --data-dir=${DAL_DATA_DIR} --endpoint=http://127.0.0.1:${NODE_RPC_PORT}
 Restart=on-failure
 RestartSec=5
@@ -111,7 +111,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-chown -R tezos:tezos "$DAL_DATA_DIR"
+chown -R octez:octez "$DAL_DATA_DIR"
 
 # === BAKER ===
 echo "Creating external baker with custom args..."
@@ -129,7 +129,7 @@ Requires=${NODE_SERVICE}.service
 
 [Service]
 Type=simple
-User=tezos
+User=octez
 ExecStart=/usr/local/bin/octez-baker --endpoint http://127.0.0.1:${NODE_RPC_PORT} --base-dir ${BAKER_DATA_DIR} run with local node ${NODE_DATA_DIR} --liquidity-baking-toggle-vote pass --adaptive-issuance-vote pass
 Restart=on-failure
 RestartSec=5
@@ -138,6 +138,8 @@ Environment="TEZOS_LOG=* -> info"
 [Install]
 WantedBy=multi-user.target
 EOF
+
+chown -R octez:octez "$BAKER_DATA_DIR"
 
 # === ACCUSER ===
 echo "Creating external accuser with custom args..."
@@ -155,7 +157,7 @@ Requires=${NODE_SERVICE}.service
 
 [Service]
 Type=simple
-User=tezos
+User=octez
 ExecStart=/usr/local/bin/octez-accuser run --endpoint=http://127.0.0.1:${NODE_RPC_PORT} --base-dir=${ACCUSER_DATA_DIR} --preserved-levels=10
 Restart=on-failure
 RestartSec=5
@@ -163,6 +165,8 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
+
+chown -R octez:octez "$ACCUSER_DATA_DIR"
 
 systemctl daemon-reload
 
