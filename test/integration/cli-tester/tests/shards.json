@@ -2,14 +2,14 @@
   "metadata": {
     "generated_at": "2026-03-10T00:00:00.000000",
     "generated_by": "incremental registration - adding unregistered tests",
-    "total_tests": 76,
-    "total_duration": 597.0,
+    "total_tests": 77,
+    "total_duration": 602.0,
     "shard_count": 5,
-    "mean_shard_duration": 119.4,
+    "mean_shard_duration": 120.4,
     "max_shard_duration": 126.61,
-    "min_shard_duration": 120.0,
-    "duration_std_dev": 2.5,
-    "balance_coefficient": 1.06
+    "min_shard_duration": 120.78,
+    "duration_std_dev": 2.3,
+    "balance_coefficient": 1.05
   },
   "shard-1": {
     "tests": [
@@ -67,10 +67,11 @@
       "accuser/38-accuser-show-service.sh",
       "node/10-purge-with-data.sh",
       "node/06-install-custom-rpc-net.sh",
-      "node/09-install-no-snapshot.sh"
+      "node/09-install-no-snapshot.sh",
+      "group/57-group-add-network-mismatch.sh"
     ],
-    "test_count": 15,
-    "total_duration": 120.0
+    "test_count": 16,
+    "total_duration": 125.0
   },
   "shard-4": {
     "tests": [
