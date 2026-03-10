@@ -2,14 +2,14 @@
   "metadata": {
     "generated_at": "2026-03-10T00:00:00.000000",
     "generated_by": "incremental registration - adding unregistered tests",
-    "total_tests": 81,
-    "total_duration": 627.0,
+    "total_tests": 84,
+    "total_duration": 645.0,
     "shard_count": 5,
-    "mean_shard_duration": 125.4,
-    "max_shard_duration": 132.0,
-    "min_shard_duration": 125.78,
-    "duration_std_dev": 2.4,
-    "balance_coefficient": 1.05
+    "mean_shard_duration": 129.0,
+    "max_shard_duration": 143.78,
+    "min_shard_duration": 126.61,
+    "duration_std_dev": 6.4,
+    "balance_coefficient": 1.13
   },
   "shard-1": {
     "tests": [
@@ -48,10 +48,13 @@
       "import/51-import-nonexistent-service.sh",
       "signatory/02-baker-dependency.sh",
       "signatory/04-external-signer.sh",
-      "group/58-group-name-validation.sh"
+      "group/58-group-name-validation.sh",
+      "import/54-import-node-config-preservation.sh",
+      "import/55-import-node-identity-preservation.sh",
+      "import/56-import-node-missing-config-created.sh"
     ],
-    "test_count": 14,
-    "total_duration": 125.78
+    "test_count": 17,
+    "total_duration": 143.78
   },
   "shard-3": {
     "tests": [
