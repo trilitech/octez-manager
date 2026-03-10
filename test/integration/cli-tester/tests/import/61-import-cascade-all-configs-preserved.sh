@@ -130,7 +130,7 @@ Requires=${NODE_SERVICE}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=/usr/local/bin/octez-baker --endpoint http://127.0.0.1:${NODE_RPC_PORT} run with local node ${NODE_DATA_DIR} --base-dir ${BAKER_DATA_DIR} --liquidity-baking-toggle-vote pass --adaptive-issuance-vote pass
+ExecStart=/usr/local/bin/octez-baker --endpoint http://127.0.0.1:${NODE_RPC_PORT} --base-dir ${BAKER_DATA_DIR} run with local node ${NODE_DATA_DIR} --liquidity-baking-toggle-vote pass --adaptive-issuance-vote pass
 Restart=on-failure
 RestartSec=5
 Environment="TEZOS_LOG=* -> info"
