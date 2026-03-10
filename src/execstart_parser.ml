@@ -147,7 +147,8 @@ let parse_flag_value ~flag_name ~setter word rest acc =
   | Some (cleaned, new_rest) ->
       if contains_variable cleaned then
         let warning = flag_name ^ " contains unexpanded variable: " ^ cleaned in
-        (new_rest, {acc with warnings = warning :: acc.warnings})
+        (* Store the value AND generate a warning *)
+        (new_rest, setter {acc with warnings = warning :: acc.warnings} cleaned)
       else (new_rest, setter acc cleaned)
   | None -> (rest, acc)
 
@@ -246,7 +247,19 @@ let rec parse_args_list words acc =
         parse_args_list rest {acc with extra_args = word :: acc.extra_args}
       else if is_octez_binary word then
         (* Found binary path *)
-        parse_args_list rest {acc with binary_path = Some (unquote word)}
+        let cleaned = unquote word in
+        if contains_variable cleaned then
+          let warning =
+            "binary_path contains unexpanded variable: " ^ cleaned
+          in
+          parse_args_list
+            rest
+            {
+              acc with
+              binary_path = Some cleaned;
+              warnings = warning :: acc.warnings;
+            }
+        else parse_args_list rest {acc with binary_path = Some cleaned}
       else if acc.binary_path <> None && acc.subcommand = None then
         (* First non-flag word after binary is likely a subcommand *)
         (* Common subcommands: run, config, snapshot, dal *)
