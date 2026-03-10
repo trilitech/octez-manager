@@ -100,3 +100,70 @@ wait
 
 If any run fails, the test has dependencies or conflicts.
 
+## Shard Registration
+
+**All integration tests MUST be registered in `test/integration/cli-tester/tests/shards.json`.**
+
+Tests not registered in the shard manifest will **not run in CI**, creating silent test coverage gaps.
+
+### Checking Registration
+
+Before committing a new test, verify it's registered:
+
+```bash
+cd test/integration/cli-tester
+./selftest-shard-registration.sh
+```
+
+This selftest runs automatically in CI and will fail if any tests are unregistered.
+
+### Registering a New Test
+
+When you add a new test file (e.g., `node/26-my-new-test.sh`):
+
+1. **Run the test locally** to measure its duration:
+   ```bash
+   ./run-tests.sh node/26-my-new-test.sh
+   ```
+   Note the duration printed at the end (e.g., "12.3s").
+
+2. **Add it to a shard** in `tests/shards.json`:
+   - Choose the shard with the lowest `total_duration` to keep shards balanced
+   - Add your test path to that shard's `tests` array
+   - Update the shard's `test_count` (increment by 1)
+   - Update the shard's `total_duration` (add your test's duration)
+   - Update the top-level `metadata.total_tests` (increment by 1)
+
+3. **Verify registration**:
+   ```bash
+   ./selftest-shard-registration.sh
+   ```
+   It should now pass with no unregistered tests.
+
+### Example: Adding a Test to a Shard
+
+```json
+{
+  "shard-3": {
+    "tests": [
+      "node/01-install.sh",
+      "node/02-show.sh",
+      "node/26-my-new-test.sh"  // Add your test here
+    ],
+    "test_count": 15,              // Increment
+    "total_duration": 132.3        // Add your test's duration
+  }
+}
+```
+
+### Why Shard Registration Matters
+
+- Tests run in parallel across 5 shards in CI for speed
+- Each shard runs a subset of tests independently
+- Unregistered tests are silently skipped, leading to:
+  - Broken features reaching production
+  - False confidence in test coverage
+  - Difficult-to-diagnose regressions
+
+The selftest prevents this by failing CI if any test is unregistered.
+
