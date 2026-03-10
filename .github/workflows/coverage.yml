@@ -156,10 +156,24 @@ jobs:
             test_golden_path_tui_v2
           retention-days: 1
 
+  check-shard-registration:
+    name: Check Shard Registration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run shard registration selftest
+        run: |
+          cd test/integration/cli-tester
+          ./selftest-shard-registration.sh
+
   integration-coverage:
     name: Integration Tests Coverage (Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    needs: [build-and-test-coverage]
+    needs: [build-and-test-coverage, check-shard-registration]
     # Only run on main branch pushes to maintain coverage baseline
     # For PRs, fast non-instrumented tests run in ci.yml instead
     if: github.event_name == 'push'
