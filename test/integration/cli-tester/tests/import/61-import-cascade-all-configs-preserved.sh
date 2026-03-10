@@ -166,19 +166,15 @@ EOF
 
 systemctl daemon-reload
 
-echo "Enabling and starting all services before import..."
-# Enable and start node first
-systemctl enable "${NODE_SERVICE}.service"
+echo "Starting all services before import..."
+# Start all services
 systemctl start "${NODE_SERVICE}.service"
+systemctl start "${DAL_SERVICE}.service"
+systemctl start "${BAKER_SERVICE}.service"
+systemctl start "${ACCUSER_SERVICE}.service"
 
-# Enable (but don't start) dependent services
-# The cascade import should detect these as dependents
-systemctl enable "${DAL_SERVICE}.service"
-systemctl enable "${BAKER_SERVICE}.service"
-systemctl enable "${ACCUSER_SERVICE}.service"
-
-# Give node a moment to start (but don't wait for full sync)
-sleep 2
+# Give services a moment to start
+sleep 3
 
 echo "Performing cascade import..."
 om import "$NODE_SERVICE" --cascade --network shadownet
