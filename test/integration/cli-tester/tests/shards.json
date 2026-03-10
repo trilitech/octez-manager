@@ -2,14 +2,14 @@
   "metadata": {
     "generated_at": "2026-03-10T00:00:00.000000",
     "generated_by": "incremental registration - adding unregistered tests",
-    "total_tests": 79,
-    "total_duration": 613.0,
+    "total_tests": 80,
+    "total_duration": 620.0,
     "shard_count": 5,
-    "mean_shard_duration": 122.6,
-    "max_shard_duration": 128.0,
-    "min_shard_duration": 123.66,
-    "duration_std_dev": 1.8,
-    "balance_coefficient": 1.04
+    "mean_shard_duration": 124.0,
+    "max_shard_duration": 130.66,
+    "min_shard_duration": 125.0,
+    "duration_std_dev": 2.4,
+    "balance_coefficient": 1.05
   },
   "shard-1": {
     "tests": [
@@ -27,10 +27,11 @@
       "signatory/03-key-management.sh",
       "group/54-group-create-list-show-delete.sh",
       "group/55-group-add-remove-service.sh",
-      "group/56-group-multiple-groups.sh"
+      "group/56-group-multiple-groups.sh",
+      "import/44-import-detect-process-based.sh"
     ],
-    "test_count": 15,
-    "total_duration": 123.66
+    "test_count": 16,
+    "total_duration": 130.66
   },
   "shard-2": {
     "tests": [
