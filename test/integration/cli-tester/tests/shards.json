@@ -2,13 +2,13 @@
   "metadata": {
     "generated_at": "2026-03-10T00:00:00.000000",
     "generated_by": "incremental registration - adding unregistered tests",
-    "total_tests": 78,
-    "total_duration": 607.0,
+    "total_tests": 79,
+    "total_duration": 613.0,
     "shard_count": 5,
-    "mean_shard_duration": 121.4,
-    "max_shard_duration": 126.61,
-    "min_shard_duration": 122.0,
-    "duration_std_dev": 2.2,
+    "mean_shard_duration": 122.6,
+    "max_shard_duration": 128.0,
+    "min_shard_duration": 123.66,
+    "duration_std_dev": 1.8,
     "balance_coefficient": 1.04
   },
   "shard-1": {
@@ -114,9 +114,10 @@
       "node/08-install-preserve-data.sh",
       "node/07-install-extra-args.sh",
       "node/15-list-format.sh",
-      "signatory/06-restart-cascade.sh"
+      "signatory/06-restart-cascade.sh",
+      "group/59-group-delete-cascade-ungroup.sh"
     ],
-    "test_count": 16,
-    "total_duration": 122.0
+    "test_count": 17,
+    "total_duration": 128.0
   }
 }
