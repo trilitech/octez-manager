@@ -1,118 +1,21 @@
 {
   "metadata": {
-    "generated_at": "2026-03-09T15:03:00.000000",
-    "generated_by": "manual update - added test 61 (import cascade all configs)",
-    "total_tests": 74,
-    "total_duration": 591.04,
-    "shard_count": 5,
-    "mean_shard_duration": 118.21,
-    "max_shard_duration": 130.61,
-    "min_shard_duration": 111.99,
-    "duration_std_dev": 6.5,
-    "balance_coefficient": 1.35
+    "generated_at": "2026-03-11T10:00:00.000000",
+    "generated_by": "TEMPORARY - debug test 61 only",
+    "total_tests": 1,
+    "total_duration": 30.0,
+    "shard_count": 1,
+    "mean_shard_duration": 30.0,
+    "max_shard_duration": 30.0,
+    "min_shard_duration": 30.0,
+    "duration_std_dev": 0.0,
+    "balance_coefficient": 1.0
   },
   "shard-1": {
     "tests": [
-      "node/20-tmp-dir-option.sh",
-      "baker/42-baker-requires-node-running.sh",
-      "node/01-install.sh",
-      "node/05-install-history-modes.sh",
-      "import/52-import-name-conflict.sh",
-      "accuser/35-accuser-basic-install.sh",
-      "dal/24-dal-show-service.sh",
-      "baker/27-baker-with-delegates.sh",
-      "node/04-install-custom-datadir.sh",
-      "binaries/01-download-and-verify.sh",
-      "signatory/01-install.sh",
-      "signatory/03-key-management.sh",
-      "group/54-group-create-list-show-delete.sh",
-      "group/55-group-add-remove-service.sh",
-      "group/56-group-multiple-groups.sh"
+      "import/61-import-cascade-all-configs-preserved.sh"
     ],
-    "test_count": 15,
-    "total_duration": 123.66
-  },
-  "shard-2": {
-    "tests": [
-      "headless/01-golden-path.sh",
-      "baker/32-baker-node-dependency.sh",
-      "dal/26-dal-custom-data-dir.sh",
-      "import/45-import-takeover-node.sh",
-      "node/02-show.sh",
-      "dal/25-dal-multiple-instances.sh",
-      "dal/18-dal-basic-install.sh",
-      "dal/20-dal-custom-addresses.sh",
-      "baker/33-baker-show-service.sh",
-      "node/12-show-service.sh",
-      "import/51-import-nonexistent-service.sh",
-      "signatory/02-baker-dependency.sh",
-      "signatory/04-external-signer.sh"
-    ],
-    "test_count": 13,
-    "total_duration": 120.78
-  },
-  "shard-3": {
-    "tests": [
-      "accuser/36-accuser-start-stop.sh",
-      "baker/30-baker-extra-args.sh",
-      "baker/31-baker-start-stop.sh",
-      "accuser/39-accuser-node-dependency.sh",
-      "node/16-start-node-syncs.sh",
-      "import/46-import-clone-node.sh",
-      "import/50-import-field-overrides.sh",
-      "import/43-import-detect-service-based.sh",
-      "import/67-import-node-network-stopped.sh",
-      "baker/34-baker-multiple-instances.sh",
-      "baker/26-baker-basic-install.sh",
-      "accuser/38-accuser-show-service.sh",
-      "node/10-purge-with-data.sh",
-      "node/06-install-custom-rpc-net.sh",
-      "node/09-install-no-snapshot.sh"
-    ],
-    "test_count": 15,
-    "total_duration": 120.0
-  },
-  "shard-4": {
-    "tests": [
-      "node/19-cascading-dependencies.sh",
-      "node/18-restart.sh",
-      "dal/22-dal-start-stop.sh",
-      "dal/23-dal-node-dependency.sh",
-      "import/47-import-cascade-baker.sh",
-      "import/61-import-cascade-all-configs-preserved.sh",
-      "node/21-systemd-failure-detection.sh",
-      "node/03-remove.sh",
-      "node/14-multiple-instances.sh",
-      "baker/28-baker-liquidity-vote.sh",
-      "baker/29-baker-dal-config.sh",
-      "node/11-remove-vs-purge.sh",
-      "node/23-rename-updates-dependents.sh",
-      "node/22-list-status-display.sh",
-      "binaries/02-list-remote-major-versions.sh",
-      "signatory/05-multiple-instances.sh"
-    ],
-    "test_count": 16,
-    "total_duration": 130.61
-  },
-  "shard-5": {
-    "tests": [
-      "node/17-preserve-data-resume.sh",
-      "accuser/37-accuser-extra-args.sh",
-      "baker/41-baker-with-dal-node.sh",
-      "baker/40-baker-remote-endpoint.sh",
-      "node/24-export-logs.sh",
-      "node/25-binary-access-validation.sh",
-      "import/49-import-extra-args-node.sh",
-      "import/48-import-dry-run.sh",
-      "dal/21-dal-extra-args.sh",
-      "node/13-reinstall-same-instance.sh",
-      "dal/19-dal-remote-endpoint.sh",
-      "node/08-install-preserve-data.sh",
-      "node/07-install-extra-args.sh",
-      "node/15-list-format.sh",
-      "signatory/06-restart-cascade.sh"
-    ],
-    "test_count": 15,
-    "total_duration": 111.99
+    "test_count": 1,
+    "total_duration": 30.0
   }
 }
