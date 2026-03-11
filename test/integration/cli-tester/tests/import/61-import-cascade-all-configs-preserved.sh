@@ -178,6 +178,15 @@ echo "Starting all services before import..."
 # This ensures we're importing fully-initialized services (not mid-startup),
 # which is the typical real-world use case.
 systemctl start "${NODE_SERVICE}.service"
+
+# Debug: check if service started
+echo "DEBUG: Checking node service status after start..."
+systemctl status "${NODE_SERVICE}.service" --no-pager || true
+echo "DEBUG: Node service logs:"
+journalctl -u "${NODE_SERVICE}.service" -n 20 --no-pager || true
+echo "DEBUG: Node service file:"
+systemctl cat "${NODE_SERVICE}.service" || true
+
 echo "Waiting for node RPC to be ready before import..."
 wait_for_node_ready "127.0.0.1:$NODE_RPC_PORT" 30
 
