@@ -179,13 +179,89 @@ echo "Starting all services before import..."
 # which is the typical real-world use case.
 systemctl start "${NODE_SERVICE}.service"
 
-# Debug: check if service started
-echo "DEBUG: Checking node service status after start..."
+echo "=== COMPREHENSIVE DEBUG: Node startup diagnostics ==="
+echo ""
+
+# 1. Check if node process exists
+sleep 2
+echo "1. Process check:"
+ps aux | grep octez-node | grep -v grep || echo "  No octez-node process found!"
+MAIN_PID=$(systemctl show "${NODE_SERVICE}.service" -p MainPID --value)
+echo "  MainPID from systemd: $MAIN_PID"
+if [ "$MAIN_PID" != "0" ]; then
+	ps -p "$MAIN_PID" -o pid,user,cmd || echo "  Process $MAIN_PID not found"
+fi
+echo ""
+
+# 2. File permissions
+echo "2. Data directory permissions:"
+ls -la "$NODE_DATA_DIR" | head -10
+echo ""
+echo "  Config file:"
+ls -l "$NODE_DATA_DIR/config.json" 2>&1
+echo "  Identity file:"
+ls -l "$NODE_DATA_DIR/identity.json" 2>&1
+echo ""
+
+# 3. Validate config.json
+echo "3. Config validation:"
+if jq empty "$NODE_DATA_DIR/config.json" 2>&1; then
+	echo "  ✓ Valid JSON"
+else
+	echo "  ✗ INVALID JSON!"
+fi
+echo "  Config contents:"
+cat "$NODE_DATA_DIR/config.json"
+echo ""
+
+# 4. Octez binary check
+echo "4. Octez binary:"
+/usr/local/bin/octez-node --version 2>&1 | head -3
+ls -l /usr/local/bin/octez-node
+echo "  Can octez user execute it?"
+sudo -u octez /usr/local/bin/octez-node --version 2>&1 | head -1 || echo "  Cannot execute as octez user"
+echo ""
+
+# 5. Systemd service details
+echo "5. Service status immediately after start:"
 systemctl status "${NODE_SERVICE}.service" --no-pager || true
-echo "DEBUG: Node service logs:"
-journalctl -u "${NODE_SERVICE}.service" -n 20 --no-pager || true
-echo "DEBUG: Node service file:"
-systemctl cat "${NODE_SERVICE}.service" || true
+echo ""
+echo "  Restart count:"
+systemctl show "${NODE_SERVICE}.service" -p NRestarts
+echo "  stdout/stderr settings:"
+systemctl show "${NODE_SERVICE}.service" -p StandardOutput -p StandardError
+echo ""
+
+# 6. Service logs with verbose output
+echo "6. Service logs (verbose):"
+journalctl -u "${NODE_SERVICE}.service" --no-pager -n 50 --output=cat || echo "  No logs"
+echo ""
+
+# 7. Network/port check
+echo "7. Network check:"
+echo "  Ports in use (looking for $NODE_RPC_PORT and $NODE_PORT):"
+ss -tlnp 2>/dev/null | grep -E ":$NODE_RPC_PORT|:$NODE_PORT" || echo "  No matching ports in use"
+echo "  All listening ports:"
+ss -tlnp 2>/dev/null | grep LISTEN || echo "  None"
+echo ""
+
+# 8. Try running manually
+echo "8. Manual execution test (5 second timeout):"
+echo "  Running: sudo -u octez /usr/local/bin/octez-node run --data-dir=$NODE_DATA_DIR --network=shadownet --rpc-addr=127.0.0.1:$NODE_RPC_PORT"
+timeout 5 sudo -u octez /usr/local/bin/octez-node run --data-dir="$NODE_DATA_DIR" \
+	--network=shadownet --rpc-addr=127.0.0.1:$NODE_RPC_PORT 2>&1 || echo "  Command timed out or failed (exit: $?)"
+echo ""
+
+# 9. Wait and check again
+echo "9. Status after 5 second delay:"
+sleep 5
+systemctl status "${NODE_SERVICE}.service" --no-pager || true
+echo "  New restart count:"
+systemctl show "${NODE_SERVICE}.service" -p NRestarts
+echo ""
+
+echo "=== END COMPREHENSIVE DEBUG ==="
+echo ""
 
 echo "Waiting for node RPC to be ready before import..."
 wait_for_node_ready "127.0.0.1:$NODE_RPC_PORT" 30
