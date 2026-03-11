@@ -171,13 +171,19 @@ chown -R octez:octez "$ACCUSER_DATA_DIR"
 systemctl daemon-reload
 
 echo "Starting all services before import..."
-# Start all services
+# Start node first and wait for it to be ready before import.
+# This ensures we're importing fully-initialized services (not mid-startup),
+# which is the typical real-world use case.
 systemctl start "${NODE_SERVICE}.service"
+echo "Waiting for node RPC to be ready before import..."
+wait_for_node_ready "127.0.0.1:$NODE_RPC_PORT" 30
+
+# Start remaining services
 systemctl start "${DAL_SERVICE}.service"
 systemctl start "${BAKER_SERVICE}.service"
 systemctl start "${ACCUSER_SERVICE}.service"
 
-# Give services a moment to start
+# Give DAL/baker/accuser a moment to start
 sleep 3
 
 echo "Performing cascade import..."
