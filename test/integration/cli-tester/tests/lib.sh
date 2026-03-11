@@ -57,6 +57,12 @@ ensure_tezos_user() {
 	fi
 }
 
+ensure_octez_user() {
+	if ! id octez &>/dev/null; then
+		useradd --system --no-create-home octez 2>/dev/null || true
+	fi
+}
+
 # Lock file used to serialize install and purge operations.
 # Purge can delete the tezos service user; install needs it for chown.
 # Without serialization, a parallel purge can delete the user between
