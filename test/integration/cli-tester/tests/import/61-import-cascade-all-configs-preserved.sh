@@ -32,6 +32,9 @@ register_instance "$ACCUSER_INSTANCE"
 
 echo "Setting up full Octez stack (node + DAL + baker + accuser) as external services..."
 
+# Ensure the octez user exists for external services
+ensure_octez_user
+
 # === NODE ===
 echo "Creating external node with custom config..."
 NODE_DATA_DIR="/tmp/octez-node-cascade-$$"
