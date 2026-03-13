@@ -371,7 +371,7 @@ Requires=octez-node@${node_instance}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=$octez_bin_path/octez-baker --endpoint $node_endpoint --base-dir $base_dir run --liquidity-baking-toggle-vote pass with local node $data_dir
+ExecStart=$octez_bin_path/octez-baker --endpoint $node_endpoint --base-dir $base_dir run with local node $data_dir --liquidity-baking-toggle-vote pass
 Restart=on-failure
 RestartSec=5
 
