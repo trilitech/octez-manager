@@ -53,7 +53,7 @@ mkdir -p "$DAL_DATA"
 chown -R tezos:tezos "$DAL_DATA"
 
 echo "Creating external DAL service..."
-create_external_service "dal-node" "$DAL_INSTANCE" "$DAL_DATA" "" "shadownet" "$NODE_ENDPOINT" "127.0.0.1:$DAL_RPC_PORT"
+create_external_service "dal-node" "$DAL_INSTANCE" "$DAL_DATA" "" "shadownet" "$NODE_ENDPOINT" "127.0.0.1:$DAL_RPC_PORT" "$NODE_INSTANCE"
 
 echo "=== Creating External Octez Baker ==="
 echo "Creating baker base directory at $BAKER_DATA..."
@@ -61,11 +61,11 @@ mkdir -p "$BAKER_DATA"
 chown -R tezos:tezos "$BAKER_DATA"
 
 echo "Creating external baker service..."
-create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "$NODE_ENDPOINT" "$BAKER_DATA"
+create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "$NODE_ENDPOINT" "$BAKER_DATA" "$NODE_INSTANCE"
 
 echo "=== Creating External Octez Accuser ==="
 echo "Creating external accuser service..."
-create_external_service "accuser" "$ACCUSER_INSTANCE" "" "" "shadownet" "$NODE_ENDPOINT"
+create_external_service "accuser" "$ACCUSER_INSTANCE" "" "" "shadownet" "$NODE_ENDPOINT" "" "$NODE_INSTANCE"
 
 echo "=== Starting All Services ==="
 systemctl daemon-reload
