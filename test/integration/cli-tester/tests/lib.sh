@@ -371,7 +371,7 @@ Requires=octez-node@${node_instance}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=$octez_bin_path/octez-baker run --endpoint $node_endpoint --base-dir $base_dir --liquidity-baking-toggle-vote pass with local node $data_dir
+ExecStart=$octez_bin_path/octez-baker --endpoint $node_endpoint --base-dir $base_dir run --liquidity-baking-toggle-vote pass with local node $data_dir
 Restart=on-failure
 RestartSec=5
 
@@ -381,6 +381,7 @@ SERVICE
 		;;
 	accuser)
 		local node_endpoint="${6:-http://localhost:8732}"
+		local base_dir="${7:-$data_dir}"
 		local node_instance="${8:-$instance}"
 		cat >"$unit_dir/$unit_name" <<SERVICE
 [Unit]
@@ -391,7 +392,7 @@ Requires=octez-node@${node_instance}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=$octez_bin_path/octez-baker run accuser --endpoint $node_endpoint
+ExecStart=$octez_bin_path/octez-baker --endpoint $node_endpoint --base-dir $base_dir run accuser
 Restart=on-failure
 RestartSec=5
 
