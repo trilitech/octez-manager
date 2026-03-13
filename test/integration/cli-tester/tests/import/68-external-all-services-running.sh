@@ -130,6 +130,60 @@ if ! service_is_active "accuser" "$ACCUSER_INSTANCE"; then
 fi
 echo "✓ Accuser service is active"
 
+echo ""
+echo "=== Checking Service Logs for Errors ==="
+
+# Dump the actual systemd unit files to see what commands are being run
+echo "Baker service file:"
+systemctl cat "octez-baker@${BAKER_INSTANCE}.service" | grep "ExecStart"
+echo ""
+echo "Accuser service file:"
+systemctl cat "octez-accuser@${ACCUSER_INSTANCE}.service" | grep "ExecStart"
+echo ""
+
+# Check baker logs for errors
+echo "Checking baker logs..."
+BAKER_LOGS=$(journalctl -u "octez-baker@${BAKER_INSTANCE}.service" --no-pager --since "1 minute ago" 2>&1 || true)
+echo "Baker logs:"
+echo "$BAKER_LOGS"
+if echo "$BAKER_LOGS" | grep -qi "error\|unknown option\|invalid\|unrecognized\|failed to parse"; then
+	echo "ERROR: Baker service has errors in logs"
+	show_service_status "baker" "$BAKER_INSTANCE"
+	exit 1
+fi
+
+# Check accuser logs for errors
+echo "Checking accuser logs..."
+ACCUSER_LOGS=$(journalctl -u "octez-accuser@${ACCUSER_INSTANCE}.service" --no-pager --since "1 minute ago" 2>&1 || true)
+echo "Accuser logs:"
+echo "$ACCUSER_LOGS"
+if echo "$ACCUSER_LOGS" | grep -qi "error\|unknown option\|invalid\|unrecognized\|failed to parse"; then
+	echo "ERROR: Accuser service has errors in logs"
+	show_service_status "accuser" "$ACCUSER_INSTANCE"
+	exit 1
+fi
+
+echo ""
+echo "=== Waiting 5 seconds to ensure services stay running ==="
+sleep 5
+
+# Verify services are still active after delay (catches crash-looping)
+if ! service_is_active "baker" "$BAKER_INSTANCE"; then
+	echo "ERROR: Baker service crashed after startup"
+	show_service_status "baker" "$BAKER_INSTANCE"
+	show_service_logs "baker" "$BAKER_INSTANCE" 50
+	exit 1
+fi
+echo "✓ Baker service still active after 5 seconds"
+
+if ! service_is_active "accuser" "$ACCUSER_INSTANCE"; then
+	echo "ERROR: Accuser service crashed after startup"
+	show_service_status "accuser" "$ACCUSER_INSTANCE"
+	show_service_logs "accuser" "$ACCUSER_INSTANCE" 50
+	exit 1
+fi
+echo "✓ Accuser service still active after 5 seconds"
+
 echo "=== Verifying Node RPC Endpoint ==="
 if ! curl -sf "http://${NODE_RPC_ADDR}/chains/main/blocks/head/header" >/dev/null 2>&1; then
 	echo "ERROR: Node RPC endpoint is not responding"
