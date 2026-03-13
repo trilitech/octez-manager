@@ -23,6 +23,7 @@ DAL_RPC_PORT=$(alloc_port)
 # Data directories
 NODE_DATA="/var/lib/octez-external/$NODE_INSTANCE"
 BAKER_DATA="/var/lib/octez-external/$BAKER_INSTANCE"
+ACCUSER_DATA="/var/lib/octez-external/$ACCUSER_INSTANCE"
 DAL_DATA="/var/lib/octez-external/$DAL_INSTANCE"
 
 # Register for cleanup
@@ -32,6 +33,7 @@ register_external_service "accuser" "$ACCUSER_INSTANCE"
 register_external_service "dal-node" "$DAL_INSTANCE"
 register_data_dir "$NODE_DATA"
 register_data_dir "$BAKER_DATA"
+register_data_dir "$ACCUSER_DATA"
 register_data_dir "$DAL_DATA"
 
 NODE_RPC_ADDR="127.0.0.1:$NODE_RPC_PORT"
@@ -63,8 +65,12 @@ echo "Creating external baker service..."
 create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA" "" "shadownet" "$NODE_ENDPOINT" "$BAKER_DATA" "$NODE_INSTANCE"
 
 echo "=== Creating External Octez Accuser ==="
+echo "Creating accuser base directory at $ACCUSER_DATA..."
+mkdir -p "$ACCUSER_DATA"
+chown -R tezos:tezos "$ACCUSER_DATA"
+
 echo "Creating external accuser service..."
-create_external_service "accuser" "$ACCUSER_INSTANCE" "" "" "shadownet" "$NODE_ENDPOINT" "" "$NODE_INSTANCE"
+create_external_service "accuser" "$ACCUSER_INSTANCE" "" "" "shadownet" "$NODE_ENDPOINT" "$ACCUSER_DATA" "$NODE_INSTANCE"
 
 echo "=== Starting All Services ==="
 systemctl daemon-reload
