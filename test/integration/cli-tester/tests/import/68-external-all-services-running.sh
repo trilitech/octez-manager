@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>
+# Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>
 #
 # SPDX-License-Identifier: MIT
 
