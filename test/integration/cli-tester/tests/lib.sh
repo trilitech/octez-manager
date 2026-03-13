@@ -357,7 +357,46 @@ Requires=octez-node@${instance}.service
 [Service]
 Type=simple
 User=tezos
-ExecStart=$octez_bin_path/octez-baker-PsParisC run --endpoint $node_endpoint --base-dir $base_dir --liquidity-baking-toggle-vote pass with local node $data_dir
+ExecStart=$octez_bin_path/octez-baker run --endpoint $node_endpoint --base-dir $base_dir --liquidity-baking-toggle-vote pass with local node $data_dir
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+		;;
+	accuser)
+		local node_endpoint="${6:-http://localhost:8732}"
+		cat >"$unit_dir/$unit_name" <<SERVICE
+[Unit]
+Description=External Octez Accuser - $instance
+After=network.target octez-node@${instance}.service
+Requires=octez-node@${instance}.service
+
+[Service]
+Type=simple
+User=tezos
+ExecStart=$octez_bin_path/octez-baker run accuser --endpoint $node_endpoint
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+		;;
+	dal-node)
+		local node_endpoint="${6:-http://localhost:8732}"
+		local dal_rpc_addr="${7:-127.0.0.1:10732}"
+		cat >"$unit_dir/$unit_name" <<SERVICE
+[Unit]
+Description=External Octez DAL Node - $instance
+After=network.target octez-node@${instance}.service
+Requires=octez-node@${instance}.service
+
+[Service]
+Type=simple
+User=tezos
+ExecStart=$octez_bin_path/octez-dal-node run --data-dir $data_dir --endpoint $node_endpoint --rpc-addr $dal_rpc_addr
 Restart=on-failure
 RestartSec=5
 
