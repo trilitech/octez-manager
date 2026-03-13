@@ -1,15 +1,15 @@
 {
   "metadata": {
-    "generated_at": "2026-03-06T17:00:00.000000",
-    "generated_by": "manual update - added test 67 (import stopped node)",
-    "total_tests": 73,
-    "total_duration": 571.04,
+    "generated_at": "2026-03-13T14:00:00.000000",
+    "generated_by": "manual update - added test 68 (external all services running)",
+    "total_tests": 74,
+    "total_duration": 611.04,
     "shard_count": 5,
-    "mean_shard_duration": 114.21,
-    "max_shard_duration": 123.66,
-    "min_shard_duration": 110.61,
-    "duration_std_dev": 4.5,
-    "balance_coefficient": 1.28
+    "mean_shard_duration": 122.21,
+    "max_shard_duration": 150.61,
+    "min_shard_duration": 111.99,
+    "duration_std_dev": 12.5,
+    "balance_coefficient": 1.35
   },
   "shard-1": {
     "tests": [
@@ -79,6 +79,7 @@
       "dal/22-dal-start-stop.sh",
       "dal/23-dal-node-dependency.sh",
       "import/47-import-cascade-baker.sh",
+      "import/68-external-all-services-running.sh",
       "node/21-systemd-failure-detection.sh",
       "node/03-remove.sh",
       "node/14-multiple-instances.sh",
@@ -90,8 +91,8 @@
       "binaries/02-list-remote-major-versions.sh",
       "signatory/05-multiple-instances.sh"
     ],
-    "test_count": 15,
-    "total_duration": 110.61
+    "test_count": 16,
+    "total_duration": 150.61
   },
   "shard-5": {
     "tests": [
