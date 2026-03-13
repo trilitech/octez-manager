@@ -1,6 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2025 Trilitech <contact@trili.tech>
-# Copyright (c) 2025 Functori <contact@functori.com>
+# Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>
 #
 # SPDX-License-Identifier: MIT
 
