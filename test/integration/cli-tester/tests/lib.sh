@@ -322,9 +322,13 @@ create_external_service() {
 	local octez_bin_path="/usr/local/bin"
 
 	mkdir -p "$unit_dir"
-	mkdir -p "$data_dir"
-	ensure_tezos_user
-	chown -R tezos:tezos "$data_dir"
+	if [ -n "$data_dir" ]; then
+		mkdir -p "$data_dir"
+		ensure_tezos_user
+		chown -R tezos:tezos "$data_dir"
+	else
+		ensure_tezos_user
+	fi
 
 	case "$role" in
 	node)
