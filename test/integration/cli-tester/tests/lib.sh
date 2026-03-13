@@ -310,6 +310,15 @@ show_service_logs() {
 # Import test helpers
 
 # Create an external systemd service (unmanaged by octez-manager)
+# Parameters:
+#   $1: role (node, baker, accuser, dal-node)
+#   $2: instance name
+#   $3: data directory (empty string for accuser)
+#   $4: rpc_addr (for node) or empty for dependent services
+#   $5: network
+#   $6: node_endpoint (for baker, accuser, dal-node)
+#   $7: base_dir (for baker) or dal_rpc_addr (for dal-node)
+#   $8: node_instance (optional, for baker/accuser/dal-node dependencies)
 create_external_service() {
 	local role="$1"
 	local instance="$2"
@@ -352,11 +361,12 @@ SERVICE
 	baker)
 		local node_endpoint="${6:-http://localhost:8732}"
 		local base_dir="${7:-$data_dir}"
+		local node_instance="${8:-$instance}"
 		cat >"$unit_dir/$unit_name" <<SERVICE
 [Unit]
 Description=External Octez Baker - $instance
-After=network.target octez-node@${instance}.service
-Requires=octez-node@${instance}.service
+After=network.target octez-node@${node_instance}.service
+Requires=octez-node@${node_instance}.service
 
 [Service]
 Type=simple
@@ -371,11 +381,12 @@ SERVICE
 		;;
 	accuser)
 		local node_endpoint="${6:-http://localhost:8732}"
+		local node_instance="${8:-$instance}"
 		cat >"$unit_dir/$unit_name" <<SERVICE
 [Unit]
 Description=External Octez Accuser - $instance
-After=network.target octez-node@${instance}.service
-Requires=octez-node@${instance}.service
+After=network.target octez-node@${node_instance}.service
+Requires=octez-node@${node_instance}.service
 
 [Service]
 Type=simple
@@ -391,11 +402,12 @@ SERVICE
 	dal-node)
 		local node_endpoint="${6:-http://localhost:8732}"
 		local dal_rpc_addr="${7:-127.0.0.1:10732}"
+		local node_instance="${8:-$instance}"
 		cat >"$unit_dir/$unit_name" <<SERVICE
 [Unit]
 Description=External Octez DAL Node - $instance
-After=network.target octez-node@${instance}.service
-Requires=octez-node@${instance}.service
+After=network.target octez-node@${node_instance}.service
+Requires=octez-node@${node_instance}.service
 
 [Service]
 Type=simple
