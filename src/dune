@@ -96,6 +96,7 @@
   octez_manager_lib
   octez_manager_cli
   octez-manager.ui
+  dune-build-info
   cmdliner
   rresult
   yojson

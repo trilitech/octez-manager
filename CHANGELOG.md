@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Version reported by `--version`**: `octez-manager --version` now reports the version from the dune build system rather than a hardcoded string. In development builds (not installed via opam), it reports `dev`.
+
 - **Rewards non-mainnet TzKT routing**: Fixed incorrect TzKT API base URL used when generating or paying rewards for non-mainnet bakers. Network names that are full URLs (e.g. from Teztnets picker) are now normalized to slugs before constructing the TzKT endpoint. The continual scheduler and payout executor now correctly resolve the baker's base directory from environment variables (`OCTEZ_CLIENT_BASE_DIR`, `OCTEZ_BAKER_BASE_DIR`).
 
 - **`om list --internal` flag**: New flag to list only managed (internal) services, complementing the existing `--external` flag. While `om list` shows managed services by default, `--all` shows both, and `--external` shows only external services, the new `--internal` flag explicitly lists only managed services without external service detection. Useful for scripting, automation, and situations where you want to ensure you're only working with octez-manager-controlled services.
