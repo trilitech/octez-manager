@@ -567,11 +567,19 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
         | Ok c -> c
         | Error _ -> Payout_config.default ~network ~baker_pkh:pkh ()
       in
+      let base_dir =
+        match Node_env.read ~inst:instance with
+        | Ok pairs -> (
+            match List.assoc_opt "OCTEZ_CLIENT_BASE_DIR" pairs with
+            | Some d -> Some d
+            | None -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs)
+        | Error _ -> None
+      in
       let ctx : Payout_executor.context =
         {
           octez_client_bin;
           endpoint = node_endpoint;
-          base_dir = None;
+          base_dir;
           password_file = None;
           payout_key_alias = config.payout_key_alias;
           instance;
