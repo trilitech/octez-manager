@@ -53,4 +53,9 @@ module For_tests : sig
   (** Generate instance name from network and history mode.
       Format: node-{network} for rolling, node-{network}-{history_mode} for full/archive *)
   val generate_instance_name : network:string -> history_mode:string -> string
+
+  (** Format the display string for a selected tzinit snapshot.
+      Shows "tzinit · {label}" using the human-readable label (or the
+      kind slug as fallback), without duplicating the slug in parentheses. *)
+  val format_selected_snapshot : tzinit_snapshot -> string
 end

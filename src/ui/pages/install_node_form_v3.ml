@@ -477,6 +477,12 @@ let history_snapshot_conflict ~history_mode ~snapshot ~network =
 
 (** {1 Custom Fields} *)
 
+let format_selected_snapshot snap =
+  let display_kind =
+    if String.trim snap.label <> "" then snap.label else snap.kind_slug
+  in
+  Printf.sprintf "tzinit · %s" display_kind
+
 let snapshot_field =
   Form_builder.custom
     ~label:"Snapshot Import"
@@ -484,8 +490,7 @@ let snapshot_field =
       match m.snapshot with
       | `None -> "None"
       | `Url url -> if url = "" then "Custom URL..." else url
-      | `Tzinit snap ->
-          Printf.sprintf "tzinit · %s (%s)" snap.label snap.kind_slug)
+      | `Tzinit snap -> format_selected_snapshot snap)
     ~edit:(fun model_ref ->
       let snapshots_opt =
         match slug_of_network !model_ref.node.network with
@@ -535,7 +540,11 @@ let snapshot_field =
         | `None -> "None (manual sync)"
         | `Custom -> "Custom URL..."
         | `Tzinit e ->
-            Printf.sprintf "%s (%s)" e.Snapshots.label e.Snapshots.slug
+            let display_label =
+              if String.trim e.Snapshots.label <> "" then e.Snapshots.label
+              else e.Snapshots.slug
+            in
+            display_label
       in
 
       let on_select choice =
@@ -1148,6 +1157,8 @@ module For_tests = struct
   let history_snapshot_conflict = history_snapshot_conflict
 
   let generate_instance_name = generate_instance_name
+
+  let format_selected_snapshot = format_selected_snapshot
 end
 
 let page : Miaou.Core.Registry.page = (module Page)

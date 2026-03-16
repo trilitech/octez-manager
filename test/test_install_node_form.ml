@@ -769,7 +769,46 @@ let validation_tests =
     ("detects duplicate instances", `Quick, test_duplicate_instance_detection);
   ]
 
+(* ============================================================ *)
+(* Regression tests for issue #113: snapshot kind duplication  *)
+(* ============================================================ *)
+
+(** Verify that the snapshot display string does not include the kind slug
+    twice (e.g. "Rolling (rolling)").  The expected format is
+    "tzinit · Rolling" when the label is set, or "tzinit · rolling" when
+    the label falls back to the slug. *)
+let test_snapshot_display_no_duplicate () =
+  let snap =
+    Install_node_form.For_tests.format_selected_snapshot
+      Install_node_form.
+        {network_slug = "mainnet"; kind_slug = "rolling"; label = "Rolling"}
+  in
+  check string "label used, not slug" "tzinit \xc2\xb7 Rolling" snap ;
+  check
+    bool
+    "no (rolling) suffix"
+    false
+    (TH.contains_substring snap "(rolling)")
+
+let test_snapshot_display_fallback_to_slug () =
+  let snap =
+    Install_node_form.For_tests.format_selected_snapshot
+      Install_node_form.
+        {network_slug = "mainnet"; kind_slug = "full"; label = ""}
+  in
+  check string "slug used as fallback" "tzinit \xc2\xb7 full" snap
+
+let snapshot_display_tests =
+  [
+    ("no duplicate kind", `Quick, test_snapshot_display_no_duplicate);
+    ("fallback to slug", `Quick, test_snapshot_display_fallback_to_slug);
+  ]
+
 let () =
   Alcotest.run
     "Install Node Form (TUI)"
-    [("node_form", form_tests); ("validation", validation_tests)]
+    [
+      ("node_form", form_tests);
+      ("validation", validation_tests);
+      ("snapshot_display", snapshot_display_tests);
+    ]
