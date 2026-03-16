@@ -96,7 +96,8 @@
   cmdliner
   rresult
   yojson
-  linenoise)
+  linenoise
+  dune-build-info)
  (ocamlopt_flags
   (:standard
    (:include %{project_root}/static_flags.sexp)))
