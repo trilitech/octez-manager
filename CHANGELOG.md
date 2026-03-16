@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Local indexer compare mode**: `om ui --local-indexer <URL>` registers a local TzKT-compatible indexer as the preferred source for all rewards and delegation queries. Add `--compare-indexers` to simultaneously query public TzKT and log any divergences, useful for validating a self-hosted indexer. The `--indexer-network` flag (default: `mainnet`) identifies which network the local indexer serves.
+- **`rewards continual tick` command**: One-shot command that checks all baker instances with continual mode enabled and dispatches payouts for any cycles that are due. Intended for use with external schedulers (cron, systemd timers). When `rewards continual start` is called, octez-manager optionally installs a systemd timer to call `tick` automatically.
+
+### Fixed
+
+- **Rewards non-mainnet TzKT routing**: Fixed incorrect TzKT API base URL used when generating or paying rewards for non-mainnet bakers. Network names that are full URLs (e.g. from Teztnets picker) are now normalized to slugs before constructing the TzKT endpoint. The continual scheduler and payout executor now correctly resolve the baker's base directory from environment variables (`OCTEZ_CLIENT_BASE_DIR`, `OCTEZ_BAKER_BASE_DIR`).
+
 - **`om list --internal` flag**: New flag to list only managed (internal) services, complementing the existing `--external` flag. While `om list` shows managed services by default, `--all` shows both, and `--external` shows only external services, the new `--internal` flag explicitly lists only managed services without external service detection. Useful for scripting, automation, and situations where you want to ensure you're only working with octez-manager-controlled services.
 - **Tab-based main navigation shell**: The app now opens with a five-tab navigation bar (Instances, Wallets, Diagnostics, Topology, Sandboxes) at the top. Switch tabs with number keys `1`–`5`, or use the existing shortcuts `K` (Wallets), `d` (Diagnostics), `t` (Topology). Each tab preserves its state (cursor position, fold state, scroll offset) across switches — returning to a tab shows exactly what you left.
 - **Instances page: visual action buttons**: The three action buttons (Install new instance, Manage binaries, Browse RPCs) in the Instances button bar are now rendered as focusable `Button_widget` entries with highlighted selection, replacing the plain `[ Label ]` text style.
