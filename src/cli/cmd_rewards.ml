@@ -1182,13 +1182,168 @@ let continual_status_cmd =
   let info = Cmd.info "status" ~doc:"Show continual mode status." in
   Cmd.v info Term.(ret (const continual_status_run $ baker_arg))
 
+(* ── rewards continual install-timer / uninstall-timer ───── *)
+
+let timer_unit_name = "octez-manager-continual"
+
+let service_unit_path () =
+  if Paths.is_root () then
+    Printf.sprintf "/etc/systemd/system/%s.service" timer_unit_name
+  else
+    Filename.concat
+      (Filename.concat (Paths.xdg_config_home ()) "systemd/user")
+      (Printf.sprintf "%s.service" timer_unit_name)
+
+let timer_unit_path () =
+  if Paths.is_root () then
+    Printf.sprintf "/etc/systemd/system/%s.timer" timer_unit_name
+  else
+    Filename.concat
+      (Filename.concat (Paths.xdg_config_home ()) "systemd/user")
+      (Printf.sprintf "%s.timer" timer_unit_name)
+
+let resolve_exe_path () =
+  match Paths.which "octez-manager" with
+  | Some path -> path
+  | None -> (
+      (* Fall back to realpath of current executable *)
+      try Unix.readlink (Printf.sprintf "/proc/%d/exe" (Unix.getpid ()))
+      with _ -> Sys.argv.(0))
+
+let generate_service_unit () =
+  let exe = resolve_exe_path () in
+  Printf.sprintf
+    {|[Unit]
+Description=octez-manager continual payout tick
+
+[Service]
+Type=oneshot
+ExecStart=%s rewards continual tick
+|}
+    exe
+
+let generate_timer_unit () =
+  {|[Unit]
+Description=Periodic continual payout tick
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+|}
+
+let systemctl_cmd () =
+  if Paths.is_root () then ["systemctl"] else ["systemctl"; "--user"]
+
+let rec mkdir_p path =
+  if Sys.file_exists path then ()
+  else (
+    mkdir_p (Filename.dirname path) ;
+    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+
+let write_unit_file path content =
+  mkdir_p (Filename.dirname path) ;
+  let oc = open_out path in
+  output_string oc content ;
+  close_out oc
+
+let install_timer_run () =
+  let svc_path = service_unit_path () in
+  let tmr_path = timer_unit_path () in
+  (* Write unit files *)
+  (try
+     write_unit_file svc_path (generate_service_unit ()) ;
+     Printf.printf "Wrote %s\n" svc_path
+   with exn ->
+     Printf.eprintf "Error writing %s: %s\n" svc_path (Printexc.to_string exn) ;
+     exit 1) ;
+  (try
+     write_unit_file tmr_path (generate_timer_unit ()) ;
+     Printf.printf "Wrote %s\n" tmr_path
+   with exn ->
+     Printf.eprintf "Error writing %s: %s\n" tmr_path (Printexc.to_string exn) ;
+     exit 1) ;
+  (* daemon-reload *)
+  (match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
+  | Ok () -> ()
+  | Error (`Msg msg) ->
+      Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
+  (* enable --now the timer *)
+  let timer_name = timer_unit_name ^ ".timer" in
+  (match
+     Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["enable"; "--now"; timer_name])
+   with
+  | Ok () ->
+      Printf.printf "Timer %s enabled and started.\n" timer_name
+  | Error (`Msg msg) ->
+      Printf.eprintf "Error enabling timer: %s\n" msg ;
+      exit 1) ;
+  `Ok ()
+
+let uninstall_timer_run () =
+  let svc_path = service_unit_path () in
+  let tmr_path = timer_unit_path () in
+  let timer_name = timer_unit_name ^ ".timer" in
+  (* disable --now the timer *)
+  (match
+     Cmd_runner.run
+       ~quiet:true
+       (systemctl_cmd () @ ["disable"; "--now"; timer_name])
+   with
+  | Ok () ->
+      Printf.printf "Timer %s disabled and stopped.\n" timer_name
+  | Error (`Msg msg) ->
+      Printf.eprintf "Warning: disable failed: %s\n" msg) ;
+  (* Remove unit files *)
+  (if Sys.file_exists svc_path then (
+     Sys.remove svc_path ;
+     Printf.printf "Removed %s\n" svc_path)) ;
+  (if Sys.file_exists tmr_path then (
+     Sys.remove tmr_path ;
+     Printf.printf "Removed %s\n" tmr_path)) ;
+  (* daemon-reload *)
+  (match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
+  | Ok () -> ()
+  | Error (`Msg msg) ->
+      Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
+  `Ok ()
+
+let install_timer_cmd =
+  let info =
+    Cmd.info
+      "install-timer"
+      ~doc:
+        "Install a systemd timer that runs `rewards continual tick` every 5 \
+         minutes."
+  in
+  Cmd.v info Term.(ret (const install_timer_run $ const ()))
+
+let uninstall_timer_cmd =
+  let info =
+    Cmd.info
+      "uninstall-timer"
+      ~doc:"Remove the systemd timer for continual payouts."
+  in
+  Cmd.v info Term.(ret (const uninstall_timer_run $ const ()))
+
 let continual_cmd =
   let info =
     Cmd.info "continual" ~doc:"Manage continual (automatic) payouts."
   in
   Cmd.group
     info
-    [continual_start_cmd; continual_stop_cmd; continual_status_cmd; tick_cmd]
+    [
+      continual_start_cmd;
+      continual_stop_cmd;
+      continual_status_cmd;
+      tick_cmd;
+      install_timer_cmd;
+      uninstall_timer_cmd;
+    ]
 
 (* ── rewards command group ─────────────────────────────────── *)
 
