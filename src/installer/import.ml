@@ -470,25 +470,42 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_dal_from_external ~instance ~external_svc ~network ~data_dir
-    ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy ~depends_on =
+    ~rpc_addr:_ ~net_addr:_ ~node_endpoint ~bin_dir ~strategy ~depends_on =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
-  (* Parse ExecStart to extract extra arguments *)
+  (* Parse ExecStart to extract extra arguments and detect which flags were present *)
   let parsed = Execstart_parser.parse config.exec_start in
-  (* For Clone strategy, increment ports to avoid conflicts *)
-  let rpc_addr, net_addr =
+  (* Use rpc_addr/net_addr from the parsed ExecStart when available; fall back to
+     the resolved values only if they were explicitly present in the original.
+     Passing empty strings causes dal_node.ml to omit those env vars entirely,
+     which prevents octez-dal-node from rewriting config.json on startup. *)
+  let effective_rpc_addr =
+    match parsed.Execstart_parser.rpc_addr with
+    | Some addr -> addr
+    | None ->
+        (* Flag was absent in the original ExecStart — omit it from the managed
+           service so config.json is not rewritten. *)
+        ""
+  in
+  let effective_net_addr =
+    match parsed.Execstart_parser.net_addr with Some addr -> addr | None -> ""
+  in
+  (* For Clone strategy, increment ports to avoid conflicts (only when present) *)
+  let effective_rpc_addr, effective_net_addr =
     if strategy = Clone then
       let increment_port addr =
-        match String.split_on_char ':' addr with
-        | [host; port] -> (
-            try
-              let port_num = int_of_string port in
-              Printf.sprintf "%s:%d" host (port_num + 1)
-            with _ -> addr)
-        | _ -> addr
+        if addr = "" then ""
+        else
+          match String.split_on_char ':' addr with
+          | [host; port] -> (
+              try
+                let port_num = int_of_string port in
+                Printf.sprintf "%s:%d" host (port_num + 1)
+              with _ -> addr)
+          | _ -> addr
       in
-      (increment_port rpc_addr, increment_port net_addr)
-    else (rpc_addr, net_addr)
+      (increment_port effective_rpc_addr, increment_port effective_net_addr)
+    else (effective_rpc_addr, effective_net_addr)
   in
   (* Preserve extra arguments from original ExecStart (e.g., --attester-profiles) *)
   let service_args = parsed.extra_args in
@@ -499,8 +516,8 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       network;
       history_mode = Rolling;
       data_dir;
-      rpc_addr = Rpc_addr.of_string rpc_addr;
-      net_addr;
+      rpc_addr = Rpc_addr.of_string effective_rpc_addr;
+      net_addr = effective_net_addr;
       service_user;
       app_bin_dir = bin_dir;
       bin_source = None;

@@ -60,11 +60,16 @@ let exec_line role =
        --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run accuser \
        ${OCTEZ_BAKER_COMMAND_ARGS:-}'"
   | "dal-node" | "dal" ->
-      (* DAL node uses octez-dal-node binary directly *)
+      (* DAL node uses octez-dal-node binary directly.
+         --rpc-addr and --net-addr are only included when the corresponding
+         env vars are non-empty (${VAR:+...} expands to empty when VAR is unset
+         or empty).  This preserves the original config.json when those flags
+         were not present in the imported service's ExecStart. *)
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-dal-node\" run \
        --endpoint \"${OCTEZ_NODE_ENDPOINT}\" --data-dir \
-       \"${OCTEZ_DAL_DATA_DIR}\" --rpc-addr \"${OCTEZ_DAL_RPC_ADDR}\" \
-       --net-addr \"${OCTEZ_DAL_NET_ADDR}\" ${OCTEZ_SERVICE_ARGS:-}'"
+       \"${OCTEZ_DAL_DATA_DIR}\" ${OCTEZ_DAL_RPC_ADDR:+--rpc-addr \
+       \"${OCTEZ_DAL_RPC_ADDR}\"} ${OCTEZ_DAL_NET_ADDR:+--net-addr \
+       \"${OCTEZ_DAL_NET_ADDR}\"} ${OCTEZ_SERVICE_ARGS:-}'"
   | "signatory" ->
       (* Signatory remote signer uses signatory binary with config file *)
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/signatory\" serve \
