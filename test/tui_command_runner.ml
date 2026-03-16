@@ -122,8 +122,12 @@ let wait_for_condition conditions =
                  conditions))))
     else if List.exists check_condition non_timeout_conditions then ()
     else (
-      (* Refresh page state *)
-      ignore (HD.Stateful.idle_wait ~iterations:1 ~sleep:0.01 ()) ;
+      (* Refresh page state. If the current page emits Back (e.g. a form
+         completed via navigate_back()), resolve it by switching to main_shell
+         so the tab bar and instances content become visible again. *)
+      (match HD.Stateful.idle_wait ~iterations:1 ~sleep:0.01 () with
+      | `Back -> ignore (HD.Stateful.switch_to_page "main_shell")
+      | _ -> ()) ;
       loop (iteration + 1))
   in
   loop 0
@@ -135,8 +139,10 @@ let wait_for_condition conditions =
 let handle_nav_result = function
   | `Continue -> ()
   | `Back ->
-      Printf.eprintf "  <- Back navigation\n%!" ;
-      ()
+      (* A form completed via navigate_back(). Resolve by switching to
+         main_shell so the tab bar and instances content become visible. *)
+      Printf.eprintf "  <- Back navigation, returning to main_shell\n%!" ;
+      ignore (HD.Stateful.switch_to_page "main_shell")
   | `Quit -> failwith "Unexpected Quit during test"
   | `SwitchTo page ->
       Printf.eprintf "  → Switched to page: %s\n%!" page ;
