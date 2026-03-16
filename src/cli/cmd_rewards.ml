@@ -65,9 +65,8 @@ let () =
   Indexer.set_on_divergence (fun path custom_body tzkt_body ->
       Printf.eprintf "Warning: indexer divergence on %s\n%!" path ;
       let diffs = json_field_diffs custom_body tzkt_body in
-      match diffs with
+      (match diffs with
       | [] ->
-          (* Non-JSON or identical after parsing — show raw size diff *)
           Printf.eprintf
             "  (custom: %d bytes, tzkt: %d bytes)\n%!"
             (String.length custom_body)
@@ -76,7 +75,9 @@ let () =
           List.iter
             (fun (key, cv, tv) ->
               Printf.eprintf "  %s: custom=%s  tzkt=%s\n%!" key cv tv)
-            fields)
+            fields) ;
+      Printf.eprintf "  -> using public TzKT response\n%!" ;
+      `Use_tzkt)
 
 (* ── Helpers ───────────────────────────────────────────────── *)
 

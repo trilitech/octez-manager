@@ -53,14 +53,17 @@ val set_log_info : (string -> unit) -> unit
 val set_log_warn : (string -> unit) -> unit
 
 (** Set a callback invoked on divergence between a custom source and
-    public TzKT in debug mode.  Arguments: [path], [custom_body],
-    [tzkt_body].  Default: logs a one-line warning via {!set_log_warn}. *)
-val set_on_divergence : (string -> string -> string -> unit) -> unit
+    public TzKT in compare mode.  Arguments: [path], [custom_body],
+    [tzkt_body].  Returns [`Use_custom] to keep the custom response or
+    [`Use_tzkt] to substitute the TzKT response.
+    Default: logs a warning and returns [`Use_tzkt]. *)
+val set_on_divergence :
+  (string -> string -> string -> [`Use_custom | `Use_tzkt]) -> unit
 
-(** Enable or disable debug mode.
+(** Enable or disable compare mode.
     When enabled, {!fetch} also queries TzKT whenever a local or preferred
-    source is used successfully, and calls the divergence callback if the
-    responses differ. *)
+    source is used successfully, calls the divergence callback if the
+    responses differ, and uses whichever body the callback selects. *)
 val set_debug_mode : bool -> unit
 
 (** Query every distinct registered source for [path] and return labelled

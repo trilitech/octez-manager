@@ -112,9 +112,10 @@ let set_log_info f = log_info_fn := f
 let set_log_warn f = log_warn_fn := f
 
 let on_divergence_fn :
-    (string -> string -> string -> unit) ref =
+    (string -> string -> string -> [`Use_custom | `Use_tzkt]) ref =
   ref (fun path _custom _tzkt ->
-    !log_warn_fn (Printf.sprintf "indexer divergence on %s" path))
+    !log_warn_fn (Printf.sprintf "indexer divergence on %s" path) ;
+    `Use_tzkt)
 
 let set_on_divergence f = on_divergence_fn := f
 
@@ -141,15 +142,20 @@ let fetch ~network ?preferred_base ?(timeout = 15.0) path =
         let url = src ^ path in
         match do_fetch ~url ~timeout with
         | Ok body ->
-            (* In debug mode, compare with TzKT if we used a different source. *)
-            if Atomic.get debug_mode && not (String.equal src tzkt) then begin
-              let tzkt_url = tzkt ^ path in
-              match do_fetch ~url:tzkt_url ~timeout with
-              | Ok tzkt_body when not (String.equal body tzkt_body) ->
-                  !on_divergence_fn path body tzkt_body
-              | _ -> ()
-            end ;
-            Some body
+            (* In compare mode, check TzKT if we used a different source. *)
+            let effective_body =
+              if Atomic.get debug_mode && not (String.equal src tzkt) then begin
+                let tzkt_url = tzkt ^ path in
+                match do_fetch ~url:tzkt_url ~timeout with
+                | Ok tzkt_body when not (String.equal body tzkt_body) -> (
+                    match !on_divergence_fn path body tzkt_body with
+                    | `Use_tzkt -> tzkt_body
+                    | `Use_custom -> body)
+                | _ -> body
+              end
+              else body
+            in
+            Some effective_body
         | Error e ->
             last_error := e ;
             (* Track if a custom (non-TzKT) source failed *)
