@@ -11,6 +11,73 @@ open Cmdliner
 open Octez_manager_lib
 open Octez_manager_rewards
 
+(* ── Indexer logging setup ─────────────────────────────────── *)
+
+(** Normalize a JSON value to a canonical string for comparison.
+    Strips string-vs-int encoding differences (e.g. ["120262"] vs [120262]). *)
+let normalize_json_value = function
+  | `String s -> (
+      (* If the string is a pure integer, normalize to int representation *)
+      match Int64.of_string_opt s with
+      | Some n -> Int64.to_string n
+      | None -> Printf.sprintf "%S" s)
+  | `Int n -> string_of_int n
+  | `Intlit s -> s
+  | `Float f -> string_of_float f
+  | `Bool b -> string_of_bool b
+  | `Null -> "null"
+  | v -> Yojson.Safe.to_string v
+
+(** Pretty-print a JSON value for display. *)
+let display_json_value = function
+  | `String s -> s
+  | v -> Yojson.Safe.to_string v
+
+(** Compare two JSON objects and return a list of [(key, custom_val, tzkt_val)]
+    for top-level fields whose values semantically differ (ignoring
+    string-vs-int encoding and fields present on only one side). *)
+let json_field_diffs custom_body tzkt_body =
+  let parse s =
+    try
+      match Yojson.Safe.from_string s with
+      | `Assoc fields -> Some fields
+      | _ -> None
+    with _ -> None
+  in
+  match (parse custom_body, parse tzkt_body) with
+  | Some custom_fields, Some tzkt_fields ->
+      (* Only compare keys present on both sides *)
+      List.filter_map
+        (fun (key, cv) ->
+          match List.assoc_opt key tzkt_fields with
+          | None -> None
+          | Some tv ->
+              let cn = normalize_json_value cv in
+              let tn = normalize_json_value tv in
+              if String.equal cn tn then None
+              else Some (key, display_json_value cv, display_json_value tv))
+        custom_fields
+  | _ -> []
+
+let () =
+  Indexer.set_log_info (fun msg -> Printf.eprintf "%s\n%!" msg) ;
+  Indexer.set_log_warn (fun msg -> Printf.eprintf "Warning: %s\n%!" msg) ;
+  Indexer.set_on_divergence (fun path custom_body tzkt_body ->
+      Printf.eprintf "Warning: indexer divergence on %s\n%!" path ;
+      let diffs = json_field_diffs custom_body tzkt_body in
+      match diffs with
+      | [] ->
+          (* Non-JSON or identical after parsing — show raw size diff *)
+          Printf.eprintf
+            "  (custom: %d bytes, tzkt: %d bytes)\n%!"
+            (String.length custom_body)
+            (String.length tzkt_body)
+      | fields ->
+          List.iter
+            (fun (key, cv, tv) ->
+              Printf.eprintf "  %s: custom=%s  tzkt=%s\n%!" key cv tv)
+            fields)
+
 (* ── Helpers ───────────────────────────────────────────────── *)
 
 (** List all baker instances from the service registry. *)
@@ -452,7 +519,8 @@ let history_cmd =
 
 (* ── rewards pay ───────────────────────────────────────────── *)
 
-let rec pay_run baker_opt cycle_opt dry_run confirm =
+let rec pay_run baker_opt cycle_opt dry_run confirm compare =
+  if compare then Indexer.set_debug_mode true ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
@@ -663,10 +731,18 @@ let pay_cmd =
     let doc = "Skip interactive confirmation (for automation)." in
     Arg.(value & flag & info ["confirm"] ~doc)
   in
+  let compare_flag =
+    let doc =
+      "Compare custom indexer results with public TzKT and log divergences."
+    in
+    Arg.(value & flag & info ["compare"; "compare-indexers"] ~doc)
+  in
   Cmd.v
     info
     Term.(
-      ret (const pay_run $ baker_arg $ cycle_arg $ dry_run_flag $ confirm_flag))
+      ret
+        (const pay_run $ baker_arg $ cycle_arg $ dry_run_flag $ confirm_flag
+       $ compare_flag))
 
 (* ── rewards config import ─────────────────────────────────── *)
 
