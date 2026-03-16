@@ -67,9 +67,25 @@ let pick_local_rr ~network =
 
 (* ── Public API ───────────────────────────────────────────────────────── *)
 
+(** Extract the network slug from a value that may be a full URL
+    (e.g. ["https://teztnets.com/tallinnnet"] → ["tallinnnet"])
+    or already a plain slug (e.g. ["ghostnet"]). *)
+let network_slug network =
+  let lower = String.lowercase_ascii (String.trim network) in
+  if
+    String.starts_with ~prefix:"http://" lower
+    || String.starts_with ~prefix:"https://" lower
+  then
+    match String.split_on_char '/' lower |> List.rev with
+    | seg :: _ when not (String.equal seg "") -> seg
+    | _ :: seg :: _ when not (String.equal seg "") -> seg
+    | _ -> lower
+  else lower
+
 let tzkt_base_url ~network =
-  if String.equal network "mainnet" then "https://api.tzkt.io"
-  else Printf.sprintf "https://api.%s.tzkt.io" network
+  let slug = network_slug network in
+  if String.equal slug "mainnet" then "https://api.tzkt.io"
+  else Printf.sprintf "https://api.%s.tzkt.io" slug
 
 let register_local ~network ~base_url =
   Mutex.protect state_lock (fun () ->

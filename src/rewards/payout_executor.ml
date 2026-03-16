@@ -153,7 +153,7 @@ let execute_batch ~ctx ~payouts ~dry_run =
             amount;
             op_hash;
             success = true;
-            note = (if dry_run then "dry-run" else "ok");
+            note = (if dry_run then output else "ok");
           })
         payouts
   | Error (`Msg err) ->

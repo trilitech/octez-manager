@@ -433,7 +433,7 @@ let import_notifications ~json =
 (* ── Main import ─────────────────────────────────────────── *)
 
 let import_from_json ~baker_pkh json =
-  let config = Payout_config.default ~baker_pkh in
+  let config = Payout_config.default ~baker_pkh () in
   let warnings = [] in
   let count = 0 in
   (* Check config version *)

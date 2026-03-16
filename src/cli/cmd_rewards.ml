@@ -80,9 +80,9 @@ let baker_delegate (svc : Service.t) =
           | first :: _ -> Ok first))
 
 (** Load preferred TzKT base URL from payout config, if available. *)
-let preferred_base_for ~instance =
+let preferred_base_for ~network ~instance =
   match Payout_config.load ~instance with
-  | Ok c -> Some c.tzkt_url
+  | Ok c -> Some (Payout_config.effective_tzkt_url ~network c)
   | Error _ -> None
 
 (** Format a mutez amount as a short tez string with ꜩ suffix. *)
@@ -111,7 +111,7 @@ let status_run baker_opt =
       | Ok baker_pkh ->
           let instance = svc.instance in
           let network = svc.network in
-          let preferred_base = preferred_base_for ~instance in
+          let preferred_base = preferred_base_for ~network ~instance in
           let current_cycle =
             match Cycle_data.fetch_current_cycle ~network ~preferred_base with
             | Ok c -> Some c
@@ -266,7 +266,7 @@ let generate_run baker_opt cycle_opt json force =
             match cycle_opt with
             | Some c -> Some c
             | None -> (
-                let preferred_base = preferred_base_for ~instance in
+                let preferred_base = preferred_base_for ~network ~instance in
                 (* Use the latest completed cycle (current - 1) *)
                 match
                   Cycle_data.fetch_current_cycle ~network ~preferred_base
@@ -333,7 +333,7 @@ let history_run baker_opt cycles_count json =
       | Ok baker_pkh -> (
           let instance = svc.instance in
           let network = svc.network in
-          let preferred_base = preferred_base_for ~instance in
+          let preferred_base = preferred_base_for ~network ~instance in
           match
             Cycle_data.fetch_recent_cycles
               ~network
@@ -465,7 +465,7 @@ let rec pay_run baker_opt cycle_opt dry_run confirm =
             match cycle_opt with
             | Some c -> Some c
             | None -> (
-                let preferred_base = preferred_base_for ~instance in
+                let preferred_base = preferred_base_for ~network ~instance in
                 match
                   Cycle_data.fetch_current_cycle ~network ~preferred_base
                 with
@@ -491,13 +491,13 @@ let rec pay_run baker_opt cycle_opt dry_run confirm =
                   let config =
                     match Payout_config.load ~instance with
                     | Ok c -> c
-                    | Error _ -> Payout_config.default ~baker_pkh
+                    | Error _ -> Payout_config.default ~network ~baker_pkh ()
                   in
                   let octez_client_bin =
                     Filename.concat svc.Service.app_bin_dir "octez-client"
                   in
                   let endpoint =
-                    "http://" ^ Rpc_addr.to_string svc.Service.rpc_addr
+                    Rpc_addr.to_endpoint svc.Service.rpc_addr
                   in
                   let ctx : Payout_executor.context =
                     {
@@ -509,6 +509,8 @@ let rec pay_run baker_opt cycle_opt dry_run confirm =
                       instance;
                     }
                   in
+                  (* For dry-run, show the full blueprint first *)
+                  if dry_run then render_blueprint_table blueprint ;
                   (* Interactive confirmation unless --confirm is set *)
                   if (not confirm) && not dry_run then begin
                     let distributable =
@@ -600,6 +602,22 @@ and execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle =
         (if dry_run then "Dry-run" else "Payout")
         ok_count
         total ;
+      (* Show octez-client simulation output for dry-run *)
+      if dry_run then begin
+        let sim_output =
+          List.filter_map
+            (fun (r : Rewards.payout_result) ->
+              if r.success && not (String.equal r.note "")
+                 && not (String.equal r.note "dry-run")
+              then Some r.note
+              else None)
+            results
+        in
+        match sim_output with
+        | first :: _ ->
+            Printf.printf "\n=== Simulated operations ===\n%s\n" first
+        | [] -> ()
+      end ;
       if not dry_run then (
         Printf.printf
           "Reports saved to: %s\n"
@@ -744,7 +762,7 @@ let continual_start_run baker_opt interval offset =
           let config =
             match Payout_config.load ~instance with
             | Ok c -> c
-            | Error _ -> Payout_config.default ~baker_pkh
+            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
           in
           let config =
             {
@@ -777,7 +795,7 @@ let continual_stop_run baker_opt =
           let config =
             match Payout_config.load ~instance with
             | Ok c -> c
-            | Error _ -> Payout_config.default ~baker_pkh
+            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
           in
           let config = {config with continual_enabled = false} in
           match Payout_config.save ~instance config with
@@ -798,7 +816,7 @@ let continual_status_run baker_opt =
           let config =
             match Payout_config.load ~instance with
             | Ok c -> c
-            | Error _ -> Payout_config.default ~baker_pkh
+            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
           in
           Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
           Printf.printf
