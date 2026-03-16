@@ -243,7 +243,7 @@ _octez_manager() {
       ;;
     ui)
       if [[ $cur == -* ]]; then
-        opts="--page --theme --ui-log --ui-logfile --help --version"
+        opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0

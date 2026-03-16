@@ -567,8 +567,7 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
       in
       let node_endpoint =
         Delegate_scheduler.get_baker_node_endpoint ~instance
-        |> Option.value
-             ~default:(Rpc_addr.to_endpoint svc.Service.rpc_addr)
+        |> Option.value ~default:(Rpc_addr.to_endpoint svc.Service.rpc_addr)
       in
       let config =
         match Payout_config.load ~instance with
