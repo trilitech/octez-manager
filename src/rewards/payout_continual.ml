@@ -44,15 +44,15 @@ let read_delay_until ~instance =
 let write_delay_until ~instance timestamp =
   let path = delay_file ~instance in
   let dir = Filename.dirname path in
-  if not (Sys.file_exists dir) then (
-    try Unix.mkdir dir 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()) ;
+  (if not (Sys.file_exists dir) then
+     try Unix.mkdir dir 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()) ;
   let oc = open_out path in
   Printf.fprintf oc "%.0f\n" timestamp ;
   close_out oc
 
 let clear_delay_until ~instance =
   let path = delay_file ~instance in
-  if Sys.file_exists path then (try Sys.remove path with _ -> ())
+  if Sys.file_exists path then try Sys.remove path with _ -> ()
 
 (* ── Cycle matching ──────────────────────────────────────── *)
 

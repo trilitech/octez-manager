@@ -28,9 +28,7 @@ let rec normalize_json_value = function
   | `Null -> "null"
   | `Assoc fields ->
       (* Sort fields and normalize values for stable comparison *)
-      let sorted =
-        List.sort (fun (a, _) (b, _) -> String.compare a b) fields
-      in
+      let sorted = List.sort (fun (a, _) (b, _) -> String.compare a b) fields in
       let parts =
         List.map
           (fun (k, v) -> Printf.sprintf "%s:%s" k (normalize_json_value v))
@@ -55,8 +53,7 @@ let json_arrays_equal a b =
         let f2 = normalize_obj f2 in
         let shared_keys =
           List.filter_map
-            (fun (k, _) ->
-              if List.mem_assoc k f2 then Some k else None)
+            (fun (k, _) -> if List.mem_assoc k f2 then Some k else None)
             f1
         in
         List.for_all
@@ -66,10 +63,8 @@ let json_arrays_equal a b =
             values_equal v1 v2)
           shared_keys
     | `List l1, `List l2 ->
-        List.length l1 = List.length l2
-        && List.for_all2 values_equal l1 l2
-    | _ ->
-        String.equal (normalize_json_value v1) (normalize_json_value v2)
+        List.length l1 = List.length l2 && List.for_all2 values_equal l1 l2
+    | _ -> String.equal (normalize_json_value v1) (normalize_json_value v2)
   in
   values_equal a b
 
@@ -138,7 +133,8 @@ let json_field_diffs path custom_body tzkt_body =
       in
       List.filter_map
         (fun key ->
-          match (List.assoc_opt key custom_fields, List.assoc_opt key tzkt_fields)
+          match
+            (List.assoc_opt key custom_fields, List.assoc_opt key tzkt_fields)
           with
           | Some cv, Some tv ->
               if json_arrays_equal cv tv then None
@@ -153,8 +149,7 @@ let setup_indexer_logging () =
   Indexer.set_on_divergence (fun path custom_body tzkt_body ->
       let diffs = json_field_diffs path custom_body tzkt_body in
       match diffs with
-      | [] ->
-          `Use_custom
+      | [] -> `Use_custom
       | fields ->
           Printf.eprintf "Warning: indexer divergence on %s\n%!" path ;
           List.iter
@@ -777,8 +772,10 @@ and execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle =
         let sim_output =
           List.filter_map
             (fun (r : Rewards.payout_result) ->
-              if r.success && not (String.equal r.note "")
-                 && not (String.equal r.note "dry-run")
+              if
+                r.success
+                && (not (String.equal r.note ""))
+                && not (String.equal r.note "dry-run")
               then Some r.note
               else None)
             results
@@ -935,14 +932,12 @@ let notify_cmd =
 let tick_one_baker (svc : Service.t) =
   let instance = svc.instance in
   match baker_delegate svc with
-  | Error msg ->
-      Printf.eprintf "Error [%s]: %s\n%!" instance msg
+  | Error msg -> Printf.eprintf "Error [%s]: %s\n%!" instance msg
   | Ok baker_pkh -> (
       let config =
         match Payout_config.load ~instance with
         | Ok c -> c
-        | Error _ ->
-            Payout_config.default ~network:svc.network ~baker_pkh ()
+        | Error _ -> Payout_config.default ~network:svc.network ~baker_pkh ()
       in
       if not config.continual_enabled then
         Printf.printf "[%s] continual mode disabled, skipping.\n%!" instance
@@ -955,7 +950,7 @@ let tick_one_baker (svc : Service.t) =
               "Error [%s]: cannot fetch current cycle: %s\n%!"
               instance
               msg
-        | Ok current_cycle ->
+        | Ok current_cycle -> (
             let due =
               Payout_continual.cycles_due
                 ~instance
@@ -968,7 +963,7 @@ let tick_one_baker (svc : Service.t) =
                 "[%s] no cycles due (current: %d).\n%!"
                 instance
                 current_cycle
-            else (
+            else
               (* Check delay state *)
               let now = Unix.gettimeofday () in
               match Payout_continual.read_delay_until ~instance with
@@ -984,9 +979,7 @@ let tick_one_baker (svc : Service.t) =
                   Printf.printf
                     "[%s] delay expired, paying cycles: %s\n%!"
                     instance
-                    (String.concat
-                       ", "
-                       (List.map string_of_int due)) ;
+                    (String.concat ", " (List.map string_of_int due)) ;
                   let ctx = build_executor_ctx ~svc ~config in
                   let results =
                     Payout_continual.pay_due_cycles
@@ -1022,18 +1015,15 @@ let tick_one_baker (svc : Service.t) =
                   in
                   let block_time = 10.0 in
                   let delay_secs =
-                    min_blocks *. block_time
-                    +. Random.float
-                         ((max_blocks -. min_blocks) *. block_time)
+                    (min_blocks *. block_time)
+                    +. Random.float ((max_blocks -. min_blocks) *. block_time)
                   in
                   let until = now +. delay_secs in
                   Payout_continual.write_delay_until ~instance until ;
                   Printf.printf
                     "[%s] cycles due: %s — delay set for %.0fs.\n%!"
                     instance
-                    (String.concat
-                       ", "
-                       (List.map string_of_int due))
+                    (String.concat ", " (List.map string_of_int due))
                     delay_secs))
 
 let tick_run baker_opt =
@@ -1061,8 +1051,8 @@ let tick_cmd =
     Cmd.info
       "tick"
       ~doc:
-        "Run one continual payout tick. Checks due cycles, manages delay, \
-         and pays when ready. Designed for cron/systemd timer invocation."
+        "Run one continual payout tick. Checks due cycles, manages delay, and \
+         pays when ready. Designed for cron/systemd timer invocation."
   in
   Cmd.v info Term.(ret (const tick_run $ baker_arg))
 
@@ -1154,11 +1144,12 @@ let install_timer () =
   Printf.printf "Wrote %s\n" tmr_path ;
   (match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
   | Ok () -> ()
-  | Error (`Msg msg) ->
-      Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
+  | Error (`Msg msg) -> Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
   let timer_name = timer_unit_name ^ ".timer" in
   match
-    Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["enable"; "--now"; timer_name])
+    Cmd_runner.run
+      ~quiet:true
+      (systemctl_cmd () @ ["enable"; "--now"; timer_name])
   with
   | Ok () ->
       Printf.printf "Timer %s enabled and started.\n" timer_name ;
@@ -1174,20 +1165,17 @@ let uninstall_timer () =
        ~quiet:true
        (systemctl_cmd () @ ["disable"; "--now"; timer_name])
    with
-  | Ok () ->
-      Printf.printf "Timer %s disabled and stopped.\n" timer_name
-  | Error (`Msg msg) ->
-      Printf.eprintf "Warning: disable failed: %s\n" msg) ;
+  | Ok () -> Printf.printf "Timer %s disabled and stopped.\n" timer_name
+  | Error (`Msg msg) -> Printf.eprintf "Warning: disable failed: %s\n" msg) ;
   if Sys.file_exists svc_path then (
     Sys.remove svc_path ;
     Printf.printf "Removed %s\n" svc_path) ;
   if Sys.file_exists tmr_path then (
     Sys.remove tmr_path ;
     Printf.printf "Removed %s\n" tmr_path) ;
-  (match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
+  match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
   | Ok () -> ()
-  | Error (`Msg msg) ->
-      Printf.eprintf "Warning: daemon-reload failed: %s\n" msg)
+  | Error (`Msg msg) -> Printf.eprintf "Warning: daemon-reload failed: %s\n" msg
 
 (* ── rewards continual start/stop/status ──────────────────── *)
 
@@ -1203,7 +1191,8 @@ let continual_start_run baker_opt interval offset =
           let config =
             match Payout_config.load ~instance with
             | Ok c -> c
-            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
+            | Error _ ->
+                Payout_config.default ~network:svc.Service.network ~baker_pkh ()
           in
           let config =
             {
@@ -1228,8 +1217,7 @@ let continual_start_run baker_opt interval offset =
                     match install_timer () with
                     | Ok () -> `Ok ()
                     | Error msg ->
-                        Printf.eprintf
-                          "Warning: timer install failed: %s\n" msg ;
+                        Printf.eprintf "Warning: timer install failed: %s\n" msg ;
                         Printf.eprintf
                           "  Payouts will only run while the TUI is open.\n" ;
                         `Ok ())
@@ -1249,7 +1237,8 @@ let continual_stop_run baker_opt =
           let config =
             match Payout_config.load ~instance with
             | Ok c -> c
-            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
+            | Error _ ->
+                Payout_config.default ~network:svc.Service.network ~baker_pkh ()
           in
           let config = {config with continual_enabled = false} in
           match Payout_config.save ~instance config with
@@ -1264,9 +1253,10 @@ let continual_stop_run baker_opt =
                     List.exists
                       (fun (b : Service.t) ->
                         (not (String.equal b.instance instance))
-                        && match Payout_config.load ~instance:b.instance with
-                           | Ok c -> c.continual_enabled
-                           | Error _ -> false)
+                        &&
+                        match Payout_config.load ~instance:b.instance with
+                        | Ok c -> c.continual_enabled
+                        | Error _ -> false)
                       bakers
                 | Error _ -> false
               in
@@ -1280,14 +1270,14 @@ let continual_status_run baker_opt =
   setup_indexer_logging () ;
   let show_baker_status (svc : Service.t) =
     match baker_delegate svc with
-    | Error msg ->
-        Printf.eprintf "Error [%s]: %s\n" svc.instance msg
+    | Error msg -> Printf.eprintf "Error [%s]: %s\n" svc.instance msg
     | Ok baker_pkh ->
         let instance = svc.instance in
         let config =
           match Payout_config.load ~instance with
           | Ok c -> c
-          | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
+          | Error _ ->
+              Payout_config.default ~network:svc.Service.network ~baker_pkh ()
         in
         Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
         Printf.printf
@@ -1306,13 +1296,10 @@ let continual_status_run baker_opt =
         | Some until ->
             let now = Unix.gettimeofday () in
             if Float.compare until now > 0 then
-              Printf.printf
-                "  Pending delay: %.0fs remaining\n"
-                (until -. now)
+              Printf.printf "  Pending delay: %.0fs remaining\n" (until -. now)
             else
               Printf.printf "  Pending delay: expired (will pay on next tick)\n"
-        | None ->
-            Printf.printf "  Pending delay: none\n") ;
+        | None -> Printf.printf "  Pending delay: none\n") ;
         Printf.printf "\n"
   in
   match baker_opt with
@@ -1337,8 +1324,8 @@ let continual_start_cmd =
     Cmd.info
       "start"
       ~doc:
-        "Enable continual payouts and install the systemd timer. \
-         Automatically pays due cycles every 5 minutes."
+        "Enable continual payouts and install the systemd timer. Automatically \
+         pays due cycles every 5 minutes."
   in
   let interval_arg =
     let doc = "Pay every N cycles (default: 1 = every cycle)." in
@@ -1358,8 +1345,8 @@ let continual_stop_cmd =
     Cmd.info
       "stop"
       ~doc:
-        "Disable continual payouts. Removes the systemd timer when no \
-         bakers have continual mode enabled."
+        "Disable continual payouts. Removes the systemd timer when no bakers \
+         have continual mode enabled."
   in
   Cmd.v info Term.(ret (const continual_stop_run $ baker_arg))
 
@@ -1371,7 +1358,9 @@ let continual_cmd =
   let info =
     Cmd.info "continual" ~doc:"Manage continual (automatic) payouts."
   in
-  Cmd.group info [continual_start_cmd; continual_stop_cmd; continual_status_cmd; tick_cmd]
+  Cmd.group
+    info
+    [continual_start_cmd; continual_stop_cmd; continual_status_cmd; tick_cmd]
 
 (* ── rewards command group ─────────────────────────────────── *)
 

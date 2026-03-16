@@ -114,8 +114,8 @@ let set_log_warn f = log_warn_fn := f
 let on_divergence_fn :
     (string -> string -> string -> [`Use_custom | `Use_tzkt]) ref =
   ref (fun path _custom _tzkt ->
-    !log_warn_fn (Printf.sprintf "indexer divergence on %s" path) ;
-    `Use_tzkt)
+      !log_warn_fn (Printf.sprintf "indexer divergence on %s" path) ;
+      `Use_tzkt)
 
 let set_on_divergence f = on_divergence_fn := f
 
@@ -132,7 +132,8 @@ let fetch ~network ?preferred_base ?(timeout = 15.0) path =
   (* Log when a custom source is configured *)
   (match preferred_base with
   | Some b when not (String.equal b tzkt) ->
-      !log_info_fn (Printf.sprintf "Indexer: using custom source %s for %s" b path)
+      !log_info_fn
+        (Printf.sprintf "Indexer: using custom source %s for %s" b path)
   | _ -> ()) ;
   let last_error = ref (`Msg (Printf.sprintf "no sources for %s" path)) in
   let failed_custom = ref false in

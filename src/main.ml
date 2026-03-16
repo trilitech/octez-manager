@@ -50,8 +50,7 @@ let ui_term =
   in
   let indexer_network_arg =
     Arg.(
-      value
-      & opt string "mainnet"
+      value & opt string "mainnet"
       & info
           ["indexer-network"]
           ~doc:
@@ -71,8 +70,15 @@ let ui_term =
   Term.(
     ret
       (const
-         (fun page log logfile theme local_indexer indexer_network
-              compare_indexers ->
+         (fun
+           page
+           log
+           logfile
+           theme
+           local_indexer
+           indexer_network
+           compare_indexers
+         ->
            Printexc.record_backtrace true ;
            Capabilities.register () ;
            (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)

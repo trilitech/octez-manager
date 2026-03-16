@@ -32,7 +32,8 @@ let generate ~instance ~baker ~network ~cycle ?(force = false) () =
     match
       Cycle_data.fetch_cycle
         ~network
-        ~preferred_base:(Some (Payout_config.effective_tzkt_url ~network config))
+        ~preferred_base:
+          (Some (Payout_config.effective_tzkt_url ~network config))
         ~baker
         ~cycle
     with

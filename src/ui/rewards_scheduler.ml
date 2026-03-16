@@ -178,8 +178,7 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
           let endpoint =
             Delegate_scheduler.get_baker_node_endpoint ~instance
             |> Option.value
-                 ~default:
-                   (Rpc_addr.to_endpoint service.Service.rpc_addr)
+                 ~default:(Rpc_addr.to_endpoint service.Service.rpc_addr)
           in
           let base_dir =
             match Node_env.read ~inst:instance with
@@ -256,9 +255,7 @@ let poll_baker ~instance ~network =
     match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
   in
   let preferred_base =
-    Option.map
-      (fun c -> Payout_config.effective_tzkt_url ~network c)
-      config_opt
+    Option.map (fun c -> Payout_config.effective_tzkt_url ~network c) config_opt
   in
   (* Try the configured baker first, then fall back to each delegate,
      then the cached baker (for test bakers from OM_TEST_BAKER). *)

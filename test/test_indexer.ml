@@ -264,10 +264,7 @@ let () =
           Alcotest.test_case "mainnet" `Quick test_tzkt_base_url_mainnet;
           Alcotest.test_case "testnet" `Quick test_tzkt_base_url_testnet;
           Alcotest.test_case "full_url" `Quick test_tzkt_base_url_full_url;
-          Alcotest.test_case
-            "mainnet_url"
-            `Quick
-            test_tzkt_base_url_mainnet_url;
+          Alcotest.test_case "mainnet_url" `Quick test_tzkt_base_url_mainnet_url;
         ] );
       ( "register",
         [

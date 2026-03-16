@@ -285,6 +285,9 @@ _octez-manager() {
 
   local -a opts_ui
   opts_ui=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
     '--page[Start on a registered page]:NAME:'
     '--theme[Theme name or path (built-ins: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
