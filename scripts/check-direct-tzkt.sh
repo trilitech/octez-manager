@@ -36,7 +36,7 @@ while IFS= read -r file; do
         echo ""
         found_issues=$((found_issues + 1))
     fi
-done < <(find src lib -name '*.ml' -o -name '*.mli' | grep -v '_build' | sort)
+done < <(find src lib -name '*.ml' -o -name '*.mli' | grep -v '_build' | grep -v '\.formatted' | sort)
 
 if [ $found_issues -gt 0 ]; then
     echo -e "${RED}Found $found_issues file(s) with direct TzKT URL literals.${NC}"
