@@ -1024,6 +1024,7 @@ let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
 type dir_choice =
   | Existing_dir of Octez_manager_lib.Directory_registry.directory_entry
   | Browse_new_dir
+  | Type_path
 
 let select_directory_modal ~title ~dir_type ~on_select () =
   (* Load existing directories from registry *)
@@ -1033,9 +1034,10 @@ let select_directory_modal ~title ~dir_type ~on_select () =
     | Error _ -> []
   in
 
-  (* Build choice items: existing dirs + browse option *)
+  (* Build choice items: existing dirs + type/browse options *)
   let items =
-    List.map (fun e -> Existing_dir e) existing_dirs @ [Browse_new_dir]
+    List.map (fun e -> Existing_dir e) existing_dirs
+    @ [Type_path; Browse_new_dir]
   in
 
   let to_string = function
@@ -1049,63 +1051,68 @@ let select_directory_modal ~title ~dir_type ~on_select () =
           | svcs -> "  (" ^ String.concat ", " svcs ^ ")"
         in
         entry.Octez_manager_lib.Directory_registry.path ^ services_str
+    | Type_path -> "[ Type a path directly... ]"
     | Browse_new_dir -> "[ Browse for new directory... ]"
+  in
+
+  (* Shared validation and registration for a typed/browsed path. *)
+  let apply_path_selection path =
+    let trimmed = String.trim path in
+    if trimmed = "" then
+      show_error ~title:"Invalid Path" "Directory path cannot be empty"
+    else if Sys.file_exists trimmed && not (Sys.is_directory trimmed) then
+      show_error ~title:"Invalid Path" "Path exists but is not a directory"
+    else
+      let is_writable_dir dir =
+        try
+          Unix.access dir [Unix.W_OK; Unix.X_OK] ;
+          true
+        with Unix.Unix_error _ -> false
+      in
+      let user, group = Paths.current_user_group_names () in
+      let ensure_dir () =
+        File_ops.ensure_dir_path ~owner:user ~group ~mode:0o755 trimmed
+      in
+      let proceed () =
+        (match
+           Octez_manager_lib.Directory_registry.add
+             ~path:trimmed
+             ~dir_type
+             ~registered_services:[]
+         with
+        | Ok () -> ()
+        | Error (`Msg msg) ->
+            Cmd_runner.append_debug_log ("Registry add failed: " ^ msg)) ;
+        on_select trimmed
+      in
+      if Sys.file_exists trimmed then
+        if is_writable_dir trimmed then proceed ()
+        else
+          show_error
+            ~title:"Permission Denied"
+            (Printf.sprintf "Directory is not writable: %s" trimmed)
+      else
+        match ensure_dir () with
+        | Ok () -> proceed ()
+        | Error (`Msg msg) -> show_error ~title:"Directory Creation Failed" msg
   in
 
   let on_choice_select = function
     | Existing_dir entry ->
         on_select entry.Octez_manager_lib.Directory_registry.path
+    | Type_path ->
+        (* Let the user type or paste an absolute path directly *)
+        prompt_text_modal
+          ~title:"Enter Directory Path"
+          ~placeholder:(Some "/path/to/directory")
+          ~on_submit:apply_path_selection
+          ()
     | Browse_new_dir ->
         (* Open file browser *)
         open_file_browser_modal
           ~dirs_only:true
           ~require_writable:false
-          ~on_select:(fun path ->
-            let trimmed = String.trim path in
-
-            (* Validation *)
-            if trimmed = "" then
-              show_error ~title:"Invalid Path" "Directory path cannot be empty"
-            else if Sys.file_exists trimmed && not (Sys.is_directory trimmed)
-            then
-              show_error
-                ~title:"Invalid Path"
-                "Path exists but is not a directory"
-            else
-              (* Create directory with error handling *)
-              let is_writable_dir dir =
-                try
-                  Unix.access dir [Unix.W_OK; Unix.X_OK] ;
-                  true
-                with Unix.Unix_error _ -> false
-              in
-              let user, group = Paths.current_user_group_names () in
-              let ensure_dir () =
-                File_ops.ensure_dir_path ~owner:user ~group ~mode:0o755 trimmed
-              in
-              let proceed () =
-                (match
-                   Octez_manager_lib.Directory_registry.add
-                     ~path:trimmed
-                     ~dir_type
-                     ~registered_services:[]
-                 with
-                | Ok () -> ()
-                | Error (`Msg msg) ->
-                    Cmd_runner.append_debug_log ("Registry add failed: " ^ msg)) ;
-                on_select trimmed
-              in
-              if Sys.file_exists trimmed then
-                if is_writable_dir trimmed then proceed ()
-                else
-                  show_error
-                    ~title:"Permission Denied"
-                    (Printf.sprintf "Directory is not writable: %s" trimmed)
-              else
-                match ensure_dir () with
-                | Ok () -> proceed ()
-                | Error (`Msg msg) ->
-                    show_error ~title:"Directory Creation Failed" msg)
+          ~on_select:apply_path_selection
           ()
   in
 
