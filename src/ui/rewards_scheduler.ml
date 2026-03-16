@@ -179,7 +179,7 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
             Delegate_scheduler.get_baker_node_endpoint ~instance
             |> Option.value
                  ~default:
-                   ("http://" ^ Rpc_addr.to_string service.Service.rpc_addr)
+                   (Rpc_addr.to_endpoint service.Service.rpc_addr)
           in
           let ctx : Payout_executor.context =
             {
@@ -248,7 +248,9 @@ let poll_baker ~instance ~network =
     match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
   in
   let preferred_base =
-    Option.map (fun c -> c.Payout_config.tzkt_url) config_opt
+    Option.map
+      (fun c -> Payout_config.effective_tzkt_url ~network c)
+      config_opt
   in
   (* Try the configured baker first, then fall back to each delegate,
      then the cached baker (for test bakers from OM_TEST_BAKER). *)
@@ -325,7 +327,7 @@ let poll_baker ~instance ~network =
           | Some c -> {c with baker_pkh = baker}
           | None ->
               {
-                (Payout_config.default ~baker_pkh:baker) with
+                (Payout_config.default ~network ~baker_pkh:baker ()) with
                 tzkt_url = default_tzkt_url;
                 explorer_url =
                   (if String.equal network "mainnet" then "https://tzkt.io"
@@ -370,7 +372,7 @@ let ensure_cycle_detail ~instance ~baker ~cycle =
     in
     let preferred_base =
       match Payout_config.load ~instance with
-      | Ok c -> Some c.tzkt_url
+      | Ok c -> Some (Payout_config.effective_tzkt_url ~network c)
       | Error _ -> None
     in
     ignore

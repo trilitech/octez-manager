@@ -49,8 +49,16 @@ type t = {
 
 (** {1 Defaults and construction} *)
 
-(** Default configuration for a given baker address. *)
-val default : baker_pkh:string -> t
+(** Default configuration for a given baker address.
+    @param network  Network name or URL (default ["mainnet"]).
+      Used to derive the correct TzKT base URL. *)
+val default : ?network:string -> baker_pkh:string -> unit -> t
+
+(** Return the effective TzKT base URL for [config] on [network].
+    If the stored [tzkt_url] is the generic mainnet default but the baker
+    is on a different network, returns the correct URL for that network.
+    Otherwise returns [config.tzkt_url] unchanged. *)
+val effective_tzkt_url : network:string -> t -> string
 
 (** {1 Validation} *)
 

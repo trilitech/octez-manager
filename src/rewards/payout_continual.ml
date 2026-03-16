@@ -46,7 +46,7 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
   let config =
     match Payout_config.load ~instance with
     | Ok c -> c
-    | Error _ -> Payout_config.default ~baker_pkh:baker
+    | Error _ -> Payout_config.default ~network ~baker_pkh:baker ()
   in
   let due = cycles_due ~instance ~current_cycle ~interval ~offset in
   List.map
