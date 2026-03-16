@@ -61,14 +61,21 @@ fi
 
 echo "✓ config.json created by import"
 
-# Verify config has correct network
+# Verify config has network field (value may be short name or full URL)
 NETWORK=$(jq -r '.network' "$CONFIG_FILE")
-if [ "$NETWORK" != "shadownet" ]; then
-	echo "ERROR: config.json has wrong network: $NETWORK"
+if [ -z "$NETWORK" ] || [ "$NETWORK" = "null" ]; then
+	echo "ERROR: config.json is missing network field"
 	cat "$CONFIG_FILE"
 	exit 1
 fi
-echo "✓ config.json has correct network: $NETWORK"
+# Accept both short names and full URLs (e.g. "shadownet" or "https://teztnets.com/shadownet")
+if echo "$NETWORK" | grep -qi "shadownet"; then
+	echo "✓ config.json has correct network: $NETWORK"
+else
+	echo "ERROR: config.json has unexpected network: $NETWORK (expected shadownet)"
+	cat "$CONFIG_FILE"
+	exit 1
+fi
 
 # Verify config has history-mode (should default to rolling)
 HISTORY_MODE=$(jq -r '.shell."history_mode"' "$CONFIG_FILE")
