@@ -20,11 +20,12 @@ om group create "$GROUP_NAME" \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos
 
-# ── Install a node on a DIFFERENT network ──
-echo "Installing node '$TEST_INSTANCE' on ghostnet..."
+# ── Install a node on a DIFFERENT network (mainnet ≠ shadownet) ──
+# Use mainnet which is a built-in network and always recognized.
+echo "Installing node '$TEST_INSTANCE' on mainnet..."
 om install-node \
 	--instance "$TEST_INSTANCE" \
-	--network ghostnet \
+	--network mainnet \
 	--snapshot \
 	--snapshot-no-check \
 	--snapshot-uri "$SANDBOX_URL/snapshot.rolling" \

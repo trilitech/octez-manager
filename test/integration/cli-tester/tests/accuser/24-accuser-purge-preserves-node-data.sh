@@ -5,8 +5,8 @@ source /tests/lib.sh
 
 test_init "Purging accuser preserves node blockchain data"
 
-NODE_INSTANCE="test-accuser-purge-node"
-ACCUSER_INSTANCE="test-accuser-purge"
+NODE_INSTANCE="purge-test-node"
+ACCUSER_INSTANCE="purge-test-acc"
 RPC_PORT=$(alloc_port)
 NET_PORT=$(alloc_port)
 NODE_RPC="127.0.0.1:$RPC_PORT"
