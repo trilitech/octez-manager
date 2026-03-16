@@ -25,3 +25,10 @@ val name : string
 
 (** Register the shell page in the global registry. *)
 val register : unit -> unit
+
+(**/**)
+
+(** PAGE_SIG module for use with the headless driver in tests. *)
+module Page : Miaou.Core.Tui_page.PAGE_SIG
+
+(**/**)
