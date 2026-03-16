@@ -288,7 +288,7 @@ let reset_config ~baker_pkh =
     ~message:"Reset all settings to defaults?"
     ~on_result:(fun confirmed ->
       if confirmed then begin
-        pending_config := Some (Payout_config.default ~baker_pkh) ;
+        pending_config := Some (Payout_config.default ~baker_pkh ()) ;
         Context.toast_info "Configuration reset to defaults"
       end)
     ()

@@ -40,7 +40,7 @@ type t = {
   continual_offset : int;
 }
 
-let default ~baker_pkh =
+let default ?(network = "mainnet") ~baker_pkh () =
   {
     version = 1;
     baker_pkh;
@@ -68,13 +68,22 @@ let default ~baker_pkh =
     bond_recipients = [];
     fee_recipients = [];
     rpc_fallback_pool = [];
-    tzkt_url = Indexer.tzkt_base_url ~network:"mainnet";
+    tzkt_url = Indexer.tzkt_base_url ~network;
     explorer_url = "https://tzkt.io";
     notifications = [];
     continual_enabled = false;
     continual_interval = 1;
     continual_offset = 0;
   }
+
+let effective_tzkt_url ~network config =
+  let correct = Indexer.tzkt_base_url ~network in
+  let mainnet_default = Indexer.tzkt_base_url ~network:"mainnet" in
+  if
+    String.equal config.tzkt_url mainnet_default
+    && not (String.equal correct mainnet_default)
+  then correct
+  else config.tzkt_url
 
 (* Validation *)
 

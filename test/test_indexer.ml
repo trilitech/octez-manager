@@ -59,6 +59,18 @@ let test_tzkt_base_url_testnet () =
     "https://api.ghostnet.tzkt.io"
     (Indexer.tzkt_base_url ~network:"ghostnet")
 
+let test_tzkt_base_url_full_url () =
+  Alcotest.(check string)
+    "tallinnnet from full URL"
+    "https://api.tallinnnet.tzkt.io"
+    (Indexer.tzkt_base_url ~network:"https://teztnets.com/tallinnnet")
+
+let test_tzkt_base_url_mainnet_url () =
+  Alcotest.(check string)
+    "mainnet from full URL"
+    "https://api.tzkt.io"
+    (Indexer.tzkt_base_url ~network:"https://teztnets.com/mainnet")
+
 let test_register_clear_roundtrip () =
   let network = fresh_network () in
   Indexer.register_local ~network ~base_url:"http://local1" ;
@@ -251,6 +263,11 @@ let () =
         [
           Alcotest.test_case "mainnet" `Quick test_tzkt_base_url_mainnet;
           Alcotest.test_case "testnet" `Quick test_tzkt_base_url_testnet;
+          Alcotest.test_case "full_url" `Quick test_tzkt_base_url_full_url;
+          Alcotest.test_case
+            "mainnet_url"
+            `Quick
+            test_tzkt_base_url_mainnet_url;
         ] );
       ( "register",
         [
