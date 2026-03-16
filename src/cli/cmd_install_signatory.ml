@@ -51,18 +51,16 @@ let parse_key_spec key_spec =
            "Invalid key format '%s'. Expected 'pkh' or 'pkh:op1,op2,...'"
            key_spec)
 
-(** Parse authorized keys string into list of authorized_key records *)
+(** Parse authorized keys string into list of authorized_key records.
+    Keys are separated by whitespace. Each key spec has the format
+    "pkh" or "pkh:op1,op2,op3". Commas within a key spec are part of
+    the permissions list and must NOT be used as key separators. *)
 let parse_authorized_keys_string s =
   let ( let* ) = Result.bind in
-  (* Split by whitespace to support both old comma-separated and new space-separated *)
+  (* Split only by whitespace — commas are part of the pkh:op1,op2 format *)
   let key_specs =
     String.split_on_char ' ' s |> List.map String.trim
     |> List.filter (fun s -> s <> "")
-    |> List.concat_map (fun spec ->
-        (* Also split by comma for backward compatibility *)
-        String.split_on_char ',' spec
-        |> List.map String.trim
-        |> List.filter (fun s -> s <> ""))
   in
   (* Parse each key spec *)
   List.fold_left

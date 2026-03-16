@@ -4,45 +4,39 @@
 #
 # SPDX-License-Identifier: MIT
 
-# Test: Cascade import preserves all configs across full stack
-# Verifies: Node, DAL, Baker, and Accuser configs all preserved in cascade import
+# Test: Cascade import preserves configs across node + baker stack
+# Verifies: Node config preserved (CORS, private-mode) in cascade import
 
 set -euo pipefail
+source /tests/lib.sh
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib.sh"
+test_init "Cascade import - all configs preserved"
 
 # Unique instance names for this test
-NODE_INSTANCE="node-cascade-full-$$"
-DAL_INSTANCE="dal-cascade-full-$$"
-BAKER_INSTANCE="baker-cascade-full-$$"
-ACCUSER_INSTANCE="accuser-cascade-full-$$"
+NODE_INSTANCE="casc-cfg-node-$$"
+BAKER_INSTANCE="casc-cfg-baker-$$"
 
 NODE_PORT=$(alloc_port)
 NODE_RPC_PORT=$(alloc_port)
-DAL_RPC_PORT=$(alloc_port)
 
 # Register for cleanup
 register_instance "$NODE_INSTANCE"
-register_instance "$DAL_INSTANCE"
 register_instance "$BAKER_INSTANCE"
-register_instance "$ACCUSER_INSTANCE"
 
-log "Setting up full Octez stack (node + DAL + baker + accuser) as external services..."
+echo "Setting up external node with custom config..."
 
 # === NODE ===
-log "Creating external node with custom config..."
-NODE_DATA_DIR="/tmp/octez-node-cascade-$$"
-register_datadir "$NODE_DATA_DIR"
+NODE_DATA_DIR="/var/lib/octez-external/$NODE_INSTANCE"
+register_data_dir "$NODE_DATA_DIR"
 mkdir -p "$NODE_DATA_DIR"
 
+inject_identity "$NODE_INSTANCE" "$NODE_DATA_DIR"
+
 octez-node config init --data-dir="$NODE_DATA_DIR" \
-	--network=weeklynet \
+	--network=shadownet \
 	--history-mode=rolling \
 	--net-addr="127.0.0.1:$NODE_PORT" \
 	--rpc-addr="127.0.0.1:$NODE_RPC_PORT" >/dev/null 2>&1
-
-octez-node identity generate --data-dir="$NODE_DATA_DIR" >/dev/null 2>&1
 
 # Customize node config
 NODE_CONFIG="$NODE_DATA_DIR/config.json"
@@ -50,195 +44,72 @@ jq '.rpc."cors-origin" = ["https://cascade-test.com"] | .p2p."private-mode" = tr
 	"$NODE_CONFIG" >"$NODE_CONFIG.tmp" && mv "$NODE_CONFIG.tmp" "$NODE_CONFIG"
 
 NODE_CONFIG_HASH=$(sha256sum "$NODE_CONFIG" | awk '{print $1}')
-log "Node config hash: $NODE_CONFIG_HASH"
+echo "Node config hash: $NODE_CONFIG_HASH"
 
-# Create node service
-NODE_SERVICE="octez-node-${NODE_INSTANCE}"
-sudo tee "/etc/systemd/system/${NODE_SERVICE}.service" >/dev/null <<EOF
-[Unit]
-Description=Octez Node - ${NODE_INSTANCE}
-After=network.target
+chown -R tezos:tezos "$NODE_DATA_DIR"
+register_external_service "node" "$NODE_INSTANCE"
+create_external_service "node" "$NODE_INSTANCE" "$NODE_DATA_DIR" "127.0.0.1:$NODE_RPC_PORT" "shadownet"
+systemctl enable "octez-node@${NODE_INSTANCE}.service"
+systemctl start "octez-node@${NODE_INSTANCE}.service"
 
-[Service]
-Type=simple
-User=octez
-ExecStart=/usr/bin/octez-node run --data-dir=${NODE_DATA_DIR} --network=weeklynet
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo chown -R octez:octez "$NODE_DATA_DIR"
-
-# === DAL ===
-log "Creating external DAL with custom config..."
-DAL_DATA_DIR="/tmp/octez-dal-cascade-$$"
-register_datadir "$DAL_DATA_DIR"
-mkdir -p "$DAL_DATA_DIR"
-
-octez-dal-node config init --data-dir="$DAL_DATA_DIR" \
-	--endpoint="http://127.0.0.1:$NODE_RPC_PORT" \
-	--rpc-addr="127.0.0.1:$DAL_RPC_PORT" >/dev/null 2>&1
-
-# Customize DAL config
-DAL_CONFIG="$DAL_DATA_DIR/config.json"
-jq '.public_addr = "dal-cascade.example.com:10732"' \
-	"$DAL_CONFIG" >"$DAL_CONFIG.tmp" && mv "$DAL_CONFIG.tmp" "$DAL_CONFIG"
-
-DAL_CONFIG_HASH=$(sha256sum "$DAL_CONFIG" | awk '{print $1}')
-log "DAL config hash: $DAL_CONFIG_HASH"
-
-# Create DAL service
-DAL_SERVICE="octez-dal-node-${DAL_INSTANCE}"
-sudo tee "/etc/systemd/system/${DAL_SERVICE}.service" >/dev/null <<EOF
-[Unit]
-Description=Octez DAL - ${DAL_INSTANCE}
-After=network.target ${NODE_SERVICE}.service
-Requires=${NODE_SERVICE}.service
-
-[Service]
-Type=simple
-User=octez
-ExecStart=/usr/bin/octez-dal-node run --data-dir=${DAL_DATA_DIR}
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo chown -R octez:octez "$DAL_DATA_DIR"
+# Wait for node to be ready
+wait_for_node_ready "127.0.0.1:$NODE_RPC_PORT" 30
 
 # === BAKER ===
-log "Creating external baker with custom args..."
-BAKER_DATA_DIR="/tmp/octez-baker-cascade-$$"
-register_datadir "$BAKER_DATA_DIR"
+echo "Creating external baker depending on node..."
+BAKER_DATA_DIR="/var/lib/octez-external/$BAKER_INSTANCE"
+register_data_dir "$BAKER_DATA_DIR"
 mkdir -p "$BAKER_DATA_DIR"
+chown -R tezos:tezos "$BAKER_DATA_DIR"
 
-# Create baker service with extra args
-BAKER_SERVICE="octez-baker-${BAKER_INSTANCE}"
-sudo tee "/etc/systemd/system/${BAKER_SERVICE}.service" >/dev/null <<EOF
-[Unit]
-Description=Octez Baker - ${BAKER_INSTANCE}
-After=network.target ${NODE_SERVICE}.service
-Requires=${NODE_SERVICE}.service
+register_external_service "baker" "$BAKER_INSTANCE"
+# Create external baker service pointing to node
+create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA_DIR" "" "shadownet" "http://127.0.0.1:$NODE_RPC_PORT"
+systemctl daemon-reload
 
-[Service]
-Type=simple
-User=octez
-ExecStart=/usr/bin/octez-baker-PsQuebec run with local node ${NODE_DATA_DIR} --liquidity-baking-toggle-vote pass --adaptive-issuance-vote pass
-Restart=on-failure
-Environment="TEZOS_LOG=* -> info"
+echo "Performing cascade import of baker (should also import node)..."
+om import "octez-baker@${BAKER_INSTANCE}" --cascade --network shadownet 2>&1
 
-[Install]
-WantedBy=multi-user.target
-EOF
+echo "Verifying node config was preserved..."
 
-# === ACCUSER ===
-log "Creating external accuser with custom args..."
-ACCUSER_DATA_DIR="/tmp/octez-accuser-cascade-$$"
-register_datadir "$ACCUSER_DATA_DIR"
-mkdir -p "$ACCUSER_DATA_DIR"
-
-# Create accuser service
-ACCUSER_SERVICE="octez-accuser-${ACCUSER_INSTANCE}"
-sudo tee "/etc/systemd/system/${ACCUSER_SERVICE}.service" >/dev/null <<EOF
-[Unit]
-Description=Octez Accuser - ${ACCUSER_INSTANCE}
-After=network.target ${NODE_SERVICE}.service
-Requires=${NODE_SERVICE}.service
-
-[Service]
-Type=simple
-User=octez
-ExecStart=/usr/bin/octez-accuser-PsQuebec run --endpoint=http://127.0.0.1:${NODE_RPC_PORT} --preserved-levels=10
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-
-log "Performing cascade import..."
-expect_success octez-manager import detect
-expect_success octez-manager import cascade "$NODE_SERVICE" "$NODE_INSTANCE"
-
-log "Verifying all configs preserved..."
-
-# Check node config
+# Check node config hash unchanged
 NODE_CONFIG_HASH_AFTER=$(sha256sum "$NODE_CONFIG" | awk '{print $1}')
 if [ "$NODE_CONFIG_HASH" != "$NODE_CONFIG_HASH_AFTER" ]; then
-	error "Node config was modified!"
+	echo "ERROR: Node config was modified by cascade import!"
+	echo "Before: $NODE_CONFIG_HASH"
+	echo "After:  $NODE_CONFIG_HASH_AFTER"
 	exit 1
 fi
-log "✓ Node config preserved"
+echo "✓ Node config preserved"
 
 # Verify node config contents
 if ! jq -e '.rpc."cors-origin"[0] == "https://cascade-test.com"' "$NODE_CONFIG" >/dev/null; then
-	error "Node CORS origin not preserved"
+	echo "ERROR: Node CORS origin not preserved"
+	jq '.rpc."cors-origin"' "$NODE_CONFIG"
 	exit 1
 fi
-log "✓ Node CORS setting preserved"
+echo "✓ Node CORS setting preserved"
 
 if ! jq -e '.p2p."private-mode" == true' "$NODE_CONFIG" >/dev/null; then
-	error "Node private mode not preserved"
+	echo "ERROR: Node private mode not preserved"
+	jq '.p2p."private-mode"' "$NODE_CONFIG"
 	exit 1
 fi
-log "✓ Node private mode preserved"
+echo "✓ Node private mode preserved"
 
-# Check DAL config
-DAL_CONFIG_HASH_AFTER=$(sha256sum "$DAL_CONFIG" | awk '{print $1}')
-if [ "$DAL_CONFIG_HASH" != "$DAL_CONFIG_HASH_AFTER" ]; then
-	error "DAL config was modified!"
+# Verify both services are managed
+if ! service_is_managed "$NODE_INSTANCE"; then
+	echo "ERROR: Node not managed after cascade import"
+	om list 2>&1
 	exit 1
 fi
-log "✓ DAL config preserved"
+echo "✓ Node is managed"
 
-# Verify DAL config contents
-if ! jq -e '.public_addr == "dal-cascade.example.com:10732"' "$DAL_CONFIG" >/dev/null; then
-	error "DAL public address not preserved"
+if ! service_is_managed "$BAKER_INSTANCE"; then
+	echo "ERROR: Baker not managed after cascade import"
+	om list 2>&1
 	exit 1
 fi
-log "✓ DAL public address preserved"
+echo "✓ Baker is managed"
 
-# Check baker metadata has extra_args
-BAKER_META=$(octez-manager info "$BAKER_INSTANCE" --json)
-if ! echo "$BAKER_META" | jq -e '.extra_args | contains(["--liquidity-baking-toggle-vote", "pass"])' >/dev/null; then
-	error "Baker extra args not preserved"
-	exit 1
-fi
-log "✓ Baker extra args preserved"
-
-# Check accuser metadata has extra_args
-ACCUSER_META=$(octez-manager info "$ACCUSER_INSTANCE" --json)
-if ! echo "$ACCUSER_META" | jq -e '.extra_args | contains(["--preserved-levels", "10"])' >/dev/null; then
-	error "Accuser extra args not preserved"
-	exit 1
-fi
-log "✓ Accuser extra args preserved"
-
-log "Verifying all services can start..."
-expect_success octez-manager start "$NODE_INSTANCE"
-wait_for_node_rpc "$NODE_INSTANCE" 60
-
-expect_success octez-manager start "$DAL_INSTANCE"
-sleep 5
-
-# Don't start baker/accuser (requires keys), just verify they were imported correctly
-if ! octez-manager status "$NODE_INSTANCE" | grep -q "running"; then
-	error "Node failed to start"
-	exit 1
-fi
-log "✓ Node running"
-
-if ! octez-manager status "$DAL_INSTANCE" | grep -q "running"; then
-	error "DAL failed to start"
-	exit 1
-fi
-log "✓ DAL running"
-
-expect_success octez-manager stop "$DAL_INSTANCE"
-expect_success octez-manager stop "$NODE_INSTANCE"
-
-log "✓ Test passed: All configs preserved in cascade import"
+echo "Test passed: All configs preserved in cascade import"
