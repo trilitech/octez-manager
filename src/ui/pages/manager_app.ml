@@ -129,7 +129,13 @@ let shutdown () =
   Domain_pool.shutdown () ;
   Download.kill_active_download ()
 
-let run ?page ?(log = false) ?logfile ?theme () =
+let run ?page ?(log = false) ?logfile ?theme ?local_indexer
+    ?(indexer_network = "mainnet") ?(compare_indexers = false) () =
+  (match local_indexer with
+  | Some url ->
+      Indexer.register_local ~network:indexer_network ~base_url:url ;
+      if compare_indexers then Indexer.set_debug_mode true
+  | None -> ()) ;
   let initial_theme, warning = Theme_manager.load ?name:theme () in
   Theme_manager.set_current initial_theme ;
   let quit_requested = ref false in
