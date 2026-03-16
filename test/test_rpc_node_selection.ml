@@ -259,10 +259,7 @@ let test_get_item_public_node () =
 let test_get_item_local_header () =
   (* Local-only: 0=LOCAL header, 1=network header, 2=first local node *)
   let s =
-    make_state
-      ~local_instances:[make_item ~is_public:false ()]
-      ~cursor:0
-      ()
+    make_state ~local_instances:[make_item ~is_public:false ()] ~cursor:0 ()
   in
   match Rpc_node_selection.get_item_at_cursor s with
   | `SectionHeader -> ()
