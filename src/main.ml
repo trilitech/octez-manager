@@ -126,7 +126,12 @@ let ui_cmd =
 
 let root_cmd =
   let doc = "Terminal UI for managing Octez services" in
-  let info = Cmd.info "octez-manager" ~doc ~version:"0.2.1" in
+  let version =
+    match Build_info.V1.version () with
+    | None -> "dev"
+    | Some v -> Build_info.V1.Version.to_string v
+  in
+  let info = Cmd.info "octez-manager" ~doc ~version in
   Cmd.group
     info
     ~default:ui_term

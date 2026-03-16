@@ -1,0 +1,4 @@
+; Exclude the worktrees directory from dune's directory traversal.
+; Git worktrees added here have their own dune-project roots and must not
+; be traversed as part of the parent workspace.
+(dirs :standard \ worktrees)
