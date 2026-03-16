@@ -1139,7 +1139,9 @@ let install_timer () =
   Printf.printf "Wrote %s\n" svc_path ;
   write_unit_file tmr_path (generate_timer_unit ()) ;
   Printf.printf "Wrote %s\n" tmr_path ;
-  (match Cmd_runner.run ~quiet:true (Systemd.systemctl_cmd () @ ["daemon-reload"]) with
+  (match
+     Cmd_runner.run ~quiet:true (Systemd.systemctl_cmd () @ ["daemon-reload"])
+   with
   | Ok () -> ()
   | Error (`Msg msg) -> Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
   let timer_name = timer_unit_name ^ ".timer" in
@@ -1170,7 +1172,9 @@ let uninstall_timer () =
   if Sys.file_exists tmr_path then (
     Sys.remove tmr_path ;
     Printf.printf "Removed %s\n" tmr_path) ;
-  match Cmd_runner.run ~quiet:true (Systemd.systemctl_cmd () @ ["daemon-reload"]) with
+  match
+    Cmd_runner.run ~quiet:true (Systemd.systemctl_cmd () @ ["daemon-reload"])
+  with
   | Ok () -> ()
   | Error (`Msg msg) -> Printf.eprintf "Warning: daemon-reload failed: %s\n" msg
 
