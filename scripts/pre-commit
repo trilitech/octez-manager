@@ -12,8 +12,13 @@ if ! command -v opam &> /dev/null; then
     exit 1
 fi
 
-# Ensure opam environment is loaded
-eval $(opam env --switch . 2>/dev/null) || eval $(opam env)
+# Ensure opam environment is loaded using the project's local switch.
+# Using --switch . is fragile: on fallback it picks up whatever global switch
+# is active in the shell (e.g. octez-setup / OCaml 5.2.1), which cannot
+# compile tools/arch_index.ml that requires the OCaml 5.3 Typedtree API.
+# Explicitly resolving the project root makes the switch selection robust.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+eval "$(opam env --switch "$REPO_ROOT")"
 
 # 1. Format check
 echo "📝 Checking code formatting..."
