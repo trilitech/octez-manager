@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **DAL import RPC addr omitted to prevent config rewrite**: When importing a DAL node service, `--rpc-addr` and `--net-addr` flags are now only passed to `octez-dal-node` when they were explicitly present in the original service's `ExecStart`. Omitting these flags prevents `octez-dal-node` from rewriting `config.json` on every startup, preserving original configuration. (closes #793)
 - **Version reported by `--version`**: `octez-manager --version` now reports the version from the dune build system rather than a hardcoded string. In development builds (not installed via opam), it reports `dev`.
 
 - **Rewards non-mainnet TzKT routing**: Fixed incorrect TzKT API base URL used when generating or paying rewards for non-mainnet bakers. Network names that are full URLs (e.g. from Teztnets picker) are now normalized to slugs before constructing the TzKT endpoint. The continual scheduler and payout executor now correctly resolve the baker's base directory from environment variables (`OCTEZ_CLIENT_BASE_DIR`, `OCTEZ_BAKER_BASE_DIR`).
