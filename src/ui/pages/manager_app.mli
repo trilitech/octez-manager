@@ -20,11 +20,20 @@ val shutdown : unit -> unit
     @param page Initial page to display (defaults to the instances page).
     @param log Enable Miaou debug logging.
     @param logfile Path to log file.
-    @param theme Theme name or path. *)
+    @param theme Theme name or path.
+    @param local_indexer Register a local indexer endpoint (e.g.
+      ["http://localhost:5000"]).  The URL is registered for
+      [indexer_network] (default ["mainnet"]).
+    @param compare_indexers When [true] and a local indexer is
+      registered, every fetch also queries public TzKT and logs
+      divergences. *)
 val run :
   ?page:string ->
   ?log:bool ->
   ?logfile:string ->
   ?theme:string ->
+  ?local_indexer:string ->
+  ?indexer_network:string ->
+  ?compare_indexers:bool ->
   unit ->
   (unit, [> `Msg of string]) result

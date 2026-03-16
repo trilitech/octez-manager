@@ -37,9 +37,42 @@ let ui_term =
              OCTEZ_MANAGER_THEME."
           ~docv:"THEME")
   in
+  let local_indexer_arg =
+    Arg.(
+      value
+      & opt (some string) None
+      & info
+          ["local-indexer"]
+          ~doc:
+            "Register a local TzKT-compatible indexer endpoint. This URL is \
+             tried before the public TzKT API."
+          ~docv:"URL")
+  in
+  let indexer_network_arg =
+    Arg.(
+      value
+      & opt string "mainnet"
+      & info
+          ["indexer-network"]
+          ~doc:
+            "Network the local indexer serves (default: mainnet). Only \
+             relevant when --local-indexer is set."
+          ~docv:"NETWORK")
+  in
+  let compare_indexers_flag =
+    Arg.(
+      value & flag
+      & info
+          ["compare-indexers"]
+          ~doc:
+            "When a local indexer is registered, also query public TzKT on \
+             every fetch and log divergences.")
+  in
   Term.(
     ret
-      (const (fun page log logfile theme ->
+      (const
+         (fun page log logfile theme local_indexer indexer_network
+              compare_indexers ->
            Printexc.record_backtrace true ;
            Capabilities.register () ;
            (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
@@ -59,12 +92,21 @@ let ui_term =
              Binary_downloader.set_parallel_submit
                Octez_manager_ui.Domain_pool.submit ;
              Miaou_helpers.Fiber_runtime.init ~env ~sw ;
-             Octez_manager_ui.Manager_app.run ?page ~log ?logfile ?theme ()
+             Octez_manager_ui.Manager_app.run
+               ?page
+               ~log
+               ?logfile
+               ?theme
+               ?local_indexer
+               ~indexer_network
+               ~compare_indexers
+               ()
            in
            match result with
            | Ok () -> `Ok ()
            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
-      $ page_arg $ log_flag $ logfile_arg $ theme_arg))
+      $ page_arg $ log_flag $ logfile_arg $ theme_arg $ local_indexer_arg
+      $ indexer_network_arg $ compare_indexers_flag))
 
 let ui_cmd =
   let open Cmdliner in
