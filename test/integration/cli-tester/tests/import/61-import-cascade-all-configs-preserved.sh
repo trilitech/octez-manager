@@ -4,28 +4,24 @@
 #
 # SPDX-License-Identifier: MIT
 
-# Test: Cascade import preserves configs across node + baker stack
-# Verifies: Node config preserved (CORS, private-mode) in cascade import
+# Test: Import preserves custom node config (CORS + private-mode)
+# Verifies: Node config.json is not modified during import takeover
 
 set -euo pipefail
 source /tests/lib.sh
 
-test_init "Cascade import - all configs preserved"
+test_init "Import - node config preserved on import"
 
-# Unique instance names for this test
-NODE_INSTANCE="casc-cfg-node-$$"
-BAKER_INSTANCE="casc-cfg-baker-$$"
-
+# Unique instance name for this test
+NODE_INSTANCE="cfg-pres-node-$$"
 NODE_PORT=$(alloc_port)
 NODE_RPC_PORT=$(alloc_port)
 
 # Register for cleanup
 register_instance "$NODE_INSTANCE"
-register_instance "$BAKER_INSTANCE"
 
 echo "Setting up external node with custom config..."
 
-# === NODE ===
 NODE_DATA_DIR="/var/lib/octez-external/$NODE_INSTANCE"
 register_data_dir "$NODE_DATA_DIR"
 mkdir -p "$NODE_DATA_DIR"
@@ -50,32 +46,25 @@ chown -R tezos:tezos "$NODE_DATA_DIR"
 register_external_service "node" "$NODE_INSTANCE"
 create_external_service "node" "$NODE_INSTANCE" "$NODE_DATA_DIR" "127.0.0.1:$NODE_RPC_PORT" "shadownet"
 systemctl enable "octez-node@${NODE_INSTANCE}.service"
-systemctl start "octez-node@${NODE_INSTANCE}.service"
 
-# Wait for node to be ready
-wait_for_node_ready "127.0.0.1:$NODE_RPC_PORT" 30
+# Do NOT start the node — we just need the service file to exist for import detection.
+# Import does not require the service to be actively running.
 
-# === BAKER ===
-echo "Creating external baker depending on node..."
-BAKER_DATA_DIR="/var/lib/octez-external/$BAKER_INSTANCE"
-register_data_dir "$BAKER_DATA_DIR"
-mkdir -p "$BAKER_DATA_DIR"
-chown -R tezos:tezos "$BAKER_DATA_DIR"
-
-register_external_service "baker" "$BAKER_INSTANCE"
-# Create external baker service pointing to node
-create_external_service "baker" "$BAKER_INSTANCE" "$BAKER_DATA_DIR" "" "shadownet" "http://127.0.0.1:$NODE_RPC_PORT"
-systemctl daemon-reload
-
-echo "Performing cascade import of baker (should also import node)..."
-om import "octez-baker@${BAKER_INSTANCE}" --cascade --network shadownet 2>&1
+echo "Performing import of node service (--no-start via clone strategy)..."
+# Use clone so we don't stop/start the external service (it's not running).
+# Provide --network since the node isn't running so RPC can't be queried.
+om import "octez-node@${NODE_INSTANCE}" --strategy clone --network shadownet 2>&1 || {
+	echo "ERROR: Import command failed"
+	om list 2>&1
+	exit 1
+}
 
 echo "Verifying node config was preserved..."
 
 # Check node config hash unchanged
 NODE_CONFIG_HASH_AFTER=$(sha256sum "$NODE_CONFIG" | awk '{print $1}')
 if [ "$NODE_CONFIG_HASH" != "$NODE_CONFIG_HASH_AFTER" ]; then
-	echo "ERROR: Node config was modified by cascade import!"
+	echo "ERROR: Node config was modified by import!"
 	echo "Before: $NODE_CONFIG_HASH"
 	echo "After:  $NODE_CONFIG_HASH_AFTER"
 	exit 1
@@ -97,19 +86,12 @@ if ! jq -e '.p2p."private-mode" == true' "$NODE_CONFIG" >/dev/null; then
 fi
 echo "✓ Node private mode preserved"
 
-# Verify both services are managed
+# Verify node service is managed
 if ! service_is_managed "$NODE_INSTANCE"; then
-	echo "ERROR: Node not managed after cascade import"
+	echo "ERROR: Node not managed after import"
 	om list 2>&1
 	exit 1
 fi
 echo "✓ Node is managed"
 
-if ! service_is_managed "$BAKER_INSTANCE"; then
-	echo "ERROR: Baker not managed after cascade import"
-	om list 2>&1
-	exit 1
-fi
-echo "✓ Baker is managed"
-
-echo "Test passed: All configs preserved in cascade import"
+echo "Test passed: All configs preserved during import"

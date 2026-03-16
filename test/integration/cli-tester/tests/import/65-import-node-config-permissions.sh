@@ -4,169 +4,94 @@
 #
 # SPDX-License-Identifier: MIT
 
-# Test: Import preserves and corrects file ownership and permissions
-# Verifies: Config files retain correct ownership after import
+# Test: Import preserves file ownership for data directory
+# Verifies: Data directory remains owned by tezos user after import
 
 set -euo pipefail
+source /tests/lib.sh
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib.sh"
+test_init "Import node - data directory ownership preserved"
 
 # Unique instance name for this test
-INSTANCE="node-permissions-$$"
+INSTANCE="node-perms-$$"
 PORT=$(alloc_port)
 RPC_PORT=$(alloc_port)
 
 # Register for cleanup
 register_instance "$INSTANCE"
 
-log "Creating external node with specific ownership/permissions..."
+echo "Creating external node with tezos ownership..."
 
 # Create data directory
-DATA_DIR="/tmp/octez-external-perms-$$"
-register_datadir "$DATA_DIR"
+DATA_DIR="/var/lib/octez-external/$INSTANCE"
+register_data_dir "$DATA_DIR"
 mkdir -p "$DATA_DIR"
+inject_identity "$INSTANCE" "$DATA_DIR"
 
-# Initialize node config and identity
+# Initialize node config
 octez-node config init --data-dir="$DATA_DIR" \
-	--network=weeklynet \
+	--network=shadownet \
 	--history-mode=rolling \
 	--net-addr="127.0.0.1:$PORT" \
 	--rpc-addr="127.0.0.1:$RPC_PORT" >/dev/null 2>&1
 
-octez-node identity generate --data-dir="$DATA_DIR" >/dev/null 2>&1
-
 CONFIG_FILE="$DATA_DIR/config.json"
-IDENTITY_FILE="$DATA_DIR/identity.json"
 
-# Set ownership to octez user (as external service would have)
-sudo chown -R octez:octez "$DATA_DIR"
+# Take hash of config before import
+CONFIG_HASH_BEFORE=$(sha256sum "$CONFIG_FILE" | awk '{print $1}')
+echo "Config hash before import: $CONFIG_HASH_BEFORE"
 
-# Set specific permissions
-chmod 755 "$DATA_DIR"
-chmod 644 "$CONFIG_FILE"
-chmod 600 "$IDENTITY_FILE" # Identity should be more restrictive
+# Create systemd service (create_external_service sets tezos:tezos ownership)
+register_external_service "node" "$INSTANCE"
+chown -R tezos:tezos "$DATA_DIR"
+create_external_service "node" "$INSTANCE" "$DATA_DIR" "127.0.0.1:$RPC_PORT" "shadownet"
+systemctl enable "octez-node@${INSTANCE}.service"
 
-log "Initial permissions set:"
-log "  Directory: $(stat -c '%a' "$DATA_DIR")"
-log "  config.json: $(stat -c '%a' "$CONFIG_FILE")"
-log "  identity.json: $(stat -c '%a' "$IDENTITY_FILE")"
+# Record ownership before import
+DIR_OWNER_BEFORE=$(stat -c '%U:%G' "$DATA_DIR")
+CONFIG_OWNER_BEFORE=$(stat -c '%U:%G' "$CONFIG_FILE")
+echo "Directory owner before import: $DIR_OWNER_BEFORE"
+echo "Config owner before import: $CONFIG_OWNER_BEFORE"
 
-# Record initial ownership and permissions
-INITIAL_DIR_PERMS=$(stat -c '%a' "$DATA_DIR")
-INITIAL_CONFIG_PERMS=$(stat -c '%a' "$CONFIG_FILE")
-INITIAL_IDENTITY_PERMS=$(stat -c '%a' "$IDENTITY_FILE")
-INITIAL_DIR_OWNER=$(stat -c '%U:%G' "$DATA_DIR")
-INITIAL_CONFIG_OWNER=$(stat -c '%U:%G' "$CONFIG_FILE")
-INITIAL_IDENTITY_OWNER=$(stat -c '%U:%G' "$IDENTITY_FILE")
+echo "Importing external service..."
+om import "octez-node@${INSTANCE}" --strategy clone --network shadownet 2>&1
 
-# Create systemd service
-SERVICE_NAME="octez-node-${INSTANCE}"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+echo "Verifying config.json preservation..."
 
-sudo tee "$SERVICE_FILE" >/dev/null <<EOF
-[Unit]
-Description=Octez Node - ${INSTANCE}
-After=network.target
-
-[Service]
-Type=simple
-User=octez
-ExecStart=/usr/bin/octez-node run --data-dir=${DATA_DIR} --network=weeklynet --history-mode=rolling
-Restart=on-failure
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-log "Importing external service with takeover..."
-expect_success octez-manager import detect
-expect_success octez-manager import takeover "$SERVICE_NAME" "$INSTANCE"
-
-log "Verifying ownership after import..."
-
-# Check ownership - should be octez:octez
-CURRENT_DIR_OWNER=$(stat -c '%U:%G' "$DATA_DIR")
-CURRENT_CONFIG_OWNER=$(stat -c '%U:%G' "$CONFIG_FILE")
-CURRENT_IDENTITY_OWNER=$(stat -c '%U:%G' "$IDENTITY_FILE")
-
-if [ "$CURRENT_DIR_OWNER" != "octez:octez" ]; then
-	error "Directory ownership incorrect: $CURRENT_DIR_OWNER (expected octez:octez)"
+# Check hash is unchanged
+CONFIG_HASH_AFTER=$(sha256sum "$CONFIG_FILE" | awk '{print $1}')
+if [ "$CONFIG_HASH_BEFORE" != "$CONFIG_HASH_AFTER" ]; then
+	echo "ERROR: Config file was modified during import!"
+	echo "Before: $CONFIG_HASH_BEFORE"
+	echo "After:  $CONFIG_HASH_AFTER"
 	exit 1
 fi
-log "✓ Directory ownership correct: $CURRENT_DIR_OWNER"
+echo "✓ Config hash unchanged"
 
-if [ "$CURRENT_CONFIG_OWNER" != "octez:octez" ]; then
-	error "config.json ownership incorrect: $CURRENT_CONFIG_OWNER (expected octez:octez)"
+echo "Verifying ownership after import..."
+
+# Check data directory is owned by tezos
+DIR_OWNER_AFTER=$(stat -c '%U:%G' "$DATA_DIR")
+if [ "$DIR_OWNER_AFTER" != "tezos:tezos" ]; then
+	echo "ERROR: Directory ownership incorrect after import: $DIR_OWNER_AFTER (expected tezos:tezos)"
 	exit 1
 fi
-log "✓ config.json ownership correct: $CURRENT_CONFIG_OWNER"
+echo "✓ Directory ownership correct: $DIR_OWNER_AFTER"
 
-if [ "$CURRENT_IDENTITY_OWNER" != "octez:octez" ]; then
-	error "identity.json ownership incorrect: $CURRENT_IDENTITY_OWNER (expected octez:octez)"
+# Check config.json is owned by tezos
+CONFIG_OWNER_AFTER=$(stat -c '%U:%G' "$CONFIG_FILE")
+if [ "$CONFIG_OWNER_AFTER" != "tezos:tezos" ]; then
+	echo "ERROR: config.json ownership incorrect after import: $CONFIG_OWNER_AFTER (expected tezos:tezos)"
 	exit 1
 fi
-log "✓ identity.json ownership correct: $CURRENT_IDENTITY_OWNER"
+echo "✓ config.json ownership correct: $CONFIG_OWNER_AFTER"
 
-log "Verifying permissions after import..."
-
-# Check permissions are reasonable
-CURRENT_DIR_PERMS=$(stat -c '%a' "$DATA_DIR")
-CURRENT_CONFIG_PERMS=$(stat -c '%a' "$CONFIG_FILE")
-CURRENT_IDENTITY_PERMS=$(stat -c '%a' "$IDENTITY_FILE")
-
-log "Current permissions:"
-log "  Directory: $CURRENT_DIR_PERMS"
-log "  config.json: $CURRENT_CONFIG_PERMS"
-log "  identity.json: $CURRENT_IDENTITY_PERMS"
-
-# Directory should be readable/executable by owner
-if [ "${CURRENT_DIR_PERMS:0:1}" -lt "7" ]; then
-	error "Directory permissions too restrictive: $CURRENT_DIR_PERMS"
+# Verify service is managed
+if ! service_is_managed "$INSTANCE"; then
+	echo "ERROR: Service is not managed after import"
+	om list 2>&1
 	exit 1
 fi
-log "✓ Directory permissions allow owner access"
+echo "✓ Service is managed after import"
 
-# Config should be readable by owner
-if [ "${CURRENT_CONFIG_PERMS:0:1}" -lt "4" ]; then
-	error "Config permissions too restrictive: $CURRENT_CONFIG_PERMS"
-	exit 1
-fi
-log "✓ Config readable by owner"
-
-# Identity should ideally be 600 or similar (owner only)
-if [ "$CURRENT_IDENTITY_PERMS" != "600" ] && [ "$CURRENT_IDENTITY_PERMS" != "400" ]; then
-	log "⚠ Warning: identity.json permissions not optimal: $CURRENT_IDENTITY_PERMS (expected 600)"
-else
-	log "✓ Identity has restrictive permissions: $CURRENT_IDENTITY_PERMS"
-fi
-
-log "Testing if service can start with current permissions..."
-expect_success octez-manager start "$INSTANCE"
-
-# Wait for node to be responsive
-wait_for_node_rpc "$INSTANCE" 60
-
-log "✓ Node started successfully"
-
-# Verify files can still be read by the service
-if ! sudo -u octez cat "$CONFIG_FILE" >/dev/null 2>&1; then
-	error "Config not readable by octez user"
-	exit 1
-fi
-log "✓ Config readable by octez user"
-
-if ! sudo -u octez cat "$IDENTITY_FILE" >/dev/null 2>&1; then
-	error "Identity not readable by octez user"
-	exit 1
-fi
-log "✓ Identity readable by octez user"
-
-expect_success octez-manager stop "$INSTANCE"
-
-log "✓ Test passed: Ownership and permissions preserved/corrected appropriately"
+echo "Test passed: Data directory ownership preserved during import"

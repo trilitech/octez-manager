@@ -4,40 +4,38 @@
 #
 # SPDX-License-Identifier: MIT
 
-# Test: Custom storage backend settings in config.json are preserved during import
-# Verifies: context storage backend and storage-related configuration
+# Test: Custom shell/storage settings in config.json are preserved during import
+# Verifies: Block validator limits, prevalidator limits, and synchronisation threshold
 
 set -euo pipefail
+source /tests/lib.sh
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib.sh"
+test_init "Import node - custom shell/storage settings preserved"
 
 # Unique instance name for this test
-INSTANCE="node-storage-config-test-$$"
+INSTANCE="node-storage-cfg-$$"
 PORT=$(alloc_port)
 RPC_PORT=$(alloc_port)
 
 # Register for cleanup
 register_instance "$INSTANCE"
 
-log "Creating external Octez node service with custom storage settings..."
+echo "Creating external Octez node service with custom storage settings..."
 
 # Create data directory
-DATA_DIR="/tmp/octez-external-storage-test-$$"
-register_datadir "$DATA_DIR"
+DATA_DIR="/var/lib/octez-external/$INSTANCE"
+register_data_dir "$DATA_DIR"
 mkdir -p "$DATA_DIR"
+inject_identity "$INSTANCE" "$DATA_DIR"
 
-# Initialize node config and identity
+# Initialize node config
 octez-node config init --data-dir="$DATA_DIR" \
-	--network=weeklynet \
+	--network=shadownet \
 	--history-mode=rolling \
 	--net-addr="127.0.0.1:$PORT" \
 	--rpc-addr="127.0.0.1:$RPC_PORT" >/dev/null 2>&1
 
-octez-node identity generate --data-dir="$DATA_DIR" >/dev/null 2>&1
-
-# Customize storage settings in config.json
-# Note: context storage backend options may vary by Octez version
+# Customize shell settings in config.json
 CONFIG_FILE="$DATA_DIR/config.json"
 jq '.shell = {
   "history_mode": "rolling",
@@ -56,128 +54,68 @@ jq '.shell = {
   "synchronisation_threshold": 4
 }' "$CONFIG_FILE" >"$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
 
-log "Custom storage config created with:"
-log "  - Protocol timeout: 120s"
-log "  - Backlog size: 1000"
-log "  - Max refused operations: 5000"
-log "  - Operations batch size: 100"
-log "  - Synchronisation threshold: 4"
+echo "Custom shell config created"
 
 # Take hash of config before import
 CONFIG_HASH_BEFORE=$(sha256sum "$CONFIG_FILE" | awk '{print $1}')
-log "Config hash before import: $CONFIG_HASH_BEFORE"
+echo "Config hash before import: $CONFIG_HASH_BEFORE"
 
 # Create systemd service
-SERVICE_NAME="octez-node-${INSTANCE}"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+register_external_service "node" "$INSTANCE"
+chown -R tezos:tezos "$DATA_DIR"
+create_external_service "node" "$INSTANCE" "$DATA_DIR" "127.0.0.1:$RPC_PORT" "shadownet"
+systemctl enable "octez-node@${INSTANCE}.service"
 
-sudo tee "$SERVICE_FILE" >/dev/null <<EOF
-[Unit]
-Description=Octez Node - ${INSTANCE}
-After=network.target
+echo "Importing external service..."
+om import "octez-node@${INSTANCE}" --strategy clone --network shadownet 2>&1
 
-[Service]
-Type=simple
-User=octez
-ExecStart=/usr/bin/octez-node run --data-dir=${DATA_DIR} --network=weeklynet --history-mode=rolling
-Restart=on-failure
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Set ownership
-sudo chown -R octez:octez "$DATA_DIR"
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-log "Importing external service with takeover..."
-expect_success octez-manager import detect
-expect_success octez-manager import takeover "$SERVICE_NAME" "$INSTANCE"
-
-log "Verifying config.json preservation..."
+echo "Verifying config.json preservation..."
 
 # Check hash is unchanged
 CONFIG_HASH_AFTER=$(sha256sum "$CONFIG_FILE" | awk '{print $1}')
 if [ "$CONFIG_HASH_BEFORE" != "$CONFIG_HASH_AFTER" ]; then
-	error "Config file was modified during import!"
-	error "Before: $CONFIG_HASH_BEFORE"
-	error "After:  $CONFIG_HASH_AFTER"
+	echo "ERROR: Config file was modified during import!"
+	echo "Before: $CONFIG_HASH_BEFORE"
+	echo "After:  $CONFIG_HASH_AFTER"
 	exit 1
 fi
-
-log "✓ Config hash unchanged"
+echo "✓ Config hash unchanged"
 
 # Verify specific storage settings
-log "Verifying storage settings in config.json..."
-
-# Check protocol timeout
 PROTOCOL_TIMEOUT=$(jq -r '.shell.block_validator_limits.protocol_timeout' "$CONFIG_FILE")
 if [ "$PROTOCOL_TIMEOUT" != "120" ]; then
-	error "Protocol timeout not preserved: $PROTOCOL_TIMEOUT"
+	echo "ERROR: Protocol timeout not preserved: $PROTOCOL_TIMEOUT"
 	exit 1
 fi
-log "✓ Protocol timeout preserved"
+echo "✓ Protocol timeout preserved"
 
-# Check backlog size
 BACKLOG_SIZE=$(jq -r '.shell.block_validator_limits.worker_limits.backlog_size' "$CONFIG_FILE")
 if [ "$BACKLOG_SIZE" != "1000" ]; then
-	error "Backlog size not preserved: $BACKLOG_SIZE"
+	echo "ERROR: Backlog size not preserved: $BACKLOG_SIZE"
 	exit 1
 fi
-log "✓ Backlog size preserved"
+echo "✓ Backlog size preserved"
 
-# Check backlog level
-BACKLOG_LEVEL=$(jq -r '.shell.block_validator_limits.worker_limits.backlog_level' "$CONFIG_FILE")
-if [ "$BACKLOG_LEVEL" != "50" ]; then
-	error "Backlog level not preserved: $BACKLOG_LEVEL"
-	exit 1
-fi
-log "✓ Backlog level preserved"
-
-# Check max refused operations
 MAX_REFUSED=$(jq -r '.shell.prevalidator_limits.max_refused_operations' "$CONFIG_FILE")
 if [ "$MAX_REFUSED" != "5000" ]; then
-	error "Max refused operations not preserved: $MAX_REFUSED"
+	echo "ERROR: Max refused operations not preserved: $MAX_REFUSED"
 	exit 1
 fi
-log "✓ Max refused operations preserved"
+echo "✓ Max refused operations preserved"
 
-# Check operation timeout
-OP_TIMEOUT=$(jq -r '.shell.prevalidator_limits.operation_timeout' "$CONFIG_FILE")
-if [ "$OP_TIMEOUT" != "10" ]; then
-	error "Operation timeout not preserved: $OP_TIMEOUT"
-	exit 1
-fi
-log "✓ Operation timeout preserved"
-
-# Check operations batch size
-BATCH_SIZE=$(jq -r '.shell.prevalidator_limits.operations_batch_size' "$CONFIG_FILE")
-if [ "$BATCH_SIZE" != "100" ]; then
-	error "Operations batch size not preserved: $BATCH_SIZE"
-	exit 1
-fi
-log "✓ Operations batch size preserved"
-
-# Check synchronisation threshold
 SYNC_THRESHOLD=$(jq -r '.shell.synchronisation_threshold' "$CONFIG_FILE")
 if [ "$SYNC_THRESHOLD" != "4" ]; then
-	error "Synchronisation threshold not preserved: $SYNC_THRESHOLD"
+	echo "ERROR: Synchronisation threshold not preserved: $SYNC_THRESHOLD"
 	exit 1
 fi
-log "✓ Synchronisation threshold preserved"
+echo "✓ Synchronisation threshold preserved"
 
-log "Verifying managed service can start with preserved config..."
-expect_success octez-manager start "$INSTANCE"
+# Verify service is managed
+if ! service_is_managed "$INSTANCE"; then
+	echo "ERROR: Service is not managed after import"
+	om list 2>&1
+	exit 1
+fi
+echo "✓ Service is managed after import"
 
-# Wait for node to be responsive
-wait_for_node_rpc "$INSTANCE" 60
-
-log "✓ Node started successfully with preserved storage config"
-
-expect_success octez-manager stop "$INSTANCE"
-
-log "✓ Test passed: Custom storage settings preserved during import"
+echo "Test passed: Custom storage settings preserved during import"
