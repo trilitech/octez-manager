@@ -1,15 +1,15 @@
 {
   "metadata": {
-    "generated_at": "2026-03-13T14:00:00.000000",
-    "generated_by": "manual update - added test 68 (external all services running)",
-    "total_tests": 74,
-    "total_duration": 611.04,
+    "generated_at": "2026-03-16T00:00:00.000000",
+    "generated_by": "tech-lead merge: register 22 missing tests + test 68 from #801",
+    "total_tests": 96,
+    "total_duration": 768.05,
     "shard_count": 5,
-    "mean_shard_duration": 122.21,
-    "max_shard_duration": 150.61,
-    "min_shard_duration": 111.99,
-    "duration_std_dev": 12.5,
-    "balance_coefficient": 1.35
+    "mean_shard_duration": 153.61,
+    "max_shard_duration": 190.61,
+    "min_shard_duration": 136.66,
+    "duration_std_dev": 22.3,
+    "balance_coefficient": 1.39
   },
   "shard-1": {
     "tests": [
@@ -27,10 +27,12 @@
       "signatory/03-key-management.sh",
       "group/54-group-create-list-show-delete.sh",
       "group/55-group-add-remove-service.sh",
-      "group/56-group-multiple-groups.sh"
+      "group/56-group-multiple-groups.sh",
+      "import/44-import-detect-process-based.sh",
+      "signatory/07-permissions.sh"
     ],
-    "test_count": 15,
-    "total_duration": 123.66
+    "test_count": 17,
+    "total_duration": 136.66
   },
   "shard-2": {
     "tests": [
@@ -46,10 +48,14 @@
       "node/12-show-service.sh",
       "import/51-import-nonexistent-service.sh",
       "signatory/02-baker-dependency.sh",
-      "signatory/04-external-signer.sh"
+      "signatory/04-external-signer.sh",
+      "group/58-group-name-validation.sh",
+      "import/54-import-node-config-preservation.sh",
+      "import/55-import-node-identity-preservation.sh",
+      "import/56-import-node-missing-config-created.sh"
     ],
-    "test_count": 13,
-    "total_duration": 120.78
+    "test_count": 17,
+    "total_duration": 143.78
   },
   "shard-3": {
     "tests": [
@@ -67,10 +73,13 @@
       "accuser/38-accuser-show-service.sh",
       "node/10-purge-with-data.sh",
       "node/06-install-custom-rpc-net.sh",
-      "node/09-install-no-snapshot.sh"
+      "node/09-install-no-snapshot.sh",
+      "group/57-group-add-network-mismatch.sh",
+      "import/53-import-cascade-accuser.sh",
+      "import/61-import-cascade-all-configs-preserved.sh"
     ],
-    "test_count": 15,
-    "total_duration": 120.0
+    "test_count": 18,
+    "total_duration": 139.0
   },
   "shard-4": {
     "tests": [
@@ -79,7 +88,6 @@
       "dal/22-dal-start-stop.sh",
       "dal/23-dal-node-dependency.sh",
       "import/47-import-cascade-baker.sh",
-      "import/68-external-all-services-running.sh",
       "node/21-systemd-failure-detection.sh",
       "node/03-remove.sh",
       "node/14-multiple-instances.sh",
@@ -89,15 +97,23 @@
       "node/23-rename-updates-dependents.sh",
       "node/22-list-status-display.sh",
       "binaries/02-list-remote-major-versions.sh",
-      "signatory/05-multiple-instances.sh"
+      "signatory/05-multiple-instances.sh",
+      "baker/43-baker-purge-preserves-node-data.sh",
+      "baker/44-multiple-bakers-shared-data.sh",
+      "import/57-import-node-config-rpc-settings.sh",
+      "import/58-import-node-config-p2p-settings.sh",
+      "import/59-import-node-config-storage-settings.sh",
+      "import/60-import-dal-config-preservation.sh",
+      "import/68-external-all-services-running.sh"
     ],
-    "test_count": 16,
-    "total_duration": 150.61
+    "test_count": 22,
+    "total_duration": 190.61
   },
   "shard-5": {
     "tests": [
       "node/17-preserve-data-resume.sh",
       "accuser/37-accuser-extra-args.sh",
+      "accuser/24-accuser-purge-preserves-node-data.sh",
       "baker/41-baker-with-dal-node.sh",
       "baker/40-baker-remote-endpoint.sh",
       "node/24-export-logs.sh",
@@ -110,9 +126,15 @@
       "node/08-install-preserve-data.sh",
       "node/07-install-extra-args.sh",
       "node/15-list-format.sh",
-      "signatory/06-restart-cascade.sh"
+      "signatory/06-restart-cascade.sh",
+      "group/59-group-delete-cascade-ungroup.sh",
+      "import/62-import-node-config-vs-cli-args.sh",
+      "import/63-import-node-config-with-extra-args.sh",
+      "import/64-import-node-corrupted-config.sh",
+      "import/65-import-node-config-permissions.sh",
+      "import/66-import-node-duplicate-setting-conflict.sh"
     ],
-    "test_count": 15,
-    "total_duration": 111.99
+    "test_count": 22,
+    "total_duration": 158.0
   }
 }
