@@ -41,9 +41,26 @@ val fetch :
   string ->
   (string, [`Msg of string]) result
 
+(** Set the info-level logger.
+    Called when a custom indexer source is in use.
+    Default: no-op. *)
+val set_log_info : (string -> unit) -> unit
+
+(** Set the warn-level logger.
+    Called on fallback to public TzKT after a custom source failure,
+    and on indexer divergence in debug mode.
+    Default: no-op. *)
+val set_log_warn : (string -> unit) -> unit
+
+(** Set a callback invoked on divergence between a custom source and
+    public TzKT in debug mode.  Arguments: [path], [custom_body],
+    [tzkt_body].  Default: logs a one-line warning via {!set_log_warn}. *)
+val set_on_divergence : (string -> string -> string -> unit) -> unit
+
 (** Enable or disable debug mode.
     When enabled, {!fetch} also queries TzKT whenever a local or preferred
-    source is used successfully, and logs a warning if the responses differ. *)
+    source is used successfully, and calls the divergence callback if the
+    responses differ. *)
 val set_debug_mode : bool -> unit
 
 (** Query every distinct registered source for [path] and return labelled
