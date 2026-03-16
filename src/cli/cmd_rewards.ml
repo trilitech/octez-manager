@@ -147,14 +147,13 @@ let json_field_diffs path custom_body tzkt_body =
         keys
   | _ -> []
 
-let () =
+let setup_indexer_logging () =
   Indexer.set_log_info (fun msg -> Printf.eprintf "%s\n%!" msg) ;
   Indexer.set_log_warn (fun msg -> Printf.eprintf "Warning: %s\n%!" msg) ;
   Indexer.set_on_divergence (fun path custom_body tzkt_body ->
       let diffs = json_field_diffs path custom_body tzkt_body in
       match diffs with
       | [] ->
-          (* No divergence on fields we care about — keep custom *)
           `Use_custom
       | fields ->
           Printf.eprintf "Warning: indexer divergence on %s\n%!" path ;
@@ -257,6 +256,7 @@ let json_flag =
 (* ── rewards status ────────────────────────────────────────── *)
 
 let status_run baker_opt =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
@@ -408,6 +408,7 @@ let blueprint_to_json (bp : Rewards.payout_blueprint) =
     ]
 
 let generate_run baker_opt cycle_opt json force =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
@@ -479,6 +480,7 @@ let generate_cmd =
 (* ── rewards history ───────────────────────────────────────── *)
 
 let history_run baker_opt cycles_count json =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
@@ -607,6 +609,7 @@ let history_cmd =
 (* ── rewards pay ───────────────────────────────────────────── *)
 
 let rec pay_run baker_opt cycle_opt dry_run confirm compare =
+  setup_indexer_logging () ;
   if compare then Indexer.set_debug_mode true ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
@@ -842,6 +845,7 @@ let pay_cmd =
 (* ── rewards config import ─────────────────────────────────── *)
 
 let config_import_run baker_opt path =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
@@ -882,6 +886,7 @@ let config_cmd =
 (* ── rewards notify test ──────────────────────────────────── *)
 
 let notify_test_run baker_opt =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc ->
@@ -923,6 +928,7 @@ let notify_cmd =
 (* ── rewards continual start/stop/status ──────────────────── *)
 
 let continual_start_run baker_opt interval offset =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
@@ -956,6 +962,7 @@ let continual_start_run baker_opt interval offset =
                   `Ok ())))
 
 let continual_stop_run baker_opt =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
@@ -977,6 +984,7 @@ let continual_stop_run baker_opt =
               `Ok ()))
 
 let continual_status_run baker_opt =
+  setup_indexer_logging () ;
   match resolve_baker baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
   | Ok svc -> (
