@@ -11,9 +11,12 @@
     Uses mode [0o755]. No-op if the path already exists. *)
 val mkdir_p : string -> unit
 
-(** Create a directory tree, setting ownership and permissions.
-    When running as root, sets the owner/group/mode on the final
-    directory; otherwise ownership is set on a best-effort basis. *)
+(** Create a directory tree, setting ownership and permissions on the
+    final directory.  When running as root, sets owner, group, and mode;
+    returns an error if the owner/group does not exist.  When not root,
+    chown is attempted on a best-effort basis (ignored if not permitted),
+    but chmod is always applied.  Note: only the leaf [path] receives the
+    requested [mode]; intermediate directories are created with [0o755]. *)
 val ensure_dir_path :
   owner:string ->
   group:string ->
