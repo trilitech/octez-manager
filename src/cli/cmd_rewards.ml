@@ -1066,63 +1066,7 @@ let tick_cmd =
   in
   Cmd.v info Term.(ret (const tick_run $ baker_arg))
 
-(* ── rewards continual start/stop/status ──────────────────── *)
-
-let continual_start_run baker_opt interval offset =
-  setup_indexer_logging () ;
-  match resolve_baker baker_opt with
-  | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.Service.instance in
-          let config =
-            match Payout_config.load ~instance with
-            | Ok c -> c
-            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
-          in
-          let config =
-            {
-              config with
-              continual_enabled = true;
-              continual_interval = interval;
-              continual_offset = offset;
-            }
-          in
-          match Payout_config.validate config with
-          | Error msg -> Cli_helpers.cmdliner_error msg
-          | Ok () -> (
-              match Payout_config.save ~instance config with
-              | Error msg -> Cli_helpers.cmdliner_error msg
-              | Ok () ->
-                  Payout_continual.enable ~instance ;
-                  Printf.printf "Continual mode enabled for %s.\n" instance ;
-                  Printf.printf "  Interval: every %d cycle(s)\n" interval ;
-                  if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
-                  `Ok ())))
-
-let continual_stop_run baker_opt =
-  setup_indexer_logging () ;
-  match resolve_baker baker_opt with
-  | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.Service.instance in
-          let config =
-            match Payout_config.load ~instance with
-            | Ok c -> c
-            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
-          in
-          let config = {config with continual_enabled = false} in
-          match Payout_config.save ~instance config with
-          | Error msg -> Cli_helpers.cmdliner_error msg
-          | Ok () ->
-              Payout_continual.disable ~instance ;
-              Printf.printf "Continual mode disabled for %s.\n" instance ;
-              `Ok ()))
+(* ── Systemd timer helpers ─────────────────────────────────── *)
 
 let timer_unit_name = "octez-manager-continual"
 
@@ -1145,108 +1089,6 @@ let timer_is_active () =
 
 let timer_is_installed () = Sys.file_exists (timer_unit_path ())
 
-let continual_status_run baker_opt =
-  setup_indexer_logging () ;
-  (* Timer status is per-system, not per-baker *)
-  let installed = timer_is_installed () in
-  let active = if installed then timer_is_active () else false in
-  (* Collect baker statuses to detect warning conditions *)
-  let any_enabled = ref false in
-  let show_baker_status (svc : Service.t) =
-    match baker_delegate svc with
-    | Error msg ->
-        Printf.eprintf "Error [%s]: %s\n" svc.instance msg
-    | Ok baker_pkh ->
-        let instance = svc.instance in
-        let config =
-          match Payout_config.load ~instance with
-          | Ok c -> c
-          | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
-        in
-        if config.continual_enabled then any_enabled := true ;
-        Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
-        Printf.printf
-          "  Continual mode: %s\n"
-          (if config.continual_enabled then "enabled" else "disabled") ;
-        Printf.printf
-          "  Interval: every %d cycle(s)\n"
-          config.continual_interval ;
-        if config.continual_offset > 0 then
-          Printf.printf "  Offset: %d\n" config.continual_offset ;
-        Printf.printf
-          "  Delay: %d-%d blocks\n"
-          config.min_delay_blocks
-          config.max_delay_blocks ;
-        (match Payout_continual.read_delay_until ~instance with
-        | Some until ->
-            let now = Unix.gettimeofday () in
-            if Float.compare until now > 0 then
-              Printf.printf
-                "  Pending delay: %.0fs remaining\n"
-                (until -. now)
-            else
-              Printf.printf "  Pending delay: expired (will pay on next tick)\n"
-        | None ->
-            Printf.printf "  Pending delay: none\n") ;
-        Printf.printf "\n"
-  in
-  let result =
-    match baker_opt with
-    | Some _ -> (
-        match resolve_baker baker_opt with
-        | Error msg -> Cli_helpers.cmdliner_error msg
-        | Ok svc ->
-            show_baker_status svc ;
-            `Ok ())
-    | None -> (
-        match list_baker_services () with
-        | Error msg -> Cli_helpers.cmdliner_error msg
-        | Ok [] ->
-            Printf.printf "No baker instances found.\n" ;
-            `Ok ()
-        | Ok bakers ->
-            List.iter show_baker_status bakers ;
-            `Ok ())
-  in
-  (* Warn if continual is enabled but nothing will run it *)
-  if !any_enabled && not active then (
-    Printf.printf "Warning: continual mode is enabled but no timer is running.\n" ;
-    Printf.printf "  Payouts will only happen while the TUI is open.\n" ;
-    Printf.printf
-      "  Run `octez-manager rewards continual install-timer` for background payouts.\n") ;
-  result
-
-let continual_start_cmd =
-  let info =
-    Cmd.info
-      "start"
-      ~doc:
-        "Enable continual payouts. Automatically pays due cycles when the \
-         scheduler detects cycle transitions."
-  in
-  let interval_arg =
-    let doc = "Pay every N cycles (default: 1 = every cycle)." in
-    Arg.(value & opt int 1 & info ["interval"] ~doc ~docv:"N")
-  in
-  let offset_arg =
-    let doc = "Cycle offset within the interval (default: 0)." in
-    Arg.(value & opt int 0 & info ["offset"] ~doc ~docv:"N")
-  in
-  Cmd.v
-    info
-    Term.(
-      ret (const continual_start_run $ baker_arg $ interval_arg $ offset_arg))
-
-let continual_stop_cmd =
-  let info = Cmd.info "stop" ~doc:"Disable continual payouts." in
-  Cmd.v info Term.(ret (const continual_stop_run $ baker_arg))
-
-let continual_status_cmd =
-  let info = Cmd.info "status" ~doc:"Show continual mode status." in
-  Cmd.v info Term.(ret (const continual_status_run $ baker_arg))
-
-(* ── rewards continual install-timer / uninstall-timer ───── *)
-
 let service_unit_path () =
   if Paths.is_root () then
     Printf.sprintf "/etc/systemd/system/%s.service" timer_unit_name
@@ -1259,7 +1101,6 @@ let resolve_exe_path () =
   match Paths.which "octez-manager" with
   | Some path -> path
   | None -> (
-      (* Fall back to realpath of current executable *)
       try Unix.readlink (Printf.sprintf "/proc/%d/exe" (Unix.getpid ()))
       with _ -> Sys.argv.(0))
 
@@ -1304,44 +1145,30 @@ let write_unit_file path content =
   output_string oc content ;
   close_out oc
 
-let install_timer_run () =
+let install_timer () =
   let svc_path = service_unit_path () in
   let tmr_path = timer_unit_path () in
-  (* Write unit files *)
-  (try
-     write_unit_file svc_path (generate_service_unit ()) ;
-     Printf.printf "Wrote %s\n" svc_path
-   with exn ->
-     Printf.eprintf "Error writing %s: %s\n" svc_path (Printexc.to_string exn) ;
-     exit 1) ;
-  (try
-     write_unit_file tmr_path (generate_timer_unit ()) ;
-     Printf.printf "Wrote %s\n" tmr_path
-   with exn ->
-     Printf.eprintf "Error writing %s: %s\n" tmr_path (Printexc.to_string exn) ;
-     exit 1) ;
-  (* daemon-reload *)
+  write_unit_file svc_path (generate_service_unit ()) ;
+  Printf.printf "Wrote %s\n" svc_path ;
+  write_unit_file tmr_path (generate_timer_unit ()) ;
+  Printf.printf "Wrote %s\n" tmr_path ;
   (match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
   | Ok () -> ()
   | Error (`Msg msg) ->
       Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
-  (* enable --now the timer *)
   let timer_name = timer_unit_name ^ ".timer" in
-  (match
-     Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["enable"; "--now"; timer_name])
-   with
+  match
+    Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["enable"; "--now"; timer_name])
+  with
   | Ok () ->
-      Printf.printf "Timer %s enabled and started.\n" timer_name
-  | Error (`Msg msg) ->
-      Printf.eprintf "Error enabling timer: %s\n" msg ;
-      exit 1) ;
-  `Ok ()
+      Printf.printf "Timer %s enabled and started.\n" timer_name ;
+      Ok ()
+  | Error (`Msg msg) -> Error msg
 
-let uninstall_timer_run () =
+let uninstall_timer () =
   let svc_path = service_unit_path () in
   let tmr_path = timer_unit_path () in
   let timer_name = timer_unit_name ^ ".timer" in
-  (* disable --now the timer *)
   (match
      Cmd_runner.run
        ~quiet:true
@@ -1351,52 +1178,206 @@ let uninstall_timer_run () =
       Printf.printf "Timer %s disabled and stopped.\n" timer_name
   | Error (`Msg msg) ->
       Printf.eprintf "Warning: disable failed: %s\n" msg) ;
-  (* Remove unit files *)
-  (if Sys.file_exists svc_path then (
-     Sys.remove svc_path ;
-     Printf.printf "Removed %s\n" svc_path)) ;
-  (if Sys.file_exists tmr_path then (
-     Sys.remove tmr_path ;
-     Printf.printf "Removed %s\n" tmr_path)) ;
-  (* daemon-reload *)
+  if Sys.file_exists svc_path then (
+    Sys.remove svc_path ;
+    Printf.printf "Removed %s\n" svc_path) ;
+  if Sys.file_exists tmr_path then (
+    Sys.remove tmr_path ;
+    Printf.printf "Removed %s\n" tmr_path) ;
   (match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
   | Ok () -> ()
   | Error (`Msg msg) ->
-      Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
-  `Ok ()
+      Printf.eprintf "Warning: daemon-reload failed: %s\n" msg)
 
-let install_timer_cmd =
+(* ── rewards continual start/stop/status ──────────────────── *)
+
+let continual_start_run baker_opt interval offset =
+  setup_indexer_logging () ;
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh -> (
+          let instance = svc.Service.instance in
+          let config =
+            match Payout_config.load ~instance with
+            | Ok c -> c
+            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
+          in
+          let config =
+            {
+              config with
+              continual_enabled = true;
+              continual_interval = interval;
+              continual_offset = offset;
+            }
+          in
+          match Payout_config.validate config with
+          | Error msg -> Cli_helpers.cmdliner_error msg
+          | Ok () -> (
+              match Payout_config.save ~instance config with
+              | Error msg -> Cli_helpers.cmdliner_error msg
+              | Ok () ->
+                  Payout_continual.enable ~instance ;
+                  Printf.printf "Continual mode enabled for %s.\n" instance ;
+                  Printf.printf "  Interval: every %d cycle(s)\n" interval ;
+                  if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
+                  if not (timer_is_active ()) then (
+                    Printf.printf "\nInstalling systemd timer...\n" ;
+                    match install_timer () with
+                    | Ok () -> `Ok ()
+                    | Error msg ->
+                        Printf.eprintf
+                          "Warning: timer install failed: %s\n" msg ;
+                        Printf.eprintf
+                          "  Payouts will only run while the TUI is open.\n" ;
+                        `Ok ())
+                  else (
+                    Printf.printf "\nSystemd timer already active.\n" ;
+                    `Ok ()))))
+
+let continual_stop_run baker_opt =
+  setup_indexer_logging () ;
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh -> (
+          let instance = svc.instance in
+          let config =
+            match Payout_config.load ~instance with
+            | Ok c -> c
+            | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
+          in
+          let config = {config with continual_enabled = false} in
+          match Payout_config.save ~instance config with
+          | Error msg -> Cli_helpers.cmdliner_error msg
+          | Ok () ->
+              Payout_continual.disable ~instance ;
+              Printf.printf "Continual mode disabled for %s.\n" instance ;
+              (* Uninstall timer if no other baker has continual enabled *)
+              let others_enabled =
+                match list_baker_services () with
+                | Ok bakers ->
+                    List.exists
+                      (fun (b : Service.t) ->
+                        (not (String.equal b.instance instance))
+                        && match Payout_config.load ~instance:b.instance with
+                           | Ok c -> c.continual_enabled
+                           | Error _ -> false)
+                      bakers
+                | Error _ -> false
+              in
+              if (not others_enabled) && timer_is_installed () then (
+                Printf.printf "\nNo bakers have continual mode enabled.\n" ;
+                Printf.printf "Removing systemd timer...\n" ;
+                uninstall_timer ()) ;
+              `Ok ()))
+
+let continual_status_run baker_opt =
+  setup_indexer_logging () ;
+  let active = timer_is_active () in
+  Printf.printf "Systemd timer: %s\n"
+    (if active then "active"
+     else if timer_is_installed () then "installed (inactive)"
+     else "not installed") ;
+  Printf.printf "\n" ;
+  let show_baker_status (svc : Service.t) =
+    match baker_delegate svc with
+    | Error msg ->
+        Printf.eprintf "Error [%s]: %s\n" svc.instance msg
+    | Ok baker_pkh ->
+        let instance = svc.instance in
+        let config =
+          match Payout_config.load ~instance with
+          | Ok c -> c
+          | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
+        in
+        Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+        Printf.printf
+          "  Continual mode: %s\n"
+          (if config.continual_enabled then "enabled" else "disabled") ;
+        Printf.printf
+          "  Interval: every %d cycle(s)\n"
+          config.continual_interval ;
+        if config.continual_offset > 0 then
+          Printf.printf "  Offset: %d\n" config.continual_offset ;
+        Printf.printf
+          "  Delay: %d-%d blocks\n"
+          config.min_delay_blocks
+          config.max_delay_blocks ;
+        (match Payout_continual.read_delay_until ~instance with
+        | Some until ->
+            let now = Unix.gettimeofday () in
+            if Float.compare until now > 0 then
+              Printf.printf
+                "  Pending delay: %.0fs remaining\n"
+                (until -. now)
+            else
+              Printf.printf "  Pending delay: expired (will pay on next tick)\n"
+        | None ->
+            Printf.printf "  Pending delay: none\n") ;
+        Printf.printf "\n"
+  in
+  match baker_opt with
+  | Some _ -> (
+      match resolve_baker baker_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok svc ->
+          show_baker_status svc ;
+          `Ok ())
+  | None -> (
+      match list_baker_services () with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok [] ->
+          Printf.printf "No baker instances found.\n" ;
+          `Ok ()
+      | Ok bakers ->
+          List.iter show_baker_status bakers ;
+          `Ok ())
+
+let continual_start_cmd =
   let info =
     Cmd.info
-      "install-timer"
+      "start"
       ~doc:
-        "Install a systemd timer that runs `rewards continual tick` every 5 \
-         minutes."
+        "Enable continual payouts and install the systemd timer. \
+         Automatically pays due cycles every 5 minutes."
   in
-  Cmd.v info Term.(ret (const install_timer_run $ const ()))
+  let interval_arg =
+    let doc = "Pay every N cycles (default: 1 = every cycle)." in
+    Arg.(value & opt int 1 & info ["interval"] ~doc ~docv:"N")
+  in
+  let offset_arg =
+    let doc = "Cycle offset within the interval (default: 0)." in
+    Arg.(value & opt int 0 & info ["offset"] ~doc ~docv:"N")
+  in
+  Cmd.v
+    info
+    Term.(
+      ret (const continual_start_run $ baker_arg $ interval_arg $ offset_arg))
 
-let uninstall_timer_cmd =
+let continual_stop_cmd =
   let info =
     Cmd.info
-      "uninstall-timer"
-      ~doc:"Remove the systemd timer for continual payouts."
+      "stop"
+      ~doc:
+        "Disable continual payouts. Removes the systemd timer when no \
+         bakers have continual mode enabled."
   in
-  Cmd.v info Term.(ret (const uninstall_timer_run $ const ()))
+  Cmd.v info Term.(ret (const continual_stop_run $ baker_arg))
+
+let continual_status_cmd =
+  let info = Cmd.info "status" ~doc:"Show continual mode and timer status." in
+  Cmd.v info Term.(ret (const continual_status_run $ baker_arg))
 
 let continual_cmd =
   let info =
     Cmd.info "continual" ~doc:"Manage continual (automatic) payouts."
   in
-  Cmd.group
-    info
-    [
-      continual_start_cmd;
-      continual_stop_cmd;
-      continual_status_cmd;
-      tick_cmd;
-      install_timer_cmd;
-      uninstall_timer_cmd;
-    ]
+  Cmd.group info [continual_start_cmd; continual_stop_cmd; continual_status_cmd; tick_cmd]
 
 (* ── rewards command group ─────────────────────────────────── *)
 
