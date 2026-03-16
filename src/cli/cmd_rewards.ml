@@ -1081,10 +1081,10 @@ let timer_unit_path () =
 let timer_is_active () =
   let cmd = Systemd.systemctl_cmd () in
   match
-    Cmd_runner.run_out
+    Cmd_runner.run_silent
       (cmd @ ["is-active"; "--quiet"; timer_unit_name ^ ".timer"])
   with
-  | Ok _ -> true
+  | Ok () -> true
   | Error _ -> false
 
 let timer_is_installed () = Sys.file_exists (timer_unit_path ())
