@@ -181,11 +181,19 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
                  ~default:
                    (Rpc_addr.to_endpoint service.Service.rpc_addr)
           in
+          let base_dir =
+            match Node_env.read ~inst:instance with
+            | Ok pairs -> (
+                match List.assoc_opt "OCTEZ_CLIENT_BASE_DIR" pairs with
+                | Some d -> Some d
+                | None -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs)
+            | Error _ -> None
+          in
           let ctx : Payout_executor.context =
             {
               octez_client_bin;
               endpoint;
-              base_dir = None;
+              base_dir;
               password_file = None;
               payout_key_alias = config.payout_key_alias;
               instance;
