@@ -27,7 +27,9 @@ let http_fn_ref :
     (url:string -> timeout:float -> (string, [`Msg of string]) result) ref =
   ref default_http_fn
 
-(* ── Warn logger (overridable for tests) ──────────────────────────────── *)
+(* ── Loggers (overridable for tests / app wiring) ─────────────────────── *)
+
+let log_info_fn : (string -> unit) ref = ref (fun _msg -> ())
 
 let log_warn_fn : (string -> unit) ref = ref (fun _msg -> ())
 
@@ -105,18 +107,34 @@ let clear_local ~network =
           ns.rr_idx <- 0
       | None -> ())
 
+let set_log_info f = log_info_fn := f
+
+let set_log_warn f = log_warn_fn := f
+
+let on_divergence_fn :
+    (string -> string -> string -> unit) ref =
+  ref (fun path _custom _tzkt ->
+    !log_warn_fn (Printf.sprintf "indexer divergence on %s" path))
+
+let set_on_divergence f = on_divergence_fn := f
+
 let set_debug_mode b = Atomic.set debug_mode b
 
 let fetch ~network ?preferred_base ?(timeout = 15.0) path =
   let local_ep = pick_local_rr ~network in
   let tzkt = tzkt_base_url ~network in
-  let sources =
-    stable_dedup
-      ((match preferred_base with Some b -> [b] | None -> [])
-      @ (match local_ep with Some ep -> [ep] | None -> [])
-      @ [tzkt])
+  let non_default_sources =
+    (match preferred_base with Some b -> [b] | None -> [])
+    @ match local_ep with Some ep -> [ep] | None -> []
   in
+  let sources = stable_dedup (non_default_sources @ [tzkt]) in
+  (* Log when a custom source is configured *)
+  (match preferred_base with
+  | Some b when not (String.equal b tzkt) ->
+      !log_info_fn (Printf.sprintf "Indexer: using custom source %s for %s" b path)
+  | _ -> ()) ;
   let last_error = ref (`Msg (Printf.sprintf "no sources for %s" path)) in
+  let failed_custom = ref false in
   let result =
     List.find_map
       (fun src ->
@@ -128,15 +146,26 @@ let fetch ~network ?preferred_base ?(timeout = 15.0) path =
               let tzkt_url = tzkt ^ path in
               match do_fetch ~url:tzkt_url ~timeout with
               | Ok tzkt_body when not (String.equal body tzkt_body) ->
-                  !log_warn_fn (Printf.sprintf "indexer divergence on %s" path)
+                  !on_divergence_fn path body tzkt_body
               | _ -> ()
             end ;
             Some body
         | Error e ->
             last_error := e ;
+            (* Track if a custom (non-TzKT) source failed *)
+            if not (String.equal src tzkt) then failed_custom := true ;
             None)
       sources
   in
+  (* Log fallback when a custom source failed but TzKT succeeded *)
+  (match result with
+  | Some _ when !failed_custom ->
+      !log_warn_fn
+        (Printf.sprintf
+           "Indexer: custom source failed for %s, fell back to %s"
+           path
+           tzkt)
+  | _ -> ()) ;
   match result with Some body -> Ok body | None -> Error !last_error
 
 let query_all ~network path =
