@@ -153,7 +153,15 @@ let maybe_compute_blueprint s =
                         ~network
                         ~cycle_rewards:cr
                     in
-                    {s with blueprint = Some bp; selected_cycle = Some cycle})))
+                    (* Preserve dashboard mode: only set selected_cycle
+                       if the user explicitly selected a cycle, not when
+                       computing the overview preview. *)
+                    let selected_cycle =
+                      match s.selected_cycle with
+                      | Some _ -> Some cycle
+                      | None -> None
+                    in
+                    {s with blueprint = Some bp; selected_cycle})))
 
 (** Load payout config from disk when first viewing the Configuration tab.
     Only loads once; subsequent changes are in-memory until saved. *)
