@@ -51,13 +51,23 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
     let args_entry =
       if service_args = "" then [] else [("OCTEZ_SERVICE_ARGS", service_args)]
     in
+    let rpc_addr_str = Rpc_addr.to_string request.rpc_addr in
+    (* Only write OCTEZ_DAL_RPC_ADDR / OCTEZ_DAL_NET_ADDR when the values are
+       non-empty.  The systemd template uses ${VAR:+--flag "${VAR}"} so omitting
+       these env vars causes the flags to be absent from the ExecStart, which
+       prevents octez-dal-node from rewriting config.json on startup. *)
+    let rpc_addr_entry =
+      if rpc_addr_str = "" then [] else [("OCTEZ_DAL_RPC_ADDR", rpc_addr_str)]
+    in
+    let net_addr_entry =
+      if request.net_addr = "" then []
+      else [("OCTEZ_DAL_NET_ADDR", request.net_addr)]
+    in
     [
       ("OCTEZ_DAL_DATA_DIR", request.data_dir);
-      ("OCTEZ_DAL_RPC_ADDR", Rpc_addr.to_string request.rpc_addr);
-      ("OCTEZ_DAL_NET_ADDR", request.net_addr);
       ("OCTEZ_NETWORK", request.network);
     ]
-    @ args_entry @ request.extra_env
+    @ rpc_addr_entry @ net_addr_entry @ args_entry @ request.extra_env
   in
   let* () =
     Node_env.write_pairs ~with_comments:true ~inst:request.instance extra_env

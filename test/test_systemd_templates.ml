@@ -97,7 +97,28 @@ let test_exec_line_dal_node () =
     true
     (String.starts_with ~prefix:"ExecStart=" line) ;
   check bool "contains octez-dal-node" true (contains_s line "octez-dal-node") ;
-  check bool "contains rpc-addr" true (contains_s line "OCTEZ_DAL_RPC_ADDR")
+  check bool "contains rpc-addr ref" true (contains_s line "OCTEZ_DAL_RPC_ADDR")
+
+(** Regression test for issue #793: DAL node template must use conditional
+    shell expansion so that --rpc-addr/--net-addr are only passed when the
+    corresponding env vars are set.  Without this, importing a DAL node that
+    had no --rpc-addr in its original ExecStart would add the flag and cause
+    octez-dal-node to rewrite config.json on startup. *)
+let test_exec_line_dal_node_conditional_flags () =
+  let line = S.For_tests.exec_line "dal-node" in
+  (* The template must use ${VAR:+--flag "${VAR}"} conditional form.
+     The conditional expansion prefix ${VAR:+ must be present so the shell
+     only includes the flag when the variable is non-empty. *)
+  check
+    bool
+    "rpc-addr uses conditional expansion"
+    true
+    (contains_s line "${OCTEZ_DAL_RPC_ADDR:+") ;
+  check
+    bool
+    "net-addr uses conditional expansion"
+    true
+    (contains_s line "${OCTEZ_DAL_NET_ADDR:+")
 
 let test_exec_line_unknown () =
   let line = S.For_tests.exec_line "signer" in
@@ -228,6 +249,10 @@ let () =
           test_case "baker" `Quick test_exec_line_baker;
           test_case "accuser" `Quick test_exec_line_accuser;
           test_case "dal-node" `Quick test_exec_line_dal_node;
+          test_case
+            "dal-node conditional flags"
+            `Quick
+            test_exec_line_dal_node_conditional_flags;
           test_case "unknown" `Quick test_exec_line_unknown;
         ] );
       ( "unit_template",
