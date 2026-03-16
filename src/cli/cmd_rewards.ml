@@ -14,10 +14,10 @@ open Octez_manager_rewards
 (* ── Indexer logging setup ─────────────────────────────────── *)
 
 (** Normalize a JSON value to a canonical string for comparison.
-    Strips string-vs-int encoding differences (e.g. ["120262"] vs [120262]). *)
-let normalize_json_value = function
+    Strips string-vs-int encoding differences (e.g. ["120262"] vs [120262])
+    and ignores extra object fields not present on the other side. *)
+let rec normalize_json_value = function
   | `String s -> (
-      (* If the string is a pure integer, normalize to int representation *)
       match Int64.of_string_opt s with
       | Some n -> Int64.to_string n
       | None -> Printf.sprintf "%S" s)
@@ -26,17 +26,102 @@ let normalize_json_value = function
   | `Float f -> string_of_float f
   | `Bool b -> string_of_bool b
   | `Null -> "null"
-  | v -> Yojson.Safe.to_string v
+  | `Assoc fields ->
+      (* Sort fields and normalize values for stable comparison *)
+      let sorted =
+        List.sort (fun (a, _) (b, _) -> String.compare a b) fields
+      in
+      let parts =
+        List.map
+          (fun (k, v) -> Printf.sprintf "%s:%s" k (normalize_json_value v))
+          sorted
+      in
+      "{" ^ String.concat "," parts ^ "}"
+  | `List items ->
+      let parts = List.map normalize_json_value items in
+      "[" ^ String.concat "," parts ^ "]"
+
+(** Compare two JSON arrays element-wise, ignoring extra fields in objects
+    that only appear on one side.  Returns [true] if semantically equal. *)
+let json_arrays_equal a b =
+  let normalize_obj fields =
+    List.sort (fun (a, _) (b, _) -> String.compare a b) fields
+  in
+  let rec values_equal v1 v2 =
+    match (v1, v2) with
+    | `Assoc f1, `Assoc f2 ->
+        (* Only compare fields present on both sides *)
+        let f1 = normalize_obj f1 in
+        let f2 = normalize_obj f2 in
+        let shared_keys =
+          List.filter_map
+            (fun (k, _) ->
+              if List.mem_assoc k f2 then Some k else None)
+            f1
+        in
+        List.for_all
+          (fun k ->
+            let v1 = List.assoc k f1 in
+            let v2 = List.assoc k f2 in
+            values_equal v1 v2)
+          shared_keys
+    | `List l1, `List l2 ->
+        List.length l1 = List.length l2
+        && List.for_all2 values_equal l1 l2
+    | _ ->
+        String.equal (normalize_json_value v1) (normalize_json_value v2)
+  in
+  values_equal a b
 
 (** Pretty-print a JSON value for display. *)
 let display_json_value = function
   | `String s -> s
   | v -> Yojson.Safe.to_string v
 
-(** Compare two JSON objects and return a list of [(key, custom_val, tzkt_val)]
-    for top-level fields whose values semantically differ (ignoring
-    string-vs-int encoding and fields present on only one side). *)
-let json_field_diffs custom_body tzkt_body =
+(** Fields read by [Cycle_data.fetch_current_cycle]. *)
+let head_fields = ["cycle"]
+
+(** Fields read by [Cycle_data.parse_cycle_rewards]. *)
+let split_fields =
+  [
+    "cycle";
+    "delegatorsCount";
+    "delegators";
+    "stakingBalance";
+    "delegatedBalance";
+    "ownStakedBalance";
+    "ownDelegatedBalance";
+    "externalStakedBalance";
+    "externalDelegatedBalance";
+    "blockFees";
+  ]
+  @ List.concat_map
+      (fun prefix ->
+        List.map
+          (fun suffix -> prefix ^ suffix)
+          ["Delegated"; "StakedOwn"; "StakedEdge"; "StakedShared"])
+      [
+        "blockRewards";
+        "attestationRewards";
+        "dalAttestationRewards";
+        "vdfRevelationRewards";
+        "nonceRevelationRewards";
+      ]
+
+(** Select the relevant field set for [path]. *)
+let relevant_fields_for path =
+  if String.equal path "/v1/head" then Some head_fields
+  else if
+    (* /v1/rewards/split/... or /v1/rewards/bakers/... *)
+    let prefix = "/v1/rewards/" in
+    String.length path >= String.length prefix
+    && String.equal (String.sub path 0 (String.length prefix)) prefix
+  then Some split_fields
+  else None
+
+(** Compare two JSON objects on the fields that the rewards code actually
+    reads.  Returns [(key, custom_val, tzkt_val)] for fields that differ. *)
+let json_field_diffs path custom_body tzkt_body =
   let parse s =
     try
       match Yojson.Safe.from_string s with
@@ -46,38 +131,39 @@ let json_field_diffs custom_body tzkt_body =
   in
   match (parse custom_body, parse tzkt_body) with
   | Some custom_fields, Some tzkt_fields ->
-      (* Only compare keys present on both sides *)
+      let keys =
+        match relevant_fields_for path with
+        | Some ks -> ks
+        | None -> List.map fst custom_fields
+      in
       List.filter_map
-        (fun (key, cv) ->
-          match List.assoc_opt key tzkt_fields with
-          | None -> None
-          | Some tv ->
-              let cn = normalize_json_value cv in
-              let tn = normalize_json_value tv in
-              if String.equal cn tn then None
-              else Some (key, display_json_value cv, display_json_value tv))
-        custom_fields
+        (fun key ->
+          match (List.assoc_opt key custom_fields, List.assoc_opt key tzkt_fields)
+          with
+          | Some cv, Some tv ->
+              if json_arrays_equal cv tv then None
+              else Some (key, display_json_value cv, display_json_value tv)
+          | _ -> None)
+        keys
   | _ -> []
 
 let () =
   Indexer.set_log_info (fun msg -> Printf.eprintf "%s\n%!" msg) ;
   Indexer.set_log_warn (fun msg -> Printf.eprintf "Warning: %s\n%!" msg) ;
   Indexer.set_on_divergence (fun path custom_body tzkt_body ->
-      Printf.eprintf "Warning: indexer divergence on %s\n%!" path ;
-      let diffs = json_field_diffs custom_body tzkt_body in
-      (match diffs with
+      let diffs = json_field_diffs path custom_body tzkt_body in
+      match diffs with
       | [] ->
-          Printf.eprintf
-            "  (custom: %d bytes, tzkt: %d bytes)\n%!"
-            (String.length custom_body)
-            (String.length tzkt_body)
+          (* No divergence on fields we care about — keep custom *)
+          `Use_custom
       | fields ->
+          Printf.eprintf "Warning: indexer divergence on %s\n%!" path ;
           List.iter
             (fun (key, cv, tv) ->
               Printf.eprintf "  %s: custom=%s  tzkt=%s\n%!" key cv tv)
-            fields) ;
-      Printf.eprintf "  -> using public TzKT response\n%!" ;
-      `Use_tzkt)
+            fields ;
+          Printf.eprintf "  -> using public TzKT response\n%!" ;
+          `Use_tzkt)
 
 (* ── Helpers ───────────────────────────────────────────────── *)
 
