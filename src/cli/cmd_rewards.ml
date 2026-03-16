@@ -1120,9 +1120,6 @@ Persistent=true
 WantedBy=timers.target
 |}
 
-let systemctl_cmd () =
-  if Paths.is_root () then ["systemctl"] else ["systemctl"; "--user"]
-
 let rec mkdir_p path =
   if Sys.file_exists path then ()
   else (
@@ -1142,14 +1139,14 @@ let install_timer () =
   Printf.printf "Wrote %s\n" svc_path ;
   write_unit_file tmr_path (generate_timer_unit ()) ;
   Printf.printf "Wrote %s\n" tmr_path ;
-  (match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
+  (match Cmd_runner.run ~quiet:true (Systemd.systemctl_cmd () @ ["daemon-reload"]) with
   | Ok () -> ()
   | Error (`Msg msg) -> Printf.eprintf "Warning: daemon-reload failed: %s\n" msg) ;
   let timer_name = timer_unit_name ^ ".timer" in
   match
     Cmd_runner.run
       ~quiet:true
-      (systemctl_cmd () @ ["enable"; "--now"; timer_name])
+      (Systemd.systemctl_cmd () @ ["enable"; "--now"; timer_name])
   with
   | Ok () ->
       Printf.printf "Timer %s enabled and started.\n" timer_name ;
@@ -1163,7 +1160,7 @@ let uninstall_timer () =
   (match
      Cmd_runner.run
        ~quiet:true
-       (systemctl_cmd () @ ["disable"; "--now"; timer_name])
+       (Systemd.systemctl_cmd () @ ["disable"; "--now"; timer_name])
    with
   | Ok () -> Printf.printf "Timer %s disabled and stopped.\n" timer_name
   | Error (`Msg msg) -> Printf.eprintf "Warning: disable failed: %s\n" msg) ;
@@ -1173,7 +1170,7 @@ let uninstall_timer () =
   if Sys.file_exists tmr_path then (
     Sys.remove tmr_path ;
     Printf.printf "Removed %s\n" tmr_path) ;
-  match Cmd_runner.run ~quiet:true (systemctl_cmd () @ ["daemon-reload"]) with
+  match Cmd_runner.run ~quiet:true (Systemd.systemctl_cmd () @ ["daemon-reload"]) with
   | Ok () -> ()
   | Error (`Msg msg) -> Printf.eprintf "Warning: daemon-reload failed: %s\n" msg
 
