@@ -1003,6 +1003,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_payout_continual)
+ (libraries alcotest octez_manager_rewards unix)
+ (modules test_payout_continual)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_payout_config)
  (libraries alcotest octez_manager_rewards)
  (modules test_payout_config)
