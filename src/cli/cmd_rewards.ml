@@ -1278,12 +1278,6 @@ let continual_stop_run baker_opt =
 
 let continual_status_run baker_opt =
   setup_indexer_logging () ;
-  let active = timer_is_active () in
-  Printf.printf "Systemd timer: %s\n"
-    (if active then "active"
-     else if timer_is_installed () then "installed (inactive)"
-     else "not installed") ;
-  Printf.printf "\n" ;
   let show_baker_status (svc : Service.t) =
     match baker_delegate svc with
     | Error msg ->
