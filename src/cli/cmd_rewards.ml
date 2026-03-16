@@ -1147,15 +1147,11 @@ let timer_is_installed () = Sys.file_exists (timer_unit_path ())
 
 let continual_status_run baker_opt =
   setup_indexer_logging () ;
-  (* Timer status is per-system, not per-baker — show it first *)
+  (* Timer status is per-system, not per-baker *)
   let installed = timer_is_installed () in
   let active = if installed then timer_is_active () else false in
-  Printf.printf "Systemd timer: %s\n"
-    (if active then "active"
-     else if installed then "installed (inactive)"
-     else "not installed") ;
-  Printf.printf "\n" ;
-  (* Per-baker status *)
+  (* Collect baker statuses to detect warning conditions *)
+  let any_enabled = ref false in
   let show_baker_status (svc : Service.t) =
     match baker_delegate svc with
     | Error msg ->
@@ -1167,6 +1163,7 @@ let continual_status_run baker_opt =
           | Ok c -> c
           | Error _ -> Payout_config.default ~network:svc.Service.network ~baker_pkh ()
         in
+        if config.continual_enabled then any_enabled := true ;
         Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
         Printf.printf
           "  Continual mode: %s\n"
@@ -1193,22 +1190,31 @@ let continual_status_run baker_opt =
             Printf.printf "  Pending delay: none\n") ;
         Printf.printf "\n"
   in
-  match baker_opt with
-  | Some _ -> (
-      match resolve_baker baker_opt with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok svc ->
-          show_baker_status svc ;
-          `Ok ())
-  | None -> (
-      match list_baker_services () with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok [] ->
-          Printf.printf "No baker instances found.\n" ;
-          `Ok ()
-      | Ok bakers ->
-          List.iter show_baker_status bakers ;
-          `Ok ())
+  let result =
+    match baker_opt with
+    | Some _ -> (
+        match resolve_baker baker_opt with
+        | Error msg -> Cli_helpers.cmdliner_error msg
+        | Ok svc ->
+            show_baker_status svc ;
+            `Ok ())
+    | None -> (
+        match list_baker_services () with
+        | Error msg -> Cli_helpers.cmdliner_error msg
+        | Ok [] ->
+            Printf.printf "No baker instances found.\n" ;
+            `Ok ()
+        | Ok bakers ->
+            List.iter show_baker_status bakers ;
+            `Ok ())
+  in
+  (* Warn if continual is enabled but nothing will run it *)
+  if !any_enabled && not active then (
+    Printf.printf "Warning: continual mode is enabled but no timer is running.\n" ;
+    Printf.printf "  Payouts will only happen while the TUI is open.\n" ;
+    Printf.printf
+      "  Run `octez-manager rewards continual install-timer` for background payouts.\n") ;
+  result
 
 let continual_start_cmd =
   let info =
