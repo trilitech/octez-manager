@@ -23,16 +23,22 @@ let cleanup_dir dir =
 let test_active_default () =
   (* Fresh instance should not be active *)
   let instance = "test-baker-active-default" in
-  Alcotest.(check bool) "not active by default" false
+  Alcotest.(check bool)
+    "not active by default"
+    false
     (Payout_continual.is_active ~instance)
 
 let test_enable_disable () =
   let instance = "test-baker-enable-disable" in
   Payout_continual.enable ~instance ;
-  Alcotest.(check bool) "active after enable" true
+  Alcotest.(check bool)
+    "active after enable"
+    true
     (Payout_continual.is_active ~instance) ;
   Payout_continual.disable ~instance ;
-  Alcotest.(check bool) "inactive after disable" false
+  Alcotest.(check bool)
+    "inactive after disable"
+    false
     (Payout_continual.is_active ~instance)
 
 (* ── Delay file persistence ───────────────────────── *)
@@ -117,21 +123,24 @@ let test_cycles_due_no_unpaid () =
      to avoid collision. *)
   let instance = "test-continual-cycles-none" in
   let due =
-    Payout_continual.cycles_due ~instance ~current_cycle:10 ~interval:1
+    Payout_continual.cycles_due
+      ~instance
+      ~current_cycle:10
+      ~interval:1
       ~offset:0
   in
   (* cycles 0..9 should be due (nothing is paid) — but window starts at
      max 0 (10-20) = 0 *)
   Alcotest.(check int) "10 cycles due" 10 (List.length due) ;
-  Alcotest.(check (list int))
-    "cycles 0-9"
-    [0; 1; 2; 3; 4; 5; 6; 7; 8; 9]
-    due
+  Alcotest.(check (list int)) "cycles 0-9" [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] due
 
 let test_cycles_due_with_interval () =
   let instance = "test-continual-interval" in
   let due =
-    Payout_continual.cycles_due ~instance ~current_cycle:10 ~interval:3
+    Payout_continual.cycles_due
+      ~instance
+      ~current_cycle:10
+      ~interval:3
       ~offset:0
   in
   (* Cycles where (c - 0) mod 3 = 0: 0, 3, 6, 9 *)
@@ -140,7 +149,10 @@ let test_cycles_due_with_interval () =
 let test_cycles_due_with_offset () =
   let instance = "test-continual-offset" in
   let due =
-    Payout_continual.cycles_due ~instance ~current_cycle:10 ~interval:3
+    Payout_continual.cycles_due
+      ~instance
+      ~current_cycle:10
+      ~interval:3
       ~offset:1
   in
   (* Cycles where (c - 1) mod 3 = 0: 1, 4, 7 *)
@@ -150,34 +162,29 @@ let test_cycles_due_large_cycle () =
   (* For large cycle numbers, only last 20 are checked *)
   let instance = "test-continual-large" in
   let due =
-    Payout_continual.cycles_due ~instance ~current_cycle:100 ~interval:1
+    Payout_continual.cycles_due
+      ~instance
+      ~current_cycle:100
+      ~interval:1
       ~offset:0
   in
   (* Window: max 0 (100-20) = 80, so cycles 80..99 *)
   Alcotest.(check int) "20 cycles due" 20 (List.length due) ;
   Alcotest.(check int) "first is 80" 80 (List.hd due) ;
-  Alcotest.(check int)
-    "last is 99"
-    99
-    (List.nth due (List.length due - 1))
+  Alcotest.(check int) "last is 99" 99 (List.nth due (List.length due - 1))
 
 let test_cycles_due_current_excluded () =
   (* current_cycle itself should never be in the due list *)
   let instance = "test-continual-current" in
   let due =
-    Payout_continual.cycles_due ~instance ~current_cycle:5 ~interval:1
-      ~offset:0
+    Payout_continual.cycles_due ~instance ~current_cycle:5 ~interval:1 ~offset:0
   in
-  Alcotest.(check bool)
-    "current cycle excluded"
-    false
-    (List.mem 5 due)
+  Alcotest.(check bool) "current cycle excluded" false (List.mem 5 due)
 
 let test_cycles_due_zero_current () =
   let instance = "test-continual-zero" in
   let due =
-    Payout_continual.cycles_due ~instance ~current_cycle:0 ~interval:1
-      ~offset:0
+    Payout_continual.cycles_due ~instance ~current_cycle:0 ~interval:1 ~offset:0
   in
   Alcotest.(check (list int)) "no cycles due at cycle 0" [] due
 
@@ -207,9 +214,15 @@ let () =
       ( "cycles_due",
         [
           Alcotest.test_case "all unpaid" `Quick test_cycles_due_no_unpaid;
-          Alcotest.test_case "with interval" `Quick test_cycles_due_with_interval;
+          Alcotest.test_case
+            "with interval"
+            `Quick
+            test_cycles_due_with_interval;
           Alcotest.test_case "with offset" `Quick test_cycles_due_with_offset;
-          Alcotest.test_case "large cycle window" `Quick test_cycles_due_large_cycle;
+          Alcotest.test_case
+            "large cycle window"
+            `Quick
+            test_cycles_due_large_cycle;
           Alcotest.test_case
             "current excluded"
             `Quick
