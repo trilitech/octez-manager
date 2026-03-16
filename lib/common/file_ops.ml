@@ -40,12 +40,14 @@ let ensure_dir_path ~owner ~group ~mode path =
           fn
           arg
   else (
+    (* Best-effort chown — may fail if caller is not root; chmod is separate
+       so it always runs even when chown is not permitted. *)
     (try
        let pw = Unix.getpwnam owner in
        let gr = Unix.getgrnam group in
-       Unix.chown path pw.Unix.pw_uid gr.Unix.gr_gid ;
-       Unix.chmod path mode
+       Unix.chown path pw.Unix.pw_uid gr.Unix.gr_gid
      with _ -> ()) ;
+    (try Unix.chmod path mode with _ -> ()) ;
     Ok ())
 
 let write_file ~mode ~owner ~group path contents =

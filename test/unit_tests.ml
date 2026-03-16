@@ -1606,6 +1606,24 @@ let ensure_dir_path_missing_owner () =
         | Error (`Msg msg) ->
             Alcotest.failf "ensure_dir_path missing owner: %s" msg)
 
+(** Regression test for issue #744: ensure_dir_path must chmod the target
+    directory even when it already exists.  Previously, when not running as
+    root the chown call could raise and the catch-all [with _ -> ()] silently
+    swallowed the chmod that followed it. *)
+let ensure_dir_path_updates_permissions () =
+  let owner, group = current_user_group () in
+  with_temp_dir (fun base ->
+      let dir = Filename.concat base "existing" in
+      (* Create directory with permissive mode first *)
+      Unix.mkdir dir 0o755 ;
+      (* Now ask ensure_dir_path to enforce 0o700 on the existing directory *)
+      match File_ops.ensure_dir_path ~owner ~group ~mode:0o700 dir with
+      | Ok () ->
+          let stat = Unix.stat dir in
+          let actual_mode = stat.Unix.st_perm land 0o777 in
+          Alcotest.(check int) "mode is 0o700" 0o700 actual_mode
+      | Error (`Msg msg) -> Alcotest.failf "ensure_dir_path error: %s" msg)
+
 let write_file_creates_contents () =
   let owner, group = current_user_group () in
   with_temp_dir (fun base ->
@@ -6024,6 +6042,10 @@ let () =
       ( "common.fs",
         [
           Alcotest.test_case "ensure dirs" `Quick ensure_dir_path_creates;
+          Alcotest.test_case
+            "ensure updates permissions on existing dir"
+            `Quick
+            ensure_dir_path_updates_permissions;
           Alcotest.test_case
             "ensure missing owner"
             `Quick
