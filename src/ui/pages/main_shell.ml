@@ -368,6 +368,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   let key_hints = key_hints
 end
 
+module Page = Page_Impl
+
 let register () =
   if not (Miaou.Core.Registry.exists name) then
     Miaou.Core.Registry.register name (module Page_Impl)

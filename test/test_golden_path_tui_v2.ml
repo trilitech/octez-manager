@@ -25,6 +25,7 @@
 module HD = Lib_miaou_internal.Headless_driver
 module TH = Tui_test_helpers_lib.Tui_test_helpers
 module Instances = Octez_manager_ui.Instances
+module Main_shell = Octez_manager_ui.Main_shell
 module TCR = Tui_command_runner_lib.Tui_command_runner
 open TCR
 
@@ -403,8 +404,9 @@ let test_create_node_service () =
       (* Register all pages so the headless driver can switch between them *)
       Octez_manager_ui.Manager_app.register_pages () ;
 
-      (* Initialize headless driver *)
-      HD.Stateful.init (module Instances.Page) ;
+      (* Initialize headless driver with Main_shell so tab-based navigation
+         (Key "1" for create dropdown, etc.) works as in the real app. *)
+      HD.Stateful.init (module Main_shell.Page) ;
 
       (* Run command script *)
       TCR.run_commands golden_path_script ;
