@@ -606,6 +606,33 @@ let history_cmd =
   in
   Cmd.v info Term.(ret (const history_run $ baker_arg $ cycles_arg $ json_flag))
 
+(* ── Shared executor context builder ──────────────────────── *)
+
+let build_executor_ctx ~(svc : Service.t) ~(config : Payout_config.t) =
+  let octez_client_bin =
+    Filename.concat svc.Service.app_bin_dir "octez-client"
+  in
+  let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
+  let base_dir =
+    match Node_env.read ~inst:svc.instance with
+    | Ok pairs -> (
+        match List.assoc_opt "OCTEZ_CLIENT_BASE_DIR" pairs with
+        | Some d -> Some d
+        | None -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs)
+    | Error _ -> None
+  in
+  let ctx : Payout_executor.context =
+    {
+      octez_client_bin;
+      endpoint;
+      base_dir;
+      password_file = None;
+      payout_key_alias = config.payout_key_alias;
+      instance = svc.instance;
+    }
+  in
+  ctx
+
 (* ── rewards pay ───────────────────────────────────────────── *)
 
 let rec pay_run baker_opt cycle_opt dry_run confirm compare =
@@ -651,30 +678,7 @@ let rec pay_run baker_opt cycle_opt dry_run confirm compare =
                     | Ok c -> c
                     | Error _ -> Payout_config.default ~network ~baker_pkh ()
                   in
-                  let octez_client_bin =
-                    Filename.concat svc.Service.app_bin_dir "octez-client"
-                  in
-                  let endpoint =
-                    Rpc_addr.to_endpoint svc.Service.rpc_addr
-                  in
-                  let base_dir =
-                    match Node_env.read ~inst:instance with
-                    | Ok pairs -> (
-                        match List.assoc_opt "OCTEZ_CLIENT_BASE_DIR" pairs with
-                        | Some d -> Some d
-                        | None -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs)
-                    | Error _ -> None
-                  in
-                  let ctx : Payout_executor.context =
-                    {
-                      octez_client_bin;
-                      endpoint;
-                      base_dir;
-                      password_file = None;
-                      payout_key_alias = config.payout_key_alias;
-                      instance;
-                    }
-                  in
+                  let ctx = build_executor_ctx ~svc ~config in
                   (* For dry-run, show the full blueprint first *)
                   if dry_run then render_blueprint_table blueprint ;
                   (* Interactive confirmation unless --confirm is set *)
@@ -925,6 +929,143 @@ let notify_cmd =
   let info = Cmd.info "notify" ~doc:"Manage payout notifications." in
   Cmd.group info [notify_test_cmd]
 
+(* ── rewards continual tick ────────────────────────────────── *)
+
+(** Tick a single baker: check delay state, compute due cycles, pay. *)
+let tick_one_baker (svc : Service.t) =
+  let instance = svc.instance in
+  match baker_delegate svc with
+  | Error msg ->
+      Printf.eprintf "Error [%s]: %s\n%!" instance msg
+  | Ok baker_pkh -> (
+      let config =
+        match Payout_config.load ~instance with
+        | Ok c -> c
+        | Error _ ->
+            Payout_config.default ~network:svc.network ~baker_pkh ()
+      in
+      if not config.continual_enabled then
+        Printf.printf "[%s] continual mode disabled, skipping.\n%!" instance
+      else
+        let network = svc.network in
+        let preferred_base = preferred_base_for ~network ~instance in
+        match Cycle_data.fetch_current_cycle ~network ~preferred_base with
+        | Error msg ->
+            Printf.eprintf
+              "Error [%s]: cannot fetch current cycle: %s\n%!"
+              instance
+              msg
+        | Ok current_cycle ->
+            let due =
+              Payout_continual.cycles_due
+                ~instance
+                ~current_cycle
+                ~interval:config.continual_interval
+                ~offset:config.continual_offset
+            in
+            if due = [] then
+              Printf.printf
+                "[%s] no cycles due (current: %d).\n%!"
+                instance
+                current_cycle
+            else (
+              (* Check delay state *)
+              let now = Unix.gettimeofday () in
+              match Payout_continual.read_delay_until ~instance with
+              | Some until when Float.compare until now > 0 ->
+                  let remaining = until -. now in
+                  Printf.printf
+                    "[%s] delay active, %.0fs remaining.\n%!"
+                    instance
+                    remaining
+              | Some _ ->
+                  (* Delay expired — clear and pay *)
+                  Payout_continual.clear_delay_until ~instance ;
+                  Printf.printf
+                    "[%s] delay expired, paying cycles: %s\n%!"
+                    instance
+                    (String.concat
+                       ", "
+                       (List.map string_of_int due)) ;
+                  let ctx = build_executor_ctx ~svc ~config in
+                  let results =
+                    Payout_continual.pay_due_cycles
+                      ~ctx
+                      ~baker:baker_pkh
+                      ~network
+                      ~current_cycle
+                      ~interval:config.continual_interval
+                      ~offset:config.continual_offset
+                  in
+                  List.iter
+                    (fun (cycle, result) ->
+                      match result with
+                      | Ok () ->
+                          Printf.printf
+                            "[%s] cycle %d: paid successfully.\n%!"
+                            instance
+                            cycle
+                      | Error msg ->
+                          Printf.eprintf
+                            "[%s] cycle %d: FAILED (%s)\n%!"
+                            instance
+                            cycle
+                            msg)
+                    results
+              | None ->
+                  (* No delay file — write one with random delay *)
+                  let min_blocks =
+                    Float.of_int (max 1 config.min_delay_blocks)
+                  in
+                  let max_blocks =
+                    Float.of_int (max 1 config.max_delay_blocks)
+                  in
+                  let block_time = 10.0 in
+                  let delay_secs =
+                    min_blocks *. block_time
+                    +. Random.float
+                         ((max_blocks -. min_blocks) *. block_time)
+                  in
+                  let until = now +. delay_secs in
+                  Payout_continual.write_delay_until ~instance until ;
+                  Printf.printf
+                    "[%s] cycles due: %s — delay set for %.0fs.\n%!"
+                    instance
+                    (String.concat
+                       ", "
+                       (List.map string_of_int due))
+                    delay_secs))
+
+let tick_run baker_opt =
+  setup_indexer_logging () ;
+  Random.self_init () ;
+  match baker_opt with
+  | Some _ -> (
+      match resolve_baker baker_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok svc ->
+          tick_one_baker svc ;
+          `Ok ())
+  | None -> (
+      match list_baker_services () with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok [] ->
+          Printf.printf "No baker instances found.\n" ;
+          `Ok ()
+      | Ok bakers ->
+          List.iter tick_one_baker bakers ;
+          `Ok ())
+
+let tick_cmd =
+  let info =
+    Cmd.info
+      "tick"
+      ~doc:
+        "Run one continual payout tick. Checks due cycles, manages delay, \
+         and pays when ready. Designed for cron/systemd timer invocation."
+  in
+  Cmd.v info Term.(ret (const tick_run $ baker_arg))
+
 (* ── rewards continual start/stop/status ──────────────────── *)
 
 let continual_start_run baker_opt interval offset =
@@ -1045,7 +1186,9 @@ let continual_cmd =
   let info =
     Cmd.info "continual" ~doc:"Manage continual (automatic) payouts."
   in
-  Cmd.group info [continual_start_cmd; continual_stop_cmd; continual_status_cmd]
+  Cmd.group
+    info
+    [continual_start_cmd; continual_stop_cmd; continual_status_cmd; tick_cmd]
 
 (* ── rewards command group ─────────────────────────────────── *)
 
