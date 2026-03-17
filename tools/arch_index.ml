@@ -406,102 +406,31 @@ let mutable_kind_of_path (path : Path.t) =
   then Some "atomic_other"
   else None
 
-(** Recursively scan an expression for mutable patterns.
-    Returns a list of (kind, line) pairs. *)
-let rec scan_expr_for_mutables (expr : Typedtree.expression) =
-  let line = expr.exp_loc.loc_start.pos_lnum in
-  let from_desc =
-    match expr.exp_desc with
-    | Texp_ident (path, _, _) -> (
-        match mutable_kind_of_path path with
-        | Some kind -> [(kind, line)]
-        | None -> [])
-    | Texp_apply (fn, args) ->
-        let fn_muts = scan_expr_for_mutables fn in
-        let arg_muts =
-          List.concat_map
-            (fun (_, arg_opt) ->
-              match arg_opt with
-              | Some e -> scan_expr_for_mutables e
-              | None -> [])
-            args
-        in
-        fn_muts @ arg_muts
-    | Texp_let (_, vbs, body) ->
-        let vb_muts =
-          List.concat_map
-            (fun (vb : Typedtree.value_binding) ->
-              scan_expr_for_mutables vb.vb_expr)
-            vbs
-        in
-        vb_muts @ scan_expr_for_mutables body
-    | Texp_function (_, body) -> (
-        match body with
-        | Typedtree.Tfunction_body e -> scan_expr_for_mutables e
-        | Typedtree.Tfunction_cases {cases; _} -> scan_cases_for_mutables cases)
-    | Texp_match (e, _, cases, _) ->
-        scan_expr_for_mutables e @ scan_cases_for_mutables cases
-    | Texp_try (e, cases, _) ->
-        scan_expr_for_mutables e @ scan_cases_for_mutables cases
-    | Texp_tuple es -> List.concat_map scan_expr_for_mutables es
-    | Texp_construct (_, _, es) -> List.concat_map scan_expr_for_mutables es
-    | Texp_variant (_, Some e) -> scan_expr_for_mutables e
-    | Texp_record {fields; extended_expression; _} ->
-        let field_muts =
-          Array.to_list fields
-          |> List.concat_map (fun (_, def) ->
-              match def with
-              | Typedtree.Overridden (_, e) -> scan_expr_for_mutables e
-              | Typedtree.Kept _ -> [])
-        in
-        let ext_muts =
-          match extended_expression with
-          | Some e -> scan_expr_for_mutables e
-          | None -> []
-        in
-        field_muts @ ext_muts
-    | Texp_field (e, _, _) -> scan_expr_for_mutables e
-    | Texp_setfield (e1, _, _, e2) ->
-        (* Field assignment is a mutable operation *)
-        [("mutable_field", line)]
-        @ scan_expr_for_mutables e1 @ scan_expr_for_mutables e2
-    | Texp_array es -> List.concat_map scan_expr_for_mutables es
-    | Texp_ifthenelse (e1, e2, e3_opt) -> (
-        scan_expr_for_mutables e1 @ scan_expr_for_mutables e2
-        @ match e3_opt with Some e3 -> scan_expr_for_mutables e3 | None -> [])
-    | Texp_sequence (e1, e2) ->
-        scan_expr_for_mutables e1 @ scan_expr_for_mutables e2
-    | Texp_while (e1, e2) ->
-        scan_expr_for_mutables e1 @ scan_expr_for_mutables e2
-    | Texp_for (_, _, e1, e2, _, e3) ->
-        scan_expr_for_mutables e1 @ scan_expr_for_mutables e2
-        @ scan_expr_for_mutables e3
-    | Texp_send (e, _) -> scan_expr_for_mutables e
-    | Texp_new _ -> []
-    | Texp_instvar _ -> []
-    | Texp_setinstvar (_, _, _, e) ->
-        [("mutable_field", line)] @ scan_expr_for_mutables e
-    | Texp_override (_, es) ->
-        List.concat_map (fun (_, _, e) -> scan_expr_for_mutables e) es
-    | Texp_letmodule (_, _, _, _, e) -> scan_expr_for_mutables e
-    | Texp_letexception (_, e) -> scan_expr_for_mutables e
-    | Texp_assert (e, _) -> scan_expr_for_mutables e
-    | Texp_lazy e -> scan_expr_for_mutables e
-    | Texp_object _ -> []
-    | Texp_pack _ -> []
-    | Texp_letop {body; _} -> scan_cases_for_mutables [body]
-    | Texp_unreachable -> []
-    | Texp_extension_constructor _ -> []
-    | Texp_open (_, e) -> scan_expr_for_mutables e
-    | _ -> []
+(** Scan an expression for mutable patterns.
+    Uses {!Tast_iterator} for resilience against {!Typedtree} constructor
+    arity changes across OCaml versions.
+    Returns a list of [(kind, line)] pairs. *)
+let scan_expr_for_mutables (expr : Typedtree.expression) =
+  let results = ref [] in
+  let iter =
+    {
+      Tast_iterator.default_iterator with
+      expr =
+        (fun self e ->
+          let line = e.exp_loc.loc_start.pos_lnum in
+          (match e.exp_desc with
+          | Texp_ident (path, _, _) -> (
+              match mutable_kind_of_path path with
+              | Some kind -> results := (kind, line) :: !results
+              | None -> ())
+          | Texp_setfield _ -> results := ("mutable_field", line) :: !results
+          | Texp_setinstvar _ -> results := ("mutable_field", line) :: !results
+          | _ -> ()) ;
+          Tast_iterator.default_iterator.expr self e);
+    }
   in
-  from_desc
-
-(** Helper to scan cases *)
-and scan_cases_for_mutables cases =
-  List.concat_map
-    (fun (c : Typedtree.value Typedtree.case) -> scan_expr_for_mutables c.c_rhs)
-    cases
+  iter.expr iter expr ;
+  !results
 
 let insert_constructor db stmt_ctor ~type_id ~constructor_name ~position
     ~arg_types =

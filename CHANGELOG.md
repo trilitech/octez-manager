@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `arch_index`: switched mutable-pattern scanner to `Tast_iterator`, removing ~85 lines of explicit constructor recursion and fixing OCaml 5.3 build
 - **Keys page renamed to Wallets**: The Keys management page is now called "Wallets" throughout the UI. Press `K` to open it. The tab label reads "Wallets".
 - **Instances page: Manage Sandboxes button removed**: The "Manage sandboxes" button has been removed from the Instances button bar. Sandboxes are now accessible via the dedicated Sandboxes tab (`5` key).
 - **Sandbox mode**: Create isolated Tezos sandbox environments for local testing and development. A sandbox spins up a complete node + baker pair using yes-crypto (any secret key can sign for any public key), automatically generating a yes-wallet with the top N active delegates from the network. TUI sandbox page (`sandbox` in navigation) lists all sandboxes with node/baker status, head level, and detail panel. Key bindings: `c` create, `s`/`S` start/stop, `d` destroy (with confirmation), `a` add account, `r` open RPC browser. CLI commands: `om sandbox create|list|status|start|stop|destroy|add-account`. Instance `set-env`/`get-env` commands allow setting arbitrary environment variables on any managed service instance.
