@@ -40,6 +40,8 @@ type state = {
   expanded_octez_majors : int list;
   expanded_managed_octez_items : string list;
   expanded_registered : string list;
+  download_tick : int;
+      (** incremented on each download progress update to force re-render *)
 }
 
 type msg = unit

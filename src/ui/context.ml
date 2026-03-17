@@ -100,6 +100,13 @@ let mark_keys_dirty () = Atomic.set keys_dirty true
 
 let consume_keys_dirty () = Atomic.exchange keys_dirty false
 
+(* Download progress dirty flag — set from background domains during binary downloads *)
+let download_dirty = Atomic.make false
+
+let mark_download_dirty () = Atomic.set download_dirty true
+
+let consume_download_dirty () = Atomic.exchange download_dirty false
+
 type pending_tab =
   | Tab_instances
   | Tab_wallets
@@ -385,7 +392,8 @@ let multi_progress_start ~version ~binaries =
   in
   multi_progress :=
     Some
-      {version; binaries = widgets; finished_at = None; checksum_message = None}
+      {version; binaries = widgets; finished_at = None; checksum_message = None} ;
+  mark_download_dirty ()
 
 (* Update progress for a specific binary *)
 let multi_progress_update ~binary ~downloaded ~total =
@@ -417,7 +425,8 @@ let multi_progress_update ~binary ~downloaded ~total =
             mp.binaries
         in
         {mp with binaries})
-      !multi_progress
+      !multi_progress ;
+  mark_download_dirty ()
 
 (* Mark a binary as complete *)
 let multi_progress_complete ~binary ~size =
@@ -439,19 +448,22 @@ let multi_progress_complete ~binary ~size =
             mp.binaries
         in
         {mp with binaries})
-      !multi_progress
+      !multi_progress ;
+  mark_download_dirty ()
 
 (* Set checksum message *)
 let multi_progress_checksum msg =
   multi_progress :=
-    Option.map (fun mp -> {mp with checksum_message = Some msg}) !multi_progress
+    Option.map (fun mp -> {mp with checksum_message = Some msg}) !multi_progress ;
+  mark_download_dirty ()
 
 (* Finish multi-progress *)
 let multi_progress_finish () =
   multi_progress :=
     Option.map
       (fun mp -> {mp with finished_at = Some (Unix.gettimeofday ())})
-      !multi_progress
+      !multi_progress ;
+  mark_download_dirty ()
 
 (* Render multi-progress display *)
 let render_multi_progress ~cols:_ =
