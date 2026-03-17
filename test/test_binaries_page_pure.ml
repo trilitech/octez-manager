@@ -56,6 +56,7 @@ let mk_state ?(managed_octez = []) ?(managed_signatory = []) ?(registered = [])
       expanded_octez_majors;
       expanded_managed_octez_items;
       expanded_registered;
+      download_tick = 0;
     }
 
 (* ── format_size ──────────────────────────────────────────────── *)

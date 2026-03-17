@@ -62,6 +62,7 @@ let init () =
       expanded_octez_majors;
       expanded_managed_octez_items;
       expanded_registered;
+      download_tick = 0;
     }
 
 let update ps _ = ps
@@ -103,13 +104,18 @@ let refresh_data s =
     expanded_octez_majors = s.expanded_octez_majors;
     expanded_managed_octez_items = s.expanded_managed_octez_items;
     expanded_registered = s.expanded_registered;
+    download_tick = s.download_tick;
   }
 
 let refresh ps = Navigation.update refresh_data ps
 
 let auto_refresh ps =
   (* Auto-refresh if data has been marked dirty (e.g., after remove/download) *)
-  if Context.consume_instances_dirty () then refresh ps else ps
+  if Context.consume_instances_dirty () then refresh ps
+  else if Context.consume_download_dirty () then
+    (* Increment tick to force re-render without refetching data *)
+    Navigation.update (fun s -> {s with download_tick = s.download_tick + 1}) ps
+  else ps
 
 let toggle_major_expansion s major =
   let expanded_octez_majors =
