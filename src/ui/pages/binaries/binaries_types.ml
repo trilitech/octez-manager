@@ -48,6 +48,8 @@ type state = {
       (** list of expanded managed octez versions *)
   expanded_registered : string list;
       (** list of expanded registered directory aliases *)
+  download_tick : int;
+      (** incremented on each download progress update to force re-render *)
 }
 
 type msg = unit

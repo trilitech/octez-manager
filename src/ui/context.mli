@@ -71,6 +71,13 @@ val mark_keys_dirty : unit -> unit
 (** Consume and clear the keys dirty flag. Returns [true] if it was set. *)
 val consume_keys_dirty : unit -> bool
 
+(** Mark download progress as needing a re-render (thread-safe via [Atomic]).
+    Called from background download domains whenever progress changes. *)
+val mark_download_dirty : unit -> unit
+
+(** Consume and clear the download dirty flag. Returns [true] if it was set. *)
+val consume_download_dirty : unit -> bool
+
 (** Pending tab switch requested by global key handlers. *)
 type pending_tab =
   | Tab_instances
