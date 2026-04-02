@@ -284,6 +284,7 @@ let parent_node_field =
                 client =
                   {
                     !model_ref.client with
+                    node = `Service svc.Service.instance;
                     node_endpoint = node_endpoint_of_service svc;
                   };
                 node_data_dir = svc.Service.data_dir;
