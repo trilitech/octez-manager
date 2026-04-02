@@ -742,19 +742,51 @@ let spec =
           ]
         (* 6b. Extra nodes for redundancy *)
         @ [
-            validated_text
-              ~label:"Extra Nodes (comma-separated)"
-              ~get:(fun m -> String.concat ", " m.extra_nodes)
-              ~set:(fun v m ->
-                let extra_nodes =
-                  v |> String.split_on_char ',' |> List.map String.trim
-                  |> List.filter (( <> ) "")
-                in
-                {m with extra_nodes})
-              ~validate:(fun _m -> Ok ())
+            string_list
+              ~label:"Extra Nodes"
+              ~get:(fun m -> m.extra_nodes)
+              ~set:(fun extra_nodes m -> {m with extra_nodes})
+              ~get_suggestions:(fun _model ->
+                (* Get all available node instances *)
+                let states = Form_builder_common.cached_service_states () in
+                states
+                |> List.filter (fun s ->
+                    s.Data.Service_state.service.Service.role = "node")
+                |> List.map (fun s ->
+                    s.Data.Service_state.service.Service.instance))
+              ~item_validator:(fun v ->
+                (* Accept either instance names or http(s):// endpoints *)
+                if
+                  String.starts_with ~prefix:"http://" v
+                  || String.starts_with ~prefix:"https://" v
+                then
+                  (* Validate as endpoint - extract host:port from URL *)
+                  let url = String.trim v in
+                  let after_scheme =
+                    if String.starts_with ~prefix:"https://" url then
+                      String.sub url 8 (String.length url - 8)
+                    else String.sub url 7 (String.length url - 7)
+                  in
+                  (* Basic validation: must have host:port format *)
+                  if String.contains after_scheme ':' then Ok ()
+                  else Error "Endpoint must be in format http://host:port"
+                else
+                  (* Validate as instance name - check if it exists *)
+                  let states =
+                    Form_builder_common.cached_service_states_nonblocking ()
+                  in
+                  if
+                    List.exists
+                      (fun s ->
+                        s.Data.Service_state.service.Service.role = "node"
+                        && s.Data.Service_state.service.Service.instance = v)
+                      states
+                  then Ok ()
+                  else Error (Printf.sprintf "Node instance '%s' not found" v))
+              ()
             |> with_hint
-                 "Optional: Extra node instances or RPC endpoints for baker \
-                  redundancy (e.g., node2, http://backup:8732)";
+                 "Optional: Select extra node instances or add custom RPC \
+                  endpoints for redundancy";
           ]
         (* 7. Extra args *)
         @ core_service_fields
