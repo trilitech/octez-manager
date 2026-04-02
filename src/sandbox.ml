@@ -343,6 +343,7 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
               logging_mode = Logging_mode.Journald;
               auto_enable = true;
               preserve_data = false;
+              extra_nodes = [];
             }
           in
           let* _baker_svc = Baker.install_baker baker_request in
@@ -528,7 +529,7 @@ let add_baker ?(on_log = fun _ -> ()) ~group_name ~node_instance ~delegates () =
       dal_node = None;
       liquidity_baking_vote = Some "pass";
       signer_mode = Signer_types.Local_keys;
-      extra_args = ["--force-apply-from-round"; "0"];
+      extra_args = ["--force-apply-from"; "0"];
       extra_env = yes_crypto_env;
       service_user = grp.Group.service_user;
       app_bin_dir = grp.Group.app_bin_dir;
@@ -536,6 +537,7 @@ let add_baker ?(on_log = fun _ -> ()) ~group_name ~node_instance ~delegates () =
       logging_mode = Logging_mode.Journald;
       auto_enable = true;
       preserve_data = false;
+      extra_nodes = [];
     }
   in
   let set_group ~instance =

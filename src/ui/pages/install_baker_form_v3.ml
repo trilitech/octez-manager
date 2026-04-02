@@ -931,6 +931,7 @@ let spec =
             logging_mode;
             auto_enable = model.core.enable_on_boot;
             preserve_data = model.edit_mode;
+            extra_nodes = [];
           }
         in
 
