@@ -668,6 +668,7 @@ let instance_term =
                             extra_args = new_extra_args;
                             auto_enable = true;
                             preserve_data = true;
+                            extra_nodes = [];
                           }
                         in
                         Result.map_error msg_to_string (Baker.install_baker req)
