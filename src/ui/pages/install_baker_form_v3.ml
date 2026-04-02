@@ -41,6 +41,8 @@ type model = {
   delegates : string list;
   liquidity_baking_vote : string;
   signer : signer_selection;
+  extra_nodes : string list;
+  (* extra node instances or endpoints for redundancy *)
   (* Edit mode fields *)
   edit_mode : bool;
   original_instance : string option;
@@ -73,6 +75,7 @@ let base_initial_model () =
     delegates = [];
     liquidity_baking_vote = "pass";
     signer = Signer_local_keys;
+    extra_nodes = [];
     edit_mode = false;
     original_instance = None;
     stopped_dependents = [];
@@ -117,6 +120,13 @@ let make_initial_model () =
         else Signer_uri signer_uri
       in
       let lb_vote = lookup "OCTEZ_BAKER_LB_VOTE" in
+      let extra_nodes =
+        match lookup "OCTEZ_EXTRA_NODE_ENDPOINTS" with
+        | "" -> []
+        | csv ->
+            csv |> String.split_on_char ',' |> List.map String.trim
+            |> List.filter (( <> ) "")
+      in
       {
         core =
           {
@@ -150,6 +160,7 @@ let make_initial_model () =
         delegates;
         liquidity_baking_vote = (if lb_vote = "" then "pass" else lb_vote);
         signer;
+        extra_nodes;
         edit_mode = true;
         original_instance = Some svc.Service.instance;
         stopped_dependents = edit_ctx.stopped_dependents;
@@ -729,6 +740,22 @@ let spec =
                     "Node data directory cannot be changed after creation."
              else node_data_dir_field);
           ]
+        (* 6b. Extra nodes for redundancy *)
+        @ [
+            validated_text
+              ~label:"Extra Nodes (comma-separated)"
+              ~get:(fun m -> String.concat ", " m.extra_nodes)
+              ~set:(fun v m ->
+                let extra_nodes =
+                  v |> String.split_on_char ',' |> List.map String.trim
+                  |> List.filter (( <> ) "")
+                in
+                {m with extra_nodes})
+              ~validate:(fun _m -> Ok ())
+            |> with_hint
+                 "Optional: Extra node instances or RPC endpoints for baker \
+                  redundancy (e.g., node2, http://backup:8732)";
+          ]
         (* 7. Extra args *)
         @ core_service_fields
             ~get_core:(fun m -> m.core)
@@ -906,6 +933,18 @@ let spec =
                   Signer_types.Local_keys)
           | Signer_uri uri -> Signer_types.Remote_signer {instance = None; uri}
         in
+        (* Parse extra_nodes: detect if each entry is an instance or endpoint *)
+        let extra_nodes =
+          List.map
+            (fun entry ->
+              let entry = String.trim entry in
+              if
+                String.starts_with ~prefix:"http://" entry
+                || String.starts_with ~prefix:"https://" entry
+              then Installer_types.Extra_endpoint entry
+              else Installer_types.Extra_instance entry)
+            model.extra_nodes
+        in
         let req =
           {
             Installer_types.instance = model.core.instance_name;
@@ -931,7 +970,7 @@ let spec =
             logging_mode;
             auto_enable = model.core.enable_on_boot;
             preserve_data = model.edit_mode;
-            extra_nodes = [];
+            extra_nodes;
           }
         in
 
