@@ -73,20 +73,6 @@ let install_baker ?(quiet = false) (request : baker_request) =
           "Liquidity baking vote is required. Use --liquidity-baking-vote with \
            'on', 'off', or 'pass'."
   in
-  let node_mode_env =
-    match node_mode with
-    | Local _ | Local_unmanaged _ -> "local"
-    | Remote _ -> "remote"
-  in
-  (* Validate and resolve remote signer configuration *)
-  let* signer_uri_opt =
-    Signer_validation.validate_and_resolve request.signer_mode
-  in
-  let signatory_instance =
-    match request.signer_mode with
-    | Signer_types.Remote_signer {instance = Some name; _} -> Some name
-    | _ -> None
-  in
   (* Resolve extra nodes to endpoints and collect systemd dependencies *)
   let extra_node_endpoints, extra_node_dependencies =
     List.fold_left
@@ -105,6 +91,23 @@ let install_baker ?(quiet = false) (request : baker_request) =
       ([], [])
       request.extra_nodes
     |> fun (eps, deps) -> (List.rev eps, List.rev deps)
+  in
+  (* When extra nodes are present, baker MUST run in remote mode *)
+  let node_mode_env =
+    match (node_mode, extra_node_endpoints) with
+    | _, _ :: _ ->
+        "remote" (* Force remote mode when extra nodes are configured *)
+    | Local _, [] | Local_unmanaged _, [] -> "local"
+    | Remote _, [] -> "remote"
+  in
+  (* Validate and resolve remote signer configuration *)
+  let* signer_uri_opt =
+    Signer_validation.validate_and_resolve request.signer_mode
+  in
+  let signatory_instance =
+    match request.signer_mode with
+    | Signer_types.Remote_signer {instance = Some name; _} -> Some name
+    | _ -> None
   in
   (* Delegates are positional arguments, not --delegate flags *)
   let delegate_args = String.concat " " request.delegates |> String.trim in
