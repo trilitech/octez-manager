@@ -87,6 +87,25 @@ let install_baker ?(quiet = false) (request : baker_request) =
     | Signer_types.Remote_signer {instance = Some name; _} -> Some name
     | _ -> None
   in
+  (* Resolve extra nodes to endpoints and collect systemd dependencies *)
+  let extra_node_endpoints, extra_node_dependencies =
+    List.fold_left
+      (fun (endpoints, deps) spec ->
+        match spec with
+        | Installer_types.Extra_instance inst -> (
+            (* Instance was already validated in CLI, but double-check *)
+            match Service_registry.find ~instance:inst with
+            | Ok (Some svc) when String.equal svc.Service.role "node" ->
+                let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
+                (endpoint :: endpoints, ("node", inst) :: deps)
+            | _ ->
+                (* This shouldn't happen due to CLI validation, but handle it *)
+                (endpoints, deps))
+        | Installer_types.Extra_endpoint ep -> (ep :: endpoints, deps))
+      ([], [])
+      request.extra_nodes
+    |> fun (eps, deps) -> (List.rev eps, List.rev deps)
+  in
   (* Delegates are positional arguments, not --delegate flags *)
   let delegate_args = String.concat " " request.delegates |> String.trim in
   (* Split extra args into global (before subcommand) and command (after) *)
@@ -146,7 +165,10 @@ let install_baker ?(quiet = false) (request : baker_request) =
           | _ -> [])
       | None -> []
     in
-    match node_deps @ signatory_deps with [] -> None | deps -> Some deps
+    let extra_node_deps = extra_node_dependencies in
+    match node_deps @ signatory_deps @ extra_node_deps with
+    | [] -> None
+    | deps -> Some deps
   in
   let* service =
     install_daemon
@@ -168,6 +190,8 @@ let install_baker ?(quiet = false) (request : baker_request) =
           [
             ("OCTEZ_BAKER_BASE_DIR", base_dir);
             ("OCTEZ_NODE_ENDPOINT", node_endpoint);
+            ( "OCTEZ_EXTRA_NODE_ENDPOINTS",
+              String.concat "," extra_node_endpoints );
             ( "OCTEZ_NODE_INSTANCE",
               match node_mode with
               | Local svc -> svc.Service.instance
