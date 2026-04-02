@@ -308,6 +308,7 @@ let install_baker_cmd =
           logging_mode;
           auto_enable = not no_enable;
           preserve_data = false;
+          extra_nodes = [];
         }
       in
       (* Baker.install_baker returns an Rresult-style error; convert it to a string-error Result *)

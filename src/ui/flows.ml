@@ -152,6 +152,7 @@ let create_baker_flow ~services ~on_success =
                       logging_mode = Logging_mode.Journald;
                       auto_enable = true;
                       preserve_data = false;
+                      extra_nodes = [];
                     }
                   in
                   let res =

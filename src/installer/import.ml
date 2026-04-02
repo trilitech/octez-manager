@@ -420,6 +420,7 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
       logging_mode = Logging_mode.Journald;
       auto_enable = true;
       preserve_data = true;
+      extra_nodes = [];
     }
   in
   match Baker.install_baker ~quiet:true request with

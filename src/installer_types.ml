@@ -78,6 +78,11 @@ type resolved_baker_node_mode =
 
 type dal_config = Dal_auto | Dal_disabled | Dal_endpoint of string
 
+(** Extra node specification for baker multi-node support *)
+type extra_node_spec =
+  | Extra_instance of string  (** Managed node instance *)
+  | Extra_endpoint of string  (** Raw RPC endpoint *)
+
 (** Re-export signer_mode from Signer_types for convenience *)
 include Signer_types
 
@@ -98,6 +103,8 @@ type baker_request = {
   logging_mode : Logging_mode.t;
   auto_enable : bool;
   preserve_data : bool;
+  extra_nodes : extra_node_spec list;
+      (** Additional nodes for redundancy (octez-baker --extra-node) *)
 }
 
 type accuser_request = {
