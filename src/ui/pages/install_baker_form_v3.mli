@@ -34,6 +34,8 @@ type model = {
   liquidity_baking_vote : string;
       (** Liquidity baking toggle vote (["on"], ["off"], or ["pass"]). *)
   signer : signer_selection;  (** Key signing mode. *)
+  extra_nodes : string list;
+      (** Extra node instances or endpoints for redundancy. *)
   edit_mode : bool;  (** [true] when editing an existing baker instance. *)
   original_instance : string option;
       (** Original instance name in edit mode. *)
