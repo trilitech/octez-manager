@@ -245,6 +245,16 @@ let view_details ~box_width svc =
           | "", d -> d
           | n, d -> n ^ ", " ^ d
         in
+        let extra_nodes =
+          match lookup "OCTEZ_EXTRA_NODE_ENDPOINTS" with
+          | "" -> "(none)"
+          | csv -> (
+              csv |> String.split_on_char ',' |> List.map String.trim
+              |> List.filter (( <> ) "")
+              |> function
+              | [] -> "(none)"
+              | xs -> String.concat ", " xs)
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -255,6 +265,7 @@ let view_details ~box_width svc =
           ("Node Mode", if node_mode = "" then "remote" else node_mode);
           ( "Node Endpoint",
             if node_endpoint = "" then "(unset)" else node_endpoint );
+          ("Extra Nodes", extra_nodes);
           ("Depends On", depends_on);
           ("DAL Config", dal_display);
           ("Service User", svc.Service.service_user);
