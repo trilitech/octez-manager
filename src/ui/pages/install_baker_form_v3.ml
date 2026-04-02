@@ -746,12 +746,23 @@ let spec =
               ~label:"Extra Nodes"
               ~get:(fun m -> m.extra_nodes)
               ~set:(fun extra_nodes m -> {m with extra_nodes})
-              ~get_suggestions:(fun _model ->
-                (* Get all available node instances *)
+              ~get_suggestions:(fun model ->
+                (* Get all available node instances, excluding the parent node *)
                 let states = Form_builder_common.cached_service_states () in
+                let parent_instance =
+                  match model.client.node with
+                  | `Service inst -> Some inst
+                  | _ -> None
+                in
                 states
                 |> List.filter (fun s ->
                     s.Data.Service_state.service.Service.role = "node")
+                |> List.filter (fun s ->
+                    (* Exclude parent node from suggestions *)
+                    match parent_instance with
+                    | Some parent ->
+                        s.Data.Service_state.service.Service.instance <> parent
+                    | None -> true)
                 |> List.map (fun s ->
                     s.Data.Service_state.service.Service.instance))
               ~item_validator:(fun v ->
