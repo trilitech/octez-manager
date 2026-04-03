@@ -297,4 +297,24 @@ let install_baker ?(quiet = false) (request : baker_request) =
         | _ -> Ok ())
     | None -> Ok ()
   in
+  (* Register as dependent on extra node instances (avoid duplicates) *)
+  let* () =
+    List.fold_left
+      (fun acc (_role, inst) ->
+        let* () = acc in
+        match Service_registry.find ~instance:inst with
+        | Ok (Some extra_node_svc) ->
+            if List.mem request.instance extra_node_svc.dependents then Ok ()
+            else
+              let updated_extra_node =
+                {
+                  extra_node_svc with
+                  dependents = request.instance :: extra_node_svc.dependents;
+                }
+              in
+              Service_registry.write updated_extra_node
+        | _ -> Ok ())
+      (Ok ())
+      extra_node_dependencies
+  in
   Ok service_with_signer
