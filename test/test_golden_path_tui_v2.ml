@@ -138,9 +138,10 @@ let golden_path_script =
     ]
   @ select_second_item
   @ [Screenshot "06_baker_node_selected"]
-  (* Baker form: 15 fields + confirm. Cursor on field 0, need 15 Downs.
-     Added "Remote Signer" field in PR #724 and "Group" field for instance groups *)
-  @ submit_form ~downs:15
+  (* Baker form: 16 fields + confirm. Cursor on field 0, need 16 Downs.
+     Added "Remote Signer" field in PR #724, "Group" field for instance groups,
+     and "Extra Nodes" field in PR #815 *)
+  @ submit_form ~downs:16
   @ wait_for_sync_install
   @ [Screenshot "07_baker_installed"; AssertService "baker-shadownet"]
   (* ── Step 4: Install Accuser ──────────────────────────────── *)
