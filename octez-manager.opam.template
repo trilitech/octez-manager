@@ -1,8 +1,10 @@
 pin-depends: [
   ["ppx_forbid.dev" "git+https://github.com/atacama-dev/ppx_forbid.git"]
+  ["ppx_enforce.dev" "git+https://github.com/atacama-dev/ppx_forbid.git"]
   ["miaou-core.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
   ["miaou-driver-term.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
   ["miaou-driver-matrix.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
   ["miaou-runner.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
   ["miaou-driver-web.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
+  ["miaou-registry.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
 ]

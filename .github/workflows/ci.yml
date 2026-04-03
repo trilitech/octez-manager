@@ -114,8 +114,9 @@ jobs:
         if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
         run: |
           eval $(opam env)
-          echo "Pinning ppx_forbid..."
+          echo "Pinning ppx_forbid and ppx_enforce..."
           opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
+          opam pin add ppx_enforce "$PPX_FORBID_GIT_URL" --no-action
           echo "Pinning miaou packages..."
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
@@ -123,7 +124,7 @@ jobs:
           opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-registry "$MIAOU_GIT_URL" --no-action
-          opam install ppx_forbid miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry eio_posix --jobs=4
+          opam install ppx_forbid ppx_enforce miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry eio_posix --jobs=4
 
       - name: Install project dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
