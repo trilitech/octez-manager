@@ -16,11 +16,12 @@
   yojson
   yaml
   bos
-  (miaou-core (>= 0.4.1))
-  (miaou-driver-term (>= 0.4.1))
-  (miaou-driver-matrix (>= 0.4.1))
-  (miaou-runner (>= 0.4.1))
-  (miaou-driver-web (>= 0.4.1))
+   (miaou-core (>= 0.4.1))
+   (miaou-driver-term (>= 0.4.1))
+   (miaou-driver-matrix (>= 0.4.1))
+   (miaou-runner (>= 0.4.1))
+   (miaou-driver-web (>= 0.4.1))
+   (miaou-registry (>= 0.4.1))
   eio
   eio_main
   eio_posix
