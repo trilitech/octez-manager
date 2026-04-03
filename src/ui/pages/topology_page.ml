@@ -77,12 +77,32 @@ let build_tree services =
       services
   in
   let rec build_children parent_instance =
-    let children =
+    (* Find children via depends_on (standard hierarchy) *)
+    let depends_on_children =
       List.filter
         (fun (st : Data.Service_state.t) ->
           st.service.Service.depends_on = Some parent_instance)
         services
     in
+    (* Find children via dependents list (extra connections like baker extra nodes) *)
+    let dependent_children =
+      match List.assoc_opt parent_instance svc_map with
+      | Some parent_st ->
+          List.filter_map
+            (fun dep_instance ->
+              (* Only include if not already in depends_on_children *)
+              if
+                List.exists
+                  (fun (child_st : Data.Service_state.t) ->
+                    String.equal child_st.service.Service.instance dep_instance)
+                  depends_on_children
+              then None
+              else List.assoc_opt dep_instance svc_map)
+            parent_st.service.Service.dependents
+      | None -> []
+    in
+    (* Combine both sets of children *)
+    let all_children = depends_on_children @ dependent_children in
     List.map
       (fun (st : Data.Service_state.t) ->
         {
@@ -90,7 +110,7 @@ let build_tree services =
           status = st.Data.Service_state.status;
           children = build_children st.service.Service.instance;
         })
-      children
+      all_children
   in
   List.map
     (fun (st : Data.Service_state.t) ->
