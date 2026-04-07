@@ -9,6 +9,7 @@
 
 module Service_state = Data.Service_state
 open Instances_state
+module StringMap = Instances_state.StringMap
 
 (** Layout configuration constants *)
 val min_column_width : int
@@ -59,13 +60,13 @@ type column_item = Header of string | Instance of int * Service_state.t
 (** Get flat list of items for a column *)
 val column_items :
   column_groups:(string * Service_state.t list) list ->
-  global_services:Service_state.t list ->
+  index_by_instance:int StringMap.t ->
   column_item list
 
 (** Get list of service indices in a column *)
 val column_service_indices :
   column_groups:(string * Service_state.t list) list ->
-  global_services:Service_state.t list ->
+  index_by_instance:int StringMap.t ->
   int list
 
 (** Compute layout sections based on view_mode *)
@@ -76,6 +77,7 @@ val first_service_in_column :
   num_columns:int ->
   sections:(string * Service_state.t list) list ->
   services:Service_state.t list ->
+  index_by_instance:int StringMap.t ->
   int ->
   int
 
@@ -84,6 +86,7 @@ val services_in_column :
   num_columns:int ->
   sections:(string * Service_state.t list) list ->
   services:Service_state.t list ->
+  index_by_instance:int StringMap.t ->
   int ->
   int list
 
@@ -92,6 +95,7 @@ val column_for_service :
   num_columns:int ->
   sections:(string * Service_state.t list) list ->
   services:Service_state.t list ->
+  index_by_instance:int StringMap.t ->
   int ->
   int
 
@@ -99,7 +103,7 @@ val column_for_service :
 val service_line_position :
   num_columns:int ->
   sections:(string * Service_state.t list) list ->
-  services:Service_state.t list ->
+  index_by_instance:int StringMap.t ->
   folded:StringSet.t ->
   int ->
   int ->
@@ -122,6 +126,7 @@ val find_non_empty_column :
   num_columns:int ->
   sections:(string * Service_state.t list) list ->
   services:Service_state.t list ->
+  index_by_instance:int StringMap.t ->
   int option
 
 (** Ensure active column points to a non-empty column *)

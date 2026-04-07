@@ -8,6 +8,7 @@
 open Octez_manager_lib
 module Service_state = Data.Service_state
 open Instances_state
+module StringMap = Instances_state.StringMap
 
 (** Layout configuration constants *)
 let min_column_width = 50
@@ -162,24 +163,15 @@ type column_item =
   | Header of string
   | Instance of int * Service_state.t (* global index, service *)
 
-let column_items ~column_groups ~global_services =
+let column_items ~column_groups ~index_by_instance =
   List.concat_map
     (fun (role, instances) ->
       let header = Header (role_header role) in
       let items =
         List.map
           (fun (st : Service_state.t) ->
-            (* Find global index *)
             let idx =
-              List.find_mapi
-                (fun i (s : Service_state.t) ->
-                  if
-                    String.equal
-                      s.service.Service.instance
-                      st.service.Service.instance
-                  then Some i
-                  else None)
-                global_services
+              StringMap.find_opt st.service.Service.instance index_by_instance
               |> Option.value ~default:0
             in
             Instance (idx, st))
@@ -189,51 +181,51 @@ let column_items ~column_groups ~global_services =
     column_groups
 
 (** Get list of global service indices in a column *)
-let column_service_indices ~column_groups ~global_services =
-  column_items ~column_groups ~global_services
+let column_service_indices ~column_groups ~index_by_instance =
+  column_items ~column_groups ~index_by_instance
   |> List.filter_map (function
     | Header _ -> None
     | Instance (idx, _) -> Some idx)
 
 (** Compute layout sections based on view_mode *)
-let sections_of_state (state : state) =
-  match state.view_mode with
-  | By_role -> group_by_role state.services
-  | By_group -> group_by_group ~groups:state.groups state.services
+let sections_of_state (state : state) = state.display_sections
 
 (** Get first service index in a column *)
-let first_service_in_column ~num_columns ~sections ~services col =
+let first_service_in_column ~num_columns ~sections ~services:_
+    ~index_by_instance col =
   if num_columns <= 1 then 0
   else
     let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then 0
     else
       let indices =
-        column_service_indices
-          ~column_groups:columns.(col)
-          ~global_services:services
+        column_service_indices ~column_groups:columns.(col) ~index_by_instance
       in
       match indices with [] -> 0 | first :: _ -> first
 
 (** Get all service indices in a column *)
-let services_in_column ~num_columns ~sections ~services col =
+let services_in_column ~num_columns ~sections ~services ~index_by_instance col =
   if num_columns <= 1 then List.mapi (fun i _ -> i) services
   else
     let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then []
-    else
-      column_service_indices
-        ~column_groups:columns.(col)
-        ~global_services:services
+    else column_service_indices ~column_groups:columns.(col) ~index_by_instance
 
 (** Find which column contains a given service index *)
-let column_for_service ~num_columns ~sections ~services idx =
+let column_for_service ~num_columns ~sections ~services ~index_by_instance idx =
   if num_columns <= 1 then 0
   else
     let rec find_col col =
       if col >= num_columns then 0
       else
-        let indices = services_in_column ~num_columns ~sections ~services col in
+        let indices =
+          services_in_column
+            ~num_columns
+            ~sections
+            ~services
+            ~index_by_instance
+            col
+        in
         if List.mem idx indices then col else find_col (col + 1)
     in
     find_col 0
@@ -241,14 +233,15 @@ let column_for_service ~num_columns ~sections ~services idx =
 (** Calculate line position of a service within its column.
     Returns (start_line, line_count) where start_line is 0-indexed
     from the top of the column content (after headers). *)
-let service_line_position ~num_columns ~sections ~services ~folded svc_idx col =
+let service_line_position ~num_columns ~sections ~index_by_instance ~folded
+    svc_idx col =
   if num_columns <= 1 then (0, 1)
   else
     let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then (0, 1)
     else
       let column_groups = columns.(col) in
-      let items = column_items ~column_groups ~global_services:services in
+      let items = column_items ~column_groups ~index_by_instance in
       let rec count_lines line_acc is_first = function
         | [] -> (line_acc, 1)
         | Header _ :: rest ->
@@ -281,11 +274,18 @@ let adjust_column_scroll ~column_scroll ~col ~line_start ~line_count
 let last_visible_height_ref = ref 20
 
 (** Find first non-empty column, or None if all empty *)
-let find_non_empty_column ~num_columns ~sections ~services =
+let find_non_empty_column ~num_columns ~sections ~services ~index_by_instance =
   let rec find col =
     if col >= num_columns then None
     else
-      let indices = services_in_column ~num_columns ~sections ~services col in
+      let indices =
+        services_in_column
+          ~num_columns
+          ~sections
+          ~services
+          ~index_by_instance
+          col
+      in
       if indices <> [] then Some col else find (col + 1)
   in
   find 0
@@ -307,6 +307,7 @@ let ensure_valid_column state =
         ~num_columns:state.num_columns
         ~sections
         ~services:state.services
+        ~index_by_instance:state.ordered_service_indices
         state.active_column
     in
     if current_indices <> [] then state
@@ -317,6 +318,7 @@ let ensure_valid_column state =
           ~num_columns:state.num_columns
           ~sections
           ~services:state.services
+          ~index_by_instance:state.ordered_service_indices
       with
       | None ->
           (* All columns empty (shouldn't happen if services <> []) *)
@@ -327,6 +329,7 @@ let ensure_valid_column state =
               ~num_columns:state.num_columns
               ~sections
               ~services:state.services
+              ~index_by_instance:state.ordered_service_indices
               new_col
           in
           {

@@ -11,6 +11,8 @@ module Service_state = Data.Service_state
 
 module StringSet : Set.S with type elt = string
 
+module StringMap : Map.S with type key = string
+
 (** View mode for instances page layout *)
 type view_mode =
   | By_role  (** Group services by role (node, baker, etc.) *)
@@ -48,6 +50,9 @@ type state = {
   column_scroll : int array;
   view_mode : view_mode;
   groups : Octez_manager_lib.Group.t list;
+  display_sections : (string * Service_state.t list) list;
+  ordered_services : Service_state.t list;
+  ordered_service_indices : int StringMap.t;
   create_menu_open : bool;
   create_menu_cursor : int;
 }
@@ -58,6 +63,10 @@ type pstate = state Miaou.Core.Navigation.t
 
 (** Load groups from registry, returning empty list on error. *)
 val load_groups : unit -> Octez_manager_lib.Group.t list
+
+(** Recompute the cached display layout derived from [services], [groups], and
+    [view_mode]. *)
+val rebuild_display_cache : state -> state
 
 (** Clamp selection index to valid range *)
 val clamp_selection :
