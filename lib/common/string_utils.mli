@@ -35,6 +35,11 @@ val open_in_editor : string -> (unit, [> `Msg of string]) result
 (** Check whether [needle] is a substring of [haystack]. *)
 val string_contains : needle:string -> string -> bool
 
+(** Strip non-printable and non-ASCII bytes, keeping only printable ASCII
+    (0x20-0x7E). Useful for sanitising clipboard input from web UIs that
+    inject U+00A0, U+200B, U+FEFF and similar. *)
+val strip_non_ascii : string -> string
+
 (** {1 Timestamp Utilities} *)
 
 (** Format the current local time as ["YYYY-MM-DD HH:MM:SS"]. *)
