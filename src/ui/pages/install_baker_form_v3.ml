@@ -744,7 +744,7 @@ let spec =
         (* 6b. Extra nodes for redundancy *)
         @ [
             string_list
-              ~label:"Extra Nodes"
+              ~label:"Extra Nodes [experimental]"
               ~get:(fun m -> m.extra_nodes)
               ~set:(fun extra_nodes m -> {m with extra_nodes})
               ~get_suggestions:(fun model ->
