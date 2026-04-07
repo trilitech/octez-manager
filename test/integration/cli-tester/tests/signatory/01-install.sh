@@ -66,17 +66,19 @@ fi
 echo "HTTP address configured correctly"
 
 # Verify registry entry
-if ! om list 2>&1 | grep -q "$TEST_INSTANCE"; then
+om list 2>&1 | tee /tmp/signatory-install-list.txt
+
+if ! grep -q "$TEST_INSTANCE" /tmp/signatory-install-list.txt; then
 	echo "ERROR: Instance not in registry"
-	om list 2>&1 || true
+	cat /tmp/signatory-install-list.txt
 	exit 1
 fi
 echo "Instance registered successfully"
 
 # Verify instance shows as signatory role
-if ! om list 2>&1 | grep "$TEST_INSTANCE" | grep -q "signatory"; then
+if ! grep "$TEST_INSTANCE" /tmp/signatory-install-list.txt | grep -q "signatory"; then
 	echo "ERROR: Instance not registered as signatory"
-	om list 2>&1 || true
+	cat /tmp/signatory-install-list.txt
 	exit 1
 fi
 echo "Instance role verified"
