@@ -25,6 +25,8 @@ let tab_topology = Topology_page.name
 
 let tab_sandbox = Sandbox_page.name
 
+let tab_experimental = Experimental_page.name
+
 type state = {
   tabs : Responsive_tabs_widget.t;
   instances_ps : Instances.Page.pstate;
@@ -34,6 +36,7 @@ type state = {
   diagnostics_ps : Diagnostics.Page.pstate;
   topology_ps : Topology_page.Page.pstate;
   sandbox_ps : Sandbox_page.Page.pstate;
+  experimental_ps : Experimental_page.Page.pstate;
 }
 
 type msg = unit
@@ -52,14 +55,14 @@ let initial_tabs =
         ~labels:["3 Binaries"; "3 Bins"];
       Responsive_tabs_widget.tab ~id:tab_rpcs ~labels:["4 RPCs"];
       Responsive_tabs_widget.tab
-        ~id:tab_sandbox
-        ~labels:["5 Sandboxes"; "5 Sand"];
-      Responsive_tabs_widget.tab
         ~id:tab_diagnostics
-        ~labels:["6 Diagnostics"; "6 Diag"];
+        ~labels:["5 Diagnostics"; "5 Diag"];
       Responsive_tabs_widget.tab
         ~id:tab_topology
-        ~labels:["7 Topology"; "7 Topo"];
+        ~labels:["6 Topology"; "6 Topo"];
+      Responsive_tabs_widget.tab
+        ~id:tab_experimental
+        ~labels:["7 Experimental"; "7 Exp"];
     ]
 
 let init () =
@@ -73,6 +76,7 @@ let init () =
       diagnostics_ps = Diagnostics.Page.init ();
       topology_ps = Topology_page.Page.init ();
       sandbox_ps = Sandbox_page.Page.init ();
+      experimental_ps = Experimental_page.Page.init ();
     }
 
 let update ps _ = ps
@@ -85,6 +89,7 @@ let tab_id_of_context_tab = function
   | Context.Tab_diagnostics -> tab_diagnostics
   | Context.Tab_topology -> tab_topology
   | Context.Tab_sandboxes -> tab_sandbox
+  | Context.Tab_experimental -> tab_experimental
 
 let is_tab_target t =
   String.equal t tab_instances
@@ -94,6 +99,7 @@ let is_tab_target t =
   || String.equal t tab_diagnostics
   || String.equal t tab_topology
   || String.equal t tab_sandbox
+  || String.equal t tab_experimental
 
 (** Route navigation from a sub-page: tab targets become tab switches;
     other targets propagate as [Navigation.goto] on the shell. *)
@@ -145,6 +151,8 @@ let view ps ~focus ~size =
         Topology_page.Page.view s.topology_ps ~focus ~size:content_size
     | id when String.equal id tab_sandbox ->
         Sandbox_page.Page.view s.sandbox_ps ~focus ~size:content_size
+    | id when String.equal id tab_experimental ->
+        Experimental_page.Page.view s.experimental_ps ~focus ~size:content_size
     | _ -> Themed_page.apply_themed_background ~size:content_size ""
   in
   tab_bar_themed ^ "\n" ^ content
@@ -192,6 +200,10 @@ let refresh ps =
     let sp' = Sandbox_page.Page.refresh s.sandbox_ps in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
+  else if String.equal tab tab_experimental then
+    let ep' = Experimental_page.Page.refresh s.experimental_ps in
+    let shell_s = {s with experimental_ps = Navigation.make ep'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending ep')
   else ps
 
 let dispatch_key ps key ~size =
@@ -225,6 +237,10 @@ let dispatch_key ps key ~size =
     let sp' = Sandbox_page.Page.handle_key s.sandbox_ps key ~size in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
+  else if String.equal tab tab_experimental then
+    let ep' = Experimental_page.Page.handle_key s.experimental_ps key ~size in
+    let shell_s = {s with experimental_ps = Navigation.make ep'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending ep')
   else ps
 
 let dispatch_modal_key ps key ~size =
@@ -258,6 +274,12 @@ let dispatch_modal_key ps key ~size =
     let sp' = Sandbox_page.Page.handle_modal_key s.sandbox_ps key ~size in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
+  else if String.equal tab tab_experimental then
+    let ep' =
+      Experimental_page.Page.handle_modal_key s.experimental_ps key ~size
+    in
+    let shell_s = {s with experimental_ps = Navigation.make ep'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending ep')
   else (
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
@@ -292,9 +314,9 @@ let handle_key ps key ~size =
         | "2" -> switch_tab ps tab_wallets
         | "3" -> switch_tab ps tab_binaries
         | "4" -> switch_tab ps tab_rpcs
-        | "5" -> switch_tab ps tab_sandbox
-        | "6" -> switch_tab ps tab_diagnostics
-        | "7" -> switch_tab ps tab_topology
+        | "5" -> switch_tab ps tab_diagnostics
+        | "6" -> switch_tab ps tab_topology
+        | "7" -> switch_tab ps tab_experimental
         | _ -> dispatch_key ps key ~size)
 
 let handle_modal_key ps key ~size = dispatch_modal_key ps key ~size
