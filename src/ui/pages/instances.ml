@@ -261,11 +261,8 @@ let move_selection_managed s delta =
     s.column_scroll.(s.active_column) <- 0 ;
     {s with selected = menu_item_count})
   else if new_pos >= List.length col_indices then
-    (* Transition to external services if available, otherwise stay *)
-    if List.length s.external_services > 0 then
-      let first_external = services_start_idx + List.length display_items in
-      {s with selected = first_external}
-    else s
+    (* Stay at bottom of column - don't auto-transition to external *)
+    s
   else
     let new_idx = List.nth col_indices new_pos in
     let line_start, line_count =
