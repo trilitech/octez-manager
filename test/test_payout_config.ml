@@ -13,7 +13,7 @@ let valid_addr = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 let valid_kt = "KT1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
-let default () = Payout_config.default ~baker_pkh ()
+let default () = Payout_config.default ~baker_pkh
 
 (* {1 Default values} *)
 
@@ -181,36 +181,6 @@ let test_fee_recipients_sum () =
     true
     (Result.is_error (Payout_config.validate c))
 
-(* {1 effective_tzkt_url} *)
-
-let test_effective_tzkt_url_mainnet_on_testnet () =
-  (* Config saved with mainnet default but baker is on tallinnnet *)
-  let c = {(default ()) with tzkt_url = "https://api.tzkt.io"} in
-  let url =
-    Payout_config.effective_tzkt_url
-      ~network:"https://teztnets.com/tallinnnet"
-      c
-  in
-  Alcotest.(check string)
-    "overrides to tallinnnet"
-    "https://api.tallinnnet.tzkt.io"
-    url
-
-let test_effective_tzkt_url_mainnet_on_mainnet () =
-  let c = {(default ()) with tzkt_url = "https://api.tzkt.io"} in
-  let url = Payout_config.effective_tzkt_url ~network:"mainnet" c in
-  Alcotest.(check string) "keeps mainnet" "https://api.tzkt.io" url
-
-let test_effective_tzkt_url_custom () =
-  (* User explicitly configured a custom TzKT instance *)
-  let c = {(default ()) with tzkt_url = "http://my-local-tzkt:5000"} in
-  let url =
-    Payout_config.effective_tzkt_url
-      ~network:"https://teztnets.com/tallinnnet"
-      c
-  in
-  Alcotest.(check string) "preserves custom" "http://my-local-tzkt:5000" url
-
 (* {1 JSON round-trip} *)
 
 let test_json_roundtrip () =
@@ -303,21 +273,6 @@ let () =
             `Quick
             test_bond_recipients_sum;
           Alcotest.test_case "fee recipients sum" `Quick test_fee_recipients_sum;
-        ] );
-      ( "effective_tzkt_url",
-        [
-          Alcotest.test_case
-            "mainnet default on testnet"
-            `Quick
-            test_effective_tzkt_url_mainnet_on_testnet;
-          Alcotest.test_case
-            "mainnet default on mainnet"
-            `Quick
-            test_effective_tzkt_url_mainnet_on_mainnet;
-          Alcotest.test_case
-            "custom url preserved"
-            `Quick
-            test_effective_tzkt_url_custom;
         ] );
       ( "json",
         [

@@ -9,15 +9,21 @@
 
 (* ── Template rendering ──────────────────────────────────── *)
 
+let format_tez mutez =
+  let s = Printf.sprintf "%Ld" mutez in
+  let len = String.length s in
+  if len <= 6 then "0." ^ String.make (6 - len) '0' ^ s
+  else String.sub s 0 (len - 6) ^ "." ^ String.sub s (len - 6) 6
+
 let render_template ~template ~(summary : Rewards.cycle_summary) =
   let replacements =
     [
       ("<Cycle>", string_of_int summary.cycle);
       ("<Delegators>", string_of_int summary.paid_delegators);
-      ("<TotalPaid>", Rewards.tez_of_mutez summary.distributed_rewards);
-      ("<DistributedRewards>", Rewards.tez_of_mutez summary.distributed_rewards);
-      ("<BakerFee>", Rewards.tez_of_mutez summary.fee_income);
-      ("<TxFees>", Rewards.tez_of_mutez summary.tx_fees_paid);
+      ("<TotalPaid>", format_tez summary.distributed_rewards);
+      ("<DistributedRewards>", format_tez summary.distributed_rewards);
+      ("<BakerFee>", format_tez summary.fee_income);
+      ("<TxFees>", format_tez summary.tx_fees_paid);
       ("<Timestamp>", summary.timestamp);
     ]
   in
