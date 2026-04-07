@@ -144,18 +144,17 @@ let fetch_delegates ~endpoint ~max_delegates =
         delegate_addrs ;
       (* All wallet entries indexed sequentially *)
       let all_entries =
-        List.mapi
-          (fun i (addr, curve) ->
+        List.mapi (fun i (addr, curve) ->
             Yes_wallet.
               {alias = Printf.sprintf "delegate-%d" i; address = addr; curve})
-          all_addrs
       in
-      let baker_delegates =
+      let all_entries_list = all_entries all_addrs in
+      let baker_delegates_list =
         List.filter
           (fun (d : Yes_wallet.delegate) -> Hashtbl.mem baker_set d.address)
-          all_entries
+          all_entries_list
       in
-      Ok (baker_delegates, all_entries)
+      Ok (baker_delegates_list, all_entries_list)
   | _ -> Error (`Msg "Expected JSON array from delegates RPC endpoint")
 
 let write_wallet ~wallet_dir delegates =
