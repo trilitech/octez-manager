@@ -25,6 +25,8 @@ let tab_topology = Topology_page.name
 
 let tab_sandbox = Sandbox_page.name
 
+let tab_rewards = Rewards_page.name
+
 let tab_experimental = "experimental"
 
 type state = {
@@ -36,6 +38,7 @@ type state = {
   diagnostics_ps : Diagnostics.Page.pstate;
   topology_ps : Topology_page.Page.pstate;
   sandbox_ps : Sandbox_page.Page.pstate;
+  rewards_ps : Rewards_page.Page.pstate;
   (* Track if we're on a hidden page (not in tab bar) *)
   on_hidden_page : string option;
 }
@@ -64,7 +67,7 @@ let initial_tabs =
       Responsive_tabs_widget.tab
         ~id:tab_experimental
         ~labels:["7 Experimental"; "7 Exp"];
-      (* Sandbox tab is hidden - only accessible via Experimental modal *)
+      (* Sandbox and Rewards tabs are hidden - only accessible via Experimental modal *)
     ]
 
 let init () =
@@ -78,6 +81,7 @@ let init () =
       diagnostics_ps = Diagnostics.Page.init ();
       topology_ps = Topology_page.Page.init ();
       sandbox_ps = Sandbox_page.Page.init ();
+      rewards_ps = Rewards_page.Page.init ();
       on_hidden_page = None;
     }
 
@@ -99,23 +103,18 @@ let is_tab_target t =
   || String.equal t tab_rpcs
   || String.equal t tab_diagnostics
   || String.equal t tab_topology
-  || String.equal t tab_sandbox
   || String.equal t tab_experimental
 
 (** Route navigation from a sub-page: tab targets become tab switches;
+    hidden pages (sandbox, rewards) set on_hidden_page;
     other targets propagate as [Navigation.goto] on the shell. *)
 let route_nav ~shell_ps ~shell_s target =
   let ps = {shell_ps with Navigation.s = shell_s} in
   if is_tab_target target then
-    (* Check if navigating to a hidden page *)
-    if String.equal target tab_sandbox then
-      {ps with Navigation.s = {shell_s with on_hidden_page = Some target}}
-    else
-      let tabs' = Responsive_tabs_widget.select shell_s.tabs ~id:target in
-      {
-        ps with
-        Navigation.s = {shell_s with tabs = tabs'; on_hidden_page = None};
-      }
+    let tabs' = Responsive_tabs_widget.select shell_s.tabs ~id:target in
+    {ps with Navigation.s = {shell_s with tabs = tabs'; on_hidden_page = None}}
+  else if String.equal target tab_sandbox || String.equal target tab_rewards
+  then {ps with Navigation.s = {shell_s with on_hidden_page = Some target}}
   else Navigation.goto target ps
 
 (** After calling a sub-page function, store the updated sub-pstate (with nav
@@ -162,6 +161,8 @@ let view ps ~focus ~size =
         Topology_page.Page.view s.topology_ps ~focus ~size:content_size
     | id when String.equal id tab_sandbox ->
         Sandbox_page.Page.view s.sandbox_ps ~focus ~size:content_size
+    | id when String.equal id tab_rewards ->
+        Rewards_page.Page.view s.rewards_ps ~focus ~size:content_size
     | id when String.equal id tab_experimental ->
         (* Experimental tab has no content - modal opens on selection *)
         Themed_page.apply_themed_background ~size:content_size ""
@@ -177,7 +178,7 @@ let refresh ps =
     | None -> s
     | Some ctx_tab ->
         let id = tab_id_of_context_tab ctx_tab in
-        (* Check if this is a hidden page (not in tab bar) *)
+        (* Sandbox is a hidden page, not in the tab bar *)
         if String.equal id tab_sandbox then {s with on_hidden_page = Some id}
         else
           {
@@ -219,6 +220,10 @@ let refresh ps =
     let sp' = Sandbox_page.Page.refresh s.sandbox_ps in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
+  else if String.equal tab tab_rewards then
+    let rp' = Rewards_page.Page.refresh s.rewards_ps in
+    let shell_s = {s with rewards_ps = Navigation.make rp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
   else if String.equal tab tab_experimental then
     (* Experimental tab has no page state, but needs to handle navigation *)
     match Context.consume_navigation () with
@@ -259,6 +264,10 @@ let dispatch_key ps key ~size =
     let sp' = Sandbox_page.Page.handle_key s.sandbox_ps key ~size in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
+  else if String.equal tab tab_rewards then
+    let rp' = Rewards_page.Page.handle_key s.rewards_ps key ~size in
+    let shell_s = {s with rewards_ps = Navigation.make rp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
   else ps
 
 let dispatch_modal_key ps key ~size =
@@ -292,6 +301,10 @@ let dispatch_modal_key ps key ~size =
     let sp' = Sandbox_page.Page.handle_modal_key s.sandbox_ps key ~size in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
+  else if String.equal tab tab_rewards then
+    let rp' = Rewards_page.Page.handle_modal_key s.rewards_ps key ~size in
+    let shell_s = {s with rewards_ps = Navigation.make rp'.Navigation.s} in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
   else (
     (* Experimental tab and fallback: use global modal handler *)
     Miaou.Core.Modal_manager.handle_key key ;
@@ -339,12 +352,13 @@ let handle_key ps key ~size =
             let ps' = switch_tab ps tab_experimental in
             Modal_helpers.open_choice_modal
               ~title:"Experimental Features"
-              ~items:["sandbox"]
+              ~items:["sandbox"; "rewards"]
               ~to_string:(fun s ->
                 Printf.sprintf "%s  [BETA]" (String.capitalize_ascii s))
-              ~on_select:(fun _choice ->
-                (* Close modal and navigate to sandbox tab *)
-                Context.set_pending_tab Context.Tab_sandboxes)
+              ~on_select:(fun choice ->
+                if String.equal choice "sandbox" then
+                  Context.set_pending_tab Context.Tab_sandboxes
+                else Context.navigate Rewards_page.name)
               () ;
             ps'
         | _ -> dispatch_key ps key ~size)

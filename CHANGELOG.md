@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Extract `register_and_init` and `shutdown` helpers in `manager_app.ml`
 - Simplify TzKT routing: rewards now use `tzkt_url` directly from config instead of the Indexer hub abstraction
 - Remove development-only debug scaffolding from `cmd_rewards` (-640 lines)
+- Move Rewards page to Experimental tab (accessible via 7 → Rewards [BETA])
+- Restore test_rewards_pure and test_payout_continual test stanzas
 - **Experimental features tab**: Sandbox and other beta features are now nested under a new "Experimental" tab (press `7`) instead of having direct main-tab placement. The Experimental tab displays a directory of beta features with descriptions and badges. Sandbox functionality remains unchanged, just accessed via Experimental → Sandbox.
 
 ### Fixed

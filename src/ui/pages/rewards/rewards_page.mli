@@ -13,3 +13,6 @@
 val name : string
 
 val register : unit -> unit
+
+(** PAGE_SIG module for use with the headless driver and main_shell. *)
+module Page : Miaou.Core.Tui_page.PAGE_SIG

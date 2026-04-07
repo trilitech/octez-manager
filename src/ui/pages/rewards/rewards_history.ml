@@ -29,7 +29,16 @@ let render_sparklines ~box_width (cycles : Rewards.cycle_rewards list) ~instance
   let earned_data =
     List.map
       (fun (cr : Rewards.cycle_rewards) ->
-        Int64.to_float (Rewards.total_earned cr))
+        Int64.to_float
+          (List.fold_left
+             Int64.add
+             0L
+             [
+               cr.block_rewards;
+               cr.attestation_rewards;
+               cr.other_rewards;
+               cr.block_fees;
+             ]))
       sorted
   in
   let delegator_data =
