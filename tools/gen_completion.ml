@@ -15,6 +15,18 @@ let escape_zsh_single s =
   let parts = String.split_on_char '\'' s in
   String.concat "'\\''" parts
 
+(** Escape a string for use inside a zsh [DESCRIPTION] bracket.
+    Zsh [_arguments] uses [':'] as a structural delimiter, so any literal
+    colon in the description text must be escaped as ['\\:']. *)
+let escape_zsh_description s =
+  let s = escape_zsh_single s in
+  let buf = Buffer.create (String.length s) in
+  String.iter
+    (fun c ->
+      if c = ':' then Buffer.add_string buf "\\:" else Buffer.add_char buf c)
+    s ;
+  Buffer.contents buf
+
 let write_file path contents =
   try
     let oc = open_out_bin path in
@@ -69,6 +81,10 @@ let load_instance_actions binary =
       in
       Ok (extract_actions output)
 
+let load_subcommands binary cmd =
+  let* help = run_help binary [cmd; "--help=plain"] in
+  Ok (HP.parse_cmdliner_commands help)
+
 let dedupe_options entries =
   let seen = Hashtbl.create 32 in
   let add acc entry =
@@ -82,7 +98,8 @@ let dedupe_options entries =
 
 let zsh_option_specs (entry : HP.option_entry) =
   let doc =
-    if entry.HP.doc = "" then "" else "[" ^ escape_zsh_single entry.HP.doc ^ "]"
+    if entry.HP.doc = "" then ""
+    else "[" ^ escape_zsh_description entry.HP.doc ^ "]"
   in
   match entry.HP.arg with
   | None -> List.map (fun name -> "'" ^ name ^ doc ^ "'") entry.HP.names
@@ -147,7 +164,7 @@ let render_zsh_options name (options : HP.option_entry list) =
   Buffer.add_string buf "  )\n\n" ;
   Buffer.contents buf
 
-let render_zsh ~commands ~instance_actions ~options_map =
+let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
   let sanitize_var s =
     let buf = Bytes.of_string s in
     for i = 0 to Bytes.length buf - 1 do
@@ -243,9 +260,39 @@ let render_zsh ~commands ~instance_actions ~options_map =
   String_map.iter
     (fun cmd _ ->
       if cmd <> "instance" then (
+        let subcmds =
+          match String_map.find_opt cmd subcommands_map with
+          | Some subs when subs <> [] -> subs
+          | _ -> []
+        in
         Buffer.add_string buf ("        " ^ cmd ^ ")\n") ;
-        Buffer.add_string buf "          _arguments \\\n" ;
-        Buffer.add_string buf ("            $" ^ opts_var cmd ^ "\n") ;
+        (if subcmds <> [] then (
+           let subcmd_var = "subcmds_" ^ sanitize_var cmd in
+           Buffer.add_string buf ("          local -a " ^ subcmd_var ^ "\n") ;
+           Buffer.add_string buf ("          " ^ subcmd_var ^ "=(\n") ;
+           List.iter
+             (fun (sub : HP.command_entry) ->
+               let entry =
+                 if sub.HP.doc = "" then
+                   "'" ^ escape_zsh_single sub.HP.name ^ "'"
+                 else
+                   "'" ^ escape_zsh_single sub.HP.name ^ ":"
+                   ^ escape_zsh_description sub.HP.doc ^ "'"
+               in
+               Buffer.add_string buf ("            " ^ entry ^ "\n"))
+             subcmds ;
+           Buffer.add_string buf "          )\n" ;
+           Buffer.add_string buf "          if [[ $cur == -* ]]; then\n" ;
+           Buffer.add_string buf "            _arguments \\\n" ;
+           Buffer.add_string buf ("              $" ^ opts_var cmd ^ "\n") ;
+           Buffer.add_string buf "          else\n" ;
+           Buffer.add_string buf
+             ("            _describe -t subcommands '" ^ cmd
+            ^ " subcommands' " ^ subcmd_var ^ "\n") ;
+           Buffer.add_string buf "          fi\n")
+         else (
+           Buffer.add_string buf "          _arguments \\\n" ;
+           Buffer.add_string buf ("            $" ^ opts_var cmd ^ "\n"))) ;
         Buffer.add_string buf "          ;;\n"))
     options_map ;
   Buffer.add_string buf "      esac\n" ;
@@ -257,7 +304,7 @@ let render_zsh ~commands ~instance_actions ~options_map =
   Buffer.add_string buf "fi\n" ;
   Buffer.contents buf
 
-let render_bash ~commands ~instance_actions ~options_map ~kinds =
+let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds =
   let unique_list items =
     let seen = Hashtbl.create 32 in
     let add acc item =
@@ -426,6 +473,12 @@ let render_bash ~commands ~instance_actions ~options_map ~kinds =
   String_map.iter
     (fun cmd opts ->
       if cmd <> "instance" then (
+        let subcmd_names =
+          match String_map.find_opt cmd subcommands_map with
+          | Some subs when subs <> [] ->
+              List.map (fun (sub : HP.command_entry) -> sub.HP.name) subs
+          | _ -> []
+        in
         Buffer.add_string buf ("    " ^ cmd ^ ")\n") ;
         Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
         Buffer.add_string
@@ -433,10 +486,16 @@ let render_bash ~commands ~instance_actions ~options_map ~kinds =
           ("        opts=\"" ^ String.concat " " opts ^ "\"\n") ;
         Buffer.add_string
           buf
-          "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n\
-          \      fi\n\
-          \      return 0\n\
-          \      ;;\n"))
+          "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n" ;
+        (if subcmd_names <> [] then
+           Buffer.add_string
+             buf
+             ("      else\n        COMPREPLY=( $(compgen -W \""
+            ^ String.concat " " subcmd_names
+            ^ "\" -- \"$cur\") )\n")) ;
+        Buffer.add_string buf "      fi\n" ;
+        Buffer.add_string buf "      return 0\n" ;
+        Buffer.add_string buf "      ;;\n"))
     options_map ;
   Buffer.add_string buf "  esac\n}\n\n" ;
   Buffer.add_string buf "complete -F _octez_manager octez-manager\n" ;
@@ -493,8 +552,18 @@ let () =
     let zsh_commands = List.map (fun c -> (c.HP.name, c.HP.doc)) cmds in
     let* action_names = load_instance_actions binary in
     let instance_actions = List.map (fun name -> (name, "")) action_names in
+    let* subcommands_map =
+      List.fold_left
+        (fun acc cmd ->
+          let* acc = acc in
+          let* subs = load_subcommands binary cmd in
+          Ok (String_map.add cmd subs acc))
+        (Ok String_map.empty)
+        cmd_names
+    in
     let zsh =
       render_zsh ~commands:zsh_commands ~instance_actions ~options_map
+        ~subcommands_map
     in
     let bash_options_map =
       String_map.map
@@ -510,6 +579,7 @@ let () =
         ~commands:cmd_names
         ~instance_actions:(List.map fst instance_actions)
         ~options_map:bash_options_map
+        ~subcommands_map
         ~kinds
     in
     let zsh_path = Filename.concat !out_dir "octez-manager.zsh" in

@@ -112,6 +112,8 @@ _octez_manager() {
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "finalize-unstake" -- "$cur") )
       fi
       return 0
       ;;
@@ -119,6 +121,8 @@ _octez_manager() {
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "download list list-remote prune register remove unregister" -- "$cur") )
       fi
       return 0
       ;;
@@ -140,6 +144,8 @@ _octez_manager() {
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "add create delete list remove restart show start stop upgrade [--octez-version=VERSION]" -- "$cur") )
       fi
       return 0
       ;;
@@ -217,6 +223,8 @@ _octez_manager() {
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "config continual generate history notify pay status" -- "$cur") )
       fi
       return 0
       ;;
@@ -224,6 +232,8 @@ _octez_manager() {
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "get instances interactive list public-nodes" -- "$cur") )
       fi
       return 0
       ;;
@@ -231,6 +241,8 @@ _octez_manager() {
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "add-account create destroy list start status stop" -- "$cur") )
       fi
       return 0
       ;;
