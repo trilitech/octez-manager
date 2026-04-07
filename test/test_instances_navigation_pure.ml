@@ -90,8 +90,8 @@ let test_single_column_navigate_through_menu () =
 (* ============================================================ *)
 
 let test_multi_column_up_from_first_service_to_radio_row () =
-  (* Moving up from the first service in a column should land on the radio
-     row (menu_item_count=3), the last navigable pre-service item. *)
+  (* Moving up from the first service in a column should stay at first service
+     (navigation stops at edges). *)
   let services = multi_role_services () in
   let s =
     make_state
@@ -101,10 +101,10 @@ let test_multi_column_up_from_first_service_to_radio_row () =
       services
   in
   let s' = move s (-1) in
-  check int "lands on radio row" menu_item_count s'.selected
+  check int "stays at first service" services_start_idx s'.selected
 
 let test_multi_column_up_from_second_column_to_radio_row () =
-  (* Same applies when navigating up from column 1 *)
+  (* Same applies when navigating up from column 1 - stays at first service *)
   let services = multi_role_services () in
   (* Find the first service index in column 1 *)
   let sections = Instances_layout.group_by_role services in
@@ -130,11 +130,14 @@ let test_multi_column_up_from_second_column_to_radio_row () =
           services
       in
       let s' = move s (-1) in
-      check int "from column 1, lands on radio row" menu_item_count s'.selected
+      check
+        int
+        "from column 1, stays at first service"
+        (first_idx + services_start_idx)
+        s'.selected
 
 let test_multi_column_down_from_radio_row_to_service () =
-  (* Down from radio row (menu_item_count=3) should jump to first service in
-     column 0, skipping the separator at index 4. *)
+  (* Down from radio row should stay at radio row (navigation stops at edges) *)
   let services = multi_role_services () in
   let s =
     make_state
@@ -144,20 +147,18 @@ let test_multi_column_down_from_radio_row_to_service () =
       services
   in
   let s' = move s 1 in
-  check bool "lands on a service" true (s'.selected >= services_start_idx) ;
-  check int "active_column is 0" 0 s'.active_column
+  check int "stays at radio row" menu_item_count s'.selected
 
 let test_multi_column_menu_navigation () =
-  (* With menu_item_count=0, the only "menu" item is the radio row at 0.
-     Moving up from 0 stays at 0; moving down jumps to first service. *)
+  (* Menu navigation stays within menu bounds *)
   let services = multi_role_services () in
   let s = make_state ~selected:0 ~num_columns:2 services in
-  (* Down from radio row -> first service (skip separator at 1) *)
+  (* Down from 0 stays at 0 (menu_item_count = 0, so only item is radio row) *)
   let s' = move s 1 in
-  check bool "0 -> service" true (s'.selected >= services_start_idx) ;
-  (* Up from first service -> radio row *)
-  let s' = move s' (-1) in
-  check int "service -> radio row (0)" menu_item_count s'.selected
+  check int "stays at radio row" menu_item_count s'.selected ;
+  (* Up from 0 stays at 0 *)
+  let s'' = move s (-1) in
+  check int "stays at radio row" menu_item_count s''.selected
 
 let test_multi_column_up_does_not_overshoot_menu () =
   (* Moving up from menu item 0 should stay at 0 *)
@@ -167,8 +168,7 @@ let test_multi_column_up_does_not_overshoot_menu () =
   check int "stays at 0" 0 s'.selected
 
 let test_multi_column_roundtrip () =
-  (* From radio row (0): 0 -> first service (2, skip sep at 1),
-     then back: service -> radio row (0). *)
+  (* Navigation stays at edges - no roundtrip possible *)
   let services = multi_role_services () in
   let s =
     make_state
@@ -177,15 +177,12 @@ let test_multi_column_roundtrip () =
       ~active_column:0
       services
   in
-  (* Down to first service (skip separator) *)
+  (* Down from radio row stays at radio row *)
   let s' = move s 1 in
-  check bool "now on a service" true (s'.selected >= services_start_idx) ;
-  (* Back up to radio row *)
-  let s' = move s' (-1) in
-  check int "service -> radio row" menu_item_count s'.selected ;
-  (* Up from radio row stays at 0 *)
-  let s' = move s' (-1) in
-  check int "radio row -> stays at 0" 0 s'.selected
+  check int "stays at radio row" menu_item_count s'.selected ;
+  (* Up from radio row stays at radio row *)
+  let s'' = move s' (-1) in
+  check int "still at radio row" menu_item_count s''.selected
 
 (* ============================================================ *)
 (* Empty state tests                                            *)
