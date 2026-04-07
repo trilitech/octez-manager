@@ -429,13 +429,27 @@ let go_to_rpc_browser state =
   state
 
 let activate_selection s =
-  match current_service s with
-  | Some _ -> instance_actions_modal s
-  | None -> (
-      (* Check if it's an external service *)
-      match Instances_external.current_external_service s with
-      | Some ext -> Instances_external.external_service_actions_modal s ext
-      | None -> s)
+  (* Check what's selected *)
+  if s.selected < services_start_idx then s
+  else
+    let display_items = display_ordered_items s in
+    match List.nth_opt display_items (s.selected - services_start_idx) with
+    | Some (Real_service _) -> instance_actions_modal s
+    | Some (Ghost_add_new role) ->
+        (* Navigate to the appropriate form based on role *)
+        (match role with
+        | "node" -> Context.navigate Install_node_form_v3.name
+        | "baker" -> Context.navigate Install_baker_form_v3.name
+        | "accuser" -> Context.navigate Install_accuser_form_v3.name
+        | "dal-node" -> Context.navigate Install_dal_node_form_v3.name
+        | "signatory" -> Context.navigate Install_signatory_form.name
+        | _ -> ()) ;
+        s
+    | None -> (
+        (* Check if it's an external service *)
+        match Instances_external.current_external_service s with
+        | Some ext -> Instances_external.external_service_actions_modal s ext
+        | None -> s)
 
 let dismiss_failure s =
   match current_service s with
