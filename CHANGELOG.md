@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Global shortcuts (?, C-t, K) not accessible from RPC browser and log viewer**: Pressing `?` (help), `C-t` (theme picker), or `K` (key bindings) had no effect when navigating directly to the RPC browser or log viewer pages. These pages now correctly dispatch global shortcuts.
+
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
 
 ### Added
