@@ -10,8 +10,11 @@ update-miaou:
 	opam reinstall miaou-core miaou-driver-term miaou-runner miaou-tui miaou-driver-matrix
 
 deps:
-	opam update -y
-	opam install --deps-only --with-test --reuse-build -y .
+	@opam switch list -s | grep -q "^$(CURDIR)$$" || opam switch create . 5.3.0 --no-install --yes
+	@opam pin add "https://github.com/atacama-dev/ppx_forbid.git" --yes
+	# @opam pin add "https://github.com/trilitech/miaou.git" --yes
+	@opam install . --deps-only --with-test --yes
+	@opam install sqlite3 dune-build-info --yes
 
 MIAOU_GIT_URL ?= https://github.com/trilitech/miaou.git
 PPX_FORBID_GIT_URL ?= https://github.com/atacama-dev/ppx_forbid.git
