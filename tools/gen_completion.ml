@@ -266,33 +266,37 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
           | _ -> []
         in
         Buffer.add_string buf ("        " ^ cmd ^ ")\n") ;
-        (if subcmds <> [] then (
-           let subcmd_var = "subcmds_" ^ sanitize_var cmd in
-           Buffer.add_string buf ("          local -a " ^ subcmd_var ^ "\n") ;
-           Buffer.add_string buf ("          " ^ subcmd_var ^ "=(\n") ;
-           List.iter
-             (fun (sub : HP.command_entry) ->
-               let entry =
-                 if sub.HP.doc = "" then
-                   "'" ^ escape_zsh_single sub.HP.name ^ "'"
-                 else
-                   "'" ^ escape_zsh_single sub.HP.name ^ ":"
-                   ^ escape_zsh_description sub.HP.doc ^ "'"
-               in
-               Buffer.add_string buf ("            " ^ entry ^ "\n"))
-             subcmds ;
-           Buffer.add_string buf "          )\n" ;
-           Buffer.add_string buf "          if [[ $cur == -* ]]; then\n" ;
-           Buffer.add_string buf "            _arguments \\\n" ;
-           Buffer.add_string buf ("              $" ^ opts_var cmd ^ "\n") ;
-           Buffer.add_string buf "          else\n" ;
-           Buffer.add_string buf
-             ("            _describe -t subcommands '" ^ cmd
-            ^ " subcommands' " ^ subcmd_var ^ "\n") ;
-           Buffer.add_string buf "          fi\n")
-         else (
-           Buffer.add_string buf "          _arguments \\\n" ;
-           Buffer.add_string buf ("            $" ^ opts_var cmd ^ "\n"))) ;
+        if subcmds <> [] then (
+          let subcmd_var = "subcmds_" ^ sanitize_var cmd in
+          Buffer.add_string buf ("          local -a " ^ subcmd_var ^ "\n") ;
+          Buffer.add_string buf ("          " ^ subcmd_var ^ "=(\n") ;
+          List.iter
+            (fun (sub : HP.command_entry) ->
+              let entry =
+                if sub.HP.doc = "" then
+                  "'" ^ escape_zsh_single sub.HP.name ^ "'"
+                else
+                  "'"
+                  ^ escape_zsh_single sub.HP.name
+                  ^ ":"
+                  ^ escape_zsh_description sub.HP.doc
+                  ^ "'"
+              in
+              Buffer.add_string buf ("            " ^ entry ^ "\n"))
+            subcmds ;
+          Buffer.add_string buf "          )\n" ;
+          Buffer.add_string buf "          if [[ $cur == -* ]]; then\n" ;
+          Buffer.add_string buf "            _arguments \\\n" ;
+          Buffer.add_string buf ("              $" ^ opts_var cmd ^ "\n") ;
+          Buffer.add_string buf "          else\n" ;
+          Buffer.add_string
+            buf
+            ("            _describe -t subcommands '" ^ cmd ^ " subcommands' "
+           ^ subcmd_var ^ "\n") ;
+          Buffer.add_string buf "          fi\n")
+        else (
+          Buffer.add_string buf "          _arguments \\\n" ;
+          Buffer.add_string buf ("            $" ^ opts_var cmd ^ "\n")) ;
         Buffer.add_string buf "          ;;\n"))
     options_map ;
   Buffer.add_string buf "      esac\n" ;
@@ -304,7 +308,8 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
   Buffer.add_string buf "fi\n" ;
   Buffer.contents buf
 
-let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds =
+let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds
+    =
   let unique_list items =
     let seen = Hashtbl.create 32 in
     let add acc item =
@@ -487,12 +492,12 @@ let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds
         Buffer.add_string
           buf
           "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n" ;
-        (if subcmd_names <> [] then
-           Buffer.add_string
-             buf
-             ("      else\n        COMPREPLY=( $(compgen -W \""
+        if subcmd_names <> [] then
+          Buffer.add_string
+            buf
+            ("      else\n        COMPREPLY=( $(compgen -W \""
             ^ String.concat " " subcmd_names
-            ^ "\" -- \"$cur\") )\n")) ;
+            ^ "\" -- \"$cur\") )\n") ;
         Buffer.add_string buf "      fi\n" ;
         Buffer.add_string buf "      return 0\n" ;
         Buffer.add_string buf "      ;;\n"))
@@ -562,7 +567,10 @@ let () =
         cmd_names
     in
     let zsh =
-      render_zsh ~commands:zsh_commands ~instance_actions ~options_map
+      render_zsh
+        ~commands:zsh_commands
+        ~instance_actions
+        ~options_map
         ~subcommands_map
     in
     let bash_options_map =

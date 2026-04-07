@@ -205,7 +205,8 @@ let instance_term =
         | _ ->
             Cli_helpers.cmdliner_error
               "ACTION required \
-               (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit|set-env|get-env)")
+               (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit|set-env|get-env)"
+        )
     | Some inst, Some action -> (
         match action with
         | Start ->
