@@ -460,6 +460,27 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     in
     String.concat "\n" ([first_line; second_line] @ extra_lines))
 
+(** Render a ghost "Add new" entry *)
+let line_for_ghost_add_new idx selected role =
+  let marker =
+    if idx + services_start_idx = selected then Widgets.themed_emphasis "➤"
+    else " "
+  in
+  let role_name =
+    match role with
+    | "node" -> "Node"
+    | "baker" -> "Baker"
+    | "accuser" -> "Accuser"
+    | "dal-node" -> "DAL Node"
+    | "signatory" -> "Signatory"
+    | r -> String.capitalize_ascii r
+  in
+  Printf.sprintf
+    "%s %s %s"
+    marker
+    (Widgets.themed_muted "+")
+    (Widgets.themed_muted (Printf.sprintf "Add new %s" role_name))
+
 (** Truncate a string to max visible characters, preserving ANSI codes *)
 let truncate_visible ~max_width s =
   let len = String.length s in
@@ -525,49 +546,53 @@ let render_column ~col_width ~state ~column_groups =
   let items =
     column_items
       ~column_groups
-      ~global_services:(display_ordered_services state)
+      ~global_display_items:(display_ordered_items state)
   in
   let empty_line = String.make col_width ' ' in
-  (* Group items into (header, instances) pairs *)
+  (* Group items into (header, display_items) pairs *)
   let groups =
     let current_header = ref None in
-    let current_instances = ref [] in
+    let current_items = ref [] in
     let result = ref [] in
     List.iter
       (fun item ->
         match item with
         | Header role_name ->
             (match !current_header with
-            | Some hdr ->
-                result := (hdr, List.rev !current_instances) :: !result
+            | Some hdr -> result := (hdr, List.rev !current_items) :: !result
             | None -> ()) ;
             current_header := Some role_name ;
-            current_instances := []
-        | Instance (idx, svc) ->
-            current_instances := (idx, svc) :: !current_instances)
+            current_items := []
+        | Item (idx, display_item) ->
+            current_items := (idx, display_item) :: !current_items)
       items ;
     (match !current_header with
-    | Some hdr -> result := (hdr, List.rev !current_instances) :: !result
+    | Some hdr -> result := (hdr, List.rev !current_items) :: !result
     | None -> ()) ;
     List.rev !result
   in
-  (* Render each group as a Box containing its instances *)
+  (* Render each group as a Box containing its instances and ghosts *)
   let is_first = ref true in
   let lines =
     List.concat_map
-      (fun (role_name, instances) ->
+      (fun (role_name, display_items) ->
         let widget_name = "instances-box-" ^ role_key_of_header role_name in
         let instance_lines =
           List.concat_map
-            (fun (idx, (svc : Service_state.t)) ->
-              let is_folded =
-                StringSet.mem svc.service.Service.instance state.folded
-              in
-              let line =
-                line_for_service idx state.selected ~folded:is_folded svc
-              in
-              String.split_on_char '\n' line)
-            instances
+            (fun (idx, display_item) ->
+              match display_item with
+              | Real_service svc ->
+                  let is_folded =
+                    StringSet.mem svc.service.Service.instance state.folded
+                  in
+                  let line =
+                    line_for_service idx state.selected ~folded:is_folded svc
+                  in
+                  String.split_on_char '\n' line
+              | Ghost_add_new role ->
+                  let line = line_for_ghost_add_new idx state.selected role in
+                  [line])
+            display_items
         in
         let content = String.concat "\n" instance_lines in
         let box =
@@ -910,47 +935,48 @@ let table_lines_single state =
     radio_row ~selected:(state.selected = menu_item_count) state.view_mode
   in
   let instance_rows =
-    if state.services = [] then ["  No managed instances."]
-    else
-      (* Group services by role or group based on view_mode *)
-      let sections = sections_for_view state in
-      (* Render each section as a Box *)
-      let idx = ref 0 in
-      let is_first = ref true in
-      List.concat_map
-        (fun (section_name, svcs) ->
-          let hdr =
-            match state.view_mode with
-            | By_role -> role_header section_name
-            | By_group -> section_name
-          in
-          let widget_name =
-            "instances-box-" ^ role_key_of_header section_name
-          in
-          let instance_lines =
-            List.concat_map
-              (fun (svc : Service_state.t) ->
-                let i = !idx in
-                incr idx ;
-                let is_folded =
-                  StringSet.mem svc.service.Service.instance state.folded
-                in
-                let row =
-                  line_for_service i state.selected ~folded:is_folded svc
-                in
-                String.split_on_char '\n' row)
-              svcs
-          in
-          let content = String.concat "\n" instance_lines in
-          let box =
-            Style_context.with_child_context ~widget_name (fun () ->
-                Box.render ~title:hdr ~style:Rounded ~width:78 content)
-          in
-          let box_lines = String.split_on_char '\n' box in
-          let result = if !is_first then box_lines else "" :: box_lines in
-          is_first := false ;
-          result)
-        sections
+    (* Group display items by role or group based on view_mode *)
+    let sections = sections_for_view state in
+    (* Render each section as a Box *)
+    let idx = ref 0 in
+    let is_first = ref true in
+    List.concat_map
+      (fun (section_name, display_items) ->
+        let hdr =
+          match state.view_mode with
+          | By_role -> role_header section_name
+          | By_group -> section_name
+        in
+        let widget_name = "instances-box-" ^ role_key_of_header section_name in
+        let instance_lines =
+          List.concat_map
+            (fun display_item ->
+              let i = !idx in
+              incr idx ;
+              match display_item with
+              | Real_service svc ->
+                  let is_folded =
+                    StringSet.mem svc.service.Service.instance state.folded
+                  in
+                  let row =
+                    line_for_service i state.selected ~folded:is_folded svc
+                  in
+                  String.split_on_char '\n' row
+              | Ghost_add_new role ->
+                  let line = line_for_ghost_add_new i state.selected role in
+                  [line])
+            display_items
+        in
+        let content = String.concat "\n" instance_lines in
+        let box =
+          Style_context.with_child_context ~widget_name (fun () ->
+              Box.render ~title:hdr ~style:Rounded ~width:78 content)
+        in
+        let box_lines = String.split_on_char '\n' box in
+        let result = if !is_first then box_lines else "" :: box_lines in
+        is_first := false ;
+        result)
+      sections
   in
   let external_rows = render_external_services_section state in
   let external_rows =

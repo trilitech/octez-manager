@@ -8,6 +8,8 @@
 module Service_state = Data.Service_state
 module StringSet = Set.Make (String)
 
+type display_item = Real_service of Service_state.t | Ghost_add_new of string
+
 type view_mode = By_role | By_group
 
 (** Track recent start/restart failures for display.
@@ -137,8 +139,109 @@ let display_ordered_services state =
       in
       by_group @ sort_services_by_role ungrouped
 
+(** Helper: Insert ghost "Add new" entry after last instance of a role *)
+let insert_ghost_for_role role services =
+  let real_services = List.map (fun s -> Real_service s) services in
+  real_services @ [Ghost_add_new role]
+
+(** Build display items with ghost entries injected after each role section *)
+let display_ordered_items state =
+  match state.view_mode with
+  | By_role ->
+      (* Group by role and inject ghost after each role *)
+      let roles = ["node"; "baker"; "accuser"; "dal-node"; "signatory"] in
+      List.concat_map
+        (fun role ->
+          let instances =
+            List.filter
+              (fun (st : Service_state.t) ->
+                String.equal st.service.Octez_manager_lib.Service.role role)
+              state.services
+          in
+          if instances = [] then
+            (* No instances for this role, show only ghost *)
+            [Ghost_add_new role]
+          else
+            (* Show instances followed by ghost *)
+            insert_ghost_for_role role instances)
+        roles
+  | By_group ->
+      (* In group mode, show ghost at the end of each group and ungrouped section *)
+      let grouped, ungrouped =
+        List.partition
+          (fun (st : Service_state.t) ->
+            Option.is_some st.service.Octez_manager_lib.Service.group)
+          state.services
+      in
+      let by_group =
+        let tbl : (string, Service_state.t list) Hashtbl.t =
+          Hashtbl.create 17
+        in
+        List.iter
+          (fun (st : Service_state.t) ->
+            match st.service.Octez_manager_lib.Service.group with
+            | Some gname ->
+                let prev =
+                  match Hashtbl.find_opt tbl gname with
+                  | Some l -> l
+                  | None -> []
+                in
+                Hashtbl.replace tbl gname (st :: prev)
+            | None -> ())
+          grouped ;
+        let names =
+          Hashtbl.fold (fun k _ acc -> k :: acc) tbl []
+          |> List.sort String.compare
+        in
+        (* For grouped mode, we add ghosts for all 5 roles at the end of each group *)
+        List.concat_map
+          (fun gname ->
+            match Hashtbl.find_opt tbl gname with
+            | Some l ->
+                let sorted = sort_services_by_role l in
+                (* Add all role ghosts after the group *)
+                List.map (fun s -> Real_service s) sorted
+                @ [
+                    Ghost_add_new "node";
+                    Ghost_add_new "baker";
+                    Ghost_add_new "accuser";
+                    Ghost_add_new "dal-node";
+                    Ghost_add_new "signatory";
+                  ]
+            | None -> [])
+          names
+      in
+      (* Add ungrouped services + ghosts for all roles *)
+      let ungrouped_items =
+        if ungrouped = [] then
+          (* No ungrouped, just show all role ghosts *)
+          [
+            Ghost_add_new "node";
+            Ghost_add_new "baker";
+            Ghost_add_new "accuser";
+            Ghost_add_new "dal-node";
+            Ghost_add_new "signatory";
+          ]
+        else
+          List.map (fun s -> Real_service s) (sort_services_by_role ungrouped)
+          @ [
+              Ghost_add_new "node";
+              Ghost_add_new "baker";
+              Ghost_add_new "accuser";
+              Ghost_add_new "dal-node";
+              Ghost_add_new "signatory";
+            ]
+      in
+      by_group @ ungrouped_items
+
+let clamp_selection_with_items items idx =
+  let len = services_start_idx + List.length items in
+  max 0 (min idx (len - 1))
+
 let current_service state =
   if state.selected < services_start_idx then None
   else
-    let ordered = display_ordered_services state in
-    List.nth_opt ordered (state.selected - services_start_idx)
+    let ordered = display_ordered_items state in
+    match List.nth_opt ordered (state.selected - services_start_idx) with
+    | Some (Real_service st) -> Some st
+    | Some (Ghost_add_new _) | None -> None
