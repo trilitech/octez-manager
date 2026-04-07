@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Experimental features tab**: Sandbox and other beta features are now nested under a new "Experimental" tab (press `7`) instead of having direct main-tab placement. The Experimental tab displays a directory of beta features with descriptions and badges. Sandbox functionality remains unchanged, just accessed via Experimental → Sandbox.
+
 ### Fixed
 
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
