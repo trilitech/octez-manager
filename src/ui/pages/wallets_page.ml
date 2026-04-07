@@ -346,7 +346,34 @@ let init () =
 
 let update ps _ = ps
 
-let refresh ps = ps
+let reload_if_dirty ps =
+  if Context.consume_keys_dirty () then (
+    let all_dirs = get_all_base_dirs () in
+    let regular_groups =
+      all_dirs
+      |> List.map load_enriched_group
+      |> List.filter (fun g ->
+          g.keys <> [] || g.error <> None || g.services <> [])
+    in
+    let sandbox_groups = get_sandbox_wallet_groups () in
+    let groups = regular_groups @ sandbox_groups in
+    let s = ps.Navigation.s in
+    let nav_items = build_nav_items ~folded:s.folded groups in
+    let total_keys = count_keys groups in
+    let cursor = min s.cursor (max 0 (List.length nav_items - 1)) in
+    (* Update scheduler with new key set *)
+    let keys_by_dir =
+      List.map
+        (fun (g : enriched_group) ->
+          ( g.base_dir,
+            List.map (fun (k : Keys_reader.key_metadata) -> k.pkh) g.keys ))
+        groups
+    in
+    Keys_scheduler.set_keys keys_by_dir ;
+    {ps with s = {s with groups; nav_items; total_keys; cursor}})
+  else ps
+
+let refresh ps = reload_if_dirty ps
 
 let move ps _ = ps
 
@@ -360,33 +387,7 @@ let focused_since : float ref = ref 0.0
 let focus_debounce = 2.0
 
 let service_cycle ps _ =
-  let ps =
-    if Context.consume_keys_dirty () then (
-      let all_dirs = get_all_base_dirs () in
-      let regular_groups =
-        all_dirs
-        |> List.map load_enriched_group
-        |> List.filter (fun g ->
-            g.keys <> [] || g.error <> None || g.services <> [])
-      in
-      let sandbox_groups = get_sandbox_wallet_groups () in
-      let groups = regular_groups @ sandbox_groups in
-      let s = ps.Navigation.s in
-      let nav_items = build_nav_items ~folded:s.folded groups in
-      let total_keys = count_keys groups in
-      let cursor = min s.cursor (max 0 (List.length nav_items - 1)) in
-      (* Update scheduler with new key set *)
-      let keys_by_dir =
-        List.map
-          (fun (g : enriched_group) ->
-            ( g.base_dir,
-              List.map (fun (k : Keys_reader.key_metadata) -> k.pkh) g.keys ))
-          groups
-      in
-      Keys_scheduler.set_keys keys_by_dir ;
-      {ps with s = {s with groups; nav_items; total_keys; cursor}})
-    else ps
-  in
+  let ps = reload_if_dirty ps in
   (* Auto-fetch for the focused key after debounce *)
   let s = ps.Navigation.s in
   let current_pkh =

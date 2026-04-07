@@ -322,7 +322,14 @@
 
 (test
  (name test_wallets_page)
- (libraries alcotest octez_manager_lib octez-manager.ui)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
  (modules test_wallets_page)
  (instrumentation
   (backend bisect_ppx)))
