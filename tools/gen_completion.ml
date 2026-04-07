@@ -409,6 +409,27 @@ let render_zsh ~roots ~instance_actions =
   in
   List.iter (fun node -> emit_node 0 [node.name] node) roots ;
   Buffer.add_string buf "      esac\n" ;
+  (* State handlers for enum values: nested _arguments calls (inside the arms
+     above) use ->state-name actions.  When such an action fires, _arguments
+     sets $state and returns.  We handle the resulting state here, still inside
+     the args) arm, so that the arrays declared at the top of the function are
+     in scope. *)
+  Buffer.add_string buf "      case $state in\n" ;
+  Buffer.add_string buf "        history-modes)\n" ;
+  Buffer.add_string
+    buf
+    "          _describe -t history-modes 'history modes' history_modes\n" ;
+  Buffer.add_string buf "          ;;\n" ;
+  Buffer.add_string buf "        snapshot-kinds)\n" ;
+  Buffer.add_string
+    buf
+    "          _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds\n" ;
+  Buffer.add_string buf "          ;;\n" ;
+  Buffer.add_string buf "        lb-votes)\n" ;
+  Buffer.add_string
+    buf "          _describe -t lb-votes 'liquidity baking votes' lb_votes\n" ;
+  Buffer.add_string buf "          ;;\n" ;
+  Buffer.add_string buf "      esac\n" ;
   Buffer.add_string buf "      ;;\n" ;
   Buffer.add_string buf "  esac\n" ;
   Buffer.add_string buf "}\n\n" ;

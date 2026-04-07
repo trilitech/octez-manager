@@ -34,4 +34,13 @@ echo "full:50 colon correctly escaped (no bare 'full:50:' found)"
 assert_contains "$content" "_describe" \
   "zsh script should use _describe for subcommand groups"
 
+# State handlers must be emitted: verifies that ->snapshot-kinds, ->history-modes,
+# and ->lb-votes actions in option specs have corresponding dispatch arms.
+assert_contains "$content" "snapshot-kinds)" \
+  "zsh script must contain snapshot-kinds state handler"
+assert_contains "$content" "history-modes)" \
+  "zsh script must contain history-modes state handler"
+assert_contains "$content" "lb-votes)" \
+  "zsh script must contain lb-votes state handler"
+
 echo "Test passed"

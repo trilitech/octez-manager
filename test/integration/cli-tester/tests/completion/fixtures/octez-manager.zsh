@@ -1321,6 +1321,17 @@ _octez-manager() {
             $opts_web
           ;;
       esac
+      case $state in
+        history-modes)
+          _describe -t history-modes 'history modes' history_modes
+          ;;
+        snapshot-kinds)
+          _describe -t snapshot-kinds 'snapshot kinds' snapshot_kinds
+          ;;
+        lb-votes)
+          _describe -t lb-votes 'liquidity baking votes' lb_votes
+          ;;
+      esac
       ;;
   esac
 }

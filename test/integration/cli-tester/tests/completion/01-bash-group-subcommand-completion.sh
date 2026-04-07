@@ -42,6 +42,16 @@ result=$(run_completion "octez-manager" "binaries" "")
 assert_contains "$result" "list"     "binaries <TAB> should offer 'list'"
 assert_contains "$result" "download" "binaries <TAB> should offer 'download'"
 
+# rpc subcommands at depth 2 (US3: all 7 affected groups)
+result=$(run_completion "octez-manager" "rpc" "")
+assert_contains "$result" "get"       "rpc <TAB> should offer 'get'"
+assert_contains "$result" "instances" "rpc <TAB> should offer 'instances'"
+
+# sandbox subcommands at depth 2 (US3: all 7 affected groups)
+result=$(run_completion "octez-manager" "sandbox" "")
+assert_contains "$result" "create"  "sandbox <TAB> should offer 'create'"
+assert_contains "$result" "destroy" "sandbox <TAB> should offer 'destroy'"
+
 # top-level: both group commands and leaf commands appear
 result=$(run_completion "octez-manager" "")
 assert_contains "$result" "baker"        "top-level <TAB> should offer 'baker'"
