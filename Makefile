@@ -14,7 +14,7 @@ deps:
 	@opam pin add "https://github.com/atacama-dev/ppx_forbid.git" --yes
 	# @opam pin add "https://github.com/trilitech/miaou.git" --yes
 	@opam install . --deps-only --with-test --yes
-	@opam install sqlite3 dune-build-info --yes
+	@opam install sqlite3 dune-build-info ocamlformat --yes
 
 MIAOU_GIT_URL ?= https://github.com/trilitech/miaou.git
 PPX_FORBID_GIT_URL ?= https://github.com/atacama-dev/ppx_forbid.git
