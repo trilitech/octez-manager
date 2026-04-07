@@ -54,17 +54,18 @@ let move = Instances.For_tests.move_selection
 (* ============================================================ *)
 
 let test_single_column_up_from_first_service () =
-  (* In single column, moving up from the first service (services_start_idx=2)
-     should skip only the separator (index 1) and land on the radio row
-     (menu_item_count=0). *)
+  (* In single column, moving up from the first service (services_start_idx=5)
+     should skip the non-navigable zone [radio-row(3), separator(4)] and land
+     on Browse RPCs (menu_item_count-1=2). *)
   let services = [running_service ~instance:"node-1" ()] in
   let s = make_state ~selected:services_start_idx ~num_columns:1 services in
   let s' = move s (-1) in
   check int "lands on radio row" menu_item_count s'.selected
 
-let test_single_column_down_from_radio_row () =
-  (* Moving down from radio row (menu_item_count=0) should skip the separator
-     (index 1) and reach the first service (services_start_idx=2). *)
+let test_single_column_down_from_browse_rpcs () =
+  (* Moving down from Browse RPCs (menu_item_count-1=2) should skip the
+     non-navigable zone [radio-row(3), separator(4)] and land on the
+     first service (services_start_idx=5). *)
   let services = [running_service ~instance:"node-1" ()] in
   let s = make_state ~selected:menu_item_count ~num_columns:1 services in
   let s' = move s 1 in
@@ -209,7 +210,7 @@ let () =
             test_single_column_up_from_first_service );
           ( "down from radio row -> first service (skip sep)",
             `Quick,
-            test_single_column_down_from_radio_row );
+            test_single_column_down_from_browse_rpcs );
           ( "navigate through radio row and services",
             `Quick,
             test_single_column_navigate_through_menu );
