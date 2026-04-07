@@ -344,8 +344,6 @@ let init () =
       selected = StringSet.empty;
     }
 
-let update ps _ = ps
-
 let reload_if_dirty ps =
   if Context.consume_keys_dirty () then (
     let all_dirs = get_all_base_dirs () in
@@ -372,6 +370,8 @@ let reload_if_dirty ps =
     Keys_scheduler.set_keys keys_by_dir ;
     {ps with s = {s with groups; nav_items; total_keys; cursor}})
   else ps
+
+let update ps _ = reload_if_dirty ps
 
 let refresh ps = reload_if_dirty ps
 
