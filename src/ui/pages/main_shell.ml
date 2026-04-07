@@ -25,7 +25,7 @@ let tab_topology = Topology_page.name
 
 let tab_sandbox = Sandbox_page.name
 
-let tab_experimental = Experimental_page.name
+let tab_experimental = "experimental"
 
 type state = {
   tabs : Responsive_tabs_widget.t;
@@ -36,7 +36,6 @@ type state = {
   diagnostics_ps : Diagnostics.Page.pstate;
   topology_ps : Topology_page.Page.pstate;
   sandbox_ps : Sandbox_page.Page.pstate;
-  experimental_ps : Experimental_page.Page.pstate;
 }
 
 type msg = unit
@@ -63,6 +62,7 @@ let initial_tabs =
       Responsive_tabs_widget.tab
         ~id:tab_experimental
         ~labels:["7 Experimental"; "7 Exp"];
+      Responsive_tabs_widget.tab ~id:tab_sandbox ~labels:["8 Sandbox"; "8 Sand"];
     ]
 
 let init () =
@@ -76,7 +76,6 @@ let init () =
       diagnostics_ps = Diagnostics.Page.init ();
       topology_ps = Topology_page.Page.init ();
       sandbox_ps = Sandbox_page.Page.init ();
-      experimental_ps = Experimental_page.Page.init ();
     }
 
 let update ps _ = ps
@@ -89,7 +88,6 @@ let tab_id_of_context_tab = function
   | Context.Tab_diagnostics -> tab_diagnostics
   | Context.Tab_topology -> tab_topology
   | Context.Tab_sandboxes -> tab_sandbox
-  | Context.Tab_experimental -> tab_experimental
 
 let is_tab_target t =
   String.equal t tab_instances
@@ -152,7 +150,8 @@ let view ps ~focus ~size =
     | id when String.equal id tab_sandbox ->
         Sandbox_page.Page.view s.sandbox_ps ~focus ~size:content_size
     | id when String.equal id tab_experimental ->
-        Experimental_page.Page.view s.experimental_ps ~focus ~size:content_size
+        (* Experimental tab has no content - modal opens on selection *)
+        Themed_page.apply_themed_background ~size:content_size ""
     | _ -> Themed_page.apply_themed_background ~size:content_size ""
   in
   tab_bar_themed ^ "\n" ^ content
@@ -201,9 +200,12 @@ let refresh ps =
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
   else if String.equal tab tab_experimental then
-    let ep' = Experimental_page.Page.refresh s.experimental_ps in
-    let shell_s = {s with experimental_ps = Navigation.make ep'.Navigation.s} in
-    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending ep')
+    (* Experimental tab has no page state, but needs to handle navigation *)
+    match Context.consume_navigation () with
+    | Some (Context.Goto target) -> route_nav ~shell_ps:ps ~shell_s:s target
+    | Some Context.Back -> Navigation.back ps
+    | Some Context.Quit -> Navigation.quit ps
+    | None -> ps
   else ps
 
 let dispatch_key ps key ~size =
@@ -237,10 +239,6 @@ let dispatch_key ps key ~size =
     let sp' = Sandbox_page.Page.handle_key s.sandbox_ps key ~size in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
-  else if String.equal tab tab_experimental then
-    let ep' = Experimental_page.Page.handle_key s.experimental_ps key ~size in
-    let shell_s = {s with experimental_ps = Navigation.make ep'.Navigation.s} in
-    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending ep')
   else ps
 
 let dispatch_modal_key ps key ~size =
@@ -274,13 +272,8 @@ let dispatch_modal_key ps key ~size =
     let sp' = Sandbox_page.Page.handle_modal_key s.sandbox_ps key ~size in
     let shell_s = {s with sandbox_ps = Navigation.make sp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending sp')
-  else if String.equal tab tab_experimental then
-    let ep' =
-      Experimental_page.Page.handle_modal_key s.experimental_ps key ~size
-    in
-    let shell_s = {s with experimental_ps = Navigation.make ep'.Navigation.s} in
-    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending ep')
   else (
+    (* Experimental tab and fallback: use global modal handler *)
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
 
@@ -316,7 +309,20 @@ let handle_key ps key ~size =
         | "4" -> switch_tab ps tab_rpcs
         | "5" -> switch_tab ps tab_diagnostics
         | "6" -> switch_tab ps tab_topology
-        | "7" -> switch_tab ps tab_experimental
+        | "7" ->
+            (* Switch to experimental tab and open modal *)
+            let ps' = switch_tab ps tab_experimental in
+            Modal_helpers.open_choice_modal
+              ~title:"Experimental Features"
+              ~items:["sandbox"]
+              ~to_string:(fun s ->
+                Printf.sprintf "%s  [BETA]" (String.capitalize_ascii s))
+              ~on_select:(fun _choice ->
+                (* Close modal and navigate to sandbox tab *)
+                Context.set_pending_tab Context.Tab_sandboxes)
+              () ;
+            ps'
+        | "8" -> switch_tab ps tab_sandbox
         | _ -> dispatch_key ps key ~size)
 
 let handle_modal_key ps key ~size = dispatch_modal_key ps key ~size
