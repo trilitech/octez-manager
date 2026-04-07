@@ -577,8 +577,6 @@ _octez-manager() {
   local -a opts_rewards_pay
   opts_rewards_pay=(
     '--baker[Baker instance name. Auto-inferred when only one baker is registered.]:INSTANCE:'
-    '--compare-indexers[Compare custom indexer results with public TzKT and log divergences.]'
-    '--compare[Compare custom indexer results with public TzKT and log divergences.]'
     '--confirm[Skip interactive confirmation (for automation).]'
     '--cycle[Target cycle number (default\: latest completed).]:N:'
     '--dry-run[Simulate without broadcasting.]'
