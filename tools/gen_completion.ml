@@ -285,14 +285,19 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
               Buffer.add_string buf ("            " ^ entry ^ "\n"))
             subcmds ;
           Buffer.add_string buf "          )\n" ;
-          Buffer.add_string buf "          if [[ $cur == -* ]]; then\n" ;
-          Buffer.add_string buf "            _arguments \\\n" ;
-          Buffer.add_string buf ("              $" ^ opts_var cmd ^ "\n") ;
-          Buffer.add_string buf "          else\n" ;
+          (* Only offer subcommands when on word 2 (right after the group
+             command). Without this guard, pressing TAB after the subcommand
+             is already typed would re-append it indefinitely. *)
+          Buffer.add_string buf "          if (( CURRENT == 2 )); then\n" ;
+          Buffer.add_string buf "            if [[ $cur == -* ]]; then\n" ;
+          Buffer.add_string buf "              _arguments \\\n" ;
+          Buffer.add_string buf ("                $" ^ opts_var cmd ^ "\n") ;
+          Buffer.add_string buf "            else\n" ;
           Buffer.add_string
             buf
-            ("            _describe -t subcommands '" ^ cmd ^ " subcommands' "
-           ^ subcmd_var ^ "\n") ;
+            ("              _describe -t subcommands '" ^ cmd
+           ^ " subcommands' " ^ subcmd_var ^ "\n") ;
+          Buffer.add_string buf "            fi\n" ;
           Buffer.add_string buf "          fi\n")
         else (
           Buffer.add_string buf "          _arguments \\\n" ;
@@ -485,6 +490,11 @@ let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds
           | _ -> []
         in
         Buffer.add_string buf ("    " ^ cmd ^ ")\n") ;
+        (* Only offer subcommands when on word 2 (right after the group
+           command). Without this guard, pressing TAB after the subcommand
+           is already typed would re-append it indefinitely. *)
+        (if subcmd_names <> [] then
+           Buffer.add_string buf "      if [[ $COMP_CWORD -eq 2 ]]; then\n") ;
         Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
         Buffer.add_string
           buf
@@ -499,6 +509,7 @@ let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds
             ^ String.concat " " subcmd_names
             ^ "\" -- \"$cur\") )\n") ;
         Buffer.add_string buf "      fi\n" ;
+        (if subcmd_names <> [] then Buffer.add_string buf "      fi\n") ;
         Buffer.add_string buf "      return 0\n" ;
         Buffer.add_string buf "      ;;\n"))
     options_map ;
