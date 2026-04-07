@@ -60,6 +60,7 @@ val prompt_text_modal :
   ?width:int ->
   ?initial:string ->
   ?placeholder:string option ->
+  ?filter_key:(string -> bool) ->
   on_submit:(string -> unit) ->
   unit ->
   unit
@@ -80,6 +81,7 @@ val prompt_validated_text_modal :
   ?width:int ->
   ?initial:string ->
   ?placeholder:string option ->
+  ?filter_key:(string -> bool) ->
   validator:(string -> (unit, string) result) ->
   on_submit:(string -> unit) ->
   unit ->

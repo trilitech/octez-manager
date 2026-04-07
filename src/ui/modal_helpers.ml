@@ -392,7 +392,8 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
           | None -> ())
       | `Cancel -> Miaou.Core.Help_hint.clear ())
 
-let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
+let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder
+    ?(filter_key = fun _ -> true) ~on_submit () =
   let module Modal = struct
     type state = Textbox_widget.t
 
@@ -430,6 +431,7 @@ let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
       else if key = "Esc" || key = "Escape" then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
         ps)
+      else if String.length key = 1 && not (filter_key key) then ps
       else Navigation.update (fun _ -> Textbox_widget.handle_key s ~key) ps
 
     let handle_key = handle_modal_key
@@ -754,7 +756,7 @@ let confirm_modal ?title ~message ~on_result () =
     ()
 
 let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
-    ~validator ~on_submit () =
+    ?(filter_key = fun _ -> true) ~validator ~on_submit () =
   let module Modal = struct
     type state = unit Miaou_widgets_input.Validated_textbox_widget.t
 
@@ -803,6 +805,7 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
       else if key = "Esc" || key = "Escape" then (
         Miaou.Core.Modal_manager.close_top `Cancel ;
         ps)
+      else if String.length key = 1 && not (filter_key key) then ps
       else
         (* Process key and flush validation to avoid stale error messages *)
         let s =

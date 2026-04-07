@@ -27,6 +27,10 @@ type validation_result =
   | Valid  (** PKH matches tz[1-4] base58check format *)
   | Invalid of string  (** Reason the PKH is invalid *)
 
+(** Strip non-ASCII bytes and trim whitespace. Apply before storing a PKH
+    received from clipboard input. *)
+val sanitize : string -> string
+
 (** Validate PKH format without any I/O.
     Strips unicode whitespace (e.g. non-breaking spaces inserted by browsers
     when copying addresses) before checking prefix (tz1-4), base58check

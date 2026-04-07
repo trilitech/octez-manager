@@ -19,8 +19,10 @@ let base58_alphabet =
 
 let is_base58_char c = String.contains base58_alphabet c
 
+let sanitize pkh = pkh |> String_utils.strip_non_ascii |> String.trim
+
 let validate_format pkh =
-  let pkh = pkh |> String_utils.strip_non_ascii |> String.trim in
+  let pkh = sanitize pkh in
   let len = String.length pkh in
   if len = 0 then Invalid "Empty address"
   else if len <> 36 then
