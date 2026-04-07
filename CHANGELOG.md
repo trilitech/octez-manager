@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Sandbox: yes-wallet integration for automatic delegate generation
+- Sandbox: restore multi-node/multi-baker topology parameters
 - **Directory picker: type a path directly**: When a form field opens a directory picker, a new "Type a path directly..." option lets users enter an arbitrary path without navigating the filesystem tree. Useful for paths on remote mounts or outside home directories. (closes #800)
 - **Local indexer compare mode**: `om ui --local-indexer <URL>` registers a local TzKT-compatible indexer as the preferred source for all rewards and delegation queries. Add `--compare-indexers` to simultaneously query public TzKT and log any divergences, useful for validating a self-hosted indexer. The `--indexer-network` flag (default: `mainnet`) identifies which network the local indexer serves.
 - **`rewards continual tick` command**: One-shot command that checks all baker instances with continual mode enabled and dispatches payouts for any cycles that are due. Intended for use with external schedulers (cron, systemd timers). When `rewards continual start` is called, octez-manager optionally installs a systemd timer to call `tick` automatically.

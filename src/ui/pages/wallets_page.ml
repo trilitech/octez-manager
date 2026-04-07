@@ -2073,8 +2073,7 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
         |> List.filter (fun (st : Data.Service_state.t) ->
             String.equal st.service.role "node"
             && match st.status with Running -> true | _ -> false)
-        |> List.map (fun (st : Data.Service_state.t) ->
-            Network_name.normalize st.service.network)
+        |> List.map (fun (st : Data.Service_state.t) -> st.service.network)
         |> List.sort_uniq String.compare
       in
       (* All networks with public nodes *)

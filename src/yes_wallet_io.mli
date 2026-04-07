@@ -7,18 +7,17 @@
 
 (** I/O layer for yes-wallet: delegate fetching and wallet file writing. *)
 
-(** Fetch active delegates from a node RPC endpoint, including their
-    consensus and companion keys needed for signing.
+(** Fetch active delegates from a node RPC endpoint.
 
     Calls [/chains/main/blocks/head/context/delegates?active=true&with_minimal_stake=true],
-    takes the first [max_delegates], then fetches the consensus key and companion
-    key for each delegate (needed when delegates use BLS consensus keys).
+    takes the first [max_delegates], detects curve from address prefix, and
+    assigns sequential aliases [delegate-0], [delegate-1], etc.
 
-    Returns [(baker_delegates, all_wallet_entries)] where [baker_delegates] is
-    the consensus key aliases to pass as baker CLI args (the baker daemon uses
-    consensus key hashes to query attestation rights), and [all_wallet_entries]
-    is the full list to write to the wallet (includes consensus/companion keys).
-    For delegates without a distinct consensus key, the delegate alias is used.
+    Returns a tuple [(baker_delegates, all_wallet_entries)] where
+    [baker_delegates] is the subset of entries whose aliases correspond to
+    consensus key addresses (suitable for baker CLI arguments), and
+    [all_wallet_entries] is the full list of wallet entries including
+    consensus and companion keys.
 
     @param endpoint Node RPC endpoint (e.g. ["http://127.0.0.1:18732"])
     @param max_delegates Maximum number of delegates to return *)
@@ -40,10 +39,13 @@ val write_wallet :
   Yes_wallet.delegate list ->
   (unit, [> `Msg of string]) result
 
-(** Read the [public_key_hashs] file from a wallet directory.
+(** Read public key hashes from an existing wallet directory.
 
-    Returns a list of [(alias, address)] pairs. Returns [[]] if the file does
-    not exist. Used to inspect wallet contents without rewriting. *)
+    Returns the list of [(alias, address)] pairs from the [public_key_hashs]
+    wallet file. Returns [Ok []] if the wallet directory or public_key_hashs
+    file does not exist. Returns an error if the file exists but is malformed.
+
+    @param wallet_dir Wallet directory containing [public_key_hashs] *)
 val read_wallet_pkhs :
   wallet_dir:string -> ((string * string) list, [> `Msg of string]) result
 
