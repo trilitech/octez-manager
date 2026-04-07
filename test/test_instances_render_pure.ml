@@ -12,12 +12,18 @@
     rather than just checking String.length > 0. *)
 
 open Alcotest
+open Octez_manager_lib
 module Render = Octez_manager_ui.Instances_render
 module Actions = Octez_manager_ui.Instances_actions
 module Layout = Octez_manager_ui.Instances_layout
 module State = Octez_manager_ui.Instances_state
+module Mock_service_helpers = Mock_service_helpers_lib.Mock_service_helpers
 
 let string_contains = Test_string_helpers.string_contains
+
+let with_group group_name (svc : State.Service_state.t) =
+  let service = {svc.service with Service.group = Some group_name} in
+  {svc with service}
 
 (* ================================================================== *)
 (* role_header tests                                                   *)
@@ -34,6 +40,108 @@ let test_role_header_unknown_capitalizes () =
   let h = Layout.role_header "foobar" in
   (* Unknown roles get capitalized name *)
   check bool "has capitalized name" true (string_contains ~needle:"Foobar" h)
+
+let test_rebuild_display_cache_groups_and_indexes () =
+  let services =
+    [
+      Mock_service_helpers.running_service ~instance:"node-1" ~role:"node" ();
+      with_group
+        "alpha"
+        (Mock_service_helpers.running_service
+           ~instance:"baker-1"
+           ~role:"baker"
+           ());
+      with_group
+        "alpha"
+        (Mock_service_helpers.running_service
+           ~instance:"node-2"
+           ~role:"node"
+           ());
+      Mock_service_helpers.running_service
+        ~instance:"accuser-1"
+        ~role:"accuser"
+        ();
+    ]
+  in
+  let state =
+    State.rebuild_display_cache
+      State.
+        {
+          services;
+          external_services = [];
+          selected = 0;
+          folded = State.StringSet.empty;
+          external_folded = State.StringSet.empty;
+          external_section_folded = false;
+          last_updated = 0.0;
+          num_columns = 2;
+          active_column = 0;
+          column_scroll = [||];
+          view_mode = State.By_group;
+          groups = [];
+          display_sections = [];
+          ordered_services = [];
+          ordered_service_indices = State.StringMap.empty;
+          create_menu_open = false;
+          create_menu_cursor = 0;
+        }
+  in
+  check
+    int
+    "ordered services length"
+    4
+    (List.length state.State.ordered_services) ;
+  check
+    string
+    "group section title"
+    "alpha"
+    (fst (List.hd state.State.display_sections)) ;
+  check
+    (option int)
+    "node-1 index"
+    (Some 2)
+    (State.StringMap.find_opt "node-1" state.State.ordered_service_indices) ;
+  check
+    (option int)
+    "accuser-1 index"
+    (Some 3)
+    (State.StringMap.find_opt "accuser-1" state.State.ordered_service_indices)
+
+let test_column_items_use_cached_indices () =
+  let services =
+    [
+      Mock_service_helpers.running_service ~instance:"node-1" ~role:"node" ();
+      Mock_service_helpers.running_service ~instance:"baker-1" ~role:"baker" ();
+      Mock_service_helpers.running_service
+        ~instance:"accuser-1"
+        ~role:"accuser"
+        ();
+    ]
+  in
+  let index_by_instance =
+    List.mapi
+      (fun idx (svc : State.Service_state.t) ->
+        (svc.service.Service.instance, idx))
+      services
+    |> List.fold_left
+         (fun acc (instance, idx) -> State.StringMap.add instance idx acc)
+         State.StringMap.empty
+  in
+  let items =
+    Layout.column_items
+      ~column_groups:
+        [("node", [List.hd services]); ("baker", [List.nth services 1])]
+      ~index_by_instance
+  in
+  match items with
+  | [
+   Layout.Header _;
+   Layout.Instance (0, _);
+   Layout.Header _;
+   Layout.Instance (1, _);
+  ] ->
+      ()
+  | _ -> fail "column_items did not use cached indices"
 
 (* ================================================================== *)
 (* truncate_visible tests                                              *)
@@ -135,6 +243,9 @@ let empty_state () =
       active_column = 0;
       view_mode = State.By_role;
       groups = [];
+      display_sections = [];
+      ordered_services = [];
+      ordered_service_indices = State.StringMap.empty;
       create_menu_open = false;
       create_menu_cursor = 0;
     }
@@ -222,6 +333,17 @@ let () =
             "unknown role capitalizes"
             `Quick
             test_role_header_unknown_capitalizes;
+        ] );
+      ( "layout_cache",
+        [
+          test_case
+            "cache builds ordered services and indexes"
+            `Quick
+            test_rebuild_display_cache_groups_and_indexes;
+          test_case
+            "column items use cached indices"
+            `Quick
+            test_column_items_use_cached_indices;
         ] );
       ( "truncate_visible",
         [
