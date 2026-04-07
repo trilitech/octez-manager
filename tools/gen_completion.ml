@@ -164,7 +164,8 @@ let render_zsh_options name (options : HP.option_entry list) =
   Buffer.add_string buf "  )\n\n" ;
   Buffer.contents buf
 
-let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
+let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map
+    ~suboptions_map =
   let sanitize_var s =
     let buf = Bytes.of_string s in
     for i = 0 to Bytes.length buf - 1 do
@@ -204,6 +205,15 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
     (fun key opts ->
       Buffer.add_string buf (render_zsh_options (opts_var key) opts))
     options_map ;
+  (* Declare option arrays for each subcommand of each group command *)
+  String_map.iter
+    (fun cmd sub_opts_map ->
+      String_map.iter
+        (fun sub_name opts ->
+          let var = "opts_" ^ sanitize_var cmd ^ "_" ^ sanitize_var sub_name in
+          Buffer.add_string buf (render_zsh_options var opts))
+        sub_opts_map)
+    suboptions_map ;
   Buffer.add_string buf "  _arguments -C \\\n" ;
   Buffer.add_string buf "    '1: :->command' \\\n" ;
   Buffer.add_string buf "    '*:: :->args'\n\n" ;
@@ -265,6 +275,14 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
           | Some subs when subs <> [] -> subs
           | _ -> []
         in
+        let sub_opts_map =
+          match String_map.find_opt cmd suboptions_map with
+          | Some m -> m
+          | None -> String_map.empty
+        in
+        let sub_opts_var sub_name =
+          "opts_" ^ sanitize_var cmd ^ "_" ^ sanitize_var sub_name
+        in
         Buffer.add_string buf ("        " ^ cmd ^ ")\n") ;
         if subcmds <> [] then (
           let subcmd_var = "subcmds_" ^ sanitize_var cmd in
@@ -285,15 +303,31 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
               Buffer.add_string buf ("            " ^ entry ^ "\n"))
             subcmds ;
           Buffer.add_string buf "          )\n" ;
-          Buffer.add_string buf "          if [[ $cur == -* ]]; then\n" ;
-          Buffer.add_string buf "            _arguments \\\n" ;
-          Buffer.add_string buf ("              $" ^ opts_var cmd ^ "\n") ;
-          Buffer.add_string buf "          else\n" ;
+          Buffer.add_string buf "          if (( CURRENT == 2 )); then\n" ;
+          Buffer.add_string buf "            if [[ $cur == -* ]]; then\n" ;
+          Buffer.add_string buf "              _arguments \\\n" ;
+          Buffer.add_string buf ("                $" ^ opts_var cmd ^ "\n") ;
+          Buffer.add_string buf "            else\n" ;
           Buffer.add_string
             buf
-            ("            _describe -t subcommands '" ^ cmd ^ " subcommands' "
+            ("              _describe -t subcommands '" ^ cmd ^ " subcommands' "
            ^ subcmd_var ^ "\n") ;
-          Buffer.add_string buf "          fi\n")
+          Buffer.add_string buf "            fi\n" ;
+          if not (String_map.is_empty sub_opts_map) then (
+            Buffer.add_string buf "          else\n" ;
+            Buffer.add_string buf "            case $words[2] in\n" ;
+            List.iter
+              (fun (sub : HP.command_entry) ->
+                Buffer.add_string buf ("              " ^ sub.HP.name ^ ")\n") ;
+                Buffer.add_string buf "                _arguments \\\n" ;
+                Buffer.add_string
+                  buf
+                  ("                  $" ^ sub_opts_var sub.HP.name ^ "\n") ;
+                Buffer.add_string buf "                ;;\n")
+              subcmds ;
+            Buffer.add_string buf "            esac\n" ;
+            Buffer.add_string buf "          fi\n")
+          else Buffer.add_string buf "          fi\n")
         else (
           Buffer.add_string buf "          _arguments \\\n" ;
           Buffer.add_string buf ("            $" ^ opts_var cmd ^ "\n")) ;
@@ -308,8 +342,12 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map =
   Buffer.add_string buf "fi\n" ;
   Buffer.contents buf
 
-let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds
-    =
+let render_bash ~commands ~instance_actions ~options_map ~subcommands_map
+    ~suboptions_map ~kinds =
+  let bash_subopts_var cmd sub_name =
+    let sanitize s = String.concat "_" (String.split_on_char '-' s) in
+    sanitize cmd ^ "_" ^ sanitize sub_name ^ "_opts"
+  in
   let unique_list items =
     let seen = Hashtbl.create 32 in
     let add acc item =
@@ -361,7 +399,20 @@ let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds
   Buffer.add_string
     buf
     "  local snapshot_kinds=\"rolling full full:50 archive\"\n" ;
-  Buffer.add_string buf "  local lb_votes=\"on off pass\"\n\n" ;
+  Buffer.add_string buf "  local lb_votes=\"on off pass\"\n" ;
+  (* Declare option name variables for each subcommand of each group command *)
+  String_map.iter
+    (fun cmd sub_opts_map ->
+      String_map.iter
+        (fun sub_name opts ->
+          let var = bash_subopts_var cmd sub_name in
+          let names = List.concat_map (fun o -> o.HP.names) opts in
+          Buffer.add_string
+            buf
+            ("  local " ^ var ^ "=\"" ^ String.concat " " names ^ "\"\n"))
+        sub_opts_map)
+    suboptions_map ;
+  Buffer.add_string buf "\n" ;
   Buffer.add_string
     buf
     "  if [[ $prev == --endpoint || $prev == --node-endpoint || $prev == \
@@ -484,21 +535,58 @@ let render_bash ~commands ~instance_actions ~options_map ~subcommands_map ~kinds
               List.map (fun (sub : HP.command_entry) -> sub.HP.name) subs
           | _ -> []
         in
+        let sub_opts_map =
+          match String_map.find_opt cmd suboptions_map with
+          | Some m -> m
+          | None -> String_map.empty
+        in
         Buffer.add_string buf ("    " ^ cmd ^ ")\n") ;
-        Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
-        Buffer.add_string
-          buf
-          ("        opts=\"" ^ String.concat " " opts ^ "\"\n") ;
-        Buffer.add_string
-          buf
-          "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n" ;
-        if subcmd_names <> [] then
+        if subcmd_names <> [] then (
+          (* Word 2: offer subcommands or group flags *)
+          Buffer.add_string buf "      if [[ $COMP_CWORD -eq 2 ]]; then\n" ;
+          Buffer.add_string buf "        if [[ $cur == -* ]]; then\n" ;
           Buffer.add_string
             buf
-            ("      else\n        COMPREPLY=( $(compgen -W \""
+            ("          opts=\"" ^ String.concat " " opts ^ "\"\n") ;
+          Buffer.add_string
+            buf
+            "          COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n" ;
+          Buffer.add_string buf "        else\n" ;
+          Buffer.add_string
+            buf
+            ("          COMPREPLY=( $(compgen -W \""
             ^ String.concat " " subcmd_names
             ^ "\" -- \"$cur\") )\n") ;
-        Buffer.add_string buf "      fi\n" ;
+          Buffer.add_string buf "        fi\n" ;
+          (* Word 3+: dispatch to subcommand-specific options *)
+          if not (String_map.is_empty sub_opts_map) then (
+            Buffer.add_string buf "      else\n" ;
+            Buffer.add_string buf "        local subcmd=\"${COMP_WORDS[2]}\"\n" ;
+            Buffer.add_string buf "        case \"$subcmd\" in\n" ;
+            List.iter
+              (fun sub_name ->
+                let var = bash_subopts_var cmd sub_name in
+                Buffer.add_string buf ("          " ^ sub_name ^ ")\n") ;
+                Buffer.add_string buf "            if [[ $cur == -* ]]; then\n" ;
+                Buffer.add_string
+                  buf
+                  ("              COMPREPLY=( $(compgen -W \"$" ^ var
+                 ^ "\" -- \"$cur\") )\n") ;
+                Buffer.add_string buf "            fi\n" ;
+                Buffer.add_string buf "            ;;\n")
+              subcmd_names ;
+            Buffer.add_string buf "        esac\n" ;
+            Buffer.add_string buf "      fi\n")
+          else Buffer.add_string buf "      fi\n")
+        else (
+          Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
+          Buffer.add_string
+            buf
+            ("        opts=\"" ^ String.concat " " opts ^ "\"\n") ;
+          Buffer.add_string
+            buf
+            "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n" ;
+          Buffer.add_string buf "      fi\n") ;
         Buffer.add_string buf "      return 0\n" ;
         Buffer.add_string buf "      ;;\n"))
     options_map ;
@@ -566,12 +654,32 @@ let () =
         (Ok String_map.empty)
         cmd_names
     in
+    let* suboptions_map =
+      String_map.fold
+        (fun cmd subcmds acc ->
+          let* acc = acc in
+          if subcmds = [] then Ok acc
+          else
+            let* sub_opts_map =
+              List.fold_left
+                (fun sub_acc (sub : HP.command_entry) ->
+                  let* sub_acc = sub_acc in
+                  let* opts = load_options binary [cmd; sub.HP.name] in
+                  Ok (String_map.add sub.HP.name (dedupe_options opts) sub_acc))
+                (Ok String_map.empty)
+                subcmds
+            in
+            Ok (String_map.add cmd sub_opts_map acc))
+        subcommands_map
+        (Ok String_map.empty)
+    in
     let zsh =
       render_zsh
         ~commands:zsh_commands
         ~instance_actions
         ~options_map
         ~subcommands_map
+        ~suboptions_map
     in
     let bash_options_map =
       String_map.map
@@ -588,6 +696,7 @@ let () =
         ~instance_actions:(List.map fst instance_actions)
         ~options_map:bash_options_map
         ~subcommands_map
+        ~suboptions_map
         ~kinds
     in
     let zsh_path = Filename.concat !out_dir "octez-manager.zsh" in
