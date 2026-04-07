@@ -40,7 +40,7 @@ type t = {
   continual_offset : int;
 }
 
-let default ?(network = "mainnet") ~baker_pkh () =
+let default ~baker_pkh =
   {
     version = 1;
     baker_pkh;
@@ -68,7 +68,7 @@ let default ?(network = "mainnet") ~baker_pkh () =
     bond_recipients = [];
     fee_recipients = [];
     rpc_fallback_pool = [];
-    tzkt_url = Indexer.tzkt_base_url ~network;
+    tzkt_url = "https://api.tzkt.io";
     explorer_url = "https://tzkt.io";
     notifications = [];
     continual_enabled = false;
@@ -76,14 +76,9 @@ let default ?(network = "mainnet") ~baker_pkh () =
     continual_offset = 0;
   }
 
-let effective_tzkt_url ~network config =
-  let correct = Indexer.tzkt_base_url ~network in
-  let mainnet_default = Indexer.tzkt_base_url ~network:"mainnet" in
-  if
-    String.equal config.tzkt_url mainnet_default
-    && not (String.equal correct mainnet_default)
-  then correct
-  else config.tzkt_url
+let tzkt_base_url_for_network network =
+  if String.equal network "mainnet" then "https://api.tzkt.io"
+  else Printf.sprintf "https://api.%s.tzkt.io" network
 
 (* Validation *)
 
@@ -448,13 +443,21 @@ let rewards_dir ~instance =
 let config_path ~instance =
   Filename.concat (rewards_dir ~instance) "config.json"
 
+let rec mkdir_p path =
+  if Sys.file_exists path then ()
+  else (
+    mkdir_p (Filename.dirname path) ;
+    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+
 let load ~instance =
   let path = config_path ~instance in
   if not (Sys.file_exists path) then
     Error (Printf.sprintf "config not found: %s" path)
   else
     try
-      let content = In_channel.with_open_text path In_channel.input_all in
+      let ic = open_in path in
+      let content = In_channel.input_all ic in
+      close_in ic ;
       let json = Yojson.Safe.from_string content in
       of_json json
     with
@@ -464,12 +467,13 @@ let load ~instance =
 let save ~instance t =
   try
     let dir = rewards_dir ~instance in
-    File_ops.mkdir_p dir ;
+    mkdir_p dir ;
     let json = to_json t in
     let content = Yojson.Safe.pretty_to_string ~std:true json in
     let path = config_path ~instance in
-    Out_channel.with_open_text path (fun oc ->
-        output_string oc content ;
-        output_char oc '\n') ;
+    let oc = open_out path in
+    output_string oc content ;
+    output_char oc '\n' ;
+    close_out oc ;
     Ok ()
   with exn -> Error (Printexc.to_string exn)

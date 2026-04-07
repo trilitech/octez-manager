@@ -153,7 +153,7 @@ let execute_batch ~ctx ~payouts ~dry_run =
             amount;
             op_hash;
             success = true;
-            note = (if dry_run then output else "ok");
+            note = (if dry_run then "dry-run" else "ok");
           })
         payouts
   | Error (`Msg err) ->
@@ -203,7 +203,15 @@ let execute ~ctx ~(blueprint : Rewards.payout_blueprint) ?(dry_run = false)
         if dry_run then Payout_report.dry_report_dir ~instance ~cycle
         else Payout_report.report_dir ~instance ~cycle
       in
-      File_ops.mkdir_p report_dir ;
+      (* Ensure report directory exists *)
+      let rec ensure_dir path =
+        if Sys.file_exists path then ()
+        else (
+          ensure_dir (Filename.dirname path) ;
+          try Unix.mkdir path 0o755
+          with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+      in
+      ensure_dir report_dir ;
       let lock_path = Filename.concat report_dir ".lock" in
       File_ops.with_file_lock lock_path (fun () ->
           let payouts = collect_payouts blueprint in
@@ -289,10 +297,10 @@ let execute ~ctx ~(blueprint : Rewards.payout_blueprint) ?(dry_run = false)
               cycle;
               delegators = blueprint.total_delegators;
               paid_delegators = List.length succeeded;
-              own_staked_balance = blueprint.own_staked_balance;
-              own_delegated_balance = blueprint.own_delegated_balance;
-              external_staked_balance = blueprint.external_staked_balance;
-              external_delegated_balance = blueprint.external_delegated_balance;
+              own_staked_balance = 0L;
+              own_delegated_balance = 0L;
+              external_staked_balance = 0L;
+              external_delegated_balance = 0L;
               earned_rewards = blueprint.earned_rewards;
               earned_block_fees = blueprint.earned_block_fees;
               distributed_rewards = distributed;

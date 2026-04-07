@@ -145,7 +145,7 @@ let maybe_compute_blueprint s =
                     let config =
                       match s.config with
                       | Some c -> c
-                      | None -> Payout_config.default ~network ~baker_pkh:pkh ()
+                      | None -> Payout_config.default ~baker_pkh:pkh
                     in
                     let bp =
                       Reward_calculator.generate_blueprint
@@ -175,11 +175,10 @@ let maybe_load_config s =
         let config =
           match Payout_config.load ~instance with
           | Ok c -> c
-          | Error _ -> Payout_config.default ~baker_pkh:pkh ()
+          | Error _ -> Payout_config.default ~baker_pkh:pkh
         in
         {s with config = Some config}
 
-(** Apply pending config edits from modal callbacks. *)
 let apply_pending_config s =
   match Rewards_config_tab.consume_pending_config () with
   | Some config -> {s with config = Some config; config_dirty = true}
@@ -572,7 +571,7 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
       let config =
         match Payout_config.load ~instance with
         | Ok c -> c
-        | Error _ -> Payout_config.default ~network ~baker_pkh:pkh ()
+        | Error _ -> Payout_config.default ~baker_pkh:pkh
       in
       let base_dir =
         match Node_env.read ~inst:instance with
@@ -858,7 +857,7 @@ let handle_key ps key ~size:_ =
                   let config =
                     match Payout_config.load ~instance with
                     | Ok c -> c
-                    | Error _ -> Payout_config.default ~baker_pkh:pkh ()
+                    | Error _ -> Payout_config.default ~baker_pkh:pkh
                   in
                   let config =
                     {config with Payout_config.continual_enabled = false}
@@ -872,7 +871,7 @@ let handle_key ps key ~size:_ =
                   let config =
                     match Payout_config.load ~instance with
                     | Ok c -> c
-                    | Error _ -> Payout_config.default ~baker_pkh:pkh ()
+                    | Error _ -> Payout_config.default ~baker_pkh:pkh
                   in
                   let config =
                     {config with Payout_config.continual_enabled = true}

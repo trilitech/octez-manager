@@ -14,12 +14,8 @@ let get_override config delegator =
 let is_in_list addr = List.exists (String.equal addr)
 
 let delegator_status config delegator ~balance ~net_reward =
-  let has_whitelist =
-    match config.Payout_config.whitelist with [] -> false | _ -> true
-  in
-  let has_blacklist =
-    match config.Payout_config.blacklist with [] -> false | _ -> true
-  in
+  let has_whitelist = config.Payout_config.whitelist <> [] in
+  let has_blacklist = config.Payout_config.blacklist <> [] in
   if has_blacklist && is_in_list delegator config.blacklist then Rewards.Ignored
   else if has_whitelist && not (is_in_list delegator config.whitelist) then
     Rewards.Ignored
@@ -221,10 +217,6 @@ let generate_blueprint ~config ~network ~cycle_rewards =
     Rewards.cycle = cr.cycle;
     baker = cr.baker;
     network;
-    own_staked_balance = cr.own_staked_balance;
-    own_delegated_balance = cr.own_delegated_balance;
-    external_staked_balance = cr.external_staked_balance;
-    external_delegated_balance = cr.external_delegated_balance;
     earned_rewards = total_rewards;
     earned_block_fees = cr.block_fees;
     total_delegators = cr.num_delegators;

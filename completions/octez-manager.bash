@@ -64,7 +64,7 @@ _octez_manager() {
   local rewards_generate_opts="--baker --cycle --force --json --help --version"
   local rewards_history_opts="--baker --cycles --json --help --version"
   local rewards_notify_opts="--help --version"
-  local rewards_pay_opts="--baker --compare-indexers --compare --confirm --cycle --dry-run --help --version"
+  local rewards_pay_opts="--baker --confirm --cycle --dry-run --help --version"
   local rewards_status_opts="--baker --help --version"
   local rpc_get_opts="-i --instance -p --public -u --url --help --version"
   local rpc_instances_opts="--help --version"
