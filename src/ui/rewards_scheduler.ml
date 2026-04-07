@@ -49,11 +49,6 @@ let payout_status_cache : (string * int, Rewards.payout_status) Hashtbl.t =
 
 let payout_status_lock = Mutex.create ()
 
-(* Track payouts currently being executed *)
-let in_progress_payouts : (string * int, unit) Hashtbl.t = Hashtbl.create 4
-
-let in_progress_lock = Mutex.create ()
-
 (* Payout summary cache: keyed by (instance, cycle) *)
 let summary_cache : (string * int, Rewards.cycle_summary) Hashtbl.t =
   Hashtbl.create 64
@@ -63,6 +58,11 @@ let summary_lock = Mutex.create ()
 let get_payout_summary ~instance ~cycle =
   Mutex.protect summary_lock (fun () ->
       Hashtbl.find_opt summary_cache (instance, cycle))
+
+(* Track payouts currently being executed *)
+let in_progress_payouts : (string * int, unit) Hashtbl.t = Hashtbl.create 4
+
+let in_progress_lock = Mutex.create ()
 
 let get_payout_status ~instance ~cycle =
   let in_prog =
@@ -178,7 +178,8 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
           let endpoint =
             Delegate_scheduler.get_baker_node_endpoint ~instance
             |> Option.value
-                 ~default:(Rpc_addr.to_endpoint service.Service.rpc_addr)
+                 ~default:
+                   ("http://" ^ Rpc_addr.to_string service.Service.rpc_addr)
           in
           let base_dir =
             match Node_env.read ~inst:instance with
@@ -230,10 +231,8 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
 
 (** Try fetching recent cycles for [baker]. Returns [Some cycles] on success
     with at least one cycle, [None] otherwise. *)
-let try_fetch_baker ~network ~preferred_base ~baker =
-  match
-    Cycle_data.fetch_recent_cycles ~network ~preferred_base ~baker ~limit:10
-  with
+let try_fetch_baker ~tzkt_url ~baker =
+  match Cycle_data.fetch_recent_cycles ~tzkt_url ~baker ~limit:10 with
   | Ok (_ :: _ as cycles) -> Some cycles
   | Ok [] | Error _ -> None
 
@@ -254,8 +253,10 @@ let poll_baker ~instance ~network =
   let config_opt =
     match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
   in
-  let preferred_base =
-    Option.map (fun c -> Payout_config.effective_tzkt_url ~network c) config_opt
+  let tzkt_url =
+    match config_opt with
+    | Some c -> c.tzkt_url
+    | None -> Payout_config.tzkt_base_url_for_network network
   in
   (* Try the configured baker first, then fall back to each delegate,
      then the cached baker (for test bakers from OM_TEST_BAKER). *)
@@ -269,7 +270,7 @@ let poll_baker ~instance ~network =
     let from_config =
       match configured_baker with
       | Some baker -> (
-          match try_fetch_baker ~network ~preferred_base ~baker with
+          match try_fetch_baker ~tzkt_url ~baker with
           | Some cycles -> Some (baker, cycles)
           | None -> None)
       | None -> None
@@ -285,7 +286,7 @@ let poll_baker ~instance ~network =
         in
         List.find_map
           (fun baker ->
-            match try_fetch_baker ~network ~preferred_base ~baker with
+            match try_fetch_baker ~tzkt_url ~baker with
             | Some cycles -> Some (baker, cycles)
             | None -> None)
           candidates
@@ -304,13 +305,7 @@ let poll_baker ~instance ~network =
       in
       List.iter
         (fun (cr : Rewards.cycle_rewards) ->
-          match
-            Cycle_data.fetch_cycle
-              ~network
-              ~preferred_base
-              ~baker
-              ~cycle:cr.cycle
-          with
+          match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle:cr.cycle with
           | Ok full_cr ->
               Mutex.protect cycle_lock (fun () ->
                   Hashtbl.replace cycle_cache (baker, cr.cycle) full_cr)
@@ -326,14 +321,13 @@ let poll_baker ~instance ~network =
         | Some c -> not (String.equal c.baker_pkh baker)
       in
       if need_save then begin
-        let default_tzkt_url = Indexer.tzkt_base_url ~network in
         let config =
           match config_opt with
-          | Some c -> {c with baker_pkh = baker}
+          | Some c -> {c with baker_pkh = baker; tzkt_url}
           | None ->
               {
-                (Payout_config.default ~network ~baker_pkh:baker ()) with
-                tzkt_url = default_tzkt_url;
+                (Payout_config.default ~baker_pkh:baker) with
+                tzkt_url;
                 explorer_url =
                   (if String.equal network "mainnet" then "https://tzkt.io"
                    else Printf.sprintf "https://%s.tzkt.io" network);
@@ -357,7 +351,7 @@ let poll_baker ~instance ~network =
         cycles
   | None -> ()) ;
   (* Fetch current cycle *)
-  match Cycle_data.fetch_current_cycle ~network ~preferred_base with
+  match Cycle_data.fetch_current_cycle ~tzkt_url with
   | Error _ -> ()
   | Ok c ->
       Mutex.protect current_cycle_lock (fun () ->
@@ -375,16 +369,17 @@ let ensure_cycle_detail ~instance ~baker ~cycle =
           Hashtbl.find_opt network_cache instance)
       |> Option.value ~default:"mainnet"
     in
-    let preferred_base =
-      match Payout_config.load ~instance with
-      | Ok c -> Some (Payout_config.effective_tzkt_url ~network c)
-      | Error _ -> None
+    let config_opt =
+      match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
+    in
+    let tzkt_url =
+      match config_opt with
+      | Some c -> c.tzkt_url
+      | None -> Payout_config.tzkt_base_url_for_network network
     in
     ignore
       (Domain_pool.submit (fun () ->
-           match
-             Cycle_data.fetch_cycle ~network ~preferred_base ~baker ~cycle
-           with
+           match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle with
            | Ok full_cr ->
                Mutex.protect cycle_lock (fun () ->
                    Hashtbl.replace cycle_cache (baker, cycle) full_cr)
@@ -465,7 +460,6 @@ let clear () =
   Mutex.protect current_cycle_lock (fun () -> Hashtbl.clear current_cycle_cache) ;
   Mutex.protect payout_status_lock (fun () -> Hashtbl.clear payout_status_cache) ;
   Mutex.protect in_progress_lock (fun () -> Hashtbl.clear in_progress_payouts) ;
-  Mutex.protect summary_lock (fun () -> Hashtbl.clear summary_cache) ;
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.clear baker_instance_cache) ;
   Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache) ;

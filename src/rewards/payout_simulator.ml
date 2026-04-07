@@ -26,10 +26,9 @@ let simulate ~ctx ~(blueprint : Rewards.payout_blueprint) ?on_progress
   let total_needed =
     List.fold_left
       (fun acc (r : Rewards.delegator_reward) ->
-        match r.status with
-        | Rewards.Eligible when Int64.compare r.net_reward 0L > 0 ->
-            Int64.add acc r.net_reward
-        | _ -> acc)
+        if r.status = Rewards.Eligible && Int64.compare r.net_reward 0L > 0 then
+          Int64.add acc r.net_reward
+        else acc)
       0L
       blueprint.delegator_rewards
   in

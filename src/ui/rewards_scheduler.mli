@@ -39,18 +39,17 @@ val get_recent_cycles :
 (** Get the cached current cycle number for a specific instance. *)
 val get_current_cycle : instance:string -> int option
 
-(** Get payout status for a baker + cycle (paid/unpaid/partial/in_progress).
-    Pure cache read — safe for view functions. *)
-val get_payout_status :
-  instance:string -> cycle:int -> Octez_manager_rewards.Rewards.payout_status
-
-(** Get the cached payout summary for a cycle.
-    Returns [None] if no summary has been cached for this cycle.
-    Pure cache read — safe for view functions. *)
+(** Returns the cached payout summary for [instance] and [cycle], or [None] if
+    no summary has been loaded yet. *)
 val get_payout_summary :
   instance:string ->
   cycle:int ->
   Octez_manager_rewards.Rewards.cycle_summary option
+
+(** Get payout status for a baker + cycle (paid/unpaid/partial/in_progress).
+    Pure cache read — safe for view functions. *)
+val get_payout_status :
+  instance:string -> cycle:int -> Octez_manager_rewards.Rewards.payout_status
 
 (** Refresh payout status from disk for a specific cycle.
     Reads summary.json to determine Paid vs Partial. Does I/O. *)
