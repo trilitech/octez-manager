@@ -427,7 +427,8 @@ let render_zsh ~roots ~instance_actions =
   Buffer.add_string buf "          ;;\n" ;
   Buffer.add_string buf "        lb-votes)\n" ;
   Buffer.add_string
-    buf "          _describe -t lb-votes 'liquidity baking votes' lb_votes\n" ;
+    buf
+    "          _describe -t lb-votes 'liquidity baking votes' lb_votes\n" ;
   Buffer.add_string buf "          ;;\n" ;
   Buffer.add_string buf "      esac\n" ;
   Buffer.add_string buf "      ;;\n" ;
