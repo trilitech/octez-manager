@@ -187,12 +187,27 @@ let move_selection_single_column s delta =
 
 (** Multi-column: navigate within the menu area (indices 0..menu_item_count).
     The radio row at menu_item_count is the last "menu-like" navigable item.
-    Navigation stays within the menu area. *)
+    Pressing down from the radio row transitions to first service in column 0. *)
 let move_selection_menu s delta =
   let selected = s.selected + delta in
-  (* Clamp to stay within menu area [0, menu_item_count] *)
-  let selected = max 0 (min menu_item_count selected) in
-  {s with selected}
+  if selected < 0 then
+    (* Stay at top of menu *)
+    {s with selected = 0}
+  else if selected > menu_item_count then
+    (* Transition to first service in column 0 *)
+    let sections = sections_of_state s in
+    let display_items = display_ordered_items s in
+    let first_svc =
+      first_service_in_column
+        ~num_columns:s.num_columns
+        ~sections
+        ~display_items
+        0
+    in
+    {s with selected = first_svc + services_start_idx; active_column = 0}
+  else
+    (* Stay within menu bounds *)
+    {s with selected}
 
 (** Multi-column: navigate within the external services section
     (below all column-distributed managed services). *)
@@ -200,8 +215,20 @@ let move_selection_external s delta =
   let display_items = display_ordered_items s in
   let first_external = services_start_idx + List.length display_items in
   if s.selected = first_external && delta < 0 then
-    (* Stay at first external service when pressing up *)
-    s
+    (* Transition back to last managed service in column 0 *)
+    if List.length display_items > 0 && s.num_columns > 1 then
+      let sections = sections_of_state s in
+      let col_indices =
+        services_in_column ~num_columns:s.num_columns ~sections ~display_items 0
+      in
+      match List.rev col_indices with
+      | [] -> {s with selected = menu_item_count; active_column = 0}
+      | last_idx :: _ ->
+          {s with selected = last_idx + services_start_idx; active_column = 0}
+    else if List.length display_items > 0 then
+      let last_managed = services_start_idx + List.length display_items - 1 in
+      {s with selected = last_managed}
+    else {s with selected = menu_item_count}
   else
     let ext = if s.external_section_folded then [] else s.external_services in
     let raw = s.selected + delta in
@@ -209,7 +236,8 @@ let move_selection_external s delta =
     {s with selected}
 
 (** Multi-column: navigate within managed services, constrained to the
-    active column.  Moving up/down stays within the column bounds. *)
+    active column.  Pressing up from first service goes to menu; pressing down
+    from last service transitions to external services if available. *)
 let move_selection_managed s delta =
   let current_idx = s.selected - services_start_idx in
   let sections = sections_of_state s in
@@ -228,12 +256,16 @@ let move_selection_managed s delta =
     |> Option.value ~default:0
   in
   let new_pos = current_pos + delta in
-  if new_pos < 0 then
-    (* Stay at top of column *)
-    s
+  if new_pos < 0 then (
+    (* Transition to menu *)
+    s.column_scroll.(s.active_column) <- 0 ;
+    {s with selected = menu_item_count})
   else if new_pos >= List.length col_indices then
-    (* Stay at bottom of column *)
-    s
+    (* Transition to external services if available, otherwise stay *)
+    if List.length s.external_services > 0 then
+      let first_external = services_start_idx + List.length display_items in
+      {s with selected = first_external}
+    else s
   else
     let new_idx = List.nth col_indices new_pos in
     let line_start, line_count =
