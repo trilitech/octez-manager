@@ -86,9 +86,27 @@ let load_instance_actions binary =
       in
       Ok (extract_actions output)
 
+let is_valid_cmd_name name =
+  (* Reject tokens like [--octez-version=VERSION] that appear when cmdliner
+     wraps a long COMMANDS entry across multiple lines: the continuation line
+     starts at the same indentation as real subcommands so the parser
+     mistakenly treats the first token as a new command. *)
+  String.length name > 0
+  && String.for_all
+       (fun c ->
+         (c >= 'a' && c <= 'z')
+         || (c >= 'A' && c <= 'Z')
+         || (c >= '0' && c <= '9')
+         || c = '-' || c = '_')
+       name
+
 let load_subcommands binary cmd =
   let* help = run_help binary [cmd; "--help=plain"] in
-  Ok (HP.parse_cmdliner_commands help)
+  let subs = HP.parse_cmdliner_commands help in
+  Ok
+    (List.filter
+       (fun (sub : HP.command_entry) -> is_valid_cmd_name sub.HP.name)
+       subs)
 
 let dedupe_options entries =
   let seen = Hashtbl.create 32 in

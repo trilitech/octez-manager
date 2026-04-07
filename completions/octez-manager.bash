@@ -49,7 +49,6 @@ _octez_manager() {
   local binaries_register_opts="-a --alias --help --version"
   local binaries_remove_opts="--help --version"
   local binaries_unregister_opts="-f --force --help --version"
-  local group_[__octez_version=VERSION]_opts="--help --version"
   local group_add_opts="--instance --help --version"
   local group_create_opts="--app-bin-dir --bin-dir-alias --network --octez-version --service-user --help --version"
   local group_delete_opts="--cascade --ungroup --help --version"
@@ -290,7 +289,7 @@ _octez_manager() {
           opts="--help --version"
           COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
         else
-          COMPREPLY=( $(compgen -W "add create delete list remove restart show start stop upgrade [--octez-version=VERSION]" -- "$cur") )
+          COMPREPLY=( $(compgen -W "add create delete list remove restart show start stop upgrade" -- "$cur") )
         fi
       else
         local subcmd="${COMP_WORDS[2]}"
@@ -343,11 +342,6 @@ _octez_manager() {
           upgrade)
             if [[ $cur == -* ]]; then
               COMPREPLY=( $(compgen -W "$group_upgrade_opts" -- "$cur") )
-            fi
-            ;;
-          [--octez-version=VERSION])
-            if [[ $cur == -* ]]; then
-              COMPREPLY=( $(compgen -W "$group_[__octez_version=VERSION]_opts" -- "$cur") )
             fi
             ;;
         esac
