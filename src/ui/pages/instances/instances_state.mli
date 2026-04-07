@@ -11,6 +11,12 @@ module Service_state = Data.Service_state
 
 module StringSet : Set.S with type elt = string
 
+(** Display item type for rendering - includes real services and ghost "Add new" entries *)
+type display_item =
+  | Real_service of Service_state.t
+  | Ghost_add_new of string
+      (** Ghost entry labeled with role (e.g., "node", "baker") *)
+
 (** View mode for instances page layout *)
 type view_mode =
   | By_role  (** Group services by role (node, baker, etc.) *)
@@ -66,8 +72,14 @@ val clamp_selection :
   int ->
   int
 
+(** Clamp selection index to valid range (with display items) *)
+val clamp_selection_with_items : display_item list -> int -> int
+
 (** Services in display order (respects view_mode grouping) *)
 val display_ordered_services : state -> Service_state.t list
+
+(** Display items in order (services + ghost entries, respects view_mode grouping) *)
+val display_ordered_items : state -> display_item list
 
 (** Get currently selected service, if any *)
 val current_service : state -> Service_state.t option

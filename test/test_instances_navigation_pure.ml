@@ -108,8 +108,16 @@ let test_multi_column_up_from_second_column_to_radio_row () =
   let services = multi_role_services () in
   (* Find the first service index in column 1 *)
   let sections = Instances_layout.group_by_role services in
+  (* Convert services to display_items for the layout functions *)
+  let display_items =
+    List.map (fun svc -> Instances_state.Real_service svc) services
+  in
   let col1_services =
-    Instances_layout.services_in_column ~num_columns:2 ~sections ~services 1
+    Instances_layout.services_in_column
+      ~num_columns:2
+      ~sections
+      ~display_items
+      1
   in
   match col1_services with
   | [] -> (* Column 1 is empty, skip test *) ()
