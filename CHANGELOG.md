@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
+- `octez-manager instance <name>` with an unknown instance name now shows "Unknown instance '<name>'" instead of the misleading "ACTION required" prompt
+- `octez-manager baker list` no longer crashes with an internal exception when no baker instances are installed; it now exits cleanly with a helpful message
+- Shell tab-completion for command groups (`baker`, `binaries`, `group`, `rewards`, `rpc`, `sandbox`) now correctly offers subcommands instead of only `--help`/`--version`
+- Zsh tab-completion for commands with colons in flag descriptions (e.g. `install-signatory`) no longer crashes the shell
 
 ### Added
 
