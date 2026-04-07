@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Imported key not visible until restart**: After importing a watch-only address in the Wallets page, the key list now updates immediately without requiring an app restart.
+
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
 
 ### Added
