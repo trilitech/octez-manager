@@ -170,19 +170,23 @@ open Instances_actions
 
 (** Single-column navigation: linear up/down with separator skipping.
     Layout: 0-2 = buttons, 3 = radio row (navigable), 4 = separator (skipped),
-    5+ = services. *)
+    5+ = services (including ghosts). *)
 let move_selection_single_column s delta =
+  let display_items = display_ordered_items s in
   let ext = if s.external_section_folded then [] else s.external_services in
   let raw = s.selected + delta in
-  let selected = clamp_selection s.services ext raw in
-  (* Skip only the separator (index menu_item_count+1 = 4); the radio row (3) is navigable *)
+  (* Total navigable items: menu + display_items + external *)
+  let total_items =
+    services_start_idx + List.length display_items + List.length ext
+  in
+  let selected = max 0 (min (total_items - 1) raw) in
+  (* Skip only the separator (index menu_item_count+1 = 1) *)
   let sep_idx = menu_item_count + 1 in
   let selected =
     if selected >= sep_idx && selected < services_start_idx then
       if delta > 0 then services_start_idx else menu_item_count
     else selected
   in
-  let selected = clamp_selection s.services ext selected in
   {s with selected}
 
 (** Multi-column: navigate within the menu area (indices 0..menu_item_count).
