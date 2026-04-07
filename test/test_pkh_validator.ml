@@ -59,6 +59,31 @@ let test_valid_tz4 () =
 let test_valid_with_whitespace () =
   check_valid "trimmed whitespace" "  tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx  "
 
+let test_valid_with_nbsp () =
+  (* U+00A0 non-breaking space (\xc2\xa0 in UTF-8) — common when copying from
+     browsers or rich-text editors *)
+  check_valid
+    "non-breaking space stripped"
+    "\xc2\xa0tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\xc2\xa0"
+
+let test_valid_with_bom () =
+  (* U+FEFF BOM / zero-width no-break space (\xef\xbb\xbf in UTF-8) —
+     sometimes prepended when copying from Windows applications *)
+  check_valid "BOM stripped" "\xef\xbb\xbftz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+
+let test_valid_with_zwsp () =
+  (* U+200B ZERO-WIDTH SPACE (\xe2\x80\x8b in UTF-8) — injected by some
+     web UIs between characters *)
+  check_valid
+    "zero-width space stripped"
+    ("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ^ "\xe2\x80\x8b")
+
+let test_valid_with_mixed_unicode () =
+  (* BOM at start + NBSP at end — realistic tzkt copy-paste scenario *)
+  check_valid
+    "BOM + NBSP mixed stripped"
+    ("\xef\xbb\xbf" ^ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ^ "\xc2\xa0")
+
 (* ============================================================ *)
 (* Invalid PKH Tests *)
 (* ============================================================ *)
@@ -103,6 +128,10 @@ let valid_tests =
     ("valid tz3", `Quick, test_valid_tz3);
     ("valid tz4", `Quick, test_valid_tz4);
     ("valid with whitespace", `Quick, test_valid_with_whitespace);
+    ("valid with non-breaking space", `Quick, test_valid_with_nbsp);
+    ("valid with BOM", `Quick, test_valid_with_bom);
+    ("valid with zero-width space", `Quick, test_valid_with_zwsp);
+    ("valid with mixed unicode", `Quick, test_valid_with_mixed_unicode);
   ]
 
 let invalid_tests =

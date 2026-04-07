@@ -99,6 +99,18 @@ let now () =
     tm.tm_min
     tm.tm_sec
 
+(** Strip non-printable and non-ASCII bytes, keeping only printable ASCII
+    (0x20-0x7E). Browsers inject U+00A0, U+200B, U+FEFF and similar when
+    copying from web UIs. *)
+let strip_non_ascii s =
+  let buf = Buffer.create (String.length s) in
+  String.iter
+    (fun c ->
+      let code = Char.code c in
+      if code >= 0x20 && code <= 0x7E then Buffer.add_char buf c)
+    s ;
+  Buffer.contents buf
+
 (** {1 Size Formatting} *)
 
 (** Format a byte count as a human-readable string using integer
