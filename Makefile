@@ -1,4 +1,4 @@
-.PHONY: all deps deps-ci build test clean coverage update-miaou arch-index arch-query
+.PHONY: all deps build test clean coverage update-miaou arch-index arch-query
 
 OPAM_EXEC ?= opam exec --
 DUNE = $(OPAM_EXEC) dune
@@ -15,17 +15,6 @@ deps:
 	# @opam pin add "https://github.com/trilitech/miaou.git" --yes
 	@opam install . --deps-only --with-test --yes
 	@opam install sqlite3 dune-build-info ocamlformat --yes
-
-MIAOU_GIT_URL ?= https://github.com/trilitech/miaou.git
-PPX_FORBID_GIT_URL ?= https://github.com/atacama-dev/ppx_forbid.git
-
-deps-ci:
-	@echo "Pinning ppx_forbid from $(PPX_FORBID_GIT_URL)"
-	@opam pin add -y ppx_forbid "$(PPX_FORBID_GIT_URL)" || { echo "ERROR: Failed to pin ppx_forbid package" >&2; exit 1; }
-	@echo "Pinning miaou from $(MIAOU_GIT_URL)"
-	@opam pin add -y miaou "$(MIAOU_GIT_URL)" || { echo "ERROR: Failed to pin miaou package" >&2; exit 1; }
-	@opam pin add -y miaou-driver-matrix "$(MIAOU_GIT_URL)" || { echo "ERROR: Failed to pin miaou-driver-matrix package" >&2; exit 1; }
-	$(MAKE) deps
 
 build:
 	$(DUNE) build
