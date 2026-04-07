@@ -288,7 +288,7 @@ let reset_config ~baker_pkh =
     ~message:"Reset all settings to defaults?"
     ~on_result:(fun confirmed ->
       if confirmed then begin
-        pending_config := Some (Payout_config.default ~baker_pkh ()) ;
+        pending_config := Some (Payout_config.default ~baker_pkh) ;
         Context.toast_info "Configuration reset to defaults"
       end)
     ()
@@ -332,11 +332,7 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
       (* Hint panel: left-bordered block for the selected field *)
       let hint_box =
         if state.config_show_hint then
-          let field =
-            match List.nth_opt all_fields state.config_cursor with
-            | Some f -> f
-            | None -> List.hd all_fields
-          in
+          let field = List.nth all_fields state.config_cursor in
           let bar = Widgets.themed_muted "\xe2\x94\x82 " in
           let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
           let hint_width = max 20 (box_width - 6) in
