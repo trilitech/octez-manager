@@ -187,21 +187,12 @@ let move_selection_single_column s delta =
 
 (** Multi-column: navigate within the menu area (indices 0..menu_item_count).
     The radio row at menu_item_count is the last "menu-like" navigable item.
-    When pressing Down past the radio row, jump to first service in column 0. *)
+    Navigation stays within the menu area. *)
 let move_selection_menu s delta =
-  let selected = max 0 (min (menu_item_count + 1) (s.selected + delta)) in
-  if selected >= menu_item_count + 1 && delta > 0 then
-    let sections = sections_of_state s in
-    let display_items = display_ordered_items s in
-    let first_svc =
-      first_service_in_column
-        ~num_columns:s.num_columns
-        ~sections
-        ~display_items
-        0
-    in
-    {s with selected = first_svc + services_start_idx; active_column = 0}
-  else {s with selected}
+  let selected = s.selected + delta in
+  (* Clamp to stay within menu area [0, menu_item_count] *)
+  let selected = max 0 (min menu_item_count selected) in
+  {s with selected}
 
 (** Multi-column: navigate within the external services section
     (below all column-distributed managed services). *)
@@ -209,20 +200,8 @@ let move_selection_external s delta =
   let display_items = display_ordered_items s in
   let first_external = services_start_idx + List.length display_items in
   if s.selected = first_external && delta < 0 then
-    (* Moving up from first external service *)
-    if List.length display_items > 0 && s.num_columns > 1 then
-      let sections = sections_of_state s in
-      let col_indices =
-        services_in_column ~num_columns:s.num_columns ~sections ~display_items 0
-      in
-      match List.rev col_indices with
-      | [] -> {s with selected = menu_item_count; active_column = 0}
-      | last_idx :: _ ->
-          {s with selected = last_idx + services_start_idx; active_column = 0}
-    else if List.length display_items > 0 then
-      let last_managed = services_start_idx + List.length display_items - 1 in
-      {s with selected = last_managed}
-    else {s with selected = menu_item_count}
+    (* Stay at first external service when pressing up *)
+    s
   else
     let ext = if s.external_section_folded then [] else s.external_services in
     let raw = s.selected + delta in
@@ -230,8 +209,7 @@ let move_selection_external s delta =
     {s with selected}
 
 (** Multi-column: navigate within managed services, constrained to the
-    active column.  Moving up past the first service goes to the last menu
-    item; moving down past the last service goes to external services. *)
+    active column.  Moving up/down stays within the column bounds. *)
 let move_selection_managed s delta =
   let current_idx = s.selected - services_start_idx in
   let sections = sections_of_state s in
@@ -250,14 +228,12 @@ let move_selection_managed s delta =
     |> Option.value ~default:0
   in
   let new_pos = current_pos + delta in
-  if new_pos < 0 then (
-    s.column_scroll.(s.active_column) <- 0 ;
-    {s with selected = menu_item_count})
+  if new_pos < 0 then
+    (* Stay at top of column *)
+    s
   else if new_pos >= List.length col_indices then
-    if List.length s.external_services > 0 then
-      let first_external = services_start_idx + List.length display_items in
-      {s with selected = first_external}
-    else s
+    (* Stay at bottom of column *)
+    s
   else
     let new_idx = List.nth col_indices new_pos in
     let line_start, line_count =
@@ -848,26 +824,33 @@ Press **Enter** to open instance menu.|}
           current_col_indices
         |> Option.value ~default:0
       in
-      let new_col = (s.active_column + delta + num_cols) mod num_cols in
-      let target_col_indices =
-        services_in_column
-          ~num_columns:num_cols
-          ~sections
-          ~display_items
-          new_col
-      in
-      if target_col_indices = [] then
-        (* Target column is empty, stay in current column *)
+      (* Clamp new_col to valid range instead of wrapping *)
+      let new_col = s.active_column + delta in
+      if new_col < 0 || new_col >= num_cols then
+        (* Stay at current column when at edge *)
         s
       else
-        (* Move to same position (clamped) in target column *)
-        let target_pos = min current_pos (List.length target_col_indices - 1) in
-        let target_idx = List.nth target_col_indices target_pos in
-        {
-          s with
-          active_column = new_col;
-          selected = target_idx + services_start_idx;
-        }
+        let target_col_indices =
+          services_in_column
+            ~num_columns:num_cols
+            ~sections
+            ~display_items
+            new_col
+        in
+        if target_col_indices = [] then
+          (* Target column is empty, stay in current column *)
+          s
+        else
+          (* Move to same position (clamped) in target column *)
+          let target_pos =
+            min current_pos (List.length target_col_indices - 1)
+          in
+          let target_idx = List.nth target_col_indices target_pos in
+          {
+            s with
+            active_column = new_col;
+            selected = target_idx + services_start_idx;
+          }
 
   let create_menu_items =
     [|"Node"; "Baker"; "DAL Node"; "Accuser"; "Signatory"|]
