@@ -28,7 +28,9 @@ type validation_result =
   | Invalid of string  (** Reason the PKH is invalid *)
 
 (** Validate PKH format without any I/O.
-    Checks prefix (tz1-4) and base58check character set and length. *)
+    Strips unicode whitespace (e.g. non-breaking spaces inserted by browsers
+    when copying addresses) before checking prefix (tz1-4), base58check
+    character set, and length. *)
 val validate_format : string -> validation_result
 
 (** Enrich a valid PKH with on-chain data.

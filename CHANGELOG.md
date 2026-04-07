@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **PKH validation rejects valid addresses pasted from browsers**: Pasting a Tezos public key hash from a browser or rich-text editor could silently include a unicode non-breaking space (U+00A0) or a BOM (U+FEFF), causing the validator to report "Expected 36 characters, got 38" even for a correct address. The validator now strips these unicode whitespace sequences before checking length and character set.
+
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
 
 ### Added
