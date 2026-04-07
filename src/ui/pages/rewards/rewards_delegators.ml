@@ -34,8 +34,7 @@ let string_contains ~needle haystack =
     let found = ref false in
     let i = ref 0 in
     while (not !found) && !i <= hlen - nlen do
-      if String.equal (String.sub haystack !i nlen) needle then found := true
-      else incr i
+      if String.sub haystack !i nlen = needle then found := true else incr i
     done ;
     !found
 
@@ -46,8 +45,7 @@ let apply_filter filter (delegators : Rewards.delegator_reward list) =
   | Rewards_state.FilterAll -> delegators
   | Rewards_state.FilterEligible ->
       List.filter
-        (fun (d : Rewards.delegator_reward) ->
-          match d.status with Rewards.Eligible -> true | _ -> false)
+        (fun (d : Rewards.delegator_reward) -> d.status = Rewards.Eligible)
         delegators
   | Rewards_state.FilterExcluded ->
       List.filter

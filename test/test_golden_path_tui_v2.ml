@@ -221,8 +221,8 @@ let golden_path_script =
         "Resize to single-column (60x80) for predictable navigation. Use Home \
          to reset selection to 0, then j keys (not Down, which the headless \
          driver routes to P.move, a no-op on instances) to reach \
-         node-shadownet (selected=2). Path: 0(radio row)->2(skip sep at 1). \
-         Requires 1 j press.";
+         node-shadownet (selected=5, skipping radio-row+separator at indices \
+         3-4).";
       Resize (60, 80);
       Key "Home";
     ]
