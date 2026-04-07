@@ -51,6 +51,13 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_topology_page)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_topology_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
 ; TUI tests are skipped in CI (headless driver hangs in container)
 ; Run locally with: dune exec test/tui_flow_tests.exe
 
