@@ -186,23 +186,12 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
     | None -> Widgets.themed_warning "no signing activity"
     | Some summary -> summary
   in
-  (* Check if baker has DAL enabled *)
-  let baker_has_dal ~instance =
-    match Node_env.read ~inst:instance with
-    | Error _ -> false
-    | Ok pairs -> (
-        match List.assoc_opt "OCTEZ_DAL_CONFIG" pairs with
-        | None -> false
-        | Some cfg ->
-            let cfg = String.trim (String.lowercase_ascii cfg) in
-            cfg <> "" && cfg <> "disabled")
-  in
   (* Render delegate status for bakers (from RPC) *)
   let delegate_status_line ~instance =
     let delegate_pkhs = Delegate_scheduler.get_baker_delegates ~instance in
     if delegate_pkhs = [] then Widgets.themed_muted "no delegates configured"
     else
-      let has_dal = baker_has_dal ~instance in
+      let has_dal = Delegate_scheduler.baker_has_dal ~instance in
       let parts =
         List.map
           (fun pkh ->
@@ -523,9 +512,7 @@ let role_key_of_header = function
 (** Render a single column's content - returns list of lines *)
 let render_column ~col_width ~state ~column_groups =
   let items =
-    column_items
-      ~column_groups
-      ~global_services:(display_ordered_services state)
+    column_items ~column_groups ~index_by_instance:state.ordered_service_indices
   in
   let empty_line = String.make col_width ' ' in
   (* Group items into (header, instances) pairs *)

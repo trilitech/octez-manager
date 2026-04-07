@@ -62,6 +62,9 @@ let init_state () =
       (* max practical columns based on terminal width; 10 is a safe upper bound *)
       view_mode;
       groups;
+      display_sections = [];
+      ordered_services = [];
+      ordered_service_indices = StringMap.empty;
       create_menu_open = false;
       create_menu_cursor = 0;
     }
@@ -197,6 +200,7 @@ let move_selection_menu s delta =
         ~num_columns:s.num_columns
         ~sections
         ~services:(display_ordered_services s)
+        ~index_by_instance:s.ordered_service_indices
         0
     in
     {s with selected = first_svc + services_start_idx; active_column = 0}
@@ -215,6 +219,7 @@ let move_selection_external s delta =
           ~num_columns:s.num_columns
           ~sections
           ~services:(display_ordered_services s)
+          ~index_by_instance:s.ordered_service_indices
           0
       in
       match List.rev col_indices with
@@ -242,6 +247,7 @@ let move_selection_managed s delta =
       ~num_columns:s.num_columns
       ~sections
       ~services:(display_ordered_services s)
+      ~index_by_instance:s.ordered_service_indices
       s.active_column
   in
   let current_pos =
@@ -265,7 +271,7 @@ let move_selection_managed s delta =
       service_line_position
         ~num_columns:s.num_columns
         ~sections
-        ~services:(display_ordered_services s)
+        ~index_by_instance:s.ordered_service_indices
         ~folded:s.folded
         new_idx
         s.active_column
@@ -840,6 +846,7 @@ Press **Enter** to open instance menu.|}
           ~num_columns:num_cols
           ~sections
           ~services:ordered
+          ~index_by_instance:s.ordered_service_indices
           s.active_column
       in
       let current_pos =
@@ -854,6 +861,7 @@ Press **Enter** to open instance menu.|}
           ~num_columns:num_cols
           ~sections
           ~services:ordered
+          ~index_by_instance:s.ordered_service_indices
           new_col
       in
       if target_col_indices = [] then
@@ -1014,6 +1022,7 @@ Press **Enter** to open instance menu.|}
               ~num_columns:s.num_columns
               ~sections
               ~services:(display_ordered_services s)
+              ~index_by_instance:s.ordered_service_indices
               svc_idx
           in
           Navigation.update (fun s -> {s with active_column = col}) ps
