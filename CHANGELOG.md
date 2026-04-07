@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- Global key `K` for navigating to Wallets tab has been removed. Users can now access the Wallets tab using the number key corresponding to its tab position.
+
 ### Changed
 
 - Extract `register_and_init` and `shutdown` helpers in `manager_app.ml`

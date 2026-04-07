@@ -73,11 +73,9 @@ let open_theme_picker () =
       Style_context.set_theme original_theme)
     ()
 
-(** Register global key handler for Ctrl+T *)
+(** Register global key handlers *)
 let register_global_keys () =
   Context.register_global_key "C-t" (fun () -> open_theme_picker ()) ;
-  Context.register_global_key "K" (fun () ->
-      Context.set_pending_tab Context.Tab_wallets) ;
   Context.register_global_key "R" (fun () -> Context.navigate Rewards_page.name)
 
 let register_and_init ?(log = false) ?logfile () =
