@@ -1053,16 +1053,8 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
   let num_columns =
     calc_num_columns ~cols ~min_column_width ~column_separator
   in
-  if state.services = [] then
-    let view_row =
-      radio_row ~selected:(state.selected = menu_item_count) state.view_mode
-    in
-    let external_rows = render_external_services_section state in
-    let external_rows =
-      if external_rows = [] then [] else "" :: external_rows
-    in
-    view_row :: "" :: "  No managed instances." :: external_rows
-  else if num_columns <= 1 then table_lines_single state
+  (* Always render sections - they will show ghost entries even when empty *)
+  if num_columns <= 1 then table_lines_single state
   else
     (* For matrix layout, subtract for menu rows (install + separator) *)
     let matrix_height = max 5 (visible_height - services_start_idx) in
