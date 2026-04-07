@@ -354,6 +354,9 @@ let handle_key ps key ~size =
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
   else
+    match Global_shortcuts.handle key with
+    | Global_shortcuts.Handled -> ps
+    | Global_shortcuts.NotGlobal ->
     let s = ps.Navigation.s in
     (* Handle C-x chord for pager selection *)
     match !pending_chord with
