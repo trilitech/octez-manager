@@ -186,10 +186,14 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
             "Esc"
         | _ -> key
       in
-      (* Don't call close_top here - Modal_manager.handle_key already handles
-         commit/cancel based on commit_on/cancel_on keys. Only handle selection
-         navigation here. *)
-      if key = "Enter" || key = "Esc" then ps
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if key = "Esc" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
       else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
 
     let handle_key = handle_modal_key
@@ -2112,6 +2116,23 @@ let open_theme_picker_modal ~title ~items ~to_string ~load_theme ~on_select
           | Some choice -> on_select choice
           | None -> on_cancel ())
       | `Cancel -> on_cancel ())
+
+type experimental_feature = {
+  title : string;
+  description : string;
+  badge : string;
+  on_select : unit -> unit;
+}
+
+let open_experimental_modal ~features () =
+  let to_string f = Printf.sprintf "%s  [%s]" f.title f.badge in
+  let on_select_feature f = f.on_select () in
+  open_choice_modal
+    ~title:"Experimental Features"
+    ~items:features
+    ~to_string
+    ~on_select:on_select_feature
+    ()
 
 module For_tests = struct
   let first_nonempty_line = first_nonempty_line

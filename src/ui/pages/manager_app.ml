@@ -31,7 +31,6 @@ let register_pages () =
   Sandbox_page.register () ;
   Sandbox_create_form.register () ;
   Sandbox_key_alloc_page.register () ;
-  Experimental_page.register () ;
   Main_shell.register ()
 
 let find_page_or_default name default_name =
