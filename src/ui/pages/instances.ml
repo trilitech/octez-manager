@@ -255,12 +255,11 @@ let move_selection_managed s delta =
     {s with selected = menu_item_count})
   else if new_pos >= List.length col_indices then
     if List.length s.external_services > 0 then
-      let first_external = services_start_idx + List.length s.services in
+      let first_external = services_start_idx + List.length display_items in
       {s with selected = first_external}
     else s
   else
     let new_idx = List.nth col_indices new_pos in
-    let display_items = display_ordered_items s in
     let line_start, line_count =
       service_line_position
         ~num_columns:s.num_columns
@@ -286,7 +285,8 @@ let move_selection s delta =
   else if s.selected < services_start_idx then move_selection_menu s delta
   else
     let current_idx = s.selected - services_start_idx in
-    let in_external = current_idx >= List.length s.services in
+    let display_items = display_ordered_items s in
+    let in_external = current_idx >= List.length display_items in
     if in_external then move_selection_external s delta
     else move_selection_managed s delta
 
