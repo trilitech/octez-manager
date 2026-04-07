@@ -36,7 +36,7 @@ let load_baker_instances () =
     let bakers =
       Data.load_service_states ()
       |> List.filter (fun (st : Data.Service_state.t) ->
-          String.equal st.service.Service.role "baker")
+          st.service.Service.role = "baker")
     in
     List.filter_map
       (fun (st : Data.Service_state.t) ->
@@ -153,15 +153,7 @@ let maybe_compute_blueprint s =
                         ~network
                         ~cycle_rewards:cr
                     in
-                    (* Preserve dashboard mode: only set selected_cycle
-                       if the user explicitly selected a cycle, not when
-                       computing the overview preview. *)
-                    let selected_cycle =
-                      match s.selected_cycle with
-                      | Some _ -> Some cycle
-                      | None -> None
-                    in
-                    {s with blueprint = Some bp; selected_cycle})))
+                    {s with blueprint = Some bp; selected_cycle = Some cycle})))
 
 (** Load payout config from disk when first viewing the Configuration tab.
     Only loads once; subsequent changes are in-memory until saved. *)
@@ -410,12 +402,10 @@ let handle_config_key ps key =
         ps
   | Some Keys.Enter -> (
       match s.config with
-      | Some config -> (
-          match List.nth_opt Rewards_config_tab.all_fields s.config_cursor with
-          | Some field ->
-              Rewards_config_tab.edit_field config field ;
-              ps
-          | None -> ps)
+      | Some config ->
+          let field = List.nth Rewards_config_tab.all_fields s.config_cursor in
+          Rewards_config_tab.edit_field config field ;
+          ps
       | None -> ps)
   | Some (Keys.Char "s") -> (
       match (s.config, Rewards_state.selected_instance_name s) with
@@ -566,26 +556,19 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
       in
       let node_endpoint =
         Delegate_scheduler.get_baker_node_endpoint ~instance
-        |> Option.value ~default:(Rpc_addr.to_endpoint svc.Service.rpc_addr)
+        |> Option.value
+             ~default:("http://" ^ Rpc_addr.to_string svc.Service.rpc_addr)
       in
       let config =
         match Payout_config.load ~instance with
         | Ok c -> c
         | Error _ -> Payout_config.default ~baker_pkh:pkh
       in
-      let base_dir =
-        match Node_env.read ~inst:instance with
-        | Ok pairs -> (
-            match List.assoc_opt "OCTEZ_CLIENT_BASE_DIR" pairs with
-            | Some d -> Some d
-            | None -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs)
-        | Error _ -> None
-      in
       let ctx : Payout_executor.context =
         {
           octez_client_bin;
           endpoint = node_endpoint;
-          base_dir;
+          base_dir = None;
           password_file = None;
           payout_key_alias = config.payout_key_alias;
           instance;
