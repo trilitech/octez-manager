@@ -220,6 +220,27 @@ All pull requests must include:
 - **Ask for confirmation before force pushing** - force push operations rewrite history and should only be done with explicit user approval
 - **Never delete untracked files without confirmation** - user scripts, test data, and work-in-progress files must be preserved unless explicitly requested
 
+### Working on New Features with Worktrees
+
+When starting work on a new feature, use git worktrees to isolate your work:
+
+1. **Create a worktree** for the feature branch:
+   ```bash
+   git worktree add -b feature/my-feature ../octez-manager-my-feature
+   cd ../octez-manager-my-feature
+   ```
+
+2. **Share dependencies** by symlinking the `.opam` directory from the main folder:
+   ```bash
+   ln -s ../octez-manager/.opam .
+   ```
+
+This approach allows you to:
+- Work on multiple features in parallel without switching branches
+- Keep your main worktree clean and ready for quick fixes
+- Avoid rebuilding dependencies for each feature branch (shared via symlink)
+- Isolate build artifacts and temporary files per feature
+
 ### Atomic Commits
 
 - **Separate refactoring from functional changes.** A commit that renames a function should not also change its behavior. This makes each commit reviewable and revertable in isolation.
