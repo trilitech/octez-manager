@@ -185,6 +185,18 @@ val show_spinner_modal :
     @param width The maximum line width in characters. Must be [>= 1]. *)
 val wrap_text : width:int -> string -> string list
 
+(** Experimental feature descriptor for the experimental features modal. *)
+type experimental_feature = {
+  title : string;
+  description : string;
+  badge : string;
+  on_select : unit -> unit;
+}
+
+(** Open the experimental features modal showing a list of beta/experimental features.
+    Selecting a feature triggers its [on_select] callback. *)
+val open_experimental_modal : features:experimental_feature list -> unit -> unit
+
 module For_tests : sig
   (** Return the first non-empty line from a list, or [None]. *)
   val first_nonempty_line : string list -> string option
