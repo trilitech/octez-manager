@@ -14,45 +14,6 @@ open Octez_manager_lib
 
 let name = "topology"
 
-type state = {services : Data.Service_state.t list}
-
-type msg = unit
-
-type pstate = state Navigation.t
-
-let init () = Navigation.make {services = Data.load_service_states ()}
-
-let update ps _ = ps
-
-let refresh ps =
-  match Context.consume_navigation () with
-  | Some (Context.Goto p) -> Navigation.goto p ps
-  | Some Context.Back -> Navigation.back ps
-  | Some Context.Quit -> Navigation.quit ps
-  | None ->
-      if Context.consume_instances_dirty () then
-        Navigation.update
-          (fun _s -> {services = Data.load_service_states ()})
-          ps
-      else ps
-
-let move ps _ = ps
-
-let service_select ps _ = ps
-
-let service_cycle ps _ = refresh ps
-
-let back ps = Navigation.back ps
-
-let handled_keys () = Miaou.Core.Keys.[Escape]
-
-let keymap _ =
-  let noop ps = ps in
-  let kb key help =
-    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
-  in
-  [kb "Esc" "Back"; kb "?" "Help"]
-
 (* Build tree structure: roots are services with no depends_on,
    children are those that depend on a root *)
 type tree_node = {
@@ -60,6 +21,12 @@ type tree_node = {
   status : Data.Service_state.status;
   children : tree_node list;
 }
+
+type state = {services : Data.Service_state.t list; tree : tree_node list}
+
+type msg = unit
+
+type pstate = state Navigation.t
 
 let build_tree services =
   let svc_map =
@@ -120,6 +87,41 @@ let build_tree services =
         children = build_children st.service.Service.instance;
       })
     roots
+
+let build_state services = {services; tree = build_tree services}
+
+let init () = Navigation.make (build_state (Data.load_service_states ()))
+
+let update ps _ = ps
+
+let refresh ps =
+  match Context.consume_navigation () with
+  | Some (Context.Goto p) -> Navigation.goto p ps
+  | Some Context.Back -> Navigation.back ps
+  | Some Context.Quit -> Navigation.quit ps
+  | None ->
+      if Context.consume_instances_dirty () then
+        Navigation.update
+          (fun _s -> build_state (Data.load_service_states ()))
+          ps
+      else ps
+
+let move ps _ = ps
+
+let service_select ps _ = ps
+
+let service_cycle ps _ = refresh ps
+
+let back ps = Navigation.back ps
+
+let handled_keys () = Miaou.Core.Keys.[Escape]
+
+let keymap _ =
+  let noop ps = ps in
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
+  in
+  [kb "Esc" "Back"; kb "?" "Help"]
 
 module Style_context = Miaou_style.Style_context
 
@@ -325,8 +327,7 @@ let render_compact ~width ~node_w trees =
   C.to_ansi c
 
 (* Render the topology, choosing layout based on available width *)
-let render_topology ~width ~services =
-  let trees = build_tree services in
+let render_topology ~width ~trees =
   if trees = [] then Widgets.themed_muted "No services to display"
   else
     (* Adaptive node width: shrink for narrow terminals *)
@@ -348,7 +349,7 @@ let header = [Widgets.themed_primary " Network Topology "]
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
   let box_width = min 120 (size.LTerm_geom.cols - 2) in
-  let body = render_topology ~width:box_width ~services:s.services in
+  let body = render_topology ~width:box_width ~trees:s.tree in
   Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun _ -> body)
 
 let handle_modal_key ps key ~size:_ =
@@ -427,3 +428,9 @@ let page : Miaou.Core.Registry.page =
 let register () =
   if not (Miaou.Core.Registry.exists name) then
     Miaou.Core.Registry.register name page
+
+module Internal_for_tests = struct
+  let build_tree = build_tree
+
+  let build_state = build_state
+end
