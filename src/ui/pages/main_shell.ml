@@ -36,6 +36,8 @@ type state = {
   diagnostics_ps : Diagnostics.Page.pstate;
   topology_ps : Topology_page.Page.pstate;
   sandbox_ps : Sandbox_page.Page.pstate;
+  (* Track if we're on a hidden page (not in tab bar) *)
+  on_hidden_page : string option;
 }
 
 type msg = unit
@@ -62,7 +64,7 @@ let initial_tabs =
       Responsive_tabs_widget.tab
         ~id:tab_experimental
         ~labels:["7 Experimental"; "7 Exp"];
-      Responsive_tabs_widget.tab ~id:tab_sandbox ~labels:["8 Sandbox"; "8 Sand"];
+      (* Sandbox tab is hidden - only accessible via Experimental modal *)
     ]
 
 let init () =
@@ -76,6 +78,7 @@ let init () =
       diagnostics_ps = Diagnostics.Page.init ();
       topology_ps = Topology_page.Page.init ();
       sandbox_ps = Sandbox_page.Page.init ();
+      on_hidden_page = None;
     }
 
 let update ps _ = ps
@@ -104,8 +107,15 @@ let is_tab_target t =
 let route_nav ~shell_ps ~shell_s target =
   let ps = {shell_ps with Navigation.s = shell_s} in
   if is_tab_target target then
-    let tabs' = Responsive_tabs_widget.select shell_s.tabs ~id:target in
-    {ps with Navigation.s = {shell_s with tabs = tabs'}}
+    (* Check if navigating to a hidden page *)
+    if String.equal target tab_sandbox then
+      {ps with Navigation.s = {shell_s with on_hidden_page = Some target}}
+    else
+      let tabs' = Responsive_tabs_widget.select shell_s.tabs ~id:target in
+      {
+        ps with
+        Navigation.s = {shell_s with tabs = tabs'; on_hidden_page = None};
+      }
   else Navigation.goto target ps
 
 (** After calling a sub-page function, store the updated sub-pstate (with nav
@@ -119,9 +129,12 @@ let apply_sub_nav ~shell_ps ~shell_s nav_result =
   | Some (Navigation.Goto target) -> route_nav ~shell_ps:ps ~shell_s target
 
 let current_tab_id s =
-  match Responsive_tabs_widget.current s.tabs with
-  | None -> ""
-  | Some tab -> tab.Responsive_tabs_widget.id
+  match s.on_hidden_page with
+  | Some page_id -> page_id
+  | None -> (
+      match Responsive_tabs_widget.current s.tabs with
+      | None -> ""
+      | Some tab -> tab.Responsive_tabs_widget.id)
 
 let view ps ~focus ~size =
   let s = ps.Navigation.s in
@@ -164,7 +177,14 @@ let refresh ps =
     | None -> s
     | Some ctx_tab ->
         let id = tab_id_of_context_tab ctx_tab in
-        {s with tabs = Responsive_tabs_widget.select s.tabs ~id}
+        (* Check if this is a hidden page (not in tab bar) *)
+        if String.equal id tab_sandbox then {s with on_hidden_page = Some id}
+        else
+          {
+            s with
+            tabs = Responsive_tabs_widget.select s.tabs ~id;
+            on_hidden_page = None;
+          }
   in
   let ps = {ps with Navigation.s} in
   let s = ps.Navigation.s in
@@ -281,7 +301,12 @@ let switch_tab ps id =
   let s = ps.Navigation.s in
   {
     ps with
-    Navigation.s = {s with tabs = Responsive_tabs_widget.select s.tabs ~id};
+    Navigation.s =
+      {
+        s with
+        tabs = Responsive_tabs_widget.select s.tabs ~id;
+        on_hidden_page = None;
+      };
   }
 
 (** Open the create-instance dropdown on the instances tab. *)
@@ -322,7 +347,6 @@ let handle_key ps key ~size =
                 Context.set_pending_tab Context.Tab_sandboxes)
               () ;
             ps'
-        | "8" -> switch_tab ps tab_sandbox
         | _ -> dispatch_key ps key ~size)
 
 let handle_modal_key ps key ~size = dispatch_modal_key ps key ~size
