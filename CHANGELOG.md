@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
+- **Instances and Topology page responsiveness**: The TUI no longer rebuilds expensive topology trees and grouped instance layouts during every render. Topology data is cached outside `view`, the Instances page now reuses precomputed grouped sections and service indices for multi-column rendering/navigation, and baker DAL status no longer reads environment files in the render loop.
 
 ### Added
 
