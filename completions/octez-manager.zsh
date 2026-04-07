@@ -366,7 +366,16 @@ _octez-manager() {
         baker)
           local -a subcmds_baker
           subcmds_baker=(
-            'finalize-unstake'
+            'finalize-unstake:INSTANCE Finalize pending unstake requests'
+            'list:List all baker instances'
+            'register:Register delegate key'
+            'set-delegate-params:Set delegate staking parameters'
+            'stake:Stake tez for a baker delegate'
+            'status:Show wallet state for a baker instance'
+            'transfer:DESTINATION Transfer tez to another address'
+            'unstake:Unstake tez (amount or "everything")'
+            'update-consensus-key:INSTANCE KEY Update baker consensus key'
+            'vote:Vote on governance (protocol hash during proposal period, yay/nay/pass during exploration/promotion)'
           )
           if (( CURRENT == 2 )); then
             if [[ $cur == -* ]]; then

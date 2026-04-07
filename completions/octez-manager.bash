@@ -114,7 +114,7 @@ _octez_manager() {
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       else
-        COMPREPLY=( $(compgen -W "finalize-unstake" -- "$cur") )
+        COMPREPLY=( $(compgen -W "finalize-unstake list register set-delegate-params stake status transfer unstake update-consensus-key vote" -- "$cur") )
       fi
       fi
       return 0
