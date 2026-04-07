@@ -83,10 +83,7 @@ let list_run json =
   (* load_service_states uses Capability.require which raises Failure when the
      service manager capability is not registered (e.g. on a clean install with
      no instances). Catch it and fall back to a direct registry read. *)
-  let states =
-    try Data.load_service_states ()
-    with Failure _ -> []
-  in
+  let states = try Data.load_service_states () with Failure _ -> [] in
   let baker_states =
     List.filter
       (fun (st : Data.Service_state.t) ->
@@ -119,7 +116,8 @@ let list_run json =
   if baker_states = [] then (
     Printf.printf
       "No baker instances found. Use 'octez-manager install-baker' to create \
-       one.\n%!" ;
+       one.\n\
+       %!" ;
     `Ok ())
   else if json then (
     let entries =
