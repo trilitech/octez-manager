@@ -2,7 +2,7 @@
   "metadata": {
     "generated_at": "2026-03-16T00:00:00.000000",
     "generated_by": "tech-lead merge: register 22 missing tests + test 68 from #801",
-    "total_tests": 98,
+    "total_tests": 101,
     "total_duration": 768.05,
     "shard_count": 5,
     "mean_shard_duration": 153.61,
@@ -78,10 +78,13 @@
       "node/09-install-no-snapshot.sh",
       "group/57-group-add-network-mismatch.sh",
       "import/53-import-cascade-accuser.sh",
-      "import/61-import-cascade-all-configs-preserved.sh"
+      "import/61-import-cascade-all-configs-preserved.sh",
+      "completion/01-bash-group-subcommand-completion.sh",
+      "completion/02-zsh-completion-syntax.sh",
+      "completion/03-bash-snapshot-kind-completion.sh"
     ],
-    "test_count": 18,
-    "total_duration": 139.0
+    "test_count": 21,
+    "total_duration": 148.0
   },
   "shard-4": {
     "tests": [

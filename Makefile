@@ -37,6 +37,8 @@ fmt-check:
 
 completions:
 	$(DUNE) exec -- octez-manager-gen-completion
+	@cp completions/octez-manager.bash test/integration/cli-tester/tests/completion/fixtures/octez-manager.bash
+	@cp completions/octez-manager.zsh test/integration/cli-tester/tests/completion/fixtures/octez-manager.zsh
 
 completions-check:
 	@mkdir -p /tmp/octez-completions-check
