@@ -135,6 +135,160 @@ let test_classify_text_fallback () =
   | _ -> fail "should default to text"
 
 (* ============================================================ *)
+(* strip_ansi Tests *)
+(* ============================================================ *)
+
+let test_strip_ansi_removes_color_codes () =
+  let result = Help_parser.strip_ansi "\027[32mhello\027[0m" in
+  check string "strips color codes" "hello" result
+
+let test_strip_ansi_leaves_plain_text () =
+  let result = Help_parser.strip_ansi "hello world" in
+  check string "plain text unchanged" "hello world" result
+
+let test_strip_ansi_empty () =
+  check string "empty string" "" (Help_parser.strip_ansi "")
+
+let test_strip_ansi_no_letter_terminator () =
+  (* An escape sequence is terminated by the first letter; digits/semicolons
+     in between are consumed. *)
+  let result = Help_parser.strip_ansi "\027[1;33mtext\027[0m" in
+  check string "bold yellow stripped" "text" result
+
+(* ============================================================ *)
+(* split_bracket_arg Tests *)
+(* ============================================================ *)
+
+let test_split_bracket_arg_equals () =
+  let result = Help_parser.split_bracket_arg "--flag[=VAL]" in
+  check
+    (option (pair string string))
+    "bracket equals"
+    (Some ("--flag", "=VAL"))
+    result
+
+let test_split_bracket_arg_no_bracket () =
+  let result = Help_parser.split_bracket_arg "--flag" in
+  check (option (pair string string)) "no bracket" None result
+
+let test_split_bracket_arg_empty_inside () =
+  let result = Help_parser.split_bracket_arg "--flag[]" in
+  check
+    (option (pair string string))
+    "empty bracket"
+    (Some ("--flag", ""))
+    result
+
+let test_split_bracket_arg_unclosed () =
+  (* No closing bracket → None *)
+  let result = Help_parser.split_bracket_arg "--flag[VAL" in
+  check (option (pair string string)) "unclosed bracket" None result
+
+(* ============================================================ *)
+(* extract_section_lines Tests *)
+(* ============================================================ *)
+
+let test_extract_section_lines_found () =
+  let lines =
+    [
+      "DESCRIPTION";
+      "  Some desc";
+      "OPTIONS";
+      "  --foo  The foo flag";
+      "  --bar  The bar flag";
+      "COMMANDS";
+      "  start  Start it";
+    ]
+  in
+  let result = Help_parser.extract_section_lines ~header:"OPTIONS" lines in
+  check int "two option lines" 2 (List.length result) ;
+  check
+    bool
+    "first line contains foo"
+    true
+    (String.length (List.nth result 0) > 0)
+
+let test_extract_section_lines_missing () =
+  let lines = ["DESCRIPTION"; "  Some desc"; "COMMANDS"; "  start  Start"] in
+  let result = Help_parser.extract_section_lines ~header:"OPTIONS" lines in
+  check int "empty when missing" 0 (List.length result)
+
+let test_extract_section_lines_stops_at_next_header () =
+  let lines =
+    ["OPTIONS"; "  --foo  foo"; "COMMANDS"; "  start  start"; "  stop  stop"]
+  in
+  let result = Help_parser.extract_section_lines ~header:"OPTIONS" lines in
+  (* Should only get the OPTIONS content, not COMMANDS content *)
+  check int "one line from OPTIONS" 1 (List.length result)
+
+(* ============================================================ *)
+(* parse_cmdliner_commands Tests *)
+(* ============================================================ *)
+
+let test_parse_cmdliner_commands_basic () =
+  let input =
+    "COMMANDS\n\
+    \  start [OPTION]...\n\
+    \      Start the service.\n\
+    \  stop [OPTION]...\n\
+    \      Stop the service.\n"
+  in
+  let cmds = Help_parser.parse_cmdliner_commands input in
+  check int "two commands" 2 (List.length cmds) ;
+  check string "first cmd name" "start" (List.nth cmds 0).Help_parser.name ;
+  check string "second cmd name" "stop" (List.nth cmds 1).Help_parser.name
+
+let test_parse_cmdliner_commands_captures_doc () =
+  let input =
+    "COMMANDS\n  list [OPTION]...\n      List all baker instances.\n"
+  in
+  let cmds = Help_parser.parse_cmdliner_commands input in
+  check int "one command" 1 (List.length cmds) ;
+  check
+    string
+    "doc captured"
+    "List all baker instances."
+    (List.nth cmds 0).Help_parser.doc
+
+let test_parse_cmdliner_commands_no_commands_section () =
+  let input = "OPTIONS\n  --help  Show help.\n" in
+  let cmds = Help_parser.parse_cmdliner_commands input in
+  check int "empty when no COMMANDS section" 0 (List.length cmds)
+
+(* ============================================================ *)
+(* parse_cmdliner_options Tests *)
+(* ============================================================ *)
+
+let test_parse_cmdliner_options_basic () =
+  let input =
+    "OPTIONS\n\
+    \  --verbose  Enable verbose output.\n\
+    \  --port[=PORT]  Port number (default: 8732).\n"
+  in
+  let opts = Help_parser.parse_cmdliner_options input in
+  check bool "at least one option" true (List.length opts >= 1)
+
+let test_parse_cmdliner_options_bracket_syntax () =
+  let input = "OPTIONS\n  --flag[=VAL]  A flag with optional value.\n" in
+  let opts = Help_parser.parse_cmdliner_options input in
+  check int "one option" 1 (List.length opts) ;
+  let opt = List.nth opts 0 in
+  check
+    string
+    "name is --flag"
+    "--flag"
+    (Help_parser.primary_name opt.Help_parser.names) ;
+  check (option string) "arg is VAL" (Some "VAL") opt.Help_parser.arg
+
+let test_parse_cmdliner_options_common_options_section () =
+  let input =
+    "OPTIONS\n  --foo  Foo.\nCOMMON OPTIONS\n  --help[=FMT]  Show help.\n"
+  in
+  let opts = Help_parser.parse_cmdliner_options input in
+  (* Should parse options from BOTH sections *)
+  check bool "options from both sections" true (List.length opts >= 2)
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -163,7 +317,58 @@ let classification_tests =
     ("classify text fallback", `Quick, test_classify_text_fallback);
   ]
 
+let strip_ansi_tests =
+  [
+    ("removes color codes", `Quick, test_strip_ansi_removes_color_codes);
+    ("leaves plain text", `Quick, test_strip_ansi_leaves_plain_text);
+    ("empty string", `Quick, test_strip_ansi_empty);
+    ("bold yellow stripped", `Quick, test_strip_ansi_no_letter_terminator);
+  ]
+
+let split_bracket_arg_tests =
+  [
+    ("bracket equals", `Quick, test_split_bracket_arg_equals);
+    ("no bracket", `Quick, test_split_bracket_arg_no_bracket);
+    ("empty bracket", `Quick, test_split_bracket_arg_empty_inside);
+    ("unclosed bracket", `Quick, test_split_bracket_arg_unclosed);
+  ]
+
+let extract_section_lines_tests =
+  [
+    ("section found", `Quick, test_extract_section_lines_found);
+    ("section missing", `Quick, test_extract_section_lines_missing);
+    ( "stops at next header",
+      `Quick,
+      test_extract_section_lines_stops_at_next_header );
+  ]
+
+let parse_cmdliner_commands_tests =
+  [
+    ("basic commands", `Quick, test_parse_cmdliner_commands_basic);
+    ("captures doc", `Quick, test_parse_cmdliner_commands_captures_doc);
+    ( "no commands section",
+      `Quick,
+      test_parse_cmdliner_commands_no_commands_section );
+  ]
+
+let parse_cmdliner_options_tests =
+  [
+    ("basic options", `Quick, test_parse_cmdliner_options_basic);
+    ("bracket syntax", `Quick, test_parse_cmdliner_options_bracket_syntax);
+    ( "common options section",
+      `Quick,
+      test_parse_cmdliner_options_common_options_section );
+  ]
+
 let () =
   Alcotest.run
     "Help_parser"
-    [("helpers", helper_tests); ("classification", classification_tests)]
+    [
+      ("helpers", helper_tests);
+      ("classification", classification_tests);
+      ("strip_ansi", strip_ansi_tests);
+      ("split_bracket_arg", split_bracket_arg_tests);
+      ("extract_section_lines", extract_section_lines_tests);
+      ("parse_cmdliner_commands", parse_cmdliner_commands_tests);
+      ("parse_cmdliner_options", parse_cmdliner_options_tests);
+    ]

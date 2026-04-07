@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `octez-manager baker list` no longer crashes with an internal exception when no baker instances are installed; it now exits cleanly with a helpful message
 - Shell tab-completion for command groups (`baker`, `binaries`, `group`, `rewards`, `rpc`, `sandbox`) now correctly offers subcommands instead of only `--help`/`--version`
 - Zsh tab-completion for commands with colons in flag descriptions (e.g. `install-signatory`) no longer crashes the shell
+- Zsh tab-completion for `node install` snapshot mode now correctly offers `full:50` as a completion value (was silently truncated to `full` due to an unescaped colon)
+- Shell injection vulnerability fixed in instance action completion: binary paths with spaces or special characters are now safely quoted
+- Shell tab-completion now works correctly for CLI commands at any nesting depth; the generator no longer hardcodes a two-level limit
 
 ### Added
 

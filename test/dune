@@ -423,6 +423,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_completion_generator)
+ (libraries alcotest gen_completion_helpers)
+ (modules test_completion_generator)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_form_builder)
  (libraries alcotest octez-manager.ui)
  (modules test_form_builder)

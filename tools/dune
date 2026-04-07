@@ -1,8 +1,13 @@
+(library
+ (name gen_completion_helpers)
+ (wrapped false)
+ (modules gen_completion_helpers))
+
 (executable
  (name gen_completion)
  (public_name octez-manager-gen-completion)
  (modules gen_completion)
- (libraries octez_manager_lib rresult))
+ (libraries gen_completion_helpers octez_manager_lib rresult))
 
 (executable
  (name arch_index)
