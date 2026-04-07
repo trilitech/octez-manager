@@ -72,10 +72,10 @@ let force_refresh state =
   let services = load_services_fresh () in
   let external_services = External_services_scheduler.get () in
   let groups = load_groups () in
-  let ext_for_clamp =
-    if state.external_section_folded then [] else external_services
-  in
-  let selected = clamp_selection services ext_for_clamp state.selected in
+  let state_with_services = {state with services; external_services; groups} in
+  let display_items = display_ordered_items state_with_services in
+  (* clamp_selection_with_items uses display_items for clamping *)
+  let selected = clamp_selection_with_items display_items state.selected in
   (* Auto-fold newly discovered external services (not seen in previous state).
      Services already known keep their user-set fold state unchanged. *)
   let prev_names =
@@ -192,11 +192,12 @@ let move_selection_menu s delta =
   let selected = max 0 (min (menu_item_count + 1) (s.selected + delta)) in
   if selected >= menu_item_count + 1 && delta > 0 then
     let sections = sections_of_state s in
+    let display_items = display_ordered_items s in
     let first_svc =
       first_service_in_column
         ~num_columns:s.num_columns
         ~sections
-        ~services:(display_ordered_services s)
+        ~display_items
         0
     in
     {s with selected = first_svc + services_start_idx; active_column = 0}
@@ -205,24 +206,21 @@ let move_selection_menu s delta =
 (** Multi-column: navigate within the external services section
     (below all column-distributed managed services). *)
 let move_selection_external s delta =
-  let first_external = services_start_idx + List.length s.services in
+  let display_items = display_ordered_items s in
+  let first_external = services_start_idx + List.length display_items in
   if s.selected = first_external && delta < 0 then
     (* Moving up from first external service *)
-    if List.length s.services > 0 && s.num_columns > 1 then
+    if List.length display_items > 0 && s.num_columns > 1 then
       let sections = sections_of_state s in
       let col_indices =
-        services_in_column
-          ~num_columns:s.num_columns
-          ~sections
-          ~services:(display_ordered_services s)
-          0
+        services_in_column ~num_columns:s.num_columns ~sections ~display_items 0
       in
       match List.rev col_indices with
       | [] -> {s with selected = menu_item_count; active_column = 0}
       | last_idx :: _ ->
           {s with selected = last_idx + services_start_idx; active_column = 0}
-    else if List.length s.services > 0 then
-      let last_managed = services_start_idx + List.length s.services - 1 in
+    else if List.length display_items > 0 then
+      let last_managed = services_start_idx + List.length display_items - 1 in
       {s with selected = last_managed}
     else {s with selected = menu_item_count}
   else
@@ -237,11 +235,12 @@ let move_selection_external s delta =
 let move_selection_managed s delta =
   let current_idx = s.selected - services_start_idx in
   let sections = sections_of_state s in
+  let display_items = display_ordered_items s in
   let col_indices =
     services_in_column
       ~num_columns:s.num_columns
       ~sections
-      ~services:(display_ordered_services s)
+      ~display_items
       s.active_column
   in
   let current_pos =
@@ -261,11 +260,12 @@ let move_selection_managed s delta =
     else s
   else
     let new_idx = List.nth col_indices new_pos in
+    let display_items = display_ordered_items s in
     let line_start, line_count =
       service_line_position
         ~num_columns:s.num_columns
         ~sections
-        ~services:(display_ordered_services s)
+        ~display_items
         ~folded:s.folded
         new_idx
         s.active_column
@@ -834,12 +834,12 @@ Press **Enter** to open instance menu.|}
       (* In services area: move to same position in target column *)
       let current_idx = s.selected - services_start_idx in
       let sections = sections_of_state s in
-      let ordered = display_ordered_services s in
+      let display_items = display_ordered_items s in
       let current_col_indices =
         services_in_column
           ~num_columns:num_cols
           ~sections
-          ~services:ordered
+          ~display_items
           s.active_column
       in
       let current_pos =
@@ -853,7 +853,7 @@ Press **Enter** to open instance menu.|}
         services_in_column
           ~num_columns:num_cols
           ~sections
-          ~services:ordered
+          ~display_items
           new_col
       in
       if target_col_indices = [] then
@@ -1009,11 +1009,12 @@ Press **Enter** to open instance menu.|}
         if s.selected >= services_start_idx && s.num_columns > 1 then
           let svc_idx = s.selected - services_start_idx in
           let sections = sections_of_state s in
+          let display_items = display_ordered_items s in
           let col =
             column_for_service
               ~num_columns:s.num_columns
               ~sections
-              ~services:(display_ordered_services s)
+              ~display_items
               svc_idx
           in
           Navigation.update (fun s -> {s with active_column = col}) ps

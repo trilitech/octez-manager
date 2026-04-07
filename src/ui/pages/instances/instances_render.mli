@@ -25,6 +25,9 @@ val network_short : string -> string
 (** Render a single service line *)
 val line_for_service : int -> int -> folded:bool -> Service_state.t -> string
 
+(** Render a ghost "Add new" entry *)
+val line_for_ghost_add_new : int -> int -> string -> string
+
 (** Truncate string to visible width *)
 val truncate_visible : max_width:int -> string -> string
 
@@ -35,7 +38,7 @@ val pad_line : col_width:int -> string -> string
 val render_column :
   col_width:int ->
   state:state ->
-  column_groups:(string * Service_state.t list) list ->
+  column_groups:(string * display_item list) list ->
   string list
 
 (** Dim inactive column content *)
@@ -62,7 +65,7 @@ val table_lines_matrix :
   string list
 
 (** Compute role or group sections based on view_mode *)
-val sections_for_view : state -> (string * Service_state.t list) list
+val sections_for_view : state -> (string * display_item list) list
 
 (** Main table rendering function *)
 val table_lines : ?cols:int -> ?visible_height:int -> state -> string list
