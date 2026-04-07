@@ -56,17 +56,20 @@ let calc_num_columns ~cols ~min_column_width ~column_separator =
   (* At least 1 column, max based on available width *)
   max 1 (available / (min_column_width + separator_width))
 
-(** Group services by role, preserving order *)
+(** Group services by role, preserving order, with ghost entries *)
 let group_by_role services =
   let roles = ["node"; "baker"; "accuser"; "dal-node"; "signatory"] in
-  List.filter_map
+  List.map
     (fun role ->
       let instances =
         List.filter
           (fun (st : Service_state.t) -> st.service.Service.role = role)
           services
       in
-      if instances = [] then None else Some (role, instances))
+      let display_items =
+        List.map (fun st -> Real_service st) instances @ [Ghost_add_new role]
+      in
+      (role, display_items))
     roles
 
 (** Build a display title for a group, e.g. "mainnet-prod (mainnet · v22.0)" *)
@@ -95,7 +98,7 @@ let group_by_group ~(groups : Group.t list) services =
     List.fold_left (fun acc (g : Group.t) -> (g.name, g) :: acc) [] groups
   in
   (* Collect services per group name *)
-  let group_services : (string * Service_state.t list) list =
+  let group_services : (string * display_item list) list =
     let tbl : (string, Service_state.t list) Hashtbl.t = Hashtbl.create 17 in
     List.iter
       (fun (st : Service_state.t) ->
@@ -122,11 +125,46 @@ let group_by_group ~(groups : Group.t list) services =
           | Some g -> group_display_title g
           | None -> gname
         in
-        (title, svcs))
+        (* Add ghost entries for all roles after the group *)
+        let display_items =
+          List.map (fun st -> Real_service st) svcs
+          @ [
+              Ghost_add_new "node";
+              Ghost_add_new "baker";
+              Ghost_add_new "accuser";
+              Ghost_add_new "dal-node";
+              Ghost_add_new "signatory";
+            ]
+        in
+        (title, display_items))
       names
   in
   let ungrouped_section =
-    if ungrouped = [] then [] else [("Ungrouped", sort_services ungrouped)]
+    if ungrouped = [] then
+      (* Show ghosts even if no ungrouped services *)
+      [
+        ( "Ungrouped",
+          [
+            Ghost_add_new "node";
+            Ghost_add_new "baker";
+            Ghost_add_new "accuser";
+            Ghost_add_new "dal-node";
+            Ghost_add_new "signatory";
+          ] );
+      ]
+    else
+      let sorted_ungrouped = sort_services ungrouped in
+      [
+        ( "Ungrouped",
+          List.map (fun st -> Real_service st) sorted_ungrouped
+          @ [
+              Ghost_add_new "node";
+              Ghost_add_new "baker";
+              Ghost_add_new "accuser";
+              Ghost_add_new "dal-node";
+              Ghost_add_new "signatory";
+            ] );
+      ]
   in
   group_services @ ungrouped_section
 
@@ -157,43 +195,48 @@ let distribute_to_columns ~num_columns role_groups =
       role_groups ;
     columns
 
-(** Get flat list of services for a column, with their global indices *)
+(** Get flat list of display items for a column, with their global indices *)
 type column_item =
   | Header of string
-  | Instance of int * Service_state.t (* global index, service *)
+  | Item of int * display_item (* global index, display item *)
 
-let column_items ~column_groups ~global_services =
+let column_items ~column_groups ~global_display_items =
   List.concat_map
-    (fun (role, instances) ->
+    (fun (role, display_items) ->
       let header = Header (role_header role) in
       let items =
         List.map
-          (fun (st : Service_state.t) ->
+          (fun item ->
             (* Find global index *)
             let idx =
               List.find_mapi
-                (fun i (s : Service_state.t) ->
-                  if
-                    String.equal
-                      s.service.Service.instance
-                      st.service.Service.instance
-                  then Some i
-                  else None)
-                global_services
+                (fun i di ->
+                  match (di, item) with
+                  | Real_service s1, Real_service s2 ->
+                      if
+                        String.equal
+                          s1.service.Service.instance
+                          s2.service.Service.instance
+                      then Some i
+                      else None
+                  | Ghost_add_new r1, Ghost_add_new r2 ->
+                      (* For ghosts, we need a better identity check *)
+                      (* This is a simplification - ideally use position *)
+                      if String.equal r1 r2 then Some i else None
+                  | _ -> None)
+                global_display_items
               |> Option.value ~default:0
             in
-            Instance (idx, st))
-          instances
+            Item (idx, item))
+          display_items
       in
       header :: items)
     column_groups
 
 (** Get list of global service indices in a column *)
-let column_service_indices ~column_groups ~global_services =
-  column_items ~column_groups ~global_services
-  |> List.filter_map (function
-    | Header _ -> None
-    | Instance (idx, _) -> Some idx)
+let column_service_indices ~column_groups ~global_display_items =
+  column_items ~column_groups ~global_display_items
+  |> List.filter_map (function Header _ -> None | Item (idx, _) -> Some idx)
 
 (** Compute layout sections based on view_mode *)
 let sections_of_state (state : state) =
@@ -202,7 +245,7 @@ let sections_of_state (state : state) =
   | By_group -> group_by_group ~groups:state.groups state.services
 
 (** Get first service index in a column *)
-let first_service_in_column ~num_columns ~sections ~services col =
+let first_service_in_column ~num_columns ~sections ~display_items col =
   if num_columns <= 1 then 0
   else
     let columns = distribute_to_columns ~num_columns sections in
@@ -211,29 +254,31 @@ let first_service_in_column ~num_columns ~sections ~services col =
       let indices =
         column_service_indices
           ~column_groups:columns.(col)
-          ~global_services:services
+          ~global_display_items:display_items
       in
       match indices with [] -> 0 | first :: _ -> first
 
 (** Get all service indices in a column *)
-let services_in_column ~num_columns ~sections ~services col =
-  if num_columns <= 1 then List.mapi (fun i _ -> i) services
+let services_in_column ~num_columns ~sections ~display_items col =
+  if num_columns <= 1 then List.mapi (fun i _ -> i) display_items
   else
     let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then []
     else
       column_service_indices
         ~column_groups:columns.(col)
-        ~global_services:services
+        ~global_display_items:display_items
 
 (** Find which column contains a given service index *)
-let column_for_service ~num_columns ~sections ~services idx =
+let column_for_service ~num_columns ~sections ~display_items idx =
   if num_columns <= 1 then 0
   else
     let rec find_col col =
       if col >= num_columns then 0
       else
-        let indices = services_in_column ~num_columns ~sections ~services col in
+        let indices =
+          services_in_column ~num_columns ~sections ~display_items col
+        in
         if List.mem idx indices then col else find_col (col + 1)
     in
     find_col 0
@@ -241,24 +286,32 @@ let column_for_service ~num_columns ~sections ~services idx =
 (** Calculate line position of a service within its column.
     Returns (start_line, line_count) where start_line is 0-indexed
     from the top of the column content (after headers). *)
-let service_line_position ~num_columns ~sections ~services ~folded svc_idx col =
+let service_line_position ~num_columns ~sections ~display_items ~folded svc_idx
+    col =
   if num_columns <= 1 then (0, 1)
   else
     let columns = distribute_to_columns ~num_columns sections in
     if col >= Array.length columns then (0, 1)
     else
       let column_groups = columns.(col) in
-      let items = column_items ~column_groups ~global_services:services in
+      let items =
+        column_items ~column_groups ~global_display_items:display_items
+      in
       let rec count_lines line_acc is_first = function
         | [] -> (line_acc, 1)
         | Header _ :: rest ->
             (* Header + possible empty line before it *)
             let header_lines = if is_first then 1 else 2 in
             count_lines (line_acc + header_lines) false rest
-        | Instance (idx, st) :: rest ->
+        | Item (idx, Real_service st) :: rest ->
             let is_folded = StringSet.mem st.service.Service.instance folded in
             let line_count = if is_folded then 2 else 6 in
             (* Approximate: 2 lines folded, ~6 unfolded *)
+            if idx = svc_idx then (line_acc, line_count)
+            else count_lines (line_acc + line_count) false rest
+        | Item (idx, Ghost_add_new _) :: rest ->
+            let line_count = 1 in
+            (* Ghost entries are 1 line *)
             if idx = svc_idx then (line_acc, line_count)
             else count_lines (line_acc + line_count) false rest
       in
@@ -281,11 +334,13 @@ let adjust_column_scroll ~column_scroll ~col ~line_start ~line_count
 let last_visible_height_ref = ref 20
 
 (** Find first non-empty column, or None if all empty *)
-let find_non_empty_column ~num_columns ~sections ~services =
+let find_non_empty_column ~num_columns ~sections ~display_items =
   let rec find col =
     if col >= num_columns then None
     else
-      let indices = services_in_column ~num_columns ~sections ~services col in
+      let indices =
+        services_in_column ~num_columns ~sections ~display_items col
+      in
       if indices <> [] then Some col else find (col + 1)
   in
   find 0
@@ -293,12 +348,10 @@ let find_non_empty_column ~num_columns ~sections ~services =
 (** Ensure active_column points to a non-empty column, adjusting selection if needed.
     If all columns are empty (no services), move selection to menu. *)
 let ensure_valid_column state =
+  let display_items = display_ordered_items state in
   if state.services = [] && state.external_services = [] then
-    (* No services at all, go to "Install new instance" *)
+    (* No services at all, go to first item (radio buttons) *)
     {state with selected = 0; active_column = 0}
-  else if state.services = [] then
-    (* Only external services, keep selection as-is *)
-    state
   else if state.num_columns <= 1 then state
   else
     let sections = sections_of_state state in
@@ -306,7 +359,7 @@ let ensure_valid_column state =
       services_in_column
         ~num_columns:state.num_columns
         ~sections
-        ~services:state.services
+        ~display_items
         state.active_column
     in
     if current_indices <> [] then state
@@ -316,7 +369,7 @@ let ensure_valid_column state =
         find_non_empty_column
           ~num_columns:state.num_columns
           ~sections
-          ~services:state.services
+          ~display_items
       with
       | None ->
           (* All columns empty (shouldn't happen if services <> []) *)
@@ -326,7 +379,7 @@ let ensure_valid_column state =
             first_service_in_column
               ~num_columns:state.num_columns
               ~sections
-              ~services:state.services
+              ~display_items
               new_col
           in
           {
