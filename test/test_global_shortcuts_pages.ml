@@ -79,7 +79,4 @@ let log_viewer_tests =
 let () =
   Alcotest.run
     "Global shortcuts in direct-navigation pages"
-    [
-      ("rpc_browser", rpc_browser_tests);
-      ("log_viewer", log_viewer_tests);
-    ]
+    [("rpc_browser", rpc_browser_tests); ("log_viewer", log_viewer_tests)]
