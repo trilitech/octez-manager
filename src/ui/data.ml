@@ -207,8 +207,9 @@ let load_service_states ?detail () =
       let cached = Atomic.get cache in
       let now = Unix.gettimeofday () in
       let age = now -. Atomic.get last_refresh in
-      if cached = [] && not (Atomic.get refresh_inflight) then
-        refresh_cache ?detail ()
+      if cached = [] && not (Atomic.get refresh_inflight) then (
+        schedule_refresh ?detail () ;
+        [])
       else (
         if age > cache_ttl_secs then schedule_refresh ?detail () ;
         cached)
