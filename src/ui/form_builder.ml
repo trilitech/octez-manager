@@ -228,6 +228,11 @@ let extra_args ?baker_mode ~label ~get_args ~set_args ~get_bin_dir ~binary
           ~app_bin_dir
           ~initial_args
           ~on_apply
+    | "octez-index", _ ->
+        Binary_help_explorer.open_index_run_help
+          ~app_bin_dir
+          ~initial_args
+          ~on_apply
     | "octez-baker", _ ->
         let mode =
           match baker_mode with None -> `Local | Some f -> f !model_ref
