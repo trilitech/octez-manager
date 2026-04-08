@@ -80,13 +80,14 @@ let exec_line role =
       "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/signatory\" serve \
        --base-dir \"${OCTEZ_DATA_DIR}\" --config \"${SIGNATORY_CONFIG_PATH}\"'"
   | "index" ->
-      (* octez-index run --base-dir ... --endpoint ...
-         --rpc-addr is only added when OCTEZ_INDEX_RPC_ADDR is non-empty.
-         OCTEZ_SERVICE_ARGS carries --watched-address and --db-name flags. *)
-      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-index\" run \
-       --base-dir \"${OCTEZ_INDEXER_DIR}\" --endpoint \
-       \"${OCTEZ_NODE_ENDPOINT}\" ${OCTEZ_INDEX_RPC_ADDR:+--rpc-addr \
-       \"${OCTEZ_INDEX_RPC_ADDR}\"} ${OCTEZ_SERVICE_ARGS:-}'"
+      (* --base-dir and --endpoint are global options for octez-index and must
+         come before the 'run' subcommand. --rpc-addr is only added when
+         OCTEZ_INDEX_RPC_ADDR is non-empty. OCTEZ_SERVICE_ARGS carries
+         --watched-address and --db-name flags. *)
+      "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-index\" --base-dir \
+       \"${OCTEZ_INDEXER_DIR}\" --endpoint \"${OCTEZ_NODE_ENDPOINT}\" run \
+       ${OCTEZ_INDEX_RPC_ADDR:+--rpc-addr \"${OCTEZ_INDEX_RPC_ADDR}\"} \
+       ${OCTEZ_SERVICE_ARGS:-}'"
   | other ->
       Printf.sprintf
         "ExecStart=/bin/sh -lc 'exec \"${APP_BIN_DIR}/octez-%s\" \
