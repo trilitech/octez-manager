@@ -295,6 +295,27 @@ let managed_version_exists version =
   let path = managed_version_path version in
   Sys.file_exists path && Sys.is_directory path
 
+let list_managed_index_versions () =
+  let dir = index_binaries_dir () in
+  if Sys.file_exists dir && Sys.is_directory dir then
+    try
+      let entries = Sys.readdir dir |> Array.to_list in
+      let versions =
+        entries
+        |> List.filter (fun e ->
+            String.length e > 1
+            && e.[0] = 'v'
+            && Sys.is_directory (Filename.concat dir e))
+        |> List.map (fun e -> String.sub e 1 (String.length e - 1))
+        |> List.sort (fun a b -> compare_versions b a)
+      in
+      Ok versions
+    with exn ->
+      R.error_msgf
+        "Failed to list managed index versions: %s"
+        (Printexc.to_string exn)
+  else Ok []
+
 (* Path resolution *)
 
 let resolve_bin_source = function
