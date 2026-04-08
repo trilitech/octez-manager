@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generated_at": "2026-04-08T00:00:00.000000",
-    "generated_by": "Add tests 47 and 48 for shared base-dir with accusers and mixed",
-    "total_tests": 101,
-    "total_duration": 813.05,
+    "generated_at": "2026-04-09T00:00:00.000000",
+    "generated_by": "Rebase: merge main (101 tests) + install-index test",
+    "total_tests": 102,
+    "total_duration": 816.05,
     "shard_count": 5,
     "mean_shard_duration": 162.61,
     "max_shard_duration": 190.61,
@@ -81,10 +81,11 @@
       "node/09-install-no-snapshot.sh",
       "group/57-group-add-network-mismatch.sh",
       "import/53-import-cascade-accuser.sh",
-      "import/61-import-cascade-all-configs-preserved.sh"
+      "import/61-import-cascade-all-configs-preserved.sh",
+      "index/01-install.sh"
     ],
     "test_count": 19,
-    "total_duration": 146.0
+    "total_duration": 149.0
   },
   "shard-4": {
     "tests": [
