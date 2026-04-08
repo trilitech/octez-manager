@@ -16,6 +16,7 @@
   binary_registry
   binary_downloader
   signatory_downloader
+  octez_index_downloader
   version_checker
   signer_types
   group
