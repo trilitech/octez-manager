@@ -54,7 +54,11 @@ let install ?(quiet = false) (request : index_request) =
   in
   let db_args =
     match request.db_name with
-    | Some name when String.trim name <> "" -> ["--db-name"; name]
+    | Some name when String.trim name <> "" ->
+        let normalized =
+          if String.contains name ':' then name else "sqlite3:" ^ name
+        in
+        ["--db-name"; normalized]
     | _ -> []
   in
   let all_service_args = watched_args @ db_args @ request.extra_args in
