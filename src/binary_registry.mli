@@ -11,6 +11,8 @@ type bin_source =
       (** Downloaded/managed Octez version e.g. "24.0" *)
   | Managed_signatory_version of string
       (** Downloaded/managed Signatory version e.g. "1.3.1" *)
+  | Managed_octez_index_version of string
+      (** Downloaded/managed octez-index version e.g. "0.1.0" *)
   | Registered_alias of string
       (** Registered directory alias e.g. "dev-build" *)
   | Raw_path of string  (** Raw filesystem path e.g. "/usr/local/bin" *)
