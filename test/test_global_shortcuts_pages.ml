@@ -30,11 +30,11 @@ let test_rpc_browser_help_modal () =
          Dismiss it with Escape before testing global shortcuts. *)
       if Miaou.Core.Modal_manager.has_active () then (
         ignore (HD.Stateful.send_key "Escape") ;
-        ignore (HD.Stateful.idle_wait ~iterations:3 ~sleep:0.001 ())) ;
+        ignore (TH.wait_until_no_modal ())) ;
 
       (* Press '?' — global shortcut, must open help modal *)
       ignore (HD.Stateful.send_key "?") ;
-      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+      ignore (TH.wait_until_modal_active ()) ;
 
       check
         bool
@@ -58,7 +58,7 @@ let test_log_viewer_help_modal () =
 
       (* Press '?' — must open help modal when pager is not in search mode *)
       ignore (HD.Stateful.send_key "?") ;
-      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+      ignore (TH.wait_until_modal_active ()) ;
 
       check
         bool
