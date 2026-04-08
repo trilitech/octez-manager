@@ -19,6 +19,7 @@ val cmdliner_error : string -> [> `Error of bool * string]
 val resolve_app_bin_dir :
   ?octez_version:string ->
   ?bin_dir_alias:string ->
+  ?binary_name:string ->
   string option ->
   (string * Binary_registry.bin_source, string) result
 
@@ -27,6 +28,15 @@ val resolve_app_bin_dir :
     Returns: (path, bin_source) tuple *)
 val resolve_signatory_bin_dir :
   ?signatory_version:string ->
+  ?bin_dir_alias:string ->
+  string option ->
+  (string * Binary_registry.bin_source, string) result
+
+(** Resolve octez-index binary directory from optional path, version, or alias.
+    Priority: octez_index_version > bin_dir_alias > app_bin_dir > auto-detect
+    Returns: (path, bin_source) tuple *)
+val resolve_octez_index_bin_dir :
+  ?octez_index_version:string ->
   ?bin_dir_alias:string ->
   string option ->
   (string * Binary_registry.bin_source, string) result
