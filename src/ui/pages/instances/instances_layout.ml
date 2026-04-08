@@ -78,6 +78,7 @@ let group_display_title (g : Group.t) =
     match g.bin_source with
     | Binary_registry.Managed_octez_version v -> v
     | Binary_registry.Managed_signatory_version v -> v
+    | Binary_registry.Managed_octez_index_version v -> v
     | Binary_registry.Registered_alias a -> a
     | Binary_registry.Raw_path p -> Filename.basename p
   in
