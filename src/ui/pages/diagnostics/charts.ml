@@ -457,18 +457,17 @@ let render_summary_bars samples ~width ~height =
       ([header; ""; services_line; bg_line] @ Option.to_list render_line)
 
 let render_bg_queue_sparkline spark =
-  if Sparkline.is_empty spark then "BG Queue (60s): " ^ "[collecting...]"
+  if Sparkline.is_empty spark then "BG Queue (60s): [collecting...]"
   else
-    "BG Queue (60s): "
-    ^ Sparkline.render_with_label
-        spark
-        ~label:""
-        ~focus:false
-        ~thresholds:
-          [
-            {
-              Sparkline.value = 3.0;
-              color = threshold_color (Style_context.warning ());
-            };
-          ]
-        ()
+    Sparkline.render_with_label
+      spark
+      ~label:"BG Queue (60s)"
+      ~focus:false
+      ~thresholds:
+        [
+          {
+            Sparkline.value = 3.0;
+            color = threshold_color (Style_context.warning ());
+          };
+        ]
+      ()
