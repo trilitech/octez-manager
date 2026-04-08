@@ -7,6 +7,17 @@
 
 (** Service removal and cleanup functionality *)
 
+(** Get list of instances that use the same base directory.
+    
+    Returns a list of instance names (excluding the provided instance) that
+    share the same base directory for baker/accuser client data.
+    
+    @param instance Instance name to exclude from results
+    @param base_dir Base directory path to check
+    @return List of instance names using the same base_dir *)
+val get_base_dir_users :
+  instance:string -> base_dir:string -> unit -> string list
+
 (** Remove a service instance.
     
     Stops dependent services, unregisters from parent, disables systemd unit,

@@ -29,6 +29,82 @@ let do_purge ~instance () =
     ~instance
     ()
 
+(** Check if base-dir should be deleted and show appropriate modals.
+    For bakers/accusers: check if other instances share the same base-dir.
+    - If shared: show warning modal (non-blocking)
+    - If not shared: show confirmation modal, then purge on confirm *)
+let purge_with_base_dir_check ~instance () =
+  match Service_registry.find ~instance with
+  | Error _ ->
+      Modal_helpers.show_error
+        ~title:"Purge Error"
+        (Printf.sprintf "Instance '%s' not found" instance)
+  | Ok None ->
+      Modal_helpers.show_error
+        ~title:"Purge Error"
+        (Printf.sprintf "Instance '%s' not found" instance)
+  | Ok (Some svc) ->
+      let is_baker = svc.Service.role = "baker" in
+      let is_accuser = svc.Service.role = "accuser" in
+      if is_baker || is_accuser then
+        (* Read the base_dir from env file *)
+        let env =
+          match Node_env.read ~inst:instance with
+          | Ok pairs -> pairs
+          | Error _ -> []
+        in
+        let base_dir_opt =
+          List.assoc_opt
+            (if is_baker then "OCTEZ_BAKER_BASE_DIR"
+             else "OCTEZ_CLIENT_BASE_DIR")
+            env
+        in
+        match base_dir_opt with
+        | None ->
+            (* No base_dir found, just purge directly *)
+            run_unit_action ~verb:"purge" ~instance (fun () ->
+                do_purge ~instance ())
+        | Some base_dir ->
+            (* Check if other instances use this base_dir *)
+            let other_users =
+              Removal.get_base_dir_users ~instance ~base_dir ()
+            in
+            if other_users <> [] then (
+              (* Base-dir is shared - show warning and purge without deleting base-dir *)
+              let warning_message =
+                Printf.sprintf
+                  "Base directory is shared with other instances:\n\n\
+                   %s\n\n\
+                   The base directory will NOT be deleted.\n\
+                   Used by: %s"
+                  base_dir
+                  (String.concat ", " other_users)
+              in
+              Modal_helpers.open_text_modal
+                ~title:"⚠ Shared Base Directory"
+                ~lines:(String.split_on_char '\n' warning_message) ;
+              run_unit_action ~verb:"purge" ~instance (fun () ->
+                  do_purge ~instance ()))
+            else
+              (* Base-dir not shared - show confirmation modal *)
+              Modal_helpers.open_choice_modal
+                ~title:"Confirm Base Directory Deletion"
+                ~items:[`Confirm; `Cancel]
+                ~to_string:(function
+                  | `Confirm ->
+                      Printf.sprintf "Delete base-dir and purge: %s" base_dir
+                  | `Cancel -> "Cancel")
+                ~on_select:(function
+                  | `Confirm ->
+                      run_unit_action ~verb:"purge" ~instance (fun () ->
+                          do_purge ~instance ())
+                  | `Cancel -> ())
+                ()
+      else
+        (* Not a baker/accuser - just purge directly *)
+        run_unit_action ~verb:"purge" ~instance (fun () ->
+            do_purge ~instance ())
+
 let remove_with_dependents_confirm ~instance ~dependents ~delete_data_dir =
   Modal_helpers.open_choice_modal
     ~title:"Confirm Removal"
@@ -57,10 +133,7 @@ let purge_with_dependents_confirm ~instance ~dependents =
             (String.concat ", " dependents)
       | `Cancel -> "Cancel")
     ~on_select:(function
-      | `Confirm ->
-          run_unit_action ~verb:"purge" ~instance (fun () ->
-              do_purge ~instance ())
-      | `Cancel -> ())
+      | `Confirm -> purge_with_base_dir_check ~instance () | `Cancel -> ())
     ()
 
 let remove_modal state =
@@ -96,9 +169,7 @@ let remove_modal state =
                   ~dependents
                   ~delete_data_dir:true
           | `Purge ->
-              if dependents = [] then
-                run_unit_action ~verb:"purge" ~instance (fun () ->
-                    do_purge ~instance ())
+              if dependents = [] then purge_with_base_dir_check ~instance ()
               else purge_with_dependents_confirm ~instance ~dependents)
         () ;
       state)
