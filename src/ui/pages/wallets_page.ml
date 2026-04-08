@@ -2453,6 +2453,7 @@ let copy_selected_pkh ps =
   ps
 
 let handle_key ps key ~size =
+  Metrics.mark_input_event () ;
   let ps = apply_pending_search ps in
   if Miaou.Core.Modal_manager.has_active () then (
     Miaou.Core.Modal_manager.handle_key key ;
