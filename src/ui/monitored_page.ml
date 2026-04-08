@@ -44,6 +44,7 @@ struct
   let handle_modal_key = P.handle_modal_key
 
   let handle_key ps key ~size =
+    Metrics.mark_input_event () ;
     if Miaou.Core.Modal_manager.has_active () then P.handle_key ps key ~size
     else
       match Global_shortcuts.handle key with
@@ -51,6 +52,7 @@ struct
       | Global_shortcuts.NotGlobal -> P.handle_key ps key ~size
 
   let on_key ps key ~size =
+    Metrics.mark_input_event () ;
     if Miaou.Core.Modal_manager.has_active () then P.on_key ps key ~size
     else
       let key_str = Miaou.Core.Keys.to_string key in
