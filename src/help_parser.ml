@@ -363,9 +363,14 @@ let parse_help_baker =
     ~parse_spec
 
 let is_section_header line =
+  (* Real section headers (OPTIONS, COMMANDS, …) always start at column 0 in
+     cmdliner's --help=plain output. Indented all-caps words like INSTANCE or
+     AMOUNT are argument-name tokens, not section headers. *)
   let trimmed = String.trim line in
   let len = String.length trimmed in
-  len > 0 && String.for_all (fun c -> (c >= 'A' && c <= 'Z') || c = ' ') trimmed
+  len > 0
+  && line.[0] <> ' '
+  && String.for_all (fun c -> (c >= 'A' && c <= 'Z') || c = ' ') trimmed
 
 let extract_section_lines ~header lines =
   let rec find = function
