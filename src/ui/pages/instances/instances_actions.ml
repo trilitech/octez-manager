@@ -519,6 +519,7 @@ let activate_selection s =
         | "accuser" -> Context.navigate Install_accuser_form_v3.name
         | "dal-node" -> Context.navigate Install_dal_node_form_v3.name
         | "signatory" -> Context.navigate Install_signatory_form.name
+        | "index" -> Context.navigate Install_index_form_v3.name
         | _ -> ()) ;
         s
     | None -> (
