@@ -354,349 +354,340 @@ let handle_key ps key ~size =
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
   else
-    match Global_shortcuts.handle key with
-    | Global_shortcuts.Handled -> ps
-    | Global_shortcuts.NotGlobal -> (
-        let s = ps.Navigation.s in
-        (* Handle C-x chord for pager selection *)
-        match !pending_chord with
-        | Some "C-x" ->
-            pending_chord := None ;
-            if String.length key = 1 && key.[0] >= '0' && key.[0] <= '9' then
-              let pager_id = Char.code key.[0] - Char.code '0' in
-              let pager_ids = State.get_pager_ids s in
-              if List.mem pager_id pager_ids then (
-                let new_state = State.focus_pager pager_id s in
-                state_ref := Some new_state ;
-                Navigation.update (fun _ -> new_state) ps)
-              else ps
-            else ps
-        | Some _ ->
-            pending_chord := None ;
-            ps
-        | None -> (
-            if
-              (* Check for C-x prefix *)
-              key = "C-x"
-            then (
-              pending_chord := Some "C-x" ;
-              ps)
-            else
-              match s.State.mode with
-              | State.List _ -> (
-                  (* Check for shortcut keys (1-9) when at root *)
-                  let shortcut_keys =
-                    ["1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]
-                  in
-                  let is_shortcut_key =
-                    s.State.path = []
-                    && List.exists (fun k -> key = k) shortcut_keys
-                  in
-                  if is_shortcut_key then
-                    let handled =
-                      Actions.execute_shortcut ~key s update_state
+    let s = ps.Navigation.s in
+    (* Handle C-x chord for pager selection before any other dispatch *)
+    match !pending_chord with
+    | Some "C-x" ->
+        pending_chord := None ;
+        if String.length key = 1 && key.[0] >= '0' && key.[0] <= '9' then
+          let pager_id = Char.code key.[0] - Char.code '0' in
+          let pager_ids = State.get_pager_ids s in
+          if List.mem pager_id pager_ids then (
+            let new_state = State.focus_pager pager_id s in
+            state_ref := Some new_state ;
+            Navigation.update (fun _ -> new_state) ps)
+          else ps
+        else ps
+    | Some _ ->
+        pending_chord := None ;
+        ps
+    | None -> (
+        if
+          (* Check for C-x prefix *)
+          key = "C-x"
+        then (
+          pending_chord := Some "C-x" ;
+          ps)
+        else
+          match s.State.mode with
+          | State.List _ -> (
+              (* Check for shortcut keys (1-9) when at root *)
+              let shortcut_keys =
+                ["1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]
+              in
+              let is_shortcut_key =
+                s.State.path = []
+                && List.exists (fun k -> key = k) shortcut_keys
+              in
+              if is_shortcut_key then
+                let handled = Actions.execute_shortcut ~key s update_state in
+                if handled then
+                  match !state_ref with
+                  | Some new_s -> Navigation.update (fun _ -> new_s) ps
+                  | None -> ps
+                else ps
+              else
+                match Keys.of_string key with
+                | Some Keys.Escape -> back ps
+                | Some Keys.Enter -> (
+                    Actions.handle_enter s update_state ;
+                    match !state_ref with
+                    | Some new_s -> Navigation.update (fun _ -> new_s) ps
+                    | None -> ps)
+                | Some Keys.Up | Some (Keys.Char "k") ->
+                    let new_state = State.cursor_up s in
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                | Some Keys.Down | Some (Keys.Char "j") ->
+                    let new_state = State.cursor_down s in
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                | Some (Keys.Char "u") | Some Keys.Backspace -> back ps
+                | Some (Keys.Char "r") -> refresh ps
+                | Some Keys.Tab -> cycle_instance ps
+                | _ -> ps)
+          | State.Result _ -> (
+              let result_focus = State.get_result_focus s in
+              let is_browser_focused =
+                match result_focus with
+                | State.FocusBrowser -> true
+                | _ -> false
+              in
+              (* Handle save key - saves the focused pager's content *)
+              if key = "s" then (
+                match State.get_focused_pager s with
+                | Some slot when slot.State.raw_body <> "" -> (
+                    (* Save to file - use raw JSON (unfolded, no colors) *)
+                    let filename =
+                      let base =
+                        slot.State.request |> String.split_on_char '/'
+                        |> List.filter (fun str -> str <> "")
+                        |> String.concat "_"
+                      in
+                      Printf.sprintf
+                        "rpc_%s_%d.json"
+                        base
+                        (int_of_float (Unix.time ()))
                     in
-                    if handled then
-                      match !state_ref with
-                      | Some new_s -> Navigation.update (fun _ -> new_s) ps
-                      | None -> ps
-                    else ps
-                  else
-                    match Keys.of_string key with
-                    | Some Keys.Escape -> back ps
-                    | Some Keys.Enter -> (
-                        Actions.handle_enter s update_state ;
-                        match !state_ref with
-                        | Some new_s -> Navigation.update (fun _ -> new_s) ps
-                        | None -> ps)
-                    | Some Keys.Up | Some (Keys.Char "k") ->
-                        let new_state = State.cursor_up s in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                    | Some Keys.Down | Some (Keys.Char "j") ->
-                        let new_state = State.cursor_down s in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                    | Some (Keys.Char "u") | Some Keys.Backspace -> back ps
-                    | Some (Keys.Char "r") -> refresh ps
-                    | Some Keys.Tab -> cycle_instance ps
-                    | _ -> ps)
-              | State.Result _ -> (
-                  let result_focus = State.get_result_focus s in
-                  let is_browser_focused =
-                    match result_focus with
-                    | State.FocusBrowser -> true
-                    | _ -> false
-                  in
-                  (* Handle save key - saves the focused pager's content *)
-                  if key = "s" then (
-                    match State.get_focused_pager s with
-                    | Some slot when slot.State.raw_body <> "" -> (
-                        (* Save to file - use raw JSON (unfolded, no colors) *)
-                        let filename =
-                          let base =
-                            slot.State.request |> String.split_on_char '/'
-                            |> List.filter (fun str -> str <> "")
-                            |> String.concat "_"
-                          in
-                          Printf.sprintf
-                            "rpc_%s_%d.json"
-                            base
-                            (int_of_float (Unix.time ()))
-                        in
-                        try
-                          let oc = open_out filename in
-                          output_string oc slot.State.raw_body ;
-                          close_out oc ;
-                          let new_state =
-                            State.set_error
-                              (Printf.sprintf "Saved to %s" filename)
-                              s
-                          in
-                          state_ref := Some new_state ;
-                          Navigation.update (fun _ -> new_state) ps
-                        with exn ->
-                          let new_state =
-                            State.set_error
-                              (Printf.sprintf
-                                 "Save failed: %s"
-                                 (Printexc.to_string exn))
-                              s
-                          in
-                          state_ref := Some new_state ;
-                          Navigation.update (fun _ -> new_state) ps)
-                    | _ ->
-                        let new_state =
-                          State.set_error "No content to save" s
-                        in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                        (* Handle split key - create new pager *))
-                  else if key = "S" then (
-                    match State.add_pager s with
-                    | Some new_state ->
-                        (* Keep focus on browser after creating pager *)
-                        let new_state = State.focus_browser new_state in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                    | None ->
-                        let new_state =
-                          State.set_error "Maximum pagers reached (10)" s
-                        in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                        (* Handle close pager key *))
-                  else if key = "x" then (
-                    let focused_id = State.get_focused_pager_id s in
-                    match State.remove_pager focused_id s with
-                    | Some new_state ->
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                    | None ->
-                        let new_state =
-                          State.set_error "Cannot close last pager" s
-                        in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                    (* Handle target instance selection *))
-                  else if key = "@" || key = "t" then (
-                    (* Open modal to select target instance with sections *)
-                    let all_instances = State.get_instances s in
-                    (* Local instances have non-empty data_dir or app_bin_dir *)
-                    let is_local svc =
-                      svc.Octez_manager_lib.Service.data_dir <> ""
-                      || svc.Octez_manager_lib.Service.app_bin_dir <> ""
-                    in
-                    let local = List.filter is_local all_instances in
-                    let public = State.public_nodes () in
-                    let items = build_instance_items ~local ~public in
-                    if items = [] then (
+                    try
+                      let oc = open_out filename in
+                      output_string oc slot.State.raw_body ;
+                      close_out oc ;
                       let new_state =
-                        State.set_error "No instances available" s
+                        State.set_error
+                          (Printf.sprintf "Saved to %s" filename)
+                          s
+                      in
+                      state_ref := Some new_state ;
+                      Navigation.update (fun _ -> new_state) ps
+                    with exn ->
+                      let new_state =
+                        State.set_error
+                          (Printf.sprintf
+                             "Save failed: %s"
+                             (Printexc.to_string exn))
+                          s
                       in
                       state_ref := Some new_state ;
                       Navigation.update (fun _ -> new_state) ps)
-                    else
-                      (* Expand items to include visual headers for display *)
-                      let display_items =
-                        let rec expand prev_section prev_network = function
-                          | [] -> []
-                          | (section, network, svc) :: rest ->
-                              let needs_section =
-                                match prev_section with
-                                | None -> true
-                                | Some s -> s <> section
-                              in
-                              let needs_network =
-                                (not needs_section)
-                                &&
-                                match prev_network with
-                                | None -> true
-                                | Some n -> n <> network
-                              in
-                              let items =
-                                if needs_section then
-                                  [
-                                    (section, network, svc, `SectionHeader);
-                                    (section, network, svc, `NetworkHeader);
-                                    (section, network, svc, `Service);
-                                  ]
-                                else if needs_network then
-                                  [
-                                    (section, network, svc, `NetworkHeader);
-                                    (section, network, svc, `Service);
-                                  ]
-                                else [(section, network, svc, `Service)]
-                              in
-                              items @ expand (Some section) (Some network) rest
-                        in
-                        expand None None items
-                      in
-                      Modal_helpers.open_choice_modal
-                        ~title:"Select target instance for pager"
-                        ~items:display_items
-                        ~to_string:(fun (_section, network, svc, kind) ->
-                          match kind with
-                          | `SectionHeader ->
-                              let section =
-                                if
-                                  svc.Octez_manager_lib.Service.data_dir <> ""
-                                  || svc.Octez_manager_lib.Service.app_bin_dir
-                                     <> ""
-                                then "Local Instances"
-                                else "Public Nodes"
-                              in
-                              Miaou_widgets_display.Widgets.themed_emphasis
-                                section
-                          | `NetworkHeader ->
-                              Miaou_widgets_display.Widgets.themed_accent
-                                ("  • " ^ network)
-                          | `Service ->
-                              let name =
-                                svc.Octez_manager_lib.Service.instance
-                              in
-                              "        " ^ name)
-                        ~on_select:(fun (_, _, svc, kind) ->
-                          (* Only react to service selections, ignore headers *)
-                          match kind with
-                          | `Service -> (
-                              match !state_ref with
-                              | Some current_state ->
-                                  let new_state =
-                                    State.set_pager_target
-                                      (Some svc)
-                                      current_state
-                                  in
-                                  state_ref := Some new_state ;
-                                  update_state new_state
-                              | None -> ())
-                          | `SectionHeader | `NetworkHeader -> ())
-                        () ;
-                      ps
-                    (* Handle shortcut keys 1-9, but not if pager is in input mode *))
-                  else if
-                    String.length key = 1 && key.[0] >= '1' && key.[0] <= '9'
-                  then
-                    (* Check if pager is in search/input mode - if so, pass to pager *)
-                    let pager_in_input_mode =
-                      match State.get_pager s with
-                      | Some p -> p.Pager.input_mode <> `None
-                      | None -> false
+                | _ ->
+                    let new_state = State.set_error "No content to save" s in
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                    (* Handle split key - create new pager *))
+              else if key = "S" then (
+                match State.add_pager s with
+                | Some new_state ->
+                    (* Keep focus on browser after creating pager *)
+                    let new_state = State.focus_browser new_state in
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                | None ->
+                    let new_state =
+                      State.set_error "Maximum pagers reached (10)" s
                     in
-                    if pager_in_input_mode then
-                      (* Let pager handle digit keys in search mode *)
-                      match State.get_pager s with
-                      | Some pager ->
-                          let win = size.LTerm_geom.rows - 3 in
-                          let pager', _consumed =
-                            Pager.handle_key pager ~key ~win
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                    (* Handle close pager key *))
+              else if key = "x" then (
+                let focused_id = State.get_focused_pager_id s in
+                match State.remove_pager focused_id s with
+                | Some new_state ->
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                | None ->
+                    let new_state =
+                      State.set_error "Cannot close last pager" s
+                    in
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                (* Handle target instance selection *))
+              else if key = "@" || key = "t" then (
+                (* Open modal to select target instance with sections *)
+                let all_instances = State.get_instances s in
+                (* Local instances have non-empty data_dir or app_bin_dir *)
+                let is_local svc =
+                  svc.Octez_manager_lib.Service.data_dir <> ""
+                  || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+                in
+                let local = List.filter is_local all_instances in
+                let public = State.public_nodes () in
+                let items = build_instance_items ~local ~public in
+                if items = [] then (
+                  let new_state = State.set_error "No instances available" s in
+                  state_ref := Some new_state ;
+                  Navigation.update (fun _ -> new_state) ps)
+                else
+                  (* Expand items to include visual headers for display *)
+                  let display_items =
+                    let rec expand prev_section prev_network = function
+                      | [] -> []
+                      | (section, network, svc) :: rest ->
+                          let needs_section =
+                            match prev_section with
+                            | None -> true
+                            | Some s -> s <> section
                           in
-                          let new_state = State.set_pager pager' s in
-                          state_ref := Some new_state ;
-                          Navigation.update (fun _ -> new_state) ps
-                      | None -> ps
-                    else
-                      let handled =
-                        Actions.execute_shortcut ~key s update_state
+                          let needs_network =
+                            (not needs_section)
+                            &&
+                            match prev_network with
+                            | None -> true
+                            | Some n -> n <> network
+                          in
+                          let items =
+                            if needs_section then
+                              [
+                                (section, network, svc, `SectionHeader);
+                                (section, network, svc, `NetworkHeader);
+                                (section, network, svc, `Service);
+                              ]
+                            else if needs_network then
+                              [
+                                (section, network, svc, `NetworkHeader);
+                                (section, network, svc, `Service);
+                              ]
+                            else [(section, network, svc, `Service)]
+                          in
+                          items @ expand (Some section) (Some network) rest
+                    in
+                    expand None None items
+                  in
+                  Modal_helpers.open_choice_modal
+                    ~title:"Select target instance for pager"
+                    ~items:display_items
+                    ~to_string:(fun (_section, network, svc, kind) ->
+                      match kind with
+                      | `SectionHeader ->
+                          let section =
+                            if
+                              svc.Octez_manager_lib.Service.data_dir <> ""
+                              || svc.Octez_manager_lib.Service.app_bin_dir <> ""
+                            then "Local Instances"
+                            else "Public Nodes"
+                          in
+                          Miaou_widgets_display.Widgets.themed_emphasis section
+                      | `NetworkHeader ->
+                          Miaou_widgets_display.Widgets.themed_accent
+                            ("  • " ^ network)
+                      | `Service ->
+                          let name = svc.Octez_manager_lib.Service.instance in
+                          "        " ^ name)
+                    ~on_select:(fun (_, _, svc, kind) ->
+                      (* Only react to service selections, ignore headers *)
+                      match kind with
+                      | `Service -> (
+                          match !state_ref with
+                          | Some current_state ->
+                              let new_state =
+                                State.set_pager_target (Some svc) current_state
+                              in
+                              state_ref := Some new_state ;
+                              update_state new_state
+                          | None -> ())
+                      | `SectionHeader | `NetworkHeader -> ())
+                    () ;
+                  ps
+                (* Handle shortcut keys 1-9, but not if pager is in input mode *))
+              else if String.length key = 1 && key.[0] >= '1' && key.[0] <= '9'
+              then
+                (* Check if pager is in search/input mode - if so, pass to pager *)
+                let pager_in_input_mode =
+                  match State.get_pager s with
+                  | Some p -> p.Pager.input_mode <> `None
+                  | None -> false
+                in
+                if pager_in_input_mode then
+                  (* Let pager handle digit keys in search mode *)
+                  match State.get_pager s with
+                  | Some pager ->
+                      let win = size.LTerm_geom.rows - 3 in
+                      let pager', _consumed =
+                        Pager.handle_key pager ~key ~win
                       in
-                      if handled then
-                        match !state_ref with
-                        | Some new_s -> Navigation.update (fun _ -> new_s) ps
-                        | None -> ps
-                      else ps (* Handle fold keys *)
-                  else if key = "f" then (
-                    (* Fold all sections *)
-                    let new_state = State.fold_all_json s in
+                      let new_state = State.set_pager pager' s in
+                      state_ref := Some new_state ;
+                      Navigation.update (fun _ -> new_state) ps
+                  | None -> ps
+                else
+                  let handled = Actions.execute_shortcut ~key s update_state in
+                  if handled then
+                    match !state_ref with
+                    | Some new_s -> Navigation.update (fun _ -> new_s) ps
+                    | None -> ps
+                  else ps (* Handle fold keys *)
+              else if key = "f" then (
+                (* Fold all sections *)
+                let new_state = State.fold_all_json s in
+                state_ref := Some new_state ;
+                Navigation.update (fun _ -> new_state) ps)
+              else if key = "F" then (
+                (* Unfold all sections *)
+                let new_state = State.unfold_all_json s in
+                state_ref := Some new_state ;
+                Navigation.update (fun _ -> new_state) ps)
+              else if key = "Tab" then cycle_instance ps
+              else if is_browser_focused then
+                (* Browser panel navigation in Result mode *)
+                match Keys.of_string key with
+                | Some Keys.Escape -> back ps
+                | Some (Keys.Char "u") | Some Keys.Backspace -> (
+                    (* Navigate back in browser while staying in Result mode *)
+                    Actions.navigate_cached_back s update_state ;
+                    match !state_ref with
+                    | Some new_s -> Navigation.update (fun _ -> new_s) ps
+                    | None -> ps)
+                | Some Keys.Up | Some (Keys.Char "k") ->
+                    let new_state = State.cached_cursor_up s in
                     state_ref := Some new_state ;
-                    Navigation.update (fun _ -> new_state) ps)
-                  else if key = "F" then (
-                    (* Unfold all sections *)
-                    let new_state = State.unfold_all_json s in
+                    Navigation.update (fun _ -> new_state) ps
+                | Some Keys.Down | Some (Keys.Char "j") ->
+                    let new_state = State.cached_cursor_down s in
                     state_ref := Some new_state ;
-                    Navigation.update (fun _ -> new_state) ps)
-                  else if key = "Tab" then cycle_instance ps
-                  else if is_browser_focused then
-                    (* Browser panel navigation in Result mode *)
-                    match Keys.of_string key with
-                    | Some Keys.Escape -> back ps
-                    | Some (Keys.Char "u") | Some Keys.Backspace -> (
-                        (* Navigate back in browser while staying in Result mode *)
-                        Actions.navigate_cached_back s update_state ;
-                        match !state_ref with
-                        | Some new_s -> Navigation.update (fun _ -> new_s) ps
-                        | None -> ps)
-                    | Some Keys.Up | Some (Keys.Char "k") ->
-                        let new_state = State.cached_cursor_up s in
+                    Navigation.update (fun _ -> new_state) ps
+                | Some Keys.Enter -> (
+                    Actions.handle_cached_enter s update_state ;
+                    match !state_ref with
+                    | Some new_s -> Navigation.update (fun _ -> new_s) ps
+                    | None -> ps)
+                | Some Keys.Right ->
+                    (* Switch focus to pager (last focused or 0) *)
+                    let pager_id = State.get_focused_pager_id s in
+                    let new_state = State.focus_pager pager_id s in
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                | _ -> ps
+              else
+                (* Pager-focused handling *)
+                match Keys.of_string key with
+                | Some Keys.Escape -> back ps
+                | Some Keys.Left ->
+                    (* Switch focus to browser panel *)
+                    let new_state = State.focus_browser s in
+                    state_ref := Some new_state ;
+                    Navigation.update (fun _ -> new_state) ps
+                | Some (Keys.Char " ") -> (
+                    (* Toggle fold at cursor position (uses pager cursor mode) *)
+                    match State.get_pager s with
+                    | Some pager ->
+                        let line = Pager.get_cursor_line pager in
+                        let new_state = State.toggle_fold ~line s in
                         state_ref := Some new_state ;
                         Navigation.update (fun _ -> new_state) ps
-                    | Some Keys.Down | Some (Keys.Char "j") ->
-                        let new_state = State.cached_cursor_down s in
+                    | None -> ps)
+                | _ -> (
+                    (* Delegate to pager for all other keys *)
+                    match State.get_pager s with
+                    | Some pager ->
+                        let win = size.LTerm_geom.rows - 3 in
+                        let pager', _consumed =
+                          Pager.handle_key pager ~key ~win
+                        in
+                        let new_state = State.set_pager pager' s in
                         state_ref := Some new_state ;
                         Navigation.update (fun _ -> new_state) ps
-                    | Some Keys.Enter -> (
-                        Actions.handle_cached_enter s update_state ;
-                        match !state_ref with
-                        | Some new_s -> Navigation.update (fun _ -> new_s) ps
-                        | None -> ps)
-                    | Some Keys.Right ->
-                        (* Switch focus to pager (last focused or 0) *)
-                        let pager_id = State.get_focused_pager_id s in
-                        let new_state = State.focus_pager pager_id s in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                    | _ -> ps
-                  else
-                    (* Pager-focused handling *)
-                    match Keys.of_string key with
-                    | Some Keys.Escape -> back ps
-                    | Some Keys.Left ->
-                        (* Switch focus to browser panel *)
-                        let new_state = State.focus_browser s in
-                        state_ref := Some new_state ;
-                        Navigation.update (fun _ -> new_state) ps
-                    | Some (Keys.Char " ") -> (
-                        (* Toggle fold at cursor position (uses pager cursor mode) *)
-                        match State.get_pager s with
-                        | Some pager ->
-                            let line = Pager.get_cursor_line pager in
-                            let new_state = State.toggle_fold ~line s in
-                            state_ref := Some new_state ;
-                            Navigation.update (fun _ -> new_state) ps
-                        | None -> ps)
-                    | _ -> (
-                        (* Delegate to pager for all other keys *)
-                        match State.get_pager s with
-                        | Some pager ->
-                            let win = size.LTerm_geom.rows - 3 in
-                            let pager', _consumed =
-                              Pager.handle_key pager ~key ~win
-                            in
-                            let new_state = State.set_pager pager' s in
-                            state_ref := Some new_state ;
-                            Navigation.update (fun _ -> new_state) ps
-                        | None -> ps))))
+                    | None -> ps)))
 
-let has_modal _ = Miaou.Core.Modal_manager.has_active ()
+let has_modal ps =
+  (* Report modal-like state for both the global modal manager and the pager's
+     own input mode (search, help). This lets Themed_page bypass global
+     shortcut interception when the pager owns the keyboard. *)
+  Miaou.Core.Modal_manager.has_active ()
+  ||
+  let s = ps.Navigation.s in
+  match State.get_pager s with
+  | Some p -> p.Pager.input_mode <> `None
+  | None -> false
 
 module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state
