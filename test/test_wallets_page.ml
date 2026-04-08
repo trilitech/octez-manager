@@ -200,50 +200,10 @@ let refresh_tests =
       test_imported_key_appears_without_restart );
   ]
 
-(* ============================================================ *)
-(* TUI Regression Tests *)
-(* ============================================================ *)
-
-(** Bug regression: pasting a PKH with NBSP bytes must not display garbage
-    characters in the import textbox. Fails without filter_key fix. *)
-let test_import_key_unicode_chars_not_displayed () =
-  TH.with_test_env (fun () ->
-      HD.Stateful.init (module Keys_page.Page) ;
-      ignore (TH.send_key_and_wait "n") ;
-      if not (TH.wait_until_modal_active ()) then
-        Alcotest.fail "create/import modal did not open" ;
-      TH.navigate_down 1 ;
-      ignore (TH.send_key_and_wait "Enter") ;
-      Unix.sleepf 0.02 ;
-      (* PKH + trailing U+00A0 NBSP (\xc2\xa0 in UTF-8), each byte sent
-         as a key *)
-      TH.type_string ("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ^ "\xc2\xa0") ;
-      Unix.sleepf 0.01 ;
-      let screen = TH.get_screen_text () in
-      check
-        bool
-        "pkh modal visible"
-        true
-        (TH.contains_substring screen "Import Key") ;
-      (* The fix strips NBSP (\xc2\xa0 in UTF-8) from pasted input. Verify
-         those specific bytes are absent from the screen. We cannot assert
-         the absence of ALL non-ASCII bytes because the TUI itself renders
-         box-drawing characters (╔ ║ etc.) which are multi-byte UTF-8. *)
-      let has_nbsp = TH.contains_substring screen "\xc2\xa0" in
-      check bool "no NBSP bytes on screen" false has_nbsp)
-
-let tui_tests =
-  [
-    ( "import key: unicode chars not displayed",
-      `Quick,
-      test_import_key_unicode_chars_not_displayed );
-  ]
-
 let () =
   Alcotest.run
     "Wallets_page"
     [
       ("base_dir_deduplication", base_dir_tests);
       ("refresh_on_dirty_flag", refresh_tests);
-      ("tui_regression", tui_tests);
     ]

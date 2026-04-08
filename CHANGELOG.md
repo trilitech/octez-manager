@@ -23,7 +23,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Imported key not visible until restart**: After importing a watch-only address in the Wallets page, the key list now updates immediately without requiring an app restart.
 - **Global shortcuts (?, C-t, K) not accessible from RPC browser and log viewer**: Pressing `?` (help), `C-t` (theme picker), or `K` (key bindings) had no effect when navigating directly to the RPC browser or log viewer pages. These pages now correctly dispatch global shortcuts.
-- **PKH validation rejects valid addresses pasted from browsers**: Pasting a Tezos public key hash from a browser or rich-text editor could silently include a unicode non-breaking space (U+00A0) or a BOM (U+FEFF), causing the validator to report "Expected 36 characters, got 38" even for a correct address. Non-ASCII bytes are now filtered at the textbox input layer so they never appear on screen, and the validator sanitizes any remaining artifacts before checking length and character set.
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
 - `octez-manager instance <name>` with an unknown instance name now shows "Unknown instance '<name>'" instead of the misleading "ACTION required" prompt
 - `octez-manager baker list` no longer crashes with an internal exception when no baker instances are installed; it now exits cleanly with a helpful message
