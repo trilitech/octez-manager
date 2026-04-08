@@ -182,6 +182,9 @@ let has_octez_signer_binary = has_binary "octez-signer"
 (** Check if octez-dal-node binary exists and is executable. *)
 let has_octez_dal_node_binary = has_binary "octez-dal-node"
 
+(** Check if octez-index binary exists and is executable. *)
+let has_octez_index_binary = has_binary "octez-index"
+
 (** Check if signatory binary exists and is executable. *)
 let has_signatory_binary = has_binary "signatory"
 

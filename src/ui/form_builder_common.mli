@@ -116,6 +116,9 @@ val has_octez_signer_binary : string -> bool
 (** Check if octez-dal-node exists in given directory. *)
 val has_octez_dal_node_binary : string -> bool
 
+(** Check if octez-index exists in given directory. *)
+val has_octez_index_binary : string -> bool
+
 (** Check if signatory exists in given directory. *)
 val has_signatory_binary : string -> bool
 
