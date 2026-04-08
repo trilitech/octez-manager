@@ -675,6 +675,7 @@ let tab_at_col col =
   find 0 1 Rewards_state.all_tabs
 
 let handle_key ps key ~size:_ =
+  Metrics.mark_input_event () ;
   let s = ps.Navigation.s in
   (* Search mode captures all input *)
   if s.search_active then handle_search_key ps key
