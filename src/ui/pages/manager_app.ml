@@ -18,6 +18,7 @@ let register_pages () =
   Install_baker_form_v3.register () ;
   Install_accuser_form_v3.register () ;
   Install_dal_node_form_v3.register () ;
+  Install_index_form_v3.register () ;
   Install_signatory_form.register () ;
   Import_wizard.register () ;
   Binaries.register () ;
