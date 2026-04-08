@@ -463,12 +463,6 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts_group_[__octez_version=VERSION]
-  opts_group_[__octez_version=VERSION]=(
-    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
-    '--version[Show version information.]'
-  )
-
   local -a opts_group_add
   opts_group_add=(
     '--instance[Instance name to add to the group.]:INST:'
@@ -890,7 +884,6 @@ _octez-manager() {
             'start:Start all services in a group (dependency order).'
             'stop:Stop all services in a group (reverse dependency order).'
             'upgrade'
-            '[--octez-version=VERSION]:Upgrade binary version for all services in a group.'
           )
           if (( CURRENT == 2 )); then
             if [[ $cur == -* ]]; then
@@ -940,10 +933,6 @@ _octez-manager() {
               upgrade)
                 _arguments \
                   $opts_group_upgrade
-                ;;
-              [--octez-version=VERSION])
-                _arguments \
-                  $opts_group_[__octez_version=VERSION]
                 ;;
             esac
           fi

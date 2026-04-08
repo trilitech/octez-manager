@@ -88,7 +88,18 @@ let load_instance_actions binary =
 
 let load_subcommands binary cmd =
   let* help = run_help binary [cmd; "--help=plain"] in
-  Ok (HP.parse_cmdliner_commands help)
+  let subs = HP.parse_cmdliner_commands help in
+  (* Filter out tokens that look like positional argument placeholders
+     (e.g. "[NAME]", "(NAME)", "NAME=VALUE") — these are not real subcommands
+     and would produce invalid shell variable names. *)
+  let is_real_subcommand (entry : HP.command_entry) =
+    (not (String.contains entry.HP.name '['))
+    && (not (String.contains entry.HP.name ']'))
+    && (not (String.contains entry.HP.name '('))
+    && (not (String.contains entry.HP.name ')'))
+    && not (String.contains entry.HP.name '=')
+  in
+  Ok (List.filter is_real_subcommand subs)
 
 let dedupe_options entries =
   let seen = Hashtbl.create 32 in
@@ -172,11 +183,18 @@ let render_zsh_options name (options : HP.option_entry list) =
 let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map
     ~suboptions_map =
   let sanitize_var s =
-    let buf = Bytes.of_string s in
-    for i = 0 to Bytes.length buf - 1 do
-      if Bytes.get buf i = '-' then Bytes.set buf i '_'
-    done ;
-    Bytes.to_string buf
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (fun c ->
+        if
+          (c >= 'a' && c <= 'z')
+          || (c >= 'A' && c <= 'Z')
+          || (c >= '0' && c <= '9')
+          || c = '_'
+        then Buffer.add_char buf c
+        else Buffer.add_char buf '_')
+      s ;
+    Buffer.contents buf
   in
   let opts_var cmd = "opts_" ^ sanitize_var cmd in
   let buf = Buffer.create 8192 in
@@ -350,7 +368,20 @@ let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map
 let render_bash ~commands ~instance_actions ~options_map ~subcommands_map
     ~suboptions_map ~kinds =
   let bash_subopts_var cmd sub_name =
-    let sanitize s = String.concat "_" (String.split_on_char '-' s) in
+    let sanitize s =
+      let buf = Buffer.create (String.length s) in
+      String.iter
+        (fun c ->
+          if
+            (c >= 'a' && c <= 'z')
+            || (c >= 'A' && c <= 'Z')
+            || (c >= '0' && c <= '9')
+            || c = '_'
+          then Buffer.add_char buf c
+          else Buffer.add_char buf '_')
+        s ;
+      Buffer.contents buf
+    in
     sanitize cmd ^ "_" ^ sanitize sub_name ^ "_opts"
   in
   let unique_list items =
