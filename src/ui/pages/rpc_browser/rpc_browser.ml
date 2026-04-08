@@ -355,7 +355,7 @@ let handle_key ps key ~size =
     ps)
   else
     let s = ps.Navigation.s in
-    (* Handle C-x chord for pager selection *)
+    (* Handle C-x chord for pager selection before any other dispatch *)
     match !pending_chord with
     | Some "C-x" ->
         pending_chord := None ;
@@ -678,7 +678,16 @@ let handle_key ps key ~size =
                         Navigation.update (fun _ -> new_state) ps
                     | None -> ps)))
 
-let has_modal _ = Miaou.Core.Modal_manager.has_active ()
+let has_modal ps =
+  (* Report modal-like state for both the global modal manager and the pager's
+     own input mode (search, help). This lets Themed_page bypass global
+     shortcut interception when the pager owns the keyboard. *)
+  Miaou.Core.Modal_manager.has_active ()
+  ||
+  let s = ps.Navigation.s in
+  match State.get_pager s with
+  | Some p -> p.Pager.input_mode <> `None
+  | None -> false
 
 module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state

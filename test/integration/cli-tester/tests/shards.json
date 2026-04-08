@@ -2,7 +2,7 @@
   "metadata": {
     "generated_at": "2026-03-16T00:00:00.000000",
     "generated_by": "tech-lead merge: register 22 missing tests + test 68 from #801",
-    "total_tests": 96,
+    "total_tests": 98,
     "total_duration": 768.05,
     "shard_count": 5,
     "mean_shard_duration": 153.61,
@@ -29,10 +29,12 @@
       "group/55-group-add-remove-service.sh",
       "group/56-group-multiple-groups.sh",
       "import/44-import-detect-process-based.sh",
-      "signatory/07-permissions.sh"
+      "signatory/07-permissions.sh",
+      "node/26-unknown-instance-error.sh",
+      "baker/45-baker-list-no-instances.sh"
     ],
-    "test_count": 17,
-    "total_duration": 136.66
+    "test_count": 19,
+    "total_duration": 142.66
   },
   "shard-2": {
     "tests": [

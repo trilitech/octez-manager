@@ -353,6 +353,9 @@ let handle_key ps key ~size =
     | `None -> false
   in
 
+  (* Global shortcuts (?, C-t, K) are handled by Themed_page.Make which checks
+     has_modal before dispatching here. When pager_in_input_mode is true,
+     has_modal returns true and Themed_page bypasses global shortcuts entirely. *)
   (* Handle Escape key directly - Keys.of_string doesn't parse it correctly *)
   if key = "Esc" || key = "Escape" then
     if pager_in_input_mode then

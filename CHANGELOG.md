@@ -6,18 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- Global key `K` for navigating to Wallets tab has been removed. Users can now access the Wallets tab using the number key corresponding to its tab position.
+
 ### Changed
 
+- Extract `register_and_init` and `shutdown` helpers in `manager_app.ml`
+- Simplify TzKT routing: rewards now use `tzkt_url` directly from config instead of the Indexer hub abstraction
+- Remove development-only debug scaffolding from `cmd_rewards` (-640 lines)
 - **Experimental features tab**: Sandbox and other beta features are now nested under a new "Experimental" tab (press `7`) instead of having direct main-tab placement. The Experimental tab displays a directory of beta features with descriptions and badges. Sandbox functionality remains unchanged, just accessed via Experimental → Sandbox.
 
 ### Fixed
 
 - **Imported key not visible until restart**: After importing a watch-only address in the Wallets page, the key list now updates immediately without requiring an app restart.
-
+- **Global shortcuts (?, C-t, K) not accessible from RPC browser and log viewer**: Pressing `?` (help), `C-t` (theme picker), or `K` (key bindings) had no effect when navigating directly to the RPC browser or log viewer pages. These pages now correctly dispatch global shortcuts.
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
+- `octez-manager instance <name>` with an unknown instance name now shows "Unknown instance '<name>'" instead of the misleading "ACTION required" prompt
+- `octez-manager baker list` no longer crashes with an internal exception when no baker instances are installed; it now exits cleanly with a helpful message
+- Shell tab-completion for command groups (`baker`, `binaries`, `group`, `rewards`, `rpc`, `sandbox`) now correctly offers subcommands instead of only `--help`/`--version`
+- Zsh tab-completion for commands with colons in flag descriptions (e.g. `install-signatory`) no longer crashes the shell
 
 ### Added
 
+- Sandbox: yes-wallet integration for automatic delegate generation
+- Sandbox: restore multi-node/multi-baker topology parameters
 - **Directory picker: type a path directly**: When a form field opens a directory picker, a new "Type a path directly..." option lets users enter an arbitrary path without navigating the filesystem tree. Useful for paths on remote mounts or outside home directories. (closes #800)
 - **Local indexer compare mode**: `om ui --local-indexer <URL>` registers a local TzKT-compatible indexer as the preferred source for all rewards and delegation queries. Add `--compare-indexers` to simultaneously query public TzKT and log any divergences, useful for validating a self-hosted indexer. The `--indexer-network` flag (default: `mainnet`) identifies which network the local indexer serves.
 - **`rewards continual tick` command**: One-shot command that checks all baker instances with continual mode enabled and dispatches payouts for any cycles that are due. Intended for use with external schedulers (cron, systemd timers). When `rewards continual start` is called, octez-manager optionally installs a systemd timer to call `tick` automatically.

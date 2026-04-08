@@ -16,7 +16,7 @@ let addr_b = "tz1aSkwEot3L2kmUvcoxzjMomb9LTQjTBKt2"
 let addr_c = "tz1burnburnburnburnburnburnburjAYjjX"
 
 let default_config () =
-  {(Payout_config.default ~baker_pkh ()) with overdelegation_protect = false}
+  {(Payout_config.default ~baker_pkh) with overdelegation_protect = false}
 
 let make_cycle_rewards ?(cycle = 100) ?(own_staked = 1_000_000_000L)
     ?(own_delegated = 0L) ?(block_rewards = 10_000_000L)

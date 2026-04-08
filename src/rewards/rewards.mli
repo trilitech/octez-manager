@@ -107,10 +107,6 @@ type payout_blueprint = {
   cycle : int;
   baker : string;
   network : string;
-  own_staked_balance : Int64.t;
-  own_delegated_balance : Int64.t;
-  external_staked_balance : Int64.t;
-  external_delegated_balance : Int64.t;
   earned_rewards : Int64.t;
   earned_block_fees : Int64.t;
   total_delegators : int;
@@ -160,14 +156,14 @@ type cycle_summary = {
 (** Status of a cycle's payout. *)
 type payout_status = Unpaid | Paid | Partial | In_progress
 
-(** {1 Formatting helpers} *)
-
 (** Total earned rewards for a cycle (block + attestation + other + fees). *)
 val total_earned : cycle_rewards -> Int64.t
 
 (** Convert a mutez amount to a plain tez decimal string (e.g., "1234.567890").
     Suitable for octez-client and machine-readable output. *)
 val tez_of_mutez : Int64.t -> string
+
+(** {1 Formatting helpers} *)
 
 (** Format a mutez amount as a human-readable tez string (e.g., "1,234.567890"). *)
 val format_tez : Int64.t -> string

@@ -194,10 +194,21 @@ let instance_term =
   let run instance action delete_data_dir extra_args =
     match (instance, action) with
     | None, _ -> `Help (`Pager, None)
-    | Some _, None ->
-        Cli_helpers.cmdliner_error
-          "ACTION required \
-           (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit|set-env|get-env)"
+    | Some inst, None -> (
+        match Service_registry.find ~instance:inst with
+        | Ok None ->
+            Cli_helpers.cmdliner_error
+              (Printf.sprintf
+                 "Unknown instance '%s'. Run 'octez-manager list' to see \
+                  available instances."
+                 inst)
+        | Ok (Some _) ->
+            Cli_helpers.cmdliner_error
+              "ACTION required \
+               (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit|set-env|get-env)"
+        | Error (`Msg msg) ->
+            Cli_helpers.cmdliner_error
+              (Printf.sprintf "Could not read instance registry: %s" msg))
     | Some inst, Some action -> (
         match action with
         | Start ->

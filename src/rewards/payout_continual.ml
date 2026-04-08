@@ -25,36 +25,21 @@ let disable ~instance =
   Mutex.protect active_lock (fun () ->
       Hashtbl.replace active_instances instance false)
 
-(* ── Delay file persistence ─────────────────────────────── *)
+(* ── Cycle matching ──────────────────────────────────────── *)
 
 let delay_file ~instance =
   Filename.concat (Payout_config.rewards_dir ~instance) "delay_until"
 
 let read_delay_until ~instance =
   let path = delay_file ~instance in
-  if Sys.file_exists path then
+  if not (Sys.file_exists path) then None
+  else
     try
       let ic = open_in path in
       let line = input_line ic in
       close_in ic ;
       Float.of_string_opt (String.trim line)
-    with _ -> None
-  else None
-
-let write_delay_until ~instance timestamp =
-  let path = delay_file ~instance in
-  let dir = Filename.dirname path in
-  (if not (Sys.file_exists dir) then
-     try Unix.mkdir dir 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()) ;
-  let oc = open_out path in
-  Printf.fprintf oc "%.0f\n" timestamp ;
-  close_out oc
-
-let clear_delay_until ~instance =
-  let path = delay_file ~instance in
-  if Sys.file_exists path then try Sys.remove path with _ -> ()
-
-(* ── Cycle matching ──────────────────────────────────────── *)
+    with Sys_error _ -> None
 
 let cycles_due ~instance ~current_cycle ~interval ~offset =
   (* Find all unpaid cycles that match the interval pattern *)
@@ -75,7 +60,7 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
   let config =
     match Payout_config.load ~instance with
     | Ok c -> c
-    | Error _ -> Payout_config.default ~network ~baker_pkh:baker ()
+    | Error _ -> Payout_config.default ~baker_pkh:baker
   in
   let due = cycles_due ~instance ~current_cycle ~interval ~offset in
   List.map

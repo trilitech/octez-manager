@@ -79,10 +79,6 @@ type payout_blueprint = {
   cycle : int;
   baker : string;
   network : string;
-  own_staked_balance : Int64.t;
-  own_delegated_balance : Int64.t;
-  external_staked_balance : Int64.t;
-  external_delegated_balance : Int64.t;
   earned_rewards : Int64.t;
   earned_block_fees : Int64.t;
   total_delegators : int;

@@ -5,6 +5,12 @@
 (*                                                                            *)
 (******************************************************************************)
 
+let rec mkdir_p path =
+  if Sys.file_exists path then ()
+  else (
+    mkdir_p (Filename.dirname path) ;
+    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+
 let report_dir ~instance ~cycle =
   let base = Payout_config.rewards_dir ~instance in
   Filename.concat (Filename.concat base "reports") (string_of_int cycle)
@@ -26,74 +32,76 @@ let escape_csv_field s =
 
 let write_payouts_csv ~dir ~baker ~cycle results =
   try
-    File_ops.mkdir_p dir ;
+    mkdir_p dir ;
     let path = Filename.concat dir "payouts.csv" in
-    Out_channel.with_open_text path (fun oc ->
-        output_string oc csv_header ;
-        output_char oc '\n' ;
-        List.iteri
-          (fun i (r : Rewards.payout_result) ->
-            let timestamp =
-              let t = Unix.gettimeofday () in
-              let tm = Unix.gmtime t in
-              Printf.sprintf
-                "%04d-%02d-%02dT%02d:%02d:%02dZ"
-                (1900 + tm.tm_year)
-                (tm.tm_mon + 1)
-                tm.tm_mday
-                tm.tm_hour
-                tm.tm_min
-                tm.tm_sec
-            in
-            let op_hash = match r.op_hash with Some h -> h | None -> "" in
-            let line =
-              Printf.sprintf
-                "%d,%s,%s,%d,delegator,transaction,,,,,%s,%s,,%s,%Ld,,,,%s,%b,%s"
-                (i + 1)
-                baker
-                timestamp
-                cycle
-                r.delegator
-                (Int64.to_string r.amount)
-                r.recipient
-                r.amount
-                op_hash
-                r.success
-                (escape_csv_field r.note)
-            in
-            output_string oc line ;
-            output_char oc '\n')
-          results) ;
+    let oc = open_out path in
+    output_string oc csv_header ;
+    output_char oc '\n' ;
+    List.iteri
+      (fun i (r : Rewards.payout_result) ->
+        let timestamp =
+          let t = Unix.gettimeofday () in
+          let tm = Unix.gmtime t in
+          Printf.sprintf
+            "%04d-%02d-%02dT%02d:%02d:%02dZ"
+            (1900 + tm.tm_year)
+            (tm.tm_mon + 1)
+            tm.tm_mday
+            tm.tm_hour
+            tm.tm_min
+            tm.tm_sec
+        in
+        let op_hash = match r.op_hash with Some h -> h | None -> "" in
+        let line =
+          Printf.sprintf
+            "%d,%s,%s,%d,delegator,transaction,,,,,%s,%s,,%s,%Ld,,,,%s,%b,%s"
+            (i + 1)
+            baker
+            timestamp
+            cycle
+            r.delegator
+            (Int64.to_string r.amount)
+            r.recipient
+            r.amount
+            op_hash
+            r.success
+            (escape_csv_field r.note)
+        in
+        output_string oc line ;
+        output_char oc '\n')
+      results ;
+    close_out oc ;
     Ok ()
   with exn -> Error (Printexc.to_string exn)
 
 let write_invalid_csv ~dir ~baker ~cycle rewards =
   try
-    File_ops.mkdir_p dir ;
+    mkdir_p dir ;
     let path = Filename.concat dir "invalid.csv" in
-    Out_channel.with_open_text path (fun oc ->
-        output_string oc csv_header ;
-        output_char oc '\n' ;
-        List.iteri
-          (fun i (r : Rewards.delegator_reward) ->
-            let line =
-              Printf.sprintf
-                "%d,%s,,%d,delegator,transaction,,,,,%s,%Ld,%Ld,%s,%Ld,%.6f,%Ld,,,,,%s"
-                (i + 1)
-                baker
-                cycle
-                r.delegator
-                r.delegated_balance
-                r.staked_balance
-                r.recipient
-                r.net_reward
-                r.fee_rate
-                r.fee_amount
-                (Rewards.string_of_delegator_status r.status)
-            in
-            output_string oc line ;
-            output_char oc '\n')
-          rewards) ;
+    let oc = open_out path in
+    output_string oc csv_header ;
+    output_char oc '\n' ;
+    List.iteri
+      (fun i (r : Rewards.delegator_reward) ->
+        let line =
+          Printf.sprintf
+            "%d,%s,,%d,delegator,transaction,,,,,%s,%Ld,%Ld,%s,%Ld,%.6f,%Ld,,,,,%s"
+            (i + 1)
+            baker
+            cycle
+            r.delegator
+            r.delegated_balance
+            r.staked_balance
+            r.recipient
+            r.net_reward
+            r.fee_rate
+            r.fee_amount
+            (Rewards.string_of_delegator_status r.status)
+        in
+        output_string oc line ;
+        output_char oc '\n')
+      rewards ;
+    close_out oc ;
     Ok ()
   with exn -> Error (Printexc.to_string exn)
 
@@ -121,13 +129,14 @@ let summary_to_json (s : Rewards.cycle_summary) =
 
 let write_summary_json ~dir summary =
   try
-    File_ops.mkdir_p dir ;
+    mkdir_p dir ;
     let path = Filename.concat dir "summary.json" in
     let json = summary_to_json summary in
     let content = Yojson.Safe.pretty_to_string ~std:true json in
-    Out_channel.with_open_text path (fun oc ->
-        output_string oc content ;
-        output_char oc '\n') ;
+    let oc = open_out path in
+    output_string oc content ;
+    output_char oc '\n' ;
+    close_out oc ;
     Ok ()
   with exn -> Error (Printexc.to_string exn)
 
@@ -166,7 +175,9 @@ let read_summary_json ~instance ~cycle =
     Error (Printf.sprintf "no summary for cycle %d" cycle)
   else
     try
-      let content = In_channel.with_open_text path In_channel.input_all in
+      let ic = open_in path in
+      let content = In_channel.input_all ic in
+      close_in ic ;
       let json = Yojson.Safe.from_string content in
       Ok (summary_of_json json)
     with

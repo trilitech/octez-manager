@@ -176,7 +176,10 @@ struct
 
   let handle_key ps key ~size =
     Metrics.mark_input_event () ;
-    if Miaou.Core.Modal_manager.has_active () then P.handle_key ps key ~size
+    (* Bypass global shortcuts when a modal is active OR when the page itself
+       reports a modal-like state (e.g. pager in search/help input mode). *)
+    if Miaou.Core.Modal_manager.has_active () || P.has_modal ps then
+      P.handle_key ps key ~size
     else
       match Global_shortcuts.handle key with
       | Global_shortcuts.Handled -> ps
@@ -184,7 +187,8 @@ struct
 
   let on_key ps key ~size =
     Metrics.mark_input_event () ;
-    if Miaou.Core.Modal_manager.has_active () then P.on_key ps key ~size
+    if Miaou.Core.Modal_manager.has_active () || P.has_modal ps then
+      P.on_key ps key ~size
     else
       let key_str = Miaou.Core.Keys.to_string key in
       match Global_shortcuts.handle key_str with

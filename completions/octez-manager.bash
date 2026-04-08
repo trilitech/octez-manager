@@ -32,6 +32,52 @@ _octez_manager() {
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
   local lb_votes="on off pass"
+  local baker_finalize_unstake_opts="--delegate --json -y --yes --help --version"
+  local baker_list_opts="--json --help --version"
+  local baker_register_opts="--delegate --json -y --yes --help --version"
+  local baker_set_delegate_params_opts="--delegate --edge-of-baking-over-staking --json --limit-of-staking-over-baking -y --yes --help --version"
+  local baker_stake_opts="--delegate --json -y --yes --help --version"
+  local baker_status_opts="--delegate --json --help --version"
+  local baker_transfer_opts="--delegate --json -y --yes --help --version"
+  local baker_unstake_opts="--delegate --json -y --yes --help --version"
+  local baker_update_consensus_key_opts="--delegate --json -y --yes --help --version"
+  local baker_vote_opts="--delegate --json -y --yes --help --version"
+  local binaries_download_opts="--help --version"
+  local binaries_list_opts="--help --version"
+  local binaries_list_remote_opts="-a --all --help --version"
+  local binaries_prune_opts="-n --dry-run --help --version"
+  local binaries_register_opts="-a --alias --help --version"
+  local binaries_remove_opts="--help --version"
+  local binaries_unregister_opts="-f --force --help --version"
+  local group_add_opts="--instance --help --version"
+  local group_create_opts="--app-bin-dir --bin-dir-alias --network --octez-version --service-user --help --version"
+  local group_delete_opts="--cascade --ungroup --help --version"
+  local group_list_opts="--json --help --version"
+  local group_remove_opts="--instance --help --version"
+  local group_restart_opts="--help --version"
+  local group_show_opts="--json --help --version"
+  local group_start_opts="--help --version"
+  local group_stop_opts="--help --version"
+  local group_upgrade_opts="--app-bin-dir --bin-dir-alias --octez-version --help --version"
+  local rewards_config_opts="--help --version"
+  local rewards_continual_opts="--help --version"
+  local rewards_generate_opts="--baker --cycle --force --json --help --version"
+  local rewards_history_opts="--baker --cycles --json --help --version"
+  local rewards_notify_opts="--help --version"
+  local rewards_pay_opts="--baker --confirm --cycle --dry-run --help --version"
+  local rewards_status_opts="--baker --help --version"
+  local rpc_get_opts="-i --instance -p --public -u --url --help --version"
+  local rpc_instances_opts="--help --version"
+  local rpc_interactive_opts="-i --instance -p --public -u --url --help --version"
+  local rpc_list_opts="-i --instance -p --public -u --url --help --version"
+  local rpc_public_nodes_opts="--help --version"
+  local sandbox_add_account_opts="--alias --help --version"
+  local sandbox_create_opts="--accuser --app-bin-dir --bin-dir-alias --max-delegates -n --network --name --num-bakers --num-nodes --octez-version --rpc-addr --service-user --snapshot --help --version"
+  local sandbox_destroy_opts="-y --yes --help --version"
+  local sandbox_list_opts="--help --version"
+  local sandbox_start_opts="--help --version"
+  local sandbox_status_opts="--help --version"
+  local sandbox_stop_opts="--help --version"
 
   if [[ $prev == --endpoint || $prev == --node-endpoint || $prev == --dal-endpoint ]]; then
     if declare -F _urls >/dev/null; then
@@ -109,16 +155,117 @@ _octez_manager() {
       return 0
       ;;
     baker)
-      if [[ $cur == -* ]]; then
-        opts="--help --version"
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        if [[ $cur == -* ]]; then
+          opts="--help --version"
+          COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+        else
+          COMPREPLY=( $(compgen -W "finalize-unstake list register set-delegate-params stake status transfer unstake update-consensus-key vote" -- "$cur") )
+        fi
+      else
+        local subcmd="${COMP_WORDS[2]}"
+        case "$subcmd" in
+          finalize-unstake)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_finalize_unstake_opts" -- "$cur") )
+            fi
+            ;;
+          list)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_list_opts" -- "$cur") )
+            fi
+            ;;
+          register)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_register_opts" -- "$cur") )
+            fi
+            ;;
+          set-delegate-params)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_set_delegate_params_opts" -- "$cur") )
+            fi
+            ;;
+          stake)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_stake_opts" -- "$cur") )
+            fi
+            ;;
+          status)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_status_opts" -- "$cur") )
+            fi
+            ;;
+          transfer)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_transfer_opts" -- "$cur") )
+            fi
+            ;;
+          unstake)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_unstake_opts" -- "$cur") )
+            fi
+            ;;
+          update-consensus-key)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_update_consensus_key_opts" -- "$cur") )
+            fi
+            ;;
+          vote)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_vote_opts" -- "$cur") )
+            fi
+            ;;
+        esac
       fi
       return 0
       ;;
     binaries)
-      if [[ $cur == -* ]]; then
-        opts="--help --version"
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        if [[ $cur == -* ]]; then
+          opts="--help --version"
+          COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+        else
+          COMPREPLY=( $(compgen -W "download list list-remote prune register remove unregister" -- "$cur") )
+        fi
+      else
+        local subcmd="${COMP_WORDS[2]}"
+        case "$subcmd" in
+          download)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$binaries_download_opts" -- "$cur") )
+            fi
+            ;;
+          list)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$binaries_list_opts" -- "$cur") )
+            fi
+            ;;
+          list-remote)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$binaries_list_remote_opts" -- "$cur") )
+            fi
+            ;;
+          prune)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$binaries_prune_opts" -- "$cur") )
+            fi
+            ;;
+          register)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$binaries_register_opts" -- "$cur") )
+            fi
+            ;;
+          remove)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$binaries_remove_opts" -- "$cur") )
+            fi
+            ;;
+          unregister)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$binaries_unregister_opts" -- "$cur") )
+            fi
+            ;;
+        esac
       fi
       return 0
       ;;
@@ -137,9 +284,67 @@ _octez_manager() {
       return 0
       ;;
     group)
-      if [[ $cur == -* ]]; then
-        opts="--help --version"
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        if [[ $cur == -* ]]; then
+          opts="--help --version"
+          COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+        else
+          COMPREPLY=( $(compgen -W "add create delete list remove restart show start stop upgrade" -- "$cur") )
+        fi
+      else
+        local subcmd="${COMP_WORDS[2]}"
+        case "$subcmd" in
+          add)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_add_opts" -- "$cur") )
+            fi
+            ;;
+          create)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_create_opts" -- "$cur") )
+            fi
+            ;;
+          delete)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_delete_opts" -- "$cur") )
+            fi
+            ;;
+          list)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_list_opts" -- "$cur") )
+            fi
+            ;;
+          remove)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_remove_opts" -- "$cur") )
+            fi
+            ;;
+          restart)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_restart_opts" -- "$cur") )
+            fi
+            ;;
+          show)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_show_opts" -- "$cur") )
+            fi
+            ;;
+          start)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_start_opts" -- "$cur") )
+            fi
+            ;;
+          stop)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_stop_opts" -- "$cur") )
+            fi
+            ;;
+          upgrade)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$group_upgrade_opts" -- "$cur") )
+            fi
+            ;;
+        esac
       fi
       return 0
       ;;
@@ -214,23 +419,142 @@ _octez_manager() {
       return 0
       ;;
     rewards)
-      if [[ $cur == -* ]]; then
-        opts="--help --version"
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        if [[ $cur == -* ]]; then
+          opts="--help --version"
+          COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+        else
+          COMPREPLY=( $(compgen -W "config continual generate history notify pay status" -- "$cur") )
+        fi
+      else
+        local subcmd="${COMP_WORDS[2]}"
+        case "$subcmd" in
+          config)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rewards_config_opts" -- "$cur") )
+            fi
+            ;;
+          continual)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rewards_continual_opts" -- "$cur") )
+            fi
+            ;;
+          generate)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rewards_generate_opts" -- "$cur") )
+            fi
+            ;;
+          history)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rewards_history_opts" -- "$cur") )
+            fi
+            ;;
+          notify)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rewards_notify_opts" -- "$cur") )
+            fi
+            ;;
+          pay)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rewards_pay_opts" -- "$cur") )
+            fi
+            ;;
+          status)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rewards_status_opts" -- "$cur") )
+            fi
+            ;;
+        esac
       fi
       return 0
       ;;
     rpc)
-      if [[ $cur == -* ]]; then
-        opts="--help --version"
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        if [[ $cur == -* ]]; then
+          opts="--help --version"
+          COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+        else
+          COMPREPLY=( $(compgen -W "get instances interactive list public-nodes" -- "$cur") )
+        fi
+      else
+        local subcmd="${COMP_WORDS[2]}"
+        case "$subcmd" in
+          get)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rpc_get_opts" -- "$cur") )
+            fi
+            ;;
+          instances)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rpc_instances_opts" -- "$cur") )
+            fi
+            ;;
+          interactive)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rpc_interactive_opts" -- "$cur") )
+            fi
+            ;;
+          list)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rpc_list_opts" -- "$cur") )
+            fi
+            ;;
+          public-nodes)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$rpc_public_nodes_opts" -- "$cur") )
+            fi
+            ;;
+        esac
       fi
       return 0
       ;;
     sandbox)
-      if [[ $cur == -* ]]; then
-        opts="--help --version"
-        COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        if [[ $cur == -* ]]; then
+          opts="--help --version"
+          COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+        else
+          COMPREPLY=( $(compgen -W "add-account create destroy list start status stop" -- "$cur") )
+        fi
+      else
+        local subcmd="${COMP_WORDS[2]}"
+        case "$subcmd" in
+          add-account)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$sandbox_add_account_opts" -- "$cur") )
+            fi
+            ;;
+          create)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$sandbox_create_opts" -- "$cur") )
+            fi
+            ;;
+          destroy)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$sandbox_destroy_opts" -- "$cur") )
+            fi
+            ;;
+          list)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$sandbox_list_opts" -- "$cur") )
+            fi
+            ;;
+          start)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$sandbox_start_opts" -- "$cur") )
+            fi
+            ;;
+          status)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$sandbox_status_opts" -- "$cur") )
+            fi
+            ;;
+          stop)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$sandbox_stop_opts" -- "$cur") )
+            fi
+            ;;
+        esac
       fi
       return 0
       ;;
