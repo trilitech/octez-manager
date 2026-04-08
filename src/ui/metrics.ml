@@ -114,6 +114,7 @@ type state = {
   mutable enabled : bool;
   mutable render_hist : histogram Page_map.t;
   key_to_render : histogram;
+  mutable key_to_render_by_page : histogram Page_map.t;
   bg_wait : histogram;
   mutable bg_queue_depth : int;
   mutable bg_queue_max : int;
@@ -152,6 +153,7 @@ let state =
     enabled = false;
     render_hist = Page_map.empty;
     key_to_render = make_histogram ();
+    key_to_render_by_page = Page_map.empty;
     bg_wait = make_histogram ();
     bg_queue_depth = 0;
     bg_queue_max = 0;
@@ -235,7 +237,18 @@ let record_render ~page (render : unit -> 'a) : 'a =
       match consume_key_to_render finish with
       | Some lag ->
           Mutex.protect state.lock (fun () ->
-              hist_add state.key_to_render (lag *. 1000.))
+              let lag_ms = lag *. 1000. in
+              hist_add state.key_to_render lag_ms ;
+              let existing =
+                match Page_map.find_opt page state.key_to_render_by_page with
+                | Some h -> h
+                | None ->
+                    let h = make_histogram () in
+                    state.key_to_render_by_page <-
+                      Page_map.add page h state.key_to_render_by_page ;
+                    h
+              in
+              hist_add existing lag_ms)
       | None -> ())
     render
 
@@ -283,6 +296,18 @@ let get_scheduler_snapshots () =
   Mutex.protect state.lock (fun () ->
       Scheduler_map.bindings state.scheduler_hist
       |> List.map (fun (name, hist) -> (name, hist_snapshot hist)))
+
+(** Get per-page render latency snapshots. Returns (page_name, snapshot) pairs. *)
+let get_render_by_page () =
+  Mutex.protect state.lock (fun () ->
+      Page_map.bindings state.render_hist
+      |> List.map (fun (page, hist) -> (page, hist_snapshot hist)))
+
+(** Get per-page key-to-render latency snapshots. Returns (page_name, snapshot) pairs. *)
+let get_key_to_render_by_page () =
+  Mutex.protect state.lock (fun () ->
+      Page_map.bindings state.key_to_render_by_page
+      |> List.map (fun (page, hist) -> (page, hist_snapshot hist)))
 
 let metrics_text () =
   let lines = Buffer.create 1024 in
@@ -679,6 +704,7 @@ module For_tests = struct
     Mutex.protect state.lock (fun () ->
         state.enabled <- false ;
         state.render_hist <- Page_map.empty ;
+        state.key_to_render_by_page <- Page_map.empty ;
         state.bg_queue_depth <- 0 ;
         state.bg_queue_max <- 0 ;
         state.service_statuses <- Service_map.empty ;

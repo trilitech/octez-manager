@@ -439,6 +439,43 @@ let render_scheduler_content () =
           snap.count)
       scheduler_snapshots
 
+let render_per_page_content () =
+  let render_snaps = Metrics.get_render_by_page () in
+  if render_snaps = [] then [Widgets.themed_muted "No per-page data yet"]
+  else
+    let k2r_map = Metrics.get_key_to_render_by_page () in
+    let find_k2r page = List.assoc_opt page k2r_map in
+    List.map
+      (fun (page, (snap : Metrics.snapshot)) ->
+        let fmt1 v_opt =
+          match v_opt with Some v -> Printf.sprintf "%.1f" v | None -> "-"
+        in
+        let k2r = find_k2r page in
+        let k2r_p50 = Option.bind k2r (fun s -> s.Metrics.p50) in
+        let k2r_p90 = Option.bind k2r (fun s -> s.Metrics.p90) in
+        let render_p90_val = Option.value ~default:0. snap.p90 in
+        let status_dot =
+          if render_p90_val > 16. then Widgets.themed_error "●"
+          else if render_p90_val > 5. then Widgets.themed_warning "●"
+          else Widgets.themed_success "●"
+        in
+        let k2r_str =
+          match (k2r_p50, k2r_p90) with
+          | None, _ -> Widgets.themed_muted "k2r:-"
+          | Some p50, p90 ->
+              Printf.sprintf "k2r:%s/%sms" (fmt1 (Some p50)) (fmt1 p90)
+        in
+        Printf.sprintf
+          "%s %-14s %s rnd:%s/%s/%sms  %s"
+          status_dot
+          page
+          (Widgets.themed_muted "|")
+          (fmt1 snap.p50)
+          (fmt1 snap.p90)
+          (fmt1 snap.p99)
+          k2r_str)
+      render_snaps
+
 let render_worker_stats_content () =
   let format_stats (stats : Worker_queue.stats) =
     let dedup_pct =
@@ -613,6 +650,10 @@ let view ps ~focus:_ ~size =
               (render_historical_content ~chart_width);
           ]
         @ [
+            render_box
+              ~title:"Per-Page Performance"
+              ~widget_name:"diagnostics-per-page"
+              (render_per_page_content ());
             render_box
               ~title:"Scheduler Performance"
               ~widget_name:"diagnostics-scheduler"

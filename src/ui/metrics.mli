@@ -37,6 +37,12 @@ type snapshot = {
 (** Get scheduler histogram snapshots. Returns (scheduler_name, snapshot) pairs. *)
 val get_scheduler_snapshots : unit -> (string * snapshot) list
 
+(** Get per-page render latency snapshots. Returns (page_name, snapshot) pairs. *)
+val get_render_by_page : unit -> (string * snapshot) list
+
+(** Get per-page key-to-render latency snapshots. Returns (page_name, snapshot) pairs. *)
+val get_key_to_render_by_page : unit -> (string * snapshot) list
+
 (** Get current background queue depth. *)
 val get_bg_queue_depth : unit -> int
 
