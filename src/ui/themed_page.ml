@@ -180,6 +180,10 @@ struct
        reports a modal-like state (e.g. pager in search/help input mode). *)
     if Miaou.Core.Modal_manager.has_active () || P.has_modal ps then
       P.handle_key ps key ~size
+    else
+      match Global_shortcuts.handle key with
+      | Global_shortcuts.Handled -> ps
+      | Global_shortcuts.NotGlobal -> P.handle_key ps key ~size
 
   let on_key ps key ~size =
     Metrics.mark_input_event () ;
