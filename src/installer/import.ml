@@ -106,6 +106,7 @@ let missing_required_fields ?network_override external_svc =
     | Some External_service.Baker -> ["network"; "base_dir"; "node_endpoint"]
     | Some External_service.Accuser -> ["network"; "base_dir"; "node_endpoint"]
     | Some External_service.Dal_node -> ["network"; "data_dir"; "node_endpoint"]
+    | Some External_service.Index -> ["network"; "data_dir"; "node_endpoint"]
     | Some External_service.Signatory -> ["address"; "authorized_keys"]
     | Some (External_service.Unknown _) | None -> []
   in
@@ -148,7 +149,9 @@ let resolve_network ~overrides ~external_svc =
 let resolve_data_dir ~overrides ~external_svc =
   let config = external_svc.External_service.config in
   match config.role.value with
-  | Some External_service.Node | Some External_service.Dal_node ->
+  | Some External_service.Node
+  | Some External_service.Dal_node
+  | Some External_service.Index ->
       resolve_field
         ~override:overrides.data_dir
         ~detected:config.data_dir
@@ -170,10 +173,11 @@ let resolve_base_dir ~overrides ~external_svc =
         ~field_name:"base_dir"
   | Some External_service.Node
   | Some External_service.Dal_node
+  | Some External_service.Index
   | Some External_service.Signatory
   | Some (External_service.Unknown _)
   | None ->
-      Ok "" (* Not required for node/dal/signatory *)
+      Ok "" (* Not required for node/dal/index/signatory *)
 
 let resolve_rpc_addr ~overrides ~external_svc =
   let config = external_svc.External_service.config in
@@ -1212,6 +1216,11 @@ let import_service ?(on_log = fun _ -> ())
               ~bin_dir
               ~strategy:options.strategy
               ~depends_on:depends_on_instance
+        | Some External_service.Index ->
+            Error
+              (`Msg
+                 "Index import is not yet implemented. Please use 'om \
+                  install-index' to create a new index instance.")
         | Some External_service.Signatory ->
             Error
               (`Msg

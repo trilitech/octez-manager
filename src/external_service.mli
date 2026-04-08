@@ -14,7 +14,14 @@
 (** {1 Role Detection} *)
 
 (** Service role detected from binary name. *)
-type role = Node | Baker | Accuser | Dal_node | Signatory | Unknown of string
+type role =
+  | Node
+  | Baker
+  | Accuser
+  | Dal_node
+  | Index
+  | Signatory
+  | Unknown of string
 
 (** Convert a role to its string representation (e.g. [Node -> "node"]). *)
 val role_to_string : role -> string
