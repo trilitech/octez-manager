@@ -383,6 +383,9 @@ let detect_daily_logs_dir ~role ~data_dir ~base_dir =
   | External_service.Dal_node ->
       (* DAL node: <data_dir>/daily_logs/ *)
       check_dir (Filename.concat data_dir "daily_logs")
+  | External_service.Index ->
+      (* Index: <data_dir>/daily_logs/ *)
+      check_dir (Filename.concat data_dir "daily_logs")
   | External_service.Signatory ->
       (* Signatory: <base_dir>/logs/signatory/ *)
       let base = if base_dir <> "" then base_dir else data_dir in
@@ -625,8 +628,8 @@ let build_external_service ~unit_name ~exec_start ~properties =
         let probe_addr =
           match role with
           | External_service.Baker | External_service.Accuser
-          | External_service.Dal_node ->
-              (* Baker/Accuser/DAL: probe their connected node's endpoint *)
+          | External_service.Dal_node | External_service.Index ->
+              (* Baker/Accuser/DAL/Index: probe their connected node's endpoint *)
               endpoint_field.value
           | External_service.Signatory ->
               (* Signatory: doesn't connect to node RPC *)
@@ -814,8 +817,8 @@ let process_to_external_service (proc : Process_scanner.process_info) =
               (* Nodes: probe their own RPC endpoint *)
               rpc_addr.value
           | External_service.Baker | External_service.Accuser
-          | External_service.Dal_node ->
-              (* Baker/Accuser/DAL: probe their connected node's endpoint *)
+          | External_service.Dal_node | External_service.Index ->
+              (* Baker/Accuser/DAL/Index: probe their connected node's endpoint *)
               node_endpoint.value
           | External_service.Signatory ->
               (* Signatory: doesn't connect to node RPC *)
