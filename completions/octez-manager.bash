@@ -27,11 +27,34 @@ _octez_manager() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="baker binaries cleanup-dependencies cleanup-orphans group import install-accuser install-baker install-dal-node install-node install-signatory instance list list-available-networks list-snapshots purge-all rewards rpc sandbox self-update ui version web"
+  local commands="baker binaries cleanup-dependencies cleanup-orphans group import install-accuser install-baker install-dal-node install-node install-signatory instance [ACTION] list list-available-networks list-snapshots purge-all rewards rpc sandbox self-update ui version web"
   local instance_actions="start stop restart remove purge show show-service logs edit export-logs set-env get-env"
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
   local lb_votes="on off pass"
+  local _ACTION__baker_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__binaries_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__cleanup_dependencies_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__cleanup_orphans_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__group_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__import_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__install_accuser_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__install_baker_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__install_dal_node_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__install_node_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__install_signatory_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__instance_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__list_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__list_available_networks_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__list_snapshots_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__purge_all_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__rewards_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__rpc_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__sandbox_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__self_update_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__ui_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__version_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__web_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
   local baker_finalize_unstake_opts="--delegate --json -y --yes --help --version"
   local baker_list_opts="--json --help --version"
   local baker_register_opts="--delegate --json -y --yes --help --version"
@@ -149,8 +172,138 @@ _octez_manager() {
         return 0
       fi
       if [[ $cur == -* ]]; then
-        opts="--delete-data-dir --help --version"
+        opts="--delete-data-dir --force-purge --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+      fi
+      return 0
+      ;;
+    [ACTION])
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        if [[ $cur == -* ]]; then
+          opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+          COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+        else
+          COMPREPLY=( $(compgen -W "baker binaries cleanup-dependencies cleanup-orphans group import install-accuser install-baker install-dal-node install-node install-signatory instance list list-available-networks list-snapshots purge-all rewards rpc sandbox self-update ui version web" -- "$cur") )
+        fi
+      else
+        local subcmd="${COMP_WORDS[2]}"
+        case "$subcmd" in
+          baker)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__baker_opts" -- "$cur") )
+            fi
+            ;;
+          binaries)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__binaries_opts" -- "$cur") )
+            fi
+            ;;
+          cleanup-dependencies)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__cleanup_dependencies_opts" -- "$cur") )
+            fi
+            ;;
+          cleanup-orphans)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__cleanup_orphans_opts" -- "$cur") )
+            fi
+            ;;
+          group)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__group_opts" -- "$cur") )
+            fi
+            ;;
+          import)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__import_opts" -- "$cur") )
+            fi
+            ;;
+          install-accuser)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__install_accuser_opts" -- "$cur") )
+            fi
+            ;;
+          install-baker)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__install_baker_opts" -- "$cur") )
+            fi
+            ;;
+          install-dal-node)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__install_dal_node_opts" -- "$cur") )
+            fi
+            ;;
+          install-node)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__install_node_opts" -- "$cur") )
+            fi
+            ;;
+          install-signatory)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__install_signatory_opts" -- "$cur") )
+            fi
+            ;;
+          instance)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__instance_opts" -- "$cur") )
+            fi
+            ;;
+          list)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__list_opts" -- "$cur") )
+            fi
+            ;;
+          list-available-networks)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__list_available_networks_opts" -- "$cur") )
+            fi
+            ;;
+          list-snapshots)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__list_snapshots_opts" -- "$cur") )
+            fi
+            ;;
+          purge-all)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__purge_all_opts" -- "$cur") )
+            fi
+            ;;
+          rewards)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__rewards_opts" -- "$cur") )
+            fi
+            ;;
+          rpc)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__rpc_opts" -- "$cur") )
+            fi
+            ;;
+          sandbox)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__sandbox_opts" -- "$cur") )
+            fi
+            ;;
+          self-update)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__self_update_opts" -- "$cur") )
+            fi
+            ;;
+          ui)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__ui_opts" -- "$cur") )
+            fi
+            ;;
+          version)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__version_opts" -- "$cur") )
+            fi
+            ;;
+          web)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$_ACTION__web_opts" -- "$cur") )
+            fi
+            ;;
+        esac
       fi
       return 0
       ;;
@@ -413,7 +566,7 @@ _octez_manager() {
       ;;
     purge-all)
       if [[ $cur == -* ]]; then
-        opts="--help --version"
+        opts="--force-purge --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0
