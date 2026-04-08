@@ -1894,13 +1894,250 @@ and open_signatory_download_progress_modal ~version ~on_complete =
     ~ui
     ~on_close:(fun _ _ -> ())
 
+let rec select_index_app_bin_dir_modal ~on_select () =
+  let managed_versions =
+    match Octez_manager_lib.Binary_registry.list_managed_index_versions () with
+    | Ok versions ->
+        List.map
+          (fun v -> `ManagedVersion v)
+          (List.sort
+             (fun a b -> -Octez_manager_lib.Version_utils.compare_versions a b)
+             versions)
+    | Error _ -> []
+  in
+  let registered_dirs =
+    match Octez_manager_lib.Binary_registry.load_registered_dirs () with
+    | Error _ -> []
+    | Ok dirs ->
+        List.map
+          (fun (ld : Octez_manager_lib.Binary_registry.registered_dir) ->
+            `Registered (ld.alias, ld.path))
+          dirs
+  in
+  let items =
+    if managed_versions = [] && registered_dirs = [] then
+      [`DownloadOther; `CustomPath]
+    else managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath]
+  in
+  let to_string :
+      [ `ManagedVersion of string
+      | `Registered of string * string
+      | `DownloadOther
+      | `CustomPath ] ->
+      string = function
+    | `ManagedVersion v -> Printf.sprintf "octez-index v%s (managed)" v
+    | `Registered (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `DownloadOther -> "[ Download other version... ]"
+    | `CustomPath -> "[ Browse for custom directory... ]"
+  in
+  let on_choice_select = function
+    | `ManagedVersion version ->
+        let path =
+          Octez_manager_lib.Binary_registry.managed_index_path version
+        in
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Managed_octez_index_version version
+        in
+        on_select (path, bin_source)
+    | `Registered (alias, path) ->
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Registered_alias alias
+        in
+        on_select (path, bin_source)
+    | `DownloadOther -> (
+        match
+          Octez_manager_lib.Octez_index_downloader.fetch_versions
+            ~include_prerelease:false
+            ()
+        with
+        | Error (`Msg msg) ->
+            show_error
+              ~title:"No Versions Available"
+              (Printf.sprintf "Could not load available versions: %s" msg)
+        | Ok [] ->
+            show_error ~title:"No Versions Available" "No releases found."
+        | Ok versions ->
+            let installed =
+              match
+                Octez_manager_lib.Binary_registry.list_managed_index_versions ()
+              with
+              | Ok vers -> vers
+              | Error _ -> []
+            in
+            let version_items =
+              List.filter
+                (fun (vi :
+                       Octez_manager_lib.Octez_index_downloader.version_info)
+                   -> not (List.mem vi.version installed))
+                versions
+            in
+            if version_items = [] then
+              show_error
+                ~title:"No Versions to Download"
+                "All available octez-index versions are already installed."
+            else
+              open_choice_modal
+                ~title:"Select octez-index Version to Download"
+                ~items:version_items
+                ~to_string:(fun vi ->
+                  Printf.sprintf
+                    "v%s%s"
+                    vi.Octez_manager_lib.Octez_index_downloader.version
+                    (match
+                       vi.Octez_manager_lib.Octez_index_downloader.release_date
+                     with
+                    | Some date -> Printf.sprintf "  (%s)" date
+                    | None -> ""))
+                ~on_select:(fun vi ->
+                  let version =
+                    vi.Octez_manager_lib.Octez_index_downloader.version
+                  in
+                  open_index_download_progress_modal
+                    ~version
+                    ~on_complete:(fun success ->
+                      if success then
+                        let path =
+                          Octez_manager_lib.Binary_registry.managed_index_path
+                            version
+                        in
+                        let bin_source =
+                          Octez_manager_lib.Binary_registry
+                          .Managed_octez_index_version
+                            version
+                        in
+                        on_select (path, bin_source)))
+                ())
+    | `CustomPath ->
+        open_file_browser_modal
+          ~dirs_only:true
+          ~require_writable:false
+          ~on_select:(fun path ->
+            let trimmed = String.trim path in
+            if trimmed = "" then
+              show_error ~title:"Invalid Path" "Directory path cannot be empty"
+            else if not (Sys.file_exists trimmed) then
+              show_error
+                ~title:"Directory Not Found"
+                (Printf.sprintf "Directory does not exist: %s" trimmed)
+            else if not (Sys.is_directory trimmed) then
+              show_error
+                ~title:"Invalid Path"
+                "Path exists but is not a directory"
+            else
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Raw_path trimmed
+              in
+              on_select (trimmed, bin_source))
+          ()
+  in
+  open_choice_modal
+    ~title:"Select octez-index Binaries"
+    ~items
+    ~to_string
+    ~on_select:on_choice_select
+    ()
+
+and open_index_download_progress_modal ~version ~on_complete =
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      Background_runner.enqueue (fun () ->
+          let result =
+            Octez_manager_lib.Octez_index_downloader.download_version
+              ~version
+              ()
+          in
+          match result with
+          | Ok _res ->
+              Context.toast_success
+                (Printf.sprintf
+                   "octez-index v%s downloaded successfully"
+                   version) ;
+              on_complete true ;
+              Miaou.Core.Modal_manager.close_top `Commit
+          | Error (`Msg msg) ->
+              Context.toast_error
+                (Printf.sprintf "octez-index download failed: %s" msg) ;
+              on_complete false ;
+              Miaou.Core.Modal_manager.close_top `Cancel) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+      add (Printf.sprintf "Downloading octez-index v%s..." version) ;
+      add "" ;
+      add "Please wait..." ;
+      add "" ;
+      add "Modal will close automatically when download completes." ;
+      let content = String.concat "\n" (List.rev !lines) in
+      let lines_list = String.split_on_char '\n' content in
+      Pager.render
+        ~win:(max 1 (size.LTerm_geom.rows - 4))
+        ~cols:(max 1 (size.LTerm_geom.cols - 2))
+        (Pager.open_lines ~title:"" lines_list)
+        ~focus:false
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Downloading octez-index v%s" version;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.8; min = 76; max = 120});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
+
 (** Show the global help modal with both global and per-page shortcuts.
-    
+
     The modal displays three sections (when applicable):
     1. Contextual hint from Help_hint (if active) - shown at the top
     2. Global shortcuts - always shown
     3. Page-specific shortcuts - shown if the active page has registered a keymap
-    
+
     Page shortcuts are retrieved from Context.get_active_page_keymap which is
     updated by page wrappers (Themed_page, Monitored_page) during view rendering. *)
 let show_help_modal () =

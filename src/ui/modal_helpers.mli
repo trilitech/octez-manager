@@ -174,6 +174,13 @@ val select_signatory_app_bin_dir_modal :
   unit ->
   unit
 
+(** octez-index-specific app bin dir selection modal. Shows managed
+    octez-index versions, registered directories, and download options. *)
+val select_index_app_bin_dir_modal :
+  on_select:(string * Octez_manager_lib.Binary_registry.bin_source -> unit) ->
+  unit ->
+  unit
+
 (** Show a spinner modal while a background task runs.
     @param title Modal title
     @param label Text shown next to spinner
