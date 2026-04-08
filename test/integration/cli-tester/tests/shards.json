@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "generated_at": "2026-03-16T00:00:00.000000",
-    "generated_by": "tech-lead merge: register 22 missing tests + test 68 from #801",
-    "total_tests": 98,
-    "total_duration": 768.05,
+    "generated_at": "2026-04-08T00:00:00.000000",
+    "generated_by": "Add test 46-shared-base-dir-purge.sh for issue #816",
+    "total_tests": 99,
+    "total_duration": 775.05,
     "shard_count": 5,
-    "mean_shard_duration": 153.61,
+    "mean_shard_duration": 155.01,
     "max_shard_duration": 190.61,
     "min_shard_duration": 136.66,
     "duration_std_dev": 22.3,
@@ -72,6 +72,7 @@
       "import/67-import-node-network-stopped.sh",
       "baker/34-baker-multiple-instances.sh",
       "baker/26-baker-basic-install.sh",
+      "baker/46-shared-base-dir-purge.sh",
       "accuser/38-accuser-show-service.sh",
       "node/10-purge-with-data.sh",
       "node/06-install-custom-rpc-net.sh",
@@ -80,8 +81,8 @@
       "import/53-import-cascade-accuser.sh",
       "import/61-import-cascade-all-configs-preserved.sh"
     ],
-    "test_count": 18,
-    "total_duration": 139.0
+    "test_count": 19,
+    "total_duration": 146.0
   },
   "shard-4": {
     "tests": [
