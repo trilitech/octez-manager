@@ -36,6 +36,9 @@ module type Package_manager = sig
 
   val install_baker :
     ?quiet:bool -> baker_request -> (Service.t, [`Msg of string]) result
+
+  val install_index :
+    ?quiet:bool -> index_request -> (Service.t, [`Msg of string]) result
 end
 
 module Package_manager_capability = struct

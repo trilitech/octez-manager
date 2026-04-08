@@ -137,6 +137,8 @@ module Package_manager : Package_manager = struct
   let install_daemon = Dal_node.install_daemon
 
   let install_baker = Baker.install_baker
+
+  let install_index = Index.install
 end
 
 module Tezos_node_manager : Tezos_node_manager = struct end
