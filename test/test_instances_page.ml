@@ -15,6 +15,7 @@
     but do NOT actually start/stop services (systemd operations not mocked). *)
 
 open Alcotest
+open Octez_manager_lib
 module HD = Lib_miaou_internal.Headless_driver
 module Instances = Octez_manager_ui.Instances
 module TH = Tui_test_helpers_lib.Tui_test_helpers
@@ -351,6 +352,71 @@ let test_help_modal_opens () =
         (TH.contains_substring screen "Help"))
 
 (* ============================================================ *)
+(* Test: SC-004 — Cascade-start includes stopped index dependency *)
+(* ============================================================ *)
+
+let test_cascade_start_includes_index_dependency () =
+  TH.with_test_env (fun () ->
+      (* Create a stopped node with index as dependent *)
+      let node =
+        Service.make
+          ~instance:"node-main"
+          ~role:"node"
+          ~network:"mainnet"
+          ~history_mode:History_mode.default
+          ~data_dir:"/tmp/test-node-data"
+          ~rpc_addr:(Rpc_addr.of_string "127.0.0.1:8732")
+          ~net_addr:"0.0.0.0:9732"
+          ~service_user:"octez"
+          ~app_bin_dir:"/usr/bin"
+          ~logging_mode:Logging_mode.default
+          ~extra_args:[]
+          ~depends_on:None
+          ~dependents:["index-main"]
+          ()
+      in
+      (* Create a stopped index instance depending on the node *)
+      let index =
+        Service.make
+          ~instance:"index-main"
+          ~role:"index"
+          ~network:""
+          ~history_mode:History_mode.default
+          ~data_dir:"/tmp/test-index-data"
+          ~rpc_addr:(Rpc_addr.of_string "0.0.0.0:8733")
+          ~net_addr:""
+          ~service_user:"octez"
+          ~app_bin_dir:"/usr/bin"
+          ~logging_mode:Logging_mode.default
+          ~extra_args:[]
+          ~depends_on:(Some "node-main")
+          ~dependents:[]
+          ()
+      in
+      (* Write both services to the (temp-dir-backed) registry *)
+      (match Service_registry.write node with _ -> ()) ;
+      (match Service_registry.write index with _ -> ()) ;
+      (* In the test env Systemd.is_active fails (no real systemd),
+         so get_stopped_dependencies treats the node as stopped. *)
+      match Lifecycle.get_stopped_dependencies ~instance:"index-main" () with
+      | Error (`Msg e) ->
+          (* index-main not found or registry error — fail clearly *)
+          check
+            bool
+            (Printf.sprintf "get_stopped_dependencies: %s" e)
+            false
+            true
+      | Ok deps ->
+          check
+            bool
+            "cascade deps includes parent node-main"
+            true
+            (List.exists
+               (fun (s : Service.t) ->
+                 String.equal s.Service.instance "node-main")
+               deps))
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -369,6 +435,9 @@ let page_tests =
     ("create menu opens with 'c' key", `Quick, test_create_menu_opens);
     ("select Node from create menu", `Quick, test_select_node_from_menu);
     ("help modal opens with '?' key", `Quick, test_help_modal_opens);
+    ( "cascade-start includes stopped index dependency",
+      `Quick,
+      test_cascade_start_includes_index_dependency );
   ]
 
 let () = Alcotest.run "Instances Page (TUI)" [("instances_page", page_tests)]
