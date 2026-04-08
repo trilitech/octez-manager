@@ -84,15 +84,15 @@ let install_index_cmd =
           ~doc:"Directory containing Octez binaries"
           ~docv:"DIR")
   in
-  let octez_version =
+  let octez_index_version =
     let doc =
-      "Use a managed Octez version. Overrides --app-bin-dir. Download versions \
-       with: octez-manager binaries download VERSION"
+      "Use a managed octez-index version. Overrides --app-bin-dir. Download \
+       versions with: octez-manager binaries download-octez-index VERSION"
     in
     Arg.(
       value
       & opt (some string) None
-      & info ["octez-version"] ~doc ~docv:"VERSION")
+      & info ["octez-index-version"] ~doc ~docv:"VERSION")
   in
   let bin_dir_alias =
     let doc =
@@ -107,10 +107,13 @@ let install_index_cmd =
       value & flag & info ["no-enable"] ~doc:"Disable automatic enable --now")
   in
   let make instance_opt base_dir_opt rpc_addr node_instance watched_addresses
-      db_name extra_args service_user app_bin_dir octez_version bin_dir_alias
-      no_enable logging_mode =
+      db_name extra_args service_user app_bin_dir octez_index_version
+      bin_dir_alias no_enable logging_mode =
     match
-      Cli_helpers.resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir
+      Cli_helpers.resolve_octez_index_bin_dir
+        ?octez_index_version
+        ?bin_dir_alias
+        app_bin_dir
     with
     | Error msg -> Cli_helpers.cmdliner_error msg
     | Ok (app_bin_dir, bin_source) -> (
@@ -203,7 +206,7 @@ let install_index_cmd =
       ret
         (const make $ instance $ base_dir_opt $ rpc_addr $ node_instance
        $ watched_addresses $ db_name $ extra_args $ service_user $ app_bin_dir
-       $ octez_version $ bin_dir_alias $ auto_enable
+       $ octez_index_version $ bin_dir_alias $ auto_enable
        $ Cli_helpers.logging_mode_term))
   in
   let info =

@@ -18,7 +18,8 @@ let interactive_tty =
 
 let is_interactive () = Lazy.force interactive_tty
 
-let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
+let resolve_app_bin_dir ?octez_version ?bin_dir_alias
+    ?(binary_name = "octez-node") app_bin_dir =
   (* Priority: octez_version > bin_dir_alias > app_bin_dir > auto-detect *)
   (* Returns: (path, bin_source) *)
   match (octez_version, bin_dir_alias, app_bin_dir) with
@@ -189,14 +190,16 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias app_bin_dir =
       | Error msg -> Error msg)
   | None, None, _ -> (
       (* Auto-detect from PATH *)
-      match Paths.which "octez-node" with
+      match Paths.which binary_name with
       | Some path ->
           let dir = Filename.dirname path in
           Ok (dir, Binary_registry.Raw_path dir)
       | None ->
           Error
-            "Unable to locate octez-node in PATH. Install Octez binaries or \
-             use --octez-version, --bin-dir-alias, or --app-bin-dir")
+            (Printf.sprintf
+               "Unable to locate %s in PATH. Install the binary or use \
+                --octez-version, --bin-dir-alias, or --app-bin-dir"
+               binary_name))
 
 let resolve_signatory_bin_dir ?signatory_version ?bin_dir_alias app_bin_dir =
   (* Priority: signatory_version > bin_dir_alias > app_bin_dir > auto-detect *)
@@ -354,6 +357,169 @@ let resolve_signatory_bin_dir ?signatory_version ?bin_dir_alias app_bin_dir =
           Error
             "Unable to locate signatory in PATH. Install Signatory binaries or \
              use --signatory-version, --bin-dir-alias, or --app-bin-dir")
+
+let download_octez_index_version version =
+  Printf.printf "Downloading octez-index v%s...\n\n%!" version ;
+  let display_state = ref (Cli_progress.init_display ["octez-index"]) in
+  let display_mutex = Mutex.create () in
+  let lines = Cli_progress.render_display !display_state in
+  display_state := {!display_state with lines_printed = lines} ;
+  let progress ~downloaded ~total =
+    Mutex.lock display_mutex ;
+    display_state :=
+      Cli_progress.set_in_progress
+        !display_state
+        ~binary:"octez-index"
+        ~downloaded
+        ~total ;
+    let lines = Cli_progress.render_display !display_state in
+    display_state := {!display_state with lines_printed = lines} ;
+    Mutex.unlock display_mutex
+  in
+  match Octez_index_downloader.download_version ~version ~progress () with
+  | Ok result ->
+      Mutex.lock display_mutex ;
+      let size =
+        try
+          let path =
+            Filename.concat
+              result.Octez_index_downloader.installed_path
+              "octez-index"
+          in
+          let stats = Unix.stat path in
+          Int64.of_int stats.Unix.st_size
+        with _ -> 0L
+      in
+      display_state :=
+        Cli_progress.set_complete !display_state ~binary:"octez-index" ~size ;
+      let lines = Cli_progress.render_display !display_state in
+      display_state := {!display_state with lines_printed = lines} ;
+      Mutex.unlock display_mutex ;
+      Printf.printf "\n" ;
+      Ok
+        ( result.Octez_index_downloader.installed_path,
+          Binary_registry.Managed_octez_index_version version )
+  | Error (`Msg e) ->
+      Printf.printf "\n" ;
+      Error
+        (Printf.sprintf
+           "Download failed: %s\n\n\
+            You can retry with:\n\
+           \  octez-manager binaries download-octez-index %s"
+           e
+           version)
+
+let fetch_latest_octez_index_version () =
+  match Octez_index_downloader.fetch_versions ~include_prerelease:false () with
+  | Error (`Msg e) ->
+      Error (Printf.sprintf "Failed to fetch octez-index versions: %s" e)
+  | Ok [] -> Error "No octez-index releases available upstream"
+  | Ok versions -> (
+      let sorted =
+        List.sort
+          (fun (a : Octez_index_downloader.version_info)
+               (b : Octez_index_downloader.version_info)
+             -> -Version_checker.compare_versions a.version b.version)
+          versions
+      in
+      match sorted with
+      | [] -> Error "No octez-index releases available upstream"
+      | latest :: _ -> Ok latest.version)
+
+let resolve_octez_index_bin_dir ?octez_index_version ?bin_dir_alias app_bin_dir
+    =
+  (* Priority: octez_index_version > bin_dir_alias > app_bin_dir > auto-detect *)
+  (* Returns: (path, bin_source) *)
+  match (octez_index_version, bin_dir_alias, app_bin_dir) with
+  | Some version_input, _, _ -> (
+      let version_input = String.trim version_input in
+      let version_result =
+        if String.equal version_input "latest" then
+          fetch_latest_octez_index_version ()
+        else Ok version_input
+      in
+      match version_result with
+      | Error e -> Error e
+      | Ok version ->
+          if Octez_index_downloader.is_complete_installation version then
+            Ok
+              ( Octez_index_downloader.octez_index_version_path version,
+                Binary_registry.Managed_octez_index_version version )
+          else if is_interactive () then
+            let msg =
+              Printf.sprintf
+                "Managed version v%s not found locally. Download now? [Y/n] "
+                version
+            in
+            match LNoise.linenoise msg with
+            | None | Some "" | Some "y" | Some "Y" | Some "yes" | Some "Yes" ->
+                download_octez_index_version version
+            | Some _ ->
+                Error
+                  (Printf.sprintf
+                     "Version v%s not installed. Download it with:\n\
+                     \  octez-manager binaries download-octez-index %s"
+                     version
+                     version)
+          else
+            Error
+              (Printf.sprintf
+                 "Managed version v%s not found. Download it first with:\n\
+                 \  octez-manager binaries download-octez-index %s"
+                 version
+                 version))
+  | None, Some alias, _ -> (
+      let alias = String.trim alias in
+      match Binary_registry.find_registered_dir alias with
+      | Ok (Some ld) ->
+          Ok (ld.Binary_registry.path, Binary_registry.Registered_alias alias)
+      | Ok None ->
+          Error
+            (Printf.sprintf
+               "Registered directory alias '%s' not found. Create it with:\n\
+               \  octez-manager binaries register --alias %s /path/to/binaries"
+               alias
+               alias)
+      | Error (`Msg e) -> Error e)
+  | None, None, Some dir when String.trim dir <> "" -> (
+      match Paths.make_absolute_path dir with
+      | Ok abs_path -> Ok (abs_path, Binary_registry.Raw_path abs_path)
+      | Error msg -> Error msg)
+  | None, None, _ -> (
+      (* 1. Check PATH *)
+      match Paths.which "octez-index" with
+      | Some path ->
+          let dir = Filename.dirname path in
+          Ok (dir, Binary_registry.Raw_path dir)
+      | None -> (
+          (* 2. Check for locally managed versions *)
+          match Octez_index_downloader.list_managed_versions () with
+          | Ok (latest :: _) ->
+              Ok
+                ( Octez_index_downloader.octez_index_version_path latest,
+                  Binary_registry.Managed_octez_index_version latest )
+          | Ok [] | Error _ ->
+              if
+                (* 3. Offer to download latest if interactive *)
+                is_interactive ()
+              then
+                match
+                  LNoise.linenoise
+                    "No octez-index binary found. Download latest? [Y/n] "
+                with
+                | None | Some "" | Some "y" | Some "Y" | Some "yes" | Some "Yes"
+                  -> (
+                    match fetch_latest_octez_index_version () with
+                    | Error _ as e -> e
+                    | Ok version -> download_octez_index_version version)
+                | Some _ ->
+                    Error
+                      "octez-index is required. Use --octez-index-version, \
+                       --bin-dir-alias, or --app-bin-dir"
+              else
+                Error
+                  "No octez-index binary found. Use --octez-index-version, \
+                   --bin-dir-alias, or --app-bin-dir"))
 
 let normalize_opt_string = function
   | Some s ->
