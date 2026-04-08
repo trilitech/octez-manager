@@ -12,6 +12,8 @@ let ( let* ) = Result.bind
 type bin_source =
   | Managed_octez_version of string
   | Managed_signatory_version of string
+  | Managed_octez_index_version of string
+      (** Downloaded/managed octez-index version e.g. "0.1.0" *)
   | Registered_alias of string
   | Raw_path of string
 
@@ -22,6 +24,8 @@ type registered_dir = {alias : string; path : string}
 let bin_source_to_string = function
   | Managed_octez_version v -> Printf.sprintf "v%s (managed)" v
   | Managed_signatory_version v -> Printf.sprintf "signatory-v%s (managed)" v
+  | Managed_octez_index_version v ->
+      Printf.sprintf "octez-index-v%s (managed)" v
   | Registered_alias a -> Printf.sprintf "%s (registered)" a
   | Raw_path p -> p
 
@@ -30,6 +34,8 @@ let bin_source_to_yojson = function
       `Assoc [("type", `String "managed_octez"); ("version", `String v)]
   | Managed_signatory_version v ->
       `Assoc [("type", `String "managed_signatory"); ("version", `String v)]
+  | Managed_octez_index_version v ->
+      `Assoc [("type", `String "managed_index"); ("version", `String v)]
   | Registered_alias a ->
       `Assoc [("type", `String "registered"); ("alias", `String a)]
   | Raw_path p ->
@@ -85,6 +91,9 @@ let bin_source_of_yojson json =
         | `String "managed_signatory" ->
             let version = member "version" json |> to_string in
             Ok (Managed_signatory_version version)
+        | `String "managed_index" ->
+            let version = member "version" json |> to_string in
+            Ok (Managed_octez_index_version version)
         | `String "managed" ->
             (* Legacy format - migrate *)
             let version = member "version" json |> to_string in
@@ -115,6 +124,12 @@ let binaries_dir () =
 
 let managed_version_path version =
   Filename.concat (binaries_dir ()) ("v" ^ version)
+
+let index_binaries_dir () =
+  Filename.concat (Paths.xdg_data_home ()) "octez-manager/octez-index-binaries"
+
+let managed_index_path version =
+  Filename.concat (index_binaries_dir ()) ("v" ^ version)
 
 let registered_dirs_file () =
   Filename.concat
@@ -291,6 +306,11 @@ let resolve_bin_source = function
       let path = Signatory_downloader.signatory_version_path version in
       if Sys.file_exists path && Sys.is_directory path then Ok path
       else R.error_msgf "Managed Signatory version v%s is not installed" version
+  | Managed_octez_index_version version ->
+      let path = managed_index_path version in
+      if Sys.file_exists path && Sys.is_directory path then Ok path
+      else
+        R.error_msgf "Managed octez-index version v%s is not installed" version
   | Registered_alias alias -> (
       match find_registered_dir alias with
       | Ok (Some ld) ->
