@@ -161,7 +161,8 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
   in
   let network =
     Widgets.themed_text
-      (Printf.sprintf "%-12s" (network_short svc.Service.network))
+      (let s = network_short svc.Service.network in
+       Printf.sprintf "%-12s" (if s = "" then "-" else s))
   in
   let fold_indicator = if folded then "+" else "−" in
   let first_line =
