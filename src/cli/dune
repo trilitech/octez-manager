@@ -10,6 +10,7 @@
   cmd_install_accuser
   cmd_install_baker
   cmd_install_dal
+  cmd_install_index
   cmd_install_node
   cmd_install_signatory
   cmd_group
