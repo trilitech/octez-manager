@@ -76,7 +76,7 @@ let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
       in
       Service_registry.remove ~instance
 
-let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
+let purge_service ?(quiet = false) ~force_purge ~prompt_yes_no ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
   | None -> R.error_msgf "Instance '%s' not found" instance
@@ -117,9 +117,11 @@ let purge_service ?(quiet = false) ~prompt_yes_no ~instance () =
               env
           in
           let remove_base_dir =
-            prompt_yes_no
-              (Format.sprintf "Purge base-dir %S?" base_dir)
-              ~default:false
+            if force_purge then true
+            else
+              prompt_yes_no
+                (Format.sprintf "Purge base-dir %S?" base_dir)
+                ~default:false
           in
           if remove_base_dir then File_ops.remove_tree base_dir else Ok ()
         else Ok ()

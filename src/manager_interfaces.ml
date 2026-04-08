@@ -91,6 +91,7 @@ module type Installer = sig
 
   val purge_service :
     ?quiet:bool ->
+    force_purge:bool ->
     prompt_yes_no:(string -> default:bool -> bool) ->
     instance:string ->
     unit ->

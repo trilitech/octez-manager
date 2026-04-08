@@ -187,11 +187,18 @@ let instance_term =
           ["delete-data-dir"]
           ~doc:"Also delete the recorded data directory when removing.")
   in
+  let force_purge =
+    Arg.(
+      value & flag
+      & info
+          ["force-purge"]
+          ~doc:"Skip confirmation prompt when purging base directory.")
+  in
   let extra_args =
     (* Additional positional args after ACTION (used by set-env) *)
     Arg.(value & pos_right 1 string [] & info [] ~docv:"ARGS")
   in
-  let run instance action delete_data_dir extra_args =
+  let run instance action delete_data_dir force_purge extra_args =
     match (instance, action) with
     | None, _ -> `Help (`Pager, None)
     | Some inst, None -> (
@@ -257,6 +264,7 @@ let instance_term =
             Cli_helpers.run_result
               (Removal.purge_service
                  ~quiet:false
+                 ~force_purge
                  ~prompt_yes_no:
                    (if Cli_helpers.is_interactive () then
                       Cli_helpers.prompt_yes_no
@@ -913,7 +921,10 @@ let instance_term =
                   `Ok ()
               | Error msg -> Cli_helpers.cmdliner_error msg))
   in
-  Term.(ret (const run $ instance $ action $ delete_data_dir $ extra_args))
+  Term.(
+    ret
+      (const run $ instance $ action $ delete_data_dir $ force_purge
+     $ extra_args))
 
 let instance_cmd =
   let info = Cmd.info "instance" ~doc:"Manage existing Octez services." in

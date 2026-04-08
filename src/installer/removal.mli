@@ -29,11 +29,13 @@ val remove_service :
     env files, and optionally removes service account if no longer used.
     
     @param quiet Suppress command output
+    @param force_purge Skip confirmation prompt for base directory deletion
     @param prompt_yes_no Function to prompt user for confirmation
     @param instance Service instance name
     @return Unit on success *)
 val purge_service :
   ?quiet:bool ->
+  force_purge:bool ->
   prompt_yes_no:(string -> default:bool -> bool) ->
   instance:string ->
   unit ->
