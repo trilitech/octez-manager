@@ -331,6 +331,15 @@ let golden_path_script =
             | _ -> false),
           "Group 'shadownet-prod' auto-removed (was only member)" );
     ]
+  (* ── Step 9: Install Index ────────────────────────────────── *)
+  @ [Comment "=== Step 9: Install Index ==="]
+  @ open_create_menu ~menu_index:5 ~target_page:"install_index_form_v3"
+  @ [
+      WaitFor [ScreenContains "Install Index"; MaxIterations 10];
+      Comment "Submit form with all defaults";
+    ]
+  @ submit_form ~downs:13 @ wait_for_sync_install
+  @ [Screenshot "15_index_installed"; AssertService "index-shadownet"]
 
 (* ============================================================ *)
 (* Test Function *)
@@ -362,6 +371,7 @@ let test_create_node_service () =
   TH.with_test_env (fun () ->
       let instances =
         [
+          "index-shadownet";
           "accuser-shadownet";
           "baker-shadownet";
           "dal-shadownet";
