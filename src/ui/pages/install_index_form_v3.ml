@@ -316,6 +316,8 @@ let spec =
             ~binary:"octez-index"
             ~subcommand:["run"]
             ~binary_validator:Form_builder_common.has_octez_index_binary
+            ~app_bin_dir_modal:Modal_helpers.select_index_app_bin_dir_modal
+            ~app_bin_dir_hint:"Directory containing the octez-index binary."
             ~skip_instance_name:true
             ~skip_extra_args:true
             ~skip_service_fields:true
