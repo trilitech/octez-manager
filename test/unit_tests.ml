@@ -3805,6 +3805,27 @@ let binary_registry_bin_source_legacy () =
         bs
   | Error (`Msg e) -> Alcotest.fail e
 
+let binary_registry_managed_octez_index_version_roundtrip () =
+  let open Binary_registry.For_tests in
+  let src = Binary_registry.Managed_octez_index_version "0.1.0" in
+  let json = bin_source_to_yojson src in
+  (* Verify type key *)
+  (match json with
+  | `Assoc pairs ->
+      Alcotest.(check string)
+        "type key is managed_index"
+        "managed_index"
+        ( List.assoc "type" pairs |> Yojson.Safe.to_string |> fun s ->
+          String.sub s 1 (String.length s - 2) )
+  | _ -> Alcotest.fail "Expected JSON object") ;
+  (* Verify round-trip *)
+  match bin_source_of_yojson json with
+  | Ok (Binary_registry.Managed_octez_index_version v) ->
+      Alcotest.(check string) "version round-trips" "0.1.0" v
+  | Ok _ -> Alcotest.fail "Wrong bin_source variant after round-trip"
+  | Error (`Msg e) ->
+      Alcotest.fail (Printf.sprintf "Deserialisation failed: %s" e)
+
 let binary_registry_registered_dirs_crud () =
   with_fake_xdg (fun xdg ->
       (* Create a test directory for registering *)
@@ -6607,6 +6628,10 @@ let () =
             "bin_source legacy"
             `Quick
             binary_registry_bin_source_legacy;
+          Alcotest.test_case
+            "Managed_octez_index_version roundtrip"
+            `Quick
+            binary_registry_managed_octez_index_version_roundtrip;
           Alcotest.test_case
             "registered dirs CRUD"
             `Quick
