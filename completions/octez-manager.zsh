@@ -316,6 +316,395 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
+  local -a opts_baker_finalize_unstake
+  opts_baker_finalize_unstake=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_list
+  opts_baker_list=(
+    '--json[Output as JSON.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_register
+  opts_baker_register=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_set_delegate_params
+  opts_baker_set_delegate_params=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--edge-of-baking-over-staking[Edge of baking over staking (0-100).]:VAL:'
+    '--json[Output as JSON.]'
+    '--limit-of-staking-over-baking[Limit of staking over baking (0-9).]:VAL:'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_stake
+  opts_baker_stake=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_status
+  opts_baker_status=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_transfer
+  opts_baker_transfer=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_unstake
+  opts_baker_unstake=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_update_consensus_key
+  opts_baker_update_consensus_key=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_baker_vote
+  opts_baker_vote=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_binaries_download
+  opts_binaries_download=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_binaries_list
+  opts_binaries_list=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_binaries_list_remote
+  opts_binaries_list_remote=(
+    '-a[Include release candidates and prereleases]'
+    '--all[Include release candidates and prereleases]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_binaries_prune
+  opts_binaries_prune=(
+    '-n[Show what would be pruned without removing]'
+    '--dry-run[Show what would be pruned without removing]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_binaries_register
+  opts_binaries_register=(
+    '-a[Alias name for this directory (default\: basename of path)]:NAME:_directories'
+    '--alias[Alias name for this directory (default\: basename of path)]:NAME:_directories'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_binaries_remove
+  opts_binaries_remove=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_binaries_unregister
+  opts_binaries_unregister=(
+    '-f[Force unregistering even if in use]'
+    '--force[Force unregistering even if in use]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_[__octez_version=VERSION]
+  opts_group_[__octez_version=VERSION]=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_add
+  opts_group_add=(
+    '--instance[Instance name to add to the group.]:INST:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_create
+  opts_group_create=(
+    '--app-bin-dir[Path to binaries directory.]:DIR:_directories'
+    '--bin-dir-alias[Registered binary directory alias.]:ALIAS:_directories'
+    '--network[Network for services in this group (e.g. mainnet, ghostnet).]:NET:'
+    '--octez-version[Managed Octez version (e.g. '\''24.1'\'' or '\''latest'\'').]:VERSION:'
+    '--service-user[System user for services (default\: tezos).]:USER:_users'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_delete
+  opts_group_delete=(
+    '--cascade[Delete all services in the group.]'
+    '--ungroup[Remove group but keep services (ungroup them).]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_list
+  opts_group_list=(
+    '--json[Output in JSON format.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_remove
+  opts_group_remove=(
+    '--instance[Instance name to remove from the group.]:INST:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_restart
+  opts_group_restart=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_show
+  opts_group_show=(
+    '--json[Output in JSON format.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_start
+  opts_group_start=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_stop
+  opts_group_stop=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_group_upgrade
+  opts_group_upgrade=(
+    '--app-bin-dir[New path to binaries directory.]:DIR:_directories'
+    '--bin-dir-alias[New registered binary directory alias.]:ALIAS:_directories'
+    '--octez-version[New managed Octez version (e.g. '\''24.1'\'' or '\''latest'\'').]:VERSION:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rewards_config
+  opts_rewards_config=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rewards_continual
+  opts_rewards_continual=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rewards_generate
+  opts_rewards_generate=(
+    '--baker[Baker instance name. Auto-inferred when only one baker is registered.]:INSTANCE:'
+    '--cycle[Target cycle number (default\: latest completed).]:N:'
+    '--force[Re-generate even if the cycle was already paid.]'
+    '--json[Output as JSON instead of human-readable table.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rewards_history
+  opts_rewards_history=(
+    '--baker[Baker instance name. Auto-inferred when only one baker is registered.]:INSTANCE:'
+    '--cycles[Number of recent cycles to show (default\: 30).]:N:'
+    '--json[Output as JSON instead of human-readable table.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rewards_notify
+  opts_rewards_notify=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rewards_pay
+  opts_rewards_pay=(
+    '--baker[Baker instance name. Auto-inferred when only one baker is registered.]:INSTANCE:'
+    '--compare-indexers[Compare custom indexer results with public TzKT and log divergences.]'
+    '--compare[Compare custom indexer results with public TzKT and log divergences.]'
+    '--confirm[Skip interactive confirmation (for automation).]'
+    '--cycle[Target cycle number (default\: latest completed).]:N:'
+    '--dry-run[Simulate without broadcasting.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rewards_status
+  opts_rewards_status=(
+    '--baker[Baker instance name. Auto-inferred when only one baker is registered.]:INSTANCE:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rpc_get
+  opts_rpc_get=(
+    '-i[Local instance name]:INSTANCE:'
+    '--instance[Local instance name]:INSTANCE:'
+    '-p[Public node (index or name from '\''rpc public-nodes'\'')]:NODE:'
+    '--public[Public node (index or name from '\''rpc public-nodes'\'')]:NODE:'
+    '-u[RPC endpoint URL (e.g., https\://mainnet.tezos.ecadinfra.com)]:URL:'
+    '--url[RPC endpoint URL (e.g., https\://mainnet.tezos.ecadinfra.com)]:URL:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rpc_instances
+  opts_rpc_instances=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rpc_interactive
+  opts_rpc_interactive=(
+    '-i[Local instance name]:INSTANCE:'
+    '--instance[Local instance name]:INSTANCE:'
+    '-p[Public node (index or name from '\''rpc public-nodes'\'')]:NODE:'
+    '--public[Public node (index or name from '\''rpc public-nodes'\'')]:NODE:'
+    '-u[RPC endpoint URL (e.g., https\://mainnet.tezos.ecadinfra.com)]:URL:'
+    '--url[RPC endpoint URL (e.g., https\://mainnet.tezos.ecadinfra.com)]:URL:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rpc_list
+  opts_rpc_list=(
+    '-i[Local instance name]:INSTANCE:'
+    '--instance[Local instance name]:INSTANCE:'
+    '-p[Public node (index or name from '\''rpc public-nodes'\'')]:NODE:'
+    '--public[Public node (index or name from '\''rpc public-nodes'\'')]:NODE:'
+    '-u[RPC endpoint URL (e.g., https\://mainnet.tezos.ecadinfra.com)]:URL:'
+    '--url[RPC endpoint URL (e.g., https\://mainnet.tezos.ecadinfra.com)]:URL:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_rpc_public_nodes
+  opts_rpc_public_nodes=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_sandbox_add_account
+  opts_sandbox_add_account=(
+    '--alias[Alias for the account (default\: derived from address).]:ALIAS:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_sandbox_create
+  opts_sandbox_create=(
+    '--accuser[Install an octez-accuser service (default\: false).]'
+    '--app-bin-dir[Path to directory containing Octez binaries.]:DIR:_directories'
+    '--bin-dir-alias[Registered binary directory alias.]:ALIAS:_directories'
+    '--max-delegates[Max delegates to impersonate via yes-wallet (default\: 20).]:N:'
+    '-n[Tezos network (e.g. ghostnet, mainnet, or a teztnets URL).]:NET:'
+    '--network[Tezos network (e.g. ghostnet, mainnet, or a teztnets URL).]:NET:'
+    '--name[Sandbox name (default\: auto-generated from network).]:NAME:'
+    '--num-bakers[Number of bakers to create (default\: 1). Delegates split evenly.]:N:'
+    '--num-nodes[Number of nodes to create (default\: 1). Nodes 2+ peer to node 1.]:N:'
+    '--octez-version[Managed Octez version (e.g. '\''24.1'\'' or '\''latest'\'').]:VERSION:'
+    '--rpc-addr[Node RPC address host\:port (default\: auto-assigned starting at 18732).]:ADDR:'
+    '--service-user[System user for services (default\: current user or '\''tezos'\'').]:USER:_users'
+    '--snapshot[Snapshot URL or file path (default\: auto-fetched).]:URI:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_sandbox_destroy
+  opts_sandbox_destroy=(
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_sandbox_list
+  opts_sandbox_list=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_sandbox_start
+  opts_sandbox_start=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_sandbox_status
+  opts_sandbox_status=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts_sandbox_stop
+  opts_sandbox_stop=(
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
   _arguments -C \
     '1: :->command' \
     '*:: :->args'
@@ -384,6 +773,49 @@ _octez-manager() {
             else
               _describe -t subcommands 'baker subcommands' subcmds_baker
             fi
+          else
+            case $words[2] in
+              finalize-unstake)
+                _arguments \
+                  $opts_baker_finalize_unstake
+                ;;
+              list)
+                _arguments \
+                  $opts_baker_list
+                ;;
+              register)
+                _arguments \
+                  $opts_baker_register
+                ;;
+              set-delegate-params)
+                _arguments \
+                  $opts_baker_set_delegate_params
+                ;;
+              stake)
+                _arguments \
+                  $opts_baker_stake
+                ;;
+              status)
+                _arguments \
+                  $opts_baker_status
+                ;;
+              transfer)
+                _arguments \
+                  $opts_baker_transfer
+                ;;
+              unstake)
+                _arguments \
+                  $opts_baker_unstake
+                ;;
+              update-consensus-key)
+                _arguments \
+                  $opts_baker_update_consensus_key
+                ;;
+              vote)
+                _arguments \
+                  $opts_baker_vote
+                ;;
+            esac
           fi
           ;;
         binaries)
@@ -404,6 +836,37 @@ _octez-manager() {
             else
               _describe -t subcommands 'binaries subcommands' subcmds_binaries
             fi
+          else
+            case $words[2] in
+              download)
+                _arguments \
+                  $opts_binaries_download
+                ;;
+              list)
+                _arguments \
+                  $opts_binaries_list
+                ;;
+              list-remote)
+                _arguments \
+                  $opts_binaries_list_remote
+                ;;
+              prune)
+                _arguments \
+                  $opts_binaries_prune
+                ;;
+              register)
+                _arguments \
+                  $opts_binaries_register
+                ;;
+              remove)
+                _arguments \
+                  $opts_binaries_remove
+                ;;
+              unregister)
+                _arguments \
+                  $opts_binaries_unregister
+                ;;
+            esac
           fi
           ;;
         cleanup-dependencies)
@@ -436,6 +899,53 @@ _octez-manager() {
             else
               _describe -t subcommands 'group subcommands' subcmds_group
             fi
+          else
+            case $words[2] in
+              add)
+                _arguments \
+                  $opts_group_add
+                ;;
+              create)
+                _arguments \
+                  $opts_group_create
+                ;;
+              delete)
+                _arguments \
+                  $opts_group_delete
+                ;;
+              list)
+                _arguments \
+                  $opts_group_list
+                ;;
+              remove)
+                _arguments \
+                  $opts_group_remove
+                ;;
+              restart)
+                _arguments \
+                  $opts_group_restart
+                ;;
+              show)
+                _arguments \
+                  $opts_group_show
+                ;;
+              start)
+                _arguments \
+                  $opts_group_start
+                ;;
+              stop)
+                _arguments \
+                  $opts_group_stop
+                ;;
+              upgrade)
+                _arguments \
+                  $opts_group_upgrade
+                ;;
+              [--octez-version=VERSION])
+                _arguments \
+                  $opts_group_[__octez_version=VERSION]
+                ;;
+            esac
           fi
           ;;
         import)
@@ -496,6 +1006,37 @@ _octez-manager() {
             else
               _describe -t subcommands 'rewards subcommands' subcmds_rewards
             fi
+          else
+            case $words[2] in
+              config)
+                _arguments \
+                  $opts_rewards_config
+                ;;
+              continual)
+                _arguments \
+                  $opts_rewards_continual
+                ;;
+              generate)
+                _arguments \
+                  $opts_rewards_generate
+                ;;
+              history)
+                _arguments \
+                  $opts_rewards_history
+                ;;
+              notify)
+                _arguments \
+                  $opts_rewards_notify
+                ;;
+              pay)
+                _arguments \
+                  $opts_rewards_pay
+                ;;
+              status)
+                _arguments \
+                  $opts_rewards_status
+                ;;
+            esac
           fi
           ;;
         rpc)
@@ -514,6 +1055,29 @@ _octez-manager() {
             else
               _describe -t subcommands 'rpc subcommands' subcmds_rpc
             fi
+          else
+            case $words[2] in
+              get)
+                _arguments \
+                  $opts_rpc_get
+                ;;
+              instances)
+                _arguments \
+                  $opts_rpc_instances
+                ;;
+              interactive)
+                _arguments \
+                  $opts_rpc_interactive
+                ;;
+              list)
+                _arguments \
+                  $opts_rpc_list
+                ;;
+              public-nodes)
+                _arguments \
+                  $opts_rpc_public_nodes
+                ;;
+            esac
           fi
           ;;
         sandbox)
@@ -534,6 +1098,37 @@ _octez-manager() {
             else
               _describe -t subcommands 'sandbox subcommands' subcmds_sandbox
             fi
+          else
+            case $words[2] in
+              add-account)
+                _arguments \
+                  $opts_sandbox_add_account
+                ;;
+              create)
+                _arguments \
+                  $opts_sandbox_create
+                ;;
+              destroy)
+                _arguments \
+                  $opts_sandbox_destroy
+                ;;
+              list)
+                _arguments \
+                  $opts_sandbox_list
+                ;;
+              start)
+                _arguments \
+                  $opts_sandbox_start
+                ;;
+              status)
+                _arguments \
+                  $opts_sandbox_status
+                ;;
+              stop)
+                _arguments \
+                  $opts_sandbox_stop
+                ;;
+            esac
           fi
           ;;
         self-update)
