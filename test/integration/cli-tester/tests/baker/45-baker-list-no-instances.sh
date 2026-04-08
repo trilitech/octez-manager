@@ -28,6 +28,8 @@ if [[ "$output" == *"capability missing"* ]] || [[ "$output" == *"Failure"* ]]; 
   exit 1
 fi
 
+assert_contains "$output" "No baker instances" "Expected friendly 'No baker instances' message"
+
 # JSON variant must also exit cleanly.
 json_output=$(om baker list --json 2>&1)
 json_exit=$?
