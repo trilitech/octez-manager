@@ -89,16 +89,16 @@ let purge_with_base_dir_check ~instance () =
               (* Base-dir not shared - show confirmation modal *)
               Modal_helpers.open_choice_modal
                 ~title:"Confirm Base Directory Deletion"
-                ~items:[`Confirm; `Cancel]
+                ~items:[`DeleteAndPurge; `SkipBaseDirDeletion]
                 ~to_string:(function
-                  | `Confirm ->
+                  | `DeleteAndPurge ->
                       Printf.sprintf "Delete base-dir and purge: %s" base_dir
-                  | `Cancel -> "Cancel")
+                  | `SkipBaseDirDeletion -> "Skip base-dir deletion")
                 ~on_select:(function
-                  | `Confirm ->
+                  | `DeleteAndPurge ->
                       run_unit_action ~verb:"purge" ~instance (fun () ->
                           do_purge ~instance ())
-                  | `Cancel -> ())
+                  | `SkipBaseDirDeletion -> ())
                 ()
       else
         (* Not a baker/accuser - just purge directly *)
