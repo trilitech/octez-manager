@@ -18,7 +18,8 @@ val do_remove :
   (unit, Rresult.R.msg) result
 
 (** Purge a service (remove + delete data) *)
-val do_purge : instance:string -> unit -> (unit, Rresult.R.msg) result
+val do_purge :
+  instance:string -> force_purge:bool -> unit -> (unit, Rresult.R.msg) result
 
 (** Confirm removal with dependent services *)
 val remove_with_dependents_confirm :
