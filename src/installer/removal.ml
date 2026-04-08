@@ -20,6 +20,35 @@ let is_shared_data_dir ~instance ~data_dir () =
           svc.instance <> instance && svc.data_dir = data_dir)
         all_services
 
+(** Check if a base directory is shared by multiple baker/accuser instances.
+    Returns a list of instance names (excluding [instance]) that use the same base_dir.
+    Empty list means no other instances use this base_dir. *)
+let get_base_dir_users ~instance ~base_dir () =
+  match Service_registry.list () with
+  | Error _ -> []
+  | Ok all_services ->
+      List.filter_map
+        (fun (svc : Service.t) ->
+          if svc.instance = instance then None
+          else
+            match Node_env.read ~inst:svc.instance with
+            | Error _ -> None
+            | Ok pairs -> (
+                let base_dir_key =
+                  match svc.role with
+                  | "baker" -> Some "OCTEZ_BAKER_BASE_DIR"
+                  | "accuser" -> Some "OCTEZ_CLIENT_BASE_DIR"
+                  | _ -> None
+                in
+                match base_dir_key with
+                | None -> None
+                | Some key -> (
+                    match List.assoc_opt key pairs with
+                    | Some bd when String.trim bd = base_dir ->
+                        Some svc.instance
+                    | _ -> None)))
+        all_services
+
 let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
   let* svc_opt = Service_registry.find ~instance in
   match svc_opt with
@@ -116,14 +145,27 @@ let purge_service ?(quiet = false) ~force_purge ~prompt_yes_no ~instance () =
                else "OCTEZ_CLIENT_BASE_DIR")
               env
           in
-          let remove_base_dir =
-            if force_purge then true
-            else
-              prompt_yes_no
-                (Format.sprintf "Purge base-dir %S?" base_dir)
-                ~default:false
-          in
-          if remove_base_dir then File_ops.remove_tree base_dir else Ok ()
+          (* Check if other instances are using the same base-dir *)
+          let other_users = get_base_dir_users ~instance ~base_dir () in
+          if other_users <> [] then (
+            (* Base-dir is shared - cannot delete *)
+            if not quiet then
+              Format.printf
+                "⚠ Skipping base directory deletion (shared with other \
+                 services): %s@.Used by: %s@."
+                base_dir
+                (String.concat ", " other_users) ;
+            Ok ())
+          else
+            (* Base-dir not shared - proceed with deletion logic *)
+            let remove_base_dir =
+              if force_purge then true
+              else
+                prompt_yes_no
+                  (Format.sprintf "Purge base-dir %S?" base_dir)
+                  ~default:false
+            in
+            if remove_base_dir then File_ops.remove_tree base_dir else Ok ()
         else Ok ()
       in
       (* Also remove per-instance env files under XDG_CONFIG_HOME or /etc when purging *)
