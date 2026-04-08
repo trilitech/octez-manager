@@ -44,8 +44,7 @@ let install_index_cmd =
       & info
           ["watched-address"]
           ~doc:
-            "Public key hash to watch. May be repeated. Omit to watch all \
-             addresses."
+            "Public key hash to watch. May be repeated. At least one required."
           ~docv:"PKH")
   in
   let db_name =
@@ -54,7 +53,9 @@ let install_index_cmd =
       & opt (some string) None
       & info
           ["db-name"]
-          ~doc:"SQLite database filename (no path separators)"
+          ~doc:
+            "SQLite database filename (no path separators). The sqlite3: \
+             scheme prefix is added automatically if omitted."
           ~docv:"NAME")
   in
   let extra_args =
@@ -155,30 +156,47 @@ let install_index_cmd =
                 with
                 | Error msg -> Cli_helpers.cmdliner_error msg
                 | Ok rpc_addr -> (
-                    let req : index_request =
-                      {
-                        instance;
-                        base_dir;
-                        rpc_addr = Rpc_addr.of_string rpc_addr;
-                        watched_addresses;
-                        db_name = Cli_helpers.normalize_opt_string db_name;
-                        node_endpoint;
-                        depends_on;
-                        service_user;
-                        app_bin_dir;
-                        bin_source = Some bin_source;
-                        logging_mode;
-                        extra_args;
-                        extra_env = [];
-                        auto_enable = not no_enable;
-                        preserve_data = false;
-                      }
+                    let watched_addresses_result =
+                      if watched_addresses <> [] then Ok watched_addresses
+                      else if Cli_helpers.is_interactive () then
+                        Ok
+                          [
+                            Cli_helpers.prompt_required_string
+                              "Watched address (PKH)";
+                          ]
+                      else
+                        Error
+                          "At least one --watched-address is required in \
+                           non-interactive mode"
                     in
-                    match Index.install req with
-                    | Ok service ->
-                        Format.printf "Installed %s\n" service.S.instance ;
-                        `Ok ()
-                    | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg))))
+                    match watched_addresses_result with
+                    | Error msg -> Cli_helpers.cmdliner_error msg
+                    | Ok watched_addresses -> (
+                        let req : index_request =
+                          {
+                            instance;
+                            base_dir;
+                            rpc_addr = Rpc_addr.of_string rpc_addr;
+                            watched_addresses;
+                            db_name = Cli_helpers.normalize_opt_string db_name;
+                            node_endpoint;
+                            depends_on;
+                            service_user;
+                            app_bin_dir;
+                            bin_source = Some bin_source;
+                            logging_mode;
+                            extra_args;
+                            extra_env = [];
+                            auto_enable = not no_enable;
+                            preserve_data = false;
+                          }
+                        in
+                        match Index.install req with
+                        | Ok service ->
+                            Format.printf "Installed %s\n" service.S.instance ;
+                            `Ok ()
+                        | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg))))
+        )
   in
   let term =
     Term.(
