@@ -109,20 +109,24 @@ _octez_manager() {
       return 0
       ;;
     baker)
+      if [[ $COMP_CWORD -eq 2 ]]; then
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       else
-        COMPREPLY=( $(compgen -W "finalize-unstake" -- "$cur") )
+        COMPREPLY=( $(compgen -W "finalize-unstake list register set-delegate-params stake status transfer unstake update-consensus-key vote" -- "$cur") )
+      fi
       fi
       return 0
       ;;
     binaries)
+      if [[ $COMP_CWORD -eq 2 ]]; then
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       else
         COMPREPLY=( $(compgen -W "download list list-remote prune register remove unregister" -- "$cur") )
+      fi
       fi
       return 0
       ;;
@@ -141,11 +145,13 @@ _octez_manager() {
       return 0
       ;;
     group)
+      if [[ $COMP_CWORD -eq 2 ]]; then
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       else
         COMPREPLY=( $(compgen -W "add create delete list remove restart show start stop upgrade [--octez-version=VERSION]" -- "$cur") )
+      fi
       fi
       return 0
       ;;
@@ -220,29 +226,35 @@ _octez_manager() {
       return 0
       ;;
     rewards)
+      if [[ $COMP_CWORD -eq 2 ]]; then
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       else
         COMPREPLY=( $(compgen -W "config continual generate history notify pay status" -- "$cur") )
       fi
+      fi
       return 0
       ;;
     rpc)
+      if [[ $COMP_CWORD -eq 2 ]]; then
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       else
         COMPREPLY=( $(compgen -W "get instances interactive list public-nodes" -- "$cur") )
       fi
+      fi
       return 0
       ;;
     sandbox)
+      if [[ $COMP_CWORD -eq 2 ]]; then
       if [[ $cur == -* ]]; then
         opts="--help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       else
         COMPREPLY=( $(compgen -W "add-account create destroy list start status stop" -- "$cur") )
+      fi
       fi
       return 0
       ;;

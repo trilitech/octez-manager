@@ -366,13 +366,24 @@ _octez-manager() {
         baker)
           local -a subcmds_baker
           subcmds_baker=(
-            'finalize-unstake'
+            'finalize-unstake:INSTANCE Finalize pending unstake requests'
+            'list:List all baker instances'
+            'register:Register delegate key'
+            'set-delegate-params:Set delegate staking parameters'
+            'stake:Stake tez for a baker delegate'
+            'status:Show wallet state for a baker instance'
+            'transfer:DESTINATION Transfer tez to another address'
+            'unstake:Unstake tez (amount or "everything")'
+            'update-consensus-key:INSTANCE KEY Update baker consensus key'
+            'vote:Vote on governance (protocol hash during proposal period, yay/nay/pass during exploration/promotion)'
           )
-          if [[ $cur == -* ]]; then
-            _arguments \
-              $opts_baker
-          else
-            _describe -t subcommands 'baker subcommands' subcmds_baker
+          if (( CURRENT == 2 )); then
+            if [[ $cur == -* ]]; then
+              _arguments \
+                $opts_baker
+            else
+              _describe -t subcommands 'baker subcommands' subcmds_baker
+            fi
           fi
           ;;
         binaries)
@@ -386,11 +397,13 @@ _octez-manager() {
             'remove:Remove managed binary versions'
             'unregister:Unregister a registered directory'
           )
-          if [[ $cur == -* ]]; then
-            _arguments \
-              $opts_binaries
-          else
-            _describe -t subcommands 'binaries subcommands' subcmds_binaries
+          if (( CURRENT == 2 )); then
+            if [[ $cur == -* ]]; then
+              _arguments \
+                $opts_binaries
+            else
+              _describe -t subcommands 'binaries subcommands' subcmds_binaries
+            fi
           fi
           ;;
         cleanup-dependencies)
@@ -416,11 +429,13 @@ _octez-manager() {
             'upgrade'
             '[--octez-version=VERSION]:Upgrade binary version for all services in a group.'
           )
-          if [[ $cur == -* ]]; then
-            _arguments \
-              $opts_group
-          else
-            _describe -t subcommands 'group subcommands' subcmds_group
+          if (( CURRENT == 2 )); then
+            if [[ $cur == -* ]]; then
+              _arguments \
+                $opts_group
+            else
+              _describe -t subcommands 'group subcommands' subcmds_group
+            fi
           fi
           ;;
         import)
@@ -474,11 +489,13 @@ _octez-manager() {
             'pay:Execute payout for a specific cycle.'
             'status:Show current cycle and payout status for a baker.'
           )
-          if [[ $cur == -* ]]; then
-            _arguments \
-              $opts_rewards
-          else
-            _describe -t subcommands 'rewards subcommands' subcmds_rewards
+          if (( CURRENT == 2 )); then
+            if [[ $cur == -* ]]; then
+              _arguments \
+                $opts_rewards
+            else
+              _describe -t subcommands 'rewards subcommands' subcmds_rewards
+            fi
           fi
           ;;
         rpc)
@@ -490,11 +507,13 @@ _octez-manager() {
             'list:[PATH] List available RPC endpoints at a path'
             'public-nodes:List available public RPC nodes from Taquito'
           )
-          if [[ $cur == -* ]]; then
-            _arguments \
-              $opts_rpc
-          else
-            _describe -t subcommands 'rpc subcommands' subcmds_rpc
+          if (( CURRENT == 2 )); then
+            if [[ $cur == -* ]]; then
+              _arguments \
+                $opts_rpc
+            else
+              _describe -t subcommands 'rpc subcommands' subcmds_rpc
+            fi
           fi
           ;;
         sandbox)
@@ -508,11 +527,13 @@ _octez-manager() {
             'status:Show sandbox status.'
             'stop:Stop all services in a sandbox.'
           )
-          if [[ $cur == -* ]]; then
-            _arguments \
-              $opts_sandbox
-          else
-            _describe -t subcommands 'sandbox subcommands' subcmds_sandbox
+          if (( CURRENT == 2 )); then
+            if [[ $cur == -* ]]; then
+              _arguments \
+                $opts_sandbox
+            else
+              _describe -t subcommands 'sandbox subcommands' subcmds_sandbox
+            fi
           fi
           ;;
         self-update)
