@@ -41,6 +41,8 @@ let init () =
       match Sys.getenv_opt "OCTEZ_MANAGER_METRICS_ADDR" with
       | Some addr -> metrics_addr_ref := addr
       | None -> ())) ;
+  (* Auto-start recording so historical charts populate immediately on open *)
+  Metrics.start_recording () ;
   Navigation.make
     {
       services = Data.load_service_states ();
@@ -604,14 +606,12 @@ let view ps ~focus:_ ~size =
                 };
               ];
           ]
-        @ (if Metrics.is_recording () || Metrics.get_snapshots () <> [] then
-             [
-               render_box
-                 ~title:"Historical Metrics"
-                 ~widget_name:"diagnostics-historical"
-                 (render_historical_content ~chart_width);
-             ]
-           else [])
+        @ [
+            render_box
+              ~title:"Historical Metrics"
+              ~widget_name:"diagnostics-historical"
+              (render_historical_content ~chart_width);
+          ]
         @ [
             render_box
               ~title:"Scheduler Performance"
@@ -704,7 +704,10 @@ let view ps ~focus:_ ~size =
             (100 * visible_height / content_height)
         else ""
       in
-      let header = [canvas_header; Widgets.themed_muted scroll_indicator] in
+      (* Split canvas into individual lines so render_layout allocates the
+         correct row count (canvas is 5 rows; List.length must reflect that). *)
+      let canvas_lines = String.split_on_char '\n' canvas_header in
+      let header = canvas_lines @ [Widgets.themed_muted scroll_indicator] in
 
       Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun _ -> body))
 
