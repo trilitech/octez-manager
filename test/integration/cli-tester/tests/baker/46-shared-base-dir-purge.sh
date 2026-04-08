@@ -48,6 +48,7 @@ om install-baker \
 	--instance "$BAKER1_INSTANCE" \
 	--node-instance "$NODE_INSTANCE" \
 	--base-dir "$SHARED_BASE_DIR" \
+	--dal-endpoint none \
 	--liquidity-baking-vote pass \
 	--service-user tezos \
 	--no-enable 2>&1
@@ -65,6 +66,7 @@ om install-baker \
 	--instance "$BAKER2_INSTANCE" \
 	--node-instance "$NODE_INSTANCE" \
 	--base-dir "$SHARED_BASE_DIR" \
+	--dal-endpoint none \
 	--liquidity-baking-vote pass \
 	--service-user tezos \
 	--no-enable 2>&1
@@ -101,7 +103,7 @@ chown tezos:tezos "$MARKER_FILE"
 # Now purge baker1 - this should NOT delete the shared base-dir
 # because baker2 still uses it
 echo "Purging baker1..."
-om instance "$BAKER1_INSTANCE" purge 2>&1
+om instance "$BAKER1_INSTANCE" purge --force-purge 2>&1
 
 # Verify baker1 is removed
 if instance_exists "$BAKER1_INSTANCE"; then
@@ -135,7 +137,7 @@ echo "✓ Baker2 still in registry"
 # Now purge baker2 - this should ALSO NOT delete the shared base-dir yet
 # because we want to verify the directory isn't removed prematurely
 echo "Purging baker2..."
-om instance "$BAKER2_INSTANCE" purge 2>&1
+om instance "$BAKER2_INSTANCE" purge --force-purge 2>&1
 
 # Verify baker2 is removed
 if instance_exists "$BAKER2_INSTANCE"; then
