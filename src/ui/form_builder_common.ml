@@ -313,25 +313,82 @@ let prepare_extra_args s =
 (** Find the best default app_bin_dir for a given binary.
 
     Priority order:
-    1. Latest managed version if any exist
-    2. Use `which <binary>` to find system-installed binary
-    3. Look in registered services for a directory containing the binary
-    4. Fall back to /usr/bin
+    1. Latest managed index version (for octez-index only)
+    2. Latest managed octez version if any exist
+    3. Use `which <binary>` to find system-installed binary
+    4. Look in registered services for a directory containing the binary
+    5. Fall back to /usr/bin
 
     @param binary_name The name of the binary to find (e.g., "octez-node")
     @return The directory containing the binary, or /usr/bin as fallback *)
 let default_app_bin_dir ~binary_name =
-  (* 1. Try latest managed version first *)
-  match Binary_registry.list_managed_versions () with
-  | Ok (latest :: _) -> (
-      (* Use latest managed version if available *)
-      let version_path = Binary_registry.managed_version_path latest in
-      if has_binary binary_name version_path then version_path
-      else
-        (* Managed version exists but doesn't have this binary, try other sources *)
+  (* 1. For octez-index, check managed index versions first *)
+  if String.equal binary_name "octez-index" then
+    match Binary_registry.list_managed_index_versions () with
+    | Ok (latest :: _) -> (
+        let path = Binary_registry.managed_index_path latest in
+        if has_binary binary_name path then path
+        else
+          (* Managed index exists but binary missing — fall through *)
+          match Paths.which binary_name with
+          | Some p -> Filename.dirname p
+          | None -> (
+              match Service_registry.list () with
+              | Ok services -> (
+                  match
+                    List.find_opt
+                      (fun (svc : Service.t) ->
+                        has_binary binary_name svc.app_bin_dir)
+                      services
+                  with
+                  | Some svc -> svc.app_bin_dir
+                  | None -> "/usr/bin")
+              | Error _ -> "/usr/bin"))
+    | Ok [] | Error _ -> (
+        match Paths.which binary_name with
+        | Some p -> Filename.dirname p
+        | None -> (
+            match Service_registry.list () with
+            | Ok services -> (
+                match
+                  List.find_opt
+                    (fun (svc : Service.t) ->
+                      has_binary binary_name svc.app_bin_dir)
+                    services
+                with
+                | Some svc -> svc.app_bin_dir
+                | None -> "/usr/bin")
+            | Error _ -> "/usr/bin"))
+  else
+    (* 2. Try latest managed octez version first *)
+    match Binary_registry.list_managed_versions () with
+    | Ok (latest :: _) -> (
+        (* Use latest managed version if available *)
+        let version_path = Binary_registry.managed_version_path latest in
+        if has_binary binary_name version_path then version_path
+        else
+          (* Managed version exists but doesn't have this binary, try other sources *)
+          match Paths.which binary_name with
+          | Some path -> Filename.dirname path
+          | None -> (
+              match Service_registry.list () with
+              | Ok services -> (
+                  let found =
+                    List.find_opt
+                      (fun (svc : Service.t) ->
+                        has_binary binary_name svc.app_bin_dir)
+                      services
+                  in
+                  match found with
+                  | Some svc -> svc.app_bin_dir
+                  | None -> "/usr/bin")
+              | Error _ -> "/usr/bin"))
+    | Ok [] | Error _ -> (
+        (* 2. No managed versions, try `which` *)
         match Paths.which binary_name with
         | Some path -> Filename.dirname path
         | None -> (
+            (* 3. Look in registered services for a directory with this binary *)
             match Service_registry.list () with
             | Ok services -> (
                 let found =
@@ -344,24 +401,6 @@ let default_app_bin_dir ~binary_name =
                 | Some svc -> svc.app_bin_dir
                 | None -> "/usr/bin")
             | Error _ -> "/usr/bin"))
-  | Ok [] | Error _ -> (
-      (* 2. No managed versions, try `which` *)
-      match Paths.which binary_name with
-      | Some path -> Filename.dirname path
-      | None -> (
-          (* 3. Look in registered services for a directory with this binary *)
-          match Service_registry.list () with
-          | Ok services -> (
-              let found =
-                List.find_opt
-                  (fun (svc : Service.t) ->
-                    has_binary binary_name svc.app_bin_dir)
-                  services
-              in
-              match found with
-              | Some svc -> svc.app_bin_dir
-              | None -> "/usr/bin")
-          | Error _ -> "/usr/bin"))
 
 (** Find the best default app_bin_dir for Signatory binary.
 
