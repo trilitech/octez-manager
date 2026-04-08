@@ -41,3 +41,10 @@ missing_mli
 god_modules
 
 unsafe_string_fields
+
+# One new mutable field added: `key_to_render_by_page : histogram Page_map.t`
+# in Metrics.state (metrics.ml). Follows the identical pattern of the existing
+# `render_hist : histogram Page_map.t` field in the same record. Both are
+# protected by Mutex.protect state.lock and are required for per-page latency
+# tracking in the in-memory metrics ring buffer.
+mutable_fields

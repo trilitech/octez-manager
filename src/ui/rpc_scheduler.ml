@@ -88,8 +88,7 @@ let poll_boot (svc : Service.t) now =
       proto;
       last_error;
       last_block_time;
-    } ;
-  Context.mark_instances_dirty ()
+    }
 
 let start_head_monitor (svc : Service.t) =
   let instance = svc.Service.instance in
@@ -147,8 +146,7 @@ let start_head_monitor (svc : Service.t) =
               proto;
               last_error;
               last_block_time = Some now;
-            } ;
-          Context.mark_instances_dirty ())
+            })
     in
     Hashtbl.replace head_monitors instance handle
 
