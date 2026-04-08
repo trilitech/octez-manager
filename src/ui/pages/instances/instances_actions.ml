@@ -19,12 +19,12 @@ let do_remove ~instance ~delete_data_dir () =
   let* (module I) = require_installer () in
   I.remove_service ~quiet:true ~delete_data_dir ~instance ()
 
-let do_purge ~instance () =
+let do_purge ~instance ~force_purge () =
   Rpc_scheduler.stop_head_monitor instance ;
   let* (module I) = require_installer () in
   I.purge_service
     ~quiet:true
-    ~force_purge:true
+    ~force_purge
     ~prompt_yes_no:(fun _ ~default:_ -> true)
     ~instance
     ()
@@ -63,7 +63,7 @@ let purge_with_base_dir_check ~instance () =
         | None ->
             (* No base_dir found, just purge directly *)
             run_unit_action ~verb:"purge" ~instance (fun () ->
-                do_purge ~instance ())
+                do_purge ~instance ~force_purge:true ())
         | Some base_dir ->
             (* Check if other instances use this base_dir *)
             let other_users =
@@ -84,7 +84,7 @@ let purge_with_base_dir_check ~instance () =
                 ~title:"⚠ Shared Base Directory"
                 ~lines:(String.split_on_char '\n' warning_message) ;
               run_unit_action ~verb:"purge" ~instance (fun () ->
-                  do_purge ~instance ()))
+                  do_purge ~instance ~force_purge:false ()))
             else
               (* Base-dir not shared - show confirmation modal *)
               Modal_helpers.open_choice_modal
@@ -97,13 +97,15 @@ let purge_with_base_dir_check ~instance () =
                 ~on_select:(function
                   | `DeleteAndPurge ->
                       run_unit_action ~verb:"purge" ~instance (fun () ->
-                          do_purge ~instance ())
-                  | `SkipBaseDirDeletion -> ())
+                          do_purge ~instance ~force_purge:true ())
+                  | `SkipBaseDirDeletion ->
+                      run_unit_action ~verb:"purge" ~instance (fun () ->
+                          do_purge ~instance ~force_purge:false ()))
                 ()
       else
         (* Not a baker/accuser - just purge directly *)
         run_unit_action ~verb:"purge" ~instance (fun () ->
-            do_purge ~instance ())
+            do_purge ~instance ~force_purge:true ())
 
 let remove_with_dependents_confirm ~instance ~dependents ~delete_data_dir =
   Modal_helpers.open_choice_modal
