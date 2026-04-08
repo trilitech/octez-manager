@@ -201,20 +201,30 @@ let get_process_stats ~pid ~prev_sample =
       in
       Some ({pid; cpu_percent; memory_rss = rss; memory_percent}, curr_sample)
 
-(** Extract version string from binary --version output *)
+(** Extract version string from binary --version output.
+    Tries two patterns:
+    1. "Octez X.Y" — standard octez binaries (octez-node, octez-baker, …)
+    2. "version v?X.Y" — octez-index and other tools with semver output *)
 let parse_version_output output =
-  (* Look for "Octez XX.Y" pattern *)
   let lines = String.split_on_char '\n' output in
-  let rec find_version = function
+  let search_line re line =
+    match Str.search_forward (Str.regexp re) line 0 with
+    | _ -> Some (Str.matched_group 1 line)
+    | exception Not_found -> None
+  in
+  let rec find_with re = function
     | [] -> None
     | line :: rest -> (
-        match
-          Str.search_forward (Str.regexp "Octez \\([0-9]+\\.[0-9]+\\)") line 0
-        with
-        | _ -> Some (Str.matched_group 1 line)
-        | exception Not_found -> find_version rest)
+        match search_line re line with
+        | Some v -> Some v
+        | None -> find_with re rest)
   in
-  find_version lines
+  (* Standard octez binaries: "Octez 21.0" *)
+  match find_with "Octez \\([0-9]+\\.[0-9]+\\)" lines with
+  | Some _ as v -> v
+  | None ->
+      (* Fallback for octez-index and similar: "version v0.1.0" *)
+      find_with "version v?\\([0-9]+\\.[0-9]+\\)" lines
 
 (** Get version string from a binary *)
 let get_version ~binary =
