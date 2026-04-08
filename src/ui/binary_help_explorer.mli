@@ -66,6 +66,16 @@ val open_dal_run_help :
   on_apply:(string list -> unit) ->
   unit
 
+(** Open the help explorer modal for [octez-index run] flags.
+    @param app_bin_dir directory containing the octez-index binary
+    @param initial_args previously selected extra arguments to pre-populate
+    @param on_apply callback invoked with the list of selected flag tokens *)
+val open_index_run_help :
+  app_bin_dir:string ->
+  initial_args:string ->
+  on_apply:(string list -> unit) ->
+  unit
+
 (** {2 Utility Functions} *)
 
 (** Render an option value for display: [None] becomes [""], [Some v] becomes [v]. *)
@@ -102,6 +112,9 @@ val excluded_accuser_options : string list
 
 (** Flag prefixes excluded from the DAL node help explorer. *)
 val excluded_dal_options : string list
+
+(** Flag prefixes excluded from the index help explorer. *)
+val excluded_index_options : string list
 
 (** Check whether an option entry matches a specific flag string. *)
 val option_matches_flag : Help_parser.option_entry -> string -> bool
