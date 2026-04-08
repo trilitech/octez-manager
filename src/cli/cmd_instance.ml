@@ -202,11 +202,13 @@ let instance_term =
                  "Unknown instance '%s'. Run 'octez-manager list' to see \
                   available instances."
                  inst)
-        | _ ->
+        | Ok (Some _) ->
             Cli_helpers.cmdliner_error
               "ACTION required \
                (start|stop|restart|remove|purge|show|show-service|logs|export-logs|edit|set-env|get-env)"
-        )
+        | Error (`Msg msg) ->
+            Cli_helpers.cmdliner_error
+              (Printf.sprintf "Could not read instance registry: %s" msg))
     | Some inst, Some action -> (
         match action with
         | Start ->

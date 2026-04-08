@@ -93,74 +93,77 @@ let list_run json =
   (* When states is empty (no instances or capability unavailable), fall back
      to the service registry which requires no capability. *)
   let baker_states =
-    if baker_states <> [] then baker_states
-    else
-      match Service_registry.list () with
-      | Error _ -> []
-      | Ok svcs ->
-          List.filter_map
-            (fun (svc : Service.t) ->
-              if String.equal svc.role "baker" then
-                Some
-                  Data.Service_state.
-                    {
-                      service = svc;
-                      enabled = None;
-                      active = None;
-                      status = Unknown "unavailable";
-                      status_text = None;
-                    }
-              else None)
-            svcs
+    match baker_states with
+    | _ :: _ -> baker_states
+    | [] -> (
+        match Service_registry.list () with
+        | Error _ -> []
+        | Ok svcs ->
+            List.filter_map
+              (fun (svc : Service.t) ->
+                if String.equal svc.role "baker" then
+                  Some
+                    Data.Service_state.
+                      {
+                        service = svc;
+                        enabled = None;
+                        active = None;
+                        status = Unknown "unavailable";
+                        status_text = None;
+                      }
+                else None)
+              svcs)
   in
-  if baker_states = [] then (
-    Printf.printf
-      "No baker instances found. Use 'octez-manager install-baker' to create \
-       one.\n\
-       %!" ;
-    `Ok ())
-  else if json then (
-    let entries =
-      List.map
-        (fun (st : Data.Service_state.t) ->
-          let svc = st.service in
-          let delegates =
-            Delegate_scheduler.get_baker_delegates ~instance:svc.instance
-          in
-          Printf.sprintf
-            {|{"instance": "%s", "network": "%s", "delegates": [%s], "status": "%s"}|}
-            svc.instance
-            svc.network
-            (String.concat
-               ", "
-               (List.map (fun d -> Printf.sprintf {|"%s"|} d) delegates))
-            (Data.Service_state.status_label st))
-        baker_states
-    in
-    Printf.printf "[%s]\n%!" (String.concat ", " entries) ;
-    `Ok ())
-  else (
-    Printf.printf
-      "%-20s %-12s %-30s %s\n"
-      "INSTANCE"
-      "NETWORK"
-      "DELEGATES"
-      "STATUS" ;
-    List.iter
-      (fun (st : Data.Service_state.t) ->
-        let svc = st.service in
-        let delegates =
-          Delegate_scheduler.get_baker_delegates ~instance:svc.instance
+  match baker_states with
+  | [] ->
+      Printf.printf
+        "No baker instances found. Use 'octez-manager install-baker' to create \
+         one.\n\
+         %!" ;
+      `Ok ()
+  | _ ->
+      if json then (
+        let entries =
+          List.map
+            (fun (st : Data.Service_state.t) ->
+              let svc = st.service in
+              let delegates =
+                Delegate_scheduler.get_baker_delegates ~instance:svc.instance
+              in
+              Printf.sprintf
+                {|{"instance": "%s", "network": "%s", "delegates": [%s], "status": "%s"}|}
+                svc.instance
+                svc.network
+                (String.concat
+                   ", "
+                   (List.map (fun d -> Printf.sprintf {|"%s"|} d) delegates))
+                (Data.Service_state.status_label st))
+            baker_states
         in
-        let delegates_str = String.concat ", " delegates in
+        Printf.printf "[%s]\n%!" (String.concat ", " entries) ;
+        `Ok ())
+      else (
         Printf.printf
           "%-20s %-12s %-30s %s\n"
-          svc.instance
-          svc.network
-          delegates_str
-          (Data.Service_state.status_label st))
-      baker_states ;
-    `Ok ())
+          "INSTANCE"
+          "NETWORK"
+          "DELEGATES"
+          "STATUS" ;
+        List.iter
+          (fun (st : Data.Service_state.t) ->
+            let svc = st.service in
+            let delegates =
+              Delegate_scheduler.get_baker_delegates ~instance:svc.instance
+            in
+            let delegates_str = String.concat ", " delegates in
+            Printf.printf
+              "%-20s %-12s %-30s %s\n"
+              svc.instance
+              svc.network
+              delegates_str
+              (Data.Service_state.status_label st))
+          baker_states ;
+        `Ok ())
 
 let list_cmd =
   let info = Cmd.info "list" ~doc:"List all baker instances" in
