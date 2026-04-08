@@ -131,8 +131,15 @@ let list_cmd =
   Cmd.v info term
 
 let purge_all_cmd =
+  let force_purge =
+    Arg.(
+      value & flag
+      & info
+          ["force-purge"]
+          ~doc:"Skip confirmation prompt when purging base directories.")
+  in
   let term =
-    let run () =
+    let run force_purge =
       Capabilities.register () ;
       match Service_registry.list () with
       | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
@@ -157,6 +164,7 @@ let purge_all_cmd =
                 match
                   Removal.purge_service
                     ~quiet:false
+                    ~force_purge
                     ~prompt_yes_no:
                       (if Cli_helpers.is_interactive () then
                          Cli_helpers.prompt_yes_no
@@ -188,7 +196,7 @@ let purge_all_cmd =
               in
               Cli_helpers.cmdliner_error error_summary
     in
-    Term.(ret (const run $ const ()))
+    Term.(ret (const run $ force_purge))
   in
   let info =
     Cmd.info

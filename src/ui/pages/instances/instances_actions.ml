@@ -24,6 +24,7 @@ let do_purge ~instance () =
   let* (module I) = require_installer () in
   I.purge_service
     ~quiet:true
+    ~force_purge:true
     ~prompt_yes_no:(fun _ ~default:_ -> true)
     ~instance
     ()
