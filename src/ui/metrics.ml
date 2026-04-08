@@ -233,7 +233,9 @@ let record_render ~page (render : unit -> 'a) : 'a =
       let duration_ms = (finish -. start) *. 1000. in
       record_render_duration_ms ~page duration_ms ;
       match consume_key_to_render finish with
-      | Some lag -> hist_add state.key_to_render (lag *. 1000.)
+      | Some lag ->
+          Mutex.protect state.lock (fun () ->
+              hist_add state.key_to_render (lag *. 1000.))
       | None -> ())
     render
 
