@@ -16,14 +16,19 @@ let escape_zsh_single s =
   String.concat "'\\''" parts
 
 (** Escape a string for use inside a zsh [DESCRIPTION] bracket.
-    Zsh [_arguments] uses [':'] as a structural delimiter, so any literal
-    colon in the description text must be escaped as ['\\:']. *)
+    Zsh [_arguments] uses [':'] as a structural delimiter and [']'] closes
+    the description bracket, so both must be escaped. ['['] is escaped for
+    symmetry. *)
 let escape_zsh_description s =
   let s = escape_zsh_single s in
   let buf = Buffer.create (String.length s) in
   String.iter
     (fun c ->
-      if c = ':' then Buffer.add_string buf "\\:" else Buffer.add_char buf c)
+      match c with
+      | ':' -> Buffer.add_string buf "\\:"
+      | ']' -> Buffer.add_string buf "\\]"
+      | '[' -> Buffer.add_string buf "\\["
+      | _ -> Buffer.add_char buf c)
     s ;
   Buffer.contents buf
 
