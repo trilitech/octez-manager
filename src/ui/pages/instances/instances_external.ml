@@ -12,7 +12,8 @@ open Instances_state
 open Instances_helpers
 
 let current_external_service s =
-  let external_start_idx = services_start_idx + List.length s.services in
+  let display_items = display_ordered_items s in
+  let external_start_idx = services_start_idx + List.length display_items in
   if s.selected >= external_start_idx then
     let ext_idx = s.selected - external_start_idx in
     List.nth_opt s.external_services ext_idx
