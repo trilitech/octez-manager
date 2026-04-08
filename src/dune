@@ -39,6 +39,7 @@
   accuser
   signatory
   signatory_config
+  index
   lifecycle
   removal
   import
