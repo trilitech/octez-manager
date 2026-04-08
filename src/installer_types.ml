@@ -188,6 +188,29 @@ type signatory_request = {
   preserve_data : bool;
 }
 
+type index_request = {
+  instance : string;
+  base_dir : string;
+      (** Directory where octez-index stores its SQLite DB and state *)
+  rpc_addr : Rpc_addr.t;  (** REST API listen address, e.g. "0.0.0.0:8733" *)
+  watched_addresses : string list;
+      (** PKHs passed as --watched-address flags; empty = watch all *)
+  db_name : string option;
+      (** SQLite database filename (no path separators); None = default *)
+  node_endpoint : string;
+      (** Node RPC host:port — caller applies Config.endpoint_of_rpc *)
+  depends_on : string option;
+      (** Parent node instance name for cascade start/stop *)
+  service_user : string;
+  app_bin_dir : string;
+  bin_source : Binary_registry.bin_source option;
+  logging_mode : Logging_mode.t;
+  extra_args : string list;
+  extra_env : (string * string) list;
+  auto_enable : bool;
+  preserve_data : bool;
+}
+
 type file_backup = {tmp_path : string; original_path : string}
 
 (** Strategy for importing external services *)
