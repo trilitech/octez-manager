@@ -54,12 +54,16 @@ val open_multiselect_modal :
 (** Open a text input prompt modal.
     @param initial Pre-filled text.
     @param placeholder Ghost text shown when input is empty.
+    @param filter_key Optional predicate to filter key input. Single-character
+    keys are only accepted if [filter_key key] returns [true]. Multi-character
+    special keys (e.g., "Backspace", "Left") are always accepted.
     @param on_submit Called with the entered text on Enter. *)
 val prompt_text_modal :
   ?title:string ->
   ?width:int ->
   ?initial:string ->
   ?placeholder:string option ->
+  ?filter_key:(string -> bool) ->
   on_submit:(string -> unit) ->
   unit ->
   unit
@@ -74,12 +78,14 @@ val prompt_password_modal :
 
 (** Like {!prompt_text_modal} but validates input before accepting.
     The [validator] returns [Ok ()] to allow submission or [Error msg]
-    to show an inline error. *)
+    to show an inline error.
+    @param filter_key Optional predicate to filter key input. *)
 val prompt_validated_text_modal :
   ?title:string ->
   ?width:int ->
   ?initial:string ->
   ?placeholder:string option ->
+  ?filter_key:(string -> bool) ->
   validator:(string -> (unit, string) result) ->
   on_submit:(string -> unit) ->
   unit ->

@@ -1316,6 +1316,67 @@ let address_entry_describe = function
       lines
   | `Custom -> ["Enter a public key hash manually"]
 
+(** Accept only printable ASCII (0x20-0x7E) for single-byte keys.
+    For multi-char strings, distinguish special keys (which start with
+    uppercase or are common names like "Backspace") from pasted content
+    (which must be all-ASCII). *)
+let pkh_key_filter key =
+  let len = String.length key in
+  Logs.warn (fun m ->
+      m
+        "[PKH_FILTER] len=%d, escaped='%s', hex=%s"
+        len
+        (String.escaped key)
+        (String.to_seq key
+        |> Seq.map (fun c -> Printf.sprintf "%02x" (Char.code c))
+        |> List.of_seq |> String.concat " ")) ;
+  let result =
+    match len with
+    | 0 ->
+        Logs.warn (fun m -> m "[PKH_FILTER]   -> rejecting empty key") ;
+        false
+    | 1 ->
+        let c = Char.code key.[0] in
+        let accept = c >= 0x20 && c <= 0x7E in
+        Logs.warn (fun m ->
+            m
+              "[PKH_FILTER]   -> single byte: code=%d (0x%02x), accept=%b"
+              c
+              c
+              accept) ;
+        accept
+    | _ ->
+        (* Multi-char: accept if it's a special key name, otherwise validate
+           each byte for pasted content *)
+        let is_special_key =
+          match key with
+          | "Backspace" | "Delete" | "Left" | "Right" | "Up" | "Down" | "Home"
+          | "End" | "Page_up" | "Page_down" | "Tab" | "Enter" | "Escape" ->
+              true
+          | s when String.length s > 0 && Char.uppercase_ascii s.[0] = s.[0] ->
+              (* Likely a special key like "F1", "Ctrl-c", etc. *)
+              true
+          | _ -> false
+        in
+        if is_special_key then (
+          Logs.warn (fun m -> m "[PKH_FILTER]   -> special key, accepting") ;
+          true)
+        else
+          (* Pasted content: validate each byte *)
+          let all_ascii =
+            String.for_all
+              (fun c ->
+                let code = Char.code c in
+                code >= 0x20 && code <= 0x7E)
+              key
+          in
+          Logs.warn (fun m ->
+              m "[PKH_FILTER]   -> multi-char content, all_ascii=%b" all_ascii) ;
+          all_ascii
+  in
+  Logs.warn (fun m -> m "[PKH_FILTER]   -> FINAL RESULT: %b" result) ;
+  result
+
 (** Open an address picker modal. Shows wallet keys and optionally MRU
     destinations, with a "Custom PKH" option at the end.
     @param title Modal title
@@ -1340,8 +1401,9 @@ let pick_address ~title ~exclude_pkh ~include_mru ~on_select =
             ~width:50
             ~initial:""
             ~placeholder:(Some "tz1...")
+            ~filter_key:pkh_key_filter
             ~on_submit:(fun pkh ->
-              let pkh = String.trim pkh in
+              let pkh = Pkh_validator.sanitize pkh in
               match Pkh_validator.validate_format pkh with
               | Pkh_validator.Invalid reason ->
                   Modal_helpers.show_error
@@ -1985,8 +2047,9 @@ let action_import_key ~base_dir =
     ~width:50
     ~initial:""
     ~placeholder:(Some "tz1...")
+    ~filter_key:pkh_key_filter
     ~on_submit:(fun pkh ->
-      let pkh = String.trim pkh in
+      let pkh = Pkh_validator.sanitize pkh in
       match Pkh_validator.validate_format pkh with
       | Pkh_validator.Invalid reason ->
           Modal_helpers.show_error

@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Unicode bytes in PKH input**: Pasting a Tezos address from a browser (e.g., tzkt) could inject non-ASCII unicode bytes (U+00A0 NBSP, U+200B ZWSP, U+FEFF BOM) into the Import Key modal. These bytes appeared as garbage characters on screen and caused `octez-client add address` to reject the PKH. Input now filters non-ASCII bytes at the textbox level, and validation strips any remaining non-ASCII characters before storing.
 - **Imported key not visible until restart**: After importing a watch-only address in the Wallets page, the key list now updates immediately without requiring an app restart.
 - **Global shortcuts (?, C-t, K) not accessible from RPC browser and log viewer**: Pressing `?` (help), `C-t` (theme picker), or `K` (key bindings) had no effect when navigating directly to the RPC browser or log viewer pages. These pages now correctly dispatch global shortcuts.
 - Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)

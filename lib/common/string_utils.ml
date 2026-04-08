@@ -85,6 +85,18 @@ let string_contains ~needle haystack =
   in
   if nlen = 0 then true else loop 0
 
+(** Strip non-printable and non-ASCII bytes, keeping only printable ASCII
+    (0x20-0x7E). Browsers inject U+00A0 NBSP, U+200B ZWSP, U+FEFF BOM and
+    similar when copying from web UIs. *)
+let strip_non_ascii s =
+  let buf = Buffer.create (String.length s) in
+  String.iter
+    (fun c ->
+      let code = Char.code c in
+      if code >= 0x20 && code <= 0x7E then Buffer.add_char buf c)
+    s ;
+  Buffer.contents buf
+
 (** {1 Timestamp Utilities} *)
 
 (** Format the current local time as ["YYYY-MM-DD HH:MM:SS"]. *)
