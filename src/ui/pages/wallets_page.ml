@@ -1316,15 +1316,6 @@ let address_entry_describe = function
       lines
   | `Custom -> ["Enter a public key hash manually"]
 
-(** Accept only printable ASCII (0x20-0x7E); pass multi-char special keys
-    through unchanged. *)
-let pkh_key_filter key =
-  match String.length key with
-  | 1 ->
-      let c = Char.code key.[0] in
-      c >= 0x20 && c <= 0x7E
-  | _ -> true
-
 (** Open an address picker modal. Shows wallet keys and optionally MRU
     destinations, with a "Custom PKH" option at the end.
     @param title Modal title
@@ -1349,9 +1340,8 @@ let pick_address ~title ~exclude_pkh ~include_mru ~on_select =
             ~width:50
             ~initial:""
             ~placeholder:(Some "tz1...")
-            ~filter_key:pkh_key_filter
             ~on_submit:(fun pkh ->
-              let pkh = Pkh_validator.sanitize pkh in
+              let pkh = String.trim pkh in
               match Pkh_validator.validate_format pkh with
               | Pkh_validator.Invalid reason ->
                   Modal_helpers.show_error
@@ -1995,9 +1985,8 @@ let action_import_key ~base_dir =
     ~width:50
     ~initial:""
     ~placeholder:(Some "tz1...")
-    ~filter_key:pkh_key_filter
     ~on_submit:(fun pkh ->
-      let pkh = Pkh_validator.sanitize pkh in
+      let pkh = String.trim pkh in
       match Pkh_validator.validate_format pkh with
       | Pkh_validator.Invalid reason ->
           Modal_helpers.show_error
