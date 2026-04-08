@@ -29,6 +29,7 @@ let role_header = function
   | "accuser" -> "Accusers"
   | "dal-node" -> "DAL Nodes"
   | "signatory" -> "Signatories"
+  | "index" -> "Indices"
   | r -> String.capitalize_ascii r
 
 (** Sort services by role, then by instance name *)
@@ -58,7 +59,7 @@ let calc_num_columns ~cols ~min_column_width ~column_separator =
 
 (** Group services by role, preserving order, with ghost entries *)
 let group_by_role services =
-  let roles = ["node"; "baker"; "accuser"; "dal-node"; "signatory"] in
+  let roles = ["node"; "baker"; "accuser"; "dal-node"; "signatory"; "index"] in
   List.map
     (fun role ->
       let instances =
@@ -135,6 +136,7 @@ let group_by_group ~(groups : Group.t list) services =
               Ghost_add_new "accuser";
               Ghost_add_new "dal-node";
               Ghost_add_new "signatory";
+              Ghost_add_new "index";
             ]
         in
         (title, display_items))
@@ -151,6 +153,7 @@ let group_by_group ~(groups : Group.t list) services =
             Ghost_add_new "accuser";
             Ghost_add_new "dal-node";
             Ghost_add_new "signatory";
+            Ghost_add_new "index";
           ] );
       ]
     else
@@ -164,6 +167,7 @@ let group_by_group ~(groups : Group.t list) services =
               Ghost_add_new "accuser";
               Ghost_add_new "dal-node";
               Ghost_add_new "signatory";
+              Ghost_add_new "index";
             ] );
       ]
   in

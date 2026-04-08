@@ -149,7 +149,9 @@ let display_ordered_items state =
   match state.view_mode with
   | By_role ->
       (* Group by role and inject ghost after each role *)
-      let roles = ["node"; "baker"; "accuser"; "dal-node"; "signatory"] in
+      let roles =
+        ["node"; "baker"; "accuser"; "dal-node"; "signatory"; "index"]
+      in
       List.concat_map
         (fun role ->
           let instances =
@@ -207,6 +209,7 @@ let display_ordered_items state =
                     Ghost_add_new "accuser";
                     Ghost_add_new "dal-node";
                     Ghost_add_new "signatory";
+                    Ghost_add_new "index";
                   ]
             | None -> [])
           names
@@ -221,6 +224,7 @@ let display_ordered_items state =
             Ghost_add_new "accuser";
             Ghost_add_new "dal-node";
             Ghost_add_new "signatory";
+            Ghost_add_new "index";
           ]
         else
           List.map (fun s -> Real_service s) (sort_services_by_role ungrouped)
@@ -230,6 +234,7 @@ let display_ordered_items state =
               Ghost_add_new "accuser";
               Ghost_add_new "dal-node";
               Ghost_add_new "signatory";
+              Ghost_add_new "index";
             ]
       in
       by_group @ ungrouped_items
