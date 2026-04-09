@@ -26,10 +26,18 @@ struct
 
   let update = P.update
 
-  (* Wrap view with metrics tracking *)
-  let view s ~focus ~size =
+  (* Wrap view with metrics tracking and keymap registration *)
+  let view ps ~focus ~size =
     Metrics.record_render ~page:Config.page_name (fun () ->
-        P.view s ~focus ~size)
+        (* Register this page's keymap for the help modal *)
+        let keymap_pairs =
+          List.map
+            (fun (kb : key_binding) -> (kb.Miaou.Core.Tui_page.key, kb.help))
+            (P.keymap ps)
+        in
+        Context.register_active_page_keymap (fun () -> keymap_pairs) ;
+        (* Render page *)
+        P.view ps ~focus ~size)
 
   let move = P.move
 
