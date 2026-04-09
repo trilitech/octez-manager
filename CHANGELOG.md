@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Top menu hidden in RPC browser and log viewer**: Navigation headers are now visible in the RPC browser and log viewer pages, showing the page title, current context (instance name, log source), and navigation hints (fixes #846)
 - **Help modal (`?`) now shows per-page shortcuts**: The global help modal triggered by `?` now displays both global shortcuts (Help, Menu, Theme picker, Back) and page-specific shortcuts from the active page's keymap. Previously, it only showed global shortcuts with a generic message. Each page (Instances, Wallets, Diagnostics, etc.) now shows its relevant keyboard shortcuts when you press `?`.
 - **Imported key not visible until restart**: After importing a watch-only address in the Wallets page, the key list now updates immediately without requiring an app restart.
 - **Global shortcuts (?, C-t, K) not accessible from RPC browser and log viewer**: Pressing `?` (help), `C-t` (theme picker), or `K` (key bindings) had no effect when navigating directly to the RPC browser or log viewer pages. These pages now correctly dispatch global shortcuts.
