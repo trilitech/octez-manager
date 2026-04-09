@@ -308,18 +308,15 @@ let view ps ~focus ~size =
   in
   let title =
     Printf.sprintf
-      "%s   %s"
+      "%s   %s . Source: %s"
       (Widgets.themed_primary
-         (Printf.sprintf " Logs: %s " (String.capitalize_ascii s.instance)))
+         (Printf.sprintf
+            " Log Viewer . %s"
+            (String.capitalize_ascii s.instance)))
       privilege
+      source_str
   in
-  let help =
-    Widgets.themed_muted
-      (Printf.sprintf
-         "Source: %s . r: refresh . t: toggle . /: search . f: follow . w: \
-          wrap . ?: help . Esc: back"
-         source_str)
-  in
+  let help = Widgets.themed_muted "Press Esc to go back" in
   let header = [title; help] in
   Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun inner_size ->
       Pager.render

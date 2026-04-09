@@ -195,6 +195,20 @@ let view ps ~focus ~size =
   let is_browser_focused =
     match result_focus with State.FocusBrowser -> true | _ -> false
   in
+  (* Page header - visible in all modes *)
+  let header =
+    let current_instance =
+      match State.current_instance s with
+      | Some svc -> svc.Octez_manager_lib.Service.instance
+      | None -> "(no instance)"
+    in
+    let title =
+      Widgets.themed_primary
+        (Printf.sprintf " RPC Browser . %s" current_instance)
+    in
+    let help = Widgets.themed_muted "Press Esc to go back" in
+    [title; help]
+  in
   let body =
     match s.State.mode with
     | State.List _ ->
@@ -343,7 +357,7 @@ let view ps ~focus ~size =
           in
           header ^ "\n" ^ result
   in
-  Themed_page.render_layout ~size ~header:[] ~footer:[] ~child:(fun _ -> body)
+  Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun _ -> body)
 
 let handle_modal_key ps key ~size:_ =
   Miaou.Core.Modal_manager.handle_key key ;
