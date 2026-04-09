@@ -474,7 +474,7 @@ let open_create_menu () =
       | `Baker -> "Baker"
       | `Accuser -> "Accuser"
       | `Signatory -> "Signatory"
-      | `Index -> "Index")
+      | `Index -> "Indexer")
     ~on_select:(function
       | `Node -> Context.navigate Install_node_form_v3.name
       | `Baker -> Context.navigate Install_baker_form_v3.name
