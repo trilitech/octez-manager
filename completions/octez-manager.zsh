@@ -17,7 +17,8 @@ _octez-manager() {
     'install-index:Install an octez-index indexer service'
     'install-node:Install an octez-node systemd instance'
     'install-signatory:Install an octez-signatory service'
-    'instance:Manage existing Octez services.'
+    'instance'
+    '[ACTION]:Manage existing Octez services.'
     'list:Show services'
     'list-available-networks:Show networks advertised on teztnets.com (with fallbacks).'
     'list-snapshots:List downloads published on snapshots.tzinit.org for a network.'
@@ -67,6 +68,19 @@ _octez-manager() {
     'on:Vote for liquidity baking'
     'off:Vote against liquidity baking'
     'pass:Abstain from voting (default)'
+  )
+
+  local -a opts__ACTION_
+  opts__ACTION_=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
   )
 
   local -a opts_baker
@@ -237,6 +251,7 @@ _octez-manager() {
   local -a opts_instance
   opts_instance=(
     '--delete-data-dir[Also delete the recorded data directory when removing.]'
+    '--force-purge[Skip confirmation prompt when purging base directory.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -270,6 +285,7 @@ _octez-manager() {
 
   local -a opts_purge_all
   opts_purge_all=(
+    '--force-purge[Skip confirmation prompt when purging base directories.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -331,6 +347,318 @@ _octez-manager() {
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
     '--viewer-password[Viewer password (defaults to controller password if not set)]:PASSWORD:'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__baker
+  opts__ACTION__baker=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__binaries
+  opts__ACTION__binaries=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__cleanup_dependencies
+  opts__ACTION__cleanup_dependencies=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__cleanup_orphans
+  opts__ACTION__cleanup_orphans=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__group
+  opts__ACTION__group=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__import
+  opts__ACTION__import=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__install_accuser
+  opts__ACTION__install_accuser=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__install_baker
+  opts__ACTION__install_baker=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__install_dal_node
+  opts__ACTION__install_dal_node=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__install_index
+  opts__ACTION__install_index=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__install_node
+  opts__ACTION__install_node=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__install_signatory
+  opts__ACTION__install_signatory=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__instance
+  opts__ACTION__instance=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__list
+  opts__ACTION__list=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__list_available_networks
+  opts__ACTION__list_available_networks=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__list_snapshots
+  opts__ACTION__list_snapshots=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__purge_all
+  opts__ACTION__purge_all=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__rewards
+  opts__ACTION__rewards=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__rpc
+  opts__ACTION__rpc=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__sandbox
+  opts__ACTION__sandbox=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__self_update
+  opts__ACTION__self_update=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__ui
+  opts__ACTION__ui=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__version
+  opts__ACTION__version=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
+  local -a opts__ACTION__web
+  opts__ACTION__web=(
+    '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
+    '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
+    '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
+    '--page[Start on a registered page]:NAME:'
+    '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
+    '--ui-log[Enable UI debug logs]'
+    '--ui-logfile[Write UI logs to FILE]:FILE:_files'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -761,6 +1089,142 @@ _octez-manager() {
           else
             _arguments \
               $opts_instance
+          fi
+          ;;
+        [ACTION])
+          local -a subcmds__ACTION_
+          subcmds__ACTION_=(
+            'baker:Baker wallet operations'
+            'binaries:Manage Octez and Signatory binaries'
+            'cleanup-dependencies:Remove stale dependency entries from service configurations. This cleans up references to services that have been removed.'
+            'cleanup-orphans:Remove orphan data directories and log files not associated with any registered service. Use --dry-run to preview what would be removed.'
+            'group:Manage instance groups.'
+            'import:Import an external Octez service'
+            'install-accuser:Install an octez-accuser service'
+            'install-baker:Install an octez-baker service'
+            'install-dal-node:Install a DAL node service (octez-dal-node)'
+            'install-index:Install an octez-index indexer service'
+            'install-node:Install an octez-node systemd instance'
+            'install-signatory:Install an octez-signatory service'
+            'instance'
+            'list:Show services'
+            'list-available-networks:Show networks advertised on teztnets.com (with fallbacks).'
+            'list-snapshots:List downloads published on snapshots.tzinit.org for a network.'
+            'purge-all:Purge all registered instances. This removes each service, deletes data directories, log files, and (when run as root) drops service users that are no longer referenced by other services.'
+            'rewards:Manage baker rewards and payouts.'
+            'rpc:Query RPC endpoints on node instances'
+            'sandbox:Manage sandbox environments.'
+            'self-update:Check for and install octez-manager updates'
+            'ui:Launch the interactive terminal UI (same as running without arguments)'
+            'version:Show version information and check for updates'
+            'web:Start the web interface (browser-based terminal over WebSocket)'
+          )
+          if (( CURRENT == 2 )); then
+            if [[ $cur == -* ]]; then
+              _arguments \
+                $opts__ACTION_
+            else
+              _describe -t subcommands '[ACTION] subcommands' subcmds__ACTION_
+            fi
+          else
+            case $words[2] in
+              baker)
+                _arguments \
+                  $opts__ACTION__baker
+                ;;
+              binaries)
+                _arguments \
+                  $opts__ACTION__binaries
+                ;;
+              cleanup-dependencies)
+                _arguments \
+                  $opts__ACTION__cleanup_dependencies
+                ;;
+              cleanup-orphans)
+                _arguments \
+                  $opts__ACTION__cleanup_orphans
+                ;;
+              group)
+                _arguments \
+                  $opts__ACTION__group
+                ;;
+              import)
+                _arguments \
+                  $opts__ACTION__import
+                ;;
+              install-accuser)
+                _arguments \
+                  $opts__ACTION__install_accuser
+                ;;
+              install-baker)
+                _arguments \
+                  $opts__ACTION__install_baker
+                ;;
+              install-dal-node)
+                _arguments \
+                  $opts__ACTION__install_dal_node
+                ;;
+              install-index)
+                _arguments \
+                  $opts__ACTION__install_index
+                ;;
+              install-node)
+                _arguments \
+                  $opts__ACTION__install_node
+                ;;
+              install-signatory)
+                _arguments \
+                  $opts__ACTION__install_signatory
+                ;;
+              instance)
+                _arguments \
+                  $opts__ACTION__instance
+                ;;
+              list)
+                _arguments \
+                  $opts__ACTION__list
+                ;;
+              list-available-networks)
+                _arguments \
+                  $opts__ACTION__list_available_networks
+                ;;
+              list-snapshots)
+                _arguments \
+                  $opts__ACTION__list_snapshots
+                ;;
+              purge-all)
+                _arguments \
+                  $opts__ACTION__purge_all
+                ;;
+              rewards)
+                _arguments \
+                  $opts__ACTION__rewards
+                ;;
+              rpc)
+                _arguments \
+                  $opts__ACTION__rpc
+                ;;
+              sandbox)
+                _arguments \
+                  $opts__ACTION__sandbox
+                ;;
+              self-update)
+                _arguments \
+                  $opts__ACTION__self_update
+                ;;
+              ui)
+                _arguments \
+                  $opts__ACTION__ui
+                ;;
+              version)
+                _arguments \
+                  $opts__ACTION__version
+                ;;
+              web)
+                _arguments \
+                  $opts__ACTION__web
+                ;;
+            esac
           fi
           ;;
         baker)

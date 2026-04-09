@@ -29,7 +29,7 @@ let role_header = function
   | "accuser" -> "Accusers"
   | "dal-node" -> "DAL Nodes"
   | "signatory" -> "Signatories"
-  | "index" -> "Indices"
+  | "index" -> "Indexers"
   | r -> String.capitalize_ascii r
 
 (** Sort services by role, then by instance name *)
@@ -45,10 +45,36 @@ let sort_services services =
       else String.compare a.service.Service.instance b.service.Service.instance)
     services
 
-let load_services () = Data.load_service_states () |> sort_services
+(** For services with an empty network and a depends_on parent,
+    inherit the network from the parent service. *)
+let resolve_networks services =
+  List.map
+    (fun (st : Service_state.t) ->
+      let svc = st.service in
+      if svc.Service.network = "" then
+        match svc.Service.depends_on with
+        | Some parent_instance -> (
+            match
+              List.find_opt
+                (fun (s : Service_state.t) ->
+                  String.equal s.service.Service.instance parent_instance)
+                services
+            with
+            | Some parent ->
+                let svc =
+                  {svc with Service.network = parent.service.Service.network}
+                in
+                {st with service = svc}
+            | None -> st)
+        | None -> st
+      else st)
+    services
+
+let load_services () =
+  Data.load_service_states () |> resolve_networks |> sort_services
 
 let load_services_fresh () =
-  Data.load_service_states ~detail:false () |> sort_services
+  Data.load_service_states ~detail:false () |> resolve_networks |> sort_services
 
 (** Calculate number of columns based on terminal width *)
 let calc_num_columns ~cols ~min_column_width ~column_separator =

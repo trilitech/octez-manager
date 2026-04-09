@@ -64,7 +64,9 @@ let rpc_status_line ~(service_status : Service_state.status) (svc : Service.t) =
       (* No metrics yet *)
       match service_prefix with
       | Some prefix -> prefix
-      | None -> Widgets.themed_muted "pending")
+      | None ->
+          if svc.Service.role = "index" then Widgets.themed_muted "indexing"
+          else Widgets.themed_muted "pending")
   | Some
       {
         Metrics.head_level;
@@ -474,6 +476,7 @@ let line_for_ghost_add_new idx selected role =
     | "accuser" -> "Accuser"
     | "dal-node" -> "DAL Node"
     | "signatory" -> "Signatory"
+    | "index" -> "Indexer"
     | r -> String.capitalize_ascii r
   in
   Printf.sprintf
