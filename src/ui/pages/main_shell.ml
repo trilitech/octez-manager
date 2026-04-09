@@ -207,7 +207,14 @@ let refresh ps =
             on_hidden_page = None;
           }
   in
-  let ps = {ps with Navigation.s} in
+  (* Apply any pending navigation queued via Context.navigate *)
+  let ps =
+    match Context.consume_navigation () with
+    | None -> {ps with Navigation.s}
+    | Some (Context.Goto target) -> route_nav ~shell_ps:ps ~shell_s:s target
+    | Some Context.Back -> Navigation.back {ps with Navigation.s}
+    | Some Context.Quit -> Navigation.quit {ps with Navigation.s}
+  in
   let s = ps.Navigation.s in
   (* Refresh only the active tab to avoid consuming context signals
      intended for other sub-pages *)

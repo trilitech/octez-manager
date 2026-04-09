@@ -484,8 +484,8 @@ Press **Enter** to open instance menu.|}
             "↑↓: select  ·  Enter: open install form  ·  Esc: cancel" )
         else if s.selected = menu_item_count then
           ( "1: ⊕ new  ·  ←/→: Switch view  g: Toggle  K: Wallets  ?: Help",
-            "1: new instance  ←/h: By Role  →/l: By Group  g: Toggle view  K: \
-             Wallets  d: Diagnostics  ?: Help" )
+            "1: new instance  ←/h/→/l: Switch view  g: Toggle  K: Wallets  d: \
+             Diagnostics  ?: Help" )
         else if has_failure_at_selected () then
           ( "Enter: Actions  Tab: Fold  x: Dismiss  K: Wallets  ?: Help",
             "Enter: Actions  Tab: Fold/unfold  x: Clear failure  G: Group \
