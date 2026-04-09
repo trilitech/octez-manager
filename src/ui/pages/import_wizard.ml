@@ -285,7 +285,7 @@ let keymap _ =
   let kb key help =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  [kb "Esc" "Back / Previous"; kb "Enter" "Select / Next"]
+  [kb "Esc" "Back"; kb "Enter" "Select"]
 
 let move_selection ps delta =
   Navigation.update
