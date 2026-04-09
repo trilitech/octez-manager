@@ -482,13 +482,12 @@ Press **Enter** to open instance menu.|}
           ( "↑↓: select  ·  Enter: open  ·  Esc: cancel",
             "↑↓: select  ·  Enter: open install form  ·  Esc: cancel" )
         else if s.selected = menu_item_count then
-          ( "1: ⊕ new  ·  ←/→: Switch view  g: Toggle  K: Wallets  ?: Help",
-            "1: new instance  ←/h: By Role  →/l: By Group  g: Toggle view  K: \
-             Wallets  d: Diagnostics  ?: Help" )
+          ( "1: ⊕ new  ·  ←/→: Switch view  g: Toggle  ?: Help",
+            "Enter: new  ·  ?: Help" )
         else if has_failure_at_selected () then
-          ( "Enter: Actions  Tab: Fold  x: Dismiss  K: Wallets  ?: Help",
-            "Enter: Actions  Tab: Fold/unfold  x: Clear failure  G: Group \
-             actions  K: Wallets  ?: Help" )
+          ( "Enter: Actions  Tab: Fold  x: Dismiss  ?: Help",
+            "Enter: Actions  ·  Tab: Fold/unfold  ·  x: Clear failure  ·  ?: \
+             Help" )
         else
           let long_hint =
             match current_service s with
@@ -500,18 +499,15 @@ Press **Enter** to open instance menu.|}
                 dal_help_hint
             | Some st when String.equal st.service.Service.role "accuser" ->
                 accuser_help_hint
-            | _ ->
-                "Enter: Actions  Tab: Fold/unfold  G: Group actions  K: \
-                 Wallets  d: Diagnostics  ?: Help"
+            | _ -> "Enter: Actions  ·  Tab: Fold/unfold  ·  ?: Help"
           in
           let unmanaged_hint =
             if s.external_services <> [] then
-              if s.external_section_folded then "  u: Show unmanaged"
-              else "  u: Hide unmanaged"
+              if s.external_section_folded then "  ·  u: Show unmanaged"
+              else "  ·  u: Hide unmanaged"
             else ""
           in
-          ( "Enter: Actions  Tab: Fold  G: Groups  K: Wallets  ?: Help"
-            ^ unmanaged_hint,
+          ( "Enter: Actions  Tab: Fold  G: Groups  ?: Help" ^ unmanaged_hint,
             long_hint ^ unmanaged_hint )
       in
       Miaou.Core.Help_hint.clear () ;
