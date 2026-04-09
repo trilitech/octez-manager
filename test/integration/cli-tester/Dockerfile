@@ -47,6 +47,10 @@ RUN echo "Downloading signatory ${SIGNATORY_VERSION}..." && \
     chmod +x /usr/local/bin/signatory && \
     rm -f /tmp/signatory.tar.gz
 
+# Create stub octez-index binary (no public releases yet)
+RUN printf '#!/bin/sh\necho "octez-index stub"\n' > /usr/local/bin/octez-index && \
+    chmod +x /usr/local/bin/octez-index
+
 # Download Zcash/Sapling parameters required for node operation
 ARG ZCASH_PARAMS_URL=https://download.z.cash/downloads
 RUN mkdir -p /usr/local/share/zcash-params && \
