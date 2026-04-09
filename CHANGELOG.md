@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Simplified help modal (`?`) keymaps across all pages: removed verbose descriptions in favor of concise action names (e.g., "Toggle view" instead of "Group/Role view", "Back" instead of "Back / Previous")
+- Simplified instances page help hint: removed verbose view mode descriptions ("By Role", "By Group", "Toggle view") in favor of concise key combinations
 - Extract `register_and_init` and `shutdown` helpers in `manager_app.ml`
 - Simplify TzKT routing: rewards now use `tzkt_url` directly from config instead of the Indexer hub abstraction
 - Remove development-only debug scaffolding from `cmd_rewards` (-640 lines)
