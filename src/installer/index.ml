@@ -91,14 +91,24 @@ let install ?(quiet = false) (request : index_request) =
       ~user:request.service_user
       ()
   in
-  let depends_on_for_systemd =
+  let parent_svc_opt =
     match request.depends_on with
     | None -> None
     | Some parent_instance -> (
         match Service_registry.find ~instance:parent_instance with
-        | Ok (Some parent_svc) ->
-            Some [(parent_svc.Service.role, parent_instance)]
+        | Ok (Some parent_svc) -> Some parent_svc
         | _ -> None)
+  in
+  let depends_on_for_systemd =
+    match parent_svc_opt with
+    | Some parent_svc ->
+        Some [(parent_svc.Service.role, parent_svc.Service.instance)]
+    | None -> None
+  in
+  let network =
+    match parent_svc_opt with
+    | Some parent_svc -> parent_svc.Service.network
+    | None -> ""
   in
   let* () =
     Systemd.write_dropin
@@ -126,7 +136,7 @@ let install ?(quiet = false) (request : index_request) =
     Service.make
       ~instance:request.instance
       ~role:"index"
-      ~network:""
+      ~network
       ~history_mode:History_mode.default
       ~data_dir:request.base_dir
       ~rpc_addr:request.rpc_addr

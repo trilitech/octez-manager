@@ -85,7 +85,20 @@ let header s =
     Widgets.themed_primary (" Instance Details . " ^ s.instance);
     (match s.service with
     | Some svc ->
-        Widgets.themed_muted (svc.Service.role ^ " @ " ^ svc.Service.network)
+        let display_role =
+          if svc.Service.role = "index" then "indexer" else svc.Service.role
+        in
+        let network =
+          if svc.Service.network <> "" then svc.Service.network
+          else
+            match svc.Service.depends_on with
+            | Some parent_instance -> (
+                match Service_registry.find ~instance:parent_instance with
+                | Ok (Some parent_svc) -> parent_svc.Service.network
+                | _ -> "")
+            | None -> ""
+        in
+        Widgets.themed_muted (display_role ^ " @ " ^ network)
     | None -> "");
   ]
 
@@ -378,6 +391,54 @@ let view_details ~box_width svc =
           ("Created At", svc.Service.created_at);
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
         ]
+    | "index" ->
+        let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
+        let indexer_dir = lookup "OCTEZ_INDEXER_DIR" in
+        let rpc_addr = lookup "OCTEZ_INDEX_RPC_ADDR" in
+        let env_args = lookup "OCTEZ_SERVICE_ARGS" in
+        let svc_args = String.concat " " svc.Service.extra_args in
+        let extra_args =
+          match (env_args, svc_args) with
+          | "", "" -> ""
+          | a, "" | "", a -> a
+          | a, b -> a ^ " " ^ b
+        in
+        let depends_on =
+          match svc.Service.depends_on with
+          | Some inst -> inst
+          | None -> "(none)"
+        in
+        let network =
+          if svc.Service.network <> "" then svc.Service.network
+          else
+            match svc.Service.depends_on with
+            | Some parent_instance -> (
+                match Service_registry.find ~instance:parent_instance with
+                | Ok (Some parent_svc) -> parent_svc.Service.network
+                | _ -> "")
+            | None -> ""
+        in
+        let dependents =
+          match svc.Service.dependents with
+          | [] -> "(none)"
+          | deps -> String.concat ", " deps
+        in
+        [
+          ("Instance", svc.Service.instance);
+          ("Role", "indexer");
+          ("Network", if network = "" then "(unknown)" else network);
+          ("Indexer Dir", if indexer_dir = "" then "(unset)" else indexer_dir);
+          ("RPC Addr", if rpc_addr = "" then "(unset)" else rpc_addr);
+          ( "Node Endpoint",
+            if node_endpoint = "" then "(unset)" else node_endpoint );
+          ("Depends On", depends_on);
+          ("Dependents", dependents);
+          ("Service User", svc.Service.service_user);
+          ("Bin Dir", svc.Service.app_bin_dir);
+          ("Created At", svc.Service.created_at);
+          ("Logging", Logging_mode.to_string svc.Service.logging_mode);
+          ("Extra Args", if extra_args = "" then "(none)" else extra_args);
+        ]
     | _ ->
         (* Default case - typically node *)
         let dependents =
@@ -400,7 +461,11 @@ let view_details ~box_width svc =
           ("Extra Args", String.concat " " svc.Service.extra_args);
         ]
   in
-  let role_title = String.capitalize_ascii svc.Service.role ^ " Details" in
+  let display_role =
+    if svc.Service.role = "index" then "Indexer"
+    else String.capitalize_ascii svc.Service.role
+  in
+  let role_title = display_role ^ " Details" in
   (* Return optional keys box for signatory *)
   let keys_box =
     if svc.Service.role = "signatory" then
