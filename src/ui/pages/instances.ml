@@ -344,7 +344,6 @@ struct
       kb "↑/↓ or j/k" "Navigate";
       kb "←/→ or h/l" "Switch column";
       kb "Enter" "Open";
-      kb "Tab" "Fold/Unfold";
       kb "g" "Toggle view";
       kb "G" "Group actions";
       kb "d" "Diagnostics";
