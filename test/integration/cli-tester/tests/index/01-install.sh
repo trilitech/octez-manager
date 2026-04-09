@@ -33,6 +33,7 @@ om install-index \
 	--instance "$INDEX_INSTANCE" \
 	--node-instance "$NODE_INSTANCE" \
 	--rpc-addr "$INDEX_RPC" \
+	--watched-address tz1burnburnburnburnburnburnburjAYjjX \
 	--service-user tezos \
 	--no-enable
 
