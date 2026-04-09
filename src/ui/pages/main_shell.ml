@@ -27,6 +27,10 @@ let tab_sandbox = Sandbox_page.name
 
 let tab_rewards = Rewards_page.name
 
+let tab_log_viewer = Log_viewer_page.name
+
+let tab_rpc_browser = Rpc_browser.name
+
 let tab_experimental = "experimental"
 
 type state = {
@@ -39,6 +43,8 @@ type state = {
   topology_ps : Topology_page.Page.pstate;
   sandbox_ps : Sandbox_page.Page.pstate;
   rewards_ps : Rewards_page.Page.pstate;
+  log_viewer_ps : Log_viewer_page.Page.pstate option;
+  rpc_browser_ps : Rpc_browser.Page.pstate option;
   (* Track if we're on a hidden page (not in tab bar) *)
   on_hidden_page : string option;
 }
@@ -82,6 +88,8 @@ let init () =
       topology_ps = Topology_page.Page.init ();
       sandbox_ps = Sandbox_page.Page.init ();
       rewards_ps = Rewards_page.Page.init ();
+      log_viewer_ps = None;
+      rpc_browser_ps = None;
       on_hidden_page = None;
     }
 
@@ -106,14 +114,18 @@ let is_tab_target t =
   || String.equal t tab_experimental
 
 (** Route navigation from a sub-page: tab targets become tab switches;
-    hidden pages (sandbox, rewards) set on_hidden_page;
+    hidden pages (sandbox, rewards, log_viewer, rpc_browser) set on_hidden_page;
     other targets propagate as [Navigation.goto] on the shell. *)
 let route_nav ~shell_ps ~shell_s target =
   let ps = {shell_ps with Navigation.s = shell_s} in
   if is_tab_target target then
     let tabs' = Responsive_tabs_widget.select shell_s.tabs ~id:target in
     {ps with Navigation.s = {shell_s with tabs = tabs'; on_hidden_page = None}}
-  else if String.equal target tab_sandbox || String.equal target tab_rewards
+  else if
+    String.equal target tab_sandbox
+    || String.equal target tab_rewards
+    || String.equal target tab_log_viewer
+    || String.equal target tab_rpc_browser
   then {ps with Navigation.s = {shell_s with on_hidden_page = Some target}}
   else Navigation.goto target ps
 
@@ -163,6 +175,14 @@ let view ps ~focus ~size =
         Sandbox_page.Page.view s.sandbox_ps ~focus ~size:content_size
     | id when String.equal id tab_rewards ->
         Rewards_page.Page.view s.rewards_ps ~focus ~size:content_size
+    | id when String.equal id tab_log_viewer -> (
+        match s.log_viewer_ps with
+        | Some ps -> Log_viewer_page.Page.view ps ~focus ~size:content_size
+        | None -> Themed_page.apply_themed_background ~size:content_size "")
+    | id when String.equal id tab_rpc_browser -> (
+        match s.rpc_browser_ps with
+        | Some ps -> Rpc_browser.Page.view ps ~focus ~size:content_size
+        | None -> Themed_page.apply_themed_background ~size:content_size "")
     | id when String.equal id tab_experimental ->
         (* Experimental tab has no content - modal opens on selection *)
         Themed_page.apply_themed_background ~size:content_size ""
@@ -224,6 +244,24 @@ let refresh ps =
     let rp' = Rewards_page.Page.refresh s.rewards_ps in
     let shell_s = {s with rewards_ps = Navigation.make rp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
+  else if String.equal tab tab_log_viewer then
+    let lv_ps =
+      Option.value s.log_viewer_ps ~default:(Log_viewer_page.Page.init ())
+    in
+    let lv' = Log_viewer_page.Page.refresh lv_ps in
+    let shell_s =
+      {s with log_viewer_ps = Some (Navigation.make lv'.Navigation.s)}
+    in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending lv')
+  else if String.equal tab tab_rpc_browser then
+    let rb_ps =
+      Option.value s.rpc_browser_ps ~default:(Rpc_browser.Page.init ())
+    in
+    let rb' = Rpc_browser.Page.refresh rb_ps in
+    let shell_s =
+      {s with rpc_browser_ps = Some (Navigation.make rb'.Navigation.s)}
+    in
+    apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rb')
   else if String.equal tab tab_experimental then
     (* Experimental tab has no page state, but needs to handle navigation *)
     match Context.consume_navigation () with
@@ -268,6 +306,38 @@ let dispatch_key ps key ~size =
     let rp' = Rewards_page.Page.handle_key s.rewards_ps key ~size in
     let shell_s = {s with rewards_ps = Navigation.make rp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
+  else if String.equal tab tab_log_viewer then
+    match s.log_viewer_ps with
+    | Some lv_ps ->
+        let lv' = Log_viewer_page.Page.handle_key lv_ps key ~size in
+        let shell_s =
+          {s with log_viewer_ps = Some (Navigation.make lv'.Navigation.s)}
+        in
+        apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending lv')
+    | None ->
+        (* Initialize state on-demand *)
+        let lv_ps = Log_viewer_page.Page.init () in
+        let lv' = Log_viewer_page.Page.handle_key lv_ps key ~size in
+        let shell_s =
+          {s with log_viewer_ps = Some (Navigation.make lv'.Navigation.s)}
+        in
+        apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending lv')
+  else if String.equal tab tab_rpc_browser then
+    match s.rpc_browser_ps with
+    | Some rb_ps ->
+        let rb' = Rpc_browser.Page.handle_key rb_ps key ~size in
+        let shell_s =
+          {s with rpc_browser_ps = Some (Navigation.make rb'.Navigation.s)}
+        in
+        apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rb')
+    | None ->
+        (* Initialize state on-demand *)
+        let rb_ps = Rpc_browser.Page.init () in
+        let rb' = Rpc_browser.Page.handle_key rb_ps key ~size in
+        let shell_s =
+          {s with rpc_browser_ps = Some (Navigation.make rb'.Navigation.s)}
+        in
+        apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rb')
   else ps
 
 let dispatch_modal_key ps key ~size =
@@ -305,6 +375,28 @@ let dispatch_modal_key ps key ~size =
     let rp' = Rewards_page.Page.handle_modal_key s.rewards_ps key ~size in
     let shell_s = {s with rewards_ps = Navigation.make rp'.Navigation.s} in
     apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rp')
+  else if String.equal tab tab_log_viewer then (
+    match s.log_viewer_ps with
+    | Some lv_ps ->
+        let lv' = Log_viewer_page.Page.handle_modal_key lv_ps key ~size in
+        let shell_s =
+          {s with log_viewer_ps = Some (Navigation.make lv'.Navigation.s)}
+        in
+        apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending lv')
+    | None ->
+        Miaou.Core.Modal_manager.handle_key key ;
+        ps)
+  else if String.equal tab tab_rpc_browser then (
+    match s.rpc_browser_ps with
+    | Some rb_ps ->
+        let rb' = Rpc_browser.Page.handle_modal_key rb_ps key ~size in
+        let shell_s =
+          {s with rpc_browser_ps = Some (Navigation.make rb'.Navigation.s)}
+        in
+        apply_sub_nav ~shell_ps:ps ~shell_s (Navigation.pending rb')
+    | None ->
+        Miaou.Core.Modal_manager.handle_key key ;
+        ps)
   else (
     (* Experimental tab and fallback: use global modal handler *)
     Miaou.Core.Modal_manager.handle_key key ;
