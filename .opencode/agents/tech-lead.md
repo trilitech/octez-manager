@@ -1,6 +1,6 @@
 ---
 description: Orchestrates agent teams, enforces quality gates, and coordinates implementation workflow
-mode: primary
+mode: subagent
 model: github-copilot/claude-opus-4.6
 temperature: 0.3
 permission:
