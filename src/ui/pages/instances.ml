@@ -364,96 +364,6 @@ struct
       Widgets.themed_secondary (summary_line s);
     ]
 
-  let node_help_hint =
-    {|## Node Instance
-
-**Line 1:** Instance status
-- `●` running, `○` stopped
-- `[enabled]` starts on boot
-
-**Line 2:** RPC status
-- `synced`/`syncing` = bootstrap state
-- `L12345` = head level
-- Protocol & chain ID (8 chars)
-- `Δ` = time since last block
-- `no rpc` = node not responding
-
-**Line 3:** System metrics
-- Version: green=latest, yellow=outdated, red=deprecated, blue=RC
-- `MEM` = memory sparkline
-- `DISK` = data directory size
-
-**Line 4+:** CPU usage chart
-
-Press **Enter** to open instance menu.|}
-
-  let baker_help_hint =
-    {|## Baker Instance
-
-**Line 1:** Instance status
-- `●` running, `○` stopped
-- `[enabled]` starts on boot
-
-**Line 2:** Signing activity (local baker data)
-- Read from `<base_dir>/<chain>_highwatermarks`
-- Shows last signed level per delegate
-- `no signing activity` = no blocks/attestations signed yet
-
-**Line 3:** Delegate status (from chain RPC)
-- Fetched from node every 60s (head~2 for stability)
-- `pkh:ok` = no missed slots (green)
-- `pkh:missed:N/M` = missed slots vs remaining allowed
-  - Yellow: missed >= remaining/2
-  - Red: missed > remaining (CRITICAL)
-- `pkh:inactive` = delegate is deactivated
-- `pkh:FORBIDDEN` = delegate is forbidden (red alert)
-- `pkh:…` = data not yet fetched
-
-**Line 4:** System metrics (local process)
-- Version: from `--version` output
-- `MEM` = RSS memory usage sparkline
-
-**Line 5+:** CPU usage chart (braille)
-
-Press **Enter** to open instance menu.|}
-
-  let dal_help_hint =
-    {|## DAL Node Instance
-
-**Line 1:** Instance status
-- `●` running, `○` stopped
-- `[enabled]` starts on boot
-
-**Line 2:** Health status (from /health RPC)
-- `health: up` (green) = all checks passing
-- `health: degraded` (yellow) = partial issues
-- `health: down` (red) = node unhealthy
-- Individual check statuses shown if available
-
-**Line 3:** System metrics
-- Version: from `--version` output
-- `MEM` = RSS memory usage sparkline
-- `DISK` = DAL node data directory size
-
-**Line 4+:** CPU usage chart (braille)
-
-Press **Enter** to open instance menu.|}
-
-  let accuser_help_hint =
-    {|## Accuser Instance
-
-**Line 1:** Instance status
-- `●` running (green), `○` stopped (yellow), `●` failed (red)
-- `[enabled]` starts on boot
-
-**Line 2:** Activity status
-- `monitoring` (green) = accuser is watching for double-baking/endorsing
-
-The accuser monitors the chain for misbehavior and
-automatically submits denunciation operations when detected.
-
-Press **Enter** to open instance menu.|}
-
   (* Mutable scroll offset - updated during view to keep selection visible *)
   let scroll_offset_ref = ref 0
 
@@ -469,49 +379,9 @@ Press **Enter** to open instance menu.|}
     let s = ps.Navigation.s in
     (* Set zone-conditional help hints.  Skipped while a modal is active
        because modals manage their own hints via push/pop. *)
-    if not (Miaou.Core.Modal_manager.has_active ()) then (
-      let has_failure_at_selected () =
-        match current_service s with
-        | None -> false
-        | Some st ->
-            Option.is_some
-              (get_recent_failure ~instance:st.service.Service.instance)
-      in
-      let hint_short, hint_long =
-        if s.create_menu_open then
-          ( "↑↓: select  ·  Enter: open  ·  Esc: cancel",
-            "↑↓: select  ·  Enter: open install form  ·  Esc: cancel" )
-        else if s.selected = menu_item_count then
-          ( "1: ⊕ new  ·  ←/→: Switch view  g: Toggle  ?: Help",
-            "Enter: new  ·  ?: Help" )
-        else if has_failure_at_selected () then
-          ( "Enter: Actions  Tab: Fold  x: Dismiss  ?: Help",
-            "Enter: Actions  ·  Tab: Fold/unfold  ·  x: Clear failure  ·  ?: \
-             Help" )
-        else
-          let long_hint =
-            match current_service s with
-            | Some st when String.equal st.service.Service.role "node" ->
-                node_help_hint
-            | Some st when String.equal st.service.Service.role "baker" ->
-                baker_help_hint
-            | Some st when String.equal st.service.Service.role "dal-node" ->
-                dal_help_hint
-            | Some st when String.equal st.service.Service.role "accuser" ->
-                accuser_help_hint
-            | _ -> "Enter: Actions  ·  Tab: Fold/unfold  ·  ?: Help"
-          in
-          let unmanaged_hint =
-            if s.external_services <> [] then
-              if s.external_section_folded then "  ·  u: Show unmanaged"
-              else "  ·  u: Hide unmanaged"
-            else ""
-          in
-          ( "Enter: Actions  Tab: Fold  G: Groups  ?: Help" ^ unmanaged_hint,
-            long_hint ^ unmanaged_hint )
-      in
+    if not (Miaou.Core.Modal_manager.has_active ()) then
+      (* Clear help hints - instances page shows no footer hints *)
       Miaou.Core.Help_hint.clear () ;
-      Miaou.Core.Help_hint.push ~short:hint_short ~long:hint_long ()) ;
     (* Tick spinner and toasts each render *)
     Context.tick_spinner () ;
     Context.tick_toasts () ;
