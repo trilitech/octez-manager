@@ -1115,6 +1115,20 @@
   (backend bisect_ppx)))
 
 (executable
+ (name test_help_modal_no_duplicates)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_no_duplicates)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
  (name test_help_modal_debug)
  (libraries
   alcotest
