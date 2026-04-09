@@ -298,7 +298,23 @@ let activate_selection s =
       s
   | `SectionHeader | `NetworkHeader | `None -> s
 
+let keymap _ps =
+  let noop ps = ps in
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
+  in
+  [kb "Enter" "Select"; kb "↑/↓" "Navigate"; kb "r" "Refresh"; kb "Esc" "Back"]
+
 let view ps ~focus:_ ~size =
+  (* Register keymap for help modal (?) *)
+  let keymap_pairs =
+    List.map
+      (fun (kb : state Miaou.Core.Tui_page.key_binding_desc) ->
+        (kb.Miaou.Core.Tui_page.key, kb.help))
+      (keymap ps)
+  in
+  Context.register_active_page_keymap (fun () -> keymap_pairs) ;
+
   let s = ps.Navigation.s in
   let cols = size.LTerm_geom.cols in
   let lines =
@@ -354,25 +370,22 @@ let view ps ~focus:_ ~size =
       lines |> List.map truncate |> String.concat "\n")
 
 let handle_key ps key ~size:_ =
-  let s = ps.Navigation.s in
-  match Keys.of_string key with
-  | Some Keys.Escape -> back ps
-  | Some Keys.Enter ->
-      let new_state = activate_selection s in
-      Navigation.update (fun _ -> new_state) ps
-  | Some Keys.Up | Some (Keys.Char "k") ->
-      Navigation.update (fun s -> move_cursor (-1) s) ps
-  | Some Keys.Down | Some (Keys.Char "j") ->
-      Navigation.update (fun s -> move_cursor 1 s) ps
-  | Some (Keys.Char "r") -> refresh ps
-  | _ -> ps
-
-let keymap _ps =
-  let noop ps = ps in
-  let kb key help =
-    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
-  in
-  [kb "Enter" "Select"; kb "↑/↓" "Navigate"; kb "r" "Refresh"; kb "Esc" "Back"]
+  (* Try global shortcuts first (?, m, C-t, etc.) *)
+  match Global_shortcuts.handle key with
+  | Global_shortcuts.Handled -> ps
+  | Global_shortcuts.NotGlobal -> (
+      let s = ps.Navigation.s in
+      match Keys.of_string key with
+      | Some Keys.Escape -> back ps
+      | Some Keys.Enter ->
+          let new_state = activate_selection s in
+          Navigation.update (fun _ -> new_state) ps
+      | Some Keys.Up | Some (Keys.Char "k") ->
+          Navigation.update (fun s -> move_cursor (-1) s) ps
+      | Some Keys.Down | Some (Keys.Char "j") ->
+          Navigation.update (fun s -> move_cursor 1 s) ps
+      | Some (Keys.Char "r") -> refresh ps
+      | _ -> ps)
 
 let handled_keys () =
   Keys.[Escape; Enter; Up; Down; Char "j"; Char "k"; Char "r"]
