@@ -801,6 +801,34 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_rpc_browser_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_rpc_browser_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_log_viewer_page_header)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_log_viewer_page_header)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (executable
  (name test_import_wizard)
  (libraries

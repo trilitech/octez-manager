@@ -298,56 +298,10 @@ let view ps ~focus ~size =
           let lines =
             Rpc_browser_render_list.render ~focus ~state:left_state ~cols
           in
-          (* OpenCode style: clean header for single-column browser mode *)
-          let pager_ids = State.get_pager_ids s in
-          let focused_pager = State.get_focused_pager_id s in
-          let tabs_plain =
-            pager_ids |> List.sort compare
-            |> List.map (fun id ->
-                if id = focused_pager then Printf.sprintf "[%d]" id
-                else Printf.sprintf " %d " id)
-            |> String.concat ""
-          in
-          let header_text = " Browser  |  Pager " ^ tabs_plain in
-          let header_len = String.length header_text in
-          let header_padded =
-            if header_len >= cols then header_text
-            else header_text ^ String.make (cols - header_len) ' '
-          in
-          let header =
-            Miaou_style.Style_context.with_child_context
-              ~widget_name:"rpc-browser-header"
-              ~focused:true
-              (fun () ->
-                Widgets.themed_contextual_fill
-                  (Widgets.themed_contextual header_padded))
-          in
-          header :: lines |> String.concat "\n"
+          (* Return just the content - page header handles the title *)
+          String.concat "\n" lines
         else
-          (* OpenCode style: clean header for single-column pager mode *)
-          let pager_ids = State.get_pager_ids s in
-          let focused_pager = State.get_focused_pager_id s in
-          let tabs_plain =
-            pager_ids |> List.sort compare
-            |> List.map (fun id ->
-                if id = focused_pager then Printf.sprintf "[%d]" id
-                else Printf.sprintf " %d " id)
-            |> String.concat ""
-          in
-          let header_text = " Browser  |  Pager " ^ tabs_plain in
-          let header_len = String.length header_text in
-          let header_padded =
-            if header_len >= cols then header_text
-            else header_text ^ String.make (cols - header_len) ' '
-          in
-          let header =
-            Miaou_style.Style_context.with_child_context
-              ~widget_name:"rpc-pager-header"
-              ~focused:true
-              (fun () ->
-                Widgets.themed_contextual_fill
-                  (Widgets.themed_contextual header_padded))
-          in
+          (* Pager-focused: show only pager *)
           let result =
             Rpc_browser_render_result.render
               ~state:s
@@ -355,7 +309,8 @@ let view ps ~focus ~size =
               ~rows:(rows - 1)
               ~focus
           in
-          header ^ "\n" ^ result
+          (* Return just the content - page header handles the title *)
+          result
   in
   Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun _ -> body)
 
