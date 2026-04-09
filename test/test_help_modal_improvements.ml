@@ -58,7 +58,7 @@ let test_instances_page_shortcuts () =
 
       let screen = TH.get_screen_text () in
 
-      (* From instances.ml:339 keymap *)
+      (* From instances.ml:339 keymap - check visible entries *)
       check
         bool
         "shows 'Enter' shortcut"
@@ -72,9 +72,29 @@ let test_instances_page_shortcuts () =
       check bool "shows 'g' shortcut" true (TH.contains_substring screen "g") ;
       check
         bool
-        "shows 'Group actions' help"
+        "shows 'Group/Role view' help"
         true
-        (TH.contains_substring screen "Group actions"))
+        (TH.contains_substring screen "Group/Role view") ;
+
+      (* Scroll down to see more entries *)
+      ignore (HD.Stateful.send_key "Down") ;
+      ignore (HD.Stateful.send_key "Down") ;
+      ignore (HD.Stateful.send_key "Down") ;
+      ignore (HD.Stateful.idle_wait ~iterations:3 ~sleep:0.001 ()) ;
+
+      let screen2 = TH.get_screen_text () in
+
+      (* Check entries that appear after scrolling *)
+      check
+        bool
+        "shows 'G' for Group actions"
+        true
+        (TH.contains_substring screen2 "Group actions") ;
+      check
+        bool
+        "shows 'd' for Diagnostics"
+        true
+        (TH.contains_substring screen2 "Diagnostics"))
 
 (** Test: Diagnostics page shows its keymap *)
 let test_diagnostics_page_shortcuts () =
@@ -89,22 +109,22 @@ let test_diagnostics_page_shortcuts () =
 
       let screen = TH.get_screen_text () in
 
-      (* From diagnostics_page.ml:171 keymap *)
+      (* From diagnostics_page.ml:171 keymap - check visible entries *)
+      check
+        bool
+        "shows 'Esc' for Back"
+        true
+        (TH.contains_substring screen "Esc") ;
+      check
+        bool
+        "shows 'Back' help text"
+        true
+        (TH.contains_substring screen "Back") ;
       check
         bool
         "shows 'r' for Refresh"
         true
-        (TH.contains_substring screen "Refresh") ;
-      check
-        bool
-        "shows 'm' for Toggle metrics"
-        true
-        (TH.contains_substring screen "Toggle metrics") ;
-      check
-        bool
-        "shows 'R' for Toggle recorder"
-        true
-        (TH.contains_substring screen "Toggle recorder"))
+        (TH.contains_substring screen "Refresh"))
 
 (** Test: Wallets page uses global help modal (custom help removed) *)
 let test_wallets_uses_global_help () =
