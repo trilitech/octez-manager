@@ -522,3 +522,14 @@ let render_multi_progress ~cols:_ =
               lines := msg :: !lines
           | None -> ()) ;
           String.concat "\n" (List.rev !lines))
+
+(** Page keymap registration for help modal *)
+
+(** Storage for the currently active page's keymap function.
+    This is updated during view rendering by page wrappers. *)
+let active_page_keymap_fn : (unit -> (string * string) list) ref =
+  ref (fun () -> [])
+
+let register_active_page_keymap keymap_fn = active_page_keymap_fn := keymap_fn
+
+let get_active_page_keymap () = !active_page_keymap_fn ()
