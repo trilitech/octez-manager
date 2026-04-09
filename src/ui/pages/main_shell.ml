@@ -168,8 +168,6 @@ let view ps ~focus ~size =
         Themed_page.apply_themed_background ~size:content_size ""
     | _ -> Themed_page.apply_themed_background ~size:content_size ""
   in
-  (* Register main_shell's keymap (empty) to override child page registrations *)
-  Context.register_active_page_keymap (fun () -> []) ;
   tab_bar_themed ^ "\n" ^ content
 
 let refresh ps =

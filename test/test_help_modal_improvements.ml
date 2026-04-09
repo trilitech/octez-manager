@@ -165,10 +165,10 @@ let test_wallets_uses_global_help () =
         true
         (TH.contains_substring screen "Back"))
 
-(** Test: Empty keymap shows only global shortcuts *)
-let test_page_without_keymap () =
+(** Test: Main shell shows active tab's keymap (instances by default) *)
+let test_main_shell_shows_child_keymap () =
   TH.with_test_env (fun () ->
-      (* main_shell has empty keymap: keymap _ps = [] *)
+      (* Main_shell starts on instances tab by default *)
       HD.Stateful.init (module Main_shell.Page) ;
 
       (* Wait for initial render to complete - ensures keymap is registered *)
@@ -186,12 +186,19 @@ let test_page_without_keymap () =
         true
         (TH.contains_substring screen "Global shortcuts:") ;
 
-      (* Should NOT show page shortcuts section (empty) *)
+      (* Should show instances page shortcuts (since that's the default tab) *)
       check
         bool
-        "does NOT show empty page section"
-        false
-        (TH.contains_substring screen "Page shortcuts:"))
+        "shows Page shortcuts section"
+        true
+        (TH.contains_substring screen "Page shortcuts:") ;
+
+      (* Verify it shows instances-specific shortcuts *)
+      check
+        bool
+        "shows 'Open' from instances keymap"
+        true
+        (TH.contains_substring screen "Open"))
 
 let () =
   Alcotest.run
@@ -203,6 +210,8 @@ let () =
           ("instances page shortcuts", `Quick, test_instances_page_shortcuts);
           ("diagnostics page shortcuts", `Quick, test_diagnostics_page_shortcuts);
           ("wallets uses global help", `Quick, test_wallets_uses_global_help);
-          ("page without keymap", `Quick, test_page_without_keymap);
+          ( "main shell shows child keymap",
+            `Quick,
+            test_main_shell_shows_child_keymap );
         ] );
     ]
