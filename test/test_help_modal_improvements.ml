@@ -23,6 +23,9 @@ let test_help_modal_has_both_sections () =
   TH.with_test_env (fun () ->
       HD.Stateful.init (module Instances.Page) ;
 
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
       ignore (HD.Stateful.send_key "?") ;
       ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
 
@@ -46,6 +49,9 @@ let test_help_modal_has_both_sections () =
 let test_instances_page_shortcuts () =
   TH.with_test_env (fun () ->
       HD.Stateful.init (module Instances.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
 
       ignore (HD.Stateful.send_key "?") ;
       ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
@@ -75,6 +81,9 @@ let test_diagnostics_page_shortcuts () =
   TH.with_test_env (fun () ->
       HD.Stateful.init (module Diagnostics_page.Page) ;
 
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
       ignore (HD.Stateful.send_key "?") ;
       ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
 
@@ -101,6 +110,9 @@ let test_diagnostics_page_shortcuts () =
 let test_wallets_uses_global_help () =
   TH.with_test_env (fun () ->
       HD.Stateful.init (module Wallets_page.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
 
       ignore (HD.Stateful.send_key "?") ;
       ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
@@ -138,6 +150,9 @@ let test_page_without_keymap () =
   TH.with_test_env (fun () ->
       (* main_shell has empty keymap: keymap _ps = [] *)
       HD.Stateful.init (module Main_shell.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
 
       ignore (HD.Stateful.send_key "?") ;
       ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
