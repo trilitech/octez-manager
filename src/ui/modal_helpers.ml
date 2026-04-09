@@ -1922,16 +1922,33 @@ let show_help_modal () =
       "";
     ]
   in
-  (* Page-specific shortcuts - from registered keymap *)
+  (* Page-specific shortcuts - from registered keymap, filtered to remove
+     duplicates of global shortcuts. Pages shouldn't define global shortcuts
+     in their keymaps (they're handled by Global_shortcuts.handle), but we
+     filter defensively to prevent user-visible duplicates.
+     
+     Global shortcut keys are: ?, Esc, q, C-t, m
+     (duplicating Global_shortcuts.reserved_keys to avoid dependency cycle) *)
+  let global_shortcut_keys = ["?"; "Esc"; "q"; "C-t"; "m"] in
   let page_section =
     match Context.get_active_page_keymap () with
     | [] -> []
-    | keymap ->
-        ["Page shortcuts:"]
-        @ List.map
-            (fun (key, help) -> Printf.sprintf "  %-8s - %s" key help)
+    | keymap -> (
+        let filtered_keymap =
+          List.filter
+            (fun (key, _help) ->
+              (* Filter out any page shortcuts that match global shortcut keys *)
+              not (List.mem key global_shortcut_keys))
             keymap
-        @ [""]
+        in
+        match filtered_keymap with
+        | [] -> []
+        | _ ->
+            ["Page shortcuts:"]
+            @ List.map
+                (fun (key, help) -> Printf.sprintf "  %-8s - %s" key help)
+                filtered_keymap
+            @ [""])
   in
   let lines = hint_lines @ global_section @ page_section in
   open_text_modal ~title:"Help" ~lines
