@@ -850,6 +850,13 @@ let render_side_by_side ~left ~right ~left_width ~total_width ~rows =
 (* ================================================================ *)
 
 let view ps ~focus ~size =
+  (* Register keymap for help modal *)
+  let keymap_pairs =
+    List.map
+      (fun kb -> (kb.Miaou.Core.Tui_page.key, kb.help))
+      (keymap ps.Navigation.s)
+  in
+  Context.register_active_page_keymap (fun () -> keymap_pairs) ;
   let s = ps.Navigation.s in
   let body =
     if s.groups = [] && String.length s.search_query = 0 then
@@ -2413,36 +2420,6 @@ let open_batch_modal ps =
       () ;
     ps
 
-let show_help ps =
-  Modal_helpers.show_error
-    ~title:"Wallets Page Help"
-    "j/Down      Move down\n\
-     k/Up        Move up\n\
-     g           Jump to top\n\
-     G           Jump to bottom\n\
-     Space       Fold/unfold (or toggle select)\n\
-     Tab         Switch panel\n\
-     Enter       Key actions (or batch)\n\
-     v           Multi-select mode\n\
-     Q           Receive info\n\
-     +/n         Create/import key\n\
-     /           Search/filter\n\
-     s           Cycle sort mode\n\
-     r           Force refresh\n\
-     y/c         Copy PKH\n\
-     Esc/q       Back\n\
-     ?           This help\n\n\
-     \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80 Icons \
-     \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\n\
-     \xF0\x9F\x94\x91  Signable key         \xF0\x9F\x93\x8B  Watch-only [ro]\n\
-     \xF0\x9F\x94\x92  Encrypted [enc]      \xF0\x9F\x94\x90  Hardware wallet \
-     [hw]\n\
-     \xE2\x9C\x92\xEF\xB8\x8F   Remote signer [rmt]  \xF0\x9F\x8D\x9E  Baker \
-     (delegate)\n\
-     \xE2\x8F\xB1\xEF\xB8\x8F   Recent target        \xE2\x86\x92   Delegating \
-     to" ;
-  ps
-
 (** Copy PKH of currently selected key. *)
 let copy_selected_pkh ps =
   let s = ps.Navigation.s in
@@ -2458,54 +2435,58 @@ let handle_key ps key ~size =
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
   else
-    match Keys.of_string key with
-    | Some Keys.Escape | Some (Keys.Char "q") ->
-        if ps.Navigation.s.multi_select then toggle_multi_select ps
-        else if String.length ps.Navigation.s.search_query > 0 then (
-          let s = {ps.Navigation.s with search_query = ""} in
-          let s = rebuild_nav s in
-          Context.toast_info "Search cleared" ;
-          {ps with s})
-        else Navigation.back ps
-    | Some Keys.Up | Some (Keys.Char "k") -> move_cursor (-1) ~size ps
-    | Some Keys.Down | Some (Keys.Char "j") -> move_cursor 1 ~size ps
-    | Some (Keys.Char "g") -> jump_to_top ~size ps
-    | Some (Keys.Char "G") -> jump_to_bottom ~size ps
-    | Some (Keys.Char " ") ->
-        if ps.Navigation.s.multi_select then toggle_selection ps
-        else toggle_fold ~size ps
-    | Some Keys.Tab -> switch_panel ps
-    | Some Keys.Enter ->
-        if ps.Navigation.s.multi_select then open_batch_modal ps
-        else action_on_selected ps
-    | Some (Keys.Char "v") -> toggle_multi_select ps
-    | Some (Keys.Char "Q") -> show_receive ps
-    | Some (Keys.Char "+") | Some (Keys.Char "n") -> create_import_selected ps
-    | Some (Keys.Char "/") -> start_search ps
-    | Some (Keys.Char "s") -> cycle_sort ~size ps
-    | Some (Keys.Char "r") -> force_refresh_keys ps
-    | Some (Keys.Char "y") | Some (Keys.Char "c") -> copy_selected_pkh ps
-    | Some (Keys.Char "?") -> show_help ps
-    | _ -> (
-        if Miaou_helpers.Mouse.is_wheel_up key then
-          move_cursor (-Miaou_helpers.Mouse.wheel_scroll_lines) ~size ps
-        else if Miaou_helpers.Mouse.is_wheel_down key then
-          move_cursor Miaou_helpers.Mouse.wheel_scroll_lines ~size ps
-        else
-          match Miaou_helpers.Mouse.parse_click key with
-          | Some {row; col} ->
-              let cols = size.LTerm_geom.cols in
-              let left_width =
-                if cols >= side_by_side_min_width then min 60 (cols * 2 / 5)
-                else cols
-              in
-              if col < left_width then
-                let idx = row - 3 + ps.Navigation.s.scroll_offset in
-                if idx >= 0 && idx < List.length ps.Navigation.s.nav_items then
-                  move_cursor (idx - ps.Navigation.s.cursor) ~size ps
-                else ps
-              else ps
-          | None -> ps)
+    (* Try global shortcuts first *)
+    match Global_shortcuts.handle key with
+    | Global_shortcuts.Handled -> ps
+    | Global_shortcuts.NotGlobal -> (
+        match Keys.of_string key with
+        | Some Keys.Escape | Some (Keys.Char "q") ->
+            if ps.Navigation.s.multi_select then toggle_multi_select ps
+            else if String.length ps.Navigation.s.search_query > 0 then (
+              let s = {ps.Navigation.s with search_query = ""} in
+              let s = rebuild_nav s in
+              Context.toast_info "Search cleared" ;
+              {ps with s})
+            else Navigation.back ps
+        | Some Keys.Up | Some (Keys.Char "k") -> move_cursor (-1) ~size ps
+        | Some Keys.Down | Some (Keys.Char "j") -> move_cursor 1 ~size ps
+        | Some (Keys.Char "g") -> jump_to_top ~size ps
+        | Some (Keys.Char "G") -> jump_to_bottom ~size ps
+        | Some (Keys.Char " ") ->
+            if ps.Navigation.s.multi_select then toggle_selection ps
+            else toggle_fold ~size ps
+        | Some Keys.Tab -> switch_panel ps
+        | Some Keys.Enter ->
+            if ps.Navigation.s.multi_select then open_batch_modal ps
+            else action_on_selected ps
+        | Some (Keys.Char "v") -> toggle_multi_select ps
+        | Some (Keys.Char "Q") -> show_receive ps
+        | Some (Keys.Char "+") | Some (Keys.Char "n") ->
+            create_import_selected ps
+        | Some (Keys.Char "/") -> start_search ps
+        | Some (Keys.Char "s") -> cycle_sort ~size ps
+        | Some (Keys.Char "r") -> force_refresh_keys ps
+        | Some (Keys.Char "y") | Some (Keys.Char "c") -> copy_selected_pkh ps
+        | _ -> (
+            if Miaou_helpers.Mouse.is_wheel_up key then
+              move_cursor (-Miaou_helpers.Mouse.wheel_scroll_lines) ~size ps
+            else if Miaou_helpers.Mouse.is_wheel_down key then
+              move_cursor Miaou_helpers.Mouse.wheel_scroll_lines ~size ps
+            else
+              match Miaou_helpers.Mouse.parse_click key with
+              | Some {row; col} ->
+                  let cols = size.LTerm_geom.cols in
+                  let left_width =
+                    if cols >= side_by_side_min_width then min 60 (cols * 2 / 5)
+                    else cols
+                  in
+                  if col < left_width then
+                    let idx = row - 3 + ps.Navigation.s.scroll_offset in
+                    if idx >= 0 && idx < List.length ps.Navigation.s.nav_items
+                    then move_cursor (idx - ps.Navigation.s.cursor) ~size ps
+                    else ps
+                  else ps
+              | None -> ps))
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 

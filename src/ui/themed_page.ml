@@ -141,6 +141,14 @@ struct
   (* Wrap view with themed background, footer, and metrics tracking *)
   let view ps ~focus ~size =
     Metrics.record_render ~page:Config.page_name (fun () ->
+        (* Register this page's keymap for the help modal *)
+        let keymap_pairs =
+          List.map
+            (fun (kb : key_binding) -> (kb.Miaou.Core.Tui_page.key, kb.help))
+            (P.keymap ps)
+        in
+        Context.register_active_page_keymap (fun () -> keymap_pairs) ;
+        (* Render page with themed background and footer *)
         let cols = size.LTerm_geom.cols in
         let content = P.view ps ~focus ~size in
         (* Get key_hints from underlying page and render themed footer *)
