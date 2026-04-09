@@ -568,6 +568,14 @@ let render_system_info_content () =
 
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
+  (* Register keymap for help modal *)
+  let keymap_pairs =
+    List.map
+      (fun (kb : state Miaou.Core.Tui_page.key_binding_desc) ->
+        (kb.key, kb.help))
+      (keymap ps)
+  in
+  Context.register_active_page_keymap (fun () -> keymap_pairs) ;
   Metrics.record_render ~page:name (fun () ->
       let box_width = min 78 (size.LTerm_geom.cols - 2) in
       let chart_width = min 70 (box_width - 6) in
@@ -767,19 +775,22 @@ let handle_key ps key ~size =
     Miaou.Core.Modal_manager.handle_key key ;
     ps)
   else
-    match Keys.of_string key with
-    | Some Keys.Escape | Some (Keys.Char "q") -> Navigation.back ps
-    | Some (Keys.Char "r") -> refresh ps
-    | Some (Keys.Char "m") -> Navigation.update toggle_metrics ps
-    | Some (Keys.Char "a") -> Navigation.update edit_metrics_addr ps
-    | Some (Keys.Char "R") -> Navigation.update toggle_recorder ps
-    | Some (Keys.Char "d") -> Navigation.update change_duration ps
-    | Some (Keys.Char "c") -> Navigation.update clear_caches ps
-    | Some Keys.Up -> Navigation.update scroll_up ps
-    | Some Keys.Down -> Navigation.update scroll_down ps
-    | Some (Keys.Char "k") -> Navigation.update scroll_up ps
-    | Some (Keys.Char "j") -> Navigation.update scroll_down ps
-    | _ -> ps
+    match Global_shortcuts.handle key with
+    | Global_shortcuts.Handled -> ps
+    | Global_shortcuts.NotGlobal -> (
+        match Keys.of_string key with
+        | Some Keys.Escape | Some (Keys.Char "q") -> Navigation.back ps
+        | Some (Keys.Char "r") -> refresh ps
+        | Some (Keys.Char "m") -> Navigation.update toggle_metrics ps
+        | Some (Keys.Char "a") -> Navigation.update edit_metrics_addr ps
+        | Some (Keys.Char "R") -> Navigation.update toggle_recorder ps
+        | Some (Keys.Char "d") -> Navigation.update change_duration ps
+        | Some (Keys.Char "c") -> Navigation.update clear_caches ps
+        | Some Keys.Up -> Navigation.update scroll_up ps
+        | Some Keys.Down -> Navigation.update scroll_down ps
+        | Some (Keys.Char "k") -> Navigation.update scroll_up ps
+        | Some (Keys.Char "j") -> Navigation.update scroll_down ps
+        | _ -> ps)
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
