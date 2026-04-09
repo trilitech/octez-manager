@@ -110,7 +110,15 @@ val show_error : title:string -> string -> unit
 val confirm_modal :
   ?title:string -> message:string -> on_result:(bool -> unit) -> unit -> unit
 
-(** Show the global help overlay listing all keybindings. *)
+(** Show the global help modal with global and per-page shortcuts.
+    
+    Displays:
+    - Contextual hint from Help_hint (if active)
+    - Global shortcuts (always shown)
+    - Page-specific shortcuts (if the active page has registered a keymap)
+    
+    Page shortcuts are retrieved from {!Context.get_active_page_keymap}
+    which is updated by page wrappers during rendering. *)
 val show_help_modal : unit -> unit
 
 (** Open a theme picker modal with live preview.
