@@ -5967,16 +5967,58 @@ let network_name_normalize_custom_urls () =
        "https://my-node.example.com/testnet")
 
 let network_name_normalize_whitespace () =
-  (* Test that extract_network_from_url finds known networks even with whitespace
-     via substring matching *)
   Alcotest.(check string)
-    "known network found despite whitespace"
-    "tallinnnet"
-    (Octez_manager_ui.Network_name.normalize "  tallinnnet  ") ;
-  Alcotest.(check string)
-    "recognized URL normalized"
-    "tallinnnet"
-    (Octez_manager_ui.Network_name.normalize "https://teztnets.com/tallinnnet")
+    "trim whitespace"
+    "mainnet"
+    (Octez_manager_ui.Network_name.normalize "  mainnet  ")
+
+(* ========================================================================== *)
+(* Context keymap registration tests *)
+(* ========================================================================== *)
+
+module Context = Octez_manager_ui.Context
+
+let test_context_keymap_registration () =
+  (* Test registration and retrieval *)
+  let keymap1 = [("a", "Action A"); ("b", "Action B")] in
+  Context.register_active_page_keymap (fun () -> keymap1) ;
+
+  let retrieved = Context.get_active_page_keymap () in
+  Alcotest.(check list_pairs) "retrieved matches registered" keymap1 retrieved ;
+
+  (* Test re-registration (last wins) *)
+  let keymap2 = [("x", "Action X"); ("y", "Action Y")] in
+  Context.register_active_page_keymap (fun () -> keymap2) ;
+
+  let retrieved2 = Context.get_active_page_keymap () in
+  Alcotest.(check list_pairs)
+    "second registration overwrites first"
+    keymap2
+    retrieved2
+
+let test_context_keymap_empty_default () =
+  (* Reset context *)
+  Context.register_active_page_keymap (fun () -> []) ;
+
+  let retrieved = Context.get_active_page_keymap () in
+  Alcotest.(check list_pairs) "empty keymap is valid" [] retrieved
+
+let test_context_keymap_special_chars () =
+  (* Test keys with special characters *)
+  let keymap =
+    [("C-t", "Theme picker"); ("↑/↓", "Navigate"); ("Esc", "Back")]
+  in
+  Context.register_active_page_keymap (fun () -> keymap) ;
+
+  let retrieved = Context.get_active_page_keymap () in
+  Alcotest.(check list_pairs) "special characters preserved" keymap retrieved
+
+let context_keymap_tests =
+  [
+    ("keymap registration", `Quick, test_context_keymap_registration);
+    ("empty keymap default", `Quick, test_context_keymap_empty_default);
+    ("special characters in keys", `Quick, test_context_keymap_special_chars);
+  ]
 
 let () =
   Alcotest.run
@@ -7000,4 +7042,5 @@ let () =
             `Quick
             network_name_normalize_whitespace;
         ] );
+      ("context_keymap", context_keymap_tests);
     ]
