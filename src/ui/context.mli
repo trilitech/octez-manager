@@ -180,3 +180,14 @@ val multi_progress_finish : unit -> unit
 
 (** Render multi-progress display (returns multi-line string) *)
 val render_multi_progress : cols:int -> string
+
+(** Page keymap registration for help modal *)
+
+(** Register the active page's keymap for display in the help modal.
+    Called by page wrappers during view rendering.
+    @param keymap_fn Function returning [(key, help_text)] pairs *)
+val register_active_page_keymap : (unit -> (string * string) list) -> unit
+
+(** Get the currently registered page keymap, or [] if none.
+    Used by help modal to display page-specific shortcuts. *)
+val get_active_page_keymap : unit -> (string * string) list
