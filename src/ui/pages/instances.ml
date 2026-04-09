@@ -889,7 +889,7 @@ Press **Enter** to open instance menu.|}
           }
 
   let create_menu_items =
-    [|"Node"; "Baker"; "DAL Node"; "Accuser"; "Signatory"|]
+    [|"Node"; "Baker"; "DAL Node"; "Accuser"; "Signatory"; "Indexer"|]
 
   let navigate_create_item cursor =
     match cursor with
@@ -898,6 +898,7 @@ Press **Enter** to open instance menu.|}
     | 2 -> Context.navigate Install_dal_node_form_v3.name
     | 3 -> Context.navigate Install_accuser_form_v3.name
     | 4 -> Context.navigate Install_signatory_form.name
+    | 5 -> Context.navigate Install_index_form_v3.name
     | _ -> ()
 
   let handle_key ps key ~size =
