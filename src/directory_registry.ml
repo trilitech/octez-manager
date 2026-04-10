@@ -248,8 +248,18 @@ let add ~path ~dir_type ~registered_services =
       let new_entry =
         match existing_entry with
         | Some e ->
-            (* Update existing: keep created_at, update last_used_at *)
-            {e with last_used_at = timestamp; registered_services; dir_type}
+            (* Update existing: keep created_at, update last_used_at, merge services *)
+            let merged_services =
+              List.sort_uniq
+                String.compare
+                (e.registered_services @ registered_services)
+            in
+            {
+              e with
+              last_used_at = timestamp;
+              registered_services = merged_services;
+              dir_type;
+            }
         | None ->
             (* New entry *)
             {
