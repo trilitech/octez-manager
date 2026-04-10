@@ -440,7 +440,23 @@ let keymap _ =
   let kb key help =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  [kb "Esc" "Back"; kb "?" "Help"]
+  [
+    kb "Esc" "Back / clear search / exit multi-select";
+    kb "?" "Help";
+    kb "↑/↓ or j/k" "Navigate list";
+    kb "g" "Jump to top";
+    kb "G" "Jump to bottom";
+    kb "Space" "Fold/unfold group (or select in multi-select)";
+    kb "Tab" "Switch panel (list ↔ detail)";
+    kb "Enter" "Action menu (or batch action in multi-select)";
+    kb "v" "Toggle multi-select mode";
+    kb "Q" "Receive / show PKH";
+    kb "+ or n" "New key / import address";
+    kb "/" "Search by alias or PKH";
+    kb "s" "Cycle sort mode";
+    kb "r" "Refresh selected key";
+    kb "y or c" "Copy PKH";
+  ]
 
 (* ================================================================ *)
 (* Rendering helpers                                                 *)
