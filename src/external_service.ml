@@ -128,7 +128,12 @@ type detected_config = {
 
 (** {1 External Service} *)
 
-type t = {config : detected_config; suggested_instance_name : string}
+type t = {
+  config : detected_config;
+  suggested_instance_name : string;
+  is_orphaned : bool;
+      (** true = dropin dir exists (created by octez-manager) but registry entry missing *)
+}
 
 (** {1 Status} *)
 

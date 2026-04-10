@@ -21,6 +21,9 @@ type process_info = {
     Only processes where the executable (first token) is an Octez binary are included. *)
 val scan_octez_processes : unit -> process_info list
 
+(** Extract the systemd unit name for a process from its cgroup, if any. *)
+val systemd_unit_of_pid : int -> string option
+
 (** Check if a PID is managed by systemd (via cgroup) *)
 val is_systemd_managed : int -> bool
 

@@ -122,7 +122,13 @@ type detected_config = {
 (** {1 External Service} *)
 
 (** A detected external service with metadata. *)
-type t = {config : detected_config; suggested_instance_name : string}
+type t = {
+  config : detected_config;
+  suggested_instance_name : string;
+  is_orphaned : bool;
+      (** true if this service was created by octez-manager (has dropin dir) but its
+          registry entry is missing. Use to distinguish orphaned from genuinely external. *)
+}
 
 (** {1 Status} *)
 
