@@ -342,8 +342,11 @@ struct
       {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
     in
     [
+      kb "↑/↓ or j/k" "Navigate";
+      kb "←/→ or h/l" "Switch column";
       kb "Enter" "Open";
-      kb "g" "Group/Role view";
+      kb "Tab" "Fold/Unfold";
+      kb "g" "Toggle view";
       kb "G" "Group actions";
       kb "d" "Diagnostics";
       kb "x" "Clear failure";
