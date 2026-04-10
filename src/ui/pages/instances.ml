@@ -289,8 +289,7 @@ let move_selection_managed s delta =
 (** Move selection up or down by [delta] steps, handling menu items,
     separator skipping, and multi-column navigation. *)
 let move_selection s delta =
-  if s.services = [] && s.external_services = [] then {s with selected = 0}
-  else if s.num_columns <= 1 then move_selection_single_column s delta
+  if s.num_columns <= 1 then move_selection_single_column s delta
   else if s.selected < services_start_idx then move_selection_menu s delta
   else
     let current_idx = s.selected - services_start_idx in

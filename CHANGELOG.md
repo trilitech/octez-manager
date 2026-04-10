@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Instances page arrow key navigation to "Add new" entries**: Fixed arrow key navigation on the Instances page when no services are installed. Previously, pressing ↓ from the "By Role / By Group" selector would not navigate to the "Add new Node", "Add new Baker", etc. entries. Navigation now correctly moves to these ghost entries even when the service list is empty.
 - **Instances page help modal now documents arrow key navigation**: The help modal (`?`) on the Instances page now includes arrow keys (↑/↓/←/→) and vim keys (j/k/h/l) for navigation, making keyboard shortcuts more discoverable.
 
 ### Removed
