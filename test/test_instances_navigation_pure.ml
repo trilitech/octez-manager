@@ -200,10 +200,37 @@ let test_empty_state_multi_column_navigates_to_ghost () =
   let s = make_state ~selected:0 ~num_columns:2 [] in
   let s' = move s 1 in
   check
-    bool
+    int
     "radio row -> first ghost (multi column)"
-    true
-    (s'.selected >= services_start_idx)
+    services_start_idx
+    s'.selected
+
+let test_empty_state_ensure_valid_column_preserves_selection () =
+  (* ensure_valid_column should NOT reset selection when navigating to ghosts *)
+  let s = make_state ~selected:services_start_idx ~num_columns:3 [] in
+  let s' = Instances_layout.ensure_valid_column s in
+  check
+    int
+    "ensure_valid_column preserves ghost selection"
+    services_start_idx
+    s'.selected
+
+let test_empty_state_wide_terminal_multi_column_navigation () =
+  (* User scenario: very wide terminal (many columns), empty services, press Down from radio row *)
+  let s = make_state ~selected:0 ~num_columns:5 [] in
+  let s' = move s 1 in
+  check
+    int
+    "radio row -> first ghost (5 columns)"
+    services_start_idx
+    s'.selected ;
+  (* Now simulate refresh (which calls ensure_valid_column) *)
+  let s'' = Instances_layout.ensure_valid_column s' in
+  check
+    int
+    "ensure_valid_column after nav preserves ghost selection"
+    services_start_idx
+    s''.selected
 
 (* ============================================================ *)
 (* Test Suite                                                   *)
@@ -254,5 +281,11 @@ let () =
           ( "navigates to ghost (multi column)",
             `Quick,
             test_empty_state_multi_column_navigates_to_ghost );
+          ( "ensure_valid_column preserves ghost selection",
+            `Quick,
+            test_empty_state_ensure_valid_column_preserves_selection );
+          ( "wide terminal multi-column navigation",
+            `Quick,
+            test_empty_state_wide_terminal_multi_column_navigation );
         ] );
     ]

@@ -346,13 +346,10 @@ let find_non_empty_column ~num_columns ~sections ~display_items =
   find 0
 
 (** Ensure active_column points to a non-empty column, adjusting selection if needed.
-    If all columns are empty (no services), move selection to menu. *)
+    Ghosts are navigable, so we only check display_items, not real services. *)
 let ensure_valid_column state =
   let display_items = display_ordered_items state in
-  if state.services = [] && state.external_services = [] then
-    (* No services at all, go to first item (radio buttons) *)
-    {state with selected = 0; active_column = 0}
-  else if state.num_columns <= 1 then state
+  if state.num_columns <= 1 then state
   else
     let sections = sections_of_state state in
     let current_indices =
