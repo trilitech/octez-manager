@@ -8,7 +8,10 @@
 module Service_state = Data.Service_state
 module StringSet = Set.Make (String)
 
-type display_item = Real_service of Service_state.t | Ghost_add_new of string
+type display_item =
+  | Real_service of Service_state.t
+  | Ghost_add_new of string * string option
+      (** role × group name (None = ungrouped/by-role) *)
 
 type view_mode = By_role | By_group
 
@@ -136,7 +139,7 @@ let display_ordered_services state =
 (** Helper: Insert ghost "Add new" entry after last instance of a role *)
 let insert_ghost_for_role role services =
   let real_services = List.map (fun s -> Real_service s) services in
-  real_services @ [Ghost_add_new role]
+  real_services @ [Ghost_add_new (role, None)]
 
 (** Build display items with ghost entries injected after each role section *)
 let display_ordered_items state =
@@ -156,7 +159,7 @@ let display_ordered_items state =
           in
           if instances = [] then
             (* No instances for this role, show only ghost *)
-            [Ghost_add_new role]
+            [Ghost_add_new (role, None)]
           else
             (* Show instances followed by ghost *)
             insert_ghost_for_role role instances)
@@ -189,21 +192,21 @@ let display_ordered_items state =
           Hashtbl.fold (fun k _ acc -> k :: acc) tbl []
           |> List.sort String.compare
         in
-        (* For grouped mode, we add ghosts for all 5 roles at the end of each group *)
+        (* For grouped mode, we add ghosts for all roles at the end of each group *)
         List.concat_map
           (fun gname ->
             match Hashtbl.find_opt tbl gname with
             | Some l ->
                 let sorted = sort_services_by_role l in
-                (* Add all role ghosts after the group *)
+                (* Each ghost carries the group name so it has a unique identity *)
                 List.map (fun s -> Real_service s) sorted
                 @ [
-                    Ghost_add_new "node";
-                    Ghost_add_new "baker";
-                    Ghost_add_new "accuser";
-                    Ghost_add_new "dal-node";
-                    Ghost_add_new "signatory";
-                    Ghost_add_new "index";
+                    Ghost_add_new ("node", Some gname);
+                    Ghost_add_new ("baker", Some gname);
+                    Ghost_add_new ("accuser", Some gname);
+                    Ghost_add_new ("dal-node", Some gname);
+                    Ghost_add_new ("signatory", Some gname);
+                    Ghost_add_new ("index", Some gname);
                   ]
             | None -> [])
           names
@@ -213,22 +216,22 @@ let display_ordered_items state =
         if ungrouped = [] then
           (* No ungrouped, just show all role ghosts *)
           [
-            Ghost_add_new "node";
-            Ghost_add_new "baker";
-            Ghost_add_new "accuser";
-            Ghost_add_new "dal-node";
-            Ghost_add_new "signatory";
-            Ghost_add_new "index";
+            Ghost_add_new ("node", None);
+            Ghost_add_new ("baker", None);
+            Ghost_add_new ("accuser", None);
+            Ghost_add_new ("dal-node", None);
+            Ghost_add_new ("signatory", None);
+            Ghost_add_new ("index", None);
           ]
         else
           List.map (fun s -> Real_service s) (sort_services_by_role ungrouped)
           @ [
-              Ghost_add_new "node";
-              Ghost_add_new "baker";
-              Ghost_add_new "accuser";
-              Ghost_add_new "dal-node";
-              Ghost_add_new "signatory";
-              Ghost_add_new "index";
+              Ghost_add_new ("node", None);
+              Ghost_add_new ("baker", None);
+              Ghost_add_new ("accuser", None);
+              Ghost_add_new ("dal-node", None);
+              Ghost_add_new ("signatory", None);
+              Ghost_add_new ("index", None);
             ]
       in
       by_group @ ungrouped_items

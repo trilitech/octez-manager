@@ -7,6 +7,15 @@
 
 let pending_instance_detail : string option ref = ref None
 
+let pending_group : string option ref = ref None
+
+let set_pending_group group = pending_group := Some group
+
+let take_pending_group () =
+  let value = !pending_group in
+  pending_group := None ;
+  value
+
 let pending_sandbox_group : string option ref = ref None
 
 let set_pending_sandbox_group group = pending_sandbox_group := Some group
