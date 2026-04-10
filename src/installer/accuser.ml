@@ -94,6 +94,13 @@ let install_accuser ?(quiet = false) (request : accuser_request) =
         preserve_data = request.preserve_data;
       }
   in
+  (* Register accuser's base_dir in Directory_registry for wallet discovery *)
+  let* () =
+    Directory_registry.add
+      ~path:base_dir
+      ~dir_type:Client_base_dir
+      ~registered_services:[request.instance]
+  in
   (* Register as dependent on parent node (avoid duplicates) *)
   let* () =
     match node_mode with

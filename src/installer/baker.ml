@@ -227,6 +227,13 @@ let install_baker ?(quiet = false) (request : baker_request) =
     }
   in
   let* () = Service_registry.write service_with_signer in
+  (* Register baker's base_dir in Directory_registry for wallet discovery *)
+  let* () =
+    Directory_registry.add
+      ~path:base_dir
+      ~dir_type:Client_base_dir
+      ~registered_services:[request.instance]
+  in
   (* Rewrite dropin with all dependencies (node + signatory if applicable) *)
   let* () =
     match all_dependencies_for_systemd with
