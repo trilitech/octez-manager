@@ -333,7 +333,7 @@ struct
   let back ps = Navigation.back ps
 
   let handled_keys () =
-    Miaou.Core.Keys.[Enter; Char "g"; Char "G"; Char "d"; Char "t"; Char "x"]
+    Miaou.Core.Keys.[Enter; Char "g"; Char "G"; Char "t"; Char "x"]
 
   let keymap _ps =
     let noop ps = ps in
@@ -346,7 +346,6 @@ struct
       kb "Enter" "Open";
       kb "g" "Toggle view";
       kb "G" "Group actions";
-      kb "d" "Diagnostics";
       kb "x" "Clear failure";
       kb "?" "Help";
     ]
@@ -859,7 +858,6 @@ struct
             (* b still works as a shortcut to Binaries tab *)
             Context.set_pending_tab Context.Tab_binaries ;
             ps
-        | Some (Keys.Char "d") -> Navigation.update go_to_diagnostics ps
         | Some (Keys.Char "t") -> Navigation.update go_to_topology ps
         | Some (Keys.Char "r") ->
             (* r still works as a shortcut to RPCs tab *)
