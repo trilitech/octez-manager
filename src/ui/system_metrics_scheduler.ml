@@ -445,9 +445,7 @@ let tick () =
             ~data_dir:""
             ()
       | "index" ->
-          let binary =
-            Filename.concat svc.Service.app_bin_dir "octez-index"
-          in
+          let binary = Filename.concat svc.Service.app_bin_dir "octez-index" in
           (* Read OCTEZ_INDEXER_DIR for disk usage tracking *)
           let data_dir =
             match Node_env.read ~inst:svc.Service.instance with
@@ -525,8 +523,7 @@ let fetch_latest_index_version () =
   | Error _ -> ()
   | Ok [] -> ()
   | Ok (latest :: _) ->
-      latest_stable_index_version :=
-        Some latest.Octez_index_downloader.version
+      latest_stable_index_version := Some latest.Octez_index_downloader.version
 
 (** Version status for coloring *)
 type version_status =
@@ -583,9 +580,7 @@ let format_version_colored version =
 (** Format octez-index version using its own GitLab release feed *)
 let format_index_version_colored version =
   let status =
-    check_version_status
-      ~running:version
-      ~latest:!latest_stable_index_version
+    check_version_status ~running:version ~latest:!latest_stable_index_version
   in
   match version_color status with
   | None -> Printf.sprintf "v%s" version
@@ -608,7 +603,9 @@ let check_version_toast_for ~key ~instance ~version =
   | Some latest_ver -> (
       if Hashtbl.mem version_warned key then ()
       else
-        let status = check_version_status ~running:version ~latest:latest_ver_opt in
+        let status =
+          check_version_status ~running:version ~latest:latest_ver_opt
+        in
         match status with
         | MinorBehind ->
             Hashtbl.replace version_warned key () ;
