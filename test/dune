@@ -335,6 +335,21 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_wallet_empty_delegates)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  mock_service_helpers_lib)
+ (modules test_wallet_empty_delegates)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_binary_registry)
  (libraries alcotest octez_manager_lib yojson)
  (modules test_binary_registry)

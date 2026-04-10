@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Instances page help modal now documents arrow key navigation**: The help modal (`?`) on the Instances page now includes arrow keys (↑/↓/←/→) and vim keys (j/k/h/l) for navigation, making keyboard shortcuts more discoverable.
 - **Wallets page missing baker/accuser wallets**: The Wallets page now discovers wallet directories from installed baker and accuser services. Previously, only `~/.tezos-client` was shown; service-specific base directories (e.g., `~/.local/share/octez/baker-bakingnet`) were invisible because the installer did not register them in the directory registry.
 - **Wallets page fold/unfold keybinding**: Changed fold/unfold base directory groups from Space to Tab for consistency with common TUI conventions. Space now switches between the list and detail panels.
+- **Wallet modal misleading error with no delegates**: The baker wallet modal now shows "No delegates found in wallet" instead of "Unable to fetch wallet data — node may be unreachable" when the baker's base directory contains no keys.
 
 ### Removed
 

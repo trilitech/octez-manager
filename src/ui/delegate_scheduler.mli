@@ -38,3 +38,19 @@ val clear : unit -> unit
 
 (** Shutdown the background scheduler. *)
 val shutdown : unit -> unit
+
+(** {1 Testing} *)
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Set cached config for an instance (for tests that need to inject data). *)
+  val set_config :
+    instance:string ->
+    delegates:string list ->
+    node_endpoint:string option ->
+    has_dal:bool ->
+    unit
+end
+
+(**/**)
