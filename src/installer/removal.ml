@@ -155,6 +155,12 @@ let purge_service ?(quiet = false) ~force_purge ~prompt_yes_no ~instance () =
                  services): %s@.Used by: %s@."
                 base_dir
                 (String.concat ", " other_users) ;
+            (* Update Directory_registry: remove instance from registered_services *)
+            let _ =
+              Directory_registry.update_registered_services
+                ~path:base_dir
+                ~registered_services:other_users
+            in
             Ok ())
           else
             (* Base-dir not shared - proceed with deletion logic *)
@@ -165,7 +171,12 @@ let purge_service ?(quiet = false) ~force_purge ~prompt_yes_no ~instance () =
                   (Format.sprintf "Purge base-dir %S?" base_dir)
                   ~default:false
             in
-            if remove_base_dir then File_ops.remove_tree base_dir else Ok ()
+            let* () =
+              if remove_base_dir then File_ops.remove_tree base_dir else Ok ()
+            in
+            (* Clean up Directory_registry: no other users, remove entry *)
+            let _ = Directory_registry.remove base_dir in
+            Ok ()
         else Ok ()
       in
       (* Also remove per-instance env files under XDG_CONFIG_HOME or /etc when purging *)
