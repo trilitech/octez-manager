@@ -21,6 +21,8 @@
   signer_types
   group
   group_registry
+  sandbox_config
+  sandbox_config_registry
   service
   service_registry
   base_dir_registry
