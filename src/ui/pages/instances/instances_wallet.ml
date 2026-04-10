@@ -708,41 +708,52 @@ let dispatch_action svc pkh _data ~node_endpoint action =
 (* ── Wallet header rendering ──────────────────────────────── *)
 
 let render_wallet_header ~pkh ~delegates ~cols =
-  match Baker_wallet_data.get ~pkh with
-  | None ->
+  match delegates with
+  | [] ->
       String.concat
         "\n"
         [
-          Printf.sprintf "  Delegate: %s" (Widgets.themed_muted pkh);
+          "  " ^ Widgets.themed_muted "No delegates found in wallet";
           "";
-          Widgets.themed_error
-            "  Unable to fetch wallet data — node may be unreachable";
+          "  Import or generate keys to manage this baker.";
           "";
         ]
-  | Some data ->
-      let delegate_line =
-        Printf.sprintf
-          "  Delegate: %s%s"
-          data.pkh
-          (if List.length delegates > 1 then
-             "                   " ^ Widgets.themed_muted "[Tab] to switch"
-           else "")
-      in
-      let parts =
-        [
-          delegate_line;
-          "";
-          render_balance_box ~cols data;
-          "";
-          render_status_line data;
-        ]
-        @ (let p = render_staking_params data in
-           if p = "" then [] else [p])
-        @ (let u = render_pending_unstakes data in
-           if u = "" then [] else [u])
-        @ [""]
-      in
-      String.concat "\n" parts
+  | _ -> (
+      match Baker_wallet_data.get ~pkh with
+      | None ->
+          String.concat
+            "\n"
+            [
+              Printf.sprintf "  Delegate: %s" (Widgets.themed_muted pkh);
+              "";
+              Widgets.themed_error
+                "  Unable to fetch wallet data — node may be unreachable";
+              "";
+            ]
+      | Some data ->
+          let delegate_line =
+            Printf.sprintf
+              "  Delegate: %s%s"
+              data.pkh
+              (if List.length delegates > 1 then
+                 "                   " ^ Widgets.themed_muted "[Tab] to switch"
+               else "")
+          in
+          let parts =
+            [
+              delegate_line;
+              "";
+              render_balance_box ~cols data;
+              "";
+              render_status_line data;
+            ]
+            @ (let p = render_staking_params data in
+               if String.equal p "" then [] else [p])
+            @ (let u = render_pending_unstakes data in
+               if String.equal u "" then [] else [u])
+            @ [""]
+          in
+          String.concat "\n" parts)
 
 let count_lines s =
   let n = ref 1 in
@@ -760,33 +771,54 @@ let wallet_modal ~svc =
     | None -> ""
   in
   let initial_pkh = match delegates with first :: _ -> first | [] -> "" in
+  let to_string_item ~action_display = function
+    | `Empty_wallet -> Widgets.themed_muted "No operations available"
+    | `Error_state -> Widgets.themed_error "Unable to fetch wallet data"
+    | `Action action -> action_display action
+  in
   let build_select pkh :
-      [`Error_state | `Action of wallet_action] Select_widget.t =
-    match Baker_wallet_data.get ~pkh with
-    | None ->
+      [`Error_state | `Action of wallet_action | `Empty_wallet] Select_widget.t
+      =
+    match delegates with
+    | [] ->
         Select_widget.open_centered
           ~title:""
           ~items:
-            ([`Error_state] : [`Error_state | `Action of wallet_action] list)
-          ~to_string:(function
-            | `Error_state -> Widgets.themed_error "Unable to fetch wallet data"
-            | `Action _ -> "...")
+            ([`Empty_wallet]
+              : [`Error_state | `Action of wallet_action | `Empty_wallet] list)
+          ~to_string:(to_string_item ~action_display:(fun _ -> "..."))
           ()
-    | Some data ->
-        let actions = build_operations_list data ~node_endpoint in
-        Select_widget.open_centered
-          ~title:""
-          ~items:(List.map (fun a -> `Action a) actions)
-          ~to_string:(function
-            | `Error_state -> Widgets.themed_error "Unable to fetch wallet data"
-            | `Action action -> action_to_string data ~node_endpoint action)
-          ()
+    | _ -> (
+        match Baker_wallet_data.get ~pkh with
+        | None ->
+            Select_widget.open_centered
+              ~title:""
+              ~items:
+                ([`Error_state]
+                  : [`Error_state | `Action of wallet_action | `Empty_wallet]
+                    list)
+              ~to_string:(to_string_item ~action_display:(fun _ -> "..."))
+              ()
+        | Some data ->
+            let actions = build_operations_list data ~node_endpoint in
+            Select_widget.open_centered
+              ~title:""
+              ~items:
+                (List.map (fun a -> `Action a) actions
+                  : [`Error_state | `Action of wallet_action | `Empty_wallet]
+                    list)
+              ~to_string:
+                (to_string_item
+                   ~action_display:(action_to_string data ~node_endpoint))
+              ())
   in
   let title = Printf.sprintf "Wallet · %s" instance in
   let module Wallet_modal = struct
     type state = {
       current_pkh : string;
-      select : [`Error_state | `Action of wallet_action] Select_widget.t;
+      select :
+        [`Error_state | `Action of wallet_action | `Empty_wallet]
+        Select_widget.t;
     }
 
     type msg = unit
@@ -863,7 +895,7 @@ let wallet_modal ~svc =
                   Modal_manager.close_top `Commit ;
                   dispatch_action svc s.current_pkh data ~node_endpoint action ;
                   ps)
-          | Some `Error_state | None -> ps)
+          | Some `Error_state | Some `Empty_wallet | None -> ps)
       | Some Keys.Escape ->
           Modal_manager.set_consume_next_key () ;
           Modal_manager.close_top `Cancel ;
@@ -913,3 +945,9 @@ let wallet_modal ~svc =
     ~commit_on:[]
     ~cancel_on:[]
     ~on_close:(fun _ _ -> ())
+
+(** {1 Testing} *)
+
+module Internal_for_tests = struct
+  let render_wallet_header = render_wallet_header
+end

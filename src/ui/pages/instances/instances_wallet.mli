@@ -41,3 +41,15 @@ val poll_operation :
 
     @param svc The baker service to show wallet for. *)
 val wallet_modal : svc:Octez_manager_lib.Service.t -> unit
+
+(** {1 Testing} *)
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Render the wallet header section. Exposed for regression testing. *)
+  val render_wallet_header :
+    pkh:string -> delegates:string list -> cols:int -> string
+end
+
+(**/**)
