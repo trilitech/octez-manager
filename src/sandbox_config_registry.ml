@@ -68,3 +68,36 @@ let remove ~name =
       Ok ()
     with Sys_error msg -> Error (`Msg msg)
   else Ok ()
+
+(* Try to build a Sandbox_config from legacy fields in the group JSON file.
+   Pre-refactor group files included "network" and "bin_source" fields that
+   are no longer part of Group.t.  We read the raw JSON here so that
+   existing sandbox groups continue to work after the first upgrade. *)
+let migrate_from_group ~name =
+  let groups_dir = Filename.concat (Paths.registry_root ()) "groups" in
+  let group_path = Filename.concat groups_dir (name ^ ".json") in
+  if not (Sys.file_exists group_path) then Ok None
+  else
+    try
+      let json = Yojson.Safe.from_file group_path in
+      let open Yojson.Safe.Util in
+      let network_json = json |> member "network" in
+      let bin_source_json = json |> member "bin_source" in
+      (match (network_json, bin_source_json) with
+      | `Null, _ | _, `Null -> Ok None
+      | network_j, bs_j -> (
+          let network = network_j |> to_string in
+          match Binary_registry.bin_source_of_yojson bs_j with
+          | Error _ -> Ok None
+          | Ok bin_source ->
+              let cfg = Sandbox_config.make ~group_name:name ~network ~bin_source () in
+              (* Persist so future calls don't need to migrate again *)
+              let* () = write cfg in
+              Ok (Some cfg)))
+    with
+    | Sys_error _ | Yojson.Json_error _ | Yojson.Safe.Util.Type_error _ ->
+        Ok None
+
+let find_or_migrate ~name =
+  let* found = find ~name in
+  match found with Some _ as r -> Ok r | None -> migrate_from_group ~name

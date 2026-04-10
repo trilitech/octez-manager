@@ -409,7 +409,7 @@ let add_node ?(on_log = fun _ -> ()) ~group_name () =
     | Error _ as err -> err
   in
   let* sandbox_cfg =
-    match Sandbox_config_registry.find ~name:group_name with
+    match Sandbox_config_registry.find_or_migrate ~name:group_name with
     | Ok (Some cfg) -> Ok cfg
     | Ok None ->
         Error
@@ -518,7 +518,7 @@ let add_baker ?(on_log = fun _ -> ()) ~group_name ~node_instance ~delegates () =
     | Error _ as err -> err
   in
   let* sandbox_cfg =
-    match Sandbox_config_registry.find ~name:group_name with
+    match Sandbox_config_registry.find_or_migrate ~name:group_name with
     | Ok (Some cfg) -> Ok cfg
     | Ok None ->
         Error
