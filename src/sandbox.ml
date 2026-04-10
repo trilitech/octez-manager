@@ -155,16 +155,13 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
   (* Step 1: Create group *)
   log_step "Creating group..." ;
   let group =
-    Group.make
-      ~name:sandbox_name
-      ~network
-      ~bin_source
-      ~service_user
-      ~app_bin_dir
-      ~sandbox:true
-      ()
+    Group.make ~name:sandbox_name ~service_user ~app_bin_dir ~sandbox:true ()
   in
   let* () = Group_registry.write group in
+  let sandbox_cfg =
+    Sandbox_config.make ~group_name:sandbox_name ~network ~bin_source ()
+  in
+  let* () = Sandbox_config_registry.write sandbox_cfg in
 
   let rollback () =
     on_log "Rolling back: removing installed services..." ;
@@ -404,11 +401,19 @@ let find_sandbox_bakers ~group_name =
   Ok (List.filter (fun (s : Service.t) -> String.equal s.role "baker") services)
 
 let add_node ?(on_log = fun _ -> ()) ~group_name () =
-  (* Look up group to get bin_source, service_user, app_bin_dir *)
+  (* Look up group to get service_user, app_bin_dir *)
   let* grp =
     match Group_registry.find ~name:group_name with
     | Ok (Some g) -> Ok g
     | Ok None -> Error (`Msg (Printf.sprintf "Group '%s' not found" group_name))
+    | Error _ as err -> err
+  in
+  let* sandbox_cfg =
+    match Sandbox_config_registry.find_or_migrate ~name:group_name with
+    | Ok (Some cfg) -> Ok cfg
+    | Ok None ->
+        Error
+          (`Msg (Printf.sprintf "Sandbox config for '%s' not found" group_name))
     | Error _ as err -> err
   in
   (* Find primary node (node 1) *)
@@ -466,14 +471,14 @@ let add_node ?(on_log = fun _ -> ()) ~group_name () =
   let node_request : node_request =
     {
       instance = node_instance;
-      network = grp.Group.network;
+      network = sandbox_cfg.Sandbox_config.network;
       history_mode = History_mode.Rolling;
       data_dir = None;
       rpc_addr = Rpc_addr.of_string rpc_addr_str;
       net_addr = p2p_addr_str;
       service_user = grp.Group.service_user;
       app_bin_dir = grp.Group.app_bin_dir;
-      bin_source = Some grp.Group.bin_source;
+      bin_source = Some sandbox_cfg.Sandbox_config.bin_source;
       logging_mode = Logging_mode.Journald;
       extra_args =
         [
@@ -512,6 +517,14 @@ let add_baker ?(on_log = fun _ -> ()) ~group_name ~node_instance ~delegates () =
     | Ok None -> Error (`Msg (Printf.sprintf "Group '%s' not found" group_name))
     | Error _ as err -> err
   in
+  let* sandbox_cfg =
+    match Sandbox_config_registry.find_or_migrate ~name:group_name with
+    | Ok (Some cfg) -> Ok cfg
+    | Ok None ->
+        Error
+          (`Msg (Printf.sprintf "Sandbox config for '%s' not found" group_name))
+    | Error _ as err -> err
+  in
   let wallet = wallet_dir ~sandbox_name:group_name in
   let* existing_bakers = find_sandbox_bakers ~group_name in
   let baker_idx = List.length existing_bakers + 1 in
@@ -533,7 +546,7 @@ let add_baker ?(on_log = fun _ -> ()) ~group_name ~node_instance ~delegates () =
       extra_env = yes_crypto_env;
       service_user = grp.Group.service_user;
       app_bin_dir = grp.Group.app_bin_dir;
-      bin_source = Some grp.Group.bin_source;
+      bin_source = Some sandbox_cfg.Sandbox_config.bin_source;
       logging_mode = Logging_mode.Journald;
       auto_enable = true;
       preserve_data = false;
@@ -589,5 +602,6 @@ let destroy ?(on_log = fun _ -> ()) ~group_name () =
          ]) ;
   (* Remove group *)
   let* () = Group_registry.remove ~name:group_name in
+  let* () = Sandbox_config_registry.remove ~name:group_name in
   on_log (Printf.sprintf "Sandbox '%s' destroyed." group_name) ;
   Ok ()
