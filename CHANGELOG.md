@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Baker form delegates reset on base dir change**: When creating a baker, changing the Baker Base Dir or changing the Instance Name in a way that updates the base dir now clears the previously selected delegates. This prevents stale delegate selections from a different base directory being carried over.
 - **Instances page arrow key navigation to "Add new" entries**: Fixed arrow key navigation on the Instances page when no services are installed. Previously, pressing ↓ from the "By Role / By Group" selector would not navigate to the "Add new Node", "Add new Baker", etc. entries, especially in wide terminals with multi-column layout. The issue was caused by `ensure_valid_column` resetting the selection to 0 on every refresh cycle (~1 second). Navigation now correctly moves to these ghost entries even when the service list is empty.
 - **Instances page help modal now documents arrow key navigation**: The help modal (`?`) on the Instances page now includes arrow keys (↑/↓/←/→) and vim keys (j/k/h/l) for navigation, making keyboard shortcuts more discoverable.
 - **Wallets page missing baker/accuser wallets**: The Wallets page now discovers wallet directories from installed baker and accuser services. Previously, only `~/.tezos-client` was shown; service-specific base directories (e.g., `~/.local/share/octez/baker-bakingnet`) were invisible because the installer did not register them in the directory registry.
