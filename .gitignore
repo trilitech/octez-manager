@@ -32,3 +32,6 @@ test/integration/cli-tester/Dockerfile.local-golden
 docs/architecture.db-shm
 docs/architecture.db-wal
 secret.json
+
+# Agent harness (local agent roster, not tracked)
+.harness/
