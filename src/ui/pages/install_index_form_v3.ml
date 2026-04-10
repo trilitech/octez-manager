@@ -19,7 +19,7 @@ type model = {
   core : Form_builder_common.core_service_config;
   client : Form_builder_common.client_config;  (** node dependency *)
   base_dir : string;  (** OCTEZ_INDEXER_DIR — locked in edit mode *)
-  rpc_addr : string;  (** OCTEZ_INDEX_RPC_ADDR, default 0.0.0.0:8733 *)
+  rpc_addr : string;  (** OCTEZ_INDEX_RPC_ADDR, default 0.0.0.0:12832 *)
   baker : string option;  (** selected baker instance (hint only) *)
   watched_addresses : string list;
   db_name : string;  (** empty = use default; locked in edit mode *)
@@ -50,8 +50,8 @@ let base_initial_model () =
         node = `None;
         node_endpoint = "127.0.0.1:8732";
       };
-    base_dir = Paths.default_role_dir "index" "index";
-    rpc_addr = "0.0.0.0:8733";
+    base_dir = "";
+    rpc_addr = "0.0.0.0:12832";
     baker = None;
     watched_addresses = [];
     db_name = "";
@@ -70,7 +70,7 @@ let ensure_ports_initialized model_ref =
         {
           current = current.rpc_addr;
           default_host = "0.0.0.0";
-          start_port = 8733;
+          start_port = 12832;
           setter =
             (fun value -> model_ref := {!model_ref with rpc_addr = value});
         };
@@ -146,7 +146,7 @@ let make_initial_model () =
           (if base_dir = "" then
              Paths.default_role_dir "index" svc.Service.instance
            else base_dir);
-        rpc_addr = (if rpc_addr = "" then "0.0.0.0:8733" else rpc_addr);
+        rpc_addr = (if rpc_addr = "" then "0.0.0.0:12832" else rpc_addr);
         baker;
         watched_addresses;
         db_name;
@@ -192,9 +192,10 @@ let watched_addresses_field =
     ~label:"Watched Addresses"
     ~get:(fun m ->
       match m.watched_addresses with
-      | [] -> "all (empty = watch all)"
+      | [] -> "(none — required)"
       | addrs -> String.concat ", " addrs)
-    ~validate:(fun _ -> true)
+    ~validate:(fun m -> m.edit_mode || m.watched_addresses <> [])
+    ~validate_msg:(fun _ -> Some "At least one watched address is required")
     ~edit:(fun model_ref ->
       let get_suggestions () =
         match !model_ref.baker with
@@ -339,7 +340,7 @@ let spec =
                   Port_validation.validate_addr
                     ~addr
                     ?exclude_instance
-                    ~example:"0.0.0.0:8733"
+                    ~example:"0.0.0.0:12832"
                     ()
                 with
                 | Ok () -> Ok ()
@@ -351,9 +352,11 @@ let spec =
             (* 5. Base dir — locked in edit mode *)
             Form_builder.custom
               ~label:"Base Dir"
-              ~get:(fun m -> m.base_dir)
-              ~validate:(fun m -> Form_builder_common.is_nonempty m.base_dir)
-              ~validate_msg:(fun _ -> Some "Base directory is required")
+              ~get:(fun m ->
+                if m.base_dir = "" then
+                  Paths.default_role_dir "index" m.core.instance_name
+                else m.base_dir)
+              ~validate:(fun _ -> true)
               ~edit:(fun model_ref ->
                 if model.edit_mode then
                   Modal_helpers.show_error

@@ -24,7 +24,7 @@ let install_index_cmd =
   let rpc_addr =
     Arg.(
       value
-      & opt string "127.0.0.1:8733"
+      & opt string "127.0.0.1:12832"
       & info
           ["rpc-addr"]
           ~doc:"octez-index REST API listen address"
@@ -154,7 +154,7 @@ let install_index_cmd =
                   Cli_helpers.validate_port_addr
                     ~label:"Index RPC address"
                     ~addr:rpc_addr
-                    ~default:"127.0.0.1:8733"
+                    ~default:"127.0.0.1:12832"
                     ()
                 with
                 | Error msg -> Cli_helpers.cmdliner_error msg

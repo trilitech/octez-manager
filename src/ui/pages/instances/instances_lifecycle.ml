@@ -288,6 +288,7 @@ let do_edit_instance svc =
     | "accuser" -> "install_accuser_form_v3"
     | "dal-node" | "dal" -> "install_dal_node_form_v3"
     | "signatory" -> "install_signatory_form"
+    | "index" -> "install_index_form_v3"
     | _ -> "instances"
   in
   Context.navigate form_page
