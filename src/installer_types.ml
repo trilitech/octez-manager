@@ -192,7 +192,7 @@ type index_request = {
   instance : string;
   base_dir : string;
       (** Directory where octez-index stores its SQLite DB and state *)
-  rpc_addr : Rpc_addr.t;  (** REST API listen address, e.g. "0.0.0.0:8733" *)
+  rpc_addr : Rpc_addr.t;  (** REST API listen address, e.g. "0.0.0.0:12832" *)
   watched_addresses : string list;
       (** PKHs passed as --watched-address flags; empty = watch all *)
   db_name : string option;

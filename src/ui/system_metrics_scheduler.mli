@@ -52,6 +52,10 @@ val invalidate_version : role:string -> instance:string -> unit
     - Blue: dev or RC version *)
 val format_version_colored : string -> string
 
+(** Format octez-index version using its own GitLab release feed.
+    Compares against the latest octez-index release instead of octez node. *)
+val format_index_version_colored : string -> string
+
 (** Get disk size for an instance. *)
 val get_disk_size : role:string -> instance:string -> int64 option
 
