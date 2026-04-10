@@ -895,9 +895,12 @@ let render_external_services_section state =
       let header =
         Widgets.themed_emphasis (Printf.sprintf "− Unmanaged Instances (%d)" n)
       in
-      (* Calculate base index for external services (after menu and managed services) *)
+      (* Calculate base index for external services (after menu and managed services).
+         Must use display_ordered_items (which includes ghost "Add new" entries) to
+         match the index space used by move_selection in navigation. *)
       let external_start_idx =
-        services_start_idx + List.length state.services
+        services_start_idx
+        + List.length (Instances_state.display_ordered_items state)
       in
       let service_lines =
         List.mapi
