@@ -2231,19 +2231,16 @@ let action_on_selected ps =
   | _ -> ()) ;
   ps
 
-(** Open create/import modal for the currently selected group. *)
+(** Open create/import modal, prompting for base-dir when multiple are available. *)
 let create_import_selected ps =
-  let s = ps.Navigation.s in
-  let base_dir =
-    match List.nth_opt s.nav_items s.cursor with
-    | Some (GroupHeader g) -> g.base_dir
-    | Some (KeyItem (g, _)) -> g.base_dir
-    | None -> (
-        match s.groups with
-        | g :: _ -> g.base_dir
-        | [] -> default_client_base_dir ())
-  in
-  open_create_import_modal ~base_dir ;
+  let all_dirs = get_all_base_dirs () in
+  (match all_dirs with
+  | [] -> open_create_import_modal ~base_dir:(default_client_base_dir ())
+  | [single] -> open_create_import_modal ~base_dir:single
+  | _ ->
+      Modal_helpers.select_client_base_dir_modal
+        ~on_select:(fun base_dir -> open_create_import_modal ~base_dir)
+        ()) ;
   ps
 
 (** Cycle sort mode. *)
