@@ -14,8 +14,8 @@ module StringSet : Set.S with type elt = string
 (** Display item type for rendering - includes real services and ghost "Add new" entries *)
 type display_item =
   | Real_service of Service_state.t
-  | Ghost_add_new of string
-      (** Ghost entry labeled with role (e.g., "node", "baker") *)
+  | Ghost_add_new of string * string option
+      (** Ghost entry: role (e.g. "node") × group name (None = ungrouped/by-role) *)
 
 (** View mode for instances page layout *)
 type view_mode =

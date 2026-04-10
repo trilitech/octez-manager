@@ -155,14 +155,7 @@ let create ?(on_log = fun _ -> ()) ~network ?name ?rpc_addr ?snapshot
   (* Step 1: Create group *)
   log_step "Creating group..." ;
   let group =
-    Group.make
-      ~name:sandbox_name
-      ~network
-      ~bin_source
-      ~service_user
-      ~app_bin_dir
-      ~sandbox:true
-      ()
+    Group.make ~name:sandbox_name ~service_user ~app_bin_dir ~sandbox:true ()
   in
   let* () = Group_registry.write group in
   let sandbox_cfg =
