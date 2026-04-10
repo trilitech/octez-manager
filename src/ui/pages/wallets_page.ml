@@ -171,7 +171,7 @@ let load_sandbox_wallet_group (group : Group.t) =
             keys;
             error = None;
             services = [];
-            networks = [group.network];
+            networks = [];
             sandbox_name = Some group.name;
           }
     | Error (`Msg msg) ->
@@ -181,7 +181,7 @@ let load_sandbox_wallet_group (group : Group.t) =
             keys = [];
             error = Some msg;
             services = [];
-            networks = [group.network];
+            networks = [];
             sandbox_name = Some group.name;
           }
 

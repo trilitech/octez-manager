@@ -94,22 +94,14 @@ let group_by_role services =
           services
       in
       let display_items =
-        List.map (fun st -> Real_service st) instances @ [Ghost_add_new role]
+        List.map (fun st -> Real_service st) instances
+        @ [Ghost_add_new (role, None)]
       in
       (role, display_items))
     roles
 
-(** Build a display title for a group, e.g. "mainnet-prod (mainnet · v22.0)" *)
-let group_display_title (g : Group.t) =
-  let version =
-    match g.bin_source with
-    | Binary_registry.Managed_octez_version v -> v
-    | Binary_registry.Managed_signatory_version v -> v
-    | Binary_registry.Managed_octez_index_version v -> v
-    | Binary_registry.Registered_alias a -> a
-    | Binary_registry.Raw_path p -> Filename.basename p
-  in
-  Printf.sprintf "%s (%s · %s)" g.name g.network version
+(** Build a display title for a group. *)
+let group_display_title (g : Group.t) = g.name
 
 (** Group services by their instance group.
     Grouped services come first (sorted by group name, services within sorted
@@ -153,16 +145,17 @@ let group_by_group ~(groups : Group.t list) services =
           | Some g -> group_display_title g
           | None -> gname
         in
-        (* Add ghost entries for all roles after the group *)
+        (* Add ghost entries for all roles after the group; each ghost carries
+           the group name so it has a unique identity for focus tracking *)
         let display_items =
           List.map (fun st -> Real_service st) svcs
           @ [
-              Ghost_add_new "node";
-              Ghost_add_new "baker";
-              Ghost_add_new "accuser";
-              Ghost_add_new "dal-node";
-              Ghost_add_new "signatory";
-              Ghost_add_new "index";
+              Ghost_add_new ("node", Some gname);
+              Ghost_add_new ("baker", Some gname);
+              Ghost_add_new ("accuser", Some gname);
+              Ghost_add_new ("dal-node", Some gname);
+              Ghost_add_new ("signatory", Some gname);
+              Ghost_add_new ("index", Some gname);
             ]
         in
         (title, display_items))
@@ -174,12 +167,12 @@ let group_by_group ~(groups : Group.t list) services =
       [
         ( "Ungrouped",
           [
-            Ghost_add_new "node";
-            Ghost_add_new "baker";
-            Ghost_add_new "accuser";
-            Ghost_add_new "dal-node";
-            Ghost_add_new "signatory";
-            Ghost_add_new "index";
+            Ghost_add_new ("node", None);
+            Ghost_add_new ("baker", None);
+            Ghost_add_new ("accuser", None);
+            Ghost_add_new ("dal-node", None);
+            Ghost_add_new ("signatory", None);
+            Ghost_add_new ("index", None);
           ] );
       ]
     else
@@ -188,12 +181,12 @@ let group_by_group ~(groups : Group.t list) services =
         ( "Ungrouped",
           List.map (fun st -> Real_service st) sorted_ungrouped
           @ [
-              Ghost_add_new "node";
-              Ghost_add_new "baker";
-              Ghost_add_new "accuser";
-              Ghost_add_new "dal-node";
-              Ghost_add_new "signatory";
-              Ghost_add_new "index";
+              Ghost_add_new ("node", None);
+              Ghost_add_new ("baker", None);
+              Ghost_add_new ("accuser", None);
+              Ghost_add_new ("dal-node", None);
+              Ghost_add_new ("signatory", None);
+              Ghost_add_new ("index", None);
             ] );
       ]
   in
@@ -250,10 +243,10 @@ let column_items ~column_groups ~global_display_items =
                           s2.service.Service.instance
                       then Some i
                       else None
-                  | Ghost_add_new r1, Ghost_add_new r2 ->
-                      (* For ghosts, we need a better identity check *)
-                      (* This is a simplification - ideally use position *)
-                      if String.equal r1 r2 then Some i else None
+                  | Ghost_add_new (r1, g1), Ghost_add_new (r2, g2) ->
+                      if String.equal r1 r2 && Option.equal String.equal g1 g2
+                      then Some i
+                      else None
                   | _ -> None)
                 global_display_items
               |> Option.value ~default:0

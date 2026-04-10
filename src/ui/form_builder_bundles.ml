@@ -87,12 +87,7 @@ let group_field ~get_core ~set_core ?(edit_mode = false) () =
         let items = [`None] @ (groups |> List.map (fun g -> `Group g)) in
         let to_string = function
           | `None -> "None"
-          | `Group (g : Group.t) ->
-              Printf.sprintf
-                "%s (%s · %s)"
-                g.name
-                g.network
-                (Binary_registry.bin_source_to_string g.bin_source)
+          | `Group (g : Group.t) -> g.name
         in
         let on_select = function
           | `None ->

@@ -49,12 +49,10 @@ let with_fake_xdg f =
           | None -> set_var "XDG_DATA_HOME" "")
         (fun () -> f ()))
 
-let sample_group ?(name = "mainnet-prod") ?(network = "mainnet")
-    ?(service_user = "tezos") ?(app_bin_dir = "/opt/octez") () : Group.t =
+let sample_group ?(name = "mainnet-prod") ?(service_user = "tezos")
+    ?(app_bin_dir = "/opt/octez") () : Group.t =
   {
     Group.name;
-    network;
-    bin_source = Binary_registry.Managed_octez_version "24.0";
     service_user;
     app_bin_dir;
     created_at = "2026-01-01 00:00:00";
@@ -63,8 +61,6 @@ let sample_group ?(name = "mainnet-prod") ?(network = "mainnet")
 
 let group_equal (a : Group.t) (b : Group.t) =
   String.equal a.name b.name
-  && String.equal a.network b.network
-  && a.bin_source = b.bin_source
   && String.equal a.service_user b.service_user
   && String.equal a.app_bin_dir b.app_bin_dir
   && String.equal a.created_at b.created_at
@@ -85,21 +81,16 @@ let test_group_roundtrip_json () =
   | Error (`Msg msg) -> Alcotest.failf "roundtrip failed: %s" msg
 
 let test_group_roundtrip_raw_path () =
-  let original =
-    {(sample_group ()) with bin_source = Binary_registry.Raw_path "/usr/bin"}
-  in
+  (* Groups no longer carry bin_source; roundtrip test uses default sample *)
+  let original = sample_group () in
   let json = Group.to_yojson original in
   match Group.of_yojson json with
   | Ok decoded -> check_group original decoded
   | Error (`Msg msg) -> Alcotest.failf "roundtrip failed: %s" msg
 
 let test_group_roundtrip_registered_alias () =
-  let original =
-    {
-      (sample_group ()) with
-      bin_source = Binary_registry.Registered_alias "dev-build";
-    }
-  in
+  (* Groups no longer carry bin_source; roundtrip test uses default sample *)
+  let original = sample_group () in
   let json = Group.to_yojson original in
   match Group.of_yojson json with
   | Ok decoded -> check_group original decoded
@@ -107,16 +98,9 @@ let test_group_roundtrip_registered_alias () =
 
 let test_group_make () =
   let g =
-    Group.make
-      ~name:"test"
-      ~network:"ghostnet"
-      ~bin_source:(Binary_registry.Managed_octez_version "24.1")
-      ~service_user:"tezos"
-      ~app_bin_dir:"/opt/octez"
-      ()
+    Group.make ~name:"test" ~service_user:"tezos" ~app_bin_dir:"/opt/octez" ()
   in
   Alcotest.(check string) "name" "test" g.name ;
-  Alcotest.(check string) "network" "ghostnet" g.network ;
   Alcotest.(check string) "service_user" "tezos" g.service_user ;
   Alcotest.(check string) "app_bin_dir" "/opt/octez" g.app_bin_dir ;
   Alcotest.(check bool)
@@ -156,7 +140,7 @@ let test_registry_list_multiple () =
   if is_ci () then Alcotest.skip () ;
   with_fake_xdg (fun () ->
       let g1 = sample_group ~name:"group-a" () in
-      let g2 = sample_group ~name:"group-b" ~network:"ghostnet" () in
+      let g2 = sample_group ~name:"group-b" () in
       let _ = Group_registry.write g1 in
       let _ = Group_registry.write g2 in
       match Group_registry.list () with
@@ -192,16 +176,16 @@ let test_registry_remove_nonexistent () =
 let test_registry_overwrite () =
   if is_ci () then Alcotest.skip () ;
   with_fake_xdg (fun () ->
-      let g1 = sample_group ~network:"mainnet" () in
+      let g1 = sample_group ~service_user:"tezos" () in
       let _ = Group_registry.write g1 in
-      let g2 = {g1 with network = "ghostnet"} in
+      let g2 = {g1 with service_user = "octez"} in
       let _ = Group_registry.write g2 in
       match Group_registry.find ~name:"mainnet-prod" with
       | Ok (Some found) ->
           Alcotest.(check string)
-            "network updated"
-            "ghostnet"
-            found.Group.network
+            "service_user updated"
+            "octez"
+            found.Group.service_user
       | Ok None -> Alcotest.fail "Group not found after overwrite"
       | Error (`Msg msg) -> Alcotest.failf "find failed: %s" msg)
 
