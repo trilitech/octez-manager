@@ -2132,22 +2132,14 @@ and open_index_download_progress_modal ~version ~on_complete =
     ~on_close:(fun _ _ -> ())
 
 (** Show the global help modal with both global and per-page shortcuts.
-
-    The modal displays three sections (when applicable):
-    1. Contextual hint from Help_hint (if active) - shown at the top
-    2. Global shortcuts - always shown
-    3. Page-specific shortcuts - shown if the active page has registered a keymap
-
+    
+    The modal displays two sections (when applicable):
+    1. Global shortcuts - always shown
+    2. Page-specific shortcuts - shown if the active page has registered a keymap
+    
     Page shortcuts are retrieved from Context.get_active_page_keymap which is
     updated by page wrappers (Themed_page, Monitored_page) during view rendering. *)
 let show_help_modal () =
-  (* Get contextual hint from current widget/field if available *)
-  let hint_lines =
-    match Miaou.Core.Help_hint.get_active () with
-    | Some {long = Some text; _} -> [text; ""]
-    | Some {short = Some text; _} -> [text; ""]
-    | _ -> []
-  in
   (* Global shortcuts - always shown *)
   let global_section =
     [
@@ -2187,7 +2179,7 @@ let show_help_modal () =
                 filtered_keymap
             @ [""])
   in
-  let lines = hint_lines @ global_section @ page_section in
+  let lines = global_section @ page_section in
   open_text_modal ~title:"Help" ~lines
 
 (** Reference to close spinner modal from callback *)
