@@ -1,7 +1,7 @@
 ---
 description: Performs structured code review focused on correctness, OCaml patterns, and regression risk
 mode: subagent
-model: github-copilot/claude-opus-4.5
+model: github-copilot/claude-opus-4.6
 temperature: 0.1
 permission:
   edit: deny
