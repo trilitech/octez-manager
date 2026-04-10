@@ -17,6 +17,7 @@
 open Alcotest
 module HD = Lib_miaou_internal.Headless_driver
 module Install_node_form = Octez_manager_ui.Install_node_form_v3
+module Modal_helpers = Octez_manager_ui.Modal_helpers
 module TH = Tui_test_helpers_lib.Tui_test_helpers
 
 (* ============================================================ *)
@@ -256,6 +257,77 @@ let test_form_state_preserved () =
         && TH.contains_substring final "Parameter"))
 
 (* ============================================================ *)
+(* Test: Validated Text Modal Blocks Invalid Submission *)
+(* ============================================================ *)
+
+let test_validated_modal_blocks_empty_submit () =
+  TH.with_test_env (fun () ->
+      let submitted = ref false in
+      let submitted_value = ref "" in
+
+      (* Open a validated text modal with non-empty validator *)
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Test Alias"
+        ~width:40
+        ~initial:""
+        ~validator:(fun text ->
+          let trimmed = String.trim text in
+          if String.length trimmed = 0 then Error "Alias cannot be empty"
+          else Ok ())
+        ~on_submit:(fun text ->
+          submitted := true ;
+          submitted_value := text)
+        () ;
+
+      Unix.sleepf 0.02 ;
+
+      (* Modal should be open *)
+      check
+        bool
+        "modal open initially"
+        true
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* Press Enter without typing anything (should fail validation) *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Modal should STILL be open (validation blocked submission) *)
+      check
+        bool
+        "modal still open after empty Enter"
+        true
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* on_submit should NOT have been called *)
+      check bool "on_submit not called with invalid input" false !submitted ;
+
+      (* Now type valid text *)
+      ignore (TH.send_key_and_wait "t") ;
+      Unix.sleepf 0.01 ;
+      ignore (TH.send_key_and_wait "e") ;
+      Unix.sleepf 0.01 ;
+      ignore (TH.send_key_and_wait "s") ;
+      Unix.sleepf 0.01 ;
+      ignore (TH.send_key_and_wait "t") ;
+      Unix.sleepf 0.02 ;
+
+      (* Press Enter with valid text *)
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+
+      (* Modal should now be closed *)
+      check
+        bool
+        "modal closed after valid Enter"
+        false
+        (Miaou.Core.Modal_manager.has_active ()) ;
+
+      (* on_submit should have been called with the valid text *)
+      check bool "on_submit called with valid input" true !submitted ;
+      check string "submitted correct value" "test" !submitted_value)
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -268,6 +340,9 @@ let modal_tests =
     ("modal selection with enter", `Quick, test_modal_selection);
     ("field edit workflow", `Quick, test_field_edit_workflow);
     ("form state preserved after modal", `Quick, test_form_state_preserved);
+    ( "validated modal blocks empty submit",
+      `Quick,
+      test_validated_modal_blocks_empty_submit );
   ]
 
 let () =

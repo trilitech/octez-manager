@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Wallets page missing baker/accuser wallets**: The Wallets page now discovers wallet directories from installed baker and accuser services. Previously, only `~/.tezos-client` was shown; service-specific base directories (e.g., `~/.local/share/octez/baker-bakingnet`) were invisible because the installer did not register them in the directory registry.
 - **Wallets page fold/unfold keybinding**: Changed fold/unfold base directory groups from Space to Tab for consistency with common TUI conventions. Space now switches between the list and detail panels.
 - **Wallet modal misleading error with no delegates**: The baker wallet modal now shows "No delegates found in wallet" instead of "Unable to fetch wallet data — node may be unreachable" when the baker's base directory contains no keys.
+- **Validated text modals not enforcing validation**: Pressing Enter in validated text input modals (e.g., key alias, transfer amount) could bypass validation and submit invalid values. Validation errors like "Alias cannot be empty" are now properly enforced.
 
 ### Removed
 
