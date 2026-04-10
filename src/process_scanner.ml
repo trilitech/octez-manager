@@ -235,6 +235,33 @@ let scan_octez_processes () =
         process_cache) ;
   result
 
+(** Extract the systemd unit name from a process's cgroup, if any.
+    Returns e.g. ["octez-node@mainnet.service"] when the process runs
+    under a matching systemd unit, or [None] for standalone processes. *)
+let systemd_unit_of_pid pid =
+  let path = Printf.sprintf "/proc/%d/cgroup" pid in
+  try
+    let ic = open_in path in
+    Fun.protect
+      ~finally:(fun () -> close_in_noerr ic)
+      (fun () ->
+        let result = ref None in
+        (try
+           while !result = None do
+             let line = input_line ic in
+             let unit_opt =
+               String.split_on_char '/' line
+               |> List.find_opt (fun part ->
+                   (contains_substring part "octez-"
+                   || contains_substring part "signatory@")
+                   && String.ends_with ~suffix:".service" part)
+             in
+             match unit_opt with Some u -> result := Some u | None -> ()
+           done
+         with End_of_file -> ()) ;
+        !result)
+  with _ -> None
+
 (** Check if PID is managed by a systemd service unit (not just in user.slice) *)
 let is_systemd_managed pid =
   (* Check if process has a systemd service cgroup.

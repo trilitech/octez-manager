@@ -43,7 +43,7 @@ let make_service ~unit_name ?role ?rpc_addr ?node_endpoint ?dal_endpoint () :
         | None -> config.dal_endpoint);
     }
   in
-  {config; suggested_instance_name = unit_name}
+  {config; suggested_instance_name = unit_name; is_orphaned = false}
 
 (* ── Mock service graphs ─────────────────────────────────────────── *)
 

@@ -79,9 +79,7 @@ let force_refresh state =
      section. *)
   let selected =
     let n_ext = List.length external_services in
-    let max_sel =
-      services_start_idx + List.length display_items + n_ext - 1
-    in
+    let max_sel = services_start_idx + List.length display_items + n_ext - 1 in
     max 0 (min state.selected max_sel)
   in
   (* Auto-fold newly discovered external services (not seen in previous state).

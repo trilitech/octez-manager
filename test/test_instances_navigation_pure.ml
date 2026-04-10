@@ -268,6 +268,7 @@ let make_ext_svc name : Octez_manager_lib.External_service.t =
         parse_warnings = [];
       };
     suggested_instance_name = name;
+    is_orphaned = false;
   }
 
 let test_single_column_j_from_last_managed_reaches_external () =

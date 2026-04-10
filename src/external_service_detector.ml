@@ -708,7 +708,15 @@ let build_external_service ~unit_name ~exec_start ~properties =
     External_service.suggest_instance_name ~unit_name
   in
 
-  {External_service.config; suggested_instance_name}
+  let is_orphaned =
+    let base =
+      if Paths.is_root () then "/etc/systemd/system"
+      else Filename.concat (Paths.xdg_config_home ()) "systemd/user"
+    in
+    Sys.file_exists (Filename.concat base (unit_name ^ ".d"))
+  in
+
+  {External_service.config; suggested_instance_name; is_orphaned}
 
 let infer_network_from_endpoint services =
   (* Build a map of RPC addr -> network for nodes *)
@@ -904,13 +912,44 @@ let process_to_external_service (proc : Process_scanner.process_info) =
     External_service.suggest_instance_name ~unit_name:config.unit_name
   in
 
-  External_service.{config; suggested_instance_name}
+  External_service.{config; suggested_instance_name; is_orphaned = false}
 
 (** Detect Octez processes running outside systemd *)
 let detect_standalone_processes () =
   try
-    let standalone_procs = Process_scanner.get_standalone_processes () in
-    List.map process_to_external_service standalone_procs
+    (* Use all octez processes (raw), not pre-filtered, so we can inspect
+       cgroup info and classify orphaned vs truly standalone. *)
+    let all_procs = Process_scanner.scan_octez_processes () in
+    List.filter_map
+      (fun proc ->
+        match Process_scanner.systemd_unit_of_pid proc.Process_scanner.pid with
+        | Some unit_name ->
+            (* Process runs under a systemd unit *)
+            if is_managed_unit_name unit_name && is_in_registry ~unit_name then
+              None
+              (* Fully managed — skip; already visible as a managed service *)
+            else
+              (* Unit exists in systemd but not in registry: potentially orphaned *)
+              let dropin_dir =
+                let base =
+                  if Paths.is_root () then "/etc/systemd/system"
+                  else Filename.concat (Paths.xdg_config_home ()) "systemd/user"
+                in
+                Filename.concat base (unit_name ^ ".d")
+              in
+              let is_orphaned = Sys.file_exists dropin_dir in
+              let svc = process_to_external_service proc in
+              (* Replace process-<PID> unit name with the real systemd unit name *)
+              let config = {svc.External_service.config with unit_name} in
+              let suggested_instance_name =
+                External_service.suggest_instance_name ~unit_name
+              in
+              Some
+                {External_service.config; suggested_instance_name; is_orphaned}
+        | None ->
+            (* Truly standalone — no recognisable systemd cgroup *)
+            Some (process_to_external_service proc))
+      all_procs
   with _e -> []
 
 let detect () =
