@@ -9,8 +9,6 @@
 
 type t = {
   name : string;  (** Unique group identifier *)
-  network : string;  (** Shared network (e.g. "mainnet") *)
-  bin_source : Binary_registry.bin_source;  (** Shared binary version/path *)
   service_user : string;  (** Shared service user (e.g. "tezos") *)
   app_bin_dir : string;  (** Resolved binary directory *)
   created_at : string;
@@ -20,8 +18,6 @@ type t = {
 (** Create a group configuration record. *)
 val make :
   name:string ->
-  network:string ->
-  bin_source:Binary_registry.bin_source ->
   service_user:string ->
   app_bin_dir:string ->
   ?sandbox:bool ->
