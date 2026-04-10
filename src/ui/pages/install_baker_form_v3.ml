@@ -693,7 +693,9 @@ let spec =
               ~label:"Baker Base Dir"
               ~get:(fun m -> m.client.base_dir)
               ~set:(fun base_dir m ->
-                {m with client = {m.client with base_dir}})
+                let m' = {m with client = {m.client with base_dir}} in
+                if String.equal base_dir m.client.base_dir then m'
+                else {m' with delegates = []})
               ~validate:(fun m ->
                 Form_builder_common.is_nonempty m.client.base_dir)
               ()
@@ -847,15 +849,17 @@ let spec =
                             m.client.base_dir
                             (Paths.default_role_dir "baker" old))
                   in
-                  let new_client =
-                    {
-                      m.client with
-                      base_dir =
-                        (if keep_base_dir then m.client.base_dir
-                         else default_dir);
-                    }
+                  let new_base_dir =
+                    if keep_base_dir then m.client.base_dir else default_dir
                   in
-                  {m with core = new_core; client = new_client})
+                  let base_dir_changed =
+                    not (String.equal new_base_dir m.client.base_dir)
+                  in
+                  let new_client =
+                    {m.client with base_dir = new_base_dir}
+                  in
+                  let m' = {m with core = new_core; client = new_client} in
+                  if base_dir_changed then {m' with delegates = []} else m')
               ~validate:(fun m ->
                 let states = Form_builder_common.cached_service_states () in
                 if not (Form_builder_common.is_nonempty m.core.instance_name)
