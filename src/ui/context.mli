@@ -12,6 +12,12 @@ val register_global_key : string -> (unit -> unit) -> unit
     Returns [true] if a handler was found and executed. *)
 val handle_global_key : string -> bool
 
+(** Store a group name to pre-select in the next install form. *)
+val set_pending_group : string -> unit
+
+(** Consume the pending group name (returns [Some] once, then [None]). *)
+val take_pending_group : unit -> string option
+
 (** Store an instance name to navigate to the instance details page. *)
 val set_pending_instance_detail : string -> unit
 

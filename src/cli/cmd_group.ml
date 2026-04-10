@@ -69,6 +69,11 @@ let create_term =
     Arg.(value & opt string "tezos" & info ["service-user"] ~doc ~docv:"USER")
   in
   let run name network octez_version bin_dir_alias app_bin_dir service_user =
+    if network <> "" then
+      Printf.eprintf
+        "Warning: --network is deprecated for 'group create' and has no \
+         effect. Groups are no longer tied to a specific network.\n\
+         %!" ;
     let result =
       let* () = validate_group_name name in
       let* () =
@@ -77,21 +82,13 @@ let create_term =
         | Ok None -> Ok ()
         | Error (`Msg msg) -> Error msg
       in
-      let* resolved_dir, bin_source =
+      let* resolved_dir, _bin_source =
         Cli_helpers.resolve_app_bin_dir
           ?octez_version
           ?bin_dir_alias
           app_bin_dir
       in
-      let group =
-        Group.make
-          ~name
-          ~network
-          ~bin_source
-          ~service_user
-          ~app_bin_dir:resolved_dir
-          ()
-      in
+      let group = Group.make ~name ~service_user ~app_bin_dir:resolved_dir () in
       Result.map_error (fun (`Msg s) -> s) (Group_registry.write group)
     in
     match result with
@@ -129,12 +126,7 @@ let list_term =
           | _ ->
               List.iter
                 (fun (g : Group.t) ->
-                  Format.printf
-                    "%-20s  %-15s  %-20s  user=%s@."
-                    g.name
-                    g.network
-                    (Binary_registry.bin_source_to_string g.bin_source)
-                    g.service_user)
+                  Format.printf "%-20s  user=%s@." g.name g.service_user)
                 groups) ;
           `Ok ())
   in
@@ -157,10 +149,6 @@ let show_term =
           `Ok ())
         else (
           Format.printf "Name:         %s@." grp.name ;
-          Format.printf "Network:      %s@." grp.network ;
-          Format.printf
-            "Binary:       %s@."
-            (Binary_registry.bin_source_to_string grp.bin_source) ;
           Format.printf "App bin dir:  %s@." grp.app_bin_dir ;
           Format.printf "Service user: %s@." grp.service_user ;
           Format.printf "Created at:   %s@." grp.created_at ;
@@ -299,32 +287,22 @@ let add_term =
       required & opt (some string) None & info ["instance"] ~doc ~docv:"INST")
   in
   let run name instance =
-    with_group ~name (fun grp ->
+    with_group ~name (fun _grp ->
         match Service_registry.find ~instance with
         | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
         | Ok None ->
             Cli_helpers.cmdliner_error
               (Printf.sprintf "Unknown instance '%s'" instance)
         | Ok (Some svc) -> (
-            if not (String.equal svc.Service.network grp.Group.network) then
-              Cli_helpers.cmdliner_error
-                (Printf.sprintf
-                   "Network mismatch: instance '%s' is on '%s' but group '%s' \
-                    is on '%s'"
-                   instance
-                   svc.Service.network
-                   name
-                   grp.Group.network)
-            else
-              let updated = {svc with Service.group = Some name} in
-              match Service_registry.write updated with
-              | Ok () ->
-                  Format.printf
-                    "Added instance '%s' to group '%s'.@."
-                    instance
-                    name ;
-                  `Ok ()
-              | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg))
+            let updated = {svc with Service.group = Some name} in
+            match Service_registry.write updated with
+            | Ok () ->
+                Format.printf
+                  "Added instance '%s' to group '%s'.@."
+                  instance
+                  name ;
+                `Ok ()
+            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg))
   in
   Term.(ret (const run $ name_arg $ instance))
 
@@ -475,10 +453,8 @@ let upgrade_term =
               ?bin_dir_alias
               app_bin_dir
           in
-          (* Update the group *)
-          let updated_grp =
-            {grp with Group.bin_source; app_bin_dir = resolved_dir}
-          in
+          (* Update the group — bin_source is now stored per-service, not on Group.t *)
+          let updated_grp = {grp with Group.app_bin_dir = resolved_dir} in
           let* () =
             Result.map_error
               (fun (`Msg s) -> s)

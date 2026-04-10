@@ -299,25 +299,15 @@ let _view_logs_old state =
           state)
 
 let add_to_group_modal (svc : Service.t) =
-  let svc_net = Instances_render.network_short svc.Service.network in
   let groups =
     match Group_registry.list () with Ok gs -> gs | Error _ -> []
   in
-  let compatible_groups =
-    List.filter
-      (fun (g : Group.t) ->
-        String.equal (Instances_render.network_short g.network) svc_net)
-      groups
-  in
-  let items =
-    [`Create_new] @ List.map (fun g -> `Existing g) compatible_groups
-  in
+  let items = [`Create_new] @ List.map (fun g -> `Existing g) groups in
   Modal_helpers.open_choice_modal
     ~title:("Add to Group · " ^ svc.Service.instance)
     ~items
     ~to_string:(function
-      | `Create_new -> "+ Create New Group"
-      | `Existing (g : Group.t) -> Printf.sprintf "%s (%s)" g.name g.network)
+      | `Create_new -> "+ Create New Group" | `Existing (g : Group.t) -> g.name)
     ~on_select:(function
       | `Create_new ->
           let initial =
@@ -338,8 +328,6 @@ let add_to_group_modal (svc : Service.t) =
               let grp =
                 Group.make
                   ~name
-                  ~network:svc.Service.network
-                  ~bin_source:(Service.get_bin_source svc)
                   ~service_user:svc.Service.service_user
                   ~app_bin_dir:svc.Service.app_bin_dir
                   ()
@@ -502,8 +490,9 @@ let activate_selection s =
   let display_items = display_ordered_items s in
   match List.nth_opt display_items (s.selected - services_start_idx) with
   | Some (Real_service _) -> instance_actions_modal s
-  | Some (Ghost_add_new role) ->
-      (* Navigate to the appropriate form based on role *)
+  | Some (Ghost_add_new (role, group_opt)) ->
+      (* Pre-select the group so the install form opens with it already set *)
+      Option.iter (fun gname -> Context.set_pending_group gname) group_opt ;
       (match role with
       | "node" -> Context.navigate Install_node_form_v3.name
       | "baker" -> Context.navigate Install_baker_form_v3.name
@@ -585,8 +574,7 @@ let group_actions_modal state =
           Modal_helpers.open_choice_modal
             ~title:"Select Group"
             ~items:groups
-            ~to_string:(fun (g : Group.t) ->
-              Printf.sprintf "%s (%s)" g.name g.network)
+            ~to_string:(fun (g : Group.t) -> g.name)
             ~on_select:(fun grp -> group_action_modal grp)
             () ;
           state)

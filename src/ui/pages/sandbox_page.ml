@@ -309,8 +309,7 @@ let render_list_item ~selected ~(sb : sandbox_info) =
     T.concat
       [arrow; " "; node_dot; " "; baker_dot; "  "; T.text "%s" sb.group.name]
   in
-  let net = T.muted "  %s" sb.group.network in
-  T.concat [label; "\n"; net]
+  T.concat [label]
 
 let render_list ~sandboxes ~cursor ~size =
   let rows_per_item = 2 in

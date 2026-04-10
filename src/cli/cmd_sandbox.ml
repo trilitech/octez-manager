@@ -150,10 +150,10 @@ let list_term =
         Format.printf "No sandboxes registered.@." ;
         `Ok ()
     | Ok sandboxes ->
-        Format.printf "%-20s  %-20s  %-10s@." "NAME" "NETWORK" "CREATED" ;
+        Format.printf "%-20s  %-10s@." "NAME" "CREATED" ;
         List.iter
           (fun (g : Group.t) ->
-            Format.printf "%-20s  %-20s  %-10s@." g.name g.network g.created_at)
+            Format.printf "%-20s  %-10s@." g.name g.created_at)
           sandboxes ;
         `Ok ()
   in
@@ -169,7 +169,6 @@ let status_term =
   let run name =
     with_sandbox ~name (fun grp ->
         Format.printf "Sandbox:   %s@." grp.Group.name ;
-        Format.printf "Network:   %s@." grp.Group.network ;
         Format.printf "Created:   %s@." grp.Group.created_at ;
         (match Sandbox.find_sandbox_node ~group_name:name with
         | Ok (Some svc) -> (

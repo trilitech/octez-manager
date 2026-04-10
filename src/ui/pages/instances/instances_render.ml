@@ -620,7 +620,7 @@ let render_column ~col_width ~state ~column_groups =
                     line_for_service idx state.selected ~folded:is_folded svc
                   in
                   String.split_on_char '\n' line
-              | Ghost_add_new role ->
+              | Ghost_add_new (role, _) ->
                   let line = line_for_ghost_add_new idx state.selected role in
                   [line])
             display_items
@@ -973,7 +973,7 @@ let table_lines_single state =
                     line_for_service i state.selected ~folded:is_folded svc
                   in
                   String.split_on_char '\n' row
-              | Ghost_add_new role ->
+              | Ghost_add_new (role, _) ->
                   let line = line_for_ghost_add_new i state.selected role in
                   [line])
             display_items
