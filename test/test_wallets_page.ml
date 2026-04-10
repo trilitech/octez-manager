@@ -111,6 +111,100 @@ let test_get_all_base_dirs_trailing_slash () =
   (* If the directory was added, it should appear at most once after normalization *)
   check bool "trailing slash normalized" true (count <= 1)
 
+(** Test that base directories registered in Directory_registry appear in get_all_base_dirs.
+    This ensures the fix for wallet discovery from baker/accuser installations works. *)
+let test_registry_dirs_appear_in_get_all () =
+  let test_dir = "/home/test/.local/share/octez/baker-bakingnet" in
+
+  (* Register a base_dir with a service *)
+  let _ =
+    Directory_registry.add
+      ~path:test_dir
+      ~dir_type:Client_base_dir
+      ~registered_services:["baker-test"]
+  in
+
+  (* Get all base directories *)
+  let dirs = Keys_page.Internal_for_tests.get_all_base_dirs () in
+
+  (* Check the registered directory appears *)
+  let contains_test_dir = List.exists (String.equal test_dir) dirs in
+
+  (* Cleanup *)
+  let _ = Directory_registry.remove test_dir in
+
+  (* Assert: registered directory should appear in the list *)
+  check bool "registry dir appears" true contains_test_dir
+
+(** Test that removing a directory from the registry makes it disappear from get_all_base_dirs. *)
+let test_registry_removal_works () =
+  let test_dir = "/home/test/.local/share/octez/accuser-test" in
+
+  (* Register, verify, then remove *)
+  let _ =
+    Directory_registry.add
+      ~path:test_dir
+      ~dir_type:Client_base_dir
+      ~registered_services:["accuser-test"]
+  in
+
+  let dirs_before = Keys_page.Internal_for_tests.get_all_base_dirs () in
+  let appears_before = List.exists (String.equal test_dir) dirs_before in
+
+  (* Remove from registry *)
+  let _ = Directory_registry.remove test_dir in
+
+  let dirs_after = Keys_page.Internal_for_tests.get_all_base_dirs () in
+  let appears_after = List.exists (String.equal test_dir) dirs_after in
+
+  (* Assert: should appear before removal, not after *)
+  check bool "appears before removal" true appears_before ;
+  check bool "absent after removal" false appears_after
+
+(** Test that adding the same path twice merges registered_services lists.
+    This prevents losing service registrations when multiple services share a base_dir. *)
+let test_registry_merges_services () =
+  let test_dir = "/home/test/.local/share/octez/shared-base-dir" in
+
+  (* First service registers the base_dir *)
+  let _ =
+    Directory_registry.add
+      ~path:test_dir
+      ~dir_type:Client_base_dir
+      ~registered_services:["baker-alice"]
+  in
+
+  (* Second service registers the same base_dir *)
+  let _ =
+    Directory_registry.add
+      ~path:test_dir
+      ~dir_type:Client_base_dir
+      ~registered_services:["baker-bob"]
+  in
+
+  (* Check that both services are registered *)
+  let entry =
+    match Directory_registry.find_by_path test_dir with
+    | Ok (Some e) -> e
+    | _ -> failwith "Entry not found"
+  in
+
+  (* Cleanup *)
+  let _ = Directory_registry.remove test_dir in
+
+  (* Assert: both services should be in the merged list *)
+  check
+    bool
+    "contains baker-alice"
+    true
+    (List.mem "baker-alice" entry.registered_services) ;
+  check
+    bool
+    "contains baker-bob"
+    true
+    (List.mem "baker-bob" entry.registered_services) ;
+  check int "has exactly 2 services" 2 (List.length entry.registered_services)
+
 (* ============================================================ *)
 (* TUI Regression: key appears after import without restart     *)
 (* ============================================================ *)
@@ -182,15 +276,24 @@ let test_imported_key_appears_without_restart () =
 
 let base_dir_tests =
   [
-    ( "deduplicates default dir when in registry",
+    ( "deduplicates default dir when also in registry",
       `Quick,
       test_get_all_base_dirs_deduplicates );
-    ( "ensures uniqueness with multiple managed dirs",
+    ( "deduplicates multiple managed dirs",
       `Quick,
       test_get_all_base_dirs_multiple_managed );
     ( "normalizes trailing slashes during deduplication",
       `Quick,
       test_get_all_base_dirs_trailing_slash );
+    ( "registry directories appear in get_all_base_dirs",
+      `Quick,
+      test_registry_dirs_appear_in_get_all );
+    ( "registry removal removes dir from get_all_base_dirs",
+      `Quick,
+      test_registry_removal_works );
+    ( "registry merges services when path added twice",
+      `Quick,
+      test_registry_merges_services );
   ]
 
 let refresh_tests =
