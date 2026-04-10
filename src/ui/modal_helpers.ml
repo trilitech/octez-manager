@@ -797,10 +797,12 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
           Miaou_widgets_input.Validated_textbox_widget.flush_validation s
         in
         if Miaou_widgets_input.Validated_textbox_widget.is_valid s then (
+          Miaou.Core.Modal_manager.set_consume_next_key () ;
           Miaou.Core.Modal_manager.close_top `Commit ;
           Navigation.update (fun _ -> s) ps)
         else Navigation.update (fun _ -> s) ps
       else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
         Miaou.Core.Modal_manager.close_top `Cancel ;
         ps)
       else
@@ -843,15 +845,22 @@ let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
       ()
   in
   let modal_title = Option.value ~default:"Input" title in
-  Miaou.Core.Modal_manager.prompt
+  let ui : Miaou.Core.Modal_manager.ui =
+    {title = modal_title; left = None; max_width = None; dim_background = true}
+  in
+  Miaou.Core.Modal_manager.push
     (module Modal)
     ~init:(Navigation.make widget)
-    ~title:modal_title
-    ~extract:(fun pstate ->
-      Some
-        (Miaou_widgets_input.Validated_textbox_widget.value pstate.Navigation.s))
-    ~on_result:(function Some text -> on_submit text | None -> ())
-    ()
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun pstate outcome ->
+      match outcome with
+      | `Commit ->
+          on_submit
+            (Miaou_widgets_input.Validated_textbox_widget.value
+               pstate.Navigation.s)
+      | `Cancel -> ())
 
 let wrap_text ~width s =
   let wrap_line s =
