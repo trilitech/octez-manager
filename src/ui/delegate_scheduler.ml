@@ -213,3 +213,13 @@ let clear () =
   Mutex.protect config_lock (fun () -> Hashtbl.clear config_cache)
 
 let shutdown () = Atomic.set shutdown_requested true
+
+(** {1 Testing helpers} *)
+
+module Internal_for_tests = struct
+  (** Set cached config for an instance (for tests that need to inject data) *)
+  let set_config ~instance ~delegates ~node_endpoint ~has_dal =
+    let config = {delegates; node_endpoint; has_dal} in
+    Mutex.protect config_lock (fun () ->
+        Hashtbl.replace config_cache instance config)
+end
