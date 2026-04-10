@@ -336,9 +336,37 @@ let golden_path_script =
   @ open_create_menu ~menu_index:5 ~target_page:"install_index_form_v3"
   @ [
       WaitFor [ScreenContains "Install Index"; MaxIterations 10];
-      Comment "Submit form with all defaults";
+      Comment "Cursor on Node field (first). Node selection is required.";
     ]
-  @ submit_form ~downs:13 @ wait_for_sync_install
+  @ select_first_node
+  @ [
+      Comment
+        "Navigate to Watched Addresses (Down x5) and add a watched address.";
+      Comment "At least one watched address is required at creation time.";
+      Key "Down";
+      Key "Down";
+      Key "Down";
+      Key "Down";
+      Key "Down";
+      Key "Enter";
+      (* open multiselect modal *)
+      WaitFor [ModalActive; MaxIterations 10];
+      Key "Enter";
+      (* select 'Add address (manual)' - first item *)
+      WaitFor [ModalActive; MaxIterations 10];
+      (* text prompt appeared *)
+      Type "tz1golden";
+      Key "Enter";
+      (* submit address - text prompt closes, multiselect stays open *)
+      WaitFor [ScreenContains "tz1golden"; MaxIterations 10];
+      Key "Escape";
+      (* close multiselect *)
+      WaitFor [ModalClosed; MaxIterations 10];
+      Comment
+        "Index form: 13 fields. Cursor now on field 5 (Watched Addresses).";
+      Comment "Confirm is at position 13. From field 5, need 8 Downs.";
+    ]
+  @ submit_form ~downs:8 @ wait_for_sync_install
   @ [Screenshot "15_index_installed"; AssertService "index-shadownet"]
 
 (* ============================================================ *)
