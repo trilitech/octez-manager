@@ -1,7 +1,7 @@
 ---
 description: Generates and maintains governance rules from project context and risk posture
 mode: subagent
-model: github-copilot/claude-opus-4.5
+model: github-copilot/claude-opus-4.6
 temperature: 0.3
 permission:
   edit: allow
