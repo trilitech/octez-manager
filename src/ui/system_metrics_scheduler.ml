@@ -164,7 +164,16 @@ let update_pids_and_version ~key ~role ~instance ~binary ~data_dir ?unit_name
       || time_since_version_check > 300.0 (* Re-check every 5 minutes *)
     in
     if should_refresh_version then (
-      state.version <- System_metrics.get_version ~binary ;
+      state.version <-
+        (if String.equal role "index" then
+           (* octez-index --version reports "Octez 0.0+dev" regardless of
+              release; read the actual version from the versioned install
+              directory (e.g. ".../v0.1.0/octez-index" → "0.1.0"). *)
+           let dir_name = Filename.basename (Filename.dirname binary) in
+           if String.length dir_name > 1 && dir_name.[0] = 'v' then
+             Some (String.sub dir_name 1 (String.length dir_name - 1))
+           else System_metrics.get_version ~binary
+         else System_metrics.get_version ~binary) ;
       state.last_version_check <- Some now) ;
     (* Check version and show toast if outdated (on first detection or change) *)
     (match (old_version, state.version) with
@@ -435,12 +444,34 @@ let tick () =
             ~binary
             ~data_dir:""
             ()
+      | "index" ->
+          let binary =
+            Filename.concat svc.Service.app_bin_dir "octez-index"
+          in
+          (* Read OCTEZ_INDEXER_DIR for disk usage tracking *)
+          let data_dir =
+            match Node_env.read ~inst:svc.Service.instance with
+            | Error _ -> ""
+            | Ok pairs -> (
+                match List.assoc_opt "OCTEZ_INDEXER_DIR" pairs with
+                | None | Some "" -> ""
+                | Some d -> d)
+          in
+          submit_poll
+            ~role:svc.Service.role
+            ~instance:svc.Service.instance
+            ~binary
+            ~data_dir
+            ()
       | _ -> ())
 
 let started = ref false
 
 (** Latest stable Octez version string from feed (e.g., "23.3") *)
 let latest_stable_version : string option ref = ref None
+
+(** Latest stable octez-index version from GitLab releases (e.g., "1.0.0") *)
+let latest_stable_index_version : string option ref = ref None
 
 (** Fetch and parse latest stable version from octez releases JSON *)
 let fetch_latest_version () =
@@ -488,6 +519,15 @@ let fetch_latest_version () =
         | _ -> ()
       with _ -> ())
 
+(** Fetch latest octez-index version from GitLab releases *)
+let fetch_latest_index_version () =
+  match Octez_index_downloader.fetch_versions ~include_prerelease:false () with
+  | Error _ -> ()
+  | Ok [] -> ()
+  | Ok (latest :: _) ->
+      latest_stable_index_version :=
+        Some latest.Octez_index_downloader.version
+
 (** Version status for coloring *)
 type version_status =
   | Latest  (** Running latest stable *)
@@ -496,11 +536,11 @@ type version_status =
   | DevOrRC  (** Running dev or RC version *)
   | Unknown  (** Can't determine *)
 
-(** Compare running version against latest stable *)
-let check_version_status ~running =
+(** Compare running version against an explicit latest version *)
+let check_version_status ~running ~latest =
   if Version_utils.is_rc running then DevOrRC
   else
-    match !latest_stable_version with
+    match latest with
     | None -> Unknown
     | Some latest -> (
         (* Check if the running version can be parsed at all *)
@@ -533,20 +573,42 @@ let version_color status =
 
 (** Format version with color based on status *)
 let format_version_colored version =
-  let status = check_version_status ~running:version in
+  let status =
+    check_version_status ~running:version ~latest:!latest_stable_version
+  in
+  match version_color status with
+  | None -> Printf.sprintf "v%s" version
+  | Some style -> Miaou_style.Style.render style (Printf.sprintf "v%s" version)
+
+(** Format octez-index version using its own GitLab release feed *)
+let format_index_version_colored version =
+  let status =
+    check_version_status
+      ~running:version
+      ~latest:!latest_stable_index_version
+  in
   match version_color status with
   | None -> Printf.sprintf "v%s" version
   | Some style -> Miaou_style.Style.render style (Printf.sprintf "v%s" version)
 
 (** Check version for a single instance and show toast if outdated *)
 let check_version_toast_for ~key ~instance ~version =
-  (* Only check if we have latest version info *)
-  match !latest_stable_version with
+  (* Determine the right feed based on role (key = "role/instance") *)
+  let role =
+    match String.index_opt key '/' with
+    | Some i -> String.sub key 0 i
+    | None -> ""
+  in
+  let latest_ver_opt =
+    if String.equal role "index" then !latest_stable_index_version
+    else !latest_stable_version
+  in
+  match latest_ver_opt with
   | None -> ()
   | Some latest_ver -> (
       if Hashtbl.mem version_warned key then ()
       else
-        let status = check_version_status ~running:version in
+        let status = check_version_status ~running:version ~latest:latest_ver_opt in
         match status with
         | MinorBehind ->
             Hashtbl.replace version_warned key () ;
@@ -576,6 +638,8 @@ let start () =
     Worker_queue.start worker ;
     (* Fetch latest version in pool fiber - don't block worker queue *)
     Domain_pool.submit (fun () -> try fetch_latest_version () with _ -> ()) ;
+    Domain_pool.submit (fun () ->
+        try fetch_latest_index_version () with _ -> ()) ;
     (* Submit scheduler fiber to domain pool.
        Runs first tick immediately (no initial delay) to start populating
        metrics as early as possible. *)
@@ -615,7 +679,8 @@ module For_test = struct
 
   let is_rc_or_dev = Version_utils.is_rc
 
-  let check_version_status = check_version_status
+  let check_version_status ~running =
+    check_version_status ~running ~latest:!latest_stable_version
 
   let version_color = version_color
 

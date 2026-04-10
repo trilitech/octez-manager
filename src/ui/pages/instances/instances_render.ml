@@ -347,6 +347,26 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                 | Signatory_metrics.Unknown -> Widgets.themed_muted "unknown")
           in
           Printf.sprintf "%s%s" indent status_text
+      | "index" ->
+          (* Line 2 for indexers: sync status and last indexed level *)
+          let status_text =
+            match Index_metrics.get ~instance:svc.Service.instance with
+            | None -> Widgets.themed_muted "indexing"
+            | Some m ->
+                let lvl_s =
+                  match m.Index_metrics.head_level with
+                  | Some l -> Widgets.themed_text (Printf.sprintf "L%d" l)
+                  | None -> Widgets.themed_muted "L?"
+                in
+                let boot =
+                  match m.Index_metrics.synced with
+                  | Some true -> Widgets.themed_success "synced"
+                  | Some false -> Widgets.themed_warning "syncing"
+                  | None -> Widgets.themed_muted (Context.render_spinner "")
+                in
+                String.concat " · " [boot; lvl_s]
+          in
+          Printf.sprintf "%s%s" indent status_text
       | _ ->
           Printf.sprintf
             "%s%s"
@@ -390,7 +410,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                 | None -> parts
               in
               if parts = [] then [] else [indent ^ String.concat " · " parts])
-      | "node" | "baker" | "accuser" | "dal-node" ->
+      | "node" | "baker" | "accuser" | "dal-node" | "index" ->
           let focus = idx + services_start_idx = selected in
           let indent = String.make indent_start ' ' in
           (* For bakers: add delegate status line (line 3) *)
@@ -405,7 +425,10 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
                 ~role:svc.Service.role
                 ~instance:svc.Service.instance
             with
-            | Some v -> System_metrics_scheduler.format_version_colored v
+            | Some v ->
+                if String.equal svc.Service.role "index" then
+                  System_metrics_scheduler.format_index_version_colored v
+                else System_metrics_scheduler.format_version_colored v
             | None -> Widgets.themed_muted "v?"
           in
           let mem =
@@ -419,7 +442,11 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
             [version]
             @ (if mem = "" then [] else [Widgets.themed_text "MEM " ^ mem])
             @
-            if svc.Service.role = "node" || svc.Service.role = "dal-node" then
+            if
+              svc.Service.role = "node"
+              || svc.Service.role = "dal-node"
+              || svc.Service.role = "index"
+            then
               let disk =
                 match
                   System_metrics_scheduler.get_disk_size
