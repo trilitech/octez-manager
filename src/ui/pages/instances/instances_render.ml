@@ -745,7 +745,11 @@ let render_external_service ~selected_idx ~current_idx ~folded
   in
   let role_str = Widgets.themed_text (Printf.sprintf "%-10s" role_str) in
   let network = Widgets.themed_text (Printf.sprintf "%-12s" network_str) in
-  let external_badge = Widgets.themed_muted "[external]" in
+  let external_badge =
+    if ext.External_service.is_orphaned then
+      Widgets.themed_emphasis "[orphaned]"
+    else Widgets.themed_muted "[external]"
+  in
   let first_line =
     Printf.sprintf
       "%s %s %s %s %s %s %s"
