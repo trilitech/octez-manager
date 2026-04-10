@@ -2477,10 +2477,10 @@ let handle_key ps key ~size =
         | Some Keys.Down | Some (Keys.Char "j") -> move_cursor 1 ~size ps
         | Some (Keys.Char "g") -> jump_to_top ~size ps
         | Some (Keys.Char "G") -> jump_to_bottom ~size ps
-        | Some (Keys.Char " ") ->
+        | Some Keys.Tab ->
             if ps.Navigation.s.multi_select then toggle_selection ps
             else toggle_fold ~size ps
-        | Some Keys.Tab -> switch_panel ps
+        | Some (Keys.Char " ") -> switch_panel ps
         | Some Keys.Enter ->
             if ps.Navigation.s.multi_select then open_batch_modal ps
             else action_on_selected ps
@@ -2564,8 +2564,8 @@ module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
     Miaou.Core.Tui_page.
       [
         {key = "j/k"; help = "Navigate"};
-        {key = "Tab"; help = "Panel"};
-        {key = "Space"; help = "Fold"};
+        {key = "Tab"; help = "Fold"};
+        {key = "Space"; help = "Panel"};
         {key = "+/n"; help = "New key"};
         {key = "Esc"; help = "Back"};
         {key = "?"; help = "Help"};

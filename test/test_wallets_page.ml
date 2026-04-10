@@ -14,6 +14,7 @@
 open Alcotest
 open Octez_manager_lib
 module Keys_page = Octez_manager_ui.Wallets_page
+module Main_shell = Octez_manager_ui.Main_shell
 module HD = Lib_miaou_internal.Headless_driver
 module TH = Tui_test_helpers_lib.Tui_test_helpers
 module Context = Octez_manager_ui.Context
@@ -270,6 +271,108 @@ let test_imported_key_appears_without_restart () =
             true
             (TH.contains_substring screen_after "bob")))
 
+(** Regression test: Tab key toggles fold/unfold on group headers.
+    When cursor is on a GroupHeader and Tab is pressed, keys within
+    the group should be hidden (folded) and the fold indicator should change. *)
+let test_tab_toggles_fold () =
+  TH.with_test_env (fun () ->
+      with_tmp_wallet (fun base_dir ->
+          (* Pre-populate with a key so the group is visible *)
+          write_key_file
+            ~base_dir
+            ~alias:"alice"
+            ~pkh:"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ;
+          HD.Stateful.init (module Keys_page.Page) ;
+          let screen_before = TH.get_screen_text () in
+          (* Cursor starts at position 0 (first GroupHeader). Keys are visible. *)
+          check
+            bool
+            "alice visible before fold"
+            true
+            (TH.contains_substring screen_before "alice") ;
+          (* Press Tab to fold *)
+          ignore (TH.send_key_and_wait "Tab") ;
+          let screen_after = TH.get_screen_text () in
+          (* After folding, "alice" should be hidden *)
+          check
+            bool
+            "alice hidden after fold"
+            false
+            (TH.contains_substring screen_after "alice") ;
+          (* Press Tab again to unfold *)
+          ignore (TH.send_key_and_wait "Tab") ;
+          let screen_unfolded = TH.get_screen_text () in
+          (* After unfolding, "alice" should be visible again *)
+          check
+            bool
+            "alice visible after unfold"
+            true
+            (TH.contains_substring screen_unfolded "alice")))
+
+(** Integration test: Tab key toggles fold/unfold through main_shell.
+    This tests the ACTUAL user experience with the full TUI including tab bar.
+    The standalone test above works, but users report fold doesn't work in the
+    real TUI. This test reproduces the real scenario. *)
+let test_tab_toggles_fold_via_main_shell () =
+  TH.with_test_env (fun () ->
+      with_tmp_wallet (fun base_dir ->
+          (* Pre-populate with a key so the group is visible *)
+          write_key_file
+            ~base_dir
+            ~alias:"alice"
+            ~pkh:"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ;
+
+          (* Initialize with Main_shell (full TUI with tab bar) *)
+          HD.Stateful.init (module Main_shell.Page) ;
+
+          (* Wait for initial render *)
+          ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+          (* Main_shell starts on tab 1 (Instances). Switch to tab 2 (Wallets). *)
+          ignore (TH.send_key_and_wait "2") ;
+
+          (* Wait for tab switch *)
+          ignore (HD.Stateful.idle_wait ~iterations:3 ~sleep:0.001 ()) ;
+
+          let screen_before = TH.get_screen_text () in
+
+          (* Verify we're on the wallets tab and alice is visible *)
+          check
+            bool
+            "alice visible before fold (via main_shell)"
+            true
+            (TH.contains_substring screen_before "alice") ;
+
+          (* Press Tab to fold. Cursor should be on first group header. *)
+          ignore (TH.send_key_and_wait "Tab") ;
+
+          (* Wait for fold to complete *)
+          ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+          let screen_after = TH.get_screen_text () in
+
+          (* After folding, "alice" should be hidden *)
+          check
+            bool
+            "alice hidden after fold (via main_shell)"
+            false
+            (TH.contains_substring screen_after "alice") ;
+
+          (* Press Tab again to unfold *)
+          ignore (TH.send_key_and_wait "Tab") ;
+
+          (* Wait for unfold *)
+          ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+          let screen_unfolded = TH.get_screen_text () in
+
+          (* After unfolding, "alice" should be visible again *)
+          check
+            bool
+            "alice visible after unfold (via main_shell)"
+            true
+            (TH.contains_substring screen_unfolded "alice")))
+
 (* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
@@ -303,10 +406,19 @@ let refresh_tests =
       test_imported_key_appears_without_restart );
   ]
 
+let fold_tests =
+  [
+    ("tab toggles fold on group header", `Quick, test_tab_toggles_fold);
+    ( "tab toggles fold via main_shell integration",
+      `Quick,
+      test_tab_toggles_fold_via_main_shell );
+  ]
+
 let () =
   Alcotest.run
     "Wallets_page"
     [
       ("base_dir_deduplication", base_dir_tests);
+      ("fold_unfold", fold_tests);
       ("refresh_on_dirty_flag", refresh_tests);
     ]
