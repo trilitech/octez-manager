@@ -185,17 +185,25 @@ let test_multi_column_roundtrip () =
 (* Empty state tests                                            *)
 (* ============================================================ *)
 
-let test_empty_state_stays_at_install () =
+let test_empty_state_navigates_to_ghost () =
+  (* When there are no services, ghost "Add new" entries should still be navigable *)
   let s = make_state ~selected:0 ~num_columns:1 [] in
   let s' = move s 1 in
-  check int "stays at Install" 0 s'.selected ;
-  let s' = move s (-1) in
-  check int "stays at Install (up)" 0 s'.selected
+  check
+    int
+    "radio row -> first ghost (single column)"
+    services_start_idx
+    s'.selected
 
-let test_empty_state_multi_column () =
+let test_empty_state_multi_column_navigates_to_ghost () =
+  (* Multi-column: should navigate from radio row to first ghost *)
   let s = make_state ~selected:0 ~num_columns:2 [] in
   let s' = move s 1 in
-  check int "stays at Install" 0 s'.selected
+  check
+    bool
+    "radio row -> first ghost (multi column)"
+    true
+    (s'.selected >= services_start_idx)
 
 (* ============================================================ *)
 (* Test Suite                                                   *)
@@ -240,9 +248,11 @@ let () =
         ] );
       ( "empty-state",
         [
-          ("stays at Install", `Quick, test_empty_state_stays_at_install);
-          ( "multi-column stays at Install",
+          ( "navigates to ghost (single column)",
             `Quick,
-            test_empty_state_multi_column );
+            test_empty_state_navigates_to_ghost );
+          ( "navigates to ghost (multi column)",
+            `Quick,
+            test_empty_state_multi_column_navigates_to_ghost );
         ] );
     ]
