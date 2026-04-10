@@ -135,31 +135,49 @@ let list_all_service_units () =
   (* Create a set of unit files for fast lookup *)
   let file_set = List.fold_left (fun acc unit -> unit :: acc) [] files in
 
-  (* Helper to check if a unit has its own file (not just using a template) *)
+  (* Helper to check if a unit has its own file or dropin directory
+     (as opposed to only existing in systemd memory via a template). *)
   let has_own_unit_file unit_name =
     (* First check if it's in our file list *)
     if List.mem unit_name file_set then true
     else
-      (* For services not matching octez-* pattern, check FragmentPath
-         to see if they have their own file vs using a template *)
-      match
-        Cmd_runner.run_out
-          (Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "FragmentPath"])
-      with
-      | Ok output ->
-          let path = String.trim output in
-          (* FragmentPath format: "FragmentPath=/path/to/service.service" *)
-          if String.starts_with ~prefix:"FragmentPath=" path then
-            let file_path =
-              String.sub path 13 (String.length path - 13)
-              (* skip "FragmentPath=" *)
-            in
-            (* Check if the path matches the unit name (not a template)
-               Template: /path/octez-node@.service
-               Instance: /path/octez-node@instance.service or /path/test.service *)
-            String.ends_with ~suffix:unit_name file_path
-          else false
-      | Error _ -> false
+      (* Check for a dropin override directory.
+         Template-instance units (octez-<role>@<inst>.service) never appear in
+         list-unit-files output: their FragmentPath always points to the
+         template file (octez-node@.service), not the instance. However,
+         octez-manager always creates a dropin directory for every configured
+         instance. Checking the dropin dir is deterministic and works across
+         all systemd versions and daemon states. *)
+      let dropin_dir =
+        if Paths.is_root () then
+          Filename.concat "/etc/systemd/system" (unit_name ^ ".d")
+        else
+          Filename.concat
+            (Filename.concat (Paths.xdg_config_home ()) "systemd/user")
+            (unit_name ^ ".d")
+      in
+      if Sys.file_exists dropin_dir then true
+      else
+        (* FragmentPath fallback for non-template units that don't use dropins *)
+        match
+          Cmd_runner.run_out
+            (Systemd.systemctl_cmd ()
+            @ ["show"; unit_name; "-p"; "FragmentPath"])
+        with
+        | Ok output ->
+            let path = String.trim output in
+            (* FragmentPath format: "FragmentPath=/path/to/service.service" *)
+            if String.starts_with ~prefix:"FragmentPath=" path then
+              let file_path =
+                String.sub path 13 (String.length path - 13)
+                (* skip "FragmentPath=" *)
+              in
+              (* Check if the path matches the unit name (not a template)
+                 Template: /path/octez-node@.service
+                 Instance: /path/octez-node@instance.service or /path/test.service *)
+              String.ends_with ~suffix:unit_name file_path
+            else false
+        | Error _ -> false
   in
 
   (* Filter loaded units to only include those with their own unit files
