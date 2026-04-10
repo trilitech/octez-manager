@@ -855,9 +855,7 @@ let spec =
                   let base_dir_changed =
                     not (String.equal new_base_dir m.client.base_dir)
                   in
-                  let new_client =
-                    {m.client with base_dir = new_base_dir}
-                  in
+                  let new_client = {m.client with base_dir = new_base_dir} in
                   let m' = {m with core = new_core; client = new_client} in
                   if base_dir_changed then {m' with delegates = []} else m')
               ~validate:(fun m ->
