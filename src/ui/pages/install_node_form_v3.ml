@@ -125,7 +125,7 @@ let base_initial_model () =
         enable_on_boot = true;
         start_now = true;
         extra_args = "";
-        group = None;
+        group = Context.take_pending_group ();
       };
     node =
       {
