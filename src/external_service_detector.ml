@@ -924,12 +924,15 @@ let detect_standalone_processes () =
       (fun proc ->
         match Process_scanner.systemd_unit_of_pid proc.Process_scanner.pid with
         | Some unit_name ->
-            (* Process runs under a systemd unit *)
-            if is_managed_unit_name unit_name && is_in_registry ~unit_name then
-              None
+            (* Only include if this looks like a former octez-manager service
+               that is now orphaned: has a dropin dir but no registry entry.
+               All other systemd-cgroup processes are either managed (skip) or
+               already covered by the systemd unit detection path (also skip). *)
+            if not (is_managed_unit_name unit_name) then None
+              (* Not an octez-manager pattern — skip *)
+            else if is_in_registry ~unit_name then None
               (* Fully managed — skip; already visible as a managed service *)
             else
-              (* Unit exists in systemd but not in registry: potentially orphaned *)
               let dropin_dir =
                 let base =
                   if Paths.is_root () then "/etc/systemd/system"
@@ -937,18 +940,32 @@ let detect_standalone_processes () =
                 in
                 Filename.concat base (unit_name ^ ".d")
               in
-              let is_orphaned = Sys.file_exists dropin_dir in
-              let svc = process_to_external_service proc in
-              (* Replace process-<PID> unit name with the real systemd unit name *)
-              let config = {svc.External_service.config with unit_name} in
-              let suggested_instance_name =
-                External_service.suggest_instance_name ~unit_name
-              in
-              Some
-                {External_service.config; suggested_instance_name; is_orphaned}
+              if not (Sys.file_exists dropin_dir) then None
+                (* No dropin dir — a plain systemd unit not from octez-manager;
+                   already handled by the systemd unit detection path, skip. *)
+              else
+                (* Genuine orphan: dropin dir exists, not in registry *)
+                let svc = process_to_external_service proc in
+                (* Replace process-<PID> unit name with the real systemd unit name *)
+                let config = {svc.External_service.config with unit_name} in
+                let suggested_instance_name =
+                  External_service.suggest_instance_name ~unit_name
+                in
+                Some
+                  {
+                    External_service.config;
+                    suggested_instance_name;
+                    is_orphaned = true;
+                  }
         | None ->
-            (* Truly standalone — no recognisable systemd cgroup *)
-            Some (process_to_external_service proc))
+            (* Truly standalone — no recognisable systemd cgroup.
+               Exclude brief invocations like "octez-node --version" spawned by
+               our own schedulers — they are not real long-running services. *)
+            if
+              String.split_on_char ' ' proc.Process_scanner.cmdline
+              |> List.mem "--version"
+            then None
+            else Some (process_to_external_service proc))
       all_procs
   with _e -> []
 
