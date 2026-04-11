@@ -194,9 +194,17 @@ let scan_octez_processes () =
               Hashtbl.find_opt process_cache pid)
         in
         match cached with
-        | Some proc_info ->
-            (* Already in cache, reuse *)
-            Some proc_info
+        | Some proc_info -> (
+            (* Verify PID hasn't been reused: current cmdline must still match.
+               Without this check, a PID reuse (e.g. /tezos/ocamllsp taking
+               the PID of a dead octez-node) causes a stale cache hit and the
+               dead octez-node ghost-appears in Unmanaged Instances. *)
+            match read_cmdline pid with
+            | Some cur when String.equal cur proc_info.cmdline -> Some proc_info
+            | _ ->
+                Mutex.protect cache_lock (fun () ->
+                    Hashtbl.remove process_cache pid) ;
+                None)
         | None -> (
             (* New PID, need to scan *)
             match read_cmdline pid with
@@ -237,7 +245,12 @@ let scan_octez_processes () =
 
 (** Extract the systemd unit name from a process's cgroup, if any.
     Returns e.g. ["octez-node@mainnet.service"] when the process runs
-    under a matching systemd unit, or [None] for standalone processes. *)
+    under a matching systemd unit, or [None] for standalone processes.
+
+    Note: the [.service] segment in the cgroup path uses literal characters —
+    the [@] in template unit names like [octez-node@mainnet.service] appears
+    as-is (not URL-encoded). The [-] in slice names is encoded as [\x2d], but
+    only in the intermediate slice segments, not in the final [.service] part. *)
 let systemd_unit_of_pid pid =
   let path = Printf.sprintf "/proc/%d/cgroup" pid in
   try
