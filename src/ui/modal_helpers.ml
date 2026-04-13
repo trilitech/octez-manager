@@ -1355,7 +1355,10 @@ let open_export_logs_modal ~instance ~svc ~on_complete =
 
     let service_select ps _ = ps
 
-    let service_cycle ps _ = ps
+    let service_cycle ps _ =
+      if Context.consume_download_dirty () then
+        Navigation.update (fun s -> s) ps
+      else ps
 
     let keymap _ = []
 
@@ -1387,10 +1390,12 @@ let open_export_logs_modal ~instance ~svc ~on_complete =
       dim_background = true;
     }
   in
-  Miaou.Core.Modal_manager.push_default
+  Miaou.Core.Modal_manager.push
     (module Modal)
     ~init:(Modal.init ())
     ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
     ~on_close:(fun _ _ -> ())
 
 let select_app_bin_dir_modal ~on_select () =
