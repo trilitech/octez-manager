@@ -219,15 +219,10 @@ let golden_path_script =
       Comment "=== Step 6: Create group and add node ===";
       Comment
         "Resize to single-column (60x80) for predictable navigation. Use Home \
-         to reset selection to 0, then j keys (not Down, which the headless \
-         driver routes to P.move, a no-op on instances) to reach \
-         node-shadownet (selected=2). Path: 0(radio row)->2(skip sep at 1). \
-         Requires 1 j press.";
+         to reset selection to 0, which is node-shadownet \
+         (services_start_idx=0, no radio row or separator in navigation).";
       Resize (60, 80);
       Key "Home";
-    ]
-  @ keys_j 1
-  @ [
       Comment "Open action modal for node-shadownet";
       Key "Enter";
       WaitFor [ModalActive; MaxIterations 50];
@@ -298,7 +293,7 @@ let golden_path_script =
   @ [
       Comment "=== Step 8: Remove node from group ===";
       Comment
-        "selected=5 preserved through Steps 6-7, By_role mode. Open action \
+        "selected=0 preserved through Steps 6-7, By_role mode. Open action \
          modal for node-shadownet (now has group).";
       Key "Enter";
       WaitFor [ModalActive; MaxIterations 50];

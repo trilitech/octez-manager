@@ -937,10 +937,10 @@ let render_create_dropdown cursor =
   let bot = "╚═══════════════════════╝" in
   String.concat "\n" ([top] @ item_lines @ [bot])
 
-(** Render the view-mode radio row at index [menu_item_count] (= 0).
-    The focused radio (bold label) is the one matching [view_mode] when the
-    row is selected.  Widgets are created fresh from state — not stored. *)
-let radio_row ~selected view_mode =
+(** Render the view-mode radio row (visible but not navigable).
+    The radio row is always shown without focus since it's toggled via 'g' key.
+    Widgets are created fresh from state — not stored. *)
+let radio_row view_mode =
   let by_role =
     Radio_button_widget.create
       ~label:"By Role"
@@ -953,18 +953,14 @@ let radio_row ~selected view_mode =
       ~selected:(view_mode = By_group)
       ()
   in
-  let role_focus = selected && view_mode = By_role in
-  let group_focus = selected && view_mode = By_group in
   "View: "
-  ^ Radio_button_widget.render by_role ~focus:role_focus
+  ^ Radio_button_widget.render by_role ~focus:false
   ^ "   "
-  ^ Radio_button_widget.render by_group ~focus:group_focus
+  ^ Radio_button_widget.render by_group ~focus:false
 
 (** Single-column layout (original) *)
 let table_lines_single state =
-  let view_row =
-    radio_row ~selected:(state.selected = menu_item_count) state.view_mode
-  in
+  let view_row = radio_row state.view_mode in
   let instance_rows =
     (* Group display items by role or group based on view_mode *)
     let sections = sections_for_view state in
@@ -1044,13 +1040,9 @@ let table_lines_matrix ~cols ~visible_height ~column_scroll state =
   (* Reduce available height for columns to make room for external services *)
   let columns_visible_height = max 5 (visible_height - reserved_for_external) in
   (* Header row (view-mode radio) spans full width *)
-  let view_row =
-    radio_row ~selected:(state.selected = menu_item_count) state.view_mode
-  in
-  (* When selection is in menu area, use -1 to dim all columns equally *)
-  let effective_active_column =
-    if state.selected < services_start_idx then -1 else state.active_column
-  in
+  let view_row = radio_row state.view_mode in
+  (* Selection is always in services (services_start_idx = 0) *)
+  let effective_active_column = state.active_column in
   let instance_rows =
     merge_columns
       ~col_width
@@ -1087,8 +1079,9 @@ let table_lines ?(cols = 80) ?(visible_height = 20) state =
   (* Always render sections - they will show ghost entries even when empty *)
   if num_columns <= 1 then table_lines_single state
   else
-    (* For matrix layout, subtract for menu rows (install + separator) *)
-    let matrix_height = max 5 (visible_height - services_start_idx) in
+    (* For matrix layout, reserve space for the radio row + separator.
+       With services_start_idx = 0, this is just the visual header (2 lines). *)
+    let matrix_height = max 5 (visible_height - 2) in
     table_lines_matrix
       ~cols
       ~visible_height:matrix_height
