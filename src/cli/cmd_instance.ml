@@ -851,7 +851,7 @@ let instance_term =
                         (Printf.sprintf "Edit failed: %s" msg)))
         | Export_logs ->
             with_service ~instance:inst (fun svc ->
-                match Log_export.export_logs ~instance:inst ~svc with
+                match Log_export.export_logs ~instance:inst ~svc () with
                 | Ok archive_path ->
                     Format.printf "Logs exported to: %s@." archive_path ;
                     `Ok ()

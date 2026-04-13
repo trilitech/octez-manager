@@ -194,6 +194,17 @@ val show_spinner_modal :
   unit ->
   unit
 
+(** Open a progress modal that exports logs for a given instance.
+    Shows step-by-step progress and auto-closes when complete.
+    @param instance Instance name
+    @param svc Service record
+    @param on_complete Called when export completes (receives [Some path] on success, [None] on failure) *)
+val open_export_logs_modal :
+  instance:string ->
+  svc:Octez_manager_lib.Service.t ->
+  on_complete:(string option -> unit) ->
+  unit
+
 (** Wrap a string to the given width, breaking at word boundaries.
     Handles embedded newlines.
 
