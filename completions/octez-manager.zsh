@@ -821,7 +821,7 @@ _octez-manager() {
   opts_group_create=(
     '--app-bin-dir[Path to binaries directory.]:DIR:_directories'
     '--bin-dir-alias[Registered binary directory alias.]:ALIAS:_directories'
-    '--network[Network for services in this group (e.g. mainnet, ghostnet).]:NET:'
+    '--network[Deprecated — groups are no longer tied to a specific network. Accepted for backwards compatibility but has no effect.]:NET:'
     '--octez-version[Managed Octez version (e.g. '\''24.1'\'' or '\''latest'\'').]:VERSION:'
     '--service-user[System user for services (default\: tezos).]:USER:_users'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
