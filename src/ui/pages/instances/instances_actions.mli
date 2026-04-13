@@ -41,12 +41,6 @@ val _view_logs_old : state -> state
 (** Show instance actions modal *)
 val instance_actions_modal : state -> state
 
-(** Open the create/install modal (side-effect only, no state change) *)
-val open_create_menu : unit -> unit
-
-(** Show create/install menu modal *)
-val create_menu_modal : state -> state
-
 (** Navigate to diagnostics page *)
 val go_to_diagnostics : state -> state
 
