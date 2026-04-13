@@ -247,19 +247,6 @@ let assert_screen_snapshot expected =
 (* Flow Drivers *)
 (* ============================================================ *)
 
-(** Drive through the create menu from instances page.
-    Opens create menu with 'c', selects an item, returns result. *)
-let drive_create_menu_selection ~item_index () =
-  (* Open create menu *)
-  ignore (send_key_and_wait "c") ;
-  if not (wait_until_modal_active ()) then
-    Alcotest.fail "Create menu modal did not open" ;
-  (* Navigate to item *)
-  navigate_down item_index ;
-  (* Select item *)
-  let result = send_key_and_wait "Enter" in
-  result
-
 (** Drive through opening an instance action menu.
     Navigates to the instance (by index) and presses Enter. *)
 let drive_instance_action ~instance_index () =

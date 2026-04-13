@@ -52,9 +52,6 @@ type state = {
   column_scroll : int array; (* scroll offset per column *)
   view_mode : view_mode;
   groups : Octez_manager_lib.Group.t list;
-  (* Inline create-instance dropdown *)
-  create_menu_open : bool;
-  create_menu_cursor : int; (* 0-4: Node, Baker, DAL Node, Accuser, Signatory *)
 }
 
 type msg = unit

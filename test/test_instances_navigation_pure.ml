@@ -40,8 +40,6 @@ let make_state ?(selected = 0) ?(num_columns = 1) ?(active_column = 0)
     column_scroll;
     view_mode = Instances_state.By_role;
     groups = [];
-    create_menu_open = false;
-    create_menu_cursor = 0;
   }
 
 let move = Instances.For_tests.move_selection

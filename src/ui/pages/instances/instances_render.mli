@@ -83,7 +83,3 @@ val render_external_services_section : state -> string list
 
 (** Render summary line showing total instances *)
 val summary_line : state -> string
-
-(** Render the inline create-instance dropdown.
-    [cursor] is 0–4 for Node/Baker/DAL Node/Accuser/Signatory. *)
-val render_create_dropdown : int -> string
