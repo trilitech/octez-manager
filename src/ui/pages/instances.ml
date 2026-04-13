@@ -386,7 +386,10 @@ struct
     Context.tick_toasts () ;
     Job_manager.tick () ;
     let cols = size.LTerm_geom.cols in
-    let progress = Context.render_progress ~cols in
+    let progress =
+      if Miaou.Core.Modal_manager.has_active () then ""
+      else Context.render_progress ~cols
+    in
     (* Render active or recent job logs *)
     let job_logs =
       match Job_manager.get_latest_job () with
