@@ -12,6 +12,7 @@ TEST_INSTANCE="test-show"
 register_instance "$TEST_INSTANCE"
 
 RPC_PORT=$(alloc_port)
+NET_PORT=$(alloc_port)
 
 # Install node for this test
 echo "Installing node '$TEST_INSTANCE'..."
@@ -22,6 +23,7 @@ om install-node \
 	--snapshot-no-check \
 	--snapshot-uri "$SANDBOX_URL/snapshot.rolling" \
 	--rpc-addr "127.0.0.1:$RPC_PORT" \
+	--net-addr "0.0.0.0:$NET_PORT" \
 	--service-user tezos \
 	--no-enable 2>&1 || true
 
