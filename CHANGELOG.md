@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 
 - Global key `K` for navigating to Wallets tab has been removed. Users can now access the Wallets tab using the number key corresponding to its tab position.
+- Removed the "New Instance" dropdown that appeared when pressing '1' while already on the Instances tab. Use the inline "Add new" ghost entries instead.
 
 ### Changed
 
