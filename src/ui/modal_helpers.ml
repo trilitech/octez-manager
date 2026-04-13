@@ -1288,7 +1288,15 @@ let open_download_progress_modal ~version ~on_complete =
     ~ui
     ~on_close:(fun _ _ -> ())
 
+(* Type for tracking export log modal result state *)
+type export_result = InProgress | Success of string | Failed of string
+
 let open_export_logs_modal ~instance ~svc ~on_complete =
+  (* Modal-local state: tracks export result for display.
+     Written by the background domain, read by the view function. *)
+  (* Use a plain ref — written once by background, read by main thread.
+     OCaml 5 guarantees single-word ref writes are atomic. *)
+  let result_ref = ref InProgress in
   let module Modal = struct
     type state = unit
 
@@ -1321,37 +1329,52 @@ let open_export_logs_modal ~instance ~svc ~on_complete =
           Context.progress_finish () ;
           match result with
           | Ok path ->
-              (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 1.5 ;
-              Context.toast_success (Printf.sprintf "Logs exported to: %s" path) ;
-              on_complete (Some path) ;
-              Miaou.Core.Modal_manager.close_top `Commit
+              result_ref := Success path ;
+              Context.mark_download_dirty ()
           | Error (`Msg msg) ->
-              Context.toast_error (Printf.sprintf "Export failed: %s" msg) ;
-              on_complete None ;
-              Miaou.Core.Modal_manager.close_top `Cancel) ;
+              result_ref := Failed msg ;
+              Context.mark_download_dirty ()) ;
       Navigation.make ()
 
     let update ps _ = ps
 
     let view _ps ~focus:_ ~size =
+      let cols = max 1 (size.LTerm_geom.cols - 4) in
       let lines = ref [] in
       let add s = lines := s :: !lines in
-      add (Printf.sprintf "Exporting logs for %s..." instance) ;
-      add "" ;
-      let progress_line =
-        Context.render_progress ~cols:(size.LTerm_geom.cols - 4)
-      in
-      if String.trim progress_line <> "" then add progress_line
-      else add "Preparing export..." ;
-      add "" ;
-      add "Modal will close automatically when export completes." ;
-      let content = String.concat "\n" (List.rev !lines) in
-      let lines_list = String.split_on_char '\n' content in
-      Pager.render
-        ~win:(max 1 (size.LTerm_geom.rows - 4))
-        ~cols:(max 1 (size.LTerm_geom.cols - 2))
-        (Pager.open_lines ~title:"" lines_list)
-        ~focus:false
+      (match !result_ref with
+      | InProgress ->
+          add (Printf.sprintf "Exporting logs for %s..." instance) ;
+          add "" ;
+          let progress_line = Context.render_progress ~cols in
+          if String.trim progress_line <> "" then add progress_line
+          else add "Preparing export..." ;
+          add "" ;
+          add
+            (Miaou_widgets_display.Widgets.themed_muted
+               "Please wait, this may take a moment.")
+      | Success path ->
+          add
+            (Miaou_widgets_display.Widgets.themed_success
+               "\xe2\x9c\x93 Export complete") ;
+          add "" ;
+          add (Printf.sprintf "Logs exported to:") ;
+          add (Miaou_widgets_display.Widgets.themed_emphasis path) ;
+          add "" ;
+          add
+            (Miaou_widgets_display.Widgets.themed_muted
+               "Press Enter or Esc to close.")
+      | Failed msg ->
+          add
+            (Miaou_widgets_display.Widgets.themed_error
+               "\xe2\x9c\x97 Export failed") ;
+          add "" ;
+          add msg ;
+          add "" ;
+          add
+            (Miaou_widgets_display.Widgets.themed_muted
+               "Press Enter or Esc to close.")) ;
+      String.concat "\n" (List.rev !lines)
 
     let move ps _ = ps
 
@@ -1370,9 +1393,27 @@ let open_export_logs_modal ~instance ~svc ~on_complete =
 
     let handled_keys _ = []
 
-    let handle_modal_key ps _key ~size:_ = ps
+    let handle_modal_key ps key ~size:_ =
+      match !result_ref with
+      | InProgress -> ps (* Ignore keys while export is running *)
+      | Success path ->
+          if key = "Enter" || key = "Esc" then (
+            Context.toast_success (Printf.sprintf "Logs exported to: %s" path) ;
+            on_complete (Some path) ;
+            Miaou.Core.Modal_manager.set_consume_next_key () ;
+            Miaou.Core.Modal_manager.close_top `Commit ;
+            ps)
+          else ps
+      | Failed msg ->
+          if key = "Enter" || key = "Esc" then (
+            Context.toast_error (Printf.sprintf "Export failed: %s" msg) ;
+            on_complete None ;
+            Miaou.Core.Modal_manager.set_consume_next_key () ;
+            Miaou.Core.Modal_manager.close_top `Cancel ;
+            ps)
+          else ps
 
-    let handle_key ps _key ~size:_ = ps
+    let handle_key = handle_modal_key
 
     let on_key ps key ~size =
       let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
