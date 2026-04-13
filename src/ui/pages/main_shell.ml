@@ -322,26 +322,14 @@ let switch_tab ps id =
       };
   }
 
-(** Open the create-instance dropdown on the instances tab. *)
-let open_instances_create_menu ps =
-  let s = ps.Navigation.s in
-  let instances_ps = Instances.For_tests.open_create_menu s.instances_ps in
-  {ps with Navigation.s = {s with instances_ps}}
-
 let handle_key ps key ~size =
   if Miaou.Core.Modal_manager.has_active () then dispatch_modal_key ps key ~size
   else
     match Global_shortcuts.handle key with
     | Global_shortcuts.Handled -> ps
     | Global_shortcuts.NotGlobal -> (
-        let s = ps.Navigation.s in
-        let current = current_tab_id s in
         match key with
-        | "1" ->
-            if String.equal current tab_instances then
-              (* Pressing current tab number triggers create menu *)
-              open_instances_create_menu ps
-            else switch_tab ps tab_instances
+        | "1" -> switch_tab ps tab_instances
         | "2" -> switch_tab ps tab_wallets
         | "3" -> switch_tab ps tab_binaries
         | "4" -> switch_tab ps tab_rpcs
