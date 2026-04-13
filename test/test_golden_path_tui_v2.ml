@@ -71,6 +71,13 @@ let select_second_item =
     WaitFor [ModalClosed; MaxIterations 10];
   ]
 
+(** Strip ANSI escape codes from a string.
+    Box widget titles are rendered with colour codes around the text, so
+    matching a box border character + title text as a literal substring fails
+    because escape sequences are inserted between them.  Stripping them first
+    gives a clean plain-text representation that can be matched reliably. *)
+let strip_ansi s = Str.global_replace (Str.regexp "\027\\[[0-9;]*m") "" s
+
 (** Navigate to Confirm & Install and press Enter.
     [downs] = number of Down presses from current position to reach Confirm. *)
 let submit_form ~downs = keys_down downs @ [Key "Enter"]
@@ -301,13 +308,29 @@ let golden_path_script =
         "Wait for the group HEADER (not the toast). The toast from Step 6 says \
          'Created group \\'shadownet-prod\\' and added ...' which contains \
          'shadownet-prod' surrounded by single quotes. The group header is \
-         rendered as the title of a rounded Box widget: '─ shadownet-prod'. \
-         Matching on the box-drawing character avoids a false positive from \
-         the toast.";
-      WaitFor [ScreenContains "─ shadownet-prod"; MaxIterations 200];
+         rendered as the title of a rounded Box widget: '─ shadownet-prod'. We \
+         strip ANSI escape codes before matching because the Box widget \
+         injects colour codes between the border character and the title text, \
+         making a literal '─ shadownet-prod' substring match fail.";
+      WaitFor
+        [
+          ScreenMatches
+            (fun s ->
+              let s = strip_ansi s in
+              try
+                ignore
+                  (Str.search_forward
+                     (Str.regexp_string "─ shadownet-prod")
+                     s
+                     0) ;
+                true
+              with Not_found -> false);
+          MaxIterations 200;
+        ];
       Screenshot "13_group_view";
       Assert
         ( (fun s ->
+            let s = strip_ansi s in
             try
               ignore
                 (Str.search_forward (Str.regexp_string "─ shadownet-prod") s 0) ;
