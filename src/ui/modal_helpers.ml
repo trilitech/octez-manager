@@ -1284,6 +1284,115 @@ let open_download_progress_modal ~version ~on_complete =
     ~ui
     ~on_close:(fun _ _ -> ())
 
+let open_export_logs_modal ~instance ~svc ~on_complete =
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      (* Start export in background *)
+      Background_runner.enqueue (fun () ->
+          (* Initialize progress tracking *)
+          Context.progress_start
+            ~label:"Preparing export..."
+            ~estimate_secs:10.0
+            ~width:50 ;
+          (* Track steps for progress ratio *)
+          let step_count = Atomic.make 0 in
+          let total_steps = 5 in
+          let on_step label =
+            let n = Atomic.fetch_and_add step_count 1 in
+            let ratio = float_of_int n /. float_of_int total_steps in
+            Context.progress_set ~label ~progress:ratio () ;
+            Context.mark_download_dirty ()
+          in
+          let result =
+            Octez_manager_lib.Log_export.export_logs ~instance ~svc ~on_step ()
+          in
+          Context.progress_finish () ;
+          match result with
+          | Ok path ->
+              (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 1.5 ;
+              Context.toast_success (Printf.sprintf "Logs exported to: %s" path) ;
+              on_complete (Some path) ;
+              Miaou.Core.Modal_manager.close_top `Commit
+          | Error (`Msg msg) ->
+              Context.toast_error (Printf.sprintf "Export failed: %s" msg) ;
+              on_complete None ;
+              Miaou.Core.Modal_manager.close_top `Cancel) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+      add (Printf.sprintf "Exporting logs for %s..." instance) ;
+      add "" ;
+      let progress_line =
+        Context.render_progress ~cols:(size.LTerm_geom.cols - 4)
+      in
+      if String.trim progress_line <> "" then add progress_line
+      else add "Preparing export..." ;
+      add "" ;
+      add "Modal will close automatically when export completes." ;
+      let content = String.concat "\n" (List.rev !lines) in
+      let lines_list = String.split_on_char '\n' content in
+      Pager.render
+        ~win:(max 1 (size.LTerm_geom.rows - 4))
+        ~cols:(max 1 (size.LTerm_geom.cols - 2))
+        (Pager.open_lines ~title:"" lines_list)
+        ~focus:false
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Exporting logs · %s" instance;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.6; min = 60; max = 80});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
+
 let select_app_bin_dir_modal ~on_select () =
   (* Load managed versions *)
   let managed_versions =

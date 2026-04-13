@@ -255,7 +255,7 @@ let get_system_info () =
   Buffer.contents buf
 
 (** Main export function *)
-let export_logs ~instance ~svc =
+let export_logs ~instance ~svc ?(on_step = fun _ -> ()) () =
   let role = svc.Service.role in
   let days = 7 in
   (* Create temp directory for export *)
@@ -289,6 +289,7 @@ let export_logs ~instance ~svc =
               (Unix.error_message e)))
   in
   (* Collect daily logs *)
+  on_step "Collecting daily logs..." ;
   let daily_logs = collect_daily_logs ~role ~instance ~days in
   let logs_dir = Filename.concat export_dir "daily_logs" in
   if daily_logs <> [] then (
@@ -299,11 +300,13 @@ let export_logs ~instance ~svc =
         ignore (File_ops.copy_file src dst))
       daily_logs) ;
   (* Export journald logs *)
+  on_step "Exporting journald logs..." ;
   let journald_file = Filename.concat export_dir "journald.log" in
   let _ =
     export_journald_logs ~role ~instance ~days ~output_file:journald_file
   in
   (* Write instance details *)
+  on_step "Gathering instance details..." ;
   let details_file = Filename.concat export_dir "instance-details.txt" in
   let details_content =
     get_instance_details ~svc ^ get_version_info ~svc
@@ -319,6 +322,7 @@ let export_logs ~instance ~svc =
       Error (`Msg (Printf.sprintf "Failed to write details: %s" msg))
   in
   (* Copy env file *)
+  on_step "Copying configuration files..." ;
   let env_src =
     Filename.concat
       (Filename.concat (Paths.env_instances_base_dir ()) instance)
@@ -336,6 +340,7 @@ let export_logs ~instance ~svc =
          registry_src
          (Filename.concat export_dir "service.json")) ;
   (* Create tar.gz archive *)
+  on_step "Creating archive..." ;
   let tar_cmd =
     Printf.sprintf
       "tar -czf %s -C %s %s"
@@ -350,4 +355,5 @@ let export_logs ~instance ~svc =
   in
   (* Clean up temp directory *)
   let _ = File_ops.remove_tree export_dir in
+  on_step "Done" ;
   Ok archive_path
