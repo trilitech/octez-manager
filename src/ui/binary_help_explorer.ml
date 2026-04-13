@@ -314,7 +314,6 @@ module Flags_modal = struct
     on_apply : string list -> unit;
     mutable cursor : int;
     mutable scroll_offset : int;
-    mutable last_key : string;
   }
 
   type msg = unit
@@ -332,8 +331,7 @@ module Flags_modal = struct
 
   (** Create an initial pstate. Called from [open_modal], not from [PAGE_SIG.init]. *)
   let make ~rows ~title ~on_apply =
-    Navigation.make
-      {rows; title; on_apply; cursor = 0; scroll_offset = 0; last_key = ""}
+    Navigation.make {rows; title; on_apply; cursor = 0; scroll_offset = 0}
 
   (** Satisfy [PAGE_SIG.init]. Not used in practice — [Modal_manager.push]
       receives the pstate from [make] via its [~init] parameter. *)
@@ -345,7 +343,6 @@ module Flags_modal = struct
         on_apply = ignore;
         cursor = 0;
         scroll_offset = 0;
-        last_key = "";
       }
 
   let update ps _ = ps
@@ -370,16 +367,7 @@ module Flags_modal = struct
     if Array.length s.rows = 0 then None else Some s.rows.(s.cursor)
 
   let edit_value s =
-    s.last_key <- "edit_value called" ;
-    match current_row s with
-    | None -> s.last_key <- "edit_value: no row"
-    | Some row ->
-        s.last_key <-
-          Printf.sprintf
-            "edit_value: %s kind=%s"
-            (option_label row.opt)
-            (match row.opt.kind with Toggle -> "toggle" | Value _ -> "value") ;
-        edit_row_value row
+    match current_row s with None -> () | Some row -> edit_row_value row
 
   let show_hint s =
     match current_row s with
@@ -454,25 +442,12 @@ module Flags_modal = struct
     let body = String.concat "\n" visible in
     Themed_page.render_layout
       ~size
-      ~header:
-        [
-          Widgets.themed_primary
-            (Printf.sprintf
-               "%s [%s] off=%d cur=%d"
-               s.title
-               s.last_key
-               s.scroll_offset
-               s.cursor);
-          summary_line;
-          "";
-        ]
+      ~header:[Widgets.themed_primary s.title; summary_line; ""]
       ~footer:[]
       ~child:(fun _ -> body)
 
   let handle_modal_key ps key ~size:_ =
     let s = ps.Navigation.s in
-    (* Store key for debug display *)
-    s.last_key <- Printf.sprintf "%s(handler)" key ;
     (* Check raw key strings first (as sent by Miaou), then try Keys.of_string *)
     if key = "Enter" || key = "Return" then (
       edit_value s ;
@@ -545,36 +520,23 @@ module Flags_modal = struct
       {Miaou.Core.Tui_page.key; action; help; display_only = false}
     in
     [
-      kb
-        "Up"
-        (fun ps ->
-          s.last_key <- "Up(keymap)" ;
-          move ps (-1))
-        "Up";
-      kb
-        "Down"
-        (fun ps ->
-          s.last_key <- "Down(keymap)" ;
-          move ps 1)
-        "Down";
+      kb "Up" (fun ps -> move ps (-1)) "Up";
+      kb "Down" (fun ps -> move ps 1) "Down";
       kb
         "Enter"
         (fun ps ->
-          s.last_key <- "Enter(keymap)" ;
           edit_value s ;
           ps)
         "Edit/Select";
       kb
         "Return"
         (fun ps ->
-          s.last_key <- "Return(keymap)" ;
           edit_value s ;
           ps)
         "Edit/Select";
       kb
         "Space"
         (fun ps ->
-          s.last_key <- "Space(keymap)" ;
           (match current_row s with
           | None -> ()
           | Some row -> (
@@ -590,7 +552,6 @@ module Flags_modal = struct
       kb
         "Backspace"
         (fun ps ->
-          s.last_key <- "Backspace(keymap)" ;
           (match current_row s with
           | None -> ()
           | Some row ->
@@ -601,7 +562,6 @@ module Flags_modal = struct
       kb
         "s"
         (fun ps ->
-          s.last_key <- "s(keymap)" ;
           apply_and_close s ;
           ps)
         "Apply";
@@ -609,7 +569,6 @@ module Flags_modal = struct
         Miaou.Core.Tui_page.key = "?";
         action =
           (fun ps ->
-            s.last_key <- "?(keymap)" ;
             show_hint s ;
             ps);
         help = "Help";
