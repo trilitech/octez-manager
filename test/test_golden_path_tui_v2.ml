@@ -300,16 +300,17 @@ let golden_path_script =
       Comment
         "Wait for the group HEADER (not the toast). The toast from Step 6 says \
          'Created group \\'shadownet-prod\\' and added ...' which contains \
-         'shadownet-prod'. The group header includes the network: \
-         'shadownet-prod (shadownet ...)'. Matching on '(' avoids a false \
-         positive from the toast that would skip the idle_wait refresh.";
-      WaitFor [ScreenContains "shadownet-prod ("; MaxIterations 200];
+         'shadownet-prod' surrounded by single quotes. The group header is \
+         rendered as the title of a rounded Box widget: '─ shadownet-prod'. \
+         Matching on the box-drawing character avoids a false positive from \
+         the toast.";
+      WaitFor [ScreenContains "─ shadownet-prod"; MaxIterations 200];
       Screenshot "13_group_view";
       Assert
         ( (fun s ->
             try
               ignore
-                (Str.search_forward (Str.regexp_string "shadownet-prod (") s 0) ;
+                (Str.search_forward (Str.regexp_string "─ shadownet-prod") s 0) ;
               true
             with Not_found -> false),
           "Group 'shadownet-prod' header visible in group view" );
