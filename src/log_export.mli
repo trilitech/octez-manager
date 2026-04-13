@@ -15,9 +15,16 @@
     - Related service versions (dependencies and dependents) *)
 
 (** [export_logs ~instance ~svc] exports logs and diagnostic information
-    for the given instance. Returns the path to the created archive on success. *)
+    for the given instance. Returns the path to the created archive on success.
+    
+    @param on_step Optional callback invoked before each major step with a
+    description of the current operation. Useful for progress tracking. *)
 val export_logs :
-  instance:string -> svc:Service.t -> (string, [> `Msg of string]) result
+  instance:string ->
+  svc:Service.t ->
+  ?on_step:(string -> unit) ->
+  unit ->
+  (string, [> `Msg of string]) result
 
 module For_tests : sig
   val get_instance_details : svc:Service.t -> string

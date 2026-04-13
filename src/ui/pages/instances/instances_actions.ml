@@ -469,41 +469,14 @@ let instance_actions_modal state =
               if already_running then
                 Context.toast_warn
                   (Printf.sprintf "Export already in progress for %s" instance)
-              else (
-                Context.toast_info
-                  (Printf.sprintf "Exporting logs for %s..." instance) ;
-                Context.progress_start
-                  ~label:"Exporting logs..."
-                  ~estimate_secs:10.0
-                  ~width:50 ;
-                let result_path = Atomic.make None in
-                Job_manager.submit
-                  ~description:(Printf.sprintf "Export logs %s" instance)
-                  (fun ~append_log:_ () ->
-                    match Log_export.export_logs ~instance ~svc with
-                    | Ok path ->
-                        Atomic.set result_path (Some path) ;
-                        Ok ()
-                    | Error e -> Error e)
-                  ~on_complete:(fun status ->
+              else
+                Modal_helpers.open_export_logs_modal
+                  ~instance
+                  ~svc
+                  ~on_complete:(fun _result ->
                     Mutex.protect export_lock (fun () ->
                         Hashtbl.remove export_in_progress instance) ;
-                    Context.progress_finish () ;
-                    (match status with
-                    | Job_manager.Succeeded -> (
-                        match Atomic.get result_path with
-                        | Some path ->
-                            Context.toast_success
-                              (Printf.sprintf "Logs exported to: %s" path)
-                        | None ->
-                            Context.toast_success
-                              (Printf.sprintf "%s: logs exported" instance))
-                    | Job_manager.Failed msg ->
-                        record_failure ~instance ~error:msg ;
-                        Context.toast_error
-                          (Printf.sprintf "%s: export failed: %s" instance msg)
-                    | Job_manager.Pending | Job_manager.Running -> ()) ;
-                    Context.mark_instances_dirty ()))
+                    Context.mark_instances_dirty ())
           | `Remove -> remove_modal state |> ignore)
         () ;
       state)
