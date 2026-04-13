@@ -62,8 +62,6 @@ let init_state () =
       (* max practical columns based on terminal width; 10 is a safe upper bound *)
       view_mode;
       groups;
-      create_menu_open = false;
-      create_menu_cursor = 0;
     }
 
 let force_refresh state =
@@ -264,11 +262,6 @@ let move_selection s delta =
 
 module For_tests = struct
   let move_selection = move_selection
-
-  let open_create_menu ps =
-    Navigation.update
-      (fun s -> {s with create_menu_open = true; create_menu_cursor = 0})
-      ps
 end
 
 module Page_Impl :
@@ -432,11 +425,6 @@ struct
         let table = table_lines ~cols ~visible_height:avail_rows s in
         let body = String.concat "\n" table in
         let body =
-          if s.create_menu_open then
-            render_create_dropdown s.create_menu_cursor ^ "\n" ^ body
-          else body
-        in
-        let body =
           if String.trim progress = "" then body else progress ^ "\n" ^ body
         in
         let body = if job_logs = "" then body else body ^ job_logs in
@@ -445,16 +433,8 @@ struct
       else
         (* Single column: use global scrolling *)
         let table = table_lines ~cols ~visible_height:avail_rows s in
-        let dropdown_lines =
-          if s.create_menu_open then
-            String.split_on_char
-              '\n'
-              (render_create_dropdown s.create_menu_cursor)
-          else []
-        in
         let all_lines =
-          dropdown_lines
-          @ List.concat_map (fun s -> String.split_on_char '\n' s) table
+          List.concat_map (fun s -> String.split_on_char '\n' s) table
         in
         let total_lines = List.length all_lines in
         (* Calculate line index where current selection starts.
@@ -514,16 +494,10 @@ struct
           in
           (header_lines + svc_line_start, line_count)
         in
-        (* When the create dropdown is open, force scroll to top so the
-           dropdown title ("+ New Instance") is always visible. *)
-        let selection_line_start =
-          selection_line_start + List.length dropdown_lines
-        in
         (* Adjust scroll offset to keep selection visible *)
         let scroll = !scroll_offset_ref in
         let scroll =
-          if s.create_menu_open then 0
-          else if selection_line_start < scroll then selection_line_start
+          if selection_line_start < scroll then selection_line_start
           else if
             selection_line_start + selection_line_count > scroll + avail_rows
           then selection_line_start + selection_line_count - avail_rows
@@ -690,19 +664,6 @@ struct
             selected = target_idx + services_start_idx;
           }
 
-  let create_menu_items =
-    [|"Node"; "Baker"; "DAL Node"; "Accuser"; "Signatory"; "Indexer"|]
-
-  let navigate_create_item cursor =
-    match cursor with
-    | 0 -> Context.navigate Install_node_form_v3.name
-    | 1 -> Context.navigate Install_baker_form_v3.name
-    | 2 -> Context.navigate Install_dal_node_form_v3.name
-    | 3 -> Context.navigate Install_accuser_form_v3.name
-    | 4 -> Context.navigate Install_signatory_form.name
-    | 5 -> Context.navigate Install_index_form_v3.name
-    | _ -> ()
-
   let handle_key ps key ~size =
     let s = ps.Navigation.s in
     (* Update num_columns based on current terminal size *)
@@ -715,32 +676,6 @@ struct
     if Miaou.Core.Modal_manager.has_active () then (
       Miaou.Core.Modal_manager.handle_key key ;
       check_navigation ps)
-    else if s.create_menu_open then
-      (* Create dropdown is open: handle its navigation *)
-      let max_cursor = Array.length create_menu_items - 1 in
-      let ps =
-        match Keys.of_string key with
-        | Some Keys.Up | Some (Keys.Char "k") ->
-            Navigation.update
-              (fun s ->
-                {s with create_menu_cursor = max 0 (s.create_menu_cursor - 1)})
-              ps
-        | Some Keys.Down | Some (Keys.Char "j") ->
-            Navigation.update
-              (fun s ->
-                {
-                  s with
-                  create_menu_cursor = min max_cursor (s.create_menu_cursor + 1);
-                })
-              ps
-        | Some Keys.Enter ->
-            navigate_create_item s.create_menu_cursor ;
-            Navigation.update (fun s -> {s with create_menu_open = false}) ps
-        | Some Keys.Escape ->
-            Navigation.update (fun s -> {s with create_menu_open = false}) ps
-        | _ -> ps
-      in
-      check_navigation ps
     else if is_quit_key key then back ps
     else
       let ps =

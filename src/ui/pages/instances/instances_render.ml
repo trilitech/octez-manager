@@ -921,22 +921,6 @@ let render_external_services_section state =
       in
       header :: service_lines
 
-(** Render the inline create-instance dropdown at the top of the content area.
-    [cursor] is 0-4 for Node/Baker/DAL Node/Accuser/Signatory. *)
-let render_create_dropdown cursor =
-  let items = ["Node"; "Baker"; "DAL Node"; "Accuser"; "Signatory"] in
-  let item_lines =
-    List.mapi
-      (fun i label ->
-        let marker = if Int.equal i cursor then "▶ " else "  " in
-        let line = Printf.sprintf "║ %s%-18s║" marker label in
-        if Int.equal i cursor then Widgets.themed_emphasis line else line)
-      items
-  in
-  let top = "╔══ + New Instance ═════╗" in
-  let bot = "╚═══════════════════════╝" in
-  String.concat "\n" ([top] @ item_lines @ [bot])
-
 (** Render the view-mode radio row (visible but not navigable).
     The radio row is always shown without focus since it's toggled via 'g' key.
     Widgets are created fresh from state — not stored. *)

@@ -241,38 +241,6 @@ let test_fold_unfold () =
       check bool "after space valid" true (String.length after_space > 0))
 
 (* ============================================================ *)
-(* Test: Create Menu Opens *)
-(* ============================================================ *)
-
-let test_create_menu_opens () =
-  TH.with_test_env (fun () ->
-      HD.Stateful.init (module Instances.Page) ;
-
-      (* Press 'c' to open create menu *)
-      ignore (HD.Stateful.send_key "c") ;
-      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
-
-      (* Verify modal is active *)
-      check
-        bool
-        "modal opened after 'c' key"
-        true
-        (Miaou.Core.Modal_manager.has_active ()) ;
-
-      (* Check screen shows service options *)
-      let screen = TH.get_screen_text () in
-      check
-        bool
-        "menu shows Node option"
-        true
-        (TH.contains_substring screen "Node") ;
-      check
-        bool
-        "menu shows Baker option"
-        true
-        (TH.contains_substring screen "Baker"))
-
-(* ============================================================ *)
 (* Test: Select Node from Create Menu *)
 (* ============================================================ *)
 
@@ -432,7 +400,6 @@ let page_tests =
     ("periodic update works", `Quick, test_periodic_update);
     ("column navigation", `Quick, test_column_navigation);
     ("fold/unfold toggles", `Quick, test_fold_unfold);
-    ("create menu opens with 'c' key", `Quick, test_create_menu_opens);
     ("select Node from create menu", `Quick, test_select_node_from_menu);
     ("help modal opens with '?' key", `Quick, test_help_modal_opens);
     ( "cascade-start includes stopped index dependency",

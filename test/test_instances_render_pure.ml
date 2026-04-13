@@ -135,8 +135,6 @@ let empty_state () =
       active_column = 0;
       view_mode = State.By_role;
       groups = [];
-      create_menu_open = false;
-      create_menu_cursor = 0;
     }
 
 let test_summary_empty () =
