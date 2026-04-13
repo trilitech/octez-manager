@@ -481,31 +481,6 @@ let instance_actions_modal state =
         () ;
       state)
 
-let open_create_menu () =
-  let open Modal_helpers in
-  open_choice_modal
-    ~title:"Create"
-    ~items:[`Node; `DalNode; `Baker; `Accuser; `Signatory; `Index]
-    ~to_string:(function
-      | `Node -> "Node"
-      | `DalNode -> "DAL Node"
-      | `Baker -> "Baker"
-      | `Accuser -> "Accuser"
-      | `Signatory -> "Signatory"
-      | `Index -> "Indexer")
-    ~on_select:(function
-      | `Node -> Context.navigate Install_node_form_v3.name
-      | `Baker -> Context.navigate Install_baker_form_v3.name
-      | `Accuser -> Context.navigate Install_accuser_form_v3.name
-      | `DalNode -> Context.navigate Install_dal_node_form_v3.name
-      | `Signatory -> Context.navigate Install_signatory_form.name
-      | `Index -> Context.navigate Install_index_form_v3.name)
-    ()
-
-let create_menu_modal state =
-  open_create_menu () ;
-  state
-
 let go_to_diagnostics state =
   Context.navigate Diagnostics.name ;
   state
