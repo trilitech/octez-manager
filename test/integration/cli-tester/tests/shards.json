@@ -2,7 +2,7 @@
   "metadata": {
     "generated_at": "2026-04-09T00:00:00.000000",
     "generated_by": "Rebase: merge main (101 tests) + install-index test",
-    "total_tests": 102,
+    "total_tests": 101,
     "total_duration": 816.05,
     "shard_count": 5,
     "mean_shard_duration": 162.61,
@@ -79,12 +79,11 @@
       "node/10-purge-with-data.sh",
       "node/06-install-custom-rpc-net.sh",
       "node/09-install-no-snapshot.sh",
-      "group/57-group-add-network-mismatch.sh",
       "import/53-import-cascade-accuser.sh",
       "import/61-import-cascade-all-configs-preserved.sh",
       "index/01-install.sh"
     ],
-    "test_count": 19,
+    "test_count": 18,
     "total_duration": 149.0
   },
   "shard-4": {

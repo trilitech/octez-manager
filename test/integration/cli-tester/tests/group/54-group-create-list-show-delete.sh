@@ -13,7 +13,6 @@ om group delete "$GROUP_NAME" 2>/dev/null || true
 # ── Create ──
 echo "Creating group '$GROUP_NAME'..."
 om group create "$GROUP_NAME" \
-	--network shadownet \
 	--app-bin-dir /usr/local/bin \
 	--service-user tezos
 
@@ -29,14 +28,12 @@ echo "Group found in list"
 echo "Showing group '$GROUP_NAME'..."
 OUTPUT=$(om group show "$GROUP_NAME")
 assert_contains "$OUTPUT" "$GROUP_NAME" "Show should display group name"
-assert_contains "$OUTPUT" "shadownet" "Show should display network"
 echo "Group show displays correct info"
 
 # ── Show JSON ──
 echo "Showing group as JSON..."
 OUTPUT=$(om group show --json "$GROUP_NAME")
 assert_contains "$OUTPUT" "\"name\"" "JSON should have name field"
-assert_contains "$OUTPUT" "shadownet" "JSON should have network"
 echo "Group JSON output correct"
 
 # ── Delete ──
