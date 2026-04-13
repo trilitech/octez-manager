@@ -357,7 +357,9 @@ let golden_path_script =
       (* text prompt appeared *)
       Type "tz1golden";
       Key "Enter";
-      (* submit address - text prompt closes, multiselect also closes *)
+      (* submit address - text prompt closes, multiselect stays open *)
+      Key "Esc";
+      (* close the multiselect modal *)
       WaitFor [ModalClosed; MaxIterations 10];
       Comment
         "Index form: 13 fields. Cursor now on field 5 (Watched Addresses).";
