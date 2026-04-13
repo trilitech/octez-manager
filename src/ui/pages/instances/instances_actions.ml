@@ -452,13 +452,39 @@ let instance_actions_modal state =
           | `Logs ->
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
-          | `Export_logs -> (
-              match Log_export.export_logs ~instance ~svc with
-              | Ok path ->
-                  Context.toast_info
-                    (Printf.sprintf "Logs exported to: %s" path)
-              | Error (`Msg err) ->
-                  Context.toast_error (Printf.sprintf "Export failed: %s" err))
+          | `Export_logs ->
+              Context.toast_info
+                (Printf.sprintf "Exporting logs for %s..." instance) ;
+              Context.progress_start
+                ~label:"Exporting logs..."
+                ~estimate_secs:10.0
+                ~width:50 ;
+              let result_path = Atomic.make None in
+              Job_manager.submit
+                ~description:(Printf.sprintf "Export logs %s" instance)
+                (fun ~append_log:_ () ->
+                  match Log_export.export_logs ~instance ~svc with
+                  | Ok path ->
+                      Atomic.set result_path (Some path) ;
+                      Ok ()
+                  | Error e -> Error e)
+                ~on_complete:(fun status ->
+                  Context.progress_finish () ;
+                  (match status with
+                  | Job_manager.Succeeded -> (
+                      match Atomic.get result_path with
+                      | Some path ->
+                          Context.toast_success
+                            (Printf.sprintf "Logs exported to: %s" path)
+                      | None ->
+                          Context.toast_success
+                            (Printf.sprintf "%s: logs exported" instance))
+                  | Job_manager.Failed msg ->
+                      record_failure ~instance ~error:msg ;
+                      Context.toast_error
+                        (Printf.sprintf "%s: export failed: %s" instance msg)
+                  | Job_manager.Pending | Job_manager.Running -> ()) ;
+                  Context.mark_instances_dirty ())
           | `Remove -> remove_modal state |> ignore)
         () ;
       state)
