@@ -306,12 +306,12 @@ let golden_path_script =
       Key "g";
       Comment
         "Wait for the group HEADER (not the toast). The toast from Step 6 says \
-         'Created group \\'shadownet-prod\\' and added ...' which contains \
-         'shadownet-prod' surrounded by single quotes. The group header is \
-         rendered as the title of a rounded Box widget: '─ shadownet-prod'. We \
-         strip ANSI escape codes before matching because the Box widget \
-         injects colour codes between the border character and the title text, \
-         making a literal '─ shadownet-prod' substring match fail.";
+         'Created group \\'shadownet-prod\\' and added ...' where the name is \
+         surrounded by single quotes, so the space-prefixed form ' \
+         shadownet-prod' only appears as a box title. Box_widget renders the \
+         top border as: corner + hline + ' ' + title + ' ' + ..., so the title \
+         is always preceded by a space regardless of whether hline is the \
+         Unicode '─' (UTF-8 locale) or ASCII '-' (C locale in CI).";
       WaitFor
         [
           ScreenMatches
@@ -319,10 +319,7 @@ let golden_path_script =
               let s = strip_ansi s in
               try
                 ignore
-                  (Str.search_forward
-                     (Str.regexp_string "─ shadownet-prod")
-                     s
-                     0) ;
+                  (Str.search_forward (Str.regexp_string " shadownet-prod") s 0) ;
                 true
               with Not_found -> false);
           MaxIterations 200;
@@ -333,7 +330,7 @@ let golden_path_script =
             let s = strip_ansi s in
             try
               ignore
-                (Str.search_forward (Str.regexp_string "─ shadownet-prod") s 0) ;
+                (Str.search_forward (Str.regexp_string " shadownet-prod") s 0) ;
               true
             with Not_found -> false),
           "Group 'shadownet-prod' header visible in group view" );
