@@ -33,12 +33,9 @@ let get_recent_failure ~instance =
       None
   | None -> None
 
-(** Number of button menu items before services (none after UI revamp) *)
-let menu_item_count = 0
-
-(** Index where services start (after radio row + separator).
-    Layout: 0 radio row, 1 separator, 2+ services. *)
-let services_start_idx = menu_item_count + 2
+(** Index where services start. The radio row is visible but not navigable,
+    so services occupy all navigation indices starting from 0. *)
+let services_start_idx = 0
 
 type state = {
   services : Service_state.t list;
@@ -244,9 +241,8 @@ let clamp_selection_with_items items idx =
   max 0 (min idx (len - 1))
 
 let current_service state =
-  if state.selected < services_start_idx then None
-  else
-    let ordered = display_ordered_items state in
-    match List.nth_opt ordered (state.selected - services_start_idx) with
-    | Some (Real_service st) -> Some st
-    | Some (Ghost_add_new _) | None -> None
+  (* Selection is always >= services_start_idx (= 0) *)
+  let ordered = display_ordered_items state in
+  match List.nth_opt ordered (state.selected - services_start_idx) with
+  | Some (Real_service st) -> Some st
+  | Some (Ghost_add_new _) | None -> None

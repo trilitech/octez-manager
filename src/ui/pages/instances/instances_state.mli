@@ -36,8 +36,9 @@ val clear_failure : instance:string -> unit
 val get_recent_failure : instance:string -> string option
 
 (** Layout constants *)
-val menu_item_count : int
 
+(** Index where services start in the navigation. The radio row is visible
+    but not navigable, so services occupy all navigation indices. *)
 val services_start_idx : int
 
 (** Instances page state *)

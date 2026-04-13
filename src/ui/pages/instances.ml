@@ -168,50 +168,18 @@ include Instances_render
 (* Action handlers extracted to instances/instances_actions.ml *)
 open Instances_actions
 
-(** Single-column navigation: linear up/down with separator skipping.
-    Layout: 0-2 = buttons, 3 = radio row (navigable), 4 = separator (skipped),
-    5+ = services (including ghosts). *)
+(** Single-column navigation: linear up/down through services and ghosts.
+    Layout: services start at index 0, no menu or separator to skip. *)
 let move_selection_single_column s delta =
   let display_items = display_ordered_items s in
   let ext = if s.external_section_folded then [] else s.external_services in
   let raw = s.selected + delta in
-  (* Total navigable items: menu + display_items + external *)
+  (* Total navigable items: display_items + external *)
   let total_items =
     services_start_idx + List.length display_items + List.length ext
   in
   let selected = max 0 (min (total_items - 1) raw) in
-  (* Skip only the separator (index menu_item_count+1 = 1) *)
-  let sep_idx = menu_item_count + 1 in
-  let selected =
-    if selected >= sep_idx && selected < services_start_idx then
-      if delta > 0 then services_start_idx else menu_item_count
-    else selected
-  in
   {s with selected}
-
-(** Multi-column: navigate within the menu area (indices 0..menu_item_count).
-    The radio row at menu_item_count is the last "menu-like" navigable item.
-    Pressing down from the radio row transitions to first service in column 0. *)
-let move_selection_menu s delta =
-  let selected = s.selected + delta in
-  if selected < 0 then
-    (* Stay at top of menu *)
-    {s with selected = 0}
-  else if selected > menu_item_count then
-    (* Transition to first service in column 0 *)
-    let sections = sections_of_state s in
-    let display_items = display_ordered_items s in
-    let first_svc =
-      first_service_in_column
-        ~num_columns:s.num_columns
-        ~sections
-        ~display_items
-        0
-    in
-    {s with selected = first_svc + services_start_idx; active_column = 0}
-  else
-    (* Stay within menu bounds *)
-    {s with selected}
 
 (** Multi-column: navigate within the external services section
     (below all column-distributed managed services). *)
@@ -226,13 +194,13 @@ let move_selection_external s delta =
         services_in_column ~num_columns:s.num_columns ~sections ~display_items 0
       in
       match List.rev col_indices with
-      | [] -> {s with selected = menu_item_count; active_column = 0}
+      | [] -> {s with selected = services_start_idx; active_column = 0}
       | last_idx :: _ ->
           {s with selected = last_idx + services_start_idx; active_column = 0}
     else if List.length display_items > 0 then
       let last_managed = services_start_idx + List.length display_items - 1 in
       {s with selected = last_managed}
-    else {s with selected = menu_item_count}
+    else {s with selected = services_start_idx}
   else
     let ext = if s.external_section_folded then [] else s.external_services in
     let raw = s.selected + delta in
@@ -240,8 +208,7 @@ let move_selection_external s delta =
     {s with selected}
 
 (** Multi-column: navigate within managed services, constrained to the
-    active column.  Pressing up from first service goes to menu; pressing down
-    from last service transitions to external services if available. *)
+    active column. Pressing up from first service stays at first service. *)
 let move_selection_managed s delta =
   let current_idx = s.selected - services_start_idx in
   let sections = sections_of_state s in
@@ -260,10 +227,9 @@ let move_selection_managed s delta =
     |> Option.value ~default:0
   in
   let new_pos = current_pos + delta in
-  if new_pos < 0 then (
-    (* Transition to menu *)
-    s.column_scroll.(s.active_column) <- 0 ;
-    {s with selected = menu_item_count})
+  if new_pos < 0 then
+    (* Stay at top of column *)
+    s
   else if new_pos >= List.length col_indices then
     (* Stay at bottom of column - don't auto-transition to external *)
     s
@@ -286,11 +252,9 @@ let move_selection_managed s delta =
       ~visible_height:!last_visible_height_ref ;
     {s with selected = new_idx + services_start_idx}
 
-(** Move selection up or down by [delta] steps, handling menu items,
-    separator skipping, and multi-column navigation. *)
+(** Move selection up or down by [delta] steps, handling multi-column navigation. *)
 let move_selection s delta =
   if s.num_columns <= 1 then move_selection_single_column s delta
-  else if s.selected < services_start_idx then move_selection_menu s delta
   else
     let current_idx = s.selected - services_start_idx in
     let display_items = display_ordered_items s in
@@ -495,9 +459,9 @@ struct
         let total_lines = List.length all_lines in
         (* Calculate line index where current selection starts.
            s.selected meanings:
-             0 -> radio row (view mode)
-             1 -> separator (skipped in navigation)
-             2+ -> service at index (s.selected - services_start_idx)
+             0+ -> service/ghost at index (s.selected - services_start_idx)
+           
+           The radio row is rendered but not navigable (no focus state).
 
            Table structure from table_lines_single:
              [view_row; ""; ...instance_rows...]
@@ -506,86 +470,60 @@ struct
            We need to find where the selected item starts in all_lines.
         *)
         let selection_line_start, selection_line_count =
-          if s.selected < services_start_idx then
-            (* Menu items: count lines for entries 0..s.selected-1 *)
-            let line_start =
-              let rec count idx acc =
-                if idx >= s.selected then acc
-                else if idx >= List.length table then acc
-                else
-                  let entry = List.nth table idx in
-                  let lines = String.split_on_char '\n' entry in
-                  count (idx + 1) (acc + List.length lines)
-              in
-              count 0 0
-            in
-            let line_count =
-              if s.selected >= List.length table then 1
-              else
-                List.length
-                  (String.split_on_char '\n' (List.nth table s.selected))
-            in
-            (line_start, line_count)
-          else
-            (* Service selection: s.selected = services_start_idx + service_index.
-               Count menu lines, then iterate through services
-               adding header lines when role changes. *)
-            let target_svc_idx = s.selected - services_start_idx in
-            (* Menu lines: install + "" *)
-            let menu_lines =
-              let rec count idx acc =
-                if idx >= services_start_idx then acc
-                else if idx >= List.length table then acc
-                else
-                  let entry = List.nth table idx in
-                  count
-                    (idx + 1)
-                    (acc + List.length (String.split_on_char '\n' entry))
-              in
-              count 0 0
-            in
-            (* Count lines through services until target *)
-            let rec count_service_lines svc_idx prev_role acc services =
-              match services with
-              | [] -> (acc, 1) (* fallback *)
-              | (st : Service_state.t) :: rest ->
-                  let role = st.service.Service.role in
-                  (* Add header lines if role changed *)
-                  let header_lines =
-                    if Some role <> prev_role then
-                      (* Role header + empty line before it (except first) *)
-                      if prev_role = None then 1 else 2
-                    else 0
+          (* Service selection: s.selected = services_start_idx + service_index.
+             Count header lines (view_row + separator), then iterate through services
+             adding header lines when role changes. *)
+          let target_svc_idx = s.selected - services_start_idx in
+          (* Header lines: view_row + "" *)
+          let header_lines = 2 in
+          (* Count lines through services until target *)
+          let rec count_service_lines svc_idx prev_role acc services =
+            match services with
+            | [] -> (acc, 1) (* fallback *)
+            | (st : Service_state.t) :: rest ->
+                let role = st.service.Service.role in
+                (* Add header lines if role changed *)
+                let header_lines =
+                  if Some role <> prev_role then
+                    (* Role header + empty line before it (except first) *)
+                    if prev_role = None then 1 else 2
+                  else 0
+                in
+                let acc = acc + header_lines in
+                if svc_idx = target_svc_idx then
+                  (* Found target service *)
+                  let is_folded =
+                    StringSet.mem st.service.Service.instance s.folded
                   in
-                  let acc = acc + header_lines in
-                  if svc_idx = target_svc_idx then
-                    (* Found target service *)
-                    let is_folded =
-                      StringSet.mem st.service.Service.instance s.folded
-                    in
-                    let line_count = if is_folded then 2 else 6 in
-                    (acc, line_count)
-                  else
-                    (* Count this service's lines and continue *)
-                    let is_folded =
-                      StringSet.mem st.service.Service.instance s.folded
-                    in
-                    let svc_lines = if is_folded then 2 else 6 in
-                    count_service_lines
-                      (svc_idx + 1)
-                      (Some role)
-                      (acc + svc_lines)
-                      rest
-            in
-            let svc_line_start, line_count =
-              count_service_lines 0 None 0 s.services
-            in
-            (menu_lines + svc_line_start, line_count)
+                  let line_count = if is_folded then 2 else 6 in
+                  (acc, line_count)
+                else
+                  (* Count this service's lines and continue *)
+                  let is_folded =
+                    StringSet.mem st.service.Service.instance s.folded
+                  in
+                  let svc_lines = if is_folded then 2 else 6 in
+                  count_service_lines
+                    (svc_idx + 1)
+                    (Some role)
+                    (acc + svc_lines)
+                    rest
+          in
+          let svc_line_start, line_count =
+            count_service_lines 0 None 0 s.services
+          in
+          (header_lines + svc_line_start, line_count)
+        in
+        (* When the create dropdown is open, force scroll to top so the
+           dropdown title ("+ New Instance") is always visible. *)
+        let selection_line_start =
+          selection_line_start + List.length dropdown_lines
         in
         (* Adjust scroll offset to keep selection visible *)
         let scroll = !scroll_offset_ref in
         let scroll =
-          if selection_line_start < scroll then selection_line_start
+          if s.create_menu_open then 0
+          else if selection_line_start < scroll then selection_line_start
           else if
             selection_line_start + selection_line_count > scroll + avail_rows
           then selection_line_start + selection_line_count - avail_rows
@@ -706,9 +644,6 @@ struct
   let move_column s delta =
     let num_cols = s.num_columns in
     if num_cols <= 1 then s
-    else if s.selected < services_start_idx then
-      (* In menu area, left/right should do nothing - menu spans all columns *)
-      s
     else
       (* In services area: move to same position in target column *)
       let current_idx = s.selected - services_start_idx in
@@ -816,34 +751,12 @@ struct
             Navigation.update (fun s -> move_selection s (-1)) ps
         | Some (Keys.Char "j") ->
             Navigation.update (fun s -> move_selection s 1) ps
-        | Some Keys.Left ->
-            Navigation.update
-              (fun s ->
-                if s.selected = menu_item_count then
-                  {s with view_mode = By_role}
-                else move_column s (-1))
-              ps
-        | Some Keys.Right ->
-            Navigation.update
-              (fun s ->
-                if s.selected = menu_item_count then
-                  {s with view_mode = By_group}
-                else move_column s 1)
-              ps
+        | Some Keys.Left -> Navigation.update (fun s -> move_column s (-1)) ps
+        | Some Keys.Right -> Navigation.update (fun s -> move_column s 1) ps
         | Some (Keys.Char "h") ->
-            Navigation.update
-              (fun s ->
-                if s.selected = menu_item_count then
-                  {s with view_mode = By_role}
-                else move_column s (-1))
-              ps
+            Navigation.update (fun s -> move_column s (-1)) ps
         | Some (Keys.Char "l") ->
-            Navigation.update
-              (fun s ->
-                if s.selected = menu_item_count then
-                  {s with view_mode = By_group}
-                else move_column s 1)
-              ps
+            Navigation.update (fun s -> move_column s 1) ps
         | Some Keys.Tab -> Navigation.update toggle_fold ps
         | Some Keys.Enter -> Navigation.update activate_selection ps
         | Some (Keys.Char "g") ->
