@@ -219,10 +219,14 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
       dim_background = true;
     }
   in
-  Miaou.Core.Modal_manager.push_default
+  (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
+     in handle_modal_key. This prevents double-close when used as nested modal. *)
+  Miaou.Core.Modal_manager.push
     (module Modal)
     ~init:(Navigation.make widget)
     ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
     ~on_close:(fun pstate -> function
       | `Commit -> (
           match Select_widget.get_selection pstate.Navigation.s with
