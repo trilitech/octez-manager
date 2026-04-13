@@ -14,6 +14,11 @@ open Instances_helpers
 
 let ( let* ) = Result.bind
 
+(** Track export operations to prevent concurrent exports for the same instance *)
+let export_in_progress : (string, bool) Hashtbl.t = Hashtbl.create 17
+
+let export_lock = Mutex.create ()
+
 let do_remove ~instance ~delete_data_dir () =
   Rpc_scheduler.stop_head_monitor instance ;
   let* (module I) = require_installer () in
@@ -453,38 +458,52 @@ let instance_actions_modal state =
               Context.set_pending_instance_detail instance ;
               Context.navigate Log_viewer_page.name
           | `Export_logs ->
-              Context.toast_info
-                (Printf.sprintf "Exporting logs for %s..." instance) ;
-              Context.progress_start
-                ~label:"Exporting logs..."
-                ~estimate_secs:10.0
-                ~width:50 ;
-              let result_path = Atomic.make None in
-              Job_manager.submit
-                ~description:(Printf.sprintf "Export logs %s" instance)
-                (fun ~append_log:_ () ->
-                  match Log_export.export_logs ~instance ~svc with
-                  | Ok path ->
-                      Atomic.set result_path (Some path) ;
-                      Ok ()
-                  | Error e -> Error e)
-                ~on_complete:(fun status ->
-                  Context.progress_finish () ;
-                  (match status with
-                  | Job_manager.Succeeded -> (
-                      match Atomic.get result_path with
-                      | Some path ->
-                          Context.toast_success
-                            (Printf.sprintf "Logs exported to: %s" path)
-                      | None ->
-                          Context.toast_success
-                            (Printf.sprintf "%s: logs exported" instance))
-                  | Job_manager.Failed msg ->
-                      record_failure ~instance ~error:msg ;
-                      Context.toast_error
-                        (Printf.sprintf "%s: export failed: %s" instance msg)
-                  | Job_manager.Pending | Job_manager.Running -> ()) ;
-                  Context.mark_instances_dirty ())
+              let already_running =
+                Mutex.protect export_lock (fun () ->
+                    match Hashtbl.find_opt export_in_progress instance with
+                    | Some true -> true
+                    | _ ->
+                        Hashtbl.replace export_in_progress instance true ;
+                        false)
+              in
+              if already_running then
+                Context.toast_warn
+                  (Printf.sprintf "Export already in progress for %s" instance)
+              else (
+                Context.toast_info
+                  (Printf.sprintf "Exporting logs for %s..." instance) ;
+                Context.progress_start
+                  ~label:"Exporting logs..."
+                  ~estimate_secs:10.0
+                  ~width:50 ;
+                let result_path = Atomic.make None in
+                Job_manager.submit
+                  ~description:(Printf.sprintf "Export logs %s" instance)
+                  (fun ~append_log:_ () ->
+                    match Log_export.export_logs ~instance ~svc with
+                    | Ok path ->
+                        Atomic.set result_path (Some path) ;
+                        Ok ()
+                    | Error e -> Error e)
+                  ~on_complete:(fun status ->
+                    Mutex.protect export_lock (fun () ->
+                        Hashtbl.remove export_in_progress instance) ;
+                    Context.progress_finish () ;
+                    (match status with
+                    | Job_manager.Succeeded -> (
+                        match Atomic.get result_path with
+                        | Some path ->
+                            Context.toast_success
+                              (Printf.sprintf "Logs exported to: %s" path)
+                        | None ->
+                            Context.toast_success
+                              (Printf.sprintf "%s: logs exported" instance))
+                    | Job_manager.Failed msg ->
+                        record_failure ~instance ~error:msg ;
+                        Context.toast_error
+                          (Printf.sprintf "%s: export failed: %s" instance msg)
+                    | Job_manager.Pending | Job_manager.Running -> ()) ;
+                    Context.mark_instances_dirty ()))
           | `Remove -> remove_modal state |> ignore)
         () ;
       state)

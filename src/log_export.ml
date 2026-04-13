@@ -274,9 +274,11 @@ let export_logs ~instance ~svc =
   let tmp_dir = Filename.get_temp_dir_name () in
   let export_dir = Filename.concat tmp_dir export_name in
   let archive_path = Filename.concat tmp_dir (export_name ^ ".tar.gz") in
-  (* Create export directory *)
+  (* Create export directory - remove stale directory if it exists *)
   let* () =
     try
+      if Sys.file_exists export_dir then
+        ignore (File_ops.remove_tree export_dir) ;
       Unix.mkdir export_dir 0o755 ;
       Ok ()
     with Unix.Unix_error (e, _, _) ->
