@@ -55,8 +55,6 @@ type state = {
   column_scroll : int array;
   view_mode : view_mode;
   groups : Octez_manager_lib.Group.t list;
-  create_menu_open : bool;
-  create_menu_cursor : int;
 }
 
 type msg = unit

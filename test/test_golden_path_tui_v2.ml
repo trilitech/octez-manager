@@ -42,12 +42,10 @@ let keys_down n = List.init n (fun _ -> Key "Down")
     [handle_key] and properly calls [move_selection]. *)
 let keys_j n = List.init n (fun _ -> Key "j")
 
-(** Open the create dropdown ('1' when on instances tab) and select the nth
-    item (0-indexed).
-    Menu order: Node=0, Baker=1, DAL Node=2, Accuser=3, Signatory=4. *)
-let open_create_menu ~menu_index ~target_page =
-  [Key "1"; WaitFor [ScreenContains "New Instance"; MaxIterations 50]]
-  @ keys_j menu_index
+(** Navigate to a ghost "Add new" entry and activate it by navigating down [downs] times from cursor position 0.
+    After install forms navigate back to instances, cursor typically resets to 0. *)
+let navigate_to_ghost ~downs ~target_page =
+  (if downs > 0 then keys_j downs else [])
   @ [Key "Enter"; WaitFor [PageSwitched target_page; MaxIterations 50]]
 
 (** Select the first node in a node-selection modal.
@@ -91,7 +89,8 @@ let wait_for_sync_install =
 let golden_path_script =
   (* ── Step 1: Install Node ─────────────────────────────────── *)
   [Comment "=== Step 1: Install Node ==="; Screenshot "00_initial_state"]
-  @ open_create_menu ~menu_index:0 ~target_page:"install_node_form_v3"
+  (* No services yet, so node ghost is at position 0 *)
+  @ navigate_to_ghost ~downs:0 ~target_page:"install_node_form_v3"
   @ [
       WaitFor [ScreenContains "App Bin Dir"; MaxIterations 10];
       CheckRegression "01_node_form";
@@ -118,7 +117,8 @@ let golden_path_script =
     ]
   (* ── Step 2: Install DAL Node ─────────────────────────────── *)
   @ [Comment "=== Step 2: Install DAL Node ==="]
-  @ open_create_menu ~menu_index:2 ~target_page:"install_dal_node_form_v3"
+  (* After node install: node service(0), node ghost(1), baker ghost(2), accuser ghost(3), DAL ghost(4) *)
+  @ navigate_to_ghost ~downs:4 ~target_page:"install_dal_node_form_v3"
   @ [
       WaitFor [ScreenContains "DAL RPC"; MaxIterations 10];
       Comment "Cursor is on Node field (first). Select our node.";
@@ -131,7 +131,8 @@ let golden_path_script =
   @ [Screenshot "05_dal_installed"; AssertService "dal-shadownet"]
   (* ── Step 3: Install Baker ────────────────────────────────── *)
   @ [Comment "=== Step 3: Install Baker ==="]
-  @ open_create_menu ~menu_index:1 ~target_page:"install_baker_form_v3"
+  (* After node+DAL: node service(0), node ghost(1), baker ghost(2), ... *)
+  @ navigate_to_ghost ~downs:2 ~target_page:"install_baker_form_v3"
   @ [
       WaitFor [ScreenContains "Liquidity Baking"; MaxIterations 10];
       Comment "Cursor on Parent Node (first). Select our node (second item).";
@@ -146,7 +147,8 @@ let golden_path_script =
   @ [Screenshot "07_baker_installed"; AssertService "baker-shadownet"]
   (* ── Step 4: Install Accuser ──────────────────────────────── *)
   @ [Comment "=== Step 4: Install Accuser ==="]
-  @ open_create_menu ~menu_index:3 ~target_page:"install_accuser_form_v3"
+  (* After node+DAL+baker: node(0), node ghost(1), baker(2), baker ghost(3), accuser ghost(4), ... *)
+  @ navigate_to_ghost ~downs:4 ~target_page:"install_accuser_form_v3"
   @ [
       WaitFor [ScreenContains "Base Dir"; MaxIterations 10];
       Comment "Cursor on Node field (first). Select our node.";
@@ -328,7 +330,9 @@ let golden_path_script =
     ]
   (* ── Step 9: Install Index ────────────────────────────────── *)
   @ [Comment "=== Step 9: Install Index ==="]
-  @ open_create_menu ~menu_index:5 ~target_page:"install_index_form_v3"
+  (* After node+DAL+baker+accuser: positions are node(0), node ghost(1), baker(2), baker ghost(3),
+     accuser(4), accuser ghost(5), DAL(6), DAL ghost(7), signatory ghost(8), index ghost(9) *)
+  @ navigate_to_ghost ~downs:9 ~target_page:"install_index_form_v3"
   @ [
       WaitFor [ScreenContains "Install Index"; MaxIterations 10];
       Comment "Cursor on Node field (first). Node selection is required.";
