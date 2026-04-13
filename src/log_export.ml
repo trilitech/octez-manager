@@ -289,7 +289,7 @@ let export_logs ~instance ~svc ?(on_step = fun _ -> ()) () =
               (Unix.error_message e)))
   in
   (* Collect daily logs *)
-  on_step "Collecting daily logs..." ;
+  on_step "Collecting daily logs" ;
   let daily_logs = collect_daily_logs ~role ~instance ~days in
   let logs_dir = Filename.concat export_dir "daily_logs" in
   if daily_logs <> [] then (
@@ -300,13 +300,13 @@ let export_logs ~instance ~svc ?(on_step = fun _ -> ()) () =
         ignore (File_ops.copy_file src dst))
       daily_logs) ;
   (* Export journald logs *)
-  on_step "Exporting journald logs..." ;
+  on_step "Exporting journald logs" ;
   let journald_file = Filename.concat export_dir "journald.log" in
   let _ =
     export_journald_logs ~role ~instance ~days ~output_file:journald_file
   in
   (* Write instance details *)
-  on_step "Gathering instance details..." ;
+  on_step "Gathering details" ;
   let details_file = Filename.concat export_dir "instance-details.txt" in
   let details_content =
     get_instance_details ~svc ^ get_version_info ~svc
@@ -322,7 +322,7 @@ let export_logs ~instance ~svc ?(on_step = fun _ -> ()) () =
       Error (`Msg (Printf.sprintf "Failed to write details: %s" msg))
   in
   (* Copy env file *)
-  on_step "Copying configuration files..." ;
+  on_step "Copying config files" ;
   let env_src =
     Filename.concat
       (Filename.concat (Paths.env_instances_base_dir ()) instance)
