@@ -45,8 +45,11 @@ let name_arg = Arg.(required & pos 0 (some string) None & info [] ~docv:"NAME")
 
 let create_term =
   let network =
-    let doc = "Network for services in this group (e.g. mainnet, ghostnet)." in
-    Arg.(required & opt (some string) None & info ["network"] ~doc ~docv:"NET")
+    let doc =
+      "Deprecated — groups are no longer tied to a specific network. Accepted \
+       for backwards compatibility but has no effect."
+    in
+    Arg.(value & opt string "" & info ["network"] ~doc ~docv:"NET")
   in
   let octez_version =
     let doc = "Managed Octez version (e.g. '24.1' or 'latest')." in
