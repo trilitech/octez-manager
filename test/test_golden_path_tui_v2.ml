@@ -116,7 +116,10 @@ let golden_path_script =
       AssertService "node-shadownet";
     ]
   (* ── Step 2: Install DAL Node ─────────────────────────────── *)
-  @ [Comment "=== Step 2: Install DAL Node ==="]
+  @ [
+      Comment "=== Step 2: Install DAL Node ===";
+      WaitFor [ScreenContains "node-shadownet"; MaxIterations 200];
+    ]
   (* After node install: node service(0), node ghost(1), baker ghost(2), accuser ghost(3), DAL ghost(4) *)
   @ navigate_to_ghost ~downs:4 ~target_page:"install_dal_node_form_v3"
   @ [
@@ -130,7 +133,10 @@ let golden_path_script =
   @ wait_for_sync_install
   @ [Screenshot "05_dal_installed"; AssertService "dal-shadownet"]
   (* ── Step 3: Install Baker ────────────────────────────────── *)
-  @ [Comment "=== Step 3: Install Baker ==="]
+  @ [
+      Comment "=== Step 3: Install Baker ===";
+      WaitFor [ScreenContains "dal-shadownet"; MaxIterations 200];
+    ]
   (* After node+DAL: node service(0), node ghost(1), baker ghost(2), ... *)
   @ navigate_to_ghost ~downs:2 ~target_page:"install_baker_form_v3"
   @ [
@@ -146,7 +152,10 @@ let golden_path_script =
   @ wait_for_sync_install
   @ [Screenshot "07_baker_installed"; AssertService "baker-shadownet"]
   (* ── Step 4: Install Accuser ──────────────────────────────── *)
-  @ [Comment "=== Step 4: Install Accuser ==="]
+  @ [
+      Comment "=== Step 4: Install Accuser ===";
+      WaitFor [ScreenContains "baker-shadownet"; MaxIterations 200];
+    ]
   (* After node+DAL+baker: node(0), node ghost(1), baker(2), baker ghost(3), accuser ghost(4), ... *)
   @ navigate_to_ghost ~downs:4 ~target_page:"install_accuser_form_v3"
   @ [
@@ -329,7 +338,10 @@ let golden_path_script =
           "Group 'shadownet-prod' auto-removed (was only member)" );
     ]
   (* ── Step 9: Install Index ────────────────────────────────── *)
-  @ [Comment "=== Step 9: Install Index ==="]
+  @ [
+      Comment "=== Step 9: Install Index ===";
+      WaitFor [ScreenContains "accuser-shadownet"; MaxIterations 200];
+    ]
   (* After node+DAL+baker+accuser: positions are node(0), node ghost(1), baker(2), baker ghost(3),
      accuser(4), accuser ghost(5), DAL(6), DAL ghost(7), signatory ghost(8), index ghost(9) *)
   @ navigate_to_ghost ~downs:9 ~target_page:"install_index_form_v3"
