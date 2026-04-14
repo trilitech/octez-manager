@@ -21,4 +21,7 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG
 
 module For_tests : sig
   val initial_base_dir : string
+
+  (** Test helper: simulate setting instance name and return resulting base_dir *)
+  val base_dir_after_set_instance_name : instance_name:string -> string
 end

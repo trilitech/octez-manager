@@ -308,18 +308,44 @@ let spec =
             ~original_instance:model.original_instance
             ()
         (* 9. Instance name *)
-        @ core_service_fields
-            ~get_core:(fun m -> m.core)
-            ~set_core:(fun core m -> {m with core})
-            ~binary:"octez-baker"
-            ~subcommand:["run"; "accuser"]
-            ~binary_validator:Form_builder_common.has_octez_baker_binary
-            ~skip_app_bin_dir:true
-            ~skip_extra_args:true
-            ~skip_service_fields:true
-            ~edit_mode:model.edit_mode
-            ~original_instance:model.original_instance
-            ()
+        @ [
+            validated_text
+              ~label:"Instance Name"
+              ~get:(fun m -> m.core.instance_name)
+              ~set:(fun instance_name m ->
+                let old = m.core.instance_name in
+                let new_core = {m.core with instance_name} in
+                (* In edit mode, never change base_dir - data is already there *)
+                if m.edit_mode then {m with core = new_core}
+                else
+                  let default_dir =
+                    Paths.default_role_dir "accuser" instance_name
+                  in
+                  let keep_base_dir =
+                    String.trim m.client.base_dir <> ""
+                    && not
+                         (String.equal
+                            m.client.base_dir
+                            (Paths.default_role_dir "accuser" old))
+                  in
+                  let new_base_dir =
+                    if keep_base_dir then m.client.base_dir else default_dir
+                  in
+                  let new_client = {m.client with base_dir = new_base_dir} in
+                  {m with core = new_core; client = new_client})
+              ~validate:(fun m ->
+                let states =
+                  Form_builder_common.cached_service_states_nonblocking ()
+                in
+                let name = m.core.instance_name in
+                if not (Form_builder_common.is_nonempty name) then
+                  Error "Instance name is required"
+                else if
+                  Form_builder_common.instance_in_use ~states name
+                  && not (m.edit_mode && m.original_instance = Some name)
+                then Error "Instance name already exists"
+                else Ok ());
+          ]
         (* 10. Group *)
         @ [
             group_field
@@ -515,6 +541,21 @@ end)
 
 module For_tests = struct
   let initial_base_dir = (make_initial_model ()).client.base_dir
+
+  (** Simulate setting instance name and return the resulting base_dir.
+      This tests the instance name → base-dir sync logic. *)
+  let base_dir_after_set_instance_name ~instance_name =
+    let model = make_initial_model () in
+    let old = model.core.instance_name in
+    let default_dir = Paths.default_role_dir "accuser" instance_name in
+    let keep_base_dir =
+      String.trim model.client.base_dir <> ""
+      && not
+           (String.equal
+              model.client.base_dir
+              (Paths.default_role_dir "accuser" old))
+    in
+    if keep_base_dir then model.client.base_dir else default_dir
 end
 
 let page : Miaou.Core.Registry.page = (module Page)
