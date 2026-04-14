@@ -68,7 +68,7 @@ let format_network_choice (info : Teztnets.network_info) =
 
 (** {1 Group Field} *)
 
-let group_field ~get_core ~set_core ?(edit_mode = false) () =
+let group_field ~get_core ~set_core ?edit_mode:(_ = false) () =
   let open Form_builder in
   custom
     ~label:"Group"
@@ -76,33 +76,59 @@ let group_field ~get_core ~set_core ?(edit_mode = false) () =
       match (get_core m).group with None -> "None" | Some name -> name)
     ~validate:(fun _m -> true)
     ~edit:(fun model_ref ->
-      if edit_mode then
-        Modal_helpers.show_error
-          ~title:"Group"
-          "Group cannot be changed after creation."
-      else
-        let groups =
-          match Group_registry.list () with Ok gs -> gs | Error _ -> []
-        in
-        let items = [`None] @ (groups |> List.map (fun g -> `Group g)) in
-        let to_string = function
-          | `None -> "None"
-          | `Group (g : Group.t) -> g.name
-        in
-        let on_select = function
-          | `None ->
-              let core = get_core !model_ref in
-              model_ref := set_core {core with group = None} !model_ref
-          | `Group (g : Group.t) ->
-              let core = get_core !model_ref in
-              model_ref := set_core {core with group = Some g.name} !model_ref
-        in
-        Modal_helpers.open_choice_modal
-          ~title:"Select Group"
-          ~items
-          ~to_string
-          ~on_select
-          ())
+      let groups =
+        match Group_registry.list () with Ok gs -> gs | Error _ -> []
+      in
+      let items =
+        [`None] @ [`Create_new] @ (groups |> List.map (fun g -> `Group g))
+      in
+      let to_string = function
+        | `None -> "None"
+        | `Create_new -> "+ Create New Group"
+        | `Group (g : Group.t) -> g.name
+      in
+      let on_select = function
+        | `None ->
+            let core = get_core !model_ref in
+            model_ref := set_core {core with group = None} !model_ref
+        | `Create_new ->
+            Modal_helpers.prompt_validated_text_modal
+              ~title:"New Group Name"
+              ~initial:""
+              ~placeholder:(Some "e.g. mainnet-prod")
+              ~validator:(fun name ->
+                if String.length name = 0 then Error "Name cannot be empty"
+                else
+                  match Group_registry.find ~name with
+                  | Ok (Some _) ->
+                      Error (Printf.sprintf "Group '%s' already exists" name)
+                  | _ -> Ok ())
+              ~on_submit:(fun name ->
+                let core = get_core !model_ref in
+                let grp =
+                  Group.make
+                    ~name
+                    ~service_user:core.service_user
+                    ~app_bin_dir:core.app_bin_dir
+                    ()
+                in
+                match Group_registry.write grp with
+                | Ok () ->
+                    model_ref :=
+                      set_core {core with group = Some name} !model_ref
+                | Error (`Msg e) ->
+                    Modal_helpers.show_error ~title:"Group Error" e)
+              ()
+        | `Group (g : Group.t) ->
+            let core = get_core !model_ref in
+            model_ref := set_core {core with group = Some g.name} !model_ref
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Select Group"
+        ~items
+        ~to_string
+        ~on_select
+        ())
     ()
   |> with_hint
        "Optional instance group. Services in a group share configuration and \
