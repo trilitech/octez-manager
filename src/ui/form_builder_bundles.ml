@@ -384,11 +384,29 @@ let client_fields_with_autoname ~role ~binary:_ ~binary_validator ~get_core
               let current_name =
                 normalize (get_core !model_ref).instance_name
               in
+              let client = get_client !model_ref in
+              (* Also autoname when the user is switching nodes and the current
+                 instance name was itself auto-generated from the old node.
+                 E.g. "dal-tallinnet" → selecting bakingnet → "dal-bakingnet". *)
+              let was_autonamed_from_old_node =
+                match client.node with
+                | `Service old_inst ->
+                    let old_suffix =
+                      if String.starts_with ~prefix:"node-" old_inst then
+                        String.sub old_inst 5 (String.length old_inst - 5)
+                      else old_inst
+                    in
+                    String.equal
+                      current_name
+                      (normalize (Printf.sprintf "%s-%s" role old_suffix))
+                | _ -> false
+              in
               let should_autoname =
-                current_name = "" || String.equal current_name role
+                current_name = ""
+                || String.equal current_name role
+                || was_autonamed_from_old_node
               in
               let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
-              let client = get_client !model_ref in
               model_ref :=
                 set_client
                   {
