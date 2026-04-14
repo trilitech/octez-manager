@@ -56,6 +56,78 @@ dune fmt                        # Format code (MUST pass before commit)
 
 ---
 
+## Interactive Debugging with tmux
+
+Headless TUI tests verify logic but cannot catch rendering glitches or navigation regressions
+visible only in a live terminal. When a visual bug is suspected, run the real binary inside a
+tmux session so the agent can interact with and inspect the UI.
+
+### Prerequisites
+
+- `tmux` installed (`which tmux`)
+- Binary built (`make build` or `dune build`)
+
+### Launch a debug session
+
+```bash
+# 1. Start a detached tmux session with a realistic terminal size
+tmux new-session -d -s om-debug -x 220 -y 50
+
+# 2. Run octez-manager inside it
+tmux send-keys -t om-debug './octez-manager' Enter
+
+# 3. Give the render loop a moment to draw the initial screen
+sleep 1
+
+# 4. Capture the current screen content
+tmux capture-pane -t om-debug -p
+```
+
+### Navigate the UI
+
+```bash
+# Arrow keys
+tmux send-keys -t om-debug Down  ''   # move down one row
+tmux send-keys -t om-debug Up    ''   # move up one row
+tmux send-keys -t om-debug Left  ''   # move left / back
+tmux send-keys -t om-debug Right ''   # move right / forward
+
+# Common actions
+tmux send-keys -t om-debug Enter ''   # confirm / open
+tmux send-keys -t om-debug Tab   ''   # next widget / focus
+tmux send-keys -t om-debug 'q'   ''   # quit (if bound)
+
+# Multi-key sequences (e.g. Ctrl-C to exit)
+tmux send-keys -t om-debug C-c ''
+
+# Capture updated screen after acting
+sleep 0.3
+tmux capture-pane -t om-debug -p
+```
+
+### Assert visible content
+
+```bash
+# Check that a specific string appears on screen
+tmux capture-pane -t om-debug -p | grep -q 'Instances' && echo OK || echo MISSING
+```
+
+### Clean up
+
+```bash
+tmux kill-session -t om-debug
+```
+
+### Tips
+
+- `sleep 0.3` after key presses lets the render loop redraw before you capture.
+- Use a **unique session name per task** (e.g. `om-debug-$$`) to avoid collisions when agents run in parallel.
+- Set `-x`/`-y` to the terminal size you want to test — narrow widths expose layout overflow bugs.
+- `tmux capture-pane -t om-debug -p -e` includes ANSI escape codes if you need to inspect colours.
+- Kill the session in a `trap` or `finally` block so stale sessions don't accumulate.
+
+---
+
 ## OCaml Coding Standards
 
 ### General Rules
