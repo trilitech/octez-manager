@@ -74,6 +74,7 @@ let make_ext_svc name : External_service.t =
         parse_warnings = [];
       };
     suggested_instance_name = name;
+    is_orphaned = false;
   }
 
 let test_move_down () =

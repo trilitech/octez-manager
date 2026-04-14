@@ -54,7 +54,7 @@ let init_state () =
       selected = 0;
       folded = all_folded;
       external_folded = all_external_folded;
-      external_section_folded = true;
+      external_section_folded = false;
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
@@ -72,8 +72,16 @@ let force_refresh state =
   let groups = load_groups () in
   let state_with_services = {state with services; external_services; groups} in
   let display_items = display_ordered_items state_with_services in
-  (* clamp_selection_with_items uses display_items for clamping *)
-  let selected = clamp_selection_with_items display_items state.selected in
+  (* Clamp selection to the full navigable range: menu + managed ghosts + external.
+     [clamp_selection_with_items] only covers managed items (display_items), which
+     ends one index before the first external item.  Using it would reset the cursor
+     every time force_refresh fires (~1 s) while the cursor is in the external
+     section. *)
+  let selected =
+    let n_ext = List.length external_services in
+    let max_sel = services_start_idx + List.length display_items + n_ext - 1 in
+    max 0 (min state.selected max_sel)
+  in
   (* Auto-fold newly discovered external services (not seen in previous state).
      Services already known keep their user-set fold state unchanged. *)
   let prev_names =
@@ -202,7 +210,12 @@ let move_selection_external s delta =
   else
     let ext = if s.external_section_folded then [] else s.external_services in
     let raw = s.selected + delta in
-    let selected = clamp_selection s.services ext raw in
+    (* Clamp strictly within the external section.
+       [clamp_selection] uses |real_services| (no ghosts) and would produce a
+       max index that falls inside the managed ghost area — causing the cursor
+       to jump backwards on every key press within external. *)
+    let last_external = first_external + List.length ext - 1 in
+    let selected = max first_external (min last_external raw) in
     {s with selected}
 
 (** Multi-column: navigate within managed services, constrained to the
@@ -229,8 +242,12 @@ let move_selection_managed s delta =
     (* Stay at top of column *)
     s
   else if new_pos >= List.length col_indices then
-    (* Stay at bottom of column - don't auto-transition to external *)
-    s
+    (* The external section is rendered below all managed columns, so pressing
+       down from the bottom of any column should reach it when it is visible. *)
+    let ext = if s.external_section_folded then [] else s.external_services in
+    if ext <> [] then
+      {s with selected = services_start_idx + List.length display_items}
+    else s
   else
     let new_idx = List.nth col_indices new_pos in
     let line_start, line_count =

@@ -25,7 +25,7 @@ let services_start_idx = Instances_state.services_start_idx
 
 (** Helper to create a state with the given services and column count *)
 let make_state ?(selected = 0) ?(num_columns = 1) ?(active_column = 0)
-    ?(external_services = []) services =
+    ?(external_services = []) ?(external_section_folded = false) services =
   let column_scroll = Array.make (max 1 num_columns) 0 in
   {
     Instances_state.services;
@@ -33,7 +33,7 @@ let make_state ?(selected = 0) ?(num_columns = 1) ?(active_column = 0)
     selected;
     folded = StringSet.empty;
     external_folded = StringSet.empty;
-    external_section_folded = false;
+    external_section_folded;
     last_updated = 0.0;
     num_columns;
     active_column;
@@ -230,6 +230,177 @@ let test_empty_state_wide_terminal_multi_column_navigation () =
     (s''.selected >= services_start_idx)
 
 (* ============================================================ *)
+(* External section navigation tests                            *)
+(* ============================================================ *)
+
+(** Minimal External_service.t for navigation tests *)
+let make_ext_svc name : Octez_manager_lib.External_service.t =
+  let module ES = Octez_manager_lib.External_service in
+  let unknown () : _ ES.field =
+    {value = None; confidence = ES.Unknown; source = "test"}
+  in
+  {
+    config =
+      {
+        unit_name = name;
+        unit_file_path = None;
+        exec_start = "/usr/bin/octez-node run";
+        unit_state =
+          {active_state = "active"; sub_state = "running"; enabled = Some true};
+        user = None;
+        group = None;
+        working_dir = None;
+        environment_files = [];
+        role = unknown ();
+        binary_path = unknown ();
+        binary_version = unknown ();
+        data_dir = unknown ();
+        rpc_addr = unknown ();
+        net_addr = unknown ();
+        network = unknown ();
+        history_mode = unknown ();
+        node_endpoint = unknown ();
+        base_dir = unknown ();
+        delegates = {value = Some []; confidence = ES.Unknown; source = "test"};
+        dal_endpoint = unknown ();
+        daily_logs_dir = None;
+        extra_args = [];
+        parse_warnings = [];
+      };
+    suggested_instance_name = name;
+    is_orphaned = false;
+  }
+
+let test_single_column_j_from_last_managed_reaches_external () =
+  (* Single column: pressing down from the last managed service should
+     transition into the external section when it is visible. *)
+  let svc = running_service ~instance:"node-1" () in
+  let ext = make_ext_svc "foo.service" in
+  let s =
+    make_state
+      ~selected:services_start_idx
+      ~num_columns:1
+      ~external_services:[ext]
+      ~external_section_folded:false
+      [svc]
+  in
+  let s' = move s 1 in
+  check
+    int
+    "single-col: j from last managed -> first external"
+    (services_start_idx + 1)
+    s'.selected
+
+let test_multi_column_col0_j_from_last_managed_reaches_external () =
+  (* Multi-column col 0: pressing down from last managed in col 0 should
+     transition into the external section when it is visible. *)
+  let services = multi_role_services () in
+  let ext = make_ext_svc "foo.service" in
+  (* Build state first so we can get the ghost-inclusive display_items *)
+  let s_init =
+    make_state
+      ~selected:services_start_idx
+      ~num_columns:2
+      ~active_column:0
+      ~external_services:[ext]
+      ~external_section_folded:false
+      services
+  in
+  let display_items = Instances_state.display_ordered_items s_init in
+  let sections = Instances_layout.group_by_role services in
+  let col0_indices =
+    Instances_layout.services_in_column
+      ~num_columns:2
+      ~sections
+      ~display_items
+      0
+  in
+  let last_col0 = List.nth col0_indices (List.length col0_indices - 1) in
+  let s =
+    {s_init with Instances_state.selected = last_col0 + services_start_idx}
+  in
+  let s' = move s 1 in
+  check
+    int
+    "multi-col col0: j from last managed -> first external"
+    (services_start_idx + List.length display_items)
+    s'.selected
+
+let test_multi_column_col1_j_from_last_managed_reaches_external () =
+  (* Multi-column col 1: pressing down from the bottom of col 1 should also
+     reach the external section — it is rendered below ALL columns, so j from
+     any column's bottom should navigate into it when visible. *)
+  let services = multi_role_services () in
+  let ext = make_ext_svc "foo.service" in
+  (* Build state first so we can get the ghost-inclusive display_items *)
+  let s_init =
+    make_state
+      ~selected:services_start_idx
+      ~num_columns:2
+      ~active_column:1
+      ~external_services:[ext]
+      ~external_section_folded:false
+      services
+  in
+  let display_items = Instances_state.display_ordered_items s_init in
+  let sections = Instances_layout.group_by_role services in
+  let col1_indices =
+    Instances_layout.services_in_column
+      ~num_columns:2
+      ~sections
+      ~display_items
+      1
+  in
+  match col1_indices with
+  | [] -> (* Column 1 empty, test vacuously passes *) ()
+  | _ ->
+      let last_col1 = List.nth col1_indices (List.length col1_indices - 1) in
+      let s =
+        {s_init with Instances_state.selected = last_col1 + services_start_idx}
+      in
+      let s' = move s 1 in
+      check
+        int
+        "multi-col col1: j from last managed reaches external"
+        (services_start_idx + List.length display_items)
+        s'.selected
+
+let test_folded_external_no_transition () =
+  (* When external section is folded, pressing down from the last item in
+     col 0 should not transition into the hidden external section. *)
+  let svc = running_service ~instance:"node-1" () in
+  let ext = make_ext_svc "foo.service" in
+  (* Build state first so we can get the ghost-inclusive display_items *)
+  let s_init =
+    make_state
+      ~selected:services_start_idx
+      ~num_columns:2
+      ~active_column:0
+      ~external_services:[ext]
+      ~external_section_folded:true
+      [svc]
+  in
+  let display_items = Instances_state.display_ordered_items s_init in
+  let sections = Instances_layout.group_by_role [svc] in
+  let col0_indices =
+    Instances_layout.services_in_column
+      ~num_columns:2
+      ~sections
+      ~display_items
+      0
+  in
+  let last_col0 = List.nth col0_indices (List.length col0_indices - 1) in
+  let s =
+    {s_init with Instances_state.selected = last_col0 + services_start_idx}
+  in
+  let s' = move s 1 in
+  check
+    int
+    "folded external: stays at last managed"
+    (last_col0 + services_start_idx)
+    s'.selected
+
+(* ============================================================ *)
 (* Test Suite                                                   *)
 (* ============================================================ *)
 
@@ -280,5 +451,20 @@ let () =
           ( "wide terminal multi-column navigation",
             `Quick,
             test_empty_state_wide_terminal_multi_column_navigation );
+        ] );
+      ( "external-section",
+        [
+          ( "single-col: j from last managed reaches external",
+            `Quick,
+            test_single_column_j_from_last_managed_reaches_external );
+          ( "multi-col col0: j from last managed reaches external",
+            `Quick,
+            test_multi_column_col0_j_from_last_managed_reaches_external );
+          ( "multi-col col1: j from last managed reaches external",
+            `Quick,
+            test_multi_column_col1_j_from_last_managed_reaches_external );
+          ( "folded external: no transition from any column",
+            `Quick,
+            test_folded_external_no_transition );
         ] );
     ]
