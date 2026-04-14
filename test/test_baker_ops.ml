@@ -194,7 +194,9 @@ let test_build_update_consensus_key () =
       ~base_dir:None
       ~password_file:None
       ~alias
-      ~op:(Update_consensus_key {key = "edpkNew..."})
+      ~op:
+        (Update_consensus_key
+           {delegate_alias = alias; key_alias = "consensus-key"})
   in
   check
     (list string)
@@ -209,7 +211,7 @@ let test_build_update_consensus_key () =
       "for";
       alias;
       "to";
-      "edpkNew...";
+      "consensus-key";
       "--burn-cap";
       "1";
     ]
