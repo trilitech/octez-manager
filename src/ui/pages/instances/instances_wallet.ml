@@ -603,25 +603,54 @@ let dispatch_action svc pkh _data ~node_endpoint action =
                 ~op:(Baker_ops.Set_delegate_params {limit; edge}))
             ())
         ()
-  | Update_consensus_key ->
-      Modal_helpers.prompt_validated_text_modal
-        ~title:"Update Consensus Key"
-        ~placeholder:(Some "tz1... key alias or pkh")
-        ~validator:(fun s ->
-          let len = String.length s in
-          if
-            len >= 36
-            && (String.sub s 0 3 = "tz1"
-               || String.sub s 0 3 = "tz2"
-               || String.sub s 0 3 = "tz3")
-          then Ok ()
-          else Error "Enter a valid tz1/tz2/tz3 public key hash")
-        ~on_submit:(fun key ->
-          run_wallet_operation
-            ~svc
-            ~pkh
-            ~op:(Baker_ops.Update_consensus_key {key}))
-        ()
+  | Update_consensus_key -> (
+      let keys =
+        match baker_base_dir svc with
+        | None -> []
+        | Some dir -> (
+            match Keys_reader.read_public_key_hashes ~base_dir:dir with
+            | Ok ks -> ks
+            | Error _ -> [])
+      in
+      let run_with_key key =
+        run_wallet_operation
+          ~svc
+          ~pkh
+          ~op:(Baker_ops.Update_consensus_key {key})
+      in
+      let prompt_manually () =
+        Modal_helpers.prompt_validated_text_modal
+          ~title:"Update Consensus Key"
+          ~placeholder:(Some "tz1... pkh")
+          ~validator:(fun s ->
+            let len = String.length s in
+            if
+              len >= 36
+              && (String.sub s 0 3 = "tz1"
+                 || String.sub s 0 3 = "tz2"
+                 || String.sub s 0 3 = "tz3")
+            then Ok ()
+            else Error "Enter a valid tz1/tz2/tz3 public key hash")
+          ~on_submit:run_with_key
+          ()
+      in
+      match keys with
+      | [] -> prompt_manually ()
+      | _ ->
+          let items : Keys_reader.key_info option list =
+            List.map Option.some keys @ [None]
+          in
+          Modal_helpers.open_choice_modal
+            ~title:"Update Consensus Key"
+            ~items
+            ~to_string:(function
+              | None -> "Enter address manually…"
+              | Some {Keys_reader.name; value} ->
+                  Printf.sprintf "%s (%s)" name (truncate_pkh value))
+            ~on_select:(function
+              | None -> prompt_manually ()
+              | Some {Keys_reader.value = key; _} -> run_with_key key)
+            ())
   | Vote -> (
       match Baker_wallet_data.get_voting_info ~node_endpoint with
       | None ->
