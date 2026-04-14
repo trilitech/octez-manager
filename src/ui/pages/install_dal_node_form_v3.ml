@@ -161,7 +161,27 @@ let spec =
           ~binary:"octez-dal-node"
           ~binary_validator:Form_builder_common.has_octez_dal_node_binary
           ~get_core:(fun m -> m.core)
-          ~set_core:(fun core m -> {m with core})
+          ~set_core:(fun core m ->
+            let old_name = m.core.instance_name in
+            let new_name = core.instance_name in
+            let m' = {m with core} in
+            (* When autoname changes instance_name, also update dal_data_dir
+               unless the user already customized it *)
+            if String.equal old_name new_name || m.edit_mode then m'
+            else
+              let keep =
+                String.trim m.dal_data_dir <> ""
+                && not
+                     (String.equal
+                        m.dal_data_dir
+                        (Paths.default_role_dir "dal-node" old_name))
+              in
+              if keep then m'
+              else
+                {
+                  m' with
+                  dal_data_dir = Paths.default_role_dir "dal-node" new_name;
+                })
           ~get_client:(fun m -> m.client)
           ~set_client:(fun client m -> {m with client})
           ~edit_mode:model.edit_mode
@@ -279,19 +299,48 @@ let spec =
             ~edit_mode:model.edit_mode
             ~original_instance:model.original_instance
             ()
-        (* 9. Instance name *)
-        @ core_service_fields
-            ~get_core:(fun m -> m.core)
-            ~set_core:(fun core m -> {m with core})
-            ~binary:"octez-dal-node"
-            ~subcommand:["run"]
-            ~binary_validator:Form_builder_common.has_octez_dal_node_binary
-            ~skip_app_bin_dir:true
-            ~skip_extra_args:true
-            ~skip_service_fields:true
-            ~edit_mode:model.edit_mode
-            ~original_instance:model.original_instance
-            ()
+        (* 9. Instance name — also auto-updates dal_data_dir when changed *)
+        @ [
+            Form_builder.validated_text
+              ~label:"Instance Name"
+              ~get:(fun m -> m.core.instance_name)
+              ~set:(fun instance_name m ->
+                let old = m.core.instance_name in
+                let new_core = {m.core with instance_name} in
+                (* In edit mode, never change dal_data_dir - data is already there *)
+                if m.edit_mode then {m with core = new_core}
+                else
+                  let default_dir =
+                    Paths.default_role_dir "dal-node" instance_name
+                  in
+                  let keep_data_dir =
+                    String.trim m.dal_data_dir <> ""
+                    && not
+                         (String.equal
+                            m.dal_data_dir
+                            (Paths.default_role_dir "dal-node" old))
+                  in
+                  {
+                    m with
+                    core = new_core;
+                    dal_data_dir =
+                      (if keep_data_dir then m.dal_data_dir else default_dir);
+                  })
+              ~validate:(fun m ->
+                let states =
+                  Form_builder_common.cached_service_states_nonblocking ()
+                in
+                let name = m.core.instance_name in
+                if not (Form_builder_common.is_nonempty name) then
+                  Error "Instance name is required"
+                else if
+                  Form_builder_common.instance_in_use ~states name
+                  && not
+                       (m.edit_mode
+                       && m.original_instance = Some m.core.instance_name)
+                then Error "Instance name already exists"
+                else Ok ());
+          ]
         (* 10. Group *)
         @ [
             group_field
