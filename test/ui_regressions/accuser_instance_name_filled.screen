@@ -7,12 +7,12 @@ SIZE:240x24
 ├───────────────────────┼──────────────────────────────────────────────┼───────┤
 │ Node                  │ None ⚠ Node selection is required            │ ✗     │
 │ App Bin Dir           │ /usr/bin ⚠ Binary 'octez-baker' not …        │ ✗     │
-│ Base Dir              │ …sion/.local/share/octez/accuser-accuser     │ ✓     │
+│ Base Dir              │ …on/.local/share/octez/accuser-my-accuser    │ ✓     │
 │ Extra Args            │ (none)                                       │ ✓     │
 │ Service User          │ mathias                                      │ ✓     │
 │ Enable on Boot        │ true                                         │ ✓     │
 │ Start Now             │ true                                         │ ✓     │
-│ Instance Name         │ accuser                                      │ ✓     │
+│ Instance Name         │ my-accuser                                   │ ✓     │
 │ Confirm & Install     │ Incomplete                                   │ ✗     │
 └───────────────────────┴──────────────────────────────────────────────┴───────┘
 
