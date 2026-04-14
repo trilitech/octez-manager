@@ -38,6 +38,11 @@ val set_run_streaming_hook :
   (on_log:(string -> unit) -> string list -> (unit, [`Msg of string]) result) ->
   unit
 
+(** Kill any active streaming subprocess. Safe to call when none is active.
+    Called during application shutdown to terminate the snapshot import process
+    so that [Fun.protect] finalizers can clean up temp files. *)
+val kill_active_streaming : unit -> unit
+
 (** {1 Command execution} *)
 
 (** Append a line to [/tmp/octez_manager_cmds.log] for debugging. *)
