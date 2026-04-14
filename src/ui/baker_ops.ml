@@ -66,7 +66,7 @@ let build_command ~octez_client_bin ~endpoint ~base_dir ~password_file ~alias
           edge_frac;
         ]
     | Update_consensus_key {key} ->
-        ["update"; "consensus"; "key"; "of"; alias; "to"; key]
+        ["set"; "consensus"; "key"; "for"; alias; "to"; key]
     | Submit_proposals {proposals} ->
         ["submit"; "proposals"; "for"; alias] @ proposals
     | Submit_ballot {proposal; ballot} ->

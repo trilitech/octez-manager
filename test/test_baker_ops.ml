@@ -203,10 +203,10 @@ let test_build_update_consensus_key () =
       bin;
       "--endpoint";
       endpoint;
-      "update";
+      "set";
       "consensus";
       "key";
-      "of";
+      "for";
       alias;
       "to";
       "edpkNew...";
