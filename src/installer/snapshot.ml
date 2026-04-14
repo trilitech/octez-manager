@@ -307,6 +307,21 @@ let perform_snapshot_plan ?(quiet = false) ?on_log ?tmp_dir
             ~no_check
             ())
 
+let cleanup_stale_snapshot_files () =
+  let tmp_dir = Filename.get_temp_dir_name () in
+  try
+    let entries = Sys.readdir tmp_dir in
+    Array.iter
+      (fun name ->
+        if
+          String.starts_with ~prefix:"octez-manager.snapshot" name
+          && String.ends_with ~suffix:".snap" name
+        then
+          let path = Filename.concat tmp_dir name in
+          File_ops.remove_path path)
+      entries
+  with _ -> ()
+
 let perform_bootstrap ?(quiet = false) ?on_log ?tmp_dir ~plan
     ~(request : node_request) ~data_dir () =
   perform_snapshot_plan
