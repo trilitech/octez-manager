@@ -584,6 +584,54 @@ let update_consensus_key_cmd =
         (const update_consensus_key_run
         $ instance_arg $ key_arg $ delegate_opt $ json_flag $ yes_flag))
 
+(* ── baker <instance> set-companion-key <key> ───────────── *)
+
+let set_companion_key_run instance key_alias delegate_opt json yes =
+  with_baker_service ~instance (fun svc ->
+      match resolve_baker_context svc ~delegate_opt with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok (endpoint, pkh) -> (
+          let base_dir = resolve_baker_base_dir svc in
+          let delegate_alias =
+            match base_dir with
+            | None -> None
+            | Some dir -> (
+                match Keys_reader.read_public_key_hashes ~base_dir:dir with
+                | Error _ -> None
+                | Ok ks ->
+                    List.find_opt
+                      (fun k -> String.equal k.Keys_reader.value pkh)
+                      ks
+                    |> Option.map (fun k -> k.Keys_reader.name))
+          in
+          match delegate_alias with
+          | None ->
+              Cli_helpers.cmdliner_error
+                (Printf.sprintf
+                   "Delegate '%s' alias not found in base-dir — cannot update \
+                    companion key"
+                   pkh)
+          | Some da ->
+              run_operation
+                ~instance
+                ~svc
+                ~endpoint
+                ~pkh
+                ~op:
+                  (Baker_ops.Update_companion_key
+                     {delegate_alias = da; key_alias})
+                ~json
+                ~yes))
+
+let set_companion_key_cmd =
+  let info = Cmd.info "set-companion-key" ~doc:"Update baker companion key" in
+  Cmd.v
+    info
+    Term.(
+      ret
+        (const set_companion_key_run
+        $ instance_arg $ key_arg $ delegate_opt $ json_flag $ yes_flag))
+
 (* ── baker <instance> vote <value> ───────────────────────── *)
 
 let vote_value_arg =
@@ -696,5 +744,6 @@ let baker_cmd =
       transfer_cmd;
       set_delegate_params_cmd;
       update_consensus_key_cmd;
+      set_companion_key_cmd;
       vote_cmd;
     ]

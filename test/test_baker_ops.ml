@@ -217,6 +217,37 @@ let test_build_update_consensus_key () =
     ]
     cmd
 
+let test_build_update_companion_key () =
+  let cmd =
+    BO.build_command
+      ~octez_client_bin:bin
+      ~endpoint
+      ~base_dir:None
+      ~password_file:None
+      ~alias
+      ~op:
+        (Update_companion_key
+           {delegate_alias = alias; key_alias = "companion-key"})
+  in
+  check
+    (list string)
+    "update companion key"
+    [
+      bin;
+      "--endpoint";
+      endpoint;
+      "set";
+      "companion";
+      "key";
+      "for";
+      alias;
+      "to";
+      "companion-key";
+      "--burn-cap";
+      "1";
+    ]
+    cmd
+
 let test_build_submit_proposals () =
   let cmd =
     BO.build_command
@@ -444,6 +475,10 @@ let () =
             "update_consensus_key"
             `Quick
             test_build_update_consensus_key;
+          test_case
+            "update_companion_key"
+            `Quick
+            test_build_update_companion_key;
           test_case "submit_proposals" `Quick test_build_submit_proposals;
           test_case "submit_ballot yay" `Quick test_build_submit_ballot;
           test_case "submit_ballot nay" `Quick test_build_submit_ballot_nay;

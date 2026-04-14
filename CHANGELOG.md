@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - **Key selector for Update Consensus Key**: The "Update Consensus Key" action in the baker wallet modal now shows a picker listing all keys found in the baker's base directory (alias and truncated public key hash). Selecting "Enter address manually…" falls back to the previous free-text input. The fallback is also used when no keys are found in the base directory.
+- **Update Companion Key in baker wallet**: Added "Update Companion Key" to the baker wallet action list. Works identically to "Update Consensus Key" but issues `octez-client set companion key for <delegate> to <key>`. Both TUI key picker and CLI `baker <instance> set-companion-key <key-alias>` are supported.
 
 ### Fixed
 
