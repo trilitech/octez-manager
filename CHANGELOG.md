@@ -6,8 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Key selector for Update Consensus Key**: The "Update Consensus Key" action in the baker wallet modal now shows a picker listing all keys found in the baker's base directory (alias and truncated public key hash). Selecting "Enter address manually…" falls back to the previous free-text input. The fallback is also used when no keys are found in the base directory.
+
 ### Fixed
 
+- **Update Consensus Key sending wrong octez-client command**: The command used `update consensus key for <delegate> to <key>` instead of the correct `update consensus key of <delegate> to <key>`, causing an "Unrecognized command" error from octez-client.
 - **Extra args help explorer showing debug info**: Removed debug leftovers from the extra-args flag browser modal (used in node, baker, accuser, DAL, and index forms). The modal title bar was displaying the last key pressed, scroll offset, and cursor position.
 - **Baker form delegates reset on base dir change**: When creating a baker, changing the Baker Base Dir or changing the Instance Name in a way that updates the base dir now clears the previously selected delegates. This prevents stale delegate selections from a different base directory being carried over.
 - **DAL node data dir not tracking instance name**: When installing a DAL node, the data directory was always initialised to `dal-node-dal` regardless of the chosen instance name or selected node. The data dir now stays in sync with the instance name in all three cases: manual name edits, initial node selection (autoname), and node switches after autoname.

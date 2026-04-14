@@ -206,7 +206,7 @@ let test_build_update_consensus_key () =
       "update";
       "consensus";
       "key";
-      "for";
+      "of";
       alias;
       "to";
       "edpkNew...";
