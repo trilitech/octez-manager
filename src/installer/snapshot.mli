@@ -92,6 +92,11 @@ val perform_snapshot_plan :
   unit ->
   (unit, Rresult.R.msg) result
 
+(** Remove leftover temporary snapshot files from the system temp directory.
+    Safe to call at startup; cleans up files left by a previous run that was
+    interrupted while importing a snapshot. *)
+val cleanup_stale_snapshot_files : unit -> unit
+
 (** Perform bootstrap according to node request *)
 val perform_bootstrap :
   ?quiet:bool ->
