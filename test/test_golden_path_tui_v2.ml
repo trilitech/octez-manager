@@ -82,6 +82,28 @@ let submit_form ~downs = keys_down downs @ [Key "Enter"]
 let wait_for_sync_install =
   [WaitFor [ScreenContains "octez-manager"; MaxIterations 500]]
 
+(** Wait until the instances page summary shows [n] managed services.
+    The summary line reads "Managed: N | External: M" when externals exist,
+    or "Total instances: N" when they don't.  Both are always visible at the
+    top of the screen regardless of scroll position. *)
+let wait_for_managed_count n =
+  let n_str = string_of_int n in
+  [
+    WaitFor
+      [
+        ScreenMatches
+          (fun s ->
+            let has str =
+              try
+                ignore (Str.search_forward (Str.regexp_string str) s 0) ;
+                true
+              with Not_found -> false
+            in
+            has ("Managed: " ^ n_str) || has ("Total instances: " ^ n_str));
+        MaxIterations 200;
+      ];
+  ]
+
 (* ============================================================ *)
 (* Test Script *)
 (* ============================================================ *)
@@ -116,10 +138,8 @@ let golden_path_script =
       AssertService "node-shadownet";
     ]
   (* ── Step 2: Install DAL Node ─────────────────────────────── *)
-  @ [
-      Comment "=== Step 2: Install DAL Node ===";
-      WaitFor [ScreenContains "node-shadownet"; MaxIterations 200];
-    ]
+  @ [Comment "=== Step 2: Install DAL Node ==="]
+  @ wait_for_managed_count 1
   (* After node install: node service(0), node ghost(1), baker ghost(2), accuser ghost(3), DAL ghost(4) *)
   @ navigate_to_ghost ~downs:4 ~target_page:"install_dal_node_form_v3"
   @ [
@@ -133,10 +153,8 @@ let golden_path_script =
   @ wait_for_sync_install
   @ [Screenshot "05_dal_installed"; AssertService "dal-shadownet"]
   (* ── Step 3: Install Baker ────────────────────────────────── *)
-  @ [
-      Comment "=== Step 3: Install Baker ===";
-      WaitFor [ScreenContains "dal-shadownet"; MaxIterations 200];
-    ]
+  @ [Comment "=== Step 3: Install Baker ==="]
+  @ wait_for_managed_count 2
   (* After node+DAL: node service(0), node ghost(1), baker ghost(2), ... *)
   @ navigate_to_ghost ~downs:2 ~target_page:"install_baker_form_v3"
   @ [
@@ -152,10 +170,8 @@ let golden_path_script =
   @ wait_for_sync_install
   @ [Screenshot "07_baker_installed"; AssertService "baker-shadownet"]
   (* ── Step 4: Install Accuser ──────────────────────────────── *)
-  @ [
-      Comment "=== Step 4: Install Accuser ===";
-      WaitFor [ScreenContains "baker-shadownet"; MaxIterations 200];
-    ]
+  @ [Comment "=== Step 4: Install Accuser ==="]
+  @ wait_for_managed_count 3
   (* After node+DAL+baker: node(0), node ghost(1), baker(2), baker ghost(3), accuser ghost(4), ... *)
   @ navigate_to_ghost ~downs:4 ~target_page:"install_accuser_form_v3"
   @ [
@@ -338,10 +354,8 @@ let golden_path_script =
           "Group 'shadownet-prod' auto-removed (was only member)" );
     ]
   (* ── Step 9: Install Index ────────────────────────────────── *)
-  @ [
-      Comment "=== Step 9: Install Index ===";
-      WaitFor [ScreenContains "accuser-shadownet"; MaxIterations 200];
-    ]
+  @ [Comment "=== Step 9: Install Index ==="]
+  @ wait_for_managed_count 4
   (* After node+DAL+baker+accuser: positions are node(0), node ghost(1), baker(2), baker ghost(3),
      accuser(4), accuser ghost(5), DAL(6), DAL ghost(7), signatory ghost(8), index ghost(9) *)
   @ navigate_to_ghost ~downs:9 ~target_page:"install_index_form_v3"
