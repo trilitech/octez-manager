@@ -34,6 +34,12 @@ let refresh () =
   else (
     last_poll := now ;
     match External_service_detector.detect () with
+    | Ok [] ->
+        (* Empty result may be transient (daemon-reload, brief systemd state
+           flush).  Preserve the previous cache so the section does not
+           flicker away.  The next poll will update if services genuinely
+           disappeared. *)
+        ()
     | Ok services -> Mutex.protect cache_lock (fun () -> cache := services)
     | Error _ ->
         (* Keep previous cache on error *)

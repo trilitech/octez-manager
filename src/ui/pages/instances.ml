@@ -54,7 +54,7 @@ let init_state () =
       selected = 0;
       folded = all_folded;
       external_folded = all_external_folded;
-      external_section_folded = true;
+      external_section_folded = false;
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
