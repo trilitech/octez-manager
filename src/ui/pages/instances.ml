@@ -54,7 +54,7 @@ let init_state () =
       selected = 0;
       folded = all_folded;
       external_folded = all_external_folded;
-      external_section_folded = true;
+      external_section_folded = false;
       last_updated = Unix.gettimeofday ();
       num_columns;
       active_column = 0;
@@ -81,9 +81,7 @@ let force_refresh state =
      section. *)
   let selected =
     let n_ext = List.length external_services in
-    let max_sel =
-      services_start_idx + List.length display_items + n_ext - 1
-    in
+    let max_sel = services_start_idx + List.length display_items + n_ext - 1 in
     max 0 (min state.selected max_sel)
   in
   (* Auto-fold newly discovered external services (not seen in previous state).

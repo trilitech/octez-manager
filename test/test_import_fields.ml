@@ -191,6 +191,7 @@ let make_external_svc ?(rpc_addr = None) ?(net_addr = None) () :
     config =
       {config with rpc_addr = mk_field rpc_addr; net_addr = mk_field net_addr};
     suggested_instance_name = "test";
+    is_orphaned = false;
   }
 
 let test_rpc_addr_override () =

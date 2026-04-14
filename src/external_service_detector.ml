@@ -135,31 +135,49 @@ let list_all_service_units () =
   (* Create a set of unit files for fast lookup *)
   let file_set = List.fold_left (fun acc unit -> unit :: acc) [] files in
 
-  (* Helper to check if a unit has its own file (not just using a template) *)
+  (* Helper to check if a unit has its own file or dropin directory
+     (as opposed to only existing in systemd memory via a template). *)
   let has_own_unit_file unit_name =
     (* First check if it's in our file list *)
     if List.mem unit_name file_set then true
     else
-      (* For services not matching octez-* pattern, check FragmentPath
-         to see if they have their own file vs using a template *)
-      match
-        Cmd_runner.run_out
-          (Systemd.systemctl_cmd () @ ["show"; unit_name; "-p"; "FragmentPath"])
-      with
-      | Ok output ->
-          let path = String.trim output in
-          (* FragmentPath format: "FragmentPath=/path/to/service.service" *)
-          if String.starts_with ~prefix:"FragmentPath=" path then
-            let file_path =
-              String.sub path 13 (String.length path - 13)
-              (* skip "FragmentPath=" *)
-            in
-            (* Check if the path matches the unit name (not a template)
-               Template: /path/octez-node@.service
-               Instance: /path/octez-node@instance.service or /path/test.service *)
-            String.ends_with ~suffix:unit_name file_path
-          else false
-      | Error _ -> false
+      (* Check for a dropin override directory.
+         Template-instance units (octez-<role>@<inst>.service) never appear in
+         list-unit-files output: their FragmentPath always points to the
+         template file (octez-node@.service), not the instance. However,
+         octez-manager always creates a dropin directory for every configured
+         instance. Checking the dropin dir is deterministic and works across
+         all systemd versions and daemon states. *)
+      let dropin_dir =
+        if Paths.is_root () then
+          Filename.concat "/etc/systemd/system" (unit_name ^ ".d")
+        else
+          Filename.concat
+            (Filename.concat (Paths.xdg_config_home ()) "systemd/user")
+            (unit_name ^ ".d")
+      in
+      if Sys.file_exists dropin_dir then true
+      else
+        (* FragmentPath fallback for non-template units that don't use dropins *)
+        match
+          Cmd_runner.run_out
+            (Systemd.systemctl_cmd ()
+            @ ["show"; unit_name; "-p"; "FragmentPath"])
+        with
+        | Ok output ->
+            let path = String.trim output in
+            (* FragmentPath format: "FragmentPath=/path/to/service.service" *)
+            if String.starts_with ~prefix:"FragmentPath=" path then
+              let file_path =
+                String.sub path 13 (String.length path - 13)
+                (* skip "FragmentPath=" *)
+              in
+              (* Check if the path matches the unit name (not a template)
+                 Template: /path/octez-node@.service
+                 Instance: /path/octez-node@instance.service or /path/test.service *)
+              String.ends_with ~suffix:unit_name file_path
+            else false
+        | Error _ -> false
   in
 
   (* Filter loaded units to only include those with their own unit files
@@ -690,7 +708,15 @@ let build_external_service ~unit_name ~exec_start ~properties =
     External_service.suggest_instance_name ~unit_name
   in
 
-  {External_service.config; suggested_instance_name}
+  let is_orphaned =
+    let base =
+      if Paths.is_root () then "/etc/systemd/system"
+      else Filename.concat (Paths.xdg_config_home ()) "systemd/user"
+    in
+    Sys.file_exists (Filename.concat base (unit_name ^ ".d"))
+  in
+
+  {External_service.config; suggested_instance_name; is_orphaned}
 
 let infer_network_from_endpoint services =
   (* Build a map of RPC addr -> network for nodes *)
@@ -886,13 +912,61 @@ let process_to_external_service (proc : Process_scanner.process_info) =
     External_service.suggest_instance_name ~unit_name:config.unit_name
   in
 
-  External_service.{config; suggested_instance_name}
+  External_service.{config; suggested_instance_name; is_orphaned = false}
 
 (** Detect Octez processes running outside systemd *)
 let detect_standalone_processes () =
   try
-    let standalone_procs = Process_scanner.get_standalone_processes () in
-    List.map process_to_external_service standalone_procs
+    (* Use all octez processes (raw), not pre-filtered, so we can inspect
+       cgroup info and classify orphaned vs truly standalone. *)
+    let all_procs = Process_scanner.scan_octez_processes () in
+    List.filter_map
+      (fun proc ->
+        match Process_scanner.systemd_unit_of_pid proc.Process_scanner.pid with
+        | Some unit_name ->
+            (* Only include if this looks like a former octez-manager service
+               that is now orphaned: has a dropin dir but no registry entry.
+               All other systemd-cgroup processes are either managed (skip) or
+               already covered by the systemd unit detection path (also skip). *)
+            if not (is_managed_unit_name unit_name) then None
+              (* Not an octez-manager pattern — skip *)
+            else if is_in_registry ~unit_name then None
+              (* Fully managed — skip; already visible as a managed service *)
+            else
+              let dropin_dir =
+                let base =
+                  if Paths.is_root () then "/etc/systemd/system"
+                  else Filename.concat (Paths.xdg_config_home ()) "systemd/user"
+                in
+                Filename.concat base (unit_name ^ ".d")
+              in
+              if not (Sys.file_exists dropin_dir) then None
+                (* No dropin dir — a plain systemd unit not from octez-manager;
+                   already handled by the systemd unit detection path, skip. *)
+              else
+                (* Genuine orphan: dropin dir exists, not in registry *)
+                let svc = process_to_external_service proc in
+                (* Replace process-<PID> unit name with the real systemd unit name *)
+                let config = {svc.External_service.config with unit_name} in
+                let suggested_instance_name =
+                  External_service.suggest_instance_name ~unit_name
+                in
+                Some
+                  {
+                    External_service.config;
+                    suggested_instance_name;
+                    is_orphaned = true;
+                  }
+        | None ->
+            (* Truly standalone — no recognisable systemd cgroup.
+               Exclude brief invocations like "octez-node --version" spawned by
+               our own schedulers — they are not real long-running services. *)
+            if
+              String.split_on_char ' ' proc.Process_scanner.cmdline
+              |> List.mem "--version"
+            then None
+            else Some (process_to_external_service proc))
+      all_procs
   with _e -> []
 
 let detect () =

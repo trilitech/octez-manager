@@ -194,9 +194,17 @@ let scan_octez_processes () =
               Hashtbl.find_opt process_cache pid)
         in
         match cached with
-        | Some proc_info ->
-            (* Already in cache, reuse *)
-            Some proc_info
+        | Some proc_info -> (
+            (* Verify PID hasn't been reused: current cmdline must still match.
+               Without this check, a PID reuse (e.g. /tezos/ocamllsp taking
+               the PID of a dead octez-node) causes a stale cache hit and the
+               dead octez-node ghost-appears in Unmanaged Instances. *)
+            match read_cmdline pid with
+            | Some cur when String.equal cur proc_info.cmdline -> Some proc_info
+            | _ ->
+                Mutex.protect cache_lock (fun () ->
+                    Hashtbl.remove process_cache pid) ;
+                None)
         | None -> (
             (* New PID, need to scan *)
             match read_cmdline pid with
@@ -234,6 +242,38 @@ let scan_octez_processes () =
           if Hashtbl.mem candidate_set pid then Some info else None)
         process_cache) ;
   result
+
+(** Extract the systemd unit name from a process's cgroup, if any.
+    Returns e.g. ["octez-node@mainnet.service"] when the process runs
+    under a matching systemd unit, or [None] for standalone processes.
+
+    Note: the [.service] segment in the cgroup path uses literal characters —
+    the [@] in template unit names like [octez-node@mainnet.service] appears
+    as-is (not URL-encoded). The [-] in slice names is encoded as [\x2d], but
+    only in the intermediate slice segments, not in the final [.service] part. *)
+let systemd_unit_of_pid pid =
+  let path = Printf.sprintf "/proc/%d/cgroup" pid in
+  try
+    let ic = open_in path in
+    Fun.protect
+      ~finally:(fun () -> close_in_noerr ic)
+      (fun () ->
+        let result = ref None in
+        (try
+           while !result = None do
+             let line = input_line ic in
+             let unit_opt =
+               String.split_on_char '/' line
+               |> List.find_opt (fun part ->
+                   (contains_substring part "octez-"
+                   || contains_substring part "signatory@")
+                   && String.ends_with ~suffix:".service" part)
+             in
+             match unit_opt with Some u -> result := Some u | None -> ()
+           done
+         with End_of_file -> ()) ;
+        !result)
+  with _ -> None
 
 (** Check if PID is managed by a systemd service unit (not just in user.slice) *)
 let is_systemd_managed pid =
