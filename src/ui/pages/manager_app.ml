@@ -85,6 +85,7 @@ let register_and_init ?(log = false) ?logfile () =
   Runtime.initialize ~log ?logfile () ;
   register_global_keys () ;
   Binary_downloader.cleanup_stale_temp_dirs () ;
+  Snapshot.cleanup_stale_snapshot_files () ;
   Background_runner.enqueue (fun () ->
       match Version_checker.check_for_updates () with
       | Version_checker.UpdateAvailable
@@ -126,7 +127,8 @@ let shutdown () =
   Versions_scheduler.shutdown () ;
   Self_update_scheduler.stop () ;
   Domain_pool.shutdown () ;
-  Download.kill_active_download ()
+  Download.kill_active_download () ;
+  Cmd_runner.kill_active_streaming ()
 
 let run ?page ?(log = false) ?logfile ?theme ?local_indexer
     ?(indexer_network = "mainnet") ?(compare_indexers = false) () =
