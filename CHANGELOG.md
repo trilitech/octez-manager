@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Snapshot temp files leaked on exit**: Temporary snapshot files (`.snap`) left in the system temp directory when the user exits during a snapshot import are now cleaned up. On shutdown, the active import subprocess is killed so that `Fun.protect` finalizers can remove the file; on startup, any leftover files from a previous aborted run are deleted.
+
 - **Extra args help explorer showing debug info**: Removed debug leftovers from the extra-args flag browser modal (used in node, baker, accuser, DAL, and index forms). The modal title bar was displaying the last key pressed, scroll offset, and cursor position.
 - **Baker form delegates reset on base dir change**: When creating a baker, changing the Baker Base Dir or changing the Instance Name in a way that updates the base dir now clears the previously selected delegates. This prevents stale delegate selections from a different base directory being carried over.
 - **DAL node data dir not tracking instance name**: When installing a DAL node, the data directory was always initialised to `dal-node-dal` regardless of the chosen instance name or selected node. The data dir now stays in sync with the instance name in all three cases: manual name edits, initial node selection (autoname), and node switches after autoname.
