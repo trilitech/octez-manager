@@ -736,6 +736,38 @@ let install_node_form_v3_snapshot_filtering () =
        archive_slug_entry
        ~history_mode:"rolling")
 
+(** Regression test for accuser instance name → base-dir sync bug.
+    When the user changes the instance name, the base-dir should update
+    to match the new name (unless the user manually customized base-dir). *)
+let install_accuser_form_v3_instance_name_sync () =
+  let module F = Octez_manager_ui.Install_accuser_form_v3.For_tests in
+  (* Test 1: Default instance name "accuser" → base-dir "accuser-accuser" *)
+  let initial_model_base_dir = F.initial_base_dir in
+  Alcotest.(check bool)
+    "initial base_dir contains default instance name"
+    true
+    (String.ends_with ~suffix:"accuser-accuser" initial_model_base_dir) ;
+  (* Test 2: Change instance name to "my-accuser" → base-dir syncs *)
+  let new_base_dir =
+    F.base_dir_after_set_instance_name ~instance_name:"my-accuser"
+  in
+  Alcotest.(check bool)
+    "base_dir syncs with new instance name"
+    true
+    (String.ends_with ~suffix:"accuser-my-accuser" new_base_dir) ;
+  Alcotest.(check bool)
+    "base_dir does not contain old default name"
+    false
+    (String.ends_with ~suffix:"accuser-accuser" new_base_dir) ;
+  (* Test 3: Change instance name that already has prefix *)
+  let prefixed_base_dir =
+    F.base_dir_after_set_instance_name ~instance_name:"accuser-testnet"
+  in
+  Alcotest.(check bool)
+    "base_dir does not double-prefix"
+    true
+    (String.ends_with ~suffix:"accuser-testnet" prefixed_base_dir)
+
 let runtime_probe_writable_directory () =
   let dir = Filename.temp_file "octez_manager_probe" "" in
   Sys.remove dir ;
@@ -6383,6 +6415,10 @@ let () =
                    Octez_manager_ui.Install_accuser_form_v3.For_tests
                    .initial_base_dir
                 <> ""));
+          Alcotest.test_case
+            "accuser instance name syncs base-dir"
+            `Quick
+            install_accuser_form_v3_instance_name_sync;
           Alcotest.test_case
             "binary help parses"
             `Quick
