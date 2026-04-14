@@ -612,25 +612,29 @@ let dispatch_action svc pkh _data ~node_endpoint action =
             | Ok ks -> ks
             | Error _ -> [])
       in
-      let run_with_key key =
-        run_wallet_operation
-          ~svc
-          ~pkh
-          ~op:(Baker_ops.Update_consensus_key {key})
+      let delegate_alias =
+        List.find_opt (fun k -> String.equal k.Keys_reader.value pkh) keys
+        |> Option.map (fun k -> k.Keys_reader.name)
+      in
+      let run_with_key key_alias =
+        match delegate_alias with
+        | None ->
+            Context.toast_error
+              "Delegate alias not found in base-dir — cannot update consensus \
+               key"
+        | Some da ->
+            run_wallet_operation
+              ~svc
+              ~pkh
+              ~op:
+                (Baker_ops.Update_consensus_key {delegate_alias = da; key_alias})
       in
       let prompt_manually () =
         Modal_helpers.prompt_validated_text_modal
           ~title:"Update Consensus Key"
-          ~placeholder:(Some "tz1... pkh")
+          ~placeholder:(Some "key alias")
           ~validator:(fun s ->
-            let len = String.length s in
-            if
-              len >= 36
-              && (String.sub s 0 3 = "tz1"
-                 || String.sub s 0 3 = "tz2"
-                 || String.sub s 0 3 = "tz3")
-            then Ok ()
-            else Error "Enter a valid tz1/tz2/tz3 public key hash")
+            if String.length s > 0 then Ok () else Error "Enter a key alias")
           ~on_submit:run_with_key
           ()
       in
@@ -649,7 +653,7 @@ let dispatch_action svc pkh _data ~node_endpoint action =
                   Printf.sprintf "%s (%s)" name (truncate_pkh value))
             ~on_select:(function
               | None -> prompt_manually ()
-              | Some {Keys_reader.value = key; _} -> run_with_key key)
+              | Some {Keys_reader.name = key_alias; _} -> run_with_key key_alias)
             ())
   | Vote -> (
       match Baker_wallet_data.get_voting_info ~node_endpoint with
