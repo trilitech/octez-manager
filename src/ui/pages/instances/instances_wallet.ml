@@ -29,6 +29,7 @@ type wallet_action =
   | Transfer
   | Set_delegate_params
   | Update_consensus_key
+  | Update_companion_key
   | Register
   | Vote
 
@@ -121,7 +122,11 @@ let build_operations_list (data : Baker_wallet_data.t) ~node_endpoint:_ =
       | [] -> items
       | _ -> items @ [Finalize_unstake]
     in
-    items @ [Transfer; Set_delegate_params; Update_consensus_key] @ [Vote]
+    items
+    @ [
+        Transfer; Set_delegate_params; Update_consensus_key; Update_companion_key;
+      ]
+    @ [Vote]
 
 let action_to_string (data : Baker_wallet_data.t) ~node_endpoint action =
   match action with
@@ -144,6 +149,7 @@ let action_to_string (data : Baker_wallet_data.t) ~node_endpoint action =
   | Transfer -> "Transfer"
   | Set_delegate_params -> "Set Delegate Parameters"
   | Update_consensus_key -> "Update Consensus Key"
+  | Update_companion_key -> "Update Companion Key"
   | Vote -> (
       match Baker_wallet_data.get_voting_info ~node_endpoint with
       | Some info ->
@@ -646,6 +652,58 @@ let dispatch_action svc pkh _data ~node_endpoint action =
           in
           Modal_helpers.open_choice_modal
             ~title:"Update Consensus Key"
+            ~items
+            ~to_string:(function
+              | None -> "Enter address manually…"
+              | Some {Keys_reader.name; value} ->
+                  Printf.sprintf "%s (%s)" name (truncate_pkh value))
+            ~on_select:(function
+              | None -> prompt_manually ()
+              | Some {Keys_reader.name = key_alias; _} -> run_with_key key_alias)
+            ())
+  | Update_companion_key -> (
+      let keys =
+        match baker_base_dir svc with
+        | None -> []
+        | Some dir -> (
+            match Keys_reader.read_public_key_hashes ~base_dir:dir with
+            | Ok ks -> ks
+            | Error _ -> [])
+      in
+      let delegate_alias =
+        List.find_opt (fun k -> String.equal k.Keys_reader.value pkh) keys
+        |> Option.map (fun k -> k.Keys_reader.name)
+      in
+      let run_with_key key_alias =
+        match delegate_alias with
+        | None ->
+            Context.toast_error
+              "Delegate alias not found in base-dir — cannot update companion \
+               key"
+        | Some da ->
+            run_wallet_operation
+              ~svc
+              ~pkh
+              ~op:
+                (Baker_ops.Update_companion_key {delegate_alias = da; key_alias})
+      in
+      let prompt_manually () =
+        Modal_helpers.prompt_validated_text_modal
+          ~title:"Update Companion Key"
+          ~placeholder:(Some "key alias")
+          ~validator:(fun s ->
+            if String.length s > 0 then Ok () else Error "Enter a key alias")
+          ~on_submit:run_with_key
+          ()
+      in
+      match keys with
+      | [] -> prompt_manually ()
+      | _ ->
+          let items : Keys_reader.key_info option list =
+            List.map Option.some keys @ [None]
+          in
+          Modal_helpers.open_choice_modal
+            ~title:"Update Companion Key"
             ~items
             ~to_string:(function
               | None -> "Enter address manually…"
