@@ -1618,8 +1618,9 @@ let extract_client_error raw_err =
     Shows a real-time checklist (submitting → included → confirmed → finalized).
     Adds [--burn-cap 1] automatically.
     @param network Network name for explorer links in tracking modal.
+    @param endpoint Optional specific endpoint to use. If empty, resolves from network.
     @param on_done Optional cleanup callback invoked regardless of outcome. *)
-let run_onchain_operation ~base_dir ~description ~args ~network
+let run_onchain_operation ~base_dir ~description ~args ~network ?(endpoint = "")
     ?(on_done = fun () -> ()) ~on_success () =
   match find_octez_client ~base_dir with
   | None ->
@@ -1629,9 +1630,11 @@ let run_onchain_operation ~base_dir ~description ~args ~network
       let full_args =
         (client :: "--base-dir" :: base_dir :: args) @ ["--burn-cap"; "1"]
       in
-      let endpoint =
-        let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-        match endpoints with ep :: _ -> Some ep | [] -> None
+      let endpoint_opt =
+        if String.length endpoint > 0 then Some endpoint
+        else
+          let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+          match endpoints with ep :: _ -> Some ep | [] -> None
       in
       let step_ref = Atomic.make Instances_wallet.Submitting in
       Instances_wallet.open_tracking_modal ~title:description ~network ~step_ref ;
@@ -1648,7 +1651,7 @@ let run_onchain_operation ~base_dir ~description ~args ~network
                   Atomic.set step_ref (Instances_wallet.Submitted {op_hash}) ;
                   Context.toast_success (description ^ ": operation submitted") ;
                   on_success () ;
-                  (match endpoint with
+                  (match endpoint_opt with
                   | Some ep ->
                       Instances_wallet.poll_operation
                         ~endpoint:ep
@@ -1678,7 +1681,7 @@ let styled_network network =
   if String.equal network "mainnet" then Widgets.themed_warning network
   else network
 
-let confirm_and_run ~base_dir ~title ~message ~args ~network
+let confirm_and_run ~base_dir ~title ~message ~args ~network ~endpoint
     ?(on_done = fun () -> ()) ~on_success () =
   let full_message =
     Printf.sprintf "%s\nNetwork: %s" message (styled_network network)
@@ -1693,6 +1696,7 @@ let confirm_and_run ~base_dir ~title ~message ~args ~network
           ~description:title
           ~args
           ~network
+          ~endpoint
           ~on_done
           ~on_success
           ()
@@ -1720,7 +1724,8 @@ let with_password_if_needed ~base_dir (key : Keys_reader.key_metadata) ~action =
 
 (** Transfer action: pick destination from known addresses, then amount.
     Uses dry-run to estimate fees before executing. *)
-let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
+let action_transfer ~base_dir ~network ~endpoint
+    (key : Keys_reader.key_metadata) =
   pick_address
     ~title:"Transfer: Destination"
     ~exclude_pkh:key.pkh
@@ -1750,12 +1755,8 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
                       (display_alias ~base_dir key)
                   in
                   let endpoint_args =
-                    let endpoints =
-                      Keys_scheduler.get_endpoints_for_network ~network
-                    in
-                    match endpoints with
-                    | ep :: _ -> ["--endpoint"; ep]
-                    | [] -> []
+                    if String.length endpoint > 0 then ["--endpoint"; endpoint]
+                    else []
                   in
                   let op_args =
                     extra_args @ endpoint_args
@@ -1774,6 +1775,7 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
                          amount_str)
                     ~args:op_args
                     ~network
+                    ~endpoint
                     ~on_done:cleanup
                     ~on_success:(fun () ->
                       Transfer_mru.add ~pkh:dest_pkh () ;
@@ -1782,8 +1784,8 @@ let action_transfer ~base_dir ~network (key : Keys_reader.key_metadata) =
         ())
 
 (** Register as delegate action. *)
-let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
-    =
+let action_register_delegate ~base_dir ~network ~endpoint
+    (key : Keys_reader.key_metadata) =
   Modal_helpers.confirm_modal
     ~title:
       (Printf.sprintf
@@ -1805,10 +1807,8 @@ let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
                 (display_alias ~base_dir key)
             in
             let endpoint_args =
-              let endpoints =
-                Keys_scheduler.get_endpoints_for_network ~network
-              in
-              match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+              if String.length endpoint > 0 then ["--endpoint"; endpoint]
+              else []
             in
             run_onchain_operation
               ~base_dir
@@ -1817,13 +1817,15 @@ let action_register_delegate ~base_dir ~network (key : Keys_reader.key_metadata)
                 (extra_args @ endpoint_args
                 @ ["register"; "key"; key.alias; "as"; "delegate"])
               ~network
+              ~endpoint
               ~on_done:cleanup
               ~on_success:(fun () -> Keys_scheduler.force_refresh ~pkh:key.pkh)
               ()))
     ()
 
 (** Delegate to another baker. *)
-let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
+let action_delegate_to ~base_dir ~network ~endpoint
+    (key : Keys_reader.key_metadata) =
   pick_address
     ~title:"Delegate to"
     ~exclude_pkh:key.pkh
@@ -1837,8 +1839,7 @@ let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
               baker_pkh
           in
           let endpoint_args =
-            let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
-            match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+            if String.length endpoint > 0 then ["--endpoint"; endpoint] else []
           in
           run_onchain_operation
             ~base_dir
@@ -1847,12 +1848,14 @@ let action_delegate_to ~base_dir ~network (key : Keys_reader.key_metadata) =
               (extra_args @ endpoint_args
               @ ["set"; "delegate"; "for"; key.alias; "to"; baker_pkh])
             ~network
+            ~endpoint
             ~on_done:cleanup
             ~on_success:(fun () -> Keys_scheduler.force_refresh ~pkh:key.pkh)
             ()))
 
 (** Undelegate action. *)
-let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
+let action_undelegate ~base_dir ~network ~endpoint
+    (key : Keys_reader.key_metadata) =
   Modal_helpers.confirm_modal
     ~title:(Printf.sprintf "Undelegate '%s'?" (display_alias ~base_dir key))
     ~message:
@@ -1869,10 +1872,8 @@ let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
               Printf.sprintf "Undelegate '%s'" (display_alias ~base_dir key)
             in
             let endpoint_args =
-              let endpoints =
-                Keys_scheduler.get_endpoints_for_network ~network
-              in
-              match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+              if String.length endpoint > 0 then ["--endpoint"; endpoint]
+              else []
             in
             run_onchain_operation
               ~base_dir
@@ -1881,13 +1882,14 @@ let action_undelegate ~base_dir ~network (key : Keys_reader.key_metadata) =
                 (extra_args @ endpoint_args
                 @ ["withdraw"; "delegate"; "from"; key.alias])
               ~network
+              ~endpoint
               ~on_done:cleanup
               ~on_success:(fun () -> Keys_scheduler.force_refresh ~pkh:key.pkh)
               ()))
     ()
 
 (** Stake action: stake tez for a key with dry-run confirmation. *)
-let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
+let action_stake ~base_dir ~network ~endpoint (key : Keys_reader.key_metadata) =
   Modal_helpers.prompt_text_modal
     ~title:"Stake: Amount (tez)"
     ~width:30
@@ -1912,10 +1914,8 @@ let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
                   (display_alias ~base_dir key)
               in
               let endpoint_args =
-                let endpoints =
-                  Keys_scheduler.get_endpoints_for_network ~network
-                in
-                match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+                if String.length endpoint > 0 then ["--endpoint"; endpoint]
+                else []
               in
               let op_args =
                 extra_args @ endpoint_args
@@ -1931,6 +1931,7 @@ let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
                      amount_str)
                 ~args:op_args
                 ~network
+                ~endpoint
                 ~on_done:cleanup
                 ~on_success:(fun () ->
                   Keys_scheduler.force_refresh ~pkh:key.pkh)
@@ -1938,7 +1939,8 @@ let action_stake ~base_dir ~network (key : Keys_reader.key_metadata) =
     ()
 
 (** Unstake action: unstake tez for a key with dry-run confirmation. *)
-let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
+let action_unstake ~base_dir ~network ~endpoint (key : Keys_reader.key_metadata)
+    =
   Modal_helpers.prompt_text_modal
     ~title:"Unstake: Amount (tez)"
     ~width:30
@@ -1963,10 +1965,8 @@ let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
                   (display_alias ~base_dir key)
               in
               let endpoint_args =
-                let endpoints =
-                  Keys_scheduler.get_endpoints_for_network ~network
-                in
-                match endpoints with ep :: _ -> ["--endpoint"; ep] | [] -> []
+                if String.length endpoint > 0 then ["--endpoint"; endpoint]
+                else []
               in
               let op_args =
                 extra_args @ endpoint_args
@@ -1982,6 +1982,7 @@ let action_unstake ~base_dir ~network (key : Keys_reader.key_metadata) =
                      amount_str)
                 ~args:op_args
                 ~network
+                ~endpoint
                 ~on_done:cleanup
                 ~on_success:(fun () ->
                   Keys_scheduler.force_refresh ~pkh:key.pkh)
@@ -2102,56 +2103,90 @@ let open_create_import_modal ~base_dir =
       | `Import -> action_import_key ~base_dir)
     ()
 
+(** Represents a network endpoint choice: network, endpoint, and source. *)
+type network_choice = {
+  network : string;
+  endpoint : string;
+  source : string; (* "local" or "public" *)
+}
+
 (** Prompt for network if a key has access to multiple networks.
     Lists all networks with available endpoints (local instances or public
     nodes), annotated with balance if known. Skips the picker if only one.
     For sandbox wallet groups, always uses the sandbox's own network without
-    prompting — sandbox keys must not be used on other networks. *)
+    prompting — sandbox keys must not be used on other networks.
+    When a network has both local and public endpoints, shows both as separate
+    choices, allowing the user to select which endpoint to use. *)
 let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
     ~action =
   match group.sandbox_name with
   | Some _ ->
       let network = match group.networks with n :: _ -> n | [] -> "mainnet" in
-      action ~network
+      (* For sandbox, find the local endpoint *)
+      let endpoint =
+        let endpoints = Keys_scheduler.get_endpoints_for_network ~network in
+        match endpoints with ep :: _ -> ep | [] -> ""
+      in
+      action ~network ~endpoint
   | None -> (
       let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
-      (* All networks with running local nodes *)
-      let local_networks =
+      (* Collect (network, endpoint, source) from local running nodes *)
+      let local_choices =
         Data.load_service_states ()
         |> List.filter (fun (st : Data.Service_state.t) ->
             String.equal st.service.role "node"
             && match st.status with Running -> true | _ -> false)
         |> List.map (fun (st : Data.Service_state.t) ->
-            Network_name.normalize st.service.network)
-        |> List.sort_uniq String.compare
+            {
+              network = Network_name.normalize st.service.network;
+              endpoint = Rpc_addr.to_endpoint st.service.rpc_addr;
+              source = "local";
+            })
       in
-      (* All networks with public nodes *)
-      let public_networks =
+      (* Collect from public nodes *)
+      let public_choices =
         Public_nodes_cache.get_nodes ()
-        |> List.filter_map (fun (n : Public_nodes_cache.node_info) -> n.network)
-        |> List.sort_uniq String.compare
+        |> List.filter_map (fun (n : Public_nodes_cache.node_info) ->
+            match n.network with
+            | Some net ->
+                Some {network = net; endpoint = n.rpc_addr; source = "public"}
+            | None -> None)
       in
-      let all_networks =
-        List.sort_uniq String.compare (local_networks @ public_networks)
+      (* Deduplicate by (network, source) — keep one entry per network per source *)
+      let all_choices = local_choices @ public_choices in
+      let seen = Hashtbl.create 16 in
+      let choices =
+        List.filter
+          (fun c ->
+            let key = (c.network, c.source) in
+            if Hashtbl.mem seen key then false
+            else (
+              Hashtbl.replace seen key true ;
+              true))
+          all_choices
       in
-      (* Fallback to group networks if nothing else *)
-      let networks =
-        if all_networks = [] then List.sort_uniq String.compare group.networks
-        else all_networks
+      (* Sort: local first within each network, then alphabetical *)
+      let choices =
+        List.sort
+          (fun a b ->
+            let cmp_net = String.compare a.network b.network in
+            if cmp_net <> 0 then cmp_net
+            else String.compare a.source b.source (* "local" < "public" *))
+          choices
       in
-      match networks with
-      | [] -> action ~network:"mainnet"
-      | [single] -> action ~network:single
+      match choices with
+      | [] -> action ~network:"mainnet" ~endpoint:""
+      | [single] -> action ~network:single.network ~endpoint:single.endpoint
       | multiple ->
           Modal_helpers.open_choice_modal
             ~title:"Select network"
             ~items:multiple
-            ~to_string:(fun net ->
+            ~to_string:(fun c ->
               let balance_str =
                 match
                   List.find_opt
                     (fun (wd : Keys_scheduler.wallet_data) ->
-                      String.equal wd.network net)
+                      String.equal wd.network c.network)
                     wallet_data
                 with
                 | Some wd ->
@@ -2160,14 +2195,13 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
                       (Baker_wallet_data.format_tez wd.spendable_balance)
                 | None -> ""
               in
-              let source =
-                if List.exists (String.equal net) local_networks then "local"
-                else "public"
+              let label =
+                Printf.sprintf "%s  (%s)%s" c.network c.source balance_str
               in
-              let label = Printf.sprintf "%s  (%s)%s" net source balance_str in
-              if String.equal net "mainnet" then Widgets.themed_warning label
+              if String.equal c.network "mainnet" then
+                Widgets.themed_warning label
               else label)
-            ~on_select:(fun net -> action ~network:net)
+            ~on_select:(fun c -> action ~network:c.network ~endpoint:c.endpoint)
             ())
 
 (** Show the action modal for a selected key. *)
@@ -2219,23 +2253,23 @@ let open_key_action_modal ~(group : enriched_group)
     ~on_select:(function
       | `Copy -> copy_to_clipboard key.pkh
       | `Transfer ->
-          with_network key ~group ~action:(fun ~network ->
-              action_transfer ~base_dir ~network key)
+          with_network key ~group ~action:(fun ~network ~endpoint ->
+              action_transfer ~base_dir ~network ~endpoint key)
       | `Stake ->
-          with_network key ~group ~action:(fun ~network ->
-              action_stake ~base_dir ~network key)
+          with_network key ~group ~action:(fun ~network ~endpoint ->
+              action_stake ~base_dir ~network ~endpoint key)
       | `Unstake ->
-          with_network key ~group ~action:(fun ~network ->
-              action_unstake ~base_dir ~network key)
+          with_network key ~group ~action:(fun ~network ~endpoint ->
+              action_unstake ~base_dir ~network ~endpoint key)
       | `Register ->
-          with_network key ~group ~action:(fun ~network ->
-              action_register_delegate ~base_dir ~network key)
+          with_network key ~group ~action:(fun ~network ~endpoint ->
+              action_register_delegate ~base_dir ~network ~endpoint key)
       | `Delegate_to ->
-          with_network key ~group ~action:(fun ~network ->
-              action_delegate_to ~base_dir ~network key)
+          with_network key ~group ~action:(fun ~network ~endpoint ->
+              action_delegate_to ~base_dir ~network ~endpoint key)
       | `Undelegate ->
-          with_network key ~group ~action:(fun ~network ->
-              action_undelegate ~base_dir ~network key)
+          with_network key ~group ~action:(fun ~network ~endpoint ->
+              action_undelegate ~base_dir ~network ~endpoint key)
       | `Rename -> action_rename ~base_dir key
       | `Forget -> action_forget ~base_dir key)
     ()
@@ -2391,7 +2425,17 @@ let open_batch_modal ps =
                 let network =
                   match group.networks with n :: _ -> n | [] -> "mainnet"
                 in
-                action_register_delegate ~base_dir:group.base_dir ~network key)
+                let endpoint =
+                  let endpoints =
+                    Keys_scheduler.get_endpoints_for_network ~network
+                  in
+                  match endpoints with ep :: _ -> ep | [] -> ""
+                in
+                action_register_delegate
+                  ~base_dir:group.base_dir
+                  ~network
+                  ~endpoint
+                  key)
               selected_keys
         | `Batch_delegate ->
             (* Pick a single baker address, then delegate all selected keys *)
@@ -2419,13 +2463,16 @@ let open_batch_modal ps =
                       ~base_dir:group.base_dir
                       key
                       ~action:(fun ~extra_args ~cleanup ->
-                        let endpoint_args =
+                        let endpoint =
                           let endpoints =
                             Keys_scheduler.get_endpoints_for_network ~network
                           in
-                          match endpoints with
-                          | ep :: _ -> ["--endpoint"; ep]
-                          | [] -> []
+                          match endpoints with ep :: _ -> ep | [] -> ""
+                        in
+                        let endpoint_args =
+                          if String.length endpoint > 0 then
+                            ["--endpoint"; endpoint]
+                          else []
                         in
                         run_onchain_operation
                           ~base_dir:group.base_dir
@@ -2445,6 +2492,7 @@ let open_batch_modal ps =
                                 baker_pkh;
                               ])
                           ~network
+                          ~endpoint
                           ~on_done:cleanup
                           ~on_success:(fun () ->
                             Keys_scheduler.force_refresh ~pkh:key.pkh)
