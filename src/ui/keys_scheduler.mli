@@ -61,3 +61,15 @@ val stop : unit -> unit
 (** Get running node endpoints for a specific network.
     Returns a list of endpoint URLs. Fast, reads from service state cache. *)
 val get_endpoints_for_network : network:string -> string list
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Queue balance fetches for all tracked keys. *)
+  val fetch_all_tracked_keys : unit -> unit
+
+  (** Get the list of all currently tracked PKHs (flattened from all base_dirs). *)
+  val get_tracked_pkhs : unit -> string list
+end
+
+(**/**)
