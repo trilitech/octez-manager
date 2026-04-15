@@ -690,6 +690,16 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
+  local -a opts_baker_set_companion_key
+  opts_baker_set_companion_key=(
+    '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
+    '--json[Output as JSON.]'
+    '-y[Skip confirmation prompt.]'
+    '--yes[Skip confirmation prompt.]'
+    '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
+    '--version[Show version information.]'
+  )
+
   local -a opts_baker_set_delegate_params
   opts_baker_set_delegate_params=(
     '--delegate[Target delegate public key hash (default\: first delegate).]:PKH:'
@@ -1233,6 +1243,7 @@ _octez-manager() {
             'finalize-unstake:INSTANCE Finalize pending unstake requests'
             'list:List all baker instances'
             'register:Register delegate key'
+            'set-companion-key:INSTANCE KEY Update baker companion key'
             'set-delegate-params:Set delegate staking parameters'
             'stake:Stake tez for a baker delegate'
             'status:Show wallet state for a baker instance'
@@ -1261,6 +1272,10 @@ _octez-manager() {
               register)
                 _arguments \
                   $opts_baker_register
+                ;;
+              set-companion-key)
+                _arguments \
+                  $opts_baker_set_companion_key
                 ;;
               set-delegate-params)
                 _arguments \
