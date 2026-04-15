@@ -43,6 +43,25 @@ let set_run_out_silent_hook f = run_out_silent_hook := Some f
 
 let set_run_streaming_hook f = run_streaming_hook := Some f
 
+(* Track active streaming subprocess for cleanup on exit. Only one streaming
+   process runs at a time (snapshot import is sequential), so a single ref
+   suffices. *)
+let active_streaming_process :
+    (in_channel * out_channel * in_channel) option ref =
+  ref None
+
+let active_streaming_lock = Mutex.create ()
+
+let kill_active_streaming () =
+  Mutex.protect active_streaming_lock (fun () ->
+      match !active_streaming_process with
+      | None -> ()
+      | Some (ic, oc, ec) -> (
+          active_streaming_process := None ;
+          (try close_in_noerr ic with _ -> ()) ;
+          (try close_out_noerr oc with _ -> ()) ;
+          try close_in_noerr ec with _ -> ()))
+
 let append_debug_log line =
   try
     let oc =
@@ -152,6 +171,8 @@ let run_streaming_blocking ~on_log argv =
   append_debug_log ("RUN_STREAMING " ^ cmd_to_string argv) ;
   let cmd_str = cmd_to_string argv in
   let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
+  Mutex.protect active_streaming_lock (fun () ->
+      active_streaming_process := Some (ic, oc, ec)) ;
   close_out oc ;
   let ic_fd = Unix.descr_of_in_channel ic in
   let ec_fd = Unix.descr_of_in_channel ec in
@@ -220,6 +241,8 @@ let run_streaming_blocking ~on_log argv =
   in
   flush_buf ic_buf ;
   flush_buf ec_buf ;
+  Mutex.protect active_streaming_lock (fun () ->
+      active_streaming_process := None) ;
   match Unix.close_process_full (ic, oc, ec) with
   | Unix.WEXITED 0 -> Ok ()
   | _status ->
