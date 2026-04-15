@@ -12,12 +12,14 @@ val open_text_modal : title:string -> lines:string list -> unit
     @param items Choices to display.
     @param to_string Render each item as a string.
     @param on_tick Optional callback invoked on each render tick (e.g. to refresh items).
+    @param is_enabled Optional predicate to determine if an item is selectable. Disabled items are greyed out and skipped during navigation. Defaults to all items enabled.
     @param on_select Called when the user picks an item. *)
 val open_choice_modal :
   title:string ->
   items:'a list ->
   to_string:('a -> string) ->
   ?on_tick:(unit -> unit) ->
+  ?is_enabled:('a -> bool) ->
   on_select:('a -> unit) ->
   unit ->
   unit
