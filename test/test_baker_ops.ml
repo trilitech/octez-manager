@@ -39,6 +39,8 @@ let test_build_register () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "register";
       "key";
       alias;
@@ -66,6 +68,8 @@ let test_build_stake () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "stake";
       "1000";
       "for";
@@ -92,6 +96,8 @@ let test_build_unstake () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "unstake";
       "500";
       "for";
@@ -118,6 +124,8 @@ let test_build_finalize_unstake () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "finalize";
       "unstake";
       "for";
@@ -144,6 +152,8 @@ let test_build_transfer () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "transfer";
       "100";
       "from";
@@ -172,6 +182,8 @@ let test_build_set_delegate_params () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "set";
       "delegate";
       "parameters";
@@ -203,6 +215,8 @@ let test_build_update_consensus_key () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "update";
       "consensus";
       "key";
@@ -232,6 +246,8 @@ let test_build_submit_proposals () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "submit";
       "proposals";
       "for";
@@ -260,6 +276,8 @@ let test_build_submit_ballot () =
       bin;
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "submit";
       "ballot";
       "for";
@@ -304,6 +322,8 @@ let test_build_with_base_dir () =
       "/home/tezos/.tezos-client";
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "register";
       "key";
       alias;
@@ -333,6 +353,8 @@ let test_build_with_password_file () =
       "/home/mathias/passwd";
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "register";
       "key";
       alias;
@@ -364,6 +386,8 @@ let test_build_with_base_dir_and_password_file () =
       "/home/mathias/passwd";
       "--endpoint";
       endpoint;
+      "--wait";
+      "none";
       "stake";
       "500";
       "for";
