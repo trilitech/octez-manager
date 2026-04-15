@@ -2103,11 +2103,13 @@ let open_create_import_modal ~base_dir =
       | `Import -> action_import_key ~base_dir)
     ()
 
-(** Represents a network endpoint choice: network, endpoint, and source. *)
+(** Represents a network endpoint choice: network, endpoint, and display label. *)
 type network_choice = {
   network : string;
   endpoint : string;
-  source : string; (* "local" or "public" *)
+  label : string;
+      (* e.g. "node-shadownet (shadownet)" or "shadownet (public)" *)
+  is_local : bool;
 }
 
 (** Prompt for network if a key has access to multiple networks.
@@ -2130,17 +2132,19 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
       action ~network ~endpoint
   | None -> (
       let wallet_data = Keys_scheduler.get_wallet_data ~pkh:key.pkh in
-      (* Collect (network, endpoint, source) from local running nodes *)
+      (* Collect (network, endpoint, label) from local running nodes *)
       let local_choices =
         Data.load_service_states ()
         |> List.filter (fun (st : Data.Service_state.t) ->
             String.equal st.service.role "node"
             && match st.status with Running -> true | _ -> false)
         |> List.map (fun (st : Data.Service_state.t) ->
+            let net = Network_name.normalize st.service.network in
             {
-              network = Network_name.normalize st.service.network;
+              network = net;
               endpoint = Rpc_addr.to_endpoint st.service.rpc_addr;
-              source = "local";
+              label = Printf.sprintf "%s (%s)" st.service.instance net;
+              is_local = true;
             })
       in
       (* Collect from public nodes *)
@@ -2149,29 +2153,46 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
         |> List.filter_map (fun (n : Public_nodes_cache.node_info) ->
             match n.network with
             | Some net ->
-                Some {network = net; endpoint = n.rpc_addr; source = "public"}
+                Some
+                  {
+                    network = net;
+                    endpoint = n.rpc_addr;
+                    label = Printf.sprintf "%s (public)" net;
+                    is_local = false;
+                  }
             | None -> None)
       in
-      (* Deduplicate by (network, source) — keep one entry per network per source *)
-      let all_choices = local_choices @ public_choices in
-      let seen = Hashtbl.create 16 in
-      let choices =
+      (* Deduplicate: local by endpoint (keep each instance), public by
+         network (one entry per network — multiple providers share one slot). *)
+      let seen_ep = Hashtbl.create 16 in
+      let local_deduped =
         List.filter
           (fun c ->
-            let key = (c.network, c.source) in
-            if Hashtbl.mem seen key then false
+            if Hashtbl.mem seen_ep c.endpoint then false
             else (
-              Hashtbl.replace seen key true ;
+              Hashtbl.replace seen_ep c.endpoint true ;
               true))
-          all_choices
+          local_choices
       in
-      (* Sort: local first within each network, then alphabetical *)
+      let seen_net = Hashtbl.create 16 in
+      let public_deduped =
+        List.filter
+          (fun c ->
+            if Hashtbl.mem seen_net c.network then false
+            else (
+              Hashtbl.replace seen_net c.network true ;
+              true))
+          public_choices
+      in
+      let choices = local_deduped @ public_deduped in
+      (* Sort: local instances first, then public, alphabetical within each *)
       let choices =
         List.sort
           (fun a b ->
-            let cmp_net = String.compare a.network b.network in
-            if cmp_net <> 0 then cmp_net
-            else String.compare a.source b.source (* "local" < "public" *))
+            match (a.is_local, b.is_local) with
+            | true, false -> -1
+            | false, true -> 1
+            | _ -> String.compare a.label b.label)
           choices
       in
       match choices with
@@ -2195,9 +2216,7 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
                       (Baker_wallet_data.format_tez wd.spendable_balance)
                 | None -> ""
               in
-              let label =
-                Printf.sprintf "%s  (%s)%s" c.network c.source balance_str
-              in
+              let label = Printf.sprintf "%s%s" c.label balance_str in
               if String.equal c.network "mainnet" then
                 Widgets.themed_warning label
               else label)
