@@ -320,11 +320,24 @@ let refresh_tzkt_aliases () =
       if Tzkt_aliases.needs_refresh ~network then Tzkt_aliases.refresh ~network)
     networks
 
+(** Queue balance fetches for all tracked keys. Uses [request_fetch] so
+    fresh data is not re-fetched and duplicate pending requests are dropped. *)
+let fetch_all_tracked_keys () =
+  let keys = Mutex.protect keys_lock (fun () -> !tracked_keys) in
+  List.iter
+    (fun (_base_dir, pkhs) -> List.iter (fun pkh -> request_fetch ~pkh) pkhs)
+    keys
+
 let scheduler_loop () =
   Worker_queue.start worker ;
   Eio_unix.sleep 3.0 ;
+  (* Initial fetch: queue balance requests for all tracked keys so that
+     data is available as soon as the user opens the Wallets page. *)
+  fetch_all_tracked_keys () ;
   while not (Atomic.get stop_flag) do
     (try refresh_tzkt_aliases () with _ -> ()) ;
+    (* Periodic refresh: re-queue stale keys *)
+    fetch_all_tracked_keys () ;
     Eio_unix.sleep poll_interval
   done ;
   Worker_queue.stop worker
@@ -343,3 +356,11 @@ let get_endpoints_for_network ~network =
   get_node_endpoints ()
   |> List.filter_map (fun (net, endpoint) ->
       if String.equal net network then Some endpoint else None)
+
+module Internal_for_tests = struct
+  let fetch_all_tracked_keys = fetch_all_tracked_keys
+
+  let get_tracked_pkhs () =
+    let keys = Mutex.protect keys_lock (fun () -> !tracked_keys) in
+    List.concat_map (fun (_base_dir, pkhs) -> pkhs) keys
+end
