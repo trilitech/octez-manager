@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Network names shown as URLs in wallet actions**: Network picker for transfer/stake/delegate actions now shows clean network names (e.g., "shadownet") instead of raw URLs (e.g., "https://teztnets.com/shadownet") for locally running nodes.
 - **Wallet balances not fetched on page load**: Wallet balances are now fetched proactively when the application starts and refreshed periodically every 30 seconds. Previously, balances only appeared after user interaction (moving cursor to a key or pressing `r` to refresh), making the page appear unresponsive on first visit.
+- **Wallet operations hanging on non-bootstrapped nodes**: Transfer, stake, and delegate operations now pass `--wait none` to octez-client, preventing the command from blocking indefinitely at "Waiting for the node to be bootstrapped..." when the target node is still syncing.
 - **Extra args help explorer showing debug info**: Removed debug leftovers from the extra-args flag browser modal (used in node, baker, accuser, DAL, and index forms). The modal title bar was displaying the last key pressed, scroll offset, and cursor position.
 - **Baker form delegates reset on base dir change**: When creating a baker, changing the Baker Base Dir or changing the Instance Name in a way that updates the base dir now clears the previously selected delegates. This prevents stale delegate selections from a different base directory being carried over.
 - **DAL node data dir not tracking instance name**: When installing a DAL node, the data directory was always initialised to `dal-node-dal` regardless of the chosen instance name or selected node. The data dir now stays in sync with the instance name in all three cases: manual name edits, initial node selection (autoname), and node switches after autoname.
@@ -28,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **Wallet operations show both local and public endpoints**: When a network has both a local running node and public RPC endpoints, the network picker now shows separate entries for each, letting you choose which endpoint to use for transfers, staking, and other operations.
+- **Syncing endpoints greyed out in wallet network picker**: Local nodes that are not yet fully bootstrapped are now visually dimmed with a "(syncing..)" indicator in the network picker. The cursor skips over them during navigation and they cannot be selected, preventing accidental submission to non-bootstrapped endpoints.
 - **Log export now runs in the background with progress feedback**: Exporting instance logs no longer freezes the UI. A progress bar is shown during the export and a green success toast displays the archive path on completion.
 - Simplified help modal (`?`) keymaps across all pages: removed verbose descriptions in favor of concise action names (e.g., "Toggle view" instead of "Group/Role view", "Back" instead of "Back / Previous")
 - Simplified instances page help hint: removed verbose view mode descriptions ("By Role", "By Group", "Toggle view") in favor of concise key combinations
