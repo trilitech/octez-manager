@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Network names shown as URLs in wallet actions**: Network picker for transfer/stake/delegate actions now shows clean network names (e.g., "shadownet") instead of raw URLs (e.g., "https://teztnets.com/shadownet") for locally running nodes.
 - **Wallet balances not fetched on page load**: Wallet balances are now fetched proactively when the application starts and refreshed periodically every 30 seconds. Previously, balances only appeared after user interaction (moving cursor to a key or pressing `r` to refresh), making the page appear unresponsive on first visit.
 - **Extra args help explorer showing debug info**: Removed debug leftovers from the extra-args flag browser modal (used in node, baker, accuser, DAL, and index forms). The modal title bar was displaying the last key pressed, scroll offset, and cursor position.
 - **Baker form delegates reset on base dir change**: When creating a baker, changing the Baker Base Dir or changing the Instance Name in a way that updates the base dir now clears the previously selected delegates. This prevents stale delegate selections from a different base directory being carried over.
