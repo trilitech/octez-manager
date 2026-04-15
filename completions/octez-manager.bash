@@ -59,6 +59,7 @@ _octez_manager() {
   local baker_finalize_unstake_opts="--delegate --json -y --yes --help --version"
   local baker_list_opts="--json --help --version"
   local baker_register_opts="--delegate --json -y --yes --help --version"
+  local baker_set_companion_key_opts="--delegate --json -y --yes --help --version"
   local baker_set_delegate_params_opts="--delegate --edge-of-baking-over-staking --json --limit-of-staking-over-baking -y --yes --help --version"
   local baker_stake_opts="--delegate --json -y --yes --help --version"
   local baker_status_opts="--delegate --json --help --version"
@@ -319,7 +320,7 @@ _octez_manager() {
           opts="--help --version"
           COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
         else
-          COMPREPLY=( $(compgen -W "finalize-unstake list register set-delegate-params stake status transfer unstake update-consensus-key vote" -- "$cur") )
+          COMPREPLY=( $(compgen -W "finalize-unstake list register set-companion-key set-delegate-params stake status transfer unstake update-consensus-key vote" -- "$cur") )
         fi
       else
         local subcmd="${COMP_WORDS[2]}"
@@ -337,6 +338,11 @@ _octez_manager() {
           register)
             if [[ $cur == -* ]]; then
               COMPREPLY=( $(compgen -W "$baker_register_opts" -- "$cur") )
+            fi
+            ;;
+          set-companion-key)
+            if [[ $cur == -* ]]; then
+              COMPREPLY=( $(compgen -W "$baker_set_companion_key_opts" -- "$cur") )
             fi
             ;;
           set-delegate-params)

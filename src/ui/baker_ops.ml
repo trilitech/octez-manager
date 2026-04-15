@@ -20,7 +20,8 @@ type wallet_operation =
   | Finalize_unstake
   | Transfer of {amount : string; destination : string}
   | Set_delegate_params of {limit : int; edge : int}
-  | Update_consensus_key of {key : string}
+  | Update_consensus_key of {delegate_alias : string; key_alias : string}
+  | Update_companion_key of {delegate_alias : string; key_alias : string}
   | Submit_proposals of {proposals : string list}
   | Submit_ballot of {proposal : string; ballot : Baker_wallet_data.ballot_vote}
 
@@ -65,8 +66,10 @@ let build_command ~octez_client_bin ~endpoint ~base_dir ~password_file ~alias
           "--edge-of-baking-over-staking";
           edge_frac;
         ]
-    | Update_consensus_key {key} ->
-        ["update"; "consensus"; "key"; "for"; alias; "to"; key]
+    | Update_consensus_key {delegate_alias; key_alias} ->
+        ["set"; "consensus"; "key"; "for"; delegate_alias; "to"; key_alias]
+    | Update_companion_key {delegate_alias; key_alias} ->
+        ["set"; "companion"; "key"; "for"; delegate_alias; "to"; key_alias]
     | Submit_proposals {proposals} ->
         ["submit"; "proposals"; "for"; alias] @ proposals
     | Submit_ballot {proposal; ballot} ->
@@ -203,8 +206,10 @@ let describe_operation = function
         "Set Delegate Parameters (limit: %dx, edge: %d%%)"
         limit
         edge
-  | Update_consensus_key {key} ->
-      Printf.sprintf "Update Consensus Key to %s" key
+  | Update_consensus_key {key_alias; _} ->
+      Printf.sprintf "Update Consensus Key to %s" key_alias
+  | Update_companion_key {key_alias; _} ->
+      Printf.sprintf "Update Companion Key to %s" key_alias
   | Submit_proposals {proposals} ->
       Printf.sprintf
         "Submit Proposal%s: %s"

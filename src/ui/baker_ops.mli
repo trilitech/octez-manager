@@ -24,7 +24,8 @@ type wallet_operation =
   | Finalize_unstake
   | Transfer of {amount : string; destination : string}
   | Set_delegate_params of {limit : int; edge : int}
-  | Update_consensus_key of {key : string}
+  | Update_consensus_key of {delegate_alias : string; key_alias : string}
+  | Update_companion_key of {delegate_alias : string; key_alias : string}
   | Submit_proposals of {proposals : string list}
   | Submit_ballot of {proposal : string; ballot : Baker_wallet_data.ballot_vote}
 
