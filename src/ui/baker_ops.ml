@@ -40,7 +40,7 @@ let build_command ~octez_client_bin ~endpoint ~base_dir ~password_file ~alias
     @ (match password_file with
       | Some f -> ["--password-filename"; f]
       | None -> [])
-    @ ["--endpoint"; endpoint]
+    @ ["--endpoint"; endpoint; "--wait"; "none"]
   in
   let cmd =
     match op with

@@ -1628,7 +1628,8 @@ let run_onchain_operation ~base_dir ~description ~args ~network ?(endpoint = "")
       offer_download_or_error ~action_label:"perform operation"
   | Some client ->
       let full_args =
-        (client :: "--base-dir" :: base_dir :: args) @ ["--burn-cap"; "1"]
+        (client :: "--base-dir" :: base_dir :: "--wait" :: "none" :: args)
+        @ ["--burn-cap"; "1"]
       in
       let endpoint_opt =
         if String.length endpoint > 0 then Some endpoint
