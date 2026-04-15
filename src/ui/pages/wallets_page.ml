@@ -2111,6 +2111,7 @@ type network_choice = {
   label : string;
       (* e.g. "node-shadownet (shadownet)" or "shadownet (public)" *)
   is_local : bool;
+  syncing : bool; (* true when node is not fully bootstrapped *)
 }
 
 (** Prompt for network if a key has access to multiple networks.
@@ -2141,11 +2142,17 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
             && match st.status with Running -> true | _ -> false)
         |> List.map (fun (st : Data.Service_state.t) ->
             let net = Network_name.normalize st.service.network in
+            let syncing =
+              match Rpc_metrics.get ~instance:st.service.instance with
+              | Some m -> not (m.bootstrapped = Some true)
+              | None -> true (* unknown status = assume syncing *)
+            in
             {
               network = net;
               endpoint = Rpc_addr.to_endpoint st.service.rpc_addr;
               label = Printf.sprintf "%s (%s)" st.service.instance net;
               is_local = true;
+              syncing;
             })
       in
       (* Collect from public nodes *)
@@ -2160,6 +2167,7 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
                     endpoint = n.rpc_addr;
                     label = Printf.sprintf "%s (public)" net;
                     is_local = false;
+                    syncing = false;
                   }
             | None -> None)
       in
@@ -2198,7 +2206,13 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
       in
       match choices with
       | [] -> action ~network:"mainnet" ~endpoint:""
-      | [single] -> action ~network:single.network ~endpoint:single.endpoint
+      | [single] ->
+          if single.syncing then
+            Context.toast_error
+              (Printf.sprintf
+                 "%s is still syncing — cannot submit operations"
+                 single.label)
+          else action ~network:single.network ~endpoint:single.endpoint
       | multiple ->
           Modal_helpers.open_choice_modal
             ~title:"Select network"
@@ -2217,10 +2231,14 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
                       (Baker_wallet_data.format_tez wd.spendable_balance)
                 | None -> ""
               in
-              let label = Printf.sprintf "%s%s" c.label balance_str in
+              let sync_str = if c.syncing then "  (syncing..)" else "" in
+              let label =
+                Printf.sprintf "%s%s%s" c.label balance_str sync_str
+              in
               if String.equal c.network "mainnet" then
                 Widgets.themed_warning label
               else label)
+            ~is_enabled:(fun c -> not c.syncing)
             ~on_select:(fun c -> action ~network:c.network ~endpoint:c.endpoint)
             ())
 

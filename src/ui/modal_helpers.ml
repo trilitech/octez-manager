@@ -130,7 +130,12 @@ let open_text_modal ~title ~lines =
     ~on_close:(fun _ _ -> ())
 
 let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
-    ?on_tick ~on_select () =
+    ?on_tick ?is_enabled ~on_select () =
+  let is_enabled = Option.value ~default:(fun _ -> true) is_enabled in
+  let wrapped_to_string item =
+    let s = to_string item in
+    if is_enabled item then s else Widgets.themed_muted s
+  in
   let module Modal = struct
     type state = choice Select_widget.t
 
@@ -186,15 +191,46 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
             "Esc"
         | _ -> key
       in
+      (* Helper to skip over disabled items in a given direction *)
+      let skip_disabled_in_direction s direction =
+        let max_steps = List.length items in
+        let rec loop s steps =
+          if steps >= max_steps then s
+          else
+            match Select_widget.get_selection s with
+            | Some item when not (is_enabled item) ->
+                loop (Select_widget.handle_key s ~key:direction) (steps + 1)
+            | _ -> s
+        in
+        loop s 0
+      in
       if key = "Enter" then (
-        Miaou.Core.Modal_manager.set_consume_next_key () ;
-        Miaou.Core.Modal_manager.close_top `Commit ;
-        ps)
+        match Select_widget.get_selection s with
+        | Some item when not (is_enabled item) ->
+            (* Ignore Enter on disabled item *)
+            ps
+        | _ ->
+            Miaou.Core.Modal_manager.set_consume_next_key () ;
+            Miaou.Core.Modal_manager.close_top `Commit ;
+            ps)
       else if key = "Esc" then (
         Miaou.Core.Modal_manager.set_consume_next_key () ;
         Miaou.Core.Modal_manager.close_top `Cancel ;
         ps)
-      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
+      else
+        (* Handle navigation keys and skip disabled items *)
+        let s' = Select_widget.handle_key s ~key in
+        let s'' =
+          match key with
+          | "Up" -> skip_disabled_in_direction s' "Up"
+          | "Down" -> skip_disabled_in_direction s' "Down"
+          | "PageUp" -> skip_disabled_in_direction s' "Up"
+          | "PageDown" -> skip_disabled_in_direction s' "Down"
+          | "Home" -> skip_disabled_in_direction s' "Down"
+          | "End" -> skip_disabled_in_direction s' "Up"
+          | _ -> s'
+        in
+        Navigation.update (fun _ -> s'') ps
 
     let handle_key = handle_modal_key
 
@@ -210,7 +246,23 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
 
     let has_modal _ = true
   end in
-  let widget = Select_widget.open_centered ~title:"" ~items ~to_string () in
+  let widget =
+    Select_widget.open_centered ~title:"" ~items ~to_string:wrapped_to_string ()
+  in
+  (* Skip to first enabled item if initial selection is disabled *)
+  let skip_to_enabled s =
+    let max_steps = List.length items in
+    let rec loop s steps =
+      if steps >= max_steps then s
+      else
+        match Select_widget.get_selection s with
+        | Some item when not (is_enabled item) ->
+            loop (Select_widget.handle_key s ~key:"Down") (steps + 1)
+        | _ -> s
+    in
+    loop s 0
+  in
+  let widget = skip_to_enabled widget in
   let ui : Miaou.Core.Modal_manager.ui =
     {
       title;
