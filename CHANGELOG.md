@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Wallet operations show both local and public endpoints**: When a network has both a local running node and public RPC endpoints, the network picker now shows separate entries for each, letting you choose which endpoint to use for transfers, staking, and other operations.
 - **Log export now runs in the background with progress feedback**: Exporting instance logs no longer freezes the UI. A progress bar is shown during the export and a green success toast displays the archive path on completion.
 - Simplified help modal (`?`) keymaps across all pages: removed verbose descriptions in favor of concise action names (e.g., "Toggle view" instead of "Group/Role view", "Back" instead of "Back / Previous")
 - Simplified instances page help hint: removed verbose view mode descriptions ("By Role", "By Group", "Toggle view") in favor of concise key combinations
