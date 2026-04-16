@@ -171,6 +171,54 @@ let test_string_contains_empty_haystack () =
     false
     (ESD.For_tests.string_contains ~needle:"x" "")
 
+(* ── probe_network_from_config ───────────────────────────────────── *)
+
+let with_tmp_dir f =
+  let tmp_dir = Filename.temp_file "om_test_" "_dir" in
+  Unix.unlink tmp_dir ;
+  Unix.mkdir tmp_dir 0o700 ;
+  Fun.protect
+    ~finally:(fun () ->
+      (* Best-effort cleanup *)
+      (try
+         Array.iter
+           (fun name -> Unix.unlink (Filename.concat tmp_dir name))
+           (Sys.readdir tmp_dir)
+       with _ -> ()) ;
+      try Unix.rmdir tmp_dir with _ -> ())
+    (fun () -> f tmp_dir)
+
+let test_probe_network_mainnet () =
+  with_tmp_dir (fun tmp_dir ->
+      let config_path = Filename.concat tmp_dir "config.json" in
+      let oc = open_out config_path in
+      (* Mainnet: no network field or network = null *)
+      output_string oc {|{"data-dir": "/var/lib/octez"}|} ;
+      close_out oc ;
+      let result = ESD.probe_network_from_config tmp_dir in
+      check (option string) "mainnet implicit" (Some "mainnet") result)
+
+let test_probe_network_shadownet () =
+  with_tmp_dir (fun tmp_dir ->
+      let config_path = Filename.concat tmp_dir "config.json" in
+      let oc = open_out config_path in
+      (* Built-in network *)
+      output_string
+        oc
+        {|{"network": "shadownet", "data-dir": "/var/lib/octez"}|} ;
+      close_out oc ;
+      let result = ESD.probe_network_from_config tmp_dir in
+      check (option string) "shadownet" (Some "shadownet") result)
+
+let test_probe_network_missing_config () =
+  with_tmp_dir (fun tmp_dir ->
+      let result = ESD.probe_network_from_config tmp_dir in
+      check (option string) "missing config" None result)
+
+let test_probe_network_nonexistent_dir () =
+  let result = ESD.probe_network_from_config "/nonexistent/path" in
+  check (option string) "nonexistent dir" None result
+
 (* ── Suite ───────────────────────────────────────────────────── *)
 
 let () =
@@ -213,5 +261,12 @@ let () =
           test_case "not found" `Quick test_string_contains_no;
           test_case "empty needle" `Quick test_string_contains_empty_needle;
           test_case "empty haystack" `Quick test_string_contains_empty_haystack;
+        ] );
+      ( "probe_network_from_config",
+        [
+          test_case "mainnet implicit" `Quick test_probe_network_mainnet;
+          test_case "shadownet" `Quick test_probe_network_shadownet;
+          test_case "missing config" `Quick test_probe_network_missing_config;
+          test_case "nonexistent dir" `Quick test_probe_network_nonexistent_dir;
         ] );
     ]
