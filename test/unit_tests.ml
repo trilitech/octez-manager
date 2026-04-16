@@ -4934,6 +4934,70 @@ let bug4_history_mode_preserved () =
     None
     parsed_none.history_mode
 
+(** Bug: DAL node import fails when ExecStart uses variable references
+    
+    Issue: When importing a DAL node service whose ExecStart contains variable
+    references like ${OCTEZ_DAL_RPC_ADDR}, the parser extracts the literal
+    variable string which gets written to the env file as garbage (e.g.,
+    OCTEZ_DAL_RPC_ADDR="${OCTEZ_DAL_RPC_ADDR}"). The DAL node then receives
+    an invalid address and crashes on startup.
+    
+    Fix: In create_dal_from_external, use the resolved rpc_addr/net_addr
+    parameters (which expand env-file variables) instead of the raw parsed
+    values from ExecStart. The parsed ExecStart is only used to detect whether
+    the flags were present in the original command.
+    
+    This test verifies that Execstart_parser correctly extracts variable
+    references from DAL node commands. *)
+
+let bug_dal_import_variable_refs () =
+  (* Test that parser extracts variable references from DAL node ExecStart *)
+  let exec_start =
+    "/bin/sh -c 'exec /usr/bin/octez-dal-node run \
+     --endpoint=${OCTEZ_NODE_ENDPOINT} --rpc-addr=${OCTEZ_DAL_RPC_ADDR} \
+     --net-addr=${OCTEZ_DAL_NET_ADDR}'"
+  in
+  let parsed = Execstart_parser.parse exec_start in
+
+  (* Parser should extract the variable references as-is *)
+  Alcotest.(check (option string))
+    "rpc-addr contains variable reference"
+    (Some "${OCTEZ_DAL_RPC_ADDR}")
+    parsed.rpc_addr ;
+  Alcotest.(check (option string))
+    "net-addr contains variable reference"
+    (Some "${OCTEZ_DAL_NET_ADDR}")
+    parsed.net_addr ;
+  Alcotest.(check (option string))
+    "endpoint contains variable reference"
+    (Some "${OCTEZ_NODE_ENDPOINT}")
+    parsed.endpoint ;
+
+  (* The fix: create_dal_from_external should detect that rpc_addr/net_addr
+     flags were present (Some _) in parsed ExecStart, and then use the
+     resolved values passed as parameters instead of the raw variable strings.
+     This test verifies the parser behavior; the actual fix logic is tested
+     by the integration test that exercises the full import path. *)
+
+  (* Test with mixed literal and variable values *)
+  let exec_start_mixed =
+    "/usr/bin/octez-dal-node run --endpoint=http://localhost:8732 \
+     --rpc-addr=${OCTEZ_DAL_RPC_ADDR} --net-addr=0.0.0.0:11732"
+  in
+  let parsed_mixed = Execstart_parser.parse exec_start_mixed in
+  Alcotest.(check (option string))
+    "mixed: literal endpoint"
+    (Some "http://localhost:8732")
+    parsed_mixed.endpoint ;
+  Alcotest.(check (option string))
+    "mixed: variable rpc-addr"
+    (Some "${OCTEZ_DAL_RPC_ADDR}")
+    parsed_mixed.rpc_addr ;
+  Alcotest.(check (option string))
+    "mixed: literal net-addr"
+    (Some "0.0.0.0:11732")
+    parsed_mixed.net_addr
+
 (* CLI Import Command Tests *)
 
 (** Test strategy validation *)
@@ -6841,6 +6905,13 @@ let () =
             "history_mode_from_execstart"
             `Quick
             bug4_history_mode_preserved;
+        ] );
+      ( "bug_dal_import_variable_refs",
+        [
+          Alcotest.test_case
+            "dal_variable_refs_in_execstart"
+            `Quick
+            bug_dal_import_variable_refs;
         ] );
       ( "cli_import",
         [
