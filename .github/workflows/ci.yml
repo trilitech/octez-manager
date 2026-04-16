@@ -425,9 +425,10 @@ jobs:
           path: /home/opam/.opam
           key: opam-miaou-${{ hashFiles('.github/miaou-version', 'octez-manager.opam') }}
 
-      - name: Pin miaou and ppx_forbid packages
+      - name: Install dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
+          eval $(opam env)
           opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
           opam pin add ppx_enforce "$PPX_FORBID_GIT_URL" --no-action
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
@@ -436,7 +437,8 @@ jobs:
           opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-registry "$MIAOU_GIT_URL" --no-action
-          opam install ppx_forbid ppx_enforce miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry eio_posix
+          opam install ppx_forbid ppx_enforce miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry eio_posix --jobs=4
+          opam install . --deps-only --jobs=4
 
       - name: Build static binary
         run: |
