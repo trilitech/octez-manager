@@ -202,6 +202,366 @@ octez-client -d ~/.local/share/octez/signatory/dev-signer/keys \
 
 See the [Signatory Setup Guide](/guides/signatory-setup/) for comprehensive documentation and security best practices.
 
+### `baker`
+
+Manage baker wallet operations and delegate actions.
+
+```bash
+octez-manager baker <SUBCOMMAND>
+```
+
+#### `baker list`
+
+List all baker instances.
+
+```bash
+octez-manager baker list [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+
+#### `baker <instance> status`
+
+Show wallet state for a baker instance (balances, staking parameters, consensus key).
+
+```bash
+octez-manager baker <INSTANCE> status [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+
+**Example:**
+
+```bash
+# Show status for default delegate
+octez-manager baker baker-shadownet status
+
+# Show status for specific delegate
+octez-manager baker baker-shadownet status --delegate tz1abc...
+```
+
+#### `baker <instance> register`
+
+Register as a delegate.
+
+```bash
+octez-manager baker <INSTANCE> register [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+#### `baker <instance> stake`
+
+Stake tez for a baker delegate.
+
+```bash
+octez-manager baker <INSTANCE> stake <AMOUNT> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**Example:**
+
+```bash
+octez-manager baker baker-shadownet stake 1000 --yes
+```
+
+#### `baker <instance> unstake`
+
+Unstake tez (amount or "everything").
+
+```bash
+octez-manager baker <INSTANCE> unstake <AMOUNT> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**Example:**
+
+```bash
+# Unstake specific amount
+octez-manager baker baker-shadownet unstake 500
+
+# Unstake everything
+octez-manager baker baker-shadownet unstake everything
+```
+
+#### `baker <instance> finalize-unstake`
+
+Finalize pending unstake requests.
+
+```bash
+octez-manager baker <INSTANCE> finalize-unstake [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+#### `baker <instance> transfer`
+
+Transfer tez to another address.
+
+```bash
+octez-manager baker <INSTANCE> transfer <AMOUNT> <DESTINATION> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**Example:**
+
+```bash
+octez-manager baker baker-shadownet transfer 100 tz1xyz... --yes
+```
+
+#### `baker <instance> set-delegate-params`
+
+Set delegate staking parameters.
+
+```bash
+octez-manager baker <INSTANCE> set-delegate-params [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--limit-of-staking-over-baking <N>` | Limit of staking over baking (0-9) |
+| `--edge-of-baking-over-staking <N>` | Edge of baking over staking (0-100) |
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**Example:**
+
+```bash
+octez-manager baker baker-shadownet set-delegate-params \
+  --limit-of-staking-over-baking 5 \
+  --edge-of-baking-over-staking 10
+```
+
+#### `baker <instance> update-consensus-key`
+
+Update baker consensus key.
+
+```bash
+octez-manager baker <INSTANCE> update-consensus-key <KEY> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**Example:**
+
+```bash
+octez-manager baker baker-shadownet update-consensus-key edpk...
+```
+
+#### `baker <instance> vote`
+
+Vote on governance (protocol hash during proposal period, yay/nay/pass during exploration/promotion).
+
+```bash
+octez-manager baker <INSTANCE> vote <VALUE> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delegate <PKH>` | Target delegate public key hash (default: first delegate) |
+| `--json` | Output as JSON |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**Examples:**
+
+```bash
+# Vote on a proposal (proposal period)
+octez-manager baker baker-shadownet vote PtNairob...
+
+# Vote yay on current proposal (exploration/promotion period)
+octez-manager baker baker-shadownet vote yay
+
+# Vote nay
+octez-manager baker baker-shadownet vote nay
+
+# Abstain
+octez-manager baker baker-shadownet vote pass
+```
+
+### `group`
+
+Manage instance groups for organizing and operating multiple services together.
+
+```bash
+octez-manager group <SUBCOMMAND>
+```
+
+#### `group create`
+
+Create a new instance group.
+
+```bash
+octez-manager group create <NAME> [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--octez-version <VER>` | Managed Octez version (e.g. '24.1' or 'latest') | - |
+| `--bin-dir-alias <ALIAS>` | Registered binary directory alias | - |
+| `--app-bin-dir <DIR>` | Path to binaries directory | auto |
+| `--service-user <USER>` | System user for services | tezos |
+
+**Example:**
+
+```bash
+octez-manager group create shadownet-stack --octez-version 21.0
+```
+
+#### `group list`
+
+List all instance groups.
+
+```bash
+octez-manager group list [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+
+#### `group show`
+
+Show details of an instance group.
+
+```bash
+octez-manager group show <NAME> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+
+#### `group delete`
+
+Delete an instance group.
+
+```bash
+octez-manager group delete <NAME> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--cascade` | Delete all services in the group |
+| `--ungroup` | Remove group but keep services (ungroup them) |
+
+**Examples:**
+
+```bash
+# Delete empty group
+octez-manager group delete shadownet-stack
+
+# Delete group and all services
+octez-manager group delete shadownet-stack --cascade
+
+# Ungroup services but keep them
+octez-manager group delete shadownet-stack --ungroup
+```
+
+#### `group add`
+
+Add an existing service to a group.
+
+```bash
+octez-manager group add <NAME> --instance <INSTANCE>
+```
+
+**Example:**
+
+```bash
+octez-manager group add shadownet-stack --instance shadownet
+```
+
+#### `group remove`
+
+Remove a service from a group (keeps the service).
+
+```bash
+octez-manager group remove <NAME> --instance <INSTANCE>
+```
+
+**Example:**
+
+```bash
+octez-manager group remove shadownet-stack --instance shadownet
+```
+
+#### `group start`
+
+Start all services in a group (dependency order).
+
+```bash
+octez-manager group start <NAME>
+```
+
+#### `group stop`
+
+Stop all services in a group (reverse dependency order).
+
+```bash
+octez-manager group stop <NAME>
+```
+
+#### `group restart`
+
+Restart all services in a group (stop all, then start all).
+
+```bash
+octez-manager group restart <NAME>
+```
+
+#### `group upgrade`
+
+Upgrade binary version for all services in a group.
+
+```bash
+octez-manager group upgrade <NAME> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--octez-version <VER>` | New managed Octez version (e.g. '24.1' or 'latest') |
+| `--bin-dir-alias <ALIAS>` | New registered binary directory alias |
+| `--app-bin-dir <DIR>` | New path to binaries directory |
+
+**Example:**
+
+```bash
+octez-manager group upgrade shadownet-stack --octez-version 21.1
+```
+
 ### `instance`
 
 Manage existing instances.
@@ -224,6 +584,8 @@ Actions:
 | `edit` | Edit configuration |
 | `remove` | Remove instance (keeps data) |
 | `purge` | Remove instance and delete data |
+| `set-env <KEY> <VALUE>` | Set environment variable |
+| `get-env [KEY]` | Get environment variable(s) |
 
 ### `list`
 
@@ -235,9 +597,9 @@ octez-manager list [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `--external` | Include unmanaged/external services |
-| `--all` | Show all details |
-| `--json` | Output as JSON |
+| `--internal`, `-i` | List only managed services (no external detection) |
+| `--external`, `-e` | Show only external (unmanaged) services |
+| `--all`, `-a` | Show both managed and external services |
 
 ### `import`
 
@@ -422,6 +784,10 @@ octez-manager [OPTIONS]
 | `--page <NAME>` | Start on a specific page |
 | `--ui-log` | Enable UI debug logs |
 | `--ui-logfile <FILE>` | Write UI logs to file |
+| `--theme <THEME>` | Theme name or path (built-ins: dark, light) |
+| `--local-indexer <URL>` | Register local TzKT-compatible indexer endpoint |
+| `--indexer-network <NET>` | Network the local indexer serves (default: mainnet) |
+| `--compare-indexers` | Log divergences between local and public indexer |
 
 > **Note**: When run without arguments, `octez-manager` launches the TUI. Use explicit subcommands for CLI operations.
 
@@ -554,6 +920,346 @@ List available public RPC nodes from Taquito.
 
 ```bash
 octez-manager rpc public-nodes
+```
+
+### `rewards`
+
+Manage baker rewards and payouts.
+
+```bash
+octez-manager rewards <SUBCOMMAND>
+```
+
+All rewards commands auto-detect the baker instance when only one baker is registered. Use `--baker <INSTANCE>` when multiple bakers exist.
+
+#### `rewards status`
+
+Show current cycle and payout status for a baker.
+
+```bash
+octez-manager rewards status [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--baker <INSTANCE>` | Baker instance name (auto-inferred if only one baker) |
+
+**Example:**
+
+```bash
+octez-manager rewards status --baker baker-shadownet
+```
+
+#### `rewards generate`
+
+Calculate and display a payout preview for a specific cycle.
+
+```bash
+octez-manager rewards generate [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--baker <INSTANCE>` | Baker instance name | auto-inferred |
+| `--cycle <N>` | Target cycle number | latest completed |
+| `--force` | Re-generate even if cycle was already paid | false |
+| `--json` | Output as JSON | false |
+
+**Example:**
+
+```bash
+# Generate payout for latest completed cycle
+octez-manager rewards generate
+
+# Generate for specific cycle
+octez-manager rewards generate --cycle 123
+
+# Re-generate already-paid cycle
+octez-manager rewards generate --cycle 120 --force
+```
+
+#### `rewards history`
+
+Show historical payout summaries.
+
+```bash
+octez-manager rewards history [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--baker <INSTANCE>` | Baker instance name | auto-inferred |
+| `--cycles <N>` | Number of recent cycles to show | 30 |
+| `--json` | Output as JSON | false |
+
+**Example:**
+
+```bash
+# Show last 30 cycles
+octez-manager rewards history
+
+# Show last 10 cycles
+octez-manager rewards history --cycles 10
+```
+
+#### `rewards pay`
+
+Execute payout for a specific cycle.
+
+```bash
+octez-manager rewards pay [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--baker <INSTANCE>` | Baker instance name | auto-inferred |
+| `--cycle <N>` | Target cycle number | latest completed |
+| `--dry-run` | Simulate without broadcasting | false |
+| `--confirm` | Skip interactive confirmation (for automation) | false |
+
+**Example:**
+
+```bash
+# Pay latest cycle (with confirmation prompt)
+octez-manager rewards pay
+
+# Dry-run for specific cycle
+octez-manager rewards pay --cycle 123 --dry-run
+
+# Automated payout (no prompt)
+octez-manager rewards pay --confirm
+```
+
+#### `rewards config import`
+
+Import an external config.hjson file.
+
+```bash
+octez-manager rewards config import <PATH> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--baker <INSTANCE>` | Baker instance name (auto-inferred if only one baker) |
+
+**Example:**
+
+```bash
+octez-manager rewards config import ./config.hjson
+```
+
+#### `rewards notify test`
+
+Send a test notification to all configured channels.
+
+```bash
+octez-manager rewards notify test [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--baker <INSTANCE>` | Baker instance name (auto-inferred if only one baker) |
+
+**Example:**
+
+```bash
+octez-manager rewards notify test
+```
+
+#### `rewards continual start`
+
+Enable continual payouts. Automatically pays due cycles when the scheduler detects cycle transitions.
+
+```bash
+octez-manager rewards continual start [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--baker <INSTANCE>` | Baker instance name | auto-inferred |
+| `--interval <N>` | Pay every N cycles | 1 (every cycle) |
+| `--offset <N>` | Cycle offset within the interval | 0 |
+
+**Example:**
+
+```bash
+# Enable automatic payout every cycle
+octez-manager rewards continual start
+
+# Pay every 3 cycles
+octez-manager rewards continual start --interval 3
+
+# Pay every 2 cycles, offset by 1
+octez-manager rewards continual start --interval 2 --offset 1
+```
+
+#### `rewards continual stop`
+
+Disable continual payouts.
+
+```bash
+octez-manager rewards continual stop [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--baker <INSTANCE>` | Baker instance name (auto-inferred if only one baker) |
+
+#### `rewards continual status`
+
+Show continual mode status.
+
+```bash
+octez-manager rewards continual status [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--baker <INSTANCE>` | Baker instance name (auto-inferred if only one baker) |
+
+### `sandbox`
+
+Manage sandbox environments for local testing and development.
+
+```bash
+octez-manager sandbox <SUBCOMMAND>
+```
+
+#### `sandbox create`
+
+Create a sandbox with a running node and baker.
+
+```bash
+octez-manager sandbox create [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--network <NET>`, `-n` | Tezos network (e.g. ghostnet, mainnet, or teztnets URL) | shadownet |
+| `--name <NAME>` | Sandbox name | auto-generated from network |
+| `--snapshot <URI>` | Snapshot URL or file path | auto-fetched |
+| `--rpc-addr <ADDR>` | Node RPC address host:port | auto-assigned (starting at 18732) |
+| `--max-delegates <N>` | Max delegates to impersonate via yes-wallet | 20 |
+| `--num-nodes <N>` | Number of nodes to create (nodes 2+ peer to node 1) | 1 |
+| `--num-bakers <N>` | Number of bakers to create (delegates split evenly) | 1 |
+| `--accuser` | Install an octez-accuser service | false |
+| `--app-bin-dir <PATH>` | Directory containing Octez binaries | auto |
+| `--octez-version <VER>` | Managed Octez version (e.g. '24.1' or 'latest') | - |
+| `--bin-dir-alias <ALIAS>` | Registered binary directory alias | - |
+| `--service-user <USER>` | System user for services | current user or 'tezos' |
+
+**Example:**
+
+```bash
+# Create a shadownet sandbox with defaults
+octez-manager sandbox create
+
+# Create a ghostnet sandbox with 2 nodes and 3 bakers
+octez-manager sandbox create \
+  --network ghostnet \
+  --name my-test \
+  --num-nodes 2 \
+  --num-bakers 3 \
+  --accuser
+
+# Create with specific Octez version
+octez-manager sandbox create \
+  --network shadownet \
+  --octez-version 21.0
+```
+
+#### `sandbox list`
+
+List all sandboxes.
+
+```bash
+octez-manager sandbox list
+```
+
+#### `sandbox status`
+
+Show sandbox status.
+
+```bash
+octez-manager sandbox status <NAME>
+```
+
+**Example:**
+
+```bash
+octez-manager sandbox status shadownet-sandbox
+```
+
+#### `sandbox start`
+
+Start all services in a sandbox.
+
+```bash
+octez-manager sandbox start <NAME>
+```
+
+**Example:**
+
+```bash
+octez-manager sandbox start shadownet-sandbox
+```
+
+#### `sandbox stop`
+
+Stop all services in a sandbox.
+
+```bash
+octez-manager sandbox stop <NAME>
+```
+
+**Example:**
+
+```bash
+octez-manager sandbox stop shadownet-sandbox
+```
+
+#### `sandbox destroy`
+
+Destroy a sandbox (stops services and removes all data).
+
+```bash
+octez-manager sandbox destroy <NAME> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**Example:**
+
+```bash
+# Destroy with confirmation
+octez-manager sandbox destroy shadownet-sandbox
+
+# Destroy without confirmation
+octez-manager sandbox destroy shadownet-sandbox --yes
+```
+
+#### `sandbox add-account`
+
+Add an account to a sandbox wallet.
+
+```bash
+octez-manager sandbox add-account <NAME> <ADDRESS> [OPTIONS]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--alias <ALIAS>` | Alias for the account | derived from address |
+
+**Example:**
+
+```bash
+# Add account with auto-generated alias
+octez-manager sandbox add-account shadownet-sandbox tz1abc123...
+
+# Add account with custom alias
+octez-manager sandbox add-account shadownet-sandbox tz1abc123... --alias my-account
 ```
 
 ### `list-available-networks`
