@@ -437,16 +437,37 @@ let create_baker_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
-    ~node_endpoint ~bin_dir ~depends_on =
+    ~node_endpoint ~bin_dir ~depends_on ~all_external_services =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
   (* Parse ExecStart to extract extra arguments *)
   let parsed = Execstart_parser.parse config.exec_start in
-  (* Use Local_instance if we have a managed dependency, otherwise Remote_endpoint *)
+  (* Determine node mode based on original accuser configuration *)
   let node_mode =
     match depends_on with
-    | Some instance -> Local_instance instance
-    | None -> Remote_endpoint node_endpoint
+    | Some instance ->
+        (* Managed node instance found - use managed local mode *)
+        Local_instance instance
+    | None -> (
+        (* No managed instance - try to find the node's data-dir from external services for local network detection *)
+        let node_data_dir =
+          List.find_map
+            (fun (svc : External_service.t) ->
+              match svc.config.role.value with
+              | Some External_service.Node -> (
+                  match svc.config.rpc_addr.value with
+                  | Some rpc
+                    when External_service.endpoint_matches_rpc
+                           ~endpoint:node_endpoint
+                           ~rpc_addr:rpc ->
+                      svc.config.data_dir.value
+                  | _ -> None)
+              | _ -> None)
+            all_external_services
+        in
+        match node_data_dir with
+        | Some data_dir -> Local_datadir (node_endpoint, data_dir)
+        | None -> Remote_endpoint node_endpoint)
   in
   (* Preserve extra arguments from original ExecStart *)
   let extra_args = parsed.extra_args in
@@ -1204,6 +1225,7 @@ let import_service ?(on_log = fun _ -> ())
               ~node_endpoint
               ~bin_dir
               ~depends_on:depends_on_instance
+              ~all_external_services
         | Some External_service.Dal_node ->
             create_dal_from_external
               ~instance:instance_name
