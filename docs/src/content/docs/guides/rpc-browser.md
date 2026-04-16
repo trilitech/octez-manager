@@ -9,7 +9,7 @@ The RPC Browser lets you explore and query RPC endpoints on any managed or exter
 
 ## Opening RPC Browser
 
-From the main screen, press `r` to open the RPC Browser.
+From the Instances page, press `r` to open the RPC Browser.
 
 Alternatively, select a node instance, press `Enter`, and choose **Browse RPC** from the action menu.
 

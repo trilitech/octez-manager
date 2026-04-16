@@ -31,15 +31,15 @@ The TUI provides access to all Octez Manager features:
 
 | Feature | Description | Key |
 |---------|-------------|-----|
-| **Install services** | Deploy nodes, bakers, accusers, DAL nodes, Signatory, octez-index | `Enter` on Install |
+| **Install services** | Deploy nodes, bakers, accusers, DAL nodes, Signatory, octez-index | `Enter` on "Add new" |
 | **Monitor status** | Real-time service status, sync progress, delegate activity | - |
 | **View logs** | Live log streaming with search and filtering | `Enter` on instance then select logs |
 | **Control services** | Start, stop, restart, and remove instances | `Enter` |
 | **Wallets** | View balances, transfer, stake, delegate, manage keys | Tab `2` |
-| **Manage binaries** | Download and manage Octez versions | Tab `3` or `b` |
-| **Diagnostics** | System metrics, service states, background queue | Tab `4` or `d` |
-| **Topology** | Visual map of service dependencies | Tab `5` or `t` |
-| **Experimental** | Sandbox environments, Rewards engine, octez-index | Tab `7` |
+| **Manage binaries** | Download and manage Octez versions | Tab `3` |
+| **Diagnostics** | System metrics, service states, background queue | Tab `4` |
+| **Topology** | Visual map of service dependencies | Tab `5` |
+| **Experimental** | Sandbox environments, Rewards engine | Tab `7` |
 | **Themes** | Switch between 13 built-in color themes | `Ctrl+T` |
 | **Import services** | Bring external services under management | `Enter` on unmanaged |
 
@@ -107,7 +107,7 @@ To change the Octez version used by a service:
 
 ## Managing Binaries
 
-Press `b` from the main dashboard to open the **Binaries** page.
+Press `3` from the main dashboard to open the **Binaries** page.
 
 ![Download Binaries](/gifs/download_binaries.gif)
 
@@ -184,7 +184,7 @@ After import, the service appears in your managed instances with full control.
 Here's a typical workflow for a complete Shadownet baking setup:
 
 1. **Download Octez binaries** (optional but recommended)
-   - Press `b` to open Binaries page
+   - Press `3` to open Binaries page
    - Download the version you want to use
 
 2. **Install a node**
@@ -210,7 +210,7 @@ Here's a typical workflow for a complete Shadownet baking setup:
 
 ## Diagnostics
 
-Press `4` or `d` from the main dashboard to open the **Diagnostics** page.
+Press `4` from the main dashboard to open the **Diagnostics** page.
 
 This page shows system-level information useful for troubleshooting:
 
@@ -223,21 +223,11 @@ The diagnostics page is read-only and refreshes automatically.
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `1`–`7` | Switch tabs (Instances, Wallets, Binaries, Diagnostics, Topology, Sandboxes, Experimental) |
-| `↑`/`↓` or `j`/`k` | Navigate list |
-| `←`/`→` or `h`/`l` | Navigate columns / switch panels |
-| `Enter` | Select / Open action menu |
-| `Tab` | Fold/unfold instance details |
-| `Ctrl+T` | Open theme picker |
-| `?` | Show context-sensitive help |
-| `Esc` | Go back / Close modal |
-| `q` | Quit |
+Press `?` on any page to see the available keyboard shortcuts for the current context.
 
 ## Wallets
 
-Press `2` to open the **Wallets** page (previously called "Keys").
+Press `2` to open the **Wallets** page.
 
 The split-panel layout shows wallet directories on the left and key details on the right:
 
@@ -252,29 +242,9 @@ Wallet directories from all installed services (nodes, bakers, accusers) are dis
 
 ## Topology
 
-Press `5` or `t` to open the **Topology** page.
+Press `5` to open the **Topology** page.
 
 A visual map of service dependency relationships rendered on a canvas. Nodes appear as bordered boxes with status indicators, connected by dependency lines. The layout adapts for narrow terminals (vertical stack) and wide terminals (side-by-side).
-
-## Experimental Features
-
-Press `7` to open the **Experimental** tab, which groups beta features:
-
-### Sandbox
-
-Create isolated Tezos sandbox environments for local testing. A sandbox spins up a node + baker pair with yes-wallet delegate generation.
-
-| Key | Action |
-|-----|--------|
-| `c` | Create sandbox |
-| `s` / `S` | Start / Stop |
-| `d` | Destroy (with confirmation) |
-| `a` | Add account |
-| `r` | Open RPC browser |
-
-### Rewards
-
-Built-in reward distribution dashboard for bakers with 4 tabs: Overview, Delegators, History, and Configuration. Supports automatic payouts via continual mode.
 
 ## Themes
 
@@ -282,7 +252,7 @@ Press `Ctrl+T` to open the theme picker. Themes apply instantly as you navigate 
 
 ## RPC Browser
 
-Press `r` from the main dashboard to open the **RPC Browser** — an interactive explorer for Tezos node RPC endpoints.
+Press `r` from the Instances page to open the **RPC Browser** — an interactive explorer for Tezos node RPC endpoints.
 
 Features:
 - Navigate the RPC endpoint tree with arrow keys
