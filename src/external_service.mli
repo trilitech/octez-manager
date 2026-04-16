@@ -166,6 +166,13 @@ val permission_denied_fields : detected_config -> string list
 
 (** {1 Dependency Resolution} *)
 
+(** Check if an endpoint matches a service's RPC address.
+    Normalizes localhost/127.0.0.1/0.0.0.0 and compares host:port pairs.
+    @param endpoint Node endpoint (e.g., "http://localhost:8732")
+    @param rpc_addr RPC address from service config (e.g., "127.0.0.1:8732")
+    @return true if the endpoint matches the RPC address *)
+val endpoint_matches_rpc : endpoint:string -> rpc_addr:string -> bool
+
 (** Get list of services this one depends on via endpoint matching.
     Matches node_endpoint and dal_endpoint against RPC addresses.
     @param external_svc The service to analyze

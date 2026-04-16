@@ -63,6 +63,15 @@ val get_unit_properties :
 val get_unit_content :
   unit_name:string -> (string, [`Permission_denied | `Error of string]) result
 
+(** {1 Network Detection} *)
+
+(** Try to infer network from data_dir/config.json.
+    Returns Some network_name if the config file exists and contains a valid network.
+    This is used as a fallback when RPC is not accessible (e.g., stopped nodes).
+    @param data_dir Path to node data directory
+    @return Network name if detected, None otherwise *)
+val probe_network_from_config : string -> string option
+
 (** {1 Testing Utilities} *)
 
 module For_tests : sig
@@ -77,6 +86,4 @@ module For_tests : sig
   val systemctl_cmd : unit -> string list
 
   val contains_octez_binary : string -> bool
-
-  val probe_network_from_config : string -> string option
 end

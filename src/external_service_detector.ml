@@ -975,6 +975,4 @@ module For_tests = struct
   let systemctl_cmd = Systemd.systemctl_cmd
 
   let contains_octez_binary = contains_octez_binary
-
-  let probe_network_from_config = probe_network_from_config
 end
