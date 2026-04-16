@@ -429,6 +429,7 @@ jobs:
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
+          opam pin add ppx_enforce "$PPX_FORBID_GIT_URL" --no-action
           opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
           opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
