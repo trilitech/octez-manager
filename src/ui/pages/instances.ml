@@ -45,8 +45,8 @@ let init_state () =
   in
   (* Default to 1 column, will be updated on first render with actual cols *)
   let num_columns = 1 in
-  (* Default to group view if groups exist, else role view *)
-  let view_mode = match groups with _ :: _ -> By_group | [] -> By_role in
+  (* Default to role view *)
+  let view_mode = By_role in
   Navigation.make
     {
       services;
