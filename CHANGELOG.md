@@ -6,116 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Fixed
-
-- **Network names shown as URLs in wallet actions**: Network picker for transfer/stake/delegate actions now shows clean network names (e.g., "shadownet") instead of raw URLs (e.g., "https://teztnets.com/shadownet") for locally running nodes.
-- **Wallet balances not fetched on page load**: Wallet balances are now fetched proactively when the application starts and refreshed periodically every 30 seconds. Previously, balances only appeared after user interaction (moving cursor to a key or pressing `r` to refresh), making the page appear unresponsive on first visit.
-- **Wallet operations hanging on non-bootstrapped nodes**: Transfer, stake, and delegate operations now pass `--wait none` to octez-client, preventing the command from blocking indefinitely at "Waiting for the node to be bootstrapped..." when the target node is still syncing.
-- **Unmanaged Instances keyboard navigation**: Pressing `j`/↓ from the last managed service now correctly moves the cursor into the "Unmanaged Instances" section, and the `➤` cursor is now visible on external service entries. Three index-space mismatches were fixed: the render function was computing the external section's base index using `|state.services|` instead of `|display_ordered_items|` (which includes ghost "Add new" entries, inflating the index), causing the cursor to never match; the clamp in `move_selection_external` was using a wrong upper bound that fell inside the ghost range (causing backwards snapping); and `force_refresh` was clamping the selection to the managed area only, resetting the cursor on every ~1 s tick.
-- **Extra args help explorer showing debug info**: Removed debug leftovers from the extra-args flag browser modal (used in node, baker, accuser, DAL, and index forms). The modal title bar was displaying the last key pressed, scroll offset, and cursor position.
-- **Baker form delegates reset on base dir change**: When creating a baker, changing the Baker Base Dir or changing the Instance Name in a way that updates the base dir now clears the previously selected delegates. This prevents stale delegate selections from a different base directory being carried over.
-- **DAL node data dir not tracking instance name**: When installing a DAL node, the data directory was always initialised to `dal-node-dal` regardless of the chosen instance name or selected node. The data dir now stays in sync with the instance name in all three cases: manual name edits, initial node selection (autoname), and node switches after autoname.
-- **Instances page arrow key navigation to "Add new" entries**: Fixed arrow key navigation on the Instances page when no services are installed. Previously, pressing ↓ from the "By Role / By Group" selector would not navigate to the "Add new Node", "Add new Baker", etc. entries, especially in wide terminals with multi-column layout. The issue was caused by `ensure_valid_column` resetting the selection to 0 on every refresh cycle (~1 second). Navigation now correctly moves to these ghost entries even when the service list is empty.
-- **Instances page help modal now documents arrow key navigation**: The help modal (`?`) on the Instances page now includes arrow keys (↑/↓/←/→) and vim keys (j/k/h/l) for navigation, making keyboard shortcuts more discoverable.
-- **Wallets page missing baker/accuser wallets**: The Wallets page now discovers wallet directories from installed baker and accuser services. Previously, only `~/.tezos-client` was shown; service-specific base directories (e.g., `~/.local/share/octez/baker-bakingnet`) were invisible because the installer did not register them in the directory registry.
-- **Wallets page fold/unfold keybinding**: Changed fold/unfold base directory groups from Space to Tab for consistency with common TUI conventions. Space now switches between the list and detail panels.
-- **Wallet modal misleading error with no delegates**: The baker wallet modal now shows "No delegates found in wallet" instead of "Unable to fetch wallet data — node may be unreachable" when the baker's base directory contains no keys.
-- **Validated text modals not enforcing validation**: Pressing Enter in validated text input modals (e.g., key alias, transfer amount) could bypass validation and submit invalid values. Validation errors like "Alias cannot be empty" are now properly enforced.
-
-### Removed
-
-- Global key `K` for navigating to Wallets tab has been removed. Users can now access the Wallets tab using the number key corresponding to its tab position.
-- Removed the "New Instance" dropdown that appeared when pressing '1' while already on the Instances tab. Use the inline "Add new" ghost entries instead.
-
-### Changed
-
-- **Wallet operations show both local and public endpoints**: When a network has both a local running node and public RPC endpoints, the network picker now shows separate entries for each, letting you choose which endpoint to use for transfers, staking, and other operations.
-- **Syncing endpoints greyed out in wallet network picker**: Local nodes that are not yet fully bootstrapped are now visually dimmed with a "(syncing..)" indicator in the network picker. The cursor skips over them during navigation and they cannot be selected, preventing accidental submission to non-bootstrapped endpoints.
-- **Log export now runs in the background with progress feedback**: Exporting instance logs no longer freezes the UI. A progress bar is shown during the export and a green success toast displays the archive path on completion.
-- Simplified help modal (`?`) keymaps across all pages: removed verbose descriptions in favor of concise action names (e.g., "Toggle view" instead of "Group/Role view", "Back" instead of "Back / Previous")
-- Simplified instances page help hint: removed verbose view mode descriptions ("By Role", "By Group", "Toggle view") in favor of concise key combinations
-- Extract `register_and_init` and `shutdown` helpers in `manager_app.ml`
-- Simplify TzKT routing: rewards now use `tzkt_url` directly from config instead of the Indexer hub abstraction
-- Remove development-only debug scaffolding from `cmd_rewards` (-640 lines)
-- Move Rewards page to Experimental tab (accessible via 7 → Rewards [BETA])
-- Restore test_rewards_pure and test_payout_continual test stanzas
-- **Experimental features tab**: Sandbox and other beta features are now nested under a new "Experimental" tab (press `7`) instead of having direct main-tab placement. The Experimental tab displays a directory of beta features with descriptions and badges. Sandbox functionality remains unchanged, just accessed via Experimental → Sandbox.
-
-### Fixed
-
-- **Help modal (`?`) now shows per-page shortcuts**: The global help modal triggered by `?` now displays both global shortcuts (Help, Menu, Theme picker, Back) and page-specific shortcuts from the active page's keymap. Previously, it only showed global shortcuts with a generic message. Each page (Instances, Wallets, Diagnostics, etc.) now shows its relevant keyboard shortcuts when you press `?`.
-- **Imported key not visible until restart**: After importing a watch-only address in the Wallets page, the key list now updates immediately without requiring an app restart.
-- **Global shortcuts (?, C-t, K) not accessible from RPC browser and log viewer**: Pressing `?` (help), `C-t` (theme picker), or `K` (key bindings) had no effect when navigating directly to the RPC browser or log viewer pages. These pages now correctly dispatch global shortcuts.
-- Download progress bar now updates in real time instead of requiring a keypress to refresh (fixes #798)
-- `octez-manager instance <name>` with an unknown instance name now shows "Unknown instance '<name>'" instead of the misleading "ACTION required" prompt
-- `octez-manager baker list` no longer crashes with an internal exception when no baker instances are installed; it now exits cleanly with a helpful message
-- Shell tab-completion for command groups (`baker`, `binaries`, `group`, `rewards`, `rpc`, `sandbox`) now correctly offers subcommands instead of only `--help`/`--version`
-- Zsh tab-completion for commands with colons in flag descriptions (e.g. `install-signatory`) no longer crashes the shell
-
 ### Added
 
-- Sandbox: yes-wallet integration for automatic delegate generation
-- Sandbox: restore multi-node/multi-baker topology parameters
-- **octez-index support**: octez-index (TzKT-compatible indexer) is now a
-  first-class managed service. Install, edit, start/stop/restart, and import
-  external systemd units via the Instances page. Version detection uses a
-  fallback regex for semver output (`v0.1.0` style).
-- **Directory picker: type a path directly**: When a form field opens a directory picker, a new "Type a path directly..." option lets users enter an arbitrary path without navigating the filesystem tree. Useful for paths on remote mounts or outside home directories. (closes #800)
-- **Local indexer compare mode**: `om ui --local-indexer <URL>` registers a local TzKT-compatible indexer as the preferred source for all rewards and delegation queries. Add `--compare-indexers` to simultaneously query public TzKT and log any divergences, useful for validating a self-hosted indexer. The `--indexer-network` flag (default: `mainnet`) identifies which network the local indexer serves.
-- **`rewards continual tick` command**: One-shot command that checks all baker instances with continual mode enabled and dispatches payouts for any cycles that are due. Intended for use with external schedulers (cron, systemd timers). When `rewards continual start` is called, octez-manager optionally installs a systemd timer to call `tick` automatically.
-- **Baker multi-node support (TUI)**: Bakers can now specify extra node instances or RPC endpoints for redundancy. In the TUI baker install/edit form, the "Extra Nodes" field opens a multi-select modal with checkboxes showing all available node instances. Users can toggle node instances with checkboxes or add custom HTTP(S) endpoints manually. The baker service will use these as fallback endpoints if the primary node becomes unavailable. Extra nodes are displayed in the instance details view.
-
-### Fixed
-
-- **DAL import RPC addr omitted to prevent config rewrite**: When importing a DAL node service, `--rpc-addr` and `--net-addr` flags are now only passed to `octez-dal-node` when they were explicitly present in the original service's `ExecStart`. Omitting these flags prevents `octez-dal-node` from rewriting `config.json` on every startup, preserving original configuration. (closes #793)
-- **Snapshot kind display in node install form**: The snapshot selector no longer shows redundant `(kind)` suffixes when a snapshot has a non-empty label. Snapshots with empty labels fall back to the kind slug, preventing blank display. (closes #113)
-- **`ensure_dir_path` permissions always applied**: `chmod` is now applied independently of `chown`. Previously, when running without root privileges, a failed `chown` silently suppressed the subsequent `chmod`, leaving directories with incorrect permissions. (closes #744)
-- **Version reported by `--version`**: `octez-manager --version` now reports the version from the dune build system rather than a hardcoded string. In development builds (not installed via opam), it reports `dev`.
-
-- **Rewards non-mainnet TzKT routing**: Fixed incorrect TzKT API base URL used when generating or paying rewards for non-mainnet bakers. Network names that are full URLs (e.g. from Teztnets picker) are now normalized to slugs before constructing the TzKT endpoint. The continual scheduler and payout executor now correctly resolve the baker's base directory from environment variables (`OCTEZ_CLIENT_BASE_DIR`, `OCTEZ_BAKER_BASE_DIR`).
-
-- **`om list --internal` flag**: New flag to list only managed (internal) services, complementing the existing `--external` flag. While `om list` shows managed services by default, `--all` shows both, and `--external` shows only external services, the new `--internal` flag explicitly lists only managed services without external service detection. Useful for scripting, automation, and situations where you want to ensure you're only working with octez-manager-controlled services.
-- **Tab-based main navigation shell**: The app now opens with a five-tab navigation bar (Instances, Wallets, Diagnostics, Topology, Sandboxes) at the top. Switch tabs with number keys `1`–`5`, or use the existing shortcuts `K` (Wallets), `d` (Diagnostics), `t` (Topology). Each tab preserves its state (cursor position, fold state, scroll offset) across switches — returning to a tab shows exactly what you left.
-- **Instances page: visual action buttons**: The three action buttons (Install new instance, Manage binaries, Browse RPCs) in the Instances button bar are now rendered as focusable `Button_widget` entries with highlighted selection, replacing the plain `[ Label ]` text style.
-- **Instances page: view-mode toggle row**: A visible "View: (X) By Role  ( ) By Group" radio row now appears below the button bar, showing the current view mode at a glance. Switch modes with `←`/`→` or `h`/`l` when the cursor is on the row, or continue using `g` anywhere on the page.
-- **Instances page: contextual help footer**: The footer now shows context-sensitive hints that change as you move through different zones (button bar, service list, service with failure). The "?" key opens a richer per-service markdown help modal.
+- **Directory picker: type a path directly**: Form directory pickers now include a "Type a path directly..." option for entering arbitrary paths without navigating the filesystem tree. Useful for paths on remote mounts or outside home directories. (closes #800)
+- **`om list --internal` flag**: Lists only managed services, complementing `--external`. Useful for scripting and automation.
+- **Experimental features tab**: Beta features (Sandbox, Rewards) now live under a new "Experimental" tab (press `7`) with descriptions and badges.
+  - **octez-index support**: octez-index (TzKT-compatible indexer) is now a first-class managed service. Install, edit, start/stop/restart, and import external systemd units.
+  - **Local indexer compare mode**: `om ui --local-indexer <URL>` registers a local TzKT-compatible indexer for rewards/delegation queries. `--compare-indexers` logs divergences vs public TzKT.
+  - **`rewards continual tick` command**: One-shot command for external schedulers (cron, systemd timers) to dispatch due payouts. `rewards continual start` can optionally install a systemd timer.
+  - **Baker multi-node support**: Bakers can specify extra node instances or RPC endpoints for redundancy via a multi-select modal in the install/edit form.
+  - **Sandbox improvements**: Yes-wallet integration for automatic delegate generation; restored multi-node/multi-baker topology parameters.
 
 ### Changed
 
-- `arch_index`: switched mutable-pattern scanner to `Tast_iterator`, removing ~85 lines of explicit constructor recursion and fixing OCaml 5.3 build
-- **Keys page renamed to Wallets**: The Keys management page is now called "Wallets" throughout the UI. Press `K` to open it. The tab label reads "Wallets".
-- **Instances page: Manage Sandboxes button removed**: The "Manage sandboxes" button has been removed from the Instances button bar. Sandboxes are now accessible via the dedicated Sandboxes tab (`5` key).
-- **Sandbox mode**: Create isolated Tezos sandbox environments for local testing and development. A sandbox spins up a complete node + baker pair using yes-crypto (any secret key can sign for any public key), automatically generating a yes-wallet with the top N active delegates from the network. TUI sandbox page (`sandbox` in navigation) lists all sandboxes with node/baker status, head level, and detail panel. Key bindings: `c` create, `s`/`S` start/stop, `d` destroy (with confirmation), `a` add account, `r` open RPC browser. CLI commands: `om sandbox create|list|status|start|stop|destroy|add-account`. Instance `set-env`/`get-env` commands allow setting arbitrary environment variables on any managed service instance.
-- **Rewards & Payouts engine**: Built-in reward distribution system for Tezos bakers, replacing the need for external tools like third-party payout tools. TUI dashboard with 4 tabs (Overview, Delegators, History, Configuration) accessible from the main menu. Features include: cycle rewards fetching from TzKT API, proportional reward calculation with per-delegator fee overrides, overdelegation protection (9x cap), payout preview generation, real payout execution via octez-client transfers, dry-run simulation with wallet balance checking, CSV/JSON report writing (standard format), double-payment prevention via file locks, external config.hjson import with HJSON parser, notification dispatch (Discord webhooks, Telegram Bot API, generic webhooks, external scripts), and continual mode for automatic payouts on cycle transitions with configurable random delay and multi-cycle intervals. CLI commands: `om rewards status|generate|history|pay|config import|notify test|continual start/stop/status`.
-- **Signatory remote signer support**: Complete integration for managing Signatory remote signer instances. Install and configure Signatory services via CLI (`om install-signatory`) or TUI wizard. Download Signatory binaries from official GitHub releases. Configure per-key operation permissions (block, attestation, preattestation, generic) for fine-grained access control. Bakers can use Signatory instances or external signer URIs instead of local keys, with automatic systemd dependency management. Comprehensive documentation includes setup guides, backend comparisons (File, YubiHSM, AWS/Azure/GCP KMS), security best practices, and baker integration workflows. Health monitoring displays service status, authorized key count, backend type, and request metrics. (closes #702, #703, #704, #705, #706, #709)
-- **Baker wallet operations**: New `om baker` command group and TUI wallet modal for managing delegate operations directly from octez-manager. Features include viewing wallet status (balances, staking parameters, pending unstakes, consensus key), staking/unstaking tez, finalizing unstake requests, transferring tez, registering as delegate, setting delegate parameters (staking limit, baking edge), updating consensus key, and governance voting (proposal submission, ballot casting with period-aware behavior). Accessible via "Wallet" action in the TUI instance menu for baker services, or via CLI commands (`om baker <instance> status|register|stake|unstake|finalize-unstake|transfer|set-delegate-params|update-consensus-key|vote`). All operations include fee estimation, confirmation prompts, and JSON output support.
-- **Instance groups**: Services can now be organized into logical groups that share configuration (network, binary version, service user). New `om group` CLI with create/list/show/delete/add/remove/start/stop/restart/upgrade subcommands. TUI instances page supports group-based view (toggle with `g` key) showing collapsible group headers with name, network, and binary version. All install forms include a Group field for assigning services to groups at creation time. Group lifecycle operations start/stop services in dependency order. (closes #335)
-- **Keys & Wallet Manager**: Comprehensive key management page with split-panel layout showing grouped keys on the left and rich detail on the right. Features include: enriched key metadata with key kind detection (unencrypted, encrypted, ledger, remote), background balance/delegation/consensus-key fetching every 30s, inline search (`/`), sort modes (`s`: alias/balance/network), force refresh (`r`), key creation with crypto scheme picker (`+`/`n`), watch-only address import, wallet operations (transfer, delegate, undelegate, register as delegate) via action modal (`Enter`), PKH copy to clipboard (`y`/`c`), receive info modal with tzkt explorer link (`Q`), visual multi-select mode (`v`) with batch operations, tzkt alias resolution for known delegates, and transfer MRU persistence. (closes #752, #753, #754, #755, #756, #757, #758, #759, #760, #761, #762, #763, #764, #765, #766, #767)
-- **Theme system with live preview**: New Ctrl+T theme picker with live preview - themes apply instantly as you navigate, Enter confirms, Esc restores original. 13 built-in themes available: dark, light (octez-manager) plus catppuccin-mocha/latte, dracula, nord/nord-light, gruvbox-dark/light, tokyonight/tokyonight-day, opencode, oled (from Miaou 0.4.0). Theme preference persists across sessions. All UI components use semantic themed colors.
-- **ppx_forbid**: New compile-time PPX linter that forbids unsafe or deprecated function calls. Project-wide rules ban `Obj`, blocking `Unix.*` process/sleep calls (use Eio equivalents), and `Thread.create`. TUI-specific rules additionally forbid direct `print_*`/`Printf.printf` (corrupts terminal), hardcoded `Widgets.fg`/`Widgets.bg` (use themed helpers), and deprecated `Vsection.render`. Suppressible with `[@allow_forbidden "reason"]`.
-- **Mutable pattern detection**: Architecture index now tracks usage of `ref`, `:=`, `!`, `Atomic`, and mutable record fields. New `arch_query mutables` command shows summary of mutable patterns across the codebase. CI blocks PRs that increase `mutable_fields` or `functions_with_mutables` metrics.
-- **Network topology page**: Canvas-rendered visualization of service dependency relationships, accessible via 't' key from instances page. Shows nodes as bordered boxes with status indicators, connected by dependency lines. Adapts layout for narrow terminals (vertical stack) and wide terminals (side-by-side roots).
-
-### Changed
-
-- **Documentation**: Updated prerequisites in installation and baker setup guides to clarify that Octez binaries are no longer required to be manually installed — octez-manager can download and manage them automatically
-- **TUI: Removed redundant "m" global menu**: The global "m" shortcut that opened a duplicate service installation menu has been removed. All service installation now goes through the "c" (Create Service) menu on the instances page, providing a single consistent installation path.
-- Instances page now groups services by role (Nodes, Bakers, Accusers, DAL nodes, Signatory) with each group wrapped in a Box_widget container with distinct colors
-- Diagnostics dashboard now uses Canvas-rendered header with live status indicators (metrics server, recorder, privilege level) and bordered title panel
-- Diagnostics dashboard uses Flex_layout for side-by-side panel arrangement: Real-Time Metrics + Metrics Recorder in one row, Metrics Server + System Information in another row, reducing vertical scrolling
-- Instance details page now renders service details and file paths sections in Box_widget Rounded borders with distinct colors (service details in color 12, file paths in color 14)
-- Instance details page now uses Description_list widget for key-value displays with improved alignment and automatic value wrapping
-
+- **Tab-based main navigation**: The app now opens with a tab navigation bar (Instances, Wallets, Diagnostics, Topology, Sandboxes, Experimental). Switch tabs with number keys. The global `K` shortcut, "New Instance" dropdown, and redundant `m` global menu have been removed in favor of the tab system and inline "Add new" ghost entries.
+- **Instances page redesign**: Visual action buttons replace plain text labels; a view-mode toggle row shows By Role / By Group; contextual help footer changes based on cursor zone; services grouped by role in bordered containers.
+- **Help modal (`?`) shows per-page shortcuts**: Displays both global and page-specific shortcuts with concise action names.
+- **Wallet network picker**: When a network has both a local node and public endpoints, separate entries are shown. Syncing nodes are greyed out with "(syncing..)" and cannot be selected.
+- **Keys page renamed to Wallets**: The Keys management page is now called "Wallets" throughout the UI.
+- **Log export runs in background**: Exporting instance logs no longer freezes the UI. A progress bar and success toast are shown.
 ### Fixed
 
-- **Pre-commit hook switch selection**: The pre-commit hook now always uses the project's local OCaml 5.3 switch instead of the shell's active switch. Previously the `opam env` fallback could pick up the global `octez-setup` switch (OCaml 5.2.1), causing `arch_index.ml` compilation failures because it requires the OCaml 5.3 Typedtree API.
-- **External baker/accuser command structure**: Integration test helper `create_external_service` now generates correct octez-baker command syntax with global flags (`--endpoint`, `--base-dir`) placed BEFORE the `run` subcommand instead of after. The incorrect order caused external baker and accuser services to crash-loop with "Unrecognized command" errors. Also adds missing `--base-dir` parameter to accuser services.
-- **Import with environment variables**: Import command now properly expands shell variables in systemd ExecStart commands when EnvironmentFile is configured. Previously, importing a service with `--base-dir "${OCTEZ_BAKER_BASE_DIR}"` would fail with "Required field 'base_dir' is missing" even when the environment file existed and contained the variable. The fix includes: improved EnvironmentFile property parsing (handles space/semicolon/newline separators and optional files with `-` prefix), variable detection before marking fields as "detected", proper logging for environment file read operations (debug for success, warn for failures), and validation that variable expansion actually succeeded before marking fields as "known". Fields with unexpanded variables are now correctly marked as "Unknown" instead of "Detected", allowing the import command to properly report missing required fields and guide users to provide overrides or fix environment file issues.
-- **Cascade import DAL connection loss**: Fixed bug where baker lost its DAL node connection during cascade import (`--cascade` flag). When importing a node with cascade enabled, dependent services (baker, accuser, dal-node) are imported in topological order. The baker import correctly detected the DAL dependency and set `dal_config = Dal_auto`, but failed to resolve the actual DAL endpoint address during installation. This caused the baker to start without the `--dal-node` flag, resulting in "Please connect a running DAL node using '--dal-node <endpoint>'" errors. The fix resolves the DAL instance's RPC address from the service registry when `dal_config = Dal_auto` and sets the proper endpoint in the `OCTEZ_DAL_CONFIG` environment variable, ensuring the baker connects to the DAL node on startup.
-- **Import stopped nodes**: Network detection now reads from `config.json` for stopped nodes when RPC is not accessible. Previously, importing a stopped node without `--network` flag would fail with "Network could not be detected (RPC not accessible)" even though the network could be inferred from the node's configuration file. The import process now checks `config.json` first (faster, works for stopped nodes), then falls back to RPC probe if the service is active.
-- **Baker/accuser purge preserves node data**: Purging a baker or accuser instance no longer deletes the node's blockchain data directory. Previously, `om instance purge <baker>` would delete the node's data even though the node instance still existed, causing data loss. The fix detects when a data directory is shared by multiple services and skips deletion, preventing scenarios where purging one baker breaks other services using the same node. (fixes #727)
-- **Coverage workflow cache**: Fixed main branch CI failure by including `octez-manager.opam` in the coverage workflow cache key. The workflow was using a stale opam cache that didn't include new dependencies (like yaml), causing "Library not found" build errors. (fixes #742)
-- **RPC Browser responsiveness**: HTTP requests and endpoint listing now run in background worker pool, preventing UI freezes during slow network responses (fixes #673)
+- **Wallet balances not fetched on page load**: Balances are now fetched proactively on startup and refreshed every 30 seconds.
+- **Wallet operations hanging on non-bootstrapped nodes**: Operations now pass `--wait none` to prevent blocking indefinitely.
+- **Wallets page missing baker/accuser wallets**: Wallet directories from installed baker and accuser services are now discovered automatically.
+- **Wallet fold/unfold keybinding**: Changed from Space to Tab; Space now switches between list and detail panels.
+- **Wallet modal misleading error with no delegates**: Shows "No delegates found in wallet" instead of a generic node-unreachable error.
+- **Network names shown as URLs in wallet actions**: Network picker shows clean names (e.g., "shadownet") instead of raw URLs.
+- **Validated text modals not enforcing validation**: Pressing Enter can no longer bypass validation in text input modals.
+- **Unmanaged Instances keyboard navigation**: Cursor now correctly moves into the "Unmanaged Instances" section and is visible on external service entries.
+- **Instances page arrow key navigation**: Fixed navigation to "Add new" entries in empty service lists and multi-column layouts.
+- **Baker form delegates reset on base dir change**: Changing base dir now clears stale delegate selections.
+- **DAL node data dir not tracking instance name**: Data directory now stays in sync with instance name.
+- **DAL import preserves original config**: Importing a DAL node no longer rewrites its configuration on every startup. (closes #793)
+- **Snapshot kind display**: No longer shows redundant `(kind)` suffixes; empty labels fall back to kind slug. (closes #113)
+- **`ensure_dir_path` permissions**: Directory permissions are now always applied correctly, even without root privileges. (closes #744)
+- **`--version` reports build version**: Now reports version from dune build system instead of hardcoded string.
+- **Rewards non-mainnet TzKT routing**: Fixed incorrect rewards data for non-mainnet bakers.
+- **Imported key not visible until restart**: Key list updates immediately after importing a watch-only address.
+- **Global shortcuts not accessible from RPC browser/log viewer**: `?`, `C-t`, and other global shortcuts now work on all pages.
+- **Download progress bar** now updates in real time. (fixes #798)
+- `octez-manager instance <name>` with unknown name now shows "Unknown instance" instead of misleading "ACTION required"
+- `octez-manager baker list` no longer crashes when no baker instances are installed
+- Shell tab-completion for command groups now correctly offers subcommands
+- Zsh tab-completion for commands with colons no longer crashes the shell
+- **External baker/accuser command structure**: Fixed crash-loop when importing external baker/accuser services.
+- **Import with environment variables**: Import now works when systemd services use environment variables in their configuration.
+- **Cascade import DAL connection loss**: Baker no longer loses its DAL node connection when imported with `--cascade`.
+- **Import stopped nodes**: Network detection reads from `config.json` when RPC is not accessible.
+- **Baker/accuser purge preserves node data**: Shared data directories are no longer deleted. (fixes #727)
+- **RPC Browser responsiveness**: RPC browser no longer freezes the UI during slow network responses. (fixes #673)
 
 ## [0.3.0] - 2026-02-11
 
