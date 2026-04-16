@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-04-16
+
 ### Added
 
 - **Directory picker: type a path directly**: Form directory pickers now include a "Type a path directly..." option for entering arbitrary paths without navigating the filesystem tree. Useful for paths on remote mounts or outside home directories. (closes #800)
