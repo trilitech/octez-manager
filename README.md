@@ -5,7 +5,7 @@
 <h1 align="center">Octez Manager</h1>
 
 <p align="center">
-  A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, DAL nodes, Signatory remote signers).
+  A terminal UI for managing Octez blockchain services (nodes, bakers, accusers, DAL nodes, Signatory remote signers, octez-index).
 </p>
 
 <p align="center">
@@ -26,13 +26,20 @@
 
 ## Features
 
-- **Install and manage** Octez services as systemd units
-- **Signatory integration** for secure remote signing with HSM/cloud KMS support
-- **Terminal UI** with real-time monitoring and logs
+- **Install and manage** Octez services as systemd units (nodes, bakers, accusers, DAL, Signatory, octez-index)
+- **Terminal UI** with tab-based navigation, real-time monitoring, logs, and 13 built-in themes
 - **Web interface** for browser-based remote management
-- **RPC Browser** — Interactively explore and query RPC endpoints with syntax highlighting
+- **Wallets** — View balances, transfer, stake, delegate, and manage keys across all installed services
+- **Baker operations** — Register, stake/unstake, set delegate parameters, governance voting via `om baker`
+- **Instance groups** — Organize services into logical groups with shared lifecycle operations
+- **Binary management** — Download, register, and prune Octez versions; cascade version updates with rollback
+- **RPC Browser** — Interactively explore and query RPC endpoints with syntax highlighting and streaming
+- **Import external services** — Detect unmanaged Octez systemd units and bring them under management
+- **Signatory integration** for secure remote signing with HSM/cloud KMS support
 - **Snapshot import** from tzinit.org with automatic download
-- **Multiple instances** per service type
+- **Self-update** — Check for and install octez-manager updates
+- **Sandbox** — Isolated Tezos sandbox environments for local testing (Experimental)
+- **Rewards engine** — Built-in reward distribution for bakers with continual mode (Experimental)
 - **Network discovery** from teztnets.com (mainnet, shadownet, etc.)
 
 ## Quick Start
@@ -105,24 +112,29 @@ Useful presets:
 ```sh
 # Install a node with snapshot
 octez-manager install-node \
-  --instance mainnet-node \
-  --network mainnet \
+  --instance shadownet \
+  --network shadownet \
   --snapshot \
   --history-mode rolling
 
 # Install a baker
 octez-manager install-baker \
-  --instance mainnet-baker \
-  --node mainnet-node
+  --instance baker-shadownet \
+  --node-instance shadownet \
+  --delegate tz1...
 
 # List services
 octez-manager list
 
 # Service actions
-octez-manager instance <name> start|stop|restart|purge
+octez-manager instance <name> start|stop|restart|logs|purge
 
-# View logs
-octez-manager logs <name>
+# Baker wallet operations
+octez-manager baker <instance> status|stake|transfer|vote
+
+# Manage binaries
+octez-manager binaries download latest
+octez-manager binaries list
 ```
 
 Run `octez-manager --help` for all commands.
