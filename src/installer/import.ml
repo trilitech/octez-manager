@@ -496,25 +496,25 @@ let create_accuser_from_external ~instance ~external_svc ~network:_ ~base_dir
               (match e with `Msg m -> m)))
 
 let create_dal_from_external ~instance ~external_svc ~network ~data_dir
-    ~rpc_addr:_ ~net_addr:_ ~node_endpoint ~bin_dir ~strategy ~depends_on =
+    ~rpc_addr ~net_addr ~node_endpoint ~bin_dir ~strategy ~depends_on =
   let config = external_svc.External_service.config in
   let service_user = get_service_user external_svc in
   (* Parse ExecStart to extract extra arguments and detect which flags were present *)
   let parsed = Execstart_parser.parse config.exec_start in
-  (* Use rpc_addr/net_addr from the parsed ExecStart when available; fall back to
-     the resolved values only if they were explicitly present in the original.
-     Passing empty strings causes dal_node.ml to omit those env vars entirely,
-     which prevents octez-dal-node from rewriting config.json on startup. *)
+  (* Use parsed ExecStart to detect whether --rpc-addr / --net-addr were
+     present in the original command.  When present, use the resolved value
+     from the external service detector (which expands env-file variables).
+     When absent, pass empty strings so dal_node.ml omits those env vars
+     entirely, preserving config.json on startup. *)
   let effective_rpc_addr =
     match parsed.Execstart_parser.rpc_addr with
-    | Some addr -> addr
-    | None ->
-        (* Flag was absent in the original ExecStart — omit it from the managed
-           service so config.json is not rewritten. *)
-        ""
+    | Some _ -> rpc_addr (* Flag was present in original, use resolved value *)
+    | None -> "" (* Flag absent — omit to preserve config.json *)
   in
   let effective_net_addr =
-    match parsed.Execstart_parser.net_addr with Some addr -> addr | None -> ""
+    match parsed.Execstart_parser.net_addr with
+    | Some _ -> net_addr
+    | None -> ""
   in
   (* For Clone strategy, increment ports to avoid conflicts (only when present) *)
   let effective_rpc_addr, effective_net_addr =
