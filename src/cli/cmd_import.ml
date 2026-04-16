@@ -155,6 +155,7 @@ let import_cmd =
                           Import.import_service
                             ~on_log:log_fn
                             ~prompt_yes_no:prompt_fn
+                            ~all_external_services:services
                             ~options
                             ~external_svc
                             ()

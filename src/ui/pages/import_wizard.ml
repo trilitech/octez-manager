@@ -256,7 +256,12 @@ and start_import ps =
           }
         in
         match
-          Import.import_service ~on_log:append_log ~options ~external_svc ()
+          Import.import_service
+            ~on_log:append_log
+            ~all_external_services:s.external_services
+            ~options
+            ~external_svc
+            ()
         with
         | Ok _result -> Ok ()
         | Error e -> Error e

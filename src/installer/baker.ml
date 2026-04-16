@@ -41,8 +41,11 @@ let install_baker ?(quiet = false) (request : baker_request) =
   let* network =
     match node_mode with
     | Local svc -> Ok svc.Service.network
-    | Local_unmanaged _ | Remote _ ->
-        Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
+    | Local_unmanaged (_, data_dir) -> (
+        match External_service_detector.probe_network_from_config data_dir with
+        | Some net -> Ok net
+        | None -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint)
+    | Remote _ -> Teztnets.resolve_octez_node_chain ~endpoint:node_endpoint
   in
   let base_dir =
     match request.base_dir with
