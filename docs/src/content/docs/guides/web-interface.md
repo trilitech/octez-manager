@@ -24,7 +24,7 @@ Then open `http://your-server:8080` in any browser.
 
 The web interface provides full access to all Octez Manager functionality:
 
-- **Service management** — Install, start, stop, and configure nodes, bakers, accusers, and DAL nodes
+- **Service management** — Install, start, stop, and configure nodes, bakers, accusers, DAL nodes, Signatory, and octez-index
 - **Real-time monitoring** — View service status, sync progress, and system metrics
 - **Log viewing** — Stream and search logs from any service
 - **Binary management** — Download and manage Octez versions
