@@ -31,11 +31,16 @@ The TUI provides access to all Octez Manager features:
 
 | Feature | Description | Key |
 |---------|-------------|-----|
-| **Install services** | Deploy nodes, bakers, accusers, and DAL nodes | `Enter` on Install |
+| **Install services** | Deploy nodes, bakers, accusers, DAL nodes, Signatory, octez-index | `Enter` on Install |
 | **Monitor status** | Real-time service status, sync progress, delegate activity | - |
 | **View logs** | Live log streaming with search and filtering | `Enter` on instance then select logs |
 | **Control services** | Start, stop, restart, and remove instances | `Enter` |
-| **Manage binaries** | Download and manage Octez versions | `b` |
+| **Wallets** | View balances, transfer, stake, delegate, manage keys | Tab `2` |
+| **Manage binaries** | Download and manage Octez versions | Tab `3` or `b` |
+| **Diagnostics** | System metrics, service states, background queue | Tab `4` or `d` |
+| **Topology** | Visual map of service dependencies | Tab `5` or `t` |
+| **Experimental** | Sandbox environments, Rewards engine, octez-index | Tab `7` |
+| **Themes** | Switch between 13 built-in color themes | `Ctrl+T` |
 | **Import services** | Bring external services under management | `Enter` on unmanaged |
 
 ## Installing Your First Node
@@ -63,6 +68,8 @@ The dashboard shows all your instances organized by type:
 - **Bakers** — Block producers and attesters
 - **Accusers** — Double-baking detectors
 - **DAL Nodes** — Data Availability Layer nodes
+- **Signatory** — Remote signer service
+- **octez-index** — TzKT-compatible indexer
 - **Unmanaged Instances** — External services detected on your system
 
 Each instance displays:
@@ -70,7 +77,7 @@ Each instance displays:
 - Instance name and network
 - Real-time metrics
 
-Select any instance with arrow keys and press `Enter` to see details, or use the action keys shown at the bottom of the screen.
+Select any instance with arrow keys and press `Enter` to see details, or use the action keys shown at the bottom of the screen. Press `g` to toggle grouping mode.
 
 ### Upgrade Notification
 
@@ -203,7 +210,7 @@ Here's a typical workflow for a complete Shadownet baking setup:
 
 ## Diagnostics
 
-Press `d` from the main dashboard to open the **Diagnostics** page.
+Press `4` or `d` from the main dashboard to open the **Diagnostics** page.
 
 This page shows system-level information useful for troubleshooting:
 
@@ -218,15 +225,60 @@ The diagnostics page is read-only and refreshes automatically.
 
 | Key | Action |
 |-----|--------|
-| `↑`/`↓` | Navigate list |
+| `1`–`7` | Switch tabs (Instances, Wallets, Binaries, Diagnostics, Topology, Sandboxes, Experimental) |
+| `↑`/`↓` or `j`/`k` | Navigate list |
+| `←`/`→` or `h`/`l` | Navigate columns / switch panels |
 | `Enter` | Select / Open action menu |
 | `Tab` | Fold/unfold instance details |
-| `b` | Open Binaries page |
-| `d` | Open Diagnostics page |
-| `r` | Open RPC Browser |
-| `?` | Show help |
+| `Ctrl+T` | Open theme picker |
+| `?` | Show context-sensitive help |
 | `Esc` | Go back / Close modal |
 | `q` | Quit |
+
+## Wallets
+
+Press `2` to open the **Wallets** page (previously called "Keys").
+
+The split-panel layout shows wallet directories on the left and key details on the right:
+
+- **View balances** — Background refresh every 30 seconds
+- **Transfer tez** — Send to any address via a local or public node
+- **Stake/Unstake** — Manage staking directly from the wallet
+- **Delegate** — Set or change delegation
+- **Import keys** — Create new keys or import watch-only addresses
+- **Search and sort** — Press `/` to search, `s` to cycle sort modes
+
+Wallet directories from all installed services (nodes, bakers, accusers) are discovered automatically.
+
+## Topology
+
+Press `5` or `t` to open the **Topology** page.
+
+A visual map of service dependency relationships rendered on a canvas. Nodes appear as bordered boxes with status indicators, connected by dependency lines. The layout adapts for narrow terminals (vertical stack) and wide terminals (side-by-side).
+
+## Experimental Features
+
+Press `7` to open the **Experimental** tab, which groups beta features:
+
+### Sandbox
+
+Create isolated Tezos sandbox environments for local testing. A sandbox spins up a node + baker pair with yes-wallet delegate generation.
+
+| Key | Action |
+|-----|--------|
+| `c` | Create sandbox |
+| `s` / `S` | Start / Stop |
+| `d` | Destroy (with confirmation) |
+| `a` | Add account |
+| `r` | Open RPC browser |
+
+### Rewards
+
+Built-in reward distribution dashboard for bakers with 4 tabs: Overview, Delegators, History, and Configuration. Supports automatic payouts via continual mode.
+
+## Themes
+
+Press `Ctrl+T` to open the theme picker. Themes apply instantly as you navigate — press `Enter` to confirm or `Esc` to restore the original. 13 built-in themes are available including dark, light, catppuccin, dracula, nord, gruvbox, tokyonight, and oled. Your preference persists across sessions.
 
 ## RPC Browser
 
