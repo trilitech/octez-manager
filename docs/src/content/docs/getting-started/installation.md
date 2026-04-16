@@ -51,46 +51,6 @@ sudo mv octez-manager-v*-linux-x86_64 /usr/local/bin/octez-manager
 octez-manager --version
 ```
 
-## From Source
-
-### 1. Install OCaml and opam
-
-```bash
-# Ubuntu/Debian
-sudo apt install opam
-
-# Initialize opam
-opam init
-eval $(opam env)
-
-# Install OCaml 5.1
-opam switch create 5.1.0
-eval $(opam env)
-```
-
-### 2. Clone and Build
-
-```bash
-git clone https://github.com/trilitech/octez-manager.git
-cd octez-manager
-
-# Install dependencies
-opam install . --deps-only
-
-# Build
-dune build
-
-# Install locally
-dune install
-```
-
-### 3. Verify Installation
-
-```bash
-octez-manager --version
-octez-manager --help
-```
-
 ## Running Modes
 
 Octez Manager creates systemd services to manage your Tezos infrastructure. How you run it determines where services and data are stored:

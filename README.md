@@ -61,15 +61,6 @@ curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/instal
 curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh -s -- --prefix=/custom/path
 ```
 
-**Build from source:**
-
-```sh
-git clone https://github.com/trilitech/octez-manager.git
-cd octez-manager
-opam install . --deps-only
-make build
-```
-
 ### Prerequisites
 
 - OCaml 5.1+, opam 2.1+
