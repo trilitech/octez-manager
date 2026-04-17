@@ -54,7 +54,8 @@ RUN eval $(opam env) && \
     opam pin add miaou-driver-matrix git+https://github.com/trilitech/miaou.git --no-action --yes && \
     opam pin add miaou-driver-web git+https://github.com/trilitech/miaou.git --no-action --yes && \
     opam pin add miaou-runner git+https://github.com/trilitech/miaou.git --no-action --yes && \
-    opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner
+    opam pin add miaou-registry git+https://github.com/trilitech/miaou.git --no-action --yes && \
+    opam install -y miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry
 
 # Clean up opam cache
 RUN eval $(opam env) && opam clean -a -c -s --logs
