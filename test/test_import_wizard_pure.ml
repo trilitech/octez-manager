@@ -15,7 +15,8 @@ module Navigation = Miaou.Core.Navigation
 
 let make_state ?(step = Import_wizard.SelectService) ?(external_services = [])
     ?(selected_idx = 0) ?selected_service ?(strategy = Import.Takeover)
-    ?custom_name ?network_override ?error () : Import_wizard.state =
+    ?custom_name ?network_override ?error ?(cascade = false)
+    ?(cascade_chain = []) ?cascade_analysis () : Import_wizard.state =
   {
     step;
     external_services;
@@ -25,6 +26,9 @@ let make_state ?(step = Import_wizard.SelectService) ?(external_services = [])
     custom_name;
     network_override;
     error;
+    cascade;
+    cascade_chain;
+    cascade_analysis;
   }
 
 let wrap_state = Navigation.make
@@ -216,6 +220,62 @@ let test_keymap_has_enter () =
   Alcotest.(check bool) "has Enter" true (List.mem "Enter" keys)
 
 (* ============================================================ *)
+(* toggle_cascade Tests                                         *)
+(* ============================================================ *)
+
+let test_toggle_cascade_off_to_on () =
+  let svc = make_ext_svc "test-node" in
+  let ps =
+    wrap_state
+      (make_state
+         ~external_services:[svc]
+         ~selected_service:svc
+         ~cascade:false
+         ())
+  in
+  let ps' = Import_wizard.toggle_cascade ps in
+  Alcotest.(check bool) "cascade enabled" true ps'.Navigation.s.cascade
+
+let test_toggle_cascade_on_to_off () =
+  let svc = make_ext_svc "test-node" in
+  let ps =
+    wrap_state
+      (make_state
+         ~external_services:[svc]
+         ~selected_service:svc
+         ~cascade:true
+         ())
+  in
+  let ps' = Import_wizard.toggle_cascade ps in
+  Alcotest.(check bool) "cascade disabled" false ps'.Navigation.s.cascade
+
+let test_toggle_cascade_clears_chain_when_disabled () =
+  let svc = make_ext_svc "test-node" in
+  let ps =
+    wrap_state
+      (make_state
+         ~external_services:[svc]
+         ~selected_service:svc
+         ~cascade:true
+         ~cascade_chain:[svc]
+         ())
+  in
+  let ps' = Import_wizard.toggle_cascade ps in
+  Alcotest.(check int)
+    "cascade chain cleared"
+    0
+    (List.length ps'.Navigation.s.cascade_chain)
+
+let test_toggle_cascade_no_selected_service () =
+  let ps = wrap_state (make_state ~cascade:false ()) in
+  let ps' = Import_wizard.toggle_cascade ps in
+  Alcotest.(check bool) "cascade enabled" true ps'.Navigation.s.cascade ;
+  Alcotest.(check int)
+    "no chain computed"
+    0
+    (List.length ps'.Navigation.s.cascade_chain)
+
+(* ============================================================ *)
 (* Test Runner                                                   *)
 (* ============================================================ *)
 
@@ -243,6 +303,19 @@ let () =
             `Quick
             test_toggle_clone_to_takeover;
           Alcotest.test_case "round trip" `Quick test_toggle_round_trip;
+        ] );
+      ( "toggle_cascade",
+        [
+          Alcotest.test_case "off to on" `Quick test_toggle_cascade_off_to_on;
+          Alcotest.test_case "on to off" `Quick test_toggle_cascade_on_to_off;
+          Alcotest.test_case
+            "clears chain when disabled"
+            `Quick
+            test_toggle_cascade_clears_chain_when_disabled;
+          Alcotest.test_case
+            "no selected service"
+            `Quick
+            test_toggle_cascade_no_selected_service;
         ] );
       ( "header",
         [

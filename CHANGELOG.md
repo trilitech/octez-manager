@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Cascade import in TUI**: Import wizard now supports cascade import mode, allowing users to import services with all their dependencies or dependents in the correct order. Toggle with 'c' in the configure step. (fixes #886)
+
 ## [1.0.0] - 2026-04-16
 
 ### Added

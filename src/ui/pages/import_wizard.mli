@@ -30,6 +30,11 @@ type state = {
   custom_name : string option;  (** Optional custom instance name override. *)
   network_override : string option;  (** Optional network name override. *)
   error : string option;  (** Error message from the last operation. *)
+  cascade : bool;  (** Whether to import dependencies/dependents. *)
+  cascade_chain : External_service.t list;
+      (** Services to import when cascade is enabled. *)
+  cascade_analysis : Import_cascade.dependency_analysis option;
+      (** Dependency analysis for cascade import preview. *)
 }
 
 (** Navigation-wrapped state. *)
@@ -52,6 +57,9 @@ val move_selection : pstate -> int -> pstate
 
 (** Toggle the import strategy between [Takeover] and [Clone]. *)
 val toggle_strategy : pstate -> pstate
+
+(** Toggle cascade import on/off and recompute dependency chain. *)
+val toggle_cascade : pstate -> pstate
 
 (** Return the header lines for the current wizard step. *)
 val header : state -> string list
