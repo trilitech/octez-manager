@@ -26,6 +26,9 @@ type state = {
   custom_name : string option;
   network_override : string option;
   error : string option;
+  cascade : bool;
+  cascade_chain : External_service.t list;
+  cascade_analysis : Import_cascade.dependency_analysis option;
 }
 
 type msg = unit
@@ -44,6 +47,9 @@ let init () =
       custom_name = None;
       network_override = None;
       error = None;
+      cascade = false;
+      cascade_chain = [];
+      cascade_analysis = None;
     }
 
 let update ps _ =
@@ -233,54 +239,74 @@ and start_import ps =
         (fun s -> {s with error = Some "No service selected"})
         ps
   | Some external_svc ->
-      let import_task ~append_log () =
-        let overrides : Import.field_overrides =
-          {
-            network = s.network_override;
-            data_dir = None;
-            base_dir = None;
-            rpc_addr = None;
-            net_addr = None;
-            delegates = None;
-          }
-        in
-        let options : Import.import_options =
-          {
-            strategy = s.strategy;
-            new_instance_name = s.custom_name;
-            overrides;
-            dry_run = false;
-            interactive = false;
-            preserve_data = true;
-            quiet = false;
-          }
-        in
-        match
-          Import.import_service
-            ~on_log:append_log
-            ~all_external_services:s.external_services
-            ~options
-            ~external_svc
-            ()
-        with
-        | Ok _result -> Ok ()
-        | Error e -> Error e
+      (* Shared options construction *)
+      let overrides : Import.field_overrides =
+        {
+          network = s.network_override;
+          data_dir = None;
+          base_dir = None;
+          rpc_addr = None;
+          net_addr = None;
+          delegates = None;
+        }
       in
-      Job_manager.submit
-        ~on_complete:(fun status ->
-          match status with
-          | Job_manager.Succeeded ->
-              Cache.invalidate_all () ;
-              Context.mark_instances_dirty () ;
-              Context.toast_success "Service imported successfully!" ;
-              Context.set_pending_tab Context.Tab_instances ;
-              Context.navigate_back ()
-          | Job_manager.Failed msg ->
-              Context.toast_error (Printf.sprintf "Import failed: %s" msg)
-          | Job_manager.Pending | Job_manager.Running -> ())
-        ~timeout:None
-        ~description:"Import external service"
-        import_task ;
+      let options : Import.import_options =
+        {
+          strategy = s.strategy;
+          new_instance_name = s.custom_name;
+          overrides;
+          dry_run = false;
+          interactive = false;
+          preserve_data = true;
+          quiet = false;
+        }
+      in
+      (* Shared completion callback *)
+      let on_complete status =
+        match status with
+        | Job_manager.Succeeded ->
+            Cache.invalidate_all () ;
+            Context.mark_instances_dirty () ;
+            let msg =
+              if s.cascade then "Cascade import successful!"
+              else "Service imported successfully!"
+            in
+            Context.toast_success msg ;
+            Context.set_pending_tab Context.Tab_instances ;
+            Context.navigate_back ()
+        | Job_manager.Failed msg ->
+            Context.toast_error (Printf.sprintf "Import failed: %s" msg)
+        | Job_manager.Pending | Job_manager.Running -> ()
+      in
+      (* Import task differs based on cascade mode *)
+      let import_task ~append_log () =
+        if s.cascade then
+          match
+            Import.import_cascade
+              ~on_log:append_log
+              ~options
+              ~external_svc
+              ~all_services:s.external_services
+              ()
+          with
+          | Ok _results -> Ok ()
+          | Error e -> Error e
+        else
+          match
+            Import.import_service
+              ~on_log:append_log
+              ~all_external_services:s.external_services
+              ~options
+              ~external_svc
+              ()
+          with
+          | Ok _result -> Ok ()
+          | Error e -> Error e
+      in
+      let description =
+        if s.cascade then "Import cascade" else "Import external service"
+      in
+      Job_manager.submit ~on_complete ~timeout:None ~description import_task ;
       Navigation.update (fun s -> {s with step = Importing; error = None}) ps
 
 let handled_keys () = Miaou.Core.Keys.[Escape; Enter; Up; Down; Tab]
@@ -302,6 +328,29 @@ let move_selection ps delta =
         {s with selected_idx})
     ps
 
+let compute_cascade_chain s =
+  (* Compute cascade chain based on strategy and selected service *)
+  match s.selected_service with
+  | None -> ([], None)
+  | Some svc ->
+      let chain =
+        match s.strategy with
+        | Import.Takeover ->
+            Import_cascade.get_full_cascade
+              ~service:svc
+              ~all_services:s.external_services
+        | Import.Clone ->
+            Import_cascade.get_dependency_chain
+              ~service:svc
+              ~all_services:s.external_services
+      in
+      let analysis =
+        Import_cascade.analyze_dependencies
+          ~services:s.external_services
+          ~target_services:chain
+      in
+      (chain, Some analysis)
+
 let toggle_strategy ps =
   Navigation.update
     (fun s ->
@@ -310,8 +359,33 @@ let toggle_strategy ps =
         | Import.Takeover -> Import.Clone
         | Import.Clone -> Import.Takeover
       in
-      {s with strategy})
+      (* If cascade is enabled, recompute with new strategy *)
+      if s.cascade then
+        let cascade_chain, cascade_analysis = compute_cascade_chain s in
+        {s with strategy; cascade_chain; cascade_analysis}
+      else {s with strategy; cascade_chain = []; cascade_analysis = None})
     ps
+
+let toggle_cascade ps =
+  let s = ps.Navigation.s in
+  let new_cascade = not s.cascade in
+  if new_cascade then
+    (* Cascade enabled: compute the chain *)
+    let cascade_chain, cascade_analysis = compute_cascade_chain s in
+    Navigation.update
+      (fun s -> {s with cascade = new_cascade; cascade_chain; cascade_analysis})
+      ps
+  else
+    (* Cascade disabled: clear the chain *)
+    Navigation.update
+      (fun s ->
+        {
+          s with
+          cascade = new_cascade;
+          cascade_chain = [];
+          cascade_analysis = None;
+        })
+      ps
 
 let header s =
   let step_text =
@@ -401,6 +475,7 @@ let view ps ~focus:_ ~size =
               | Import.Takeover -> "Takeover (disable original)"
               | Import.Clone -> "Clone (keep original)"
             in
+            let cascade_text = if s.cascade then "Yes" else "No" in
             [
               "";
               Printf.sprintf
@@ -417,6 +492,7 @@ let view ps ~focus:_ ~size =
                      (External_service.value_or
                         ~default:"(auto-detect)"
                         svc.config.network));
+              Printf.sprintf "  Cascade:       %s" cascade_text;
               "";
             ]
             @ (let missing =
@@ -432,7 +508,42 @@ let view ps ~focus:_ ~size =
                    "";
                  ]
                else [])
-            @ [""; "Space: Toggle strategy  Enter: Next  Esc: Back"])
+            @ (if s.cascade then
+                 match s.cascade_analysis with
+                 | None ->
+                     [""; Widgets.themed_muted "  Computing cascade..."; ""]
+                 | Some analysis ->
+                     let chain_count = List.length s.cascade_chain in
+                     let order_str =
+                       String.concat
+                         " → "
+                         (List.map
+                            (fun unit_name ->
+                              match
+                                List.find_opt
+                                  (fun (svc : External_service.t) ->
+                                    String.equal svc.config.unit_name unit_name)
+                                  s.external_services
+                              with
+                              | Some svc -> svc.suggested_instance_name
+                              | None -> unit_name)
+                            analysis.import_order)
+                     in
+                     [
+                       "";
+                       Widgets.themed_emphasis
+                         (Printf.sprintf
+                            "Cascade import: %d services"
+                            chain_count);
+                       Widgets.themed_muted (Printf.sprintf "  %s" order_str);
+                       "";
+                     ]
+               else [])
+            @ [
+                "";
+                "Space: Toggle strategy  c: Toggle cascade  Enter: Next  Esc: \
+                 Back";
+              ])
     | ReviewImport -> (
         match s.selected_service with
         | None -> ["Error: No service selected"]
@@ -440,38 +551,87 @@ let view ps ~focus:_ ~size =
             let final_name =
               Option.value s.custom_name ~default:svc.suggested_instance_name
             in
-            [
-              "";
-              Widgets.themed_success "Ready to import:";
-              "";
-              Printf.sprintf "  Original unit: %s" svc.config.unit_name;
-              Printf.sprintf
-                "  New instance:  %s"
-                (Widgets.themed_emphasis final_name);
-              Printf.sprintf
-                "  Strategy:      %s"
-                (match s.strategy with
+            if s.cascade then
+              (* Cascade import review *)
+              let chain_count = List.length s.cascade_chain in
+              [
+                "";
+                Widgets.themed_success "Ready to cascade import:";
+                "";
+                Printf.sprintf
+                  "  Target service: %s"
+                  (Widgets.themed_emphasis svc.suggested_instance_name);
+                Printf.sprintf "  Services to import: %d" chain_count;
+                Printf.sprintf
+                  "  Strategy:       %s"
+                  (match s.strategy with
+                  | Import.Takeover ->
+                      Widgets.themed_warning "Takeover (will disable originals)"
+                  | Import.Clone ->
+                      Widgets.themed_success "Clone (keep originals)");
+                "";
+                "Import order:";
+              ]
+              @ (match s.cascade_analysis with
+                | None -> ["  (analysis not available)"]
+                | Some analysis ->
+                    List.mapi
+                      (fun i unit_name ->
+                        match
+                          List.find_opt
+                            (fun (svc : External_service.t) ->
+                              String.equal svc.config.unit_name unit_name)
+                            s.external_services
+                        with
+                        | Some svc ->
+                            let role_str =
+                              match svc.config.role.value with
+                              | Some r -> External_service.role_to_string r
+                              | None -> "unknown"
+                            in
+                            Printf.sprintf
+                              "  %d. %s (%s)"
+                              (i + 1)
+                              svc.suggested_instance_name
+                              role_str
+                        | None -> Printf.sprintf "  %d. %s" (i + 1) unit_name)
+                      analysis.import_order)
+              @ [""; "Enter: Confirm  Esc: Back"]
+            else
+              (* Single service import review *)
+              [
+                "";
+                Widgets.themed_success "Ready to import:";
+                "";
+                Printf.sprintf "  Original unit: %s" svc.config.unit_name;
+                Printf.sprintf
+                  "  New instance:  %s"
+                  (Widgets.themed_emphasis final_name);
+                Printf.sprintf
+                  "  Strategy:      %s"
+                  (match s.strategy with
+                  | Import.Takeover ->
+                      Widgets.themed_warning "Takeover (will disable original)"
+                  | Import.Clone ->
+                      Widgets.themed_success "Clone (keep original)");
+                "";
+                "What will happen:";
+              ]
+              @ (match s.strategy with
                 | Import.Takeover ->
-                    Widgets.themed_warning "Takeover (will disable original)"
-                | Import.Clone -> Widgets.themed_success "Clone (keep original)");
-              "";
-              "What will happen:";
-            ]
-            @ (match s.strategy with
-              | Import.Takeover ->
-                  [
-                    "  1. Stop external service";
-                    "  2. Create managed service";
-                    "  3. Disable original systemd unit";
-                    "  4. Start managed service";
-                  ]
-              | Import.Clone ->
-                  [
-                    "  1. Create managed service (copy config)";
-                    "  2. Keep original service running";
-                    "  3. Start managed service";
-                  ])
-            @ [""; "Enter: Confirm  Esc: Back"])
+                    [
+                      "  1. Stop external service";
+                      "  2. Create managed service";
+                      "  3. Disable original systemd unit";
+                      "  4. Start managed service";
+                    ]
+                | Import.Clone ->
+                    [
+                      "  1. Create managed service (copy config)";
+                      "  2. Keep original service running";
+                      "  3. Start managed service";
+                    ])
+              @ [""; "Enter: Confirm  Esc: Back"])
     | Importing -> (
         (* Show live progress from Job_manager *)
         let all_jobs = Job_manager.list () in
@@ -567,6 +727,7 @@ let handle_key ps key ~size:_ =
     | SelectService, Some Keys.Enter -> next_step ps
     | SelectService, Some Keys.Escape -> Navigation.back ps
     | ConfigureImport, Some (Keys.Char " ") -> toggle_strategy ps
+    | ConfigureImport, Some (Keys.Char "c") -> toggle_cascade ps
     | ConfigureImport, Some Keys.Enter -> next_step ps
     | ConfigureImport, Some Keys.Escape -> back ps
     | ReviewImport, Some Keys.Enter -> next_step ps
