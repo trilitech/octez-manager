@@ -13,7 +13,6 @@ module Grid = Miaou_widgets_layout.Grid_layout
 module Box = Miaou_widgets_layout.Box_widget
 module Metrics = Rpc_metrics
 module Style_context = Miaou_style.Style_context
-module Radio_button_widget = Miaou_widgets_input.Radio_button_widget
 open Octez_manager_lib
 open Instances_state
 open Instances_layout
@@ -924,26 +923,19 @@ let render_external_services_section state =
       in
       header :: service_lines
 
-(** Render the view-mode radio row (visible but not navigable).
-    The radio row is always shown without focus since it's toggled via 'g' key.
-    Widgets are created fresh from state — not stored. *)
+(** Render the view-mode row (visible but not navigable).
+    Toggled via 'g' key. *)
 let radio_row view_mode =
-  let by_role =
-    Radio_button_widget.create
-      ~label:"By Role"
-      ~selected:(view_mode = By_role)
-      ()
+  let box selected label =
+    let tick = if selected then "◉" else "○" in
+    tick ^ " " ^ label
   in
-  let by_group =
-    Radio_button_widget.create
-      ~label:"By Group"
-      ~selected:(view_mode = By_group)
-      ()
-  in
-  "View: "
-  ^ Radio_button_widget.render by_role ~focus:false
+  Widgets.title_highlight "View"
+  ^ ":" ^ "  "
+  ^ box (view_mode = By_role) "By Role"
   ^ "   "
-  ^ Radio_button_widget.render by_group ~focus:false
+  ^ box (view_mode = By_group) "By Group"
+  ^ Widgets.themed_muted "  [g: toggle view]"
 
 (** Single-column layout (original) *)
 let table_lines_single state =
