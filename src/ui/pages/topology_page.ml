@@ -146,6 +146,14 @@ let bold_of fg = {C.default_style with fg; bold = true}
 
 let dim_style = {C.default_style with dim = true}
 
+(** Get themed default colors for Canvas rendering *)
+let themed_canvas_defaults () =
+  let bg_resolved =
+    Miaou_style.Style.to_resolved (Style_context.background ())
+  in
+  let fg_resolved = Miaou_style.Style.to_resolved (Style_context.text ()) in
+  (fg_resolved.r_fg, bg_resolved.r_bg)
+
 (* Draw a service node box on a canvas *)
 let draw_node c ~node_w ~row ~col node =
   let canvas_w = C.cols c in
@@ -270,7 +278,8 @@ let render_wide ~width ~node_w trees =
       trees
       root_widths
   in
-  C.to_ansi c
+  let themed_fg, themed_bg = themed_canvas_defaults () in
+  C.to_ansi_with_defaults ~default_fg:themed_fg ~default_bg:themed_bg c
 
 (* Compact layout: vertical stack, each root with children indented below *)
 let render_compact ~width ~node_w trees =
@@ -322,7 +331,8 @@ let render_compact ~width ~node_w trees =
       0
       trees
   in
-  C.to_ansi c
+  let themed_fg, themed_bg = themed_canvas_defaults () in
+  C.to_ansi_with_defaults ~default_fg:themed_fg ~default_bg:themed_bg c
 
 (* Render the topology, choosing layout based on available width *)
 let render_topology ~width ~services =
