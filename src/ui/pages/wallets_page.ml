@@ -2074,7 +2074,12 @@ let action_receive ~base_dir (key : Keys_reader.key_metadata) =
   let explorer_url =
     match network with
     | Some net ->
-        let subdomain = if String.equal net "mainnet" then "" else net ^ "." in
+        let name =
+          match Snapshots.slug_of_network net with Some s -> s | None -> net
+        in
+        let subdomain =
+          if String.equal name "mainnet" then "" else name ^ "."
+        in
         Printf.sprintf "https://%stzkt.io/%s" subdomain key.pkh
     | None -> Printf.sprintf "https://tzkt.io/%s" key.pkh
   in

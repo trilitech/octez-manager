@@ -194,8 +194,11 @@ let baker_password_file (svc : Service.t) =
           | Some global_str -> find (String.split_on_char ' ' global_str)))
 
 let tzkt_base_url ~network =
-  if String.equal network "mainnet" then "https://tzkt.io"
-  else Printf.sprintf "https://%s.tzkt.io" network
+  let name =
+    match Snapshots.slug_of_network network with Some s -> s | None -> network
+  in
+  if String.equal name "mainnet" then "https://tzkt.io"
+  else Printf.sprintf "https://%s.tzkt.io" name
 
 (* ── Operation tracking ──────────────────────────────────── *)
 
