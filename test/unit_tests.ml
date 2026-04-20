@@ -1325,6 +1325,33 @@ let snapshots_sanitize_kind () =
         (Snapshots.sanitize_kind_input input))
     cases
 
+let tzkt_url_construction () =
+  (* Test that tzkt URLs are constructed correctly by extracting network slug from URLs.
+     This verifies the fix for #906 where URL-style networks caused double https:// prefix. *)
+  let build_tzkt_url network =
+    let name =
+      match Snapshots.slug_of_network network with
+      | Some s -> s
+      | None -> network
+    in
+    if String.equal name "mainnet" then "https://tzkt.io"
+    else Printf.sprintf "https://%s.tzkt.io" name
+  in
+  let cases =
+    [
+      ("mainnet", "https://tzkt.io");
+      ("ghostnet", "https://ghostnet.tzkt.io");
+      ("https://teztnets.com/tallinnnet", "https://tallinnnet.tzkt.io");
+      ("https://teztnets.com/weeklynet-2026-02-04", "https://weeklynet.tzkt.io");
+      ( "https://snapshots.tzinit.org/networks/Seoulnet.json",
+        "https://seoulnet.tzkt.io" );
+    ]
+  in
+  List.iter
+    (fun (input, expected) ->
+      Alcotest.(check string) "tzkt URL" expected (build_tzkt_url input))
+    cases
+
 let sh_quote_tests () =
   Alcotest.(check string)
     "needs quoting"
@@ -6276,6 +6303,10 @@ let () =
         [
           Alcotest.test_case "slug_of_network" `Quick snapshots_slug_of_network;
           Alcotest.test_case "sanitize" `Quick snapshots_sanitize_kind;
+          Alcotest.test_case
+            "tzkt_url_construction"
+            `Quick
+            tzkt_url_construction;
         ] );
       ( "snapshots.fetch",
         [
