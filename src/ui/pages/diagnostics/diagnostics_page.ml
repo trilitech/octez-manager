@@ -193,6 +193,12 @@ let resolve_bg ~fallback style =
   let resolved = Style.to_resolved style in
   if resolved.r_bg < 0 then fallback else resolved.r_bg
 
+(** Get themed default colors for Canvas rendering *)
+let themed_canvas_defaults () =
+  let bg_resolved = Style.to_resolved (Style_context.background ()) in
+  let fg_resolved = Style.to_resolved (Style_context.text ()) in
+  (fg_resolved.r_fg, bg_resolved.r_bg)
+
 let render_canvas_header ~width =
   let style_of fg = {C.default_style with fg} in
   let bold_of fg = {C.default_style with fg; bold = true} in
@@ -263,7 +269,8 @@ let render_canvas_header ~width =
       start_col
       indicators
   in
-  C.to_ansi c
+  let themed_fg, themed_bg = themed_canvas_defaults () in
+  C.to_ansi_with_defaults ~default_fg:themed_fg ~default_bg:themed_bg c
 
 let _footer = []
 
@@ -794,7 +801,7 @@ let handle_key ps key ~size =
 
 let has_modal _ = Miaou.Core.Modal_manager.has_active ()
 
-module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
+module Page_Impl : Miaou.Core.Tui_page.PAGE_SIG = struct
   type nonrec state = state
 
   type nonrec msg = msg
@@ -851,6 +858,13 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
 
   let has_modal = has_modal
 end
+
+module Page =
+  Themed_page.Make
+    (Page_Impl)
+    (struct
+      let page_name = name
+    end)
 
 let page : Miaou.Core.Registry.page =
   (module Page : Miaou.Core.Tui_page.PAGE_SIG)

@@ -374,6 +374,14 @@ let canvas_status_char = function
   | Data.Service_state.Stopped -> "○"
   | Data.Service_state.Unknown _ -> "?"
 
+(** Get themed default colors for Canvas rendering *)
+let themed_canvas_defaults () =
+  let bg_resolved =
+    Miaou_style.Style.to_resolved (Style_context.background ())
+  in
+  let fg_resolved = Miaou_style.Style.to_resolved (Style_context.text ()) in
+  (fg_resolved.r_fg, bg_resolved.r_bg)
+
 (** Draw a compact service box [● Lbl] width=7, height=3. Returns center col. *)
 let draw_compact_box c ~row ~col ~label ~role ~st =
   let box_w = 7 in
@@ -585,7 +593,8 @@ let render_sandbox_canvas (sb : sandbox_info) ~width =
         done
       end)
     sb.accusers ;
-  C.to_ansi c
+  let themed_fg, themed_bg = themed_canvas_defaults () in
+  C.to_ansi_with_defaults ~default_fg:themed_fg ~default_bg:themed_bg c
 
 (** Match a configured --peer address to a node name by comparing P2P ports. *)
 let peer_to_node_name nodes peer_addr =
