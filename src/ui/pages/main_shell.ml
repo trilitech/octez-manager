@@ -59,15 +59,12 @@ let initial_tabs =
         ~labels:["3 Binaries"; "3 Bins"];
       Responsive_tabs_widget.tab ~id:tab_rpcs ~labels:["4 RPCs"];
       Responsive_tabs_widget.tab
-        ~id:tab_diagnostics
-        ~labels:["5 Diagnostics"; "5 Diag"];
-      Responsive_tabs_widget.tab
         ~id:tab_topology
-        ~labels:["6 Topology"; "6 Topo"];
+        ~labels:["5 Topology"; "5 Topo"];
       Responsive_tabs_widget.tab
         ~id:tab_experimental
-        ~labels:["7 Experimental"; "7 Exp"];
-      (* Sandbox and Rewards tabs are hidden - only accessible via Experimental modal *)
+        ~labels:["6 Experimental"; "6 Exp"];
+      (* Sandbox, Rewards, and Diagnostics tabs are hidden - only accessible via Experimental modal *)
     ]
 
 let init () =
@@ -101,19 +98,21 @@ let is_tab_target t =
   || String.equal t tab_wallets
   || String.equal t tab_binaries
   || String.equal t tab_rpcs
-  || String.equal t tab_diagnostics
   || String.equal t tab_topology
   || String.equal t tab_experimental
 
 (** Route navigation from a sub-page: tab targets become tab switches;
-    hidden pages (sandbox, rewards) set on_hidden_page;
+    hidden pages (sandbox, rewards, diagnostics) set on_hidden_page;
     other targets propagate as [Navigation.goto] on the shell. *)
 let route_nav ~shell_ps ~shell_s target =
   let ps = {shell_ps with Navigation.s = shell_s} in
   if is_tab_target target then
     let tabs' = Responsive_tabs_widget.select shell_s.tabs ~id:target in
     {ps with Navigation.s = {shell_s with tabs = tabs'; on_hidden_page = None}}
-  else if String.equal target tab_sandbox || String.equal target tab_rewards
+  else if
+    String.equal target tab_sandbox
+    || String.equal target tab_rewards
+    || String.equal target tab_diagnostics
   then {ps with Navigation.s = {shell_s with on_hidden_page = Some target}}
   else Navigation.goto target ps
 
@@ -178,8 +177,9 @@ let refresh ps =
     | None -> s
     | Some ctx_tab ->
         let id = tab_id_of_context_tab ctx_tab in
-        (* Sandbox is a hidden page, not in the tab bar *)
-        if String.equal id tab_sandbox then {s with on_hidden_page = Some id}
+        (* Sandbox and Diagnostics are hidden pages, not in the tab bar *)
+        if String.equal id tab_sandbox || String.equal id tab_diagnostics then
+          {s with on_hidden_page = Some id}
         else
           {
             s with
@@ -333,20 +333,33 @@ let handle_key ps key ~size =
         | "2" -> switch_tab ps tab_wallets
         | "3" -> switch_tab ps tab_binaries
         | "4" -> switch_tab ps tab_rpcs
-        | "5" -> switch_tab ps tab_diagnostics
-        | "6" -> switch_tab ps tab_topology
-        | "7" ->
+        | "5" -> switch_tab ps tab_topology
+        | "6" ->
             (* Switch to experimental tab and open modal *)
             let ps' = switch_tab ps tab_experimental in
-            Modal_helpers.open_choice_modal
-              ~title:"Experimental Features"
-              ~items:["sandbox"; "rewards"]
-              ~to_string:(fun s ->
-                Printf.sprintf "%s  [BETA]" (String.capitalize_ascii s))
-              ~on_select:(fun choice ->
-                if String.equal choice "sandbox" then
-                  Context.set_pending_tab Context.Tab_sandboxes
-                else Context.navigate Rewards_page.name)
+            Modal_helpers.open_experimental_modal
+              ~features:
+                [
+                  {
+                    title = "Diagnostics";
+                    description = "System diagnostics and service health";
+                    badge = "BETA";
+                    on_select = (fun () -> Context.navigate Diagnostics.name);
+                  };
+                  {
+                    title = "Sandbox";
+                    description = "Local sandbox network";
+                    badge = "BETA";
+                    on_select =
+                      (fun () -> Context.set_pending_tab Context.Tab_sandboxes);
+                  };
+                  {
+                    title = "Rewards";
+                    description = "Staking rewards tracking";
+                    badge = "BETA";
+                    on_select = (fun () -> Context.navigate Rewards_page.name);
+                  };
+                ]
               () ;
             ps'
         | _ -> dispatch_key ps key ~size)
