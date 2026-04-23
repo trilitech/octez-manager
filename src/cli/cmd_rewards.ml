@@ -817,7 +817,63 @@ let continual_start_run baker_opt interval offset =
               match Payout_config.save ~instance config with
               | Error msg -> Cli_helpers.cmdliner_error msg
               | Ok () ->
-                  Payout_continual.enable ~instance ;
+                  (* Determine octez-manager binary path *)
+                  let octez_manager_bin =
+                    match Sys.executable_name with
+                    | "" -> "octez-manager"
+                    | path -> path
+                  in
+                  (* Get service user from the baker service *)
+                  let service_user =
+                    if Paths.is_root () then
+                      match Systemd.cat_unit ~role:"baker" ~instance with
+                      | Ok content ->
+                          (* Parse User= line from unit file *)
+                          let lines = String.split_on_char '\n' content in
+                          List.find_map
+                            (fun line ->
+                              let trimmed = String.trim line in
+                              if
+                                String.length trimmed > 5
+                                && String.sub trimmed 0 5 = "User="
+                              then
+                                Some
+                                  (String.sub
+                                     trimmed
+                                     5
+                                     (String.length trimmed - 5)
+                                  |> String.trim)
+                              else None)
+                            lines
+                      | Error _ -> None
+                    else None
+                  in
+                  (* Write systemd units *)
+                  (match
+                     Systemd.write_payout_service
+                       ~instance
+                       ~octez_manager_bin
+                       ~service_user
+                       ()
+                   with
+                  | Error (`Msg msg) ->
+                      Printf.eprintf
+                        "Warning: failed to write payout service: %s\n"
+                        msg
+                  | Ok () -> ()) ;
+                  (match Systemd.write_payout_timer ~instance () with
+                  | Error (`Msg msg) ->
+                      Printf.eprintf
+                        "Warning: failed to write payout timer: %s\n"
+                        msg
+                  | Ok () -> ()) ;
+                  (* Enable and start the timer *)
+                  (match Systemd.enable_payout_timer ~instance with
+                  | Error (`Msg msg) ->
+                      Printf.eprintf
+                        "Warning: failed to enable payout timer: %s\n"
+                        msg
+                  | Ok () -> Printf.printf "Payout timer enabled and started.\n") ;
                   Printf.printf "Continual mode enabled for %s.\n" instance ;
                   Printf.printf "  Interval: every %d cycle(s)\n" interval ;
                   if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
@@ -840,7 +896,13 @@ let continual_stop_run baker_opt =
           match Payout_config.save ~instance config with
           | Error msg -> Cli_helpers.cmdliner_error msg
           | Ok () ->
-              Payout_continual.disable ~instance ;
+              (* Disable and stop the timer *)
+              (match Systemd.disable_payout_timer ~instance with
+              | Error (`Msg msg) ->
+                  Printf.eprintf
+                    "Warning: failed to disable payout timer: %s\n"
+                    msg
+              | Ok () -> Printf.printf "Payout timer disabled and stopped.\n") ;
               Printf.printf "Continual mode disabled for %s.\n" instance ;
               `Ok ()))
 
@@ -870,6 +932,14 @@ let continual_status_run baker_opt =
             "Delay: %d-%d blocks\n"
             config.min_delay_blocks
             config.max_delay_blocks ;
+          (* Show timer status *)
+          let timer_active = Systemd.is_payout_timer_active ~instance in
+          Printf.printf
+            "Timer active: %s\n"
+            (if timer_active then "yes" else "no") ;
+          (match Systemd.payout_timer_status ~instance with
+          | Some status -> Printf.printf "\nTimer status:\n%s\n" status
+          | None -> ()) ;
           `Ok ())
 
 let continual_start_cmd =
