@@ -117,7 +117,7 @@ let render_last_completed_box ~box_width ~instance
         ~width:box_width
         desc
 
-let render_recent_cycles_box ~box_width ~instance
+let render_recent_cycles_box ~box_width ~instance ~current_cycle
     (cycles : Rewards.cycle_rewards list) =
   match cycles with
   | [] ->
@@ -139,6 +139,15 @@ let render_recent_cycles_box ~box_width ~instance
       let rows =
         List.map
           (fun (cr : Rewards.cycle_rewards) ->
+            let is_current =
+              match current_cycle with
+              | Some cc -> Int.equal cr.cycle cc
+              | None -> false
+            in
+            let cycle_label =
+              if is_current then string_of_int cr.cycle ^ " \xe2\x97\x80"
+              else string_of_int cr.cycle
+            in
             let earned =
               format_tez_short (Rewards.total_earned cr) ^ " \xEA\x9C\xA9"
             in
@@ -160,20 +169,20 @@ let render_recent_cycles_box ~box_width ~instance
               | Rewards.Partial -> Widgets.themed_warning "partial"
               | Rewards.In_progress -> Widgets.themed_accent "in progress"
             in
-            "  "
-            ^ Display.pad_right 7 (string_of_int cr.cycle)
-            ^ " "
-            ^ Display.pad_right 16 earned
-            ^ " "
-            ^ Display.pad_right 14 distributed
-            ^ " " ^ status_str)
+            let line =
+              "  "
+              ^ Display.pad_right 7 cycle_label
+              ^ " "
+              ^ Display.pad_right 16 earned
+              ^ " "
+              ^ Display.pad_right 14 distributed
+              ^ " " ^ status_str
+            in
+            if is_current then Widgets.themed_accent line
+            else Widgets.themed_text line)
           cycles
       in
-      let content =
-        String.concat
-          "\n"
-          (Widgets.themed_muted header :: List.map Widgets.themed_text rows)
-      in
+      let content = String.concat "\n" (Widgets.themed_muted header :: rows) in
       Box.render ~title:"Recent Cycles" ~style:Rounded ~width:box_width content
 
 let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
@@ -292,7 +301,9 @@ let render_dashboard ~box_width ~instance ~baker (state : Rewards_state.state) =
   let completed_box =
     render_last_completed_box ~box_width ~instance last_completed
   in
-  let recent_box = render_recent_cycles_box ~box_width ~instance recent in
+  let recent_box =
+    render_recent_cycles_box ~box_width ~instance ~current_cycle recent
+  in
   let parts =
     [network_line; ""; current_box; ""; completed_box; ""; recent_box]
   in

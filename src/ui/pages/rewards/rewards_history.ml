@@ -116,13 +116,22 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
           | Rewards.Partial -> Widgets.themed_warning "partial"
           | Rewards.In_progress -> Widgets.themed_accent "active"
         in
+        let is_current =
+          match state.Rewards_state.current_cycle with
+          | Some cc -> Int.equal cr.cycle cc
+          | None -> false
+        in
+        let cycle_label =
+          if is_current then string_of_int cr.cycle ^ " \xe2\x97\x80"
+          else string_of_int cr.cycle
+        in
         let delegators = string_of_int cr.num_delegators in
         let indicator =
           if i = state.history_cursor then "\xe2\x96\xb8 " else "  "
         in
         let line =
           indicator
-          ^ Display.pad_right 7 (string_of_int cr.cycle)
+          ^ Display.pad_right 7 cycle_label
           ^ " "
           ^ Display.pad_right 14 earned
           ^ " "
@@ -134,6 +143,7 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
           ^ " " ^ status_str
         in
         if i = state.history_cursor then Widgets.themed_emphasis line
+        else if is_current then Widgets.themed_accent line
         else Widgets.themed_text line)
       cycles
   in
