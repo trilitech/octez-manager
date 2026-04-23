@@ -219,98 +219,6 @@ let test_total_earned () =
   in
   Alcotest.(check int64) "total earned" 380L (Rewards.total_earned cr)
 
-(* ── format_time_ago tests ────────────────────────────────── *)
-
-let test_format_time_ago_just_now () =
-  let now = 1000.0 in
-  let timestamp = 970.0 in
-  (* 30 seconds ago *)
-  Alcotest.(check string)
-    "30 seconds ago"
-    "just now"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_minutes () =
-  let now = 1000.0 in
-  let timestamp = 700.0 in
-  (* 300 seconds = 5 minutes ago *)
-  Alcotest.(check string)
-    "5 minutes ago"
-    "5 min ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_one_minute () =
-  let now = 1000.0 in
-  let timestamp = 940.0 in
-  (* 60 seconds = 1 minute ago *)
-  Alcotest.(check string)
-    "1 minute ago"
-    "1 min ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_one_hour () =
-  let now = 10000.0 in
-  let timestamp = 6400.0 in
-  (* 3600 seconds = 1 hour ago *)
-  Alcotest.(check string)
-    "1 hour ago"
-    "1 hour ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_hours () =
-  let now = 10000.0 in
-  let timestamp = 0.0 in
-  (* 10000 seconds = 2.77 hours ago *)
-  Alcotest.(check string)
-    "2 hours ago"
-    "2 hours ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_one_day () =
-  let now = 100000.0 in
-  let timestamp = 13600.0 in
-  (* 86400 seconds = 1 day ago *)
-  Alcotest.(check string)
-    "1 day ago"
-    "1 day ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_days () =
-  let now = 500000.0 in
-  let timestamp = 68000.0 in
-  (* 432000 seconds = 5 days ago *)
-  Alcotest.(check string)
-    "5 days ago"
-    "5 days ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_one_week () =
-  let now = 700000.0 in
-  let timestamp = 95200.0 in
-  (* 604800 seconds = 1 week ago *)
-  Alcotest.(check string)
-    "1 week ago"
-    "1 week ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_weeks () =
-  let now = 2000000.0 in
-  let timestamp = 790000.0 in
-  (* 1210000 seconds = ~2 weeks ago *)
-  Alcotest.(check string)
-    "2 weeks ago"
-    "2 weeks ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
-let test_format_time_ago_months () =
-  let now = 10000000.0 in
-  let timestamp = 4800000.0 in
-  (* 5200000 seconds = ~2 months ago *)
-  Alcotest.(check string)
-    "2 months ago"
-    "2 months ago"
-    (Rewards.format_time_ago ~now ~timestamp)
-
 (* ── Test runner ──────────────────────────────────────────── *)
 
 let () =
@@ -358,17 +266,4 @@ let () =
         ] );
       ( "total_earned",
         [Alcotest.test_case "sum of rewards" `Quick test_total_earned] );
-      ( "format_time_ago",
-        [
-          Alcotest.test_case "just now" `Quick test_format_time_ago_just_now;
-          Alcotest.test_case "minutes" `Quick test_format_time_ago_minutes;
-          Alcotest.test_case "one minute" `Quick test_format_time_ago_one_minute;
-          Alcotest.test_case "one hour" `Quick test_format_time_ago_one_hour;
-          Alcotest.test_case "hours" `Quick test_format_time_ago_hours;
-          Alcotest.test_case "one day" `Quick test_format_time_ago_one_day;
-          Alcotest.test_case "days" `Quick test_format_time_ago_days;
-          Alcotest.test_case "one week" `Quick test_format_time_ago_one_week;
-          Alcotest.test_case "weeks" `Quick test_format_time_ago_weeks;
-          Alcotest.test_case "months" `Quick test_format_time_ago_months;
-        ] );
     ]

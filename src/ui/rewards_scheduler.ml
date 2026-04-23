@@ -29,11 +29,6 @@ let current_cycle_cache : (string, int) Hashtbl.t = Hashtbl.create 4
 
 let current_cycle_lock = Mutex.create ()
 
-(* Cycle end time cache: keyed by cycle number *)
-let cycle_end_time_cache : (int, float) Hashtbl.t = Hashtbl.create 32
-
-let cycle_end_time_lock = Mutex.create ()
-
 (* Cache accessors — safe for view functions *)
 
 let get_cycle_data ~baker ~cycle =
@@ -47,10 +42,6 @@ let get_recent_cycles ~baker =
 let get_current_cycle ~instance =
   Mutex.protect current_cycle_lock (fun () ->
       Hashtbl.find_opt current_cycle_cache instance)
-
-let get_cycle_end_time ~cycle =
-  Mutex.protect cycle_end_time_lock (fun () ->
-      Hashtbl.find_opt cycle_end_time_cache cycle)
 
 (* Payout status cache: keyed by (instance, cycle) *)
 let payout_status_cache : (string * int, Rewards.payout_status) Hashtbl.t =
@@ -288,18 +279,11 @@ let poll_baker ~instance ~network =
         cycles
   | None -> ()) ;
   (* Fetch current cycle *)
-  (match Cycle_data.fetch_current_cycle ~tzkt_url with
+  match Cycle_data.fetch_current_cycle ~tzkt_url with
   | Error _ -> ()
   | Ok c ->
       Mutex.protect current_cycle_lock (fun () ->
-          Hashtbl.replace current_cycle_cache instance c)) ;
-  (* Fetch cycle end times *)
-  let cycle_times = Cycle_data.fetch_cycle_times ~tzkt_url ~limit:10 in
-  Mutex.protect cycle_end_time_lock (fun () ->
-      List.iter
-        (fun (cycle, end_time) ->
-          Hashtbl.replace cycle_end_time_cache cycle end_time)
-        cycle_times)
+          Hashtbl.replace current_cycle_cache instance c)
 
 let ensure_cycle_detail ~instance ~baker ~cycle =
   let needs_fetch =
@@ -401,8 +385,6 @@ let clear () =
   Mutex.protect cycle_lock (fun () -> Hashtbl.clear cycle_cache) ;
   Mutex.protect recent_lock (fun () -> Hashtbl.clear recent_cache) ;
   Mutex.protect current_cycle_lock (fun () -> Hashtbl.clear current_cycle_cache) ;
-  Mutex.protect cycle_end_time_lock (fun () ->
-      Hashtbl.clear cycle_end_time_cache) ;
   Mutex.protect payout_status_lock (fun () -> Hashtbl.clear payout_status_cache) ;
   Mutex.protect in_progress_lock (fun () -> Hashtbl.clear in_progress_payouts) ;
   Mutex.protect baker_instance_lock (fun () ->

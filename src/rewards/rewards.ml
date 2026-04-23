@@ -175,22 +175,3 @@ let string_of_payout_status = function
   | Paid -> "paid"
   | Partial -> "partial"
   | In_progress -> "in progress"
-
-let format_time_ago ~now ~timestamp =
-  let diff = now -. timestamp in
-  if diff < 60.0 then "just now"
-  else if diff < 3600.0 then
-    let minutes = int_of_float (diff /. 60.0) in
-    if minutes = 1 then "1 min ago" else Printf.sprintf "%d min ago" minutes
-  else if diff < 86400.0 then
-    let hours = int_of_float (diff /. 3600.0) in
-    if hours = 1 then "1 hour ago" else Printf.sprintf "%d hours ago" hours
-  else if diff < 604800.0 then
-    let days = int_of_float (diff /. 86400.0) in
-    if days = 1 then "1 day ago" else Printf.sprintf "%d days ago" days
-  else if diff < 2592000.0 then
-    let weeks = int_of_float (diff /. 604800.0) in
-    if weeks = 1 then "1 week ago" else Printf.sprintf "%d weeks ago" weeks
-  else
-    let months = int_of_float (diff /. 2592000.0) in
-    if months = 1 then "1 month ago" else Printf.sprintf "%d months ago" months
