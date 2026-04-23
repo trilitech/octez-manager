@@ -36,6 +36,14 @@ val set_pending_config : Octez_manager_rewards.Payout_config.t -> unit
 val consume_pending_config :
   unit -> Octez_manager_rewards.Payout_config.t option
 
+(** Set a config value that doesn't trigger the dirty flag (for install/remove
+    operations where config is already saved to disk). *)
+val set_pending_config_clean : Octez_manager_rewards.Payout_config.t -> unit
+
+(** Consume and return the pending clean config if set, resetting it to [None]. *)
+val consume_pending_config_clean :
+  unit -> Octez_manager_rewards.Payout_config.t option
+
 (** Open a modal to edit a configuration field. *)
 val edit_field : Octez_manager_rewards.Payout_config.t -> field_id -> unit
 

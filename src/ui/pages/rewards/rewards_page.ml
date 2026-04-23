@@ -173,7 +173,10 @@ let maybe_load_config s =
 let apply_pending_config s =
   match Rewards_config_tab.consume_pending_config () with
   | Some config -> {s with config = Some config; config_dirty = true}
-  | None -> s
+  | None -> (
+      match Rewards_config_tab.consume_pending_config_clean () with
+      | Some config -> {s with config = Some config}
+      | None -> s)
 
 let refresh ps =
   match Context.consume_navigation () with
@@ -569,7 +572,7 @@ let handle_config_key ps key =
                       let config = {config with continual_enabled = true} in
                       match Payout_config.save ~instance config with
                       | Ok () ->
-                          Rewards_config_tab.set_pending_config config ;
+                          Rewards_config_tab.set_pending_config_clean config ;
                           (* Bug 3: Update cache immediately *)
                           Rewards_scheduler.set_payout_timer_active
                             ~instance
@@ -591,34 +594,41 @@ let handle_config_key ps key =
       (* Remove payout service *)
       match Rewards_state.selected_instance_name s with
       | None -> ps
-      | Some instance -> (
-          match Systemd.disable_payout_timer ~instance with
-          | Ok () ->
-              Systemd.remove_payout_units ~instance ;
-              let config =
-                match s.config with
-                | Some c -> c
-                | None -> (
-                    match Rewards_state.selected_baker_pkh s with
-                    | Some pkh -> Payout_config.default ~baker_pkh:pkh
-                    | None -> failwith "unreachable")
-              in
-              let config = {config with continual_enabled = false} in
-              (match Payout_config.save ~instance config with
-              | Ok () ->
-                  Rewards_config_tab.set_pending_config config ;
-                  (* Bug 3: Update cache immediately *)
-                  Rewards_scheduler.set_payout_timer_active
-                    ~instance
-                    ~active:false ;
-                  Context.toast_info "Payout service removed"
-              | Error msg ->
-                  Context.toast_error
-                    (Printf.sprintf "Config save failed: %s" msg)) ;
-              ps
-          | Error (`Msg msg) ->
-              Context.toast_error (Printf.sprintf "Remove failed: %s" msg) ;
-              ps))
+      | Some instance ->
+          Modal_helpers.confirm_modal
+            ~title:"Remove Payout Service"
+            ~message:
+              "This will stop and remove the automatic payout timer.\n\
+               Delegator rewards will no longer be paid automatically."
+            ~on_result:(fun confirmed ->
+              if confirmed then
+                match Systemd.disable_payout_timer ~instance with
+                | Ok () -> (
+                    Systemd.remove_payout_units ~instance ;
+                    let config =
+                      match s.config with
+                      | Some c -> c
+                      | None -> (
+                          match Rewards_state.selected_baker_pkh s with
+                          | Some pkh -> Payout_config.default ~baker_pkh:pkh
+                          | None -> failwith "unreachable")
+                    in
+                    let config = {config with continual_enabled = false} in
+                    match Payout_config.save ~instance config with
+                    | Ok () ->
+                        Rewards_config_tab.set_pending_config_clean config ;
+                        (* Update cache immediately *)
+                        Rewards_scheduler.set_payout_timer_active
+                          ~instance
+                          ~active:false ;
+                        Context.toast_info "Payout service removed"
+                    | Error msg ->
+                        Context.toast_error
+                          (Printf.sprintf "Config save failed: %s" msg))
+                | Error (`Msg msg) ->
+                    Context.toast_error (Printf.sprintf "Remove failed: %s" msg))
+            () ;
+          ps)
   | Some (Keys.Char "n") -> (
       (* Notification channel test *)
       match Rewards_state.selected_instance_name s with
