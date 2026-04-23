@@ -60,7 +60,7 @@ let render_current_cycle_box ~box_width ~instance current_cycle =
         | _ -> ""
       in
       Widgets.themed_success (Printf.sprintf "Continual: Active%s" interval_str)
-    else Widgets.themed_muted "Continual: Inactive"
+    else "Continual: " ^ Widgets.themed_error "Inactive"
   in
   let content = String.concat "\n" [cycle_line; continual_line] in
   let title =
