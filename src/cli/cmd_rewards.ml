@@ -90,6 +90,24 @@ let tzkt_url_for ~instance ~baker_pkh =
 (** Format a mutez amount as a short tez string with ꜩ suffix. *)
 let format_tez_short mutez = Rewards.format_tez mutez ^ " \xEA\x9C\xA9"
 
+(** Get the User property from a systemd unit using systemctl show. *)
+let get_service_user ~role ~instance =
+  let unit = Systemd.unit_name role instance in
+  let systemctl_cmd =
+    if Paths.is_root () then ["systemctl"] else ["systemctl"; "--user"]
+  in
+  match
+    Cmd_runner.run_out
+      (("timeout" :: "2s" :: systemctl_cmd) @ ["show"; "--property=User"; unit])
+  with
+  | Ok line -> (
+      match String.split_on_char '=' line with
+      | [_; value] ->
+          let trimmed = String.trim value in
+          if String.equal trimmed "" then None else Some trimmed
+      | _ -> None)
+  | Error _ -> None
+
 (* ── Common arguments ──────────────────────────────────────── *)
 
 let baker_arg =
@@ -828,26 +846,7 @@ let continual_start_run baker_opt interval offset =
                   (* Get service user from the baker service *)
                   let service_user =
                     if Paths.is_root () then
-                      match Systemd.cat_unit ~role:"baker" ~instance with
-                      | Ok content ->
-                          (* Parse User= line from unit file *)
-                          let lines = String.split_on_char '\n' content in
-                          List.find_map
-                            (fun line ->
-                              let trimmed = String.trim line in
-                              if
-                                String.length trimmed > 5
-                                && String.sub trimmed 0 5 = "User="
-                              then
-                                Some
-                                  (String.sub
-                                     trimmed
-                                     5
-                                     (String.length trimmed - 5)
-                                  |> String.trim)
-                              else None)
-                            lines
-                      | Error _ -> None
+                      get_service_user ~role:"baker" ~instance
                     else None
                   in
                   (* Write systemd units *)
