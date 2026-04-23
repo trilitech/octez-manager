@@ -263,8 +263,57 @@ let render_baker_selector s =
 
 let hint_for_tab _tab = ""
 
+let keymap ps =
+  let s = ps.Navigation.s in
+  let noop ps = ps in
+  let kb key help =
+    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
+  in
+  let common =
+    let base = [kb "Tab" "Next tab"; kb "Esc" "Back"] in
+    if List.length s.baker_instances > 1 then kb "b" "Baker" :: base else base
+  in
+  let tab_keys =
+    match s.active_tab with
+    | Rewards_state.Overview ->
+        [
+          kb "g" "Generate";
+          kb "p" "Pay";
+          kb "d" "Dry-run";
+          kb "t" "Continual";
+          kb "r" "Refresh";
+        ]
+    | Rewards_state.Delegators ->
+        [
+          kb "j/k" "Navigate";
+          kb "/" "Search";
+          kb "s" "Sort";
+          kb "f" "Filter";
+          kb "c" "Cycle";
+        ]
+    | Rewards_state.History -> [kb "j/k" "Navigate"; kb "Enter" "View"]
+    | Rewards_state.Configuration ->
+        [
+          kb "j/k" "Navigate";
+          kb "Enter" "Edit";
+          kb "s" "Save";
+          kb "r" "Reset";
+          kb "i" "Import";
+          kb "n" "Notify";
+        ]
+  in
+  tab_keys @ common
+
 let view ps ~focus:_ ~size =
   let s = ps.Navigation.s in
+  (* Register keymap for help modal *)
+  let keymap_pairs =
+    List.map
+      (fun (kb : state Miaou.Core.Tui_page.key_binding_desc) ->
+        (kb.key, kb.help))
+      (keymap ps)
+  in
+  Context.register_active_page_keymap (fun () -> keymap_pairs) ;
   let cols = size.LTerm_geom.cols in
   Context.tick_spinner () ;
   Context.tick_toasts () ;
@@ -964,47 +1013,6 @@ let handle_key ps key ~size:_ =
         | _ when s.active_tab = Rewards_state.History ->
             handle_history_key ps key
         | _ -> ps)
-
-let keymap ps =
-  let s = ps.Navigation.s in
-  let noop ps = ps in
-  let kb key help =
-    {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
-  in
-  let common =
-    let base = [kb "Tab" "Next tab"; kb "Esc" "Back"] in
-    if List.length s.baker_instances > 1 then kb "b" "Baker" :: base else base
-  in
-  let tab_keys =
-    match s.active_tab with
-    | Rewards_state.Overview ->
-        [
-          kb "g" "Generate";
-          kb "p" "Pay";
-          kb "d" "Dry-run";
-          kb "t" "Continual";
-          kb "r" "Refresh";
-        ]
-    | Rewards_state.Delegators ->
-        [
-          kb "j/k" "Navigate";
-          kb "/" "Search";
-          kb "s" "Sort";
-          kb "f" "Filter";
-          kb "c" "Cycle";
-        ]
-    | Rewards_state.History -> [kb "j/k" "Navigate"; kb "Enter" "View"]
-    | Rewards_state.Configuration ->
-        [
-          kb "j/k" "Navigate";
-          kb "Enter" "Edit";
-          kb "s" "Save";
-          kb "r" "Reset";
-          kb "i" "Import";
-          kb "n" "Notify";
-        ]
-  in
-  tab_keys @ common
 
 let handled_keys () =
   Keys.
