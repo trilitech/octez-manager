@@ -117,7 +117,7 @@ let render_last_completed_box ~box_width ~instance
         ~width:box_width
         desc
 
-let render_recent_cycles_box ~box_width ~instance
+let render_recent_cycles_box ~box_width ~instance ~current_cycle
     (cycles : Rewards.cycle_rewards list) =
   match cycles with
   | [] ->
@@ -127,9 +127,12 @@ let render_recent_cycles_box ~box_width ~instance
         ~width:box_width
         (Widgets.themed_muted "No cycle data available")
   | _ ->
+      let now = Unix.gettimeofday () in
       let header =
         "  "
         ^ Display.pad_right 7 "CYCLE"
+        ^ " "
+        ^ Display.pad_right 12 "TIME"
         ^ " "
         ^ Display.pad_right 16 "EARNED"
         ^ " "
@@ -160,8 +163,21 @@ let render_recent_cycles_box ~box_width ~instance
               | Rewards.Partial -> Widgets.themed_warning "partial"
               | Rewards.In_progress -> Widgets.themed_accent "in progress"
             in
+            let time_str =
+              match current_cycle with
+              | Some c when cr.cycle = c -> "now"
+              | _ -> (
+                  match
+                    Rewards_scheduler.get_cycle_end_time ~cycle:cr.cycle
+                  with
+                  | Some end_time ->
+                      Rewards.format_time_ago ~now ~timestamp:end_time
+                  | None -> "\xE2\x80\x94")
+            in
             "  "
             ^ Display.pad_right 7 (string_of_int cr.cycle)
+            ^ " "
+            ^ Display.pad_right 12 time_str
             ^ " "
             ^ Display.pad_right 16 earned
             ^ " "
@@ -292,7 +308,9 @@ let render_dashboard ~box_width ~instance ~baker (state : Rewards_state.state) =
   let completed_box =
     render_last_completed_box ~box_width ~instance last_completed
   in
-  let recent_box = render_recent_cycles_box ~box_width ~instance recent in
+  let recent_box =
+    render_recent_cycles_box ~box_width ~instance ~current_cycle recent
+  in
   let parts =
     [network_line; ""; current_box; ""; completed_box; ""; recent_box]
   in

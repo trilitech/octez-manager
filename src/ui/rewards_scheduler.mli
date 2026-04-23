@@ -39,6 +39,11 @@ val get_recent_cycles :
 (** Get the cached current cycle number for a specific instance. *)
 val get_current_cycle : instance:string -> int option
 
+(** Get the cached end time for a specific cycle.
+    Returns [None] if the cycle end time hasn't been fetched yet.
+    Safe for view functions. *)
+val get_cycle_end_time : cycle:int -> float option
+
 (** Returns the cached payout summary for [instance] and [cycle], or [None] if
     no summary has been loaded yet. *)
 val get_payout_summary :

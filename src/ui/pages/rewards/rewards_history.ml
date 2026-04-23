@@ -77,10 +77,13 @@ let render_sparklines ~box_width (cycles : Rewards.cycle_rewards list) ~instance
     content
 
 let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
-    (cycles : Rewards.cycle_rewards list) =
+    ~current_cycle (cycles : Rewards.cycle_rewards list) =
+  let now = Unix.gettimeofday () in
   let header =
     "  "
     ^ Display.pad_right 7 "CYCLE"
+    ^ " "
+    ^ Display.pad_right 12 "TIME"
     ^ " "
     ^ Display.pad_right 14 "EARNED"
     ^ " "
@@ -117,12 +120,23 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
           | Rewards.In_progress -> Widgets.themed_accent "active"
         in
         let delegators = string_of_int cr.num_delegators in
+        let time_str =
+          match current_cycle with
+          | Some c when cr.cycle = c -> "now"
+          | _ -> (
+              match Rewards_scheduler.get_cycle_end_time ~cycle:cr.cycle with
+              | Some end_time ->
+                  Rewards.format_time_ago ~now ~timestamp:end_time
+              | None -> "\xE2\x80\x94")
+        in
         let indicator =
           if i = state.history_cursor then "\xe2\x96\xb8 " else "  "
         in
         let line =
           indicator
           ^ Display.pad_right 7 (string_of_int cr.cycle)
+          ^ " "
+          ^ Display.pad_right 12 time_str
           ^ " "
           ^ Display.pad_right 14 earned
           ^ " "
@@ -163,6 +177,7 @@ let render ~(state : Rewards_state.state) ~cols ~rows:_ =
         ]
   | Some (instance, baker) -> (
       let cycles = Rewards_scheduler.get_recent_cycles ~baker in
+      let current_cycle = state.current_cycle in
       match cycles with
       | [] ->
           String.concat
@@ -175,5 +190,12 @@ let render ~(state : Rewards_state.state) ~cols ~rows:_ =
             ]
       | _ ->
           let sparklines = render_sparklines ~box_width cycles ~instance in
-          let table = render_history_table ~box_width ~state ~instance cycles in
+          let table =
+            render_history_table
+              ~box_width
+              ~state
+              ~instance
+              ~current_cycle
+              cycles
+          in
           String.concat "\n" [""; sparklines; ""; table])

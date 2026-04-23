@@ -148,3 +148,52 @@ let fetch_current_cycle ~tzkt_url =
           | None -> Error "no cycle field in /v1/head response")
       | exception Yojson.Json_error msg ->
           Error (Printf.sprintf "JSON parse error: %s" msg))
+
+(** Parse ISO 8601 timestamp to Unix timestamp (float).
+    Supports format: "2026-04-23T16:05:34Z" *)
+let parse_iso8601 s =
+  try
+    Scanf.sscanf
+      s
+      "%04d-%02d-%02dT%02d:%02d:%02dZ"
+      (fun year month day hour min sec ->
+        let open Unix in
+        let tm =
+          {
+            tm_year = year - 1900;
+            tm_mon = month - 1;
+            tm_mday = day;
+            tm_hour = hour;
+            tm_min = min;
+            tm_sec = sec;
+            tm_wday = 0;
+            tm_yday = 0;
+            tm_isdst = false;
+          }
+        in
+        fst (mktime tm))
+  with _ -> 0.0
+
+(** Fetch cycle metadata from TzKT to get end times.
+    Returns a list of (cycle, end_time) pairs. *)
+let fetch_cycle_times ~tzkt_url ~limit =
+  let url =
+    Printf.sprintf "%s/v1/cycles?limit=%d&sort.desc=index" tzkt_url limit
+  in
+  match curl_fetch url with
+  | Error _ -> []
+  | Ok body -> (
+      match Yojson.Safe.from_string body with
+      | `List items ->
+          List.filter_map
+            (fun json ->
+              let open Yojson.Safe.Util in
+              try
+                let cycle = member "index" json |> to_int in
+                let end_time_str = member "endTime" json |> to_string in
+                let end_time = parse_iso8601 end_time_str in
+                if end_time > 0.0 then Some (cycle, end_time) else None
+              with _ -> None)
+            items
+      | _ -> []
+      | exception _ -> [])
