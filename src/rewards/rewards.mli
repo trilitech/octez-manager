@@ -179,3 +179,10 @@ val payout_mode_of_string : string -> payout_mode option
 
 (** Format a payout status as a short label. *)
 val string_of_payout_status : payout_status -> string
+
+(** Format a relative timestamp (e.g., "5 min ago", "2 days ago").
+    
+    @param now Current time as Unix timestamp (float)
+    @param timestamp Past time as Unix timestamp (float)
+    @return Human-readable relative time string *)
+val format_time_ago : now:float -> timestamp:float -> string
