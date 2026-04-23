@@ -88,7 +88,6 @@ let init () =
       config = None;
       config_cursor = 0;
       config_dirty = false;
-      config_show_hint = false;
       history_cursor = 0;
       loading = false;
       error = None;
@@ -435,10 +434,6 @@ let handle_config_key ps key =
           Rewards_config_tab.save_config ~instance config ;
           Navigation.update (fun s -> {s with config_dirty = false}) ps
       | _ -> ps)
-  | Some (Keys.Char "?") ->
-      Navigation.update
-        (fun s -> {s with config_show_hint = not s.config_show_hint})
-        ps
   | Some (Keys.Char "r") -> (
       match Rewards_state.selected_baker_pkh s with
       | Some baker_pkh ->
@@ -1003,7 +998,6 @@ let keymap ps =
         [
           kb "j/k" "Navigate";
           kb "Enter" "Edit";
-          kb "?" "Hint";
           kb "s" "Save";
           kb "r" "Reset";
           kb "i" "Import";
@@ -1118,7 +1112,6 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
           [
             kh "j/k" "Navigate";
             kh "Enter" "Edit";
-            kh "?" "Hint";
             kh "s" "Save";
             kh "r" "Reset";
             kh "i" "Import";
