@@ -45,10 +45,11 @@ let read_delay_until ~instance =
 let is_trigger_cycle ~current_cycle ~interval ~offset =
   interval <= 1 || (current_cycle - offset) mod interval = 0
 
-(** Pure cycle collection: given a predicate for "is paid", return due cycles. *)
-let collect_due_cycles ~current_cycle ~is_paid =
+(** Pure cycle collection: given a predicate for "is paid", return due cycles.
+    Only looks back [interval] cycles from [current_cycle]. *)
+let collect_due_cycles ~current_cycle ~interval ~is_paid =
   let due = ref [] in
-  let check_from = max 0 (current_cycle - 20) in
+  let check_from = max 0 (current_cycle - interval) in
   for c = check_from to current_cycle - 1 do
     if not (is_paid c) then due := c :: !due
   done ;
@@ -58,7 +59,7 @@ let cycles_due ~instance ~current_cycle ~interval ~offset =
   (* Only trigger on interval boundaries *)
   if not (is_trigger_cycle ~current_cycle ~interval ~offset) then []
   else
-    collect_due_cycles ~current_cycle ~is_paid:(fun c ->
+    collect_due_cycles ~current_cycle ~interval ~is_paid:(fun c ->
         Payout_report.cycle_is_paid ~instance ~cycle:c)
 
 (* ── Execute due cycles ──────────────────────────────────── *)
@@ -110,5 +111,6 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
 module Internal_for_tests = struct
   let is_trigger_cycle = is_trigger_cycle
 
-  let collect_due_cycles = collect_due_cycles
+  let collect_due_cycles ~current_cycle ~is_paid =
+    collect_due_cycles ~current_cycle ~interval:20 ~is_paid
 end
