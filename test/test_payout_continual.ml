@@ -118,9 +118,7 @@ let test_delay_file_invalid_content () =
 (* ── Cycles due ───────────────────────────────────── *)
 
 let test_cycles_due_no_unpaid () =
-  (* With a fresh instance that has no paid cycles, all matching cycles
-     in the window should be returned. We use a dedicated instance name
-     to avoid collision. *)
+  (* With interval=1, only the last 1 cycle is checked *)
   let instance = "test-continual-cycles-none" in
   let due =
     Payout_continual.cycles_due
@@ -129,10 +127,8 @@ let test_cycles_due_no_unpaid () =
       ~interval:1
       ~offset:0
   in
-  (* cycles 0..9 should be due (nothing is paid) — but window starts at
-     max 0 (10-20) = 0 *)
-  Alcotest.(check int) "10 cycles due" 10 (List.length due) ;
-  Alcotest.(check (list int)) "cycles 0-9" [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] due
+  (* Only cycle 9 should be due (lookback = interval = 1) *)
+  Alcotest.(check (list int)) "1 cycle due" [9] due
 
 (* ── Pure trigger check tests ─────────────────────── *)
 
@@ -265,7 +261,7 @@ let test_collect_due_cycles_window_large () =
 (* ── Integration: combined trigger + collection ────── *)
 
 let test_cycles_due_interval_2_trigger () =
-  (* interval=2, offset=0, current=100: trigger, returns all unpaid [80..99] *)
+  (* interval=2, offset=0, current=100: trigger, returns last 2 unpaid [98, 99] *)
   let instance = "test-continual-interval-2-trigger" in
   let due =
     Payout_continual.cycles_due
@@ -274,10 +270,8 @@ let test_cycles_due_interval_2_trigger () =
       ~interval:2
       ~offset:0
   in
-  (* Cycle 100 is even, so it triggers. All unpaid cycles in window should be returned. *)
-  Alcotest.(check int) "20 cycles due" 20 (List.length due) ;
-  Alcotest.(check int) "first is 80" 80 (List.hd due) ;
-  Alcotest.(check int) "last is 99" 99 (List.nth due 19)
+  (* Cycle 100 is even, so it triggers. Last 2 cycles should be returned. *)
+  Alcotest.(check (list int)) "2 cycles due" [98; 99] due
 
 let test_cycles_due_interval_2_no_trigger () =
   (* interval=2, offset=0, current=101: no trigger, returns [] *)
@@ -293,7 +287,7 @@ let test_cycles_due_interval_2_no_trigger () =
   Alcotest.(check (list int)) "no cycles due" [] due
 
 let test_cycles_due_interval_1_always_triggers () =
-  (* interval=1: always trigger, returns all unpaid *)
+  (* interval=1: always trigger, returns last 1 unpaid cycle *)
   let instance = "test-continual-interval-1-always" in
   let due =
     Payout_continual.cycles_due
@@ -302,11 +296,10 @@ let test_cycles_due_interval_1_always_triggers () =
       ~interval:1
       ~offset:0
   in
-  Alcotest.(check int) "10 cycles due" 10 (List.length due) ;
-  Alcotest.(check (list int)) "cycles 0-9" [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] due
+  Alcotest.(check (list int)) "1 cycle due" [9] due
 
 let test_cycles_due_large_cycle () =
-  (* For large cycle numbers, only last 20 are checked *)
+  (* For large cycle numbers with interval=1, only last 1 cycle is checked *)
   let instance = "test-continual-large" in
   let due =
     Payout_continual.cycles_due
@@ -315,10 +308,19 @@ let test_cycles_due_large_cycle () =
       ~interval:1
       ~offset:0
   in
-  (* Window: max 0 (100-20) = 80, so cycles 80..99 *)
-  Alcotest.(check int) "20 cycles due" 20 (List.length due) ;
-  Alcotest.(check int) "first is 80" 80 (List.hd due) ;
-  Alcotest.(check int) "last is 99" 99 (List.nth due (List.length due - 1))
+  Alcotest.(check (list int)) "1 cycle due" [99] due
+
+let test_cycles_due_large_interval () =
+  (* interval=5, offset=0, current=100: trigger, returns last 5 unpaid *)
+  let instance = "test-continual-large-interval" in
+  let due =
+    Payout_continual.cycles_due
+      ~instance
+      ~current_cycle:100
+      ~interval:5
+      ~offset:0
+  in
+  Alcotest.(check (list int)) "5 cycles due" [95; 96; 97; 98; 99] due
 
 let test_cycles_due_current_excluded () =
   (* current_cycle itself should never be in the due list *)
@@ -420,6 +422,10 @@ let () =
             "large cycle window"
             `Quick
             test_cycles_due_large_cycle;
+          Alcotest.test_case
+            "large interval"
+            `Quick
+            test_cycles_due_large_interval;
           Alcotest.test_case
             "current excluded"
             `Quick

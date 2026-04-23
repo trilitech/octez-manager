@@ -58,13 +58,8 @@ let test_cycles_due_every_cycle () =
           ~interval:1
           ~offset:0
       in
-      (* Should include 85..104 (20 cycle lookback, all unpaid) *)
-      Alcotest.(check int) "20 cycles due" 20 (List.length due) ;
-      Alcotest.(check int) "first is 85" 85 (List.hd due) ;
-      Alcotest.(check int)
-        "last is 104"
-        104
-        (List.nth due (List.length due - 1)))
+      (* interval=1: only look back 1 cycle, so just cycle 104 *)
+      Alcotest.(check (list int)) "1 cycle due" [104] due)
 
 let test_cycles_due_interval_2 () =
   with_temp_instance (fun instance ->
@@ -79,7 +74,7 @@ let test_cycles_due_interval_2 () =
       in
       Alcotest.(check (list int)) "no trigger on odd cycle" [] due_no_trigger ;
       (* Test with current_cycle=106 (even), interval=2, offset=0
-         Since 106 is even, it IS a trigger cycle, so should return ALL unpaid cycles *)
+         Since 106 is even, it IS a trigger cycle, returns last 2 unpaid *)
       let due_trigger =
         Payout_continual.cycles_due
           ~instance
@@ -87,16 +82,10 @@ let test_cycles_due_interval_2 () =
           ~interval:2
           ~offset:0
       in
-      (* Should include all cycles 86..105 (20 cycle lookback, all unpaid) *)
-      Alcotest.(check int)
-        "20 cycles due on trigger"
-        20
-        (List.length due_trigger) ;
-      Alcotest.(check int) "first is 86" 86 (List.hd due_trigger) ;
-      Alcotest.(check int)
-        "last is 105"
-        105
-        (List.nth due_trigger (List.length due_trigger - 1)))
+      Alcotest.(check (list int))
+        "2 cycles due on trigger"
+        [104; 105]
+        due_trigger)
 
 let test_cycles_due_interval_with_offset () =
   with_temp_instance (fun instance ->
@@ -119,13 +108,8 @@ let test_cycles_due_interval_with_offset () =
           ~interval:3
           ~offset:1
       in
-      (* Should return all unpaid cycles 86..105 *)
-      Alcotest.(check int) "20 cycles due" 20 (List.length due_trigger) ;
-      Alcotest.(check int) "first is 86" 86 (List.hd due_trigger) ;
-      Alcotest.(check int)
-        "last is 105"
-        105
-        (List.nth due_trigger (List.length due_trigger - 1)))
+      (* Should return last 3 unpaid cycles: 103, 104, 105 *)
+      Alcotest.(check (list int)) "3 cycles due" [103; 104; 105] due_trigger)
 
 let test_cycles_due_excludes_current () =
   with_temp_instance (fun instance ->

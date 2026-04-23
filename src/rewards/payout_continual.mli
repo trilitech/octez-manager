@@ -41,8 +41,8 @@ val read_delay_until : instance:string -> float option
 
     The [interval] controls how often payouts are triggered: payouts only
     fire when [(current_cycle - offset) mod interval = 0]. When triggered,
-    ALL unpaid cycles (up to 20 back) are returned — not just the one
-    matching the interval. This ensures no delegator rewards are skipped.
+    the last [interval] unpaid cycles are returned. This batches rewards
+    from skipped cycles into the trigger payout.
 
     @param current_cycle The current chain cycle.
     @param interval Trigger payout every [interval] cycles (default 1).
