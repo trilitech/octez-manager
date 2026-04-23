@@ -116,6 +116,25 @@ let network_lock = Mutex.create ()
 let get_network_for_instance ~instance =
   Mutex.protect network_lock (fun () -> Hashtbl.find_opt network_cache instance)
 
+(* Payout timer active status cache *)
+let payout_timer_cache : (string, bool) Hashtbl.t = Hashtbl.create 4
+
+let payout_timer_lock = Mutex.create ()
+
+let get_payout_timer_active ~instance =
+  Mutex.protect payout_timer_lock (fun () ->
+      Hashtbl.find_opt payout_timer_cache instance
+      |> Option.value ~default:false)
+
+(* Continual interval cache *)
+let continual_interval_cache : (string, int) Hashtbl.t = Hashtbl.create 4
+
+let continual_interval_lock = Mutex.create ()
+
+let get_continual_interval ~instance =
+  Mutex.protect continual_interval_lock (fun () ->
+      Hashtbl.find_opt continual_interval_cache instance)
+
 (* Polling logic *)
 
 (** Try fetching recent cycles for [baker]. Returns [Some cycles] on success
@@ -142,6 +161,18 @@ let poll_baker ~instance ~network =
   let config_opt =
     match Payout_config.load ~instance with Ok c -> Some c | Error _ -> None
   in
+  (* Cache continual interval from config *)
+  (match config_opt with
+  | Some c when c.continual_interval > 1 ->
+      Mutex.protect continual_interval_lock (fun () ->
+          Hashtbl.replace continual_interval_cache instance c.continual_interval)
+  | _ ->
+      Mutex.protect continual_interval_lock (fun () ->
+          Hashtbl.remove continual_interval_cache instance)) ;
+  (* Cache payout timer active status *)
+  let timer_active = Systemd.is_payout_timer_active ~instance in
+  Mutex.protect payout_timer_lock (fun () ->
+      Hashtbl.replace payout_timer_cache instance timer_active) ;
   let tzkt_url =
     match config_opt with
     | Some c -> c.tzkt_url
@@ -350,4 +381,7 @@ let clear () =
   Mutex.protect in_progress_lock (fun () -> Hashtbl.clear in_progress_payouts) ;
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.clear baker_instance_cache) ;
-  Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache)
+  Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache) ;
+  Mutex.protect payout_timer_lock (fun () -> Hashtbl.clear payout_timer_cache) ;
+  Mutex.protect continual_interval_lock (fun () ->
+      Hashtbl.clear continual_interval_cache)
