@@ -7,39 +7,7 @@
 
 (** Continual payout mode: automatic payouts when new cycles complete. *)
 
-(* ── Active state per instance ───────────────────────────── *)
-
-let active_instances : (string, bool) Hashtbl.t = Hashtbl.create 4
-
-let active_lock = Mutex.create ()
-
-let is_active ~instance =
-  Mutex.protect active_lock (fun () ->
-      Hashtbl.find_opt active_instances instance |> Option.value ~default:false)
-
-let enable ~instance =
-  Mutex.protect active_lock (fun () ->
-      Hashtbl.replace active_instances instance true)
-
-let disable ~instance =
-  Mutex.protect active_lock (fun () ->
-      Hashtbl.replace active_instances instance false)
-
 (* ── Cycle matching ──────────────────────────────────────── *)
-
-let delay_file ~instance =
-  Filename.concat (Payout_config.rewards_dir ~instance) "delay_until"
-
-let read_delay_until ~instance =
-  let path = delay_file ~instance in
-  if not (Sys.file_exists path) then None
-  else
-    try
-      let ic = open_in path in
-      let line = input_line ic in
-      close_in ic ;
-      Float.of_string_opt (String.trim line)
-    with Sys_error _ -> None
 
 (** Pure trigger check: is this cycle on an interval boundary? *)
 let is_trigger_cycle ~current_cycle ~interval ~offset =

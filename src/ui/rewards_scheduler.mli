@@ -69,11 +69,6 @@ val get_baker_for_instance : instance:string -> string option
     Useful for test bakers that don't have a service registry entry. *)
 val get_network_for_instance : instance:string -> string option
 
-(** {1 Continual mode} *)
-
-(** Sync continual mode state from config (called after config changes). *)
-val sync_continual_from_config : instance:string -> unit
-
 (** {1 Refresh} *)
 
 (** Ensure delegator details are loaded for a specific cycle.
