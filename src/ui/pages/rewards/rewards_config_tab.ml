@@ -397,6 +397,41 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
           ~width:box_width
           override_content
       in
+      (* Payout Service section *)
+      let payout_service_box =
+        match Rewards_state.selected_instance_name state with
+        | None -> ""
+        | Some instance ->
+            let timer_active =
+              Rewards_scheduler.get_payout_timer_active ~instance
+            in
+            let status_line =
+              if timer_active then
+                let interval_str =
+                  match Rewards_scheduler.get_continual_interval ~instance with
+                  | Some interval when interval > 1 ->
+                      Printf.sprintf " (every %d cycles)" interval
+                  | _ -> ""
+                in
+                "  "
+                ^ Widgets.themed_success "\xe2\x97\x8f Active"
+                ^ interval_str
+              else if config.continual_enabled then
+                "  " ^ Widgets.themed_error "\xe2\x97\x8b Stopped"
+              else "  " ^ Widgets.themed_muted "\xe2\x97\x8b Not installed"
+            in
+            let hint_line =
+              if timer_active then
+                Widgets.themed_muted "  [X: remove payout service]"
+              else Widgets.themed_muted "  [I: install payout service]"
+            in
+            let content = String.concat "\n" [status_line; ""; hint_line] in
+            Box.render
+              ~title:"Payout Service"
+              ~style:Rounded
+              ~width:box_width
+              content
+      in
       (* Dirty indicator *)
       let dirty_indicator =
         if state.config_dirty then
@@ -405,6 +440,11 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
         else ""
       in
       let parts = [""; general_box; hint_box; ""; override_box] in
+      let parts =
+        if String.length payout_service_box > 0 then
+          parts @ [""; payout_service_box]
+        else parts
+      in
       let parts =
         if dirty_indicator <> "" then parts @ [dirty_indicator] else parts
       in

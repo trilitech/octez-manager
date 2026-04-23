@@ -299,6 +299,8 @@ let keymap ps =
           kb "s" "Save";
           kb "r" "Reset";
           kb "i" "Import";
+          kb "I" "Install";
+          kb "X" "Remove";
           kb "n" "Notify";
         ]
   in
@@ -516,6 +518,78 @@ let handle_config_key ps key =
                   List.iter (fun w -> Context.toast_warn w) result.warnings)
             () ;
           ps)
+  | Some (Keys.Char "I") -> (
+      (* Install payout service *)
+      match Rewards_state.selected_baker_instance s with
+      | None -> ps
+      | Some (instance, baker_pkh) -> (
+          let octez_manager_bin =
+            match Sys.executable_name with
+            | "" -> "octez-manager"
+            | path -> path
+          in
+          let service_user =
+            if Paths.is_root () then
+              Systemd.get_service_user ~role:"baker" ~instance
+            else None
+          in
+          let open Rresult.R.Infix in
+          match
+            Systemd.write_payout_service
+              ~instance
+              ~octez_manager_bin
+              ~service_user
+              ()
+            >>= fun () ->
+            Systemd.write_payout_timer ~instance () >>= fun () ->
+            Systemd.enable_payout_timer ~instance
+          with
+          | Ok () ->
+              let config =
+                match s.config with
+                | Some c -> c
+                | None -> Payout_config.default ~baker_pkh
+              in
+              let config = {config with continual_enabled = true} in
+              (match Payout_config.save ~instance config with
+              | Ok () ->
+                  Rewards_config_tab.set_pending_config config ;
+                  Context.toast_info "Payout service installed and enabled"
+              | Error msg ->
+                  Context.toast_error
+                    (Printf.sprintf "Config save failed: %s" msg)) ;
+              ps
+          | Error (`Msg msg) ->
+              Context.toast_error (Printf.sprintf "Install failed: %s" msg) ;
+              ps))
+  | Some (Keys.Char "X") -> (
+      (* Remove payout service *)
+      match Rewards_state.selected_instance_name s with
+      | None -> ps
+      | Some instance -> (
+          match Systemd.disable_payout_timer ~instance with
+          | Ok () ->
+              Systemd.remove_payout_units ~instance ;
+              let config =
+                match s.config with
+                | Some c -> c
+                | None -> (
+                    match Rewards_state.selected_baker_pkh s with
+                    | Some pkh -> Payout_config.default ~baker_pkh:pkh
+                    | None -> failwith "unreachable")
+              in
+              let config = {config with continual_enabled = false} in
+              (match Payout_config.save ~instance config with
+              | Ok () ->
+                  Rewards_config_tab.set_pending_config config ;
+                  Context.toast_info "Payout service removed"
+              | Error msg ->
+                  Context.toast_error
+                    (Printf.sprintf "Config save failed: %s" msg)) ;
+              ps
+          | Error (`Msg msg) ->
+              Context.toast_error (Printf.sprintf "Remove failed: %s" msg) ;
+              ps))
   | Some (Keys.Char "n") -> (
       (* Notification channel test *)
       match Rewards_state.selected_instance_name s with
@@ -1039,6 +1113,8 @@ let handled_keys () =
       Char "d";
       Char "t";
       Char "i";
+      Char "I";
+      Char "X";
       Char "n";
     ]
 
@@ -1120,6 +1196,8 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
             kh "s" "Save";
             kh "r" "Reset";
             kh "i" "Import";
+            kh "I" "Install";
+            kh "X" "Remove";
             kh "n" "Notify";
           ]
     in

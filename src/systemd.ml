@@ -388,6 +388,17 @@ let payout_timer_path instance =
     let base = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
     Filename.concat base (Printf.sprintf "%s.timer" (payout_unit_name instance))
 
+let get_service_user ~role ~instance =
+  let unit = unit_name role instance in
+  match run_systemctl_out_timeout ["show"; "--property=User"; unit] with
+  | Ok line -> (
+      match String.split_on_char '=' line with
+      | [_; value] ->
+          let trimmed = String.trim value in
+          if String.equal trimmed "" then None else Some trimmed
+      | _ -> None)
+  | Error _ -> None
+
 let write_payout_service ~instance ~octez_manager_bin ~service_user () =
   let* () = validate_instance_name instance in
   let path = payout_service_path instance in

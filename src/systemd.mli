@@ -200,6 +200,9 @@ val disable :
 
 (** {2 Payout Timer Management} *)
 
+(** Get the User property from a systemd unit. Returns None if not set or on error. *)
+val get_service_user : role:string -> instance:string -> string option
+
 (** Write the payout oneshot service unit file for a baker instance. *)
 val write_payout_service :
   instance:string ->
