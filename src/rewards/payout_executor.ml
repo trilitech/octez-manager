@@ -101,6 +101,37 @@ let collect_payouts (bp : Rewards.payout_blueprint) =
   in
   delegator_payouts @ bond_payouts @ fee_payouts
 
+(* ── Merge payouts from multiple cycles ───────────────── *)
+
+let merge_payouts (payouts_list : (string * string * Int64.t) list list) =
+  (* Build a map keyed by (delegator, recipient) pair *)
+  let module PairMap = Map.Make (struct
+    type t = string * string
+
+    let compare (d1, r1) (d2, r2) =
+      match String.compare d1 d2 with 0 -> String.compare r1 r2 | c -> c
+  end) in
+  let merged_map =
+    List.fold_left
+      (fun acc payouts ->
+        List.fold_left
+          (fun map (delegator, recipient, amount) ->
+            let key = (delegator, recipient) in
+            let current =
+              PairMap.find_opt key map |> Option.value ~default:0L
+            in
+            PairMap.add key (Int64.add current amount) map)
+          acc
+          payouts)
+      PairMap.empty
+      payouts_list
+  in
+  PairMap.fold
+    (fun (delegator, recipient) amount acc ->
+      (delegator, recipient, amount) :: acc)
+    merged_map
+    []
+
 (* ── Batch transfer support ───────────────────────────────── *)
 
 let write_batch_file payouts =
@@ -186,6 +217,77 @@ let chunk_list ~size lst =
   aux [] lst
 
 (* ── Main execution ────────────────────────────────────────── *)
+
+let execute_merged ~ctx ~payouts ?(dry_run = false) ?on_progress
+    ?(batch_size = 80) () =
+  (* Early guard: payout key must be configured *)
+  if String.length (String.trim ctx.payout_key_alias) = 0 then
+    Error "payout_key_alias is not configured"
+  else
+    let total = List.length payouts in
+    let chunks = chunk_list ~size:batch_size payouts in
+    let results = ref [] in
+    let processed = ref 0 in
+    let consecutive_failures = ref 0 in
+    let aborted = ref false in
+    List.iter
+      (fun chunk ->
+        if not !aborted then begin
+          let batch_results = execute_batch ~ctx ~payouts:chunk ~dry_run in
+          let batch_ok =
+            List.exists
+              (fun (r : Rewards.payout_result) -> r.success)
+              batch_results
+          in
+          if batch_ok then consecutive_failures := 0
+          else consecutive_failures := !consecutive_failures + 1 ;
+          (* Fire per-transfer progress callbacks *)
+          List.iter
+            (fun result ->
+              processed := !processed + 1 ;
+              results := result :: !results ;
+              match on_progress with
+              | Some cb ->
+                  cb
+                    {
+                      current = !processed;
+                      total;
+                      delegator = result.Rewards.delegator;
+                      result;
+                    }
+              | None -> ())
+            batch_results ;
+          (* Abort after 2 consecutive failed batches *)
+          if !consecutive_failures >= 2 then aborted := true
+        end)
+      chunks ;
+    (* Mark remaining payouts as aborted if we stopped early *)
+    if !aborted then begin
+      let remaining_count = total - !processed in
+      if remaining_count > 0 then begin
+        let remaining_payouts = drop !processed payouts in
+        List.iter
+          (fun (delegator, recipient, amount) ->
+            processed := !processed + 1 ;
+            let result =
+              {
+                Rewards.delegator;
+                recipient;
+                amount;
+                op_hash = None;
+                success = false;
+                note = "aborted: consecutive batch failures";
+              }
+            in
+            results := result :: !results ;
+            match on_progress with
+            | Some cb -> cb {current = !processed; total; delegator; result}
+            | None -> ())
+          remaining_payouts
+      end
+    end ;
+    let results = List.rev !results in
+    Ok results
 
 let execute ~ctx ~(blueprint : Rewards.payout_blueprint) ?(dry_run = false)
     ?on_progress ?(batch_size = 80) () =
@@ -345,4 +447,6 @@ let execute ~ctx ~(blueprint : Rewards.payout_blueprint) ?(dry_run = false)
 
 module Internal_for_tests = struct
   let extract_op_hash = extract_op_hash
+
+  let collect_payouts = collect_payouts
 end
