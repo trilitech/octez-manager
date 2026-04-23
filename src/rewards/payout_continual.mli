@@ -15,27 +15,7 @@
     scheduler tick, {!cycles_due} will include it again, ensuring automatic
     retry without skipping any cycle. *)
 
-(** {1 State} *)
-
-(** Whether continual mode is active for a given baker instance. *)
-val is_active : instance:string -> bool
-
-(** Enable continual mode for a baker instance. *)
-val enable : instance:string -> unit
-
-(** Disable continual mode for a baker instance. *)
-val disable : instance:string -> unit
-
 (** {1 Cycle check} *)
-
-(** Path to the per-instance payout delay file.
-    @param instance Baker instance name *)
-val delay_file : instance:string -> string
-
-(** Read the delay timestamp from the per-instance delay file.
-    Returns [None] if the file does not exist or contains invalid content.
-    @param instance Baker instance name *)
-val read_delay_until : instance:string -> float option
 
 (** Determine which cycles should be paid on this scheduler tick.
 

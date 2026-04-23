@@ -116,117 +116,6 @@ let network_lock = Mutex.create ()
 let get_network_for_instance ~instance =
   Mutex.protect network_lock (fun () -> Hashtbl.find_opt network_cache instance)
 
-(* ── Continual mode state ────────────────────────────── *)
-
-(* Track the last cycle we saw per instance (for cycle transition detection) *)
-let continual_last_cycle : (string, int) Hashtbl.t = Hashtbl.create 4
-
-(* The time at which we should trigger payouts (random delay) *)
-let continual_delay_until : (string, float) Hashtbl.t = Hashtbl.create 4
-
-let continual_lock = Mutex.create ()
-
-(** Sync continual mode from config (enable if config says so). *)
-let sync_continual_from_config ~instance =
-  match Payout_config.load ~instance with
-  | Ok c when c.continual_enabled -> Payout_continual.enable ~instance
-  | Ok _ -> ()
-  | Error _ -> ()
-
-(** Check for cycle transition and trigger continual payouts when due. *)
-let check_continual ~instance ~(svc : Data.Service_state.t) =
-  sync_continual_from_config ~instance ;
-  if not (Payout_continual.is_active ~instance) then ()
-  else
-    match (get_current_cycle ~instance, Payout_config.load ~instance) with
-    | Some current_cycle, Ok config ->
-        let prev =
-          Mutex.protect continual_lock (fun () ->
-              Hashtbl.find_opt continual_last_cycle instance)
-        in
-        (* Detect cycle transition: new cycle appeared *)
-        (match prev with
-        | Some p when p >= current_cycle -> ()
-        | _ ->
-            Mutex.protect continual_lock (fun () ->
-                Hashtbl.replace continual_last_cycle instance current_cycle) ;
-            (* Schedule payout with random delay *)
-            let range = config.max_delay_blocks - config.min_delay_blocks in
-            let delay_blocks =
-              config.min_delay_blocks
-              + if range > 0 then Random.int (range + 1) else 0
-            in
-            (* ~15 seconds per block on Tezos *)
-            let delay_seconds = Float.of_int delay_blocks *. 15.0 in
-            let trigger_at = Unix.gettimeofday () +. delay_seconds in
-            Mutex.protect continual_lock (fun () ->
-                Hashtbl.replace continual_delay_until instance trigger_at)) ;
-        (* Check if the delay has expired *)
-        let ready =
-          Mutex.protect continual_lock (fun () ->
-              match Hashtbl.find_opt continual_delay_until instance with
-              | Some t when Unix.gettimeofday () >= t ->
-                  Hashtbl.remove continual_delay_until instance ;
-                  true
-              | _ -> false)
-        in
-        if ready then
-          let service = svc.service in
-          let octez_client_bin =
-            Filename.concat service.Service.app_bin_dir "octez-client"
-          in
-          let endpoint =
-            Delegate_scheduler.get_baker_node_endpoint ~instance
-            |> Option.value
-                 ~default:
-                   ("http://" ^ Rpc_addr.to_string service.Service.rpc_addr)
-          in
-          let base_dir =
-            match Node_env.read ~inst:instance with
-            | Ok pairs -> (
-                match List.assoc_opt "OCTEZ_CLIENT_BASE_DIR" pairs with
-                | Some d -> Some d
-                | None -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs)
-            | Error _ -> None
-          in
-          let ctx : Payout_executor.context =
-            {
-              octez_client_bin;
-              endpoint;
-              base_dir;
-              password_file = None;
-              payout_key_alias = config.payout_key_alias;
-              instance;
-            }
-          in
-          let results =
-            Payout_continual.pay_due_cycles
-              ~ctx
-              ~baker:config.baker_pkh
-              ~network:service.network
-              ~current_cycle
-              ~interval:config.continual_interval
-              ~offset:config.continual_offset
-          in
-          List.iter
-            (fun (cycle, (_paid_count, result)) ->
-              match result with
-              | Ok () ->
-                  Context.toast_info
-                    (Printf.sprintf
-                       "Continual: cycle %d paid for %s"
-                       cycle
-                       instance)
-              | Error msg ->
-                  Context.toast_warn
-                    (Printf.sprintf
-                       "Continual: cycle %d failed for %s: %s"
-                       cycle
-                       instance
-                       msg))
-            results
-    | _ -> ()
-
 (* Polling logic *)
 
 (** Try fetching recent cycles for [baker]. Returns [Some cycles] on success
@@ -424,8 +313,7 @@ let tick () =
     (fun (st : Data.Service_state.t) ->
       let instance = st.service.Service.instance in
       let network = st.service.Service.network in
-      poll_baker ~instance ~network ;
-      check_continual ~instance ~svc:st)
+      poll_baker ~instance ~network)
     bakers ;
   (* Also poll any test bakers from OM_TEST_BAKER env var *)
   List.iter
@@ -462,7 +350,4 @@ let clear () =
   Mutex.protect in_progress_lock (fun () -> Hashtbl.clear in_progress_payouts) ;
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.clear baker_instance_cache) ;
-  Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache) ;
-  Mutex.protect continual_lock (fun () ->
-      Hashtbl.clear continual_last_cycle ;
-      Hashtbl.clear continual_delay_until)
+  Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache)

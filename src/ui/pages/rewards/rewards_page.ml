@@ -946,9 +946,16 @@ let handle_key ps key ~size:_ =
             match Rewards_state.selected_baker_instance s with
             | None -> ps
             | Some (instance, pkh) ->
-                let currently_active = Payout_continual.is_active ~instance in
+                let currently_active =
+                  Systemd.is_payout_timer_active ~instance
+                in
                 if currently_active then (
-                  Payout_continual.disable ~instance ;
+                  (* Disable timer *)
+                  (match Systemd.disable_payout_timer ~instance with
+                  | Ok () -> ()
+                  | Error (`Msg msg) ->
+                      Context.toast_warn
+                        (Printf.sprintf "Failed to disable timer: %s" msg)) ;
                   let config =
                     match Payout_config.load ~instance with
                     | Ok c -> c
@@ -962,19 +969,9 @@ let handle_key ps key ~size:_ =
                     (Printf.sprintf "Continual mode disabled for %s" instance) ;
                   ps)
                 else (
-                  Payout_continual.enable ~instance ;
-                  let config =
-                    match Payout_config.load ~instance with
-                    | Ok c -> c
-                    | Error _ -> Payout_config.default ~baker_pkh:pkh
-                  in
-                  let config =
-                    {config with Payout_config.continual_enabled = true}
-                  in
-                  ignore (Payout_config.save ~instance config) ;
-                  Rewards_scheduler.sync_continual_from_config ~instance ;
-                  Context.toast_info
-                    (Printf.sprintf "Continual mode enabled for %s" instance) ;
+                  (* Enable timer - need to set up systemd units first *)
+                  Context.toast_warn
+                    "Use CLI 'rewards continual start' to enable continual mode" ;
                   ps))
         | Some (Keys.Char "g") when s.active_tab = Rewards_state.Overview -> (
             (* Generate payout preview on Overview tab *)

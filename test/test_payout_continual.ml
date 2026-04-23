@@ -7,115 +7,7 @@
 
 open Octez_manager_rewards
 
-let tmpdir () = Filename.temp_dir "om_test_continual" ""
-
-let cleanup_dir dir =
-  let rec rm path =
-    if Sys.is_directory path then (
-      Array.iter (fun f -> rm (Filename.concat path f)) (Sys.readdir path) ;
-      Unix.rmdir path)
-    else Sys.remove path
-  in
-  if Sys.file_exists dir then rm dir
-
-(* ── Active state ─────────────────────────────────── *)
-
-let test_active_default () =
-  (* Fresh instance should not be active *)
-  let instance = "test-baker-active-default" in
-  Alcotest.(check bool)
-    "not active by default"
-    false
-    (Payout_continual.is_active ~instance)
-
-let test_enable_disable () =
-  let instance = "test-baker-enable-disable" in
-  Payout_continual.enable ~instance ;
-  Alcotest.(check bool)
-    "active after enable"
-    true
-    (Payout_continual.is_active ~instance) ;
-  Payout_continual.disable ~instance ;
-  Alcotest.(check bool)
-    "inactive after disable"
-    false
-    (Payout_continual.is_active ~instance)
-
-(* ── Delay file persistence ───────────────────────── *)
-
-let test_delay_file_path () =
-  let instance = "test-baker-delay" in
-  let path = Payout_continual.delay_file ~instance in
-  Alcotest.(check bool)
-    "path contains instance"
-    true
-    (let found = ref false in
-     String.split_on_char '/' path
-     |> List.iter (fun seg -> if String.equal seg instance then found := true) ;
-     !found) ;
-  Alcotest.(check bool)
-    "path ends with delay_until"
-    true
-    (Filename.basename path = "delay_until")
-
-let test_read_delay_no_file () =
-  (* When no delay file exists, read should return None *)
-  let instance = "nonexistent-baker-delay-read" in
-  Alcotest.(check (option (float 0.01)))
-    "no delay file"
-    None
-    (Payout_continual.read_delay_until ~instance)
-
-let test_write_read_delay () =
-  let dir = tmpdir () in
-  (* We need to write to a real path, so we'll use the low-level functions
-     with a temp directory. Since delay_file uses rewards_dir which depends
-     on Paths.registry_root, we test write/read via a temp file directly. *)
-  let path = Filename.concat dir "delay_until" in
-  let timestamp = 1700000000.0 in
-  let oc = open_out path in
-  Printf.fprintf oc "%.0f\n" timestamp ;
-  close_out oc ;
-  (* Verify file content *)
-  let ic = open_in path in
-  let line = input_line ic in
-  close_in ic ;
-  Alcotest.(check (option (float 0.01)))
-    "read back timestamp"
-    (Some timestamp)
-    (Float.of_string_opt (String.trim line)) ;
-  cleanup_dir dir
-
-let test_write_read_clear_delay () =
-  let dir = tmpdir () in
-  let path = Filename.concat dir "delay_until" in
-  (* Write *)
-  let timestamp = 1700000500.0 in
-  let oc = open_out path in
-  Printf.fprintf oc "%.0f\n" timestamp ;
-  close_out oc ;
-  Alcotest.(check bool) "file exists after write" true (Sys.file_exists path) ;
-  (* Clear *)
-  if Sys.file_exists path then Sys.remove path ;
-  Alcotest.(check bool) "file gone after clear" false (Sys.file_exists path) ;
-  cleanup_dir dir
-
-let test_delay_file_invalid_content () =
-  let dir = tmpdir () in
-  let path = Filename.concat dir "delay_until" in
-  let oc = open_out path in
-  output_string oc "not-a-number\n" ;
-  close_out oc ;
-  let ic = open_in path in
-  let line = input_line ic in
-  close_in ic ;
-  Alcotest.(check (option (float 0.01)))
-    "invalid content returns None"
-    None
-    (Float.of_string_opt (String.trim line)) ;
-  cleanup_dir dir
-
-(* ── Cycles due ───────────────────────────────────── *)
+(* ── Trigger cycle logic ──────────────────────────── *)
 
 let test_cycles_due_no_unpaid () =
   (* With interval=1, only the last 1 cycle is checked *)
@@ -341,25 +233,6 @@ let () =
   Alcotest.run
     "payout_continual"
     [
-      ( "active_state",
-        [
-          Alcotest.test_case "default inactive" `Quick test_active_default;
-          Alcotest.test_case "enable/disable" `Quick test_enable_disable;
-        ] );
-      ( "delay_file",
-        [
-          Alcotest.test_case "path structure" `Quick test_delay_file_path;
-          Alcotest.test_case "read nonexistent" `Quick test_read_delay_no_file;
-          Alcotest.test_case "write/read roundtrip" `Quick test_write_read_delay;
-          Alcotest.test_case
-            "write/clear lifecycle"
-            `Quick
-            test_write_read_clear_delay;
-          Alcotest.test_case
-            "invalid content"
-            `Quick
-            test_delay_file_invalid_content;
-        ] );
       ( "is_trigger_cycle",
         [
           Alcotest.test_case
