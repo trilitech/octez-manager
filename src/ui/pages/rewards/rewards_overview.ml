@@ -12,6 +12,7 @@ module Widgets = Miaou_widgets_display.Widgets
 module Box = Miaou_widgets_layout.Box_widget
 module Desc_list = Miaou_widgets_display.Description_list
 module Grid = Miaou_widgets_layout.Grid_layout
+module Display = Rewards_display_utils
 
 let format_tez_short mutez =
   let tez = Int64.to_float mutez /. 1_000_000.0 in
@@ -127,12 +128,13 @@ let render_recent_cycles_box ~box_width ~instance
         (Widgets.themed_muted "No cycle data available")
   | _ ->
       let header =
-        Printf.sprintf
-          "  %-7s %-16s %-14s %-7s"
-          "CYCLE"
-          "EARNED"
-          "DISTRIBUTED"
-          "STATUS"
+        "  "
+        ^ Display.pad_right 7 "CYCLE"
+        ^ " "
+        ^ Display.pad_right 16 "EARNED"
+        ^ " "
+        ^ Display.pad_right 14 "DISTRIBUTED"
+        ^ " STATUS"
       in
       let rows =
         List.map
@@ -158,12 +160,13 @@ let render_recent_cycles_box ~box_width ~instance
               | Rewards.Partial -> Widgets.themed_warning "partial"
               | Rewards.In_progress -> Widgets.themed_accent "in progress"
             in
-            Printf.sprintf
-              "  %-7d %-16s %-14s %s"
-              cr.cycle
-              earned
-              distributed
-              status_str)
+            "  "
+            ^ Display.pad_right 7 (string_of_int cr.cycle)
+            ^ " "
+            ^ Display.pad_right 16 earned
+            ^ " "
+            ^ Display.pad_right 14 distributed
+            ^ " " ^ status_str)
           cycles
       in
       let content =
