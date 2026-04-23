@@ -721,7 +721,74 @@ let notify_cmd =
   let info = Cmd.info "notify" ~doc:"Manage payout notifications." in
   Cmd.group info [notify_test_cmd]
 
-(* ── rewards continual start/stop/status ──────────────────── *)
+(* ── rewards continual start/stop/status/run ──────────────────── *)
+
+let continual_run_run baker_opt =
+  match resolve_baker baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok svc -> (
+      match baker_delegate svc with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok baker_pkh -> (
+          let instance = svc.instance in
+          let config =
+            match Payout_config.load ~instance with
+            | Ok c -> c
+            | Error _ -> Payout_config.default ~baker_pkh
+          in
+          let tzkt_url = config.tzkt_url in
+          (* Fetch current cycle *)
+          match Cycle_data.fetch_current_cycle ~tzkt_url with
+          | Error msg -> Cli_helpers.cmdliner_error msg
+          | Ok current_cycle ->
+              let octez_client_bin =
+                Filename.concat svc.Service.app_bin_dir "octez-client"
+              in
+              let endpoint =
+                "http://" ^ Rpc_addr.to_string svc.Service.rpc_addr
+              in
+              let ctx : Payout_executor.context =
+                {
+                  octez_client_bin;
+                  endpoint;
+                  base_dir = None;
+                  password_file = None;
+                  payout_key_alias = config.payout_key_alias;
+                  instance;
+                }
+              in
+              let results =
+                Payout_continual.pay_due_cycles
+                  ~ctx
+                  ~baker:baker_pkh
+                  ~network:svc.network
+                  ~current_cycle
+                  ~interval:config.continual_interval
+                  ~offset:config.continual_offset
+              in
+              if List.length results = 0 then (
+                Printf.printf "No cycles due for payout.\n" ;
+                `Ok ())
+              else (
+                List.iter
+                  (fun (cycle, (paid_count, result)) ->
+                    match result with
+                    | Ok () ->
+                        Printf.printf
+                          "Cycle %d: paid %d delegators\n"
+                          cycle
+                          paid_count
+                    | Error msg ->
+                        Printf.eprintf "Cycle %d: FAILED - %s\n" cycle msg)
+                  results ;
+                let all_ok =
+                  List.for_all
+                    (fun (_, (_, result)) ->
+                      match result with Ok () -> true | Error _ -> false)
+                    results
+                in
+                if all_ok then `Ok () else `Error (false, "Some payouts failed"))
+          ))
 
 let continual_start_run baker_opt interval offset =
   match resolve_baker baker_opt with
@@ -834,11 +901,28 @@ let continual_status_cmd =
   let info = Cmd.info "status" ~doc:"Show continual mode status." in
   Cmd.v info Term.(ret (const continual_status_run $ baker_arg))
 
+let continual_run_cmd =
+  let info =
+    Cmd.info
+      "run"
+      ~doc:
+        "Execute a single payout check for due cycles. Designed for systemd \
+         timer automation."
+  in
+  Cmd.v info Term.(ret (const continual_run_run $ baker_arg))
+
 let continual_cmd =
   let info =
     Cmd.info "continual" ~doc:"Manage continual (automatic) payouts."
   in
-  Cmd.group info [continual_start_cmd; continual_stop_cmd; continual_status_cmd]
+  Cmd.group
+    info
+    [
+      continual_start_cmd;
+      continual_stop_cmd;
+      continual_status_cmd;
+      continual_run_cmd;
+    ]
 
 (* ── rewards command group ─────────────────────────────────── *)
 

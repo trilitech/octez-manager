@@ -209,7 +209,7 @@ let check_continual ~instance ~(svc : Data.Service_state.t) =
               ~offset:config.continual_offset
           in
           List.iter
-            (fun (cycle, result) ->
+            (fun (cycle, (_paid_count, result)) ->
               match result with
               | Ok () ->
                   Context.toast_info
