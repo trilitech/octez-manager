@@ -331,21 +331,17 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
       in
       (* Hint panel: left-bordered block for the selected field *)
       let hint_box =
-        if state.config_show_hint then
-          let field = List.nth all_fields state.config_cursor in
-          let bar = Widgets.themed_muted "\xe2\x94\x82 " in
-          let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
-          let hint_width = max 20 (box_width - 6) in
-          let wrapped =
-            Widgets.wrap_text ~width:hint_width (field_hint field)
-          in
-          let text_lines =
-            List.map (fun l -> bar ^ Widgets.themed_text l) wrapped
-          in
-          String.concat
-            "\n"
-            (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
-        else ""
+        let field = List.nth all_fields state.config_cursor in
+        let bar = Widgets.themed_muted "\xe2\x94\x82 " in
+        let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
+        let hint_width = max 20 (box_width - 6) in
+        let wrapped = Widgets.wrap_text ~width:hint_width (field_hint field) in
+        let text_lines =
+          List.map (fun l -> bar ^ Widgets.themed_text l) wrapped
+        in
+        String.concat
+          "\n"
+          (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
       in
       (* Delegator overrides section *)
       let override_count = List.length config.delegator_overrides in
@@ -406,11 +402,7 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
         if state.config_dirty then Widgets.themed_warning "  * Unsaved changes"
         else ""
       in
-      let parts =
-        if String.length hint_box > 0 then
-          [""; general_box; hint_box; ""; override_box]
-        else [""; general_box; ""; override_box]
-      in
+      let parts = [""; general_box; hint_box; ""; override_box] in
       let parts =
         if dirty_indicator <> "" then parts @ [dirty_indicator] else parts
       in
