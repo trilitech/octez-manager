@@ -11,6 +11,7 @@ open Octez_manager_rewards
 module Widgets = Miaou_widgets_display.Widgets
 module Box = Miaou_widgets_layout.Box_widget
 module Sparkline = Miaou_widgets_display.Sparkline_widget
+module Display = Rewards_display_utils
 
 let format_tez_short mutez =
   let tez = Int64.to_float mutez /. 1_000_000.0 in
@@ -78,14 +79,17 @@ let render_sparklines ~box_width (cycles : Rewards.cycle_rewards list) ~instance
 let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
     (cycles : Rewards.cycle_rewards list) =
   let header =
-    Printf.sprintf
-      "  %-7s %-14s %-14s %-12s %-5s %-8s"
-      "CYCLE"
-      "EARNED"
-      "DISTRIBUTED"
-      "FEE INCOME"
-      "DELEG"
-      "STATUS"
+    "  "
+    ^ Display.pad_right 7 "CYCLE"
+    ^ " "
+    ^ Display.pad_right 14 "EARNED"
+    ^ " "
+    ^ Display.pad_right 14 "DISTRIBUTED"
+    ^ " "
+    ^ Display.pad_right 12 "FEE INCOME"
+    ^ " "
+    ^ Display.pad_right 5 "DELEG"
+    ^ " STATUS"
   in
   let rows =
     List.mapi
@@ -114,18 +118,20 @@ let render_history_table ~box_width ~(state : Rewards_state.state) ~instance
         in
         let delegators = string_of_int cr.num_delegators in
         let indicator =
-          if i = state.history_cursor then "\xe2\x96\xb8" else " "
+          if i = state.history_cursor then "\xe2\x96\xb8 " else "  "
         in
         let line =
-          Printf.sprintf
-            "%s %-7d %-14s %-14s %-12s %-5s %s"
-            indicator
-            cr.cycle
-            earned
-            distributed
-            fee_income
-            delegators
-            status_str
+          indicator
+          ^ Display.pad_right 7 (string_of_int cr.cycle)
+          ^ " "
+          ^ Display.pad_right 14 earned
+          ^ " "
+          ^ Display.pad_right 14 distributed
+          ^ " "
+          ^ Display.pad_right 12 fee_income
+          ^ " "
+          ^ Display.pad_right 5 delegators
+          ^ " " ^ status_str
         in
         if i = state.history_cursor then Widgets.themed_emphasis line
         else Widgets.themed_text line)

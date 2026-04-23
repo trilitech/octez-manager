@@ -11,6 +11,7 @@ open Octez_manager_rewards
 module Widgets = Miaou_widgets_display.Widgets
 module Box = Miaou_widgets_layout.Box_widget
 module Desc_list = Miaou_widgets_display.Description_list
+module Display = Rewards_display_utils
 
 let tez_symbol = "\xEA\x9C\xA9"
 
@@ -132,7 +133,7 @@ let render_row ~is_selected (d : Rewards.delegator_reward) =
   let balance = format_tez_compact d.delegated_balance ^ " " ^ tez_symbol in
   let reward = format_tez_compact d.net_reward ^ " " ^ tez_symbol in
   let fee = Printf.sprintf "%.1f%%" (d.fee_rate *. 100.0) in
-  let indicator = if is_selected then "\xe2\x96\xb8" else " " in
+  let indicator = if is_selected then "\xe2\x96\xb8 " else "  " in
   let warning =
     match d.status with
     | Rewards.Below_minimum_payout | Rewards.Below_minimum_balance ->
@@ -140,14 +141,9 @@ let render_row ~is_selected (d : Rewards.delegator_reward) =
     | _ -> ""
   in
   let line =
-    Printf.sprintf
-      "%s %-14s %14s %14s %5s%s"
-      indicator
-      addr
-      balance
-      reward
-      fee
-      warning
+    indicator ^ Display.pad_right 14 addr ^ " "
+    ^ Display.pad_left 14 balance
+    ^ " " ^ Display.pad_left 14 reward ^ " " ^ Display.pad_left 5 fee ^ warning
   in
   if is_selected then Widgets.themed_emphasis line
   else
@@ -224,12 +220,13 @@ let render ~(state : Rewards_state.state) ~cols ~rows =
       (* List header *)
       let header =
         Widgets.themed_muted
-          (Printf.sprintf
-             "  %-14s %14s %14s %5s"
-             "ADDRESS"
-             "BALANCE"
-             "REWARD"
-             "FEE")
+          ("  "
+          ^ Display.pad_right 14 "ADDRESS"
+          ^ " "
+          ^ Display.pad_left 14 "BALANCE"
+          ^ " "
+          ^ Display.pad_left 14 "REWARD"
+          ^ " " ^ Display.pad_left 5 "FEE")
       in
       (* Compute visible window. Reserve space for indicators, search,
          header, scroll indicator, detail panel, and padding. *)
