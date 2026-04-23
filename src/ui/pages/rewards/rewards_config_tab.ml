@@ -399,7 +399,9 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
       in
       (* Dirty indicator *)
       let dirty_indicator =
-        if state.config_dirty then Widgets.themed_warning "  * Unsaved changes"
+        if state.config_dirty then
+          Widgets.themed_warning "  * Unsaved changes"
+          ^ Widgets.themed_muted "  [s: save]"
         else ""
       in
       let parts = [""; general_box; hint_box; ""; override_box] in
