@@ -351,6 +351,24 @@ let get_service_paths ~role ~instance =
 
 let ( let* ) = Result.bind
 
+(** Validate instance name to prevent injection attacks in unit files.
+    Instance names must match [^[a-zA-Z0-9._-]+$]. *)
+let validate_instance_name instance =
+  let is_valid_char = function
+    | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '.' | '_' | '-' -> true
+    | _ -> false
+  in
+  if String.length instance = 0 then
+    Error (`Msg "Instance name cannot be empty")
+  else if not (String.for_all is_valid_char instance) then
+    Error
+      (`Msg
+         (Printf.sprintf
+            "Invalid instance name '%s': must contain only alphanumeric \
+             characters, dots, underscores, and hyphens"
+            instance))
+  else Ok ()
+
 let payout_unit_name instance =
   Printf.sprintf "octez-manager-payout@%s" instance
 
@@ -371,6 +389,7 @@ let payout_timer_path instance =
     Filename.concat base (Printf.sprintf "%s.timer" (payout_unit_name instance))
 
 let write_payout_service ~instance ~octez_manager_bin ~service_user () =
+  let* () = validate_instance_name instance in
   let path = payout_service_path instance in
   let owner, group =
     if Paths.is_root () then ("root", "root")
@@ -388,7 +407,7 @@ let write_payout_service ~instance ~octez_manager_bin ~service_user () =
        After=network-online.target\n\n\
        [Service]\n\
        Type=oneshot\n\
-       %sExecStart=%s rewards continual run --baker %s\n"
+       %sExecStart=\"%s\" rewards continual run --baker %s\n"
       instance
       user_line
       octez_manager_bin
@@ -402,6 +421,7 @@ let write_payout_service ~instance ~octez_manager_bin ~service_user () =
   run_systemctl_timeout ~quiet:true ["daemon-reload"]
 
 let write_payout_timer ~instance () =
+  let* () = validate_instance_name instance in
   let path = payout_timer_path instance in
   let owner, group =
     if Paths.is_root () then ("root", "root")
