@@ -23,6 +23,17 @@ let consume_pending_config () =
   pending_config := None ;
   v
 
+(* Pending config that doesn't trigger dirty flag (for install/remove operations
+   where config is already saved to disk) *)
+let pending_config_clean : Payout_config.t option ref = ref None
+
+let set_pending_config_clean config = pending_config_clean := Some config
+
+let consume_pending_config_clean () =
+  let v = !pending_config_clean in
+  pending_config_clean := None ;
+  v
+
 (* {1 Field definitions} *)
 
 type field_id =
