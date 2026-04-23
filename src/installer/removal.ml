@@ -89,6 +89,10 @@ let remove_service ?(quiet = false) ~delete_data_dir ~instance () =
       let* () =
         Systemd.disable ~quiet ~role:svc.role ~instance ~stop_now:true ()
       in
+      (* Clean up payout timer if this is a baker *)
+      (if String.equal svc.role "baker" then
+         let _ = Systemd.disable_payout_timer ~instance in
+         Systemd.remove_payout_units ~instance) ;
       Systemd.remove_dropin ~role:svc.role ~instance ;
       let* () =
         match delete_data_dir with
