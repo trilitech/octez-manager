@@ -1080,6 +1080,13 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_payout_executor)
+ (libraries alcotest octez_manager_rewards)
+ (modules test_payout_executor)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (executable
  (name test_help_modal_baseline)
  (libraries
