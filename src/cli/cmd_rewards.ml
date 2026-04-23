@@ -11,6 +11,8 @@ open Cmdliner
 open Octez_manager_lib
 open Octez_manager_rewards
 
+let ( let* ) = Result.bind
+
 (* ── Helpers ───────────────────────────────────────────────── *)
 
 (** List all baker instances from the service registry. *)
@@ -816,7 +818,7 @@ let continual_start_run baker_opt interval offset =
           | Ok () -> (
               match Payout_config.save ~instance config with
               | Error msg -> Cli_helpers.cmdliner_error msg
-              | Ok () ->
+              | Ok () -> (
                   (* Determine octez-manager binary path *)
                   let octez_manager_bin =
                     match Sys.executable_name with
@@ -849,35 +851,47 @@ let continual_start_run baker_opt interval offset =
                     else None
                   in
                   (* Write systemd units *)
-                  (match
-                     Systemd.write_payout_service
-                       ~instance
-                       ~octez_manager_bin
-                       ~service_user
-                       ()
-                   with
-                  | Error (`Msg msg) ->
-                      Printf.eprintf
-                        "Warning: failed to write payout service: %s\n"
-                        msg
-                  | Ok () -> ()) ;
-                  (match Systemd.write_payout_timer ~instance () with
-                  | Error (`Msg msg) ->
-                      Printf.eprintf
-                        "Warning: failed to write payout timer: %s\n"
-                        msg
-                  | Ok () -> ()) ;
-                  (* Enable and start the timer *)
-                  (match Systemd.enable_payout_timer ~instance with
-                  | Error (`Msg msg) ->
-                      Printf.eprintf
-                        "Warning: failed to enable payout timer: %s\n"
-                        msg
-                  | Ok () -> Printf.printf "Payout timer enabled and started.\n") ;
-                  Printf.printf "Continual mode enabled for %s.\n" instance ;
-                  Printf.printf "  Interval: every %d cycle(s)\n" interval ;
-                  if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
-                  `Ok ())))
+                  match
+                    let* () =
+                      match
+                        Systemd.write_payout_service
+                          ~instance
+                          ~octez_manager_bin
+                          ~service_user
+                          ()
+                      with
+                      | Ok () -> Ok ()
+                      | Error (`Msg msg) ->
+                          Error
+                            (Printf.sprintf
+                               "Failed to write payout service: %s"
+                               msg)
+                    in
+                    let* () =
+                      match Systemd.write_payout_timer ~instance () with
+                      | Ok () -> Ok ()
+                      | Error (`Msg msg) ->
+                          Error
+                            (Printf.sprintf
+                               "Failed to write payout timer: %s"
+                               msg)
+                    in
+                    Ok ()
+                  with
+                  | Error msg -> Cli_helpers.cmdliner_error msg
+                  | Ok () ->
+                      (* Enable and start the timer *)
+                      (match Systemd.enable_payout_timer ~instance with
+                      | Error (`Msg msg) ->
+                          Printf.eprintf
+                            "Warning: failed to enable payout timer: %s\n"
+                            msg
+                      | Ok () ->
+                          Printf.printf "Payout timer enabled and started.\n") ;
+                      Printf.printf "Continual mode enabled for %s.\n" instance ;
+                      Printf.printf "  Interval: every %d cycle(s)\n" interval ;
+                      if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
+                      `Ok ()))))
 
 let continual_stop_run baker_opt =
   match resolve_baker baker_opt with
