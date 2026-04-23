@@ -84,7 +84,7 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
             ~force:false
             ()
         with
-        | Error msg -> Error msg
+        | Error msg -> (0, Error msg)
         | Ok blueprint -> (
             match
               Payout_executor.execute
@@ -93,7 +93,7 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
                 ~batch_size:config.sim_batch_size
                 ()
             with
-            | Error msg -> Error msg
+            | Error msg -> (0, Error msg)
             | Ok (_results, summary) ->
                 (* Send notifications *)
                 let channels =
@@ -103,7 +103,8 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
                 in
                 if channels <> [] then
                   ignore (Payout_notifier.notify_all ~channels ~summary) ;
-                Ok ())
+                let paid_count = summary.Rewards.paid_delegators in
+                (paid_count, Ok ()))
       in
       (cycle, result))
     due

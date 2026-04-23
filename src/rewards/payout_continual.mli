@@ -63,7 +63,7 @@ val pay_due_cycles :
   current_cycle:int ->
   interval:int ->
   offset:int ->
-  (int * (unit, string) result) list
+  (int * (int * (unit, string) result)) list
 
 (**/**)
 
