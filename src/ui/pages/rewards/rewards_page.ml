@@ -242,6 +242,26 @@ let render_baker_header (s : Rewards_state.state) =
       Widgets.themed_primary
         (Printf.sprintf " Rewards - %s (%s) " instance short_pkh)
 
+(** Render baker selector radio row (only when multiple bakers exist). *)
+let render_baker_selector s =
+  let n = List.length s.baker_instances in
+  if n < 2 then None
+  else
+    let box selected label =
+      let tick = if selected then "◉" else "○" in
+      tick ^ " " ^ label
+    in
+    let options =
+      List.mapi
+        (fun i (instance, _pkh) -> box (i = s.selected_baker) instance)
+        s.baker_instances
+    in
+    Some
+      (Widgets.title_highlight "Baker"
+      ^ ":" ^ "  "
+      ^ String.concat "   " options
+      ^ Widgets.themed_muted "  [b: switch baker]")
+
 let hint_for_tab _tab = ""
 
 let view ps ~focus:_ ~size =
@@ -250,15 +270,17 @@ let view ps ~focus:_ ~size =
   Context.tick_spinner () ;
   Context.tick_toasts () ;
   let header_line = render_baker_header s in
+  let baker_selector = render_baker_selector s in
   let tab_bar = render_tab_bar s ~cols in
   let hint = hint_for_tab s.active_tab in
   let toast = Context.render_toasts ~cols in
   let footer = if String.length toast > 0 then [toast; hint] else [hint] in
-  Themed_page.render_layout
-    ~size
-    ~header:[header_line; tab_bar; ""]
-    ~footer
-    ~child:(fun avail ->
+  let header =
+    match baker_selector with
+    | None -> [header_line; tab_bar; ""]
+    | Some selector -> [header_line; selector; tab_bar; ""]
+  in
+  Themed_page.render_layout ~size ~header ~footer ~child:(fun avail ->
       let cols = avail.LTerm_geom.cols in
       let rows = avail.LTerm_geom.rows in
       match s.active_tab with
@@ -674,15 +696,60 @@ let tab_at_col col =
   in
   find 0 1 Rewards_state.all_tabs
 
+(** Given a column position in the baker selector row (1-indexed), return the baker index.
+    Format: "Baker:  ◉ name1   ○ name2   [b: switch baker]"
+    The prefix "Baker:  " is 8 chars. Each option is "◉ name   " or "○ name   ". *)
+let baker_at_col s col =
+  let n = List.length s.baker_instances in
+  if n < 2 then None
+  else
+    let prefix_len = 8 in
+    (* "Baker:  " *)
+    if col < prefix_len then None
+    else
+      let rec find idx pos = function
+        | [] -> None
+        | (instance, _pkh) :: rest ->
+            let tick_len = 2 in
+            (* "◉ " or "○ " *)
+            let name_len = String.length instance in
+            let spacing_len = 3 in
+            (* "   " between options *)
+            let option_len = tick_len + name_len + spacing_len in
+            if col >= pos && col < pos + tick_len + name_len then Some idx
+            else find (idx + 1) (pos + option_len) rest
+      in
+      find 0 prefix_len s.baker_instances
+
 let handle_key ps key ~size:_ =
   Metrics.mark_input_event () ;
   let s = ps.Navigation.s in
   (* Search mode captures all input *)
   if s.search_active then handle_search_key ps key
   else
-    (* Check for mouse click on tab bar (row 2 = tab bar, 1-indexed) *)
+    (* Check for mouse clicks on baker selector (row 2) or tab bar (row 2 or 3 depending on baker count) *)
     match Miaou_helpers.Mouse.parse_click key with
-    | Some {row = 2; col} -> (
+    | Some {row = 2; col} when List.length s.baker_instances > 1 -> (
+        (* Row 2 is baker selector when multiple bakers exist *)
+        match baker_at_col s col with
+        | Some idx ->
+            Navigation.update
+              (fun s ->
+                {
+                  s with
+                  selected_baker = idx;
+                  blueprint = None;
+                  overview_preview = false;
+                  config = None;
+                  config_dirty = false;
+                  selected_cycle = None;
+                  delegator_cursor = 0;
+                })
+              ps
+        | None -> ps)
+    | Some {row; col}
+      when row = if List.length s.baker_instances > 1 then 3 else 2 -> (
+        (* Tab bar is on row 3 if baker selector present, otherwise row 2 *)
         match tab_at_col col with
         | Some idx ->
             let tab = Rewards_state.tab_of_index idx in
@@ -909,7 +976,10 @@ let keymap ps =
   let kb key help =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
-  let common = [kb "Tab" "Next tab"; kb "Esc" "Back"] in
+  let common =
+    let base = [kb "Tab" "Next tab"; kb "Esc" "Back"] in
+    if List.length s.baker_instances > 1 then kb "b" "Baker" :: base else base
+  in
   let tab_keys =
     match s.active_tab with
     | Rewards_state.Overview ->
@@ -918,7 +988,6 @@ let keymap ps =
           kb "p" "Pay";
           kb "d" "Dry-run";
           kb "t" "Continual";
-          kb "b" "Baker";
           kb "r" "Refresh";
         ]
     | Rewards_state.Delegators ->
@@ -1022,7 +1091,10 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
   let key_hints ps =
     let s = ps.Navigation.s in
     let kh key help = Miaou.Core.Tui_page.{key; help} in
-    let common = [kh "Tab" "Next tab"; kh "Esc" "Back"] in
+    let common =
+      let base = [kh "Tab" "Next tab"; kh "Esc" "Back"] in
+      if List.length s.baker_instances > 1 then kh "b" "Baker" :: base else base
+    in
     let tab_keys =
       match s.active_tab with
       | Rewards_state.Overview ->
@@ -1031,7 +1103,6 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
             kh "p" "Pay";
             kh "d" "Dry-run";
             kh "t" "Continual";
-            kh "b" "Baker";
             kh "r" "Refresh";
           ]
       | Rewards_state.Delegators ->
