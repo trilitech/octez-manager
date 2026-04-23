@@ -7,7 +7,6 @@
 
 (** Overview tab for the Rewards page. *)
 
-open Octez_manager_lib
 open Octez_manager_rewards
 module Widgets = Miaou_widgets_display.Widgets
 module Box = Miaou_widgets_layout.Box_widget
@@ -52,13 +51,13 @@ let render_current_cycle_box ~box_width ~instance current_cycle =
     | Some _cycle -> Widgets.themed_text "Status: In progress"
     | None -> Widgets.themed_muted "Loading cycle data..."
   in
-  let continual_active = Systemd.is_payout_timer_active ~instance in
+  let continual_active = Rewards_scheduler.get_payout_timer_active ~instance in
   let continual_line =
     if continual_active then
       let interval_str =
-        match Payout_config.load ~instance with
-        | Ok c when c.continual_interval > 1 ->
-            Printf.sprintf " (every %d cycles)" c.continual_interval
+        match Rewards_scheduler.get_continual_interval ~instance with
+        | Some interval when interval > 1 ->
+            Printf.sprintf " (every %d cycles)" interval
         | _ -> ""
       in
       Widgets.themed_success (Printf.sprintf "Continual: Active%s" interval_str)

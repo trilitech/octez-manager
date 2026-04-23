@@ -69,6 +69,14 @@ val get_baker_for_instance : instance:string -> string option
     Useful for test bakers that don't have a service registry entry. *)
 val get_network_for_instance : instance:string -> string option
 
+(** Get the cached payout timer active status for an instance.
+    Returns [false] if not cached yet. Safe for view functions. *)
+val get_payout_timer_active : instance:string -> bool
+
+(** Get the cached continual interval for an instance.
+    Returns [None] if not configured or not cached yet. Safe for view functions. *)
+val get_continual_interval : instance:string -> int option
+
 (** {1 Refresh} *)
 
 (** Ensure delegator details are loaded for a specific cycle.
