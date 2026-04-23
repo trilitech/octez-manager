@@ -346,3 +346,116 @@ let get_service_paths ~role ~instance =
     ("Drop-in Override", dropin);
     ("Environment File", env_file);
   ]
+
+(* ── Payout Timer Management ──────────────────────────────── *)
+
+let ( let* ) = Result.bind
+
+let payout_unit_name instance =
+  Printf.sprintf "octez-manager-payout@%s" instance
+
+let payout_service_path instance =
+  if Paths.is_root () then
+    Printf.sprintf "/etc/systemd/system/%s.service" (payout_unit_name instance)
+  else
+    let base = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
+    Filename.concat
+      base
+      (Printf.sprintf "%s.service" (payout_unit_name instance))
+
+let payout_timer_path instance =
+  if Paths.is_root () then
+    Printf.sprintf "/etc/systemd/system/%s.timer" (payout_unit_name instance)
+  else
+    let base = Filename.concat (Paths.xdg_config_home ()) "systemd/user" in
+    Filename.concat base (Printf.sprintf "%s.timer" (payout_unit_name instance))
+
+let write_payout_service ~instance ~octez_manager_bin ~service_user () =
+  let path = payout_service_path instance in
+  let owner, group =
+    if Paths.is_root () then ("root", "root")
+    else Paths.current_user_group_names ()
+  in
+  let user_line =
+    match service_user with
+    | Some user when Paths.is_root () -> Printf.sprintf "User=%s\n" user
+    | _ -> ""
+  in
+  let content =
+    Printf.sprintf
+      "[Unit]\n\
+       Description=octez-manager payout for %s\n\
+       After=network-online.target\n\n\
+       [Service]\n\
+       Type=oneshot\n\
+       %sExecStart=%s rewards continual run --baker %s\n"
+      instance
+      user_line
+      octez_manager_bin
+      instance
+  in
+  (* Ensure parent directory exists *)
+  let dir = Filename.dirname path in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir in
+  let* () = File_ops.write_file ~mode:0o644 ~owner ~group path content in
+  (* Reload systemd *)
+  run_systemctl_timeout ~quiet:true ["daemon-reload"]
+
+let write_payout_timer ~instance () =
+  let path = payout_timer_path instance in
+  let owner, group =
+    if Paths.is_root () then ("root", "root")
+    else Paths.current_user_group_names ()
+  in
+  let content =
+    Printf.sprintf
+      "[Unit]\n\
+       Description=octez-manager payout timer for %s\n\n\
+       [Timer]\n\
+       OnCalendar=*:0/5\n\
+       Persistent=true\n\
+       RandomizedDelaySec=60\n\n\
+       [Install]\n\
+       WantedBy=timers.target\n"
+      instance
+  in
+  (* Ensure parent directory exists *)
+  let dir = Filename.dirname path in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir in
+  let* () = File_ops.write_file ~mode:0o644 ~owner ~group path content in
+  (* Reload systemd *)
+  run_systemctl_timeout ~quiet:true ["daemon-reload"]
+
+let enable_payout_timer ~instance =
+  let unit = payout_unit_name instance ^ ".timer" in
+  run_systemctl_timeout ~quiet:false ~duration:"10s" ["enable"; "--now"; unit]
+
+let disable_payout_timer ~instance =
+  let unit = payout_unit_name instance ^ ".timer" in
+  run_systemctl_timeout ~quiet:false ~duration:"10s" ["disable"; "--now"; unit]
+
+let remove_payout_units ~instance =
+  let service_path = payout_service_path instance in
+  let timer_path = payout_timer_path instance in
+  File_ops.remove_path service_path ;
+  File_ops.remove_path timer_path ;
+  let _ = run_systemctl_timeout ~quiet:true ["daemon-reload"] in
+  ()
+
+let is_payout_timer_active ~instance =
+  let unit = payout_unit_name instance ^ ".timer" in
+  match run_systemctl_out_timeout ["show"; "--property=ActiveState"; unit] with
+  | Ok line ->
+      let state =
+        match String.split_on_char '=' line with
+        | [_; value] -> String.trim value
+        | _ -> String.trim line
+      in
+      String.equal state "active"
+  | Error _ -> false
+
+let payout_timer_status ~instance =
+  let unit = payout_unit_name instance ^ ".timer" in
+  match run_systemctl_out_timeout ["status"; "--no-pager"; unit] with
+  | Ok output -> Some output
+  | Error _ -> None
