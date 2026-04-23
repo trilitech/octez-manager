@@ -68,33 +68,64 @@ let test_cycles_due_every_cycle () =
 
 let test_cycles_due_interval_2 () =
   with_temp_instance (fun instance ->
-      let due =
+      (* Test with current_cycle=105 (odd), interval=2, offset=0
+         Since 105 is odd, it's NOT a trigger cycle, so should return [] *)
+      let due_no_trigger =
         Payout_continual.cycles_due
           ~instance
           ~current_cycle:105
           ~interval:2
           ~offset:0
       in
-      (* Only even cycles: 86, 88, 90, ..., 104 *)
-      List.iter
-        (fun c -> Alcotest.(check bool) "even cycle" true (c mod 2 = 0))
-        due ;
-      Alcotest.(check int) "10 cycles due" 10 (List.length due))
+      Alcotest.(check (list int)) "no trigger on odd cycle" [] due_no_trigger ;
+      (* Test with current_cycle=106 (even), interval=2, offset=0
+         Since 106 is even, it IS a trigger cycle, so should return ALL unpaid cycles *)
+      let due_trigger =
+        Payout_continual.cycles_due
+          ~instance
+          ~current_cycle:106
+          ~interval:2
+          ~offset:0
+      in
+      (* Should include all cycles 86..105 (20 cycle lookback, all unpaid) *)
+      Alcotest.(check int)
+        "20 cycles due on trigger"
+        20
+        (List.length due_trigger) ;
+      Alcotest.(check int) "first is 86" 86 (List.hd due_trigger) ;
+      Alcotest.(check int)
+        "last is 105"
+        105
+        (List.nth due_trigger (List.length due_trigger - 1)))
 
 let test_cycles_due_interval_with_offset () =
   with_temp_instance (fun instance ->
-      let due =
+      (* Test with current_cycle=105, interval=3, offset=1
+         Check if 105 is a trigger: (105 - 1) mod 3 = 104 mod 3 = 2, NOT a trigger *)
+      let due_no_trigger =
         Payout_continual.cycles_due
           ~instance
           ~current_cycle:105
           ~interval:3
           ~offset:1
       in
-      (* Cycles where (c - 1) mod 3 = 0: c = 85, 88, 91, 94, 97, 100, 103 *)
-      List.iter
-        (fun c ->
-          Alcotest.(check int) "matches interval+offset" 0 ((c - 1) mod 3))
-        due)
+      Alcotest.(check (list int)) "no trigger" [] due_no_trigger ;
+      (* Test with current_cycle=106, interval=3, offset=1
+         Check if 106 is a trigger: (106 - 1) mod 3 = 105 mod 3 = 0, IS a trigger *)
+      let due_trigger =
+        Payout_continual.cycles_due
+          ~instance
+          ~current_cycle:106
+          ~interval:3
+          ~offset:1
+      in
+      (* Should return all unpaid cycles 86..105 *)
+      Alcotest.(check int) "20 cycles due" 20 (List.length due_trigger) ;
+      Alcotest.(check int) "first is 86" 86 (List.hd due_trigger) ;
+      Alcotest.(check int)
+        "last is 105"
+        105
+        (List.nth due_trigger (List.length due_trigger - 1)))
 
 let test_cycles_due_excludes_current () =
   with_temp_instance (fun instance ->

@@ -37,11 +37,17 @@ val delay_file : instance:string -> string
     @param instance Baker instance name *)
 val read_delay_until : instance:string -> float option
 
-(** Check if a cycle should be paid based on interval/offset configuration.
+(** Determine which cycles should be paid on this scheduler tick.
+
+    The [interval] controls how often payouts are triggered: payouts only
+    fire when [(current_cycle - offset) mod interval = 0]. When triggered,
+    ALL unpaid cycles (up to 20 back) are returned — not just the one
+    matching the interval. This ensures no delegator rewards are skipped.
+
     @param current_cycle The current chain cycle.
-    @param interval Pay every [interval] cycles (default 1).
+    @param interval Trigger payout every [interval] cycles (default 1).
     @param offset Cycle offset within the interval (default 0).
-    @return List of unpaid cycles that match the interval. *)
+    @return List of unpaid cycles to pay (empty if not a trigger cycle). *)
 val cycles_due :
   instance:string -> current_cycle:int -> interval:int -> offset:int -> int list
 
@@ -58,3 +64,14 @@ val pay_due_cycles :
   interval:int ->
   offset:int ->
   (int * (unit, string) result) list
+
+(**/**)
+
+module Internal_for_tests : sig
+  val is_trigger_cycle : current_cycle:int -> interval:int -> offset:int -> bool
+
+  val collect_due_cycles :
+    current_cycle:int -> is_paid:(int -> bool) -> int list
+end
+
+(**/**)

@@ -41,17 +41,25 @@ let read_delay_until ~instance =
       Float.of_string_opt (String.trim line)
     with Sys_error _ -> None
 
-let cycles_due ~instance ~current_cycle ~interval ~offset =
-  (* Find all unpaid cycles that match the interval pattern *)
+(** Pure trigger check: is this cycle on an interval boundary? *)
+let is_trigger_cycle ~current_cycle ~interval ~offset =
+  interval <= 1 || (current_cycle - offset) mod interval = 0
+
+(** Pure cycle collection: given a predicate for "is paid", return due cycles. *)
+let collect_due_cycles ~current_cycle ~is_paid =
   let due = ref [] in
-  (* Check cycles from oldest possible to current-1 (current cycle not yet complete) *)
   let check_from = max 0 (current_cycle - 20) in
   for c = check_from to current_cycle - 1 do
-    if (c - offset) mod interval = 0 then
-      if not (Payout_report.cycle_is_paid ~instance ~cycle:c) then
-        due := c :: !due
+    if not (is_paid c) then due := c :: !due
   done ;
   List.rev !due
+
+let cycles_due ~instance ~current_cycle ~interval ~offset =
+  (* Only trigger on interval boundaries *)
+  if not (is_trigger_cycle ~current_cycle ~interval ~offset) then []
+  else
+    collect_due_cycles ~current_cycle ~is_paid:(fun c ->
+        Payout_report.cycle_is_paid ~instance ~cycle:c)
 
 (* ── Execute due cycles ──────────────────────────────────── *)
 
@@ -98,3 +106,9 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
       in
       (cycle, result))
     due
+
+module Internal_for_tests = struct
+  let is_trigger_cycle = is_trigger_cycle
+
+  let collect_due_cycles = collect_due_cycles
+end
