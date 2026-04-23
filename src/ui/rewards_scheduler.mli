@@ -77,6 +77,14 @@ val get_payout_timer_active : instance:string -> bool
     Returns [None] if not configured or not cached yet. Safe for view functions. *)
 val get_continual_interval : instance:string -> int option
 
+(** Update the payout timer active status cache for an instance.
+    Called after install/remove operations to immediately update the TUI. *)
+val set_payout_timer_active : instance:string -> active:bool -> unit
+
+(** Update the continual interval cache for an instance.
+    Called after install operations to immediately update the TUI. *)
+val set_continual_interval : instance:string -> interval:int -> unit
+
 (** {1 Refresh} *)
 
 (** Ensure delegator details are loaded for a specific cycle.

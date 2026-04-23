@@ -135,6 +135,14 @@ let get_continual_interval ~instance =
   Mutex.protect continual_interval_lock (fun () ->
       Hashtbl.find_opt continual_interval_cache instance)
 
+let set_payout_timer_active ~instance ~active =
+  Mutex.protect payout_timer_lock (fun () ->
+      Hashtbl.replace payout_timer_cache instance active)
+
+let set_continual_interval ~instance ~interval =
+  Mutex.protect continual_interval_lock (fun () ->
+      Hashtbl.replace continual_interval_cache instance interval)
+
 (* Polling logic *)
 
 (** Try fetching recent cycles for [baker]. Returns [Some cycles] on success
