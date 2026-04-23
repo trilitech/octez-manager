@@ -197,3 +197,32 @@ val disable :
   stop_now:bool ->
   unit ->
   (unit, [> `Msg of string]) result
+
+(** {2 Payout Timer Management} *)
+
+(** Write the payout oneshot service unit file for a baker instance. *)
+val write_payout_service :
+  instance:string ->
+  octez_manager_bin:string ->
+  service_user:string option ->
+  unit ->
+  (unit, [`Msg of string]) result
+
+(** Write the payout timer unit file for a baker instance. *)
+val write_payout_timer :
+  instance:string -> unit -> (unit, [`Msg of string]) result
+
+(** Enable and start the payout timer. *)
+val enable_payout_timer : instance:string -> (unit, [`Msg of string]) result
+
+(** Disable and stop the payout timer. *)
+val disable_payout_timer : instance:string -> (unit, [`Msg of string]) result
+
+(** Remove payout timer and service unit files. *)
+val remove_payout_units : instance:string -> unit
+
+(** Check if payout timer is active. *)
+val is_payout_timer_active : instance:string -> bool
+
+(** Get payout timer status info (for display). Returns None if timer doesn't exist. *)
+val payout_timer_status : instance:string -> string option
