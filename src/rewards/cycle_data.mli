@@ -33,9 +33,3 @@ val fetch_recent_cycles :
 
     Uses [GET /v1/head]. *)
 val fetch_current_cycle : tzkt_url:string -> (int, string) result
-
-(** Fetch cycle metadata to get end times.
-
-    Uses [GET /v1/cycles?limit=N&sort.desc=index].
-    Returns a list of (cycle, end_time) pairs where end_time is a Unix timestamp. *)
-val fetch_cycle_times : tzkt_url:string -> limit:int -> (int * float) list
