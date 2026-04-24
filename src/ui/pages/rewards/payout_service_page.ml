@@ -6,20 +6,25 @@
 (******************************************************************************)
 
 module Pager = Miaou_widgets_display.Pager_widget
+module File_pager = Miaou_widgets_display.File_pager
 module Keys = Miaou.Core.Keys
 module Widgets = Miaou_widgets_display.Widgets
 module Navigation = Miaou.Core.Navigation
+module Render_notify = Miaou_helpers.Render_notify
 open Octez_manager_lib
 
 let name = "payout_service"
 
 type tab = Details | Logs
 
+type pager_type = Static of Pager.t | FileTail of File_pager.t
+
 type state = {
   instance : string;
   tab : tab;
   details_pager : Pager.t;
-  logs_pager : Pager.t;
+  logs_pager : pager_type;
+  cleanup_files : string list;
 }
 
 type msg = unit
@@ -31,6 +36,10 @@ let pending_initial_tab : tab option ref = ref None
 let set_initial_tab tab = pending_initial_tab := Some tab
 
 let tab_label = function Details -> "details" | Logs -> "logs"
+
+let get_logs_pager = function
+  | Static p -> p
+  | FileTail fp -> File_pager.pager fp
 
 let build_details_lines ~instance =
   (* Same content as open_payout_service_detail_only but returns string list *)
@@ -73,14 +82,59 @@ let build_logs_lines ~instance =
       else String.split_on_char '\n' output
   | Error (`Msg msg) -> [Printf.sprintf "Could not fetch logs: %s" msg]
 
+let build_logs_pager ~instance =
+  (* Use journalctl streaming for live log tailing *)
+  let payout_unit_name = Printf.sprintf "octez-manager-payout@%s" instance in
+  let unit_name = payout_unit_name ^ ".service" in
+  let cmd =
+    if Paths.is_root () then
+      Printf.sprintf
+        "journalctl -u %s -f -n 500 -o cat"
+        (Filename.quote unit_name)
+    else
+      Printf.sprintf
+        "journalctl --user -u %s -f -n 500 -o cat"
+        (Filename.quote unit_name)
+  in
+  let temp_file = Filename.temp_file "om_payout_log_" ".txt" in
+  let full_cmd =
+    Printf.sprintf "%s > %s 2>&1 &" cmd (Filename.quote temp_file)
+  in
+  match Sys.command full_cmd with
+  | 0 -> (
+      (Unix.sleepf [@allow_forbidden "file readiness delay"]) 0.1 ;
+      match
+        File_pager.open_file
+          ~follow:true
+          ~notify_render:Render_notify.request_render
+          ~title:""
+          temp_file
+      with
+      | Ok fp ->
+          let p = File_pager.pager fp in
+          let _ = Pager.handle_key p ~key:"G" in
+          (FileTail fp, [temp_file])
+      | Error e ->
+          let p =
+            Pager.open_lines
+              ~title:""
+              [Printf.sprintf "Error opening log file: %s" e]
+          in
+          (Static p, [temp_file]))
+  | _ ->
+      (* Fallback to static logs *)
+      let lines = build_logs_lines ~instance in
+      (Static (Pager.open_lines ~title:"" lines), [])
+
 let make_state instance =
   let details_lines = build_details_lines ~instance in
-  let logs_lines = build_logs_lines ~instance in
+  let logs_pager, cleanup_files = build_logs_pager ~instance in
   {
     instance;
     tab = Details;
     details_pager = Pager.open_lines ~title:"" details_lines;
-    logs_pager = Pager.open_lines ~title:"" logs_lines;
+    logs_pager;
+    cleanup_files;
   }
 
 let init () =
@@ -96,20 +150,20 @@ let init () =
 
 let update ps _ = ps
 
-let refresh ps = ps
+let refresh ps =
+  (* Consume navigation signals from Context *)
+  match Context.consume_navigation () with
+  | Some (Context.Goto page) -> Navigation.goto page ps
+  | Some Context.Back -> Navigation.back ps
+  | Some Context.Quit -> Navigation.quit ps
+  | None -> ps
 
 let manual_refresh ps =
-  (* Manual refresh (r key) - rebuild pagers with fresh data *)
+  (* Manual refresh (r key) - rebuild details pager, keep logs pager streaming *)
   let s = ps.Navigation.s in
   let details_lines = build_details_lines ~instance:s.instance in
-  let logs_lines = build_logs_lines ~instance:s.instance in
   Navigation.update
-    (fun s ->
-      {
-        s with
-        details_pager = Pager.open_lines ~title:"" details_lines;
-        logs_pager = Pager.open_lines ~title:"" logs_lines;
-      })
+    (fun s -> {s with details_pager = Pager.open_lines ~title:"" details_lines})
     ps
 
 let move ps _ = ps
@@ -118,7 +172,15 @@ let service_select ps _ = ps
 
 let service_cycle ps _ = ps
 
-let back ps = Navigation.back ps
+let cleanup s =
+  (match s.logs_pager with
+  | FileTail fp -> File_pager.close fp
+  | Static _ -> ()) ;
+  List.iter (fun f -> try Sys.remove f with _ -> ()) s.cleanup_files
+
+let back ps =
+  cleanup ps.Navigation.s ;
+  Navigation.back ps
 
 let toggle_tab ps =
   Navigation.update
@@ -128,7 +190,9 @@ let toggle_tab ps =
     ps
 
 let current_pager s =
-  match s.tab with Details -> s.details_pager | Logs -> s.logs_pager
+  match s.tab with
+  | Details -> s.details_pager
+  | Logs -> get_logs_pager s.logs_pager
 
 let handled_keys () = []
 
@@ -154,7 +218,8 @@ let view ps ~focus ~size =
       (Widgets.themed_emphasis (String.capitalize_ascii tab_str))
   in
   let help =
-    Widgets.themed_muted "t: toggle tab . r: refresh . /: search . Esc: back"
+    Widgets.themed_muted
+      "t: toggle tab . r: refresh . f: follow . /: search . Esc: back"
   in
   let header = [title; help] in
   Themed_page.render_layout ~size ~header ~footer:[] ~child:(fun inner_size ->
@@ -173,7 +238,14 @@ let handle_modal_key ps key ~size =
   let new_state =
     match s.tab with
     | Details -> {s with details_pager = pager'}
-    | Logs -> {s with logs_pager = pager'}
+    | Logs -> (
+        match s.logs_pager with
+        | Static _ -> {s with logs_pager = Static pager'}
+        | FileTail fp ->
+            (* Keep the file pager, just update its internal state *)
+            let current = File_pager.pager fp in
+            if current == pager' then s else {s with logs_pager = Static pager'}
+        )
   in
   Navigation.update (fun _ -> new_state) ps
 
@@ -197,10 +269,18 @@ let handle_key ps key ~size =
       let new_state =
         match s.tab with
         | Details -> {s with details_pager = pager'}
-        | Logs -> {s with logs_pager = pager'}
+        | Logs -> (
+            match s.logs_pager with
+            | Static _ -> {s with logs_pager = Static pager'}
+            | FileTail fp ->
+                let current = File_pager.pager fp in
+                if current == pager' then s
+                else {s with logs_pager = Static pager'})
       in
       Navigation.update (fun _ -> new_state) ps
-    else Navigation.back ps
+    else (
+      cleanup s ;
+      Navigation.back ps)
   else
     match Keys.of_string key with
     | Some Keys.Escape ->
@@ -210,10 +290,18 @@ let handle_key ps key ~size =
           let new_state =
             match s.tab with
             | Details -> {s with details_pager = pager'}
-            | Logs -> {s with logs_pager = pager'}
+            | Logs -> (
+                match s.logs_pager with
+                | Static _ -> {s with logs_pager = Static pager'}
+                | FileTail fp ->
+                    let current = File_pager.pager fp in
+                    if current == pager' then s
+                    else {s with logs_pager = Static pager'})
           in
           Navigation.update (fun _ -> new_state) ps
-        else Navigation.back ps
+        else (
+          cleanup s ;
+          Navigation.back ps)
     | Some (Keys.Char "r") when not pager_in_input_mode -> manual_refresh ps
     | Some (Keys.Char "t") when not pager_in_input_mode -> toggle_tab ps
     | _ ->
@@ -223,7 +311,13 @@ let handle_key ps key ~size =
           let new_state =
             match s.tab with
             | Details -> {s with details_pager = pager'}
-            | Logs -> {s with logs_pager = pager'}
+            | Logs -> (
+                match s.logs_pager with
+                | Static _ -> {s with logs_pager = Static pager'}
+                | FileTail fp ->
+                    let current = File_pager.pager fp in
+                    if current == pager' then s
+                    else {s with logs_pager = Static pager'})
           in
           Navigation.update (fun _ -> new_state) ps
         else ps
