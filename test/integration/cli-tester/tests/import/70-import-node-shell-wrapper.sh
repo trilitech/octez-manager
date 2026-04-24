@@ -83,9 +83,10 @@ fi
 
 # Verify network detected correctly (shadownet)
 echo "Verifying network configuration..."
-om instance "$INSTANCE" show 2>&1 | grep -q "shadownet" || {
+SHOW_OUTPUT=$(om instance "$INSTANCE" show 2>&1 || true)
+echo "$SHOW_OUTPUT" | grep -q "shadownet" || {
 	echo "ERROR: Network should be shadownet"
-	om instance "$INSTANCE" show 2>&1
+	echo "$SHOW_OUTPUT"
 	exit 1
 }
 

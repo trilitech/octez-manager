@@ -102,7 +102,8 @@ if ! grep -q "$CUSTOM_PORT" "$DATA_DIR/config.json"; then
 fi
 
 # Verify the managed service preserves the P2P configuration
-om instance "$INSTANCE" show 2>&1 | grep -q "$CUSTOM_PORT" || {
+SHOW_OUTPUT=$(om instance "$INSTANCE" show 2>&1 || true)
+echo "$SHOW_OUTPUT" | grep -q "$CUSTOM_PORT" || {
 	echo "WARNING: Custom P2P port may not be visible in show output (this is acceptable if config.json is correct)"
 }
 
