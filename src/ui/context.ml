@@ -66,6 +66,15 @@ let take_pending_payout_service () =
   pending_payout_service_instance := None ;
   value
 
+let pending_rewards_tab : string option ref = ref None
+
+let set_pending_rewards_tab tab = pending_rewards_tab := Some tab
+
+let take_pending_rewards_tab () =
+  let v = !pending_rewards_tab in
+  pending_rewards_tab := None ;
+  v
+
 let set_pending_external_service svc = pending_external_service := Some svc
 
 let take_pending_external_service () =

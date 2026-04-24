@@ -30,6 +30,12 @@ val set_pending_payout_service : string -> unit
 (** Consume the pending payout service instance (returns [Some] once, then [None]). *)
 val take_pending_payout_service : unit -> string option
 
+(** Store the rewards sub-tab to restore after returning from a sub-page. *)
+val set_pending_rewards_tab : string -> unit
+
+(** Consume and clear the pending rewards sub-tab. *)
+val take_pending_rewards_tab : unit -> string option
+
 (** Store a sandbox group name to pass to the key allocation page. *)
 val set_pending_sandbox_group : string -> unit
 

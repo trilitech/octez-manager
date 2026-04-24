@@ -191,6 +191,7 @@ let refresh ps =
   | Some Context.Back ->
       cleanup ps.Navigation.s ;
       Context.set_pending_tab Tab_rewards ;
+      Context.set_pending_rewards_tab "configuration" ;
       Navigation.back ps
   | Some Context.Quit -> Navigation.quit ps
   | None -> ps
@@ -212,6 +213,7 @@ let service_cycle ps _ = ps
 let back ps =
   cleanup ps.Navigation.s ;
   Context.set_pending_tab Tab_rewards ;
+  Context.set_pending_rewards_tab "configuration" ;
   Navigation.back ps
 
 let toggle_tab ps =
@@ -292,6 +294,7 @@ let handle_key ps key ~size =
     else (
       cleanup s ;
       Context.set_pending_tab Tab_rewards ;
+      Context.set_pending_rewards_tab "configuration" ;
       Navigation.back ps)
   else
     match Keys.of_string key with
@@ -304,6 +307,7 @@ let handle_key ps key ~size =
         else (
           cleanup s ;
           Context.set_pending_tab Tab_rewards ;
+          Context.set_pending_rewards_tab "configuration" ;
           Navigation.back ps)
     | Some (Keys.Char "r") when not pager_in_input_mode -> manual_refresh ps
     | Some (Keys.Char "t") when not pager_in_input_mode -> toggle_tab ps
