@@ -508,17 +508,37 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
       in
       (* Hint panel: left-bordered block for the selected field *)
       let hint_box =
-        let field = List.nth all_fields state.config_cursor in
-        let bar = Widgets.themed_muted "\xe2\x94\x82 " in
-        let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
-        let hint_width = max 20 (box_width - 6) in
-        let wrapped = Widgets.wrap_text ~width:hint_width (field_hint field) in
-        let text_lines =
-          List.map (fun l -> bar ^ Widgets.themed_text l) wrapped
-        in
-        String.concat
-          "\n"
-          (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
+        if state.config_cursor = field_count then
+          (* Payout service is selected — show hint for it *)
+          let bar = Widgets.themed_muted "\xe2\x94\x82 " in
+          let title_line = bar ^ Widgets.themed_emphasis "Payout Service" in
+          let hint_width = max 20 (box_width - 6) in
+          let wrapped =
+            Widgets.wrap_text
+              ~width:hint_width
+              "Manage the systemd payout timer. Press Enter to view details, \
+               logs, or install/remove the service."
+          in
+          let text_lines =
+            List.map (fun l -> bar ^ Widgets.themed_text l) wrapped
+          in
+          String.concat
+            "\n"
+            (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
+        else
+          let field = List.nth all_fields state.config_cursor in
+          let bar = Widgets.themed_muted "\xe2\x94\x82 " in
+          let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
+          let hint_width = max 20 (box_width - 6) in
+          let wrapped =
+            Widgets.wrap_text ~width:hint_width (field_hint field)
+          in
+          let text_lines =
+            List.map (fun l -> bar ^ Widgets.themed_text l) wrapped
+          in
+          String.concat
+            "\n"
+            (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
       in
       (* Delegator overrides section *)
       let override_count = List.length config.delegator_overrides in
