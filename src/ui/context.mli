@@ -99,6 +99,7 @@ type pending_tab =
   | Tab_diagnostics
   | Tab_topology
   | Tab_sandboxes
+  | Tab_rewards
 
 (** Request a tab switch. Consumed once by [Main_shell] on the next frame.
     Safe to call from global key handlers in [Manager_app]. *)

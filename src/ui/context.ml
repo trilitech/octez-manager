@@ -134,6 +134,7 @@ type pending_tab =
   | Tab_diagnostics
   | Tab_topology
   | Tab_sandboxes
+  | Tab_rewards
 
 let pending_tab : pending_tab option ref = ref None
 
