@@ -118,6 +118,12 @@ module Internal_for_tests : sig
 
   val collect_payouts :
     Rewards.payout_blueprint -> (string * string * Int64.t) list
+
+  val execute_batch :
+    ctx:context ->
+    payouts:(string * string * Int64.t) list ->
+    dry_run:bool ->
+    Rewards.payout_result list
 end
 
 (**/**)

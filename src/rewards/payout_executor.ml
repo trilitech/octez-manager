@@ -176,16 +176,15 @@ let execute_batch ~ctx ~payouts ~dry_run =
   match cmd_result with
   | Ok output ->
       let op_hash = if dry_run then None else extract_op_hash output in
+      let success = dry_run || Option.is_some op_hash in
+      let note =
+        if dry_run then "dry-run"
+        else if Option.is_some op_hash then "ok"
+        else "no operation hash in output"
+      in
       List.map
         (fun (delegator, recipient, amount) ->
-          {
-            Rewards.delegator;
-            recipient;
-            amount;
-            op_hash;
-            success = true;
-            note = (if dry_run then "dry-run" else "ok");
-          })
+          {Rewards.delegator; recipient; amount; op_hash; success; note})
         payouts
   | Error (`Msg err) ->
       List.map
@@ -449,4 +448,6 @@ module Internal_for_tests = struct
   let extract_op_hash = extract_op_hash
 
   let collect_payouts = collect_payouts
+
+  let execute_batch = execute_batch
 end

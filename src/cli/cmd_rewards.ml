@@ -488,9 +488,7 @@ let rec pay_run baker_opt cycle_opt dry_run confirm =
                   let octez_client_bin =
                     Filename.concat svc.Service.app_bin_dir "octez-client"
                   in
-                  let endpoint =
-                    "http://" ^ Rpc_addr.to_string svc.Service.rpc_addr
-                  in
+                  let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
                   let ctx : Payout_executor.context =
                     {
                       octez_client_bin;
@@ -746,9 +744,7 @@ let continual_run_run baker_opt =
               let octez_client_bin =
                 Filename.concat svc.Service.app_bin_dir "octez-client"
               in
-              let endpoint =
-                "http://" ^ Rpc_addr.to_string svc.Service.rpc_addr
-              in
+              let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
               let ctx : Payout_executor.context =
                 {
                   octez_client_bin;
