@@ -304,14 +304,12 @@ let reset_config ~baker_pkh =
       end)
     ()
 
-(* {1 Payout Service Detail Modal} *)
+(* {1 Payout Service Modals and Actions} *)
 
-let open_payout_service_detail ~instance =
-  (* All I/O happens here, before opening the modal *)
+let open_payout_service_detail_only ~instance =
   let lines = ref [] in
   let add s = lines := s :: !lines in
   let add_blank () = add "" in
-  (* Section: Status *)
   add "═══ Payout Service Status ═══" ;
   add_blank () ;
   let timer_active =
@@ -320,22 +318,22 @@ let open_payout_service_detail ~instance =
   add
     (Printf.sprintf
        "  Timer:      %s"
-       (if timer_active then "● Active" else "○ Inactive")) ;
+       (if timer_active then "\xe2\x97\x8f Active" else "\xe2\x97\x8b Inactive")) ;
   (match Octez_manager_lib.Systemd.get_payout_last_run ~instance with
   | Some info ->
-      let status = if info.success then "✓ Success" else "✗ Failed" in
+      let status =
+        if info.success then "\xe2\x9c\x93 Success" else "\xe2\x9c\x97 Failed"
+      in
       add (Printf.sprintf "  Last run:   %s" info.timestamp) ;
       add (Printf.sprintf "  Result:     %s" status)
   | None -> add "  Last run:   Never") ;
   add_blank () ;
-  (* Section: Timer Details *)
   add "═══ Timer Details ═══" ;
   add_blank () ;
   (match Octez_manager_lib.Systemd.get_payout_timer_next ~instance with
   | Some next -> add (Printf.sprintf "  Next trigger: %s" next)
   | None -> add "  Next trigger: Unknown") ;
   add_blank () ;
-  (* Section: Service Unit *)
   add "═══ Service Configuration ═══" ;
   add_blank () ;
   (match Octez_manager_lib.Systemd.cat_payout_service ~instance with
@@ -343,19 +341,134 @@ let open_payout_service_detail ~instance =
       String.split_on_char '\n' content |> List.iter (fun l -> add ("  " ^ l))
   | Error (`Msg msg) ->
       add (Printf.sprintf "  (Could not read unit file: %s)" msg)) ;
-  add_blank () ;
-  (* Section: Recent Logs *)
-  add "═══ Recent Logs (last 50 lines) ═══" ;
-  add_blank () ;
-  (match Octez_manager_lib.Systemd.get_payout_service_logs ~instance ~n:50 with
+  Modal_helpers.open_text_modal
+    ~title:"Payout Service Details"
+    ~lines:(List.rev !lines)
+
+let open_payout_service_logs ~instance =
+  match Octez_manager_lib.Systemd.get_payout_service_logs ~instance ~n:200 with
   | Ok output ->
-      if String.length (String.trim output) = 0 then
-        add "  (No log entries found)"
-      else
-        String.split_on_char '\n' output |> List.iter (fun l -> add ("  " ^ l))
-  | Error (`Msg msg) -> add (Printf.sprintf "  (Could not fetch logs: %s)" msg)) ;
-  let all_lines = List.rev !lines in
-  Modal_helpers.open_text_modal ~title:"Payout Service Details" ~lines:all_lines
+      let lines =
+        if String.length (String.trim output) = 0 then
+          ["(No log entries found)"]
+        else String.split_on_char '\n' output
+      in
+      Modal_helpers.open_text_modal ~title:"Payout Service Logs" ~lines
+  | Error (`Msg msg) ->
+      Modal_helpers.open_text_modal
+        ~title:"Payout Service Logs"
+        ~lines:[Printf.sprintf "Could not fetch logs: %s" msg]
+
+let install_payout_service ~instance ~baker_pkh ~config =
+  Modal_helpers.confirm_modal
+    ~title:"Install Payout Service"
+    ~message:
+      "This will install a systemd timer that automatically\n\
+       pays delegator rewards every 5 minutes when due cycles\n\
+       are detected.\n\n\
+       The service runs independently of octez-manager.\n\
+       You can remove it later from this menu."
+    ~on_result:(fun confirmed ->
+      if confirmed then
+        let octez_manager_bin =
+          match Sys.executable_name with "" -> "octez-manager" | path -> path
+        in
+        let service_user =
+          if Paths.is_root () then
+            Octez_manager_lib.Systemd.get_service_user ~role:"baker" ~instance
+          else None
+        in
+        let open Rresult.R.Infix in
+        match
+          Octez_manager_lib.Systemd.write_payout_service
+            ~instance
+            ~octez_manager_bin
+            ~service_user
+            ()
+          >>= fun () ->
+          Octez_manager_lib.Systemd.write_payout_timer ~instance ()
+          >>= fun () -> Octez_manager_lib.Systemd.enable_payout_timer ~instance
+        with
+        | Ok () -> (
+            let cfg =
+              match config with
+              | Some c -> c
+              | None -> Payout_config.default ~baker_pkh
+            in
+            let cfg = {cfg with Payout_config.continual_enabled = true} in
+            match Payout_config.save ~instance cfg with
+            | Ok () ->
+                set_pending_config_clean cfg ;
+                Rewards_scheduler.set_payout_timer_active ~instance ~active:true ;
+                Rewards_scheduler.set_continual_interval
+                  ~instance
+                  ~interval:cfg.continual_interval ;
+                Context.toast_info "Payout service installed and enabled"
+            | Error msg ->
+                Context.toast_error
+                  (Printf.sprintf "Config save failed: %s" msg))
+        | Error (`Msg msg) ->
+            Context.toast_error (Printf.sprintf "Install failed: %s" msg))
+    ()
+
+let remove_payout_service ~instance ~config =
+  Modal_helpers.confirm_modal
+    ~title:"Remove Payout Service"
+    ~message:
+      "Remove the payout systemd timer and service?\n\
+       This will stop automatic payouts."
+    ~on_result:(fun confirmed ->
+      if confirmed then begin
+        (match Octez_manager_lib.Systemd.disable_payout_timer ~instance with
+        | Ok () -> ()
+        | Error (`Msg msg) ->
+            Context.toast_warn (Printf.sprintf "Timer disable warning: %s" msg)) ;
+        Octez_manager_lib.Systemd.remove_payout_units ~instance ;
+        let cfg =
+          match config with
+          | Some c -> c
+          | None -> Payout_config.default ~baker_pkh:""
+        in
+        let cfg = {cfg with Payout_config.continual_enabled = false} in
+        match Payout_config.save ~instance cfg with
+        | Ok () ->
+            set_pending_config_clean cfg ;
+            Rewards_scheduler.set_payout_timer_active ~instance ~active:false ;
+            Context.toast_info "Payout service removed"
+        | Error msg ->
+            Context.toast_error (Printf.sprintf "Config save failed: %s" msg)
+      end)
+    ()
+
+let open_payout_service_actions ~instance ~baker_pkh ~config =
+  let timer_active =
+    Octez_manager_lib.Systemd.is_payout_timer_active ~instance
+  in
+  let items =
+    if timer_active then ["Details"; "Logs"; "Remove"]
+    else ["Install"; "Details"; "Logs"]
+  in
+  (* Filter: only show Details/Logs if service was ever installed *)
+  let has_service =
+    timer_active
+    ||
+    match config with
+    | Some c -> c.Payout_config.continual_enabled
+    | None -> false
+  in
+  let items = if has_service then items else ["Install"] in
+  Modal_helpers.open_choice_modal
+    ~title:"Payout Service"
+    ~items
+    ~to_string:Fun.id
+    ~on_select:(fun choice ->
+      match choice with
+      | "Details" -> open_payout_service_detail_only ~instance
+      | "Logs" -> open_payout_service_logs ~instance
+      | "Install" -> install_payout_service ~instance ~baker_pkh ~config
+      | "Remove" -> remove_payout_service ~instance ~config
+      | _ -> ())
+    ()
 
 (* {1 Rendering} *)
 
@@ -466,6 +579,7 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
         match Rewards_state.selected_instance_name state with
         | None -> ""
         | Some instance ->
+            let is_selected = state.config_cursor = field_count in
             let timer_active =
               Rewards_scheduler.get_payout_timer_active ~instance
             in
@@ -504,26 +618,22 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
                 | None -> "  " ^ Widgets.themed_muted "No runs yet"
               else ""
             in
-            let hint_line =
-              if timer_active then
-                Widgets.themed_muted
-                  "  [P: details]  [X: remove payout service]"
-              else if config.continual_enabled then
-                Widgets.themed_muted
-                  "  [P: details]  [I: install payout service]"
-              else Widgets.themed_muted "  [I: install payout service]"
-            in
+            let hint_line = Widgets.themed_muted "  Press Enter for actions" in
             let content_parts =
-              if String.length last_run_line > 0 then
-                [status_line; last_run_line; ""; hint_line]
-              else [status_line; ""; hint_line]
+              let parts = [status_line] in
+              let parts =
+                if String.length last_run_line > 0 then parts @ [last_run_line]
+                else parts
+              in
+              parts @ [""; hint_line]
             in
             let content = String.concat "\n" content_parts in
-            Box.render
-              ~title:"Payout Service"
-              ~style:Rounded
-              ~width:box_width
-              content
+            let title =
+              let indicator = if is_selected then "\xe2\x96\xb8 " else "" in
+              Printf.sprintf "%sPayout Service" indicator
+            in
+            let style = if is_selected then Box.Double else Box.Rounded in
+            Box.render ~title ~style ~width:box_width content
       in
       (* Dirty indicator *)
       let dirty_indicator =
