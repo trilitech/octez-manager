@@ -29,6 +29,7 @@ let register_pages () =
   Topology_page.register () ;
   Wallets_page.register () ;
   Rewards_page.register () ;
+  Payout_service_page.register () ;
   Sandbox_page.register () ;
   Sandbox_create_form.register () ;
   Sandbox_key_alloc_page.register () ;

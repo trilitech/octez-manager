@@ -306,59 +306,6 @@ let reset_config ~baker_pkh =
 
 (* {1 Payout Service Modals and Actions} *)
 
-let open_payout_service_detail_only ~instance =
-  let lines = ref [] in
-  let add s = lines := s :: !lines in
-  let add_blank () = add "" in
-  add "═══ Payout Service Status ═══" ;
-  add_blank () ;
-  let timer_active =
-    Octez_manager_lib.Systemd.is_payout_timer_active ~instance
-  in
-  add
-    (Printf.sprintf
-       "  Timer:      %s"
-       (if timer_active then "\xe2\x97\x8f Active" else "\xe2\x97\x8b Inactive")) ;
-  (match Octez_manager_lib.Systemd.get_payout_last_run ~instance with
-  | Some info ->
-      let status =
-        if info.success then "\xe2\x9c\x93 Success" else "\xe2\x9c\x97 Failed"
-      in
-      add (Printf.sprintf "  Last run:   %s" info.timestamp) ;
-      add (Printf.sprintf "  Result:     %s" status)
-  | None -> add "  Last run:   Never") ;
-  add_blank () ;
-  add "═══ Timer Details ═══" ;
-  add_blank () ;
-  (match Octez_manager_lib.Systemd.get_payout_timer_next ~instance with
-  | Some next -> add (Printf.sprintf "  Next trigger: %s" next)
-  | None -> add "  Next trigger: Unknown") ;
-  add_blank () ;
-  add "═══ Service Configuration ═══" ;
-  add_blank () ;
-  (match Octez_manager_lib.Systemd.cat_payout_service ~instance with
-  | Ok content ->
-      String.split_on_char '\n' content |> List.iter (fun l -> add ("  " ^ l))
-  | Error (`Msg msg) ->
-      add (Printf.sprintf "  (Could not read unit file: %s)" msg)) ;
-  Modal_helpers.open_text_modal
-    ~title:"Payout Service Details"
-    ~lines:(List.rev !lines)
-
-let open_payout_service_logs ~instance =
-  match Octez_manager_lib.Systemd.get_payout_service_logs ~instance ~n:200 with
-  | Ok output ->
-      let lines =
-        if String.length (String.trim output) = 0 then
-          ["(No log entries found)"]
-        else String.split_on_char '\n' output
-      in
-      Modal_helpers.open_text_modal ~title:"Payout Service Logs" ~lines
-  | Error (`Msg msg) ->
-      Modal_helpers.open_text_modal
-        ~title:"Payout Service Logs"
-        ~lines:[Printf.sprintf "Could not fetch logs: %s" msg]
-
 let install_payout_service ~instance ~baker_pkh ~config =
   Modal_helpers.confirm_modal
     ~title:"Install Payout Service"
@@ -463,8 +410,14 @@ let open_payout_service_actions ~instance ~baker_pkh ~config =
     ~to_string:Fun.id
     ~on_select:(fun choice ->
       match choice with
-      | "Details" -> open_payout_service_detail_only ~instance
-      | "Logs" -> open_payout_service_logs ~instance
+      | "Details" ->
+          Context.set_pending_payout_service instance ;
+          Payout_service_page.set_initial_tab Details ;
+          Context.navigate Payout_service_page.name
+      | "Logs" ->
+          Context.set_pending_payout_service instance ;
+          Payout_service_page.set_initial_tab Logs ;
+          Context.navigate Payout_service_page.name
       | "Install" -> install_payout_service ~instance ~baker_pkh ~config
       | "Remove" -> remove_payout_service ~instance ~config
       | _ -> ())
