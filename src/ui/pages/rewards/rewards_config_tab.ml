@@ -431,12 +431,37 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
                 "  " ^ Widgets.themed_error "\xe2\x97\x8b Stopped"
               else "  " ^ Widgets.themed_muted "\xe2\x97\x8b Not installed"
             in
+            let last_run_line =
+              if timer_active then
+                match Rewards_scheduler.get_payout_last_run ~instance with
+                | Some info ->
+                    let status_icon =
+                      if info.success then "\xe2\x9c\x93" else "\xe2\x9c\x97"
+                    in
+                    let style =
+                      if info.success then Widgets.themed_success
+                      else Widgets.themed_error
+                    in
+                    "  "
+                    ^ style
+                        (Printf.sprintf
+                           "%s Last run: %s"
+                           status_icon
+                           info.timestamp)
+                | None -> "  " ^ Widgets.themed_muted "No runs yet"
+              else ""
+            in
             let hint_line =
               if timer_active then
                 Widgets.themed_muted "  [X: remove payout service]"
               else Widgets.themed_muted "  [I: install payout service]"
             in
-            let content = String.concat "\n" [status_line; ""; hint_line] in
+            let content_parts =
+              if String.length last_run_line > 0 then
+                [status_line; last_run_line; ""; hint_line]
+              else [status_line; ""; hint_line]
+            in
+            let content = String.concat "\n" content_parts in
             Box.render
               ~title:"Payout Service"
               ~style:Rounded

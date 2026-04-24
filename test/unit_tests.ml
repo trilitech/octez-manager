@@ -3816,6 +3816,55 @@ let systemd_unit_state_success_result () =
   let state = Systemd.For_tests.parse_unit_state_output output in
   Alcotest.(check (option string)) "result" None state.result
 
+(* Payout last run parsing tests *)
+let payout_last_run_testable =
+  Alcotest.testable
+    (fun fmt lr ->
+      Format.fprintf
+        fmt
+        "{timestamp=%s; success=%b}"
+        lr.Systemd.timestamp
+        lr.Systemd.success)
+    (fun a b ->
+      String.equal a.Systemd.timestamp b.Systemd.timestamp
+      && Bool.equal a.Systemd.success b.Systemd.success)
+
+let systemd_payout_last_run_success () =
+  let output =
+    "ExecMainExitTimestamp=Thu 2026-04-24 10:30:00 UTC\nResult=success\n"
+  in
+  let result = Systemd.For_tests.parse_payout_last_run_output output in
+  match result with
+  | Some lr ->
+      Alcotest.(check payout_last_run_testable)
+        "last run"
+        {Systemd.timestamp = "Thu 2026-04-24 10:30:00 UTC"; success = true}
+        lr
+  | None -> Alcotest.fail "Expected Some last_run"
+
+let systemd_payout_last_run_failed () =
+  let output =
+    "ExecMainExitTimestamp=Thu 2026-04-24 10:30:00 UTC\nResult=exit-code\n"
+  in
+  let result = Systemd.For_tests.parse_payout_last_run_output output in
+  match result with
+  | Some lr ->
+      Alcotest.(check payout_last_run_testable)
+        "last run"
+        {Systemd.timestamp = "Thu 2026-04-24 10:30:00 UTC"; success = false}
+        lr
+  | None -> Alcotest.fail "Expected Some last_run"
+
+let systemd_payout_last_run_never_run () =
+  let output = "ExecMainExitTimestamp=\nResult=\n" in
+  let result = Systemd.For_tests.parse_payout_last_run_output output in
+  Alcotest.(check (option payout_last_run_testable)) "last run" None result
+
+let systemd_payout_last_run_missing_timestamp () =
+  let output = "Result=success\n" in
+  let result = Systemd.For_tests.parse_payout_last_run_output output in
+  Alcotest.(check (option payout_last_run_testable)) "last run" None result
+
 (* Binary registry tests *)
 module Binary_registry = Octez_manager_lib.Binary_registry
 
@@ -6744,6 +6793,25 @@ let () =
             "parse success result"
             `Quick
             systemd_unit_state_success_result;
+        ] );
+      ( "systemd.payout_last_run",
+        [
+          Alcotest.test_case
+            "parse success"
+            `Quick
+            systemd_payout_last_run_success;
+          Alcotest.test_case
+            "parse failed"
+            `Quick
+            systemd_payout_last_run_failed;
+          Alcotest.test_case
+            "parse never run"
+            `Quick
+            systemd_payout_last_run_never_run;
+          Alcotest.test_case
+            "parse missing timestamp"
+            `Quick
+            systemd_payout_last_run_missing_timestamp;
         ] );
       ( "binary_registry",
         [

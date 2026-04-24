@@ -17,6 +17,13 @@ type unit_state = {
   exit_status : int option;  (** actual exit code if available *)
 }
 
+(** Last run info for the payout oneshot service. *)
+type payout_last_run = {
+  timestamp : string;
+      (** e.g. "Thu 2026-04-24 10:30:00 UTC" or "" if never run *)
+  success : bool;  (** true if Result=success *)
+}
+
 (** Get detailed unit state including failure information *)
 val get_unit_state :
   role:string -> instance:string -> (unit_state, [`Msg of string]) result
@@ -134,6 +141,9 @@ module For_tests : sig
 
   (** Parse systemd show output string into unit_state (for testing) *)
   val parse_unit_state_output : string -> unit_state
+
+  (** Parse systemd show output for payout last run (for testing) *)
+  val parse_payout_last_run_output : string -> payout_last_run option
 end
 
 (** {2 Service Lifecycle} *)
@@ -229,3 +239,7 @@ val is_payout_timer_active : instance:string -> bool
 
 (** Get payout timer status info (for display). Returns None if timer doesn't exist. *)
 val payout_timer_status : instance:string -> string option
+
+(** Get the last run info for the payout oneshot service.
+    Returns [None] if the service doesn't exist or has never run. *)
+val get_payout_last_run : instance:string -> payout_last_run option
