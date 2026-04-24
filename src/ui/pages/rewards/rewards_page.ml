@@ -78,10 +78,19 @@ let init () =
     | Some "history" -> Rewards_state.History
     | _ -> Rewards_state.Overview
   in
+  let selected_baker =
+    match Context.take_pending_baker_instance () with
+    | Some pending_instance ->
+        List.find_index
+          (fun (inst, _) -> String.equal inst pending_instance)
+          baker_instances
+        |> Option.value ~default:0
+    | None -> 0
+  in
   Navigation.make
     {
       Rewards_state.baker_instances;
-      selected_baker = 0;
+      selected_baker;
       active_tab;
       selected_cycle = None;
       current_cycle = None;
@@ -655,11 +664,16 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
         | Ok c -> c
         | Error _ -> Payout_config.default ~baker_pkh:pkh
       in
+      let base_dir =
+        match Node_env.read ~inst:instance with
+        | Error _ -> None
+        | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
+      in
       let ctx : Payout_executor.context =
         {
           octez_client_bin;
           endpoint = node_endpoint;
-          base_dir = None;
+          base_dir;
           password_file = None;
           payout_key_alias = config.payout_key_alias;
           instance;

@@ -489,11 +489,16 @@ let rec pay_run baker_opt cycle_opt dry_run confirm =
                     Filename.concat svc.Service.app_bin_dir "octez-client"
                   in
                   let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
+                  let base_dir =
+                    match Node_env.read ~inst:instance with
+                    | Error _ -> None
+                    | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
+                  in
                   let ctx : Payout_executor.context =
                     {
                       octez_client_bin;
                       endpoint;
-                      base_dir = None;
+                      base_dir;
                       password_file = None;
                       payout_key_alias = config.payout_key_alias;
                       instance;
@@ -745,11 +750,16 @@ let continual_run_run baker_opt =
                 Filename.concat svc.Service.app_bin_dir "octez-client"
               in
               let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
+              let base_dir =
+                match Node_env.read ~inst:instance with
+                | Error _ -> None
+                | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
+              in
               let ctx : Payout_executor.context =
                 {
                   octez_client_bin;
                   endpoint;
-                  base_dir = None;
+                  base_dir;
                   password_file = None;
                   payout_key_alias = config.payout_key_alias;
                   instance;

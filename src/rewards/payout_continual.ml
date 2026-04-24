@@ -265,7 +265,11 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
                             ~dir:report_dir
                             summary
                         in
-                        (cycle, (List.length succeeded, Ok ()))))
+                        let paid = List.length succeeded in
+                        let total = List.length cycle_payout_results in
+                        if total > 0 && paid = 0 then
+                          (cycle, (0, Error "all payouts failed"))
+                        else (cycle, (paid, Ok ()))))
                   blueprints_with_cycles
               in
               (* Step 6: Send one combined notification *)

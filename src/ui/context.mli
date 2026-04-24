@@ -30,6 +30,12 @@ val set_pending_payout_service : string -> unit
 (** Consume the pending payout service instance (returns [Some] once, then [None]). *)
 val take_pending_payout_service : unit -> string option
 
+(** Store a baker instance name to restore after returning from a sub-page. *)
+val set_pending_baker_instance : string -> unit
+
+(** Consume the pending baker instance (returns [Some] once, then [None]). *)
+val take_pending_baker_instance : unit -> string option
+
 (** Store the rewards sub-tab to restore after returning from a sub-page. *)
 val set_pending_rewards_tab : string -> unit
 

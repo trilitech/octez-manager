@@ -9,6 +9,8 @@ let pending_instance_detail : string option ref = ref None
 
 let pending_payout_service_instance : string option ref = ref None
 
+let pending_baker_instance : string option ref = ref None
+
 let pending_group : string option ref = ref None
 
 let set_pending_group group = pending_group := Some group
@@ -64,6 +66,13 @@ let set_pending_payout_service inst =
 let take_pending_payout_service () =
   let value = !pending_payout_service_instance in
   pending_payout_service_instance := None ;
+  value
+
+let set_pending_baker_instance inst = pending_baker_instance := Some inst
+
+let take_pending_baker_instance () =
+  let value = !pending_baker_instance in
+  pending_baker_instance := None ;
   value
 
 let pending_rewards_tab : string option ref = ref None
