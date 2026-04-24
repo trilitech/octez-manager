@@ -1,15 +1,15 @@
 {
   "metadata": {
-    "generated_at": "2026-04-09T00:00:00.000000",
-    "generated_by": "Rebase: merge main (101 tests) + install-index test",
-    "total_tests": 101,
-    "total_duration": 816.05,
+    "generated_at": "2026-04-24T00:00:00.000000",
+    "generated_by": "Add 6 new import tests (69-74) for systemd service import",
+    "total_tests": 107,
+    "total_duration": 876.05,
     "shard_count": 5,
-    "mean_shard_duration": 162.61,
-    "max_shard_duration": 190.61,
-    "min_shard_duration": 143.78,
-    "duration_std_dev": 19.8,
-    "balance_coefficient": 1.32
+    "mean_shard_duration": 175.21,
+    "max_shard_duration": 203.78,
+    "min_shard_duration": 149.0,
+    "duration_std_dev": 21.5,
+    "balance_coefficient": 1.37
   },
   "shard-1": {
     "tests": [
@@ -56,10 +56,16 @@
       "group/58-group-name-validation.sh",
       "import/54-import-node-config-preservation.sh",
       "import/55-import-node-identity-preservation.sh",
-      "import/56-import-node-missing-config-created.sh"
+      "import/56-import-node-missing-config-created.sh",
+      "import/69-import-node-env-file.sh",
+      "import/70-import-node-shell-wrapper.sh",
+      "import/71-import-node-custom-rpc-override.sh",
+      "import/72-import-node-history-mode-archive.sh",
+      "import/73-import-reimport-after-purge.sh",
+      "import/74-import-node-custom-net-addr.sh"
     ],
-    "test_count": 17,
-    "total_duration": 143.78
+    "test_count": 23,
+    "total_duration": 203.78
   },
   "shard-3": {
     "tests": [
