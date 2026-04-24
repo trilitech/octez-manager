@@ -211,6 +211,7 @@ let test_total_earned () =
       external_delegated_balance = 5_000_000_000L;
       block_rewards = 1_000_000L;
       attestation_rewards = 2_000_000L;
+      dal_rewards = 0L;
       other_rewards = 500_000L;
       block_fees = 100_000L;
       num_delegators = 10;
@@ -219,6 +220,30 @@ let test_total_earned () =
   in
   let total = Rewards.total_earned cr in
   Alcotest.(check int64) "total earned" 3_600_000L total
+
+let test_total_earned_with_dal () =
+  let cr =
+    {
+      Rewards.cycle = 100;
+      baker = "tz1abc";
+      staking_balance = 10_000_000_000L;
+      delegated_balance = 5_000_000_000L;
+      own_staked_balance = 5_000_000_000L;
+      own_delegated_balance = 0L;
+      external_staked_balance = 5_000_000_000L;
+      external_delegated_balance = 5_000_000_000L;
+      block_rewards = 1_000_000L;
+      attestation_rewards = 2_000_000L;
+      dal_rewards = 300_000L;
+      other_rewards = 500_000L;
+      block_fees = 100_000L;
+      num_delegators = 10;
+      delegators = [];
+    }
+  in
+  let total = Rewards.total_earned cr in
+  (* 1M + 2M + 300k + 500k + 100k = 3.9M *)
+  Alcotest.(check int64) "total earned includes DAL" 3_900_000L total
 
 (* ── scheduler cache isolation test ──────────────────────────── *)
 
@@ -244,6 +269,7 @@ let test_scheduler_cache_isolation () =
       external_delegated_balance = 5_000_000_000L;
       block_rewards = 1_000_000L;
       attestation_rewards = 2_000_000L;
+      dal_rewards = 0L;
       other_rewards = 0L;
       block_fees = 100_000L;
       num_delegators = 5;
@@ -262,6 +288,7 @@ let test_scheduler_cache_isolation () =
       external_delegated_balance = 10_000_000_000L;
       block_rewards = 3_000_000L;
       attestation_rewards = 4_000_000L;
+      dal_rewards = 0L;
       other_rewards = 0L;
       block_fees = 200_000L;
       num_delegators = 10;
@@ -355,7 +382,13 @@ let () =
           Alcotest.test_case "large" `Quick test_tez_of_mutez_large;
         ] );
       ( "total_earned",
-        [Alcotest.test_case "sum of rewards" `Quick test_total_earned] );
+        [
+          Alcotest.test_case "sum of rewards" `Quick test_total_earned;
+          Alcotest.test_case
+            "includes DAL rewards"
+            `Quick
+            test_total_earned_with_dal;
+        ] );
       ( "scheduler_cache_isolation",
         [
           Alcotest.test_case

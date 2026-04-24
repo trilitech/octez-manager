@@ -49,6 +49,7 @@ type cycle_rewards = {
   external_delegated_balance : Int64.t;
   block_rewards : Int64.t;
   attestation_rewards : Int64.t;
+  dal_rewards : Int64.t;
   other_rewards : Int64.t;
   block_fees : Int64.t;
   num_delegators : int;
@@ -123,7 +124,13 @@ let total_earned (cr : cycle_rewards) =
   List.fold_left
     Int64.add
     0L
-    [cr.block_rewards; cr.attestation_rewards; cr.other_rewards; cr.block_fees]
+    [
+      cr.block_rewards;
+      cr.attestation_rewards;
+      cr.dal_rewards;
+      cr.other_rewards;
+      cr.block_fees;
+    ]
 
 let tez_of_mutez amount_mutez =
   let s = Printf.sprintf "%Ld" amount_mutez in

@@ -70,6 +70,7 @@ type cycle_rewards = {
   external_delegated_balance : Int64.t;
   block_rewards : Int64.t;
   attestation_rewards : Int64.t;
+  dal_rewards : Int64.t;
   other_rewards : Int64.t;
   block_fees : Int64.t;
   num_delegators : int;

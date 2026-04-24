@@ -346,6 +346,7 @@ let history_run baker_opt cycles_count json =
                       [
                         cr.block_rewards;
                         cr.attestation_rewards;
+                        cr.dal_rewards;
                         cr.other_rewards;
                         cr.block_fees;
                       ]
@@ -404,6 +405,7 @@ let history_run baker_opt cycles_count json =
                         [
                           cr.block_rewards;
                           cr.attestation_rewards;
+                          cr.dal_rewards;
                           cr.other_rewards;
                           cr.block_fees;
                         ]

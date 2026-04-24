@@ -32,6 +32,7 @@ let make_cycle_rewards ?(cycle = 100) ?(own_staked = 1_000_000_000L)
     external_delegated_balance = 0L;
     block_rewards;
     attestation_rewards = 0L;
+    dal_rewards = 0L;
     other_rewards = 0L;
     block_fees;
     num_delegators = List.length delegators;
@@ -64,7 +65,11 @@ let test_single_delegator_proportional_share () =
       Int64.add
       0L
       [
-        cr.block_rewards; cr.attestation_rewards; cr.other_rewards; cr.block_fees;
+        cr.block_rewards;
+        cr.attestation_rewards;
+        cr.dal_rewards;
+        cr.other_rewards;
+        cr.block_fees;
       ]
   in
   let expected_gross = Int64.div total 2L in

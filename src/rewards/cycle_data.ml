@@ -54,7 +54,7 @@ let parse_cycle_rewards ~baker json =
   let vdf_rewards = sum_reward_fields json "vdfRevelationRewards" in
   let nonce_rewards = sum_reward_fields json "nonceRevelationRewards" in
   let other_rewards =
-    List.fold_left Int64.add 0L [dal_rewards; vdf_rewards; nonce_rewards]
+    List.fold_left Int64.add 0L [vdf_rewards; nonce_rewards]
   in
   {
     Rewards.cycle = member "cycle" json |> to_int;
@@ -68,6 +68,7 @@ let parse_cycle_rewards ~baker json =
       int64_of_json_field json "externalDelegatedBalance";
     block_rewards;
     attestation_rewards;
+    dal_rewards;
     other_rewards;
     block_fees = int64_of_json_field json "blockFees";
     num_delegators;
