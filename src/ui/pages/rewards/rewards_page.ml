@@ -75,7 +75,6 @@ let init () =
     match Context.take_pending_rewards_tab () with
     | Some "configuration" -> Rewards_state.Configuration
     | Some "delegators" -> Rewards_state.Delegators
-    | Some "history" -> Rewards_state.History
     | _ -> Rewards_state.Overview
   in
   let selected_baker =
@@ -297,6 +296,8 @@ let keymap ps =
     match s.active_tab with
     | Rewards_state.Overview ->
         [
+          kb "j/k" "Navigate";
+          kb "Enter" "View";
           kb "g" "Generate";
           kb "p" "Pay";
           kb "d" "Dry-run";
@@ -311,7 +312,6 @@ let keymap ps =
           kb "f" "Filter";
           kb "c" "Cycle";
         ]
-    | Rewards_state.History -> [kb "j/k" "Navigate"; kb "Enter" "View"]
     | Rewards_state.Configuration ->
         [
           kb "j/k" "Navigate";
@@ -355,7 +355,6 @@ let view ps ~focus:_ ~size =
       | Rewards_state.Overview -> Rewards_overview.render ~state:s ~cols
       | Rewards_state.Delegators ->
           Rewards_delegators.render ~state:s ~cols ~rows
-      | Rewards_state.History -> Rewards_history.render ~state:s ~cols ~rows
       | Rewards_state.Configuration ->
           Rewards_config_tab.render ~state:s ~cols ~_rows:rows)
 
@@ -595,59 +594,6 @@ let handle_config_key ps key =
             ps))
   | _ -> ps
 
-(** Handle keys specific to the History tab. *)
-let handle_history_key ps key =
-  let s = ps.Navigation.s in
-  let count =
-    match Rewards_state.selected_baker_instance s with
-    | None -> 0
-    | Some (instance, _) ->
-        Rewards_history.cycle_count
-          (Rewards_scheduler.get_recent_cycles ~instance)
-  in
-  match Keys.of_string key with
-  | Some (Keys.Char "j") | Some Keys.Down ->
-      Navigation.update
-        (fun s ->
-          {
-            s with
-            history_cursor = min (s.history_cursor + 1) (max 0 (count - 1));
-          })
-        ps
-  | Some (Keys.Char "k") | Some Keys.Up ->
-      Navigation.update
-        (fun s -> {s with history_cursor = max (s.history_cursor - 1) 0})
-        ps
-  | Some Keys.Enter -> (
-      (* Navigate to the selected cycle's Overview/Delegators view *)
-      match Rewards_state.selected_baker_instance s with
-      | None -> ps
-      | Some (instance, baker) -> (
-          let recent = Rewards_scheduler.get_recent_cycles ~instance in
-          match List.nth_opt recent s.history_cursor with
-          | None -> ps
-          | Some (cr : Rewards.cycle_rewards) ->
-              let instance =
-                match Rewards_state.selected_instance_name s with
-                | Some i -> i
-                | None -> ""
-              in
-              Rewards_scheduler.ensure_cycle_detail
-                ~instance
-                ~baker
-                ~cycle:cr.cycle ;
-              Navigation.update
-                (fun s ->
-                  {
-                    s with
-                    selected_cycle = Some cr.cycle;
-                    active_tab = Rewards_state.Overview;
-                    blueprint = None;
-                    overview_preview = false;
-                  })
-                ps))
-  | _ -> ps
-
 (* ── Payout execution helper ──────────────────────────────── *)
 
 let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
@@ -850,7 +796,7 @@ let handle_key ps key ~size:_ =
                   {
                     s with
                     selected_cycle = None;
-                    active_tab = Rewards_state.History;
+                    active_tab = Rewards_state.Overview;
                     blueprint = None;
                     overview_preview = false;
                   })
@@ -860,7 +806,7 @@ let handle_key ps key ~size:_ =
             Navigation.update
               (fun s ->
                 let next_idx =
-                  (Rewards_state.tab_index s.active_tab + 1) mod 4
+                  (Rewards_state.tab_index s.active_tab + 1) mod 3
                 in
                 let next = Rewards_state.tab_of_index next_idx in
                 if next_idx = 0 then
@@ -886,10 +832,6 @@ let handle_key ps key ~size:_ =
               ps
         | Some (Keys.Char "3") ->
             Navigation.update
-              (fun s -> {s with active_tab = Rewards_state.History})
-              ps
-        | Some (Keys.Char "4") ->
-            Navigation.update
               (fun s -> {s with active_tab = Rewards_state.Configuration})
               ps
         | Some (Keys.Char "b") ->
@@ -910,6 +852,51 @@ let handle_key ps key ~size:_ =
                   })
                 ps
             else ps
+        | (Some (Keys.Char "j") | Some Keys.Down)
+          when s.active_tab = Rewards_state.Overview
+               && Option.is_none s.selected_cycle ->
+            let count =
+              match Rewards_state.selected_instance_name s with
+              | Some instance -> Rewards_overview.cycle_count ~instance
+              | None -> 0
+            in
+            Navigation.update
+              (fun s ->
+                {
+                  s with
+                  history_cursor =
+                    min (s.history_cursor + 1) (max 0 (count - 1));
+                })
+              ps
+        | (Some (Keys.Char "k") | Some Keys.Up)
+          when s.active_tab = Rewards_state.Overview
+               && Option.is_none s.selected_cycle ->
+            Navigation.update
+              (fun s -> {s with history_cursor = max (s.history_cursor - 1) 0})
+              ps
+        | Some Keys.Enter
+          when s.active_tab = Rewards_state.Overview
+               && Option.is_none s.selected_cycle -> (
+            match Rewards_state.selected_baker_instance s with
+            | None -> ps
+            | Some (instance, baker) -> (
+                let recent = Rewards_scheduler.get_recent_cycles ~instance in
+                match List.nth_opt recent s.history_cursor with
+                | None -> ps
+                | Some (cr : Rewards.cycle_rewards) ->
+                    Rewards_scheduler.ensure_cycle_detail
+                      ~instance
+                      ~baker
+                      ~cycle:cr.cycle ;
+                    Navigation.update
+                      (fun s ->
+                        {
+                          s with
+                          selected_cycle = Some cr.cycle;
+                          blueprint = None;
+                          overview_preview = false;
+                        })
+                      ps))
         | Some (Keys.Char "p") when s.active_tab = Rewards_state.Overview -> (
             (* Trigger payout confirmation *)
             let s = ps.Navigation.s in
@@ -1060,8 +1047,6 @@ let handle_key ps key ~size:_ =
             handle_delegator_key ps key
         | _ when s.active_tab = Rewards_state.Configuration ->
             handle_config_key ps key
-        | _ when s.active_tab = Rewards_state.History ->
-            handle_history_key ps key
         | _ -> ps)
 
 let handled_keys () =
@@ -1151,6 +1136,8 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
       match s.active_tab with
       | Rewards_state.Overview ->
           [
+            kh "j/k" "Navigate";
+            kh "Enter" "View";
             kh "g" "Generate";
             kh "p" "Pay";
             kh "d" "Dry-run";
@@ -1165,7 +1152,6 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
             kh "f" "Filter";
             kh "c" "Cycle";
           ]
-      | Rewards_state.History -> [kh "j/k" "Navigate"; kh "Enter" "View"]
       | Rewards_state.Configuration ->
           [
             kh "j/k" "Navigate";

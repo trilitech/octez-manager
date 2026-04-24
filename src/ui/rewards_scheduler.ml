@@ -59,6 +59,16 @@ let get_payout_summary ~instance ~cycle =
   Mutex.protect summary_lock (fun () ->
       Hashtbl.find_opt summary_cache (instance, cycle))
 
+(* Payout results cache: keyed by (instance, cycle) *)
+let results_cache : (string * int, Rewards.payout_result list) Hashtbl.t =
+  Hashtbl.create 64
+
+let results_lock = Mutex.create ()
+
+let get_payout_results ~instance ~cycle =
+  Mutex.protect results_lock (fun () ->
+      Hashtbl.find_opt results_cache (instance, cycle))
+
 (* Track payouts currently being executed *)
 let in_progress_payouts : (string * int, unit) Hashtbl.t = Hashtbl.create 4
 
@@ -77,7 +87,7 @@ let get_payout_status ~instance ~cycle =
 
 let refresh_payout_status ~instance ~cycle =
   match Payout_report.read_summary_json ~instance ~cycle with
-  | Ok summary ->
+  | Ok summary -> (
       Mutex.protect summary_lock (fun () ->
           Hashtbl.replace summary_cache (instance, cycle) summary) ;
       let status =
@@ -85,7 +95,13 @@ let refresh_payout_status ~instance ~cycle =
         else Rewards.Paid
       in
       Mutex.protect payout_status_lock (fun () ->
-          Hashtbl.replace payout_status_cache (instance, cycle) status)
+          Hashtbl.replace payout_status_cache (instance, cycle) status) ;
+      (* Also load payout results *)
+      match Payout_report.read_payouts_csv ~instance ~cycle with
+      | Ok results ->
+          Mutex.protect results_lock (fun () ->
+              Hashtbl.replace results_cache (instance, cycle) results)
+      | Error _ -> ())
   | Error _ ->
       if Payout_report.cycle_is_paid ~instance ~cycle then
         Mutex.protect payout_status_lock (fun () ->
@@ -404,6 +420,8 @@ let clear () =
   Mutex.protect recent_lock (fun () -> Hashtbl.clear recent_cache) ;
   Mutex.protect current_cycle_lock (fun () -> Hashtbl.clear current_cycle_cache) ;
   Mutex.protect payout_status_lock (fun () -> Hashtbl.clear payout_status_cache) ;
+  Mutex.protect summary_lock (fun () -> Hashtbl.clear summary_cache) ;
+  Mutex.protect results_lock (fun () -> Hashtbl.clear results_cache) ;
   Mutex.protect in_progress_lock (fun () -> Hashtbl.clear in_progress_payouts) ;
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.clear baker_instance_cache) ;

@@ -8,7 +8,7 @@
 (** Page state types and navigation helpers for the Rewards page. *)
 
 (** Tab selector for the rewards page. *)
-type active_tab = Overview | Delegators | History | Configuration
+type active_tab = Overview | Delegators | Configuration
 
 (** Sort column in the delegators list. *)
 type sort_column = SortAddress | SortBalance | SortReward | SortStatus

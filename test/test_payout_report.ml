@@ -263,6 +263,40 @@ let test_cycle_is_paid () =
   ignore report_path ;
   cleanup_dir dir
 
+(* ── CSV read round-trip ────────────────────────── *)
+
+let test_payouts_csv_roundtrip () =
+  let dir = tmpdir () in
+  let results = sample_results () in
+  (match
+     Payout_report.write_payouts_csv ~dir ~baker:"tz1Baker" ~cycle:42 results
+   with
+  | Ok () -> ()
+  | Error msg -> Alcotest.fail (Printf.sprintf "write failed: %s" msg)) ;
+  (* Read back using the dir-based reader *)
+  match Payout_report.read_payouts_csv_from_dir ~dir with
+  | Error msg -> Alcotest.fail (Printf.sprintf "read failed: %s" msg)
+  | Ok read_back ->
+      Alcotest.(check int)
+        "same count"
+        (List.length results)
+        (List.length read_back) ;
+      let r0 = List.nth read_back 0 in
+      Alcotest.(check string)
+        "delegator 0"
+        "tz1VESSKJmVRxQmd8n56jJPKVfufmD9XEVwQ"
+        r0.delegator ;
+      Alcotest.(check string)
+        "recipient 0"
+        "tz1VESSKJmVRxQmd8n56jJPKVfufmD9XEVwQ"
+        r0.recipient ;
+      Alcotest.(check int64) "amount 0" 1_000_000L r0.amount ;
+      Alcotest.(check bool) "success 0" true r0.success ;
+      let r1 = List.nth read_back 1 in
+      Alcotest.(check bool) "success 1" false r1.success ;
+      Alcotest.(check string) "note 1" "insufficient balance" r1.note ;
+      cleanup_dir dir
+
 let () =
   Alcotest.run
     "payout_report"
@@ -280,6 +314,10 @@ let () =
             "standard columns"
             `Quick
             test_csv_header_standard_columns;
+          Alcotest.test_case
+            "payouts roundtrip"
+            `Quick
+            test_payouts_csv_roundtrip;
         ] );
       ( "cycle_detection",
         [Alcotest.test_case "cycle_is_paid" `Quick test_cycle_is_paid] );

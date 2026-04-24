@@ -102,6 +102,7 @@ let render_last_completed_box ~box_width ~instance
             Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
           ( "Attestation",
             Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
+          ("DAL Rewards", Rewards.format_tez cr.dal_rewards ^ " \xEA\x9C\xA9");
           ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
           ("Delegators", string_of_int delegator_count);
           ("Payout Status", status_label);
@@ -118,7 +119,7 @@ let render_last_completed_box ~box_width ~instance
         desc
 
 let render_recent_cycles_box ~box_width ~instance ~current_cycle
-    (cycles : Rewards.cycle_rewards list) =
+    ~(state : Rewards_state.state) (cycles : Rewards.cycle_rewards list) =
   match cycles with
   | [] ->
       Box.render
@@ -131,14 +132,40 @@ let render_recent_cycles_box ~box_width ~instance ~current_cycle
         "  "
         ^ Display.pad_right 7 "CYCLE"
         ^ " "
-        ^ Display.pad_right 16 "EARNED"
+        ^ Display.pad_right 14 "EARNED"
         ^ " "
         ^ Display.pad_right 14 "DISTRIBUTED"
+        ^ " "
+        ^ Display.pad_right 12 "FEE INCOME"
+        ^ " "
+        ^ Display.pad_right 5 "DELEG"
         ^ " STATUS"
       in
       let rows =
-        List.map
-          (fun (cr : Rewards.cycle_rewards) ->
+        List.mapi
+          (fun i (cr : Rewards.cycle_rewards) ->
+            let earned =
+              format_tez_short (Rewards.total_earned cr) ^ " \xEA\x9C\xA9"
+            in
+            let status =
+              Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
+            in
+            let distributed, fee_income =
+              match
+                Rewards_scheduler.get_payout_summary ~instance ~cycle:cr.cycle
+              with
+              | Some s ->
+                  ( format_tez_short s.distributed_rewards ^ " \xEA\x9C\xA9",
+                    format_tez_short s.fee_income ^ " \xEA\x9C\xA9" )
+              | None -> ("\xe2\x80\x94", "\xe2\x80\x94")
+            in
+            let status_str =
+              match status with
+              | Rewards.Paid -> Widgets.themed_success "paid"
+              | Rewards.Unpaid -> Widgets.themed_muted "unpaid"
+              | Rewards.Partial -> Widgets.themed_warning "partial"
+              | Rewards.In_progress -> Widgets.themed_accent "active"
+            in
             let is_current =
               match current_cycle with
               | Some cc -> Int.equal cr.cycle cc
@@ -148,42 +175,38 @@ let render_recent_cycles_box ~box_width ~instance ~current_cycle
               if is_current then string_of_int cr.cycle ^ " \xe2\x97\x80"
               else string_of_int cr.cycle
             in
-            let earned =
-              format_tez_short (Rewards.total_earned cr) ^ " \xEA\x9C\xA9"
-            in
-            let status =
-              Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
-            in
-            let distributed =
-              match
-                Rewards_scheduler.get_payout_summary ~instance ~cycle:cr.cycle
-              with
-              | Some s ->
-                  format_tez_short s.distributed_rewards ^ " \xEA\x9C\xA9"
-              | None -> "\xE2\x80\x94"
-            in
-            let status_str =
-              match status with
-              | Rewards.Paid -> Widgets.themed_success "paid"
-              | Rewards.Unpaid -> Widgets.themed_muted "unpaid"
-              | Rewards.Partial -> Widgets.themed_warning "partial"
-              | Rewards.In_progress -> Widgets.themed_accent "in progress"
+            let delegators = string_of_int cr.num_delegators in
+            let indicator =
+              if i = state.history_cursor then "\xe2\x96\xb8 " else "  "
             in
             let line =
-              "  "
+              indicator
               ^ Display.pad_right 7 cycle_label
               ^ " "
-              ^ Display.pad_right 16 earned
+              ^ Display.pad_right 14 earned
               ^ " "
               ^ Display.pad_right 14 distributed
+              ^ " "
+              ^ Display.pad_right 12 fee_income
+              ^ " "
+              ^ Display.pad_right 5 delegators
               ^ " " ^ status_str
             in
-            if is_current then Widgets.themed_accent line
+            if i = state.history_cursor then Widgets.themed_emphasis line
+            else if is_current then Widgets.themed_accent line
             else Widgets.themed_text line)
           cycles
       in
-      let content = String.concat "\n" (Widgets.themed_muted header :: rows) in
-      Box.render ~title:"Recent Cycles" ~style:Rounded ~width:box_width content
+      let content =
+        String.concat
+          "\n"
+          (Widgets.themed_muted header :: List.map (fun r -> r) rows)
+      in
+      Box.render
+        ~title:(Printf.sprintf "Cycle History (%d)" (List.length cycles))
+        ~style:Rounded
+        ~width:box_width
+        content
 
 let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
   let total_distributable =
@@ -214,6 +237,70 @@ let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
     |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
   in
   Box.render ~title:"Payout Preview" ~style:Rounded ~width:box_width desc
+
+let render_payout_report_box ~box_width ~instance ~cycle =
+  match Rewards_scheduler.get_payout_results ~instance ~cycle with
+  | None | Some [] -> ""
+  | Some results ->
+      let summary = Rewards_scheduler.get_payout_summary ~instance ~cycle in
+      let summary_line =
+        match summary with
+        | Some s ->
+            let status_text =
+              if s.paid_delegators < s.delegators then
+                Widgets.themed_warning
+                  (Printf.sprintf
+                     "%d/%d delegators paid (partial)"
+                     s.paid_delegators
+                     s.delegators)
+              else
+                Widgets.themed_success
+                  (Printf.sprintf
+                     "%d/%d delegators paid"
+                     s.paid_delegators
+                     s.delegators)
+            in
+            status_text
+        | None -> ""
+      in
+      let header =
+        "  "
+        ^ Display.pad_right 18 "DELEGATOR"
+        ^ " "
+        ^ Display.pad_right 14 "AMOUNT"
+        ^ " "
+        ^ Display.pad_right 8 "STATUS"
+        ^ " NOTE"
+      in
+      let rows =
+        List.map
+          (fun (r : Rewards.payout_result) ->
+            let short_addr =
+              let len = String.length r.delegator in
+              if len > 15 then
+                String.sub r.delegator 0 10
+                ^ "..."
+                ^ String.sub r.delegator (len - 4) 4
+              else r.delegator
+            in
+            let amount_str = Rewards.format_tez r.amount ^ " \xEA\x9C\xA9" in
+            let status_str =
+              if r.success then Widgets.themed_success "\xE2\x9C\x93"
+              else Widgets.themed_error "\xE2\x9C\x97 fail"
+            in
+            let note_str =
+              if String.length r.note > 0 then Widgets.themed_muted r.note
+              else ""
+            in
+            "  "
+            ^ Display.pad_right 18 short_addr
+            ^ " "
+            ^ Display.pad_right 14 amount_str
+            ^ " " ^ status_str ^ " " ^ note_str)
+          results
+      in
+      let content = String.concat "\n" ([summary_line; ""; header] @ rows) in
+      Box.render ~title:"Payout Report" ~style:Rounded ~width:box_width content
 
 let render_cycle_detail ~box_width ~instance ~baker:_
     (state : Rewards_state.state) cycle =
@@ -253,6 +340,7 @@ let render_cycle_detail ~box_width ~instance ~baker:_
               Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
             ( "Attestation",
               Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
+            ("DAL Rewards", Rewards.format_tez cr.dal_rewards ^ " \xEA\x9C\xA9");
             ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
             ("Delegators", string_of_int delegator_count);
             ("Payout Status", status_label);
@@ -274,7 +362,12 @@ let render_cycle_detail ~box_width ~instance ~baker:_
         render_blueprint_box ~box_width bp
     | _ -> Widgets.themed_muted "  Press g to generate payout preview"
   in
-  String.concat "\n" [header; back_hint; ""; detail_box; ""; preview_box]
+  let report_box = render_payout_report_box ~box_width ~instance ~cycle in
+  let parts = [header; back_hint; ""; detail_box; ""; preview_box] in
+  let parts =
+    if String.length report_box > 0 then parts @ [""; report_box] else parts
+  in
+  String.concat "\n" parts
 
 let resolve_network ~instance =
   match Octez_manager_lib.Service_registry.find ~instance with
@@ -283,6 +376,10 @@ let resolve_network ~instance =
       match Rewards_scheduler.get_network_for_instance ~instance with
       | Some n -> n
       | None -> "unknown")
+
+let cycle_count ~instance =
+  let cycles = Rewards_scheduler.get_recent_cycles ~instance in
+  List.length cycles
 
 let render_dashboard ~box_width ~instance ~baker:_ (state : Rewards_state.state)
     =
@@ -303,7 +400,7 @@ let render_dashboard ~box_width ~instance ~baker:_ (state : Rewards_state.state)
     render_last_completed_box ~box_width ~instance last_completed
   in
   let recent_box =
-    render_recent_cycles_box ~box_width ~instance ~current_cycle recent
+    render_recent_cycles_box ~box_width ~instance ~current_cycle ~state recent
   in
   let parts =
     [network_line; ""; current_box; ""; completed_box; ""; recent_box]
@@ -318,7 +415,7 @@ let render_dashboard ~box_width ~instance ~baker:_ (state : Rewards_state.state)
   String.concat "\n" parts
 
 let render ~(state : Rewards_state.state) ~cols =
-  let box_width = min (cols - 2) 72 in
+  let box_width = min (cols - 2) 90 in
   match Rewards_state.selected_baker_instance state with
   | None ->
       String.concat

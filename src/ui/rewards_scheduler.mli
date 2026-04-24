@@ -46,6 +46,13 @@ val get_payout_summary :
   cycle:int ->
   Octez_manager_rewards.Rewards.cycle_summary option
 
+(** Get cached payout results (individual transfer outcomes) for a cycle.
+    Returns [None] if no report has been loaded. Safe for view functions. *)
+val get_payout_results :
+  instance:string ->
+  cycle:int ->
+  Octez_manager_rewards.Rewards.payout_result list option
+
 (** Get payout status for a baker + cycle (paid/unpaid/partial/in_progress).
     Pure cache read — safe for view functions. *)
 val get_payout_status :

@@ -208,3 +208,69 @@ let list_paid_cycles ~instance =
           | exception _ -> None)
       |> List.sort (fun a b -> Int.compare b a)
     with _ -> []
+
+(** Parse a CSV field, handling quoted strings with embedded commas. *)
+let parse_csv_field s =
+  let s = String.trim s in
+  if String.length s >= 2 && s.[0] = '"' && s.[String.length s - 1] = '"' then
+    (* Unquote and unescape doubled quotes *)
+    let inner = String.sub s 1 (String.length s - 2) in
+    let parts = String.split_on_char '"' inner in
+    String.concat "\"" parts
+  else s
+
+(** Split a CSV line into fields, respecting quoted strings. *)
+let split_csv_line line =
+  let len = String.length line in
+  let rec scan acc field_start i in_quotes =
+    if i >= len then
+      let field = String.sub line field_start (i - field_start) in
+      List.rev (parse_csv_field field :: acc)
+    else
+      let c = line.[i] in
+      if c = '"' then scan acc field_start (i + 1) (not in_quotes)
+      else if c = ',' && not in_quotes then
+        let field = String.sub line field_start (i - field_start) in
+        scan (parse_csv_field field :: acc) (i + 1) (i + 1) false
+      else scan acc field_start (i + 1) in_quotes
+  in
+  scan [] 0 0 false
+
+let read_payouts_csv_from_dir ~dir =
+  let path = Filename.concat dir "payouts.csv" in
+  if not (Sys.file_exists path) then
+    Error (Printf.sprintf "payouts.csv not found in %s" dir)
+  else
+    try
+      let ic = open_in path in
+      let _header = input_line ic in
+      (* Skip header *)
+      let results = ref [] in
+      (try
+         while true do
+           let line = input_line ic in
+           if String.length line > 0 then
+             let fields = split_csv_line line in
+             if List.length fields >= 21 then
+               let delegator = List.nth fields 10 in
+               let recipient = List.nth fields 13 in
+               let amount = Int64.of_string (List.nth fields 14) in
+               let op_hash_str = List.nth fields 18 in
+               let op_hash =
+                 if String.length op_hash_str > 0 then Some op_hash_str
+                 else None
+               in
+               let success = bool_of_string (List.nth fields 19) in
+               let note = List.nth fields 20 in
+               results :=
+                 {Rewards.delegator; recipient; amount; op_hash; success; note}
+                 :: !results
+         done
+       with End_of_file -> ()) ;
+      close_in ic ;
+      Ok (List.rev !results)
+    with exn -> Error (Printexc.to_string exn)
+
+let read_payouts_csv ~instance ~cycle =
+  let dir = report_dir ~instance ~cycle in
+  read_payouts_csv_from_dir ~dir

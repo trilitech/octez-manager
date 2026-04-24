@@ -53,3 +53,12 @@ val cycle_is_paid : instance:string -> cycle:int -> bool
 
 (** List all cycles that have summary files, sorted descending. *)
 val list_paid_cycles : instance:string -> int list
+
+(** Read payout results from the CSV report for a cycle.
+    Returns the list of individual transfer results. *)
+val read_payouts_csv :
+  instance:string -> cycle:int -> (Rewards.payout_result list, string) result
+
+(** Read payout results from a specific directory (for testing). *)
+val read_payouts_csv_from_dir :
+  dir:string -> (Rewards.payout_result list, string) result
