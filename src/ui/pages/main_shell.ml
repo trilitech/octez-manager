@@ -92,6 +92,7 @@ let tab_id_of_context_tab = function
   | Context.Tab_diagnostics -> tab_diagnostics
   | Context.Tab_topology -> tab_topology
   | Context.Tab_sandboxes -> tab_sandbox
+  | Context.Tab_rewards -> tab_rewards
 
 let is_tab_target t =
   String.equal t tab_instances
@@ -177,9 +178,12 @@ let refresh ps =
     | None -> s
     | Some ctx_tab ->
         let id = tab_id_of_context_tab ctx_tab in
-        (* Sandbox and Diagnostics are hidden pages, not in the tab bar *)
-        if String.equal id tab_sandbox || String.equal id tab_diagnostics then
-          {s with on_hidden_page = Some id}
+        (* Sandbox, Rewards, and Diagnostics are hidden pages, not in the tab bar *)
+        if
+          String.equal id tab_sandbox
+          || String.equal id tab_diagnostics
+          || String.equal id tab_rewards
+        then {s with on_hidden_page = Some id}
         else
           {
             s with
