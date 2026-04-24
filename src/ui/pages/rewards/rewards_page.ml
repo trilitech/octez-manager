@@ -670,6 +670,21 @@ let handle_config_key ps key =
                     results)
               () ;
             ps))
+  | Some (Keys.Char "P") -> (
+      (* Payout service details *)
+      match Rewards_state.selected_instance_name s with
+      | None -> ps
+      | Some instance ->
+          if
+            Rewards_scheduler.get_payout_timer_active ~instance
+            ||
+            match s.config with
+            | Some c -> c.continual_enabled
+            | None -> false
+          then (
+            Rewards_config_tab.open_payout_service_detail ~instance ;
+            ps)
+          else ps)
   | _ -> ps
 
 (** Handle keys specific to the History tab. *)
@@ -1236,6 +1251,7 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
             kh "r" "Reset";
             kh "i" "Import";
             kh "I" "Install";
+            kh "P" "Details";
             kh "X" "Remove";
             kh "n" "Notify";
           ]

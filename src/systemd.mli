@@ -243,3 +243,14 @@ val payout_timer_status : instance:string -> string option
 (** Get the last run info for the payout oneshot service.
     Returns [None] if the service doesn't exist or has never run. *)
 val get_payout_last_run : instance:string -> payout_last_run option
+
+(** Get the next trigger time for the payout timer. Returns None if not available. *)
+val get_payout_timer_next : instance:string -> string option
+
+(** Get the payout service unit file content via systemctl cat. *)
+val cat_payout_service : instance:string -> (string, [`Msg of string]) result
+
+(** Get recent log lines from the payout service journal.
+    Returns up to [n] lines, or an error message. *)
+val get_payout_service_logs :
+  instance:string -> n:int -> (string, [`Msg of string]) result

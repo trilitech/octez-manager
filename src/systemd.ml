@@ -541,3 +541,50 @@ let get_payout_last_run ~instance =
   with
   | Ok output -> For_tests.parse_payout_last_run_output output
   | Error _ -> None
+
+let get_payout_timer_next ~instance =
+  let unit = payout_unit_name instance ^ ".timer" in
+  match
+    run_systemctl_out_timeout
+      ["show"; "--property=NextElapseUSecRealtime"; unit]
+  with
+  | Ok line -> (
+      match String.split_on_char '=' line with
+      | [_; value] ->
+          let trimmed = String.trim value in
+          if String.equal trimmed "" then None else Some trimmed
+      | _ -> None)
+  | Error _ -> None
+
+let cat_payout_service ~instance =
+  let unit = payout_unit_name instance ^ ".service" in
+  run_systemctl_out_timeout ["cat"; unit]
+
+let get_payout_service_logs ~instance ~n =
+  let unit = payout_unit_name instance ^ ".service" in
+  let args =
+    if Paths.is_root () then
+      [
+        "journalctl";
+        "-u";
+        unit;
+        "--no-pager";
+        "-n";
+        string_of_int n;
+        "-o";
+        "cat";
+      ]
+    else
+      [
+        "journalctl";
+        "--user";
+        "-u";
+        unit;
+        "--no-pager";
+        "-n";
+        string_of_int n;
+        "-o";
+        "cat";
+      ]
+  in
+  Cmd_runner.run_out args

@@ -304,6 +304,59 @@ let reset_config ~baker_pkh =
       end)
     ()
 
+(* {1 Payout Service Detail Modal} *)
+
+let open_payout_service_detail ~instance =
+  (* All I/O happens here, before opening the modal *)
+  let lines = ref [] in
+  let add s = lines := s :: !lines in
+  let add_blank () = add "" in
+  (* Section: Status *)
+  add "═══ Payout Service Status ═══" ;
+  add_blank () ;
+  let timer_active =
+    Octez_manager_lib.Systemd.is_payout_timer_active ~instance
+  in
+  add
+    (Printf.sprintf
+       "  Timer:      %s"
+       (if timer_active then "● Active" else "○ Inactive")) ;
+  (match Octez_manager_lib.Systemd.get_payout_last_run ~instance with
+  | Some info ->
+      let status = if info.success then "✓ Success" else "✗ Failed" in
+      add (Printf.sprintf "  Last run:   %s" info.timestamp) ;
+      add (Printf.sprintf "  Result:     %s" status)
+  | None -> add "  Last run:   Never") ;
+  add_blank () ;
+  (* Section: Timer Details *)
+  add "═══ Timer Details ═══" ;
+  add_blank () ;
+  (match Octez_manager_lib.Systemd.get_payout_timer_next ~instance with
+  | Some next -> add (Printf.sprintf "  Next trigger: %s" next)
+  | None -> add "  Next trigger: Unknown") ;
+  add_blank () ;
+  (* Section: Service Unit *)
+  add "═══ Service Configuration ═══" ;
+  add_blank () ;
+  (match Octez_manager_lib.Systemd.cat_payout_service ~instance with
+  | Ok content ->
+      String.split_on_char '\n' content |> List.iter (fun l -> add ("  " ^ l))
+  | Error (`Msg msg) ->
+      add (Printf.sprintf "  (Could not read unit file: %s)" msg)) ;
+  add_blank () ;
+  (* Section: Recent Logs *)
+  add "═══ Recent Logs (last 50 lines) ═══" ;
+  add_blank () ;
+  (match Octez_manager_lib.Systemd.get_payout_service_logs ~instance ~n:50 with
+  | Ok output ->
+      if String.length (String.trim output) = 0 then
+        add "  (No log entries found)"
+      else
+        String.split_on_char '\n' output |> List.iter (fun l -> add ("  " ^ l))
+  | Error (`Msg msg) -> add (Printf.sprintf "  (Could not fetch logs: %s)" msg)) ;
+  let all_lines = List.rev !lines in
+  Modal_helpers.open_text_modal ~title:"Payout Service Details" ~lines:all_lines
+
 (* {1 Rendering} *)
 
 let render ~(state : Rewards_state.state) ~cols ~_rows =
@@ -453,7 +506,11 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
             in
             let hint_line =
               if timer_active then
-                Widgets.themed_muted "  [X: remove payout service]"
+                Widgets.themed_muted
+                  "  [P: details]  [X: remove payout service]"
+              else if config.continual_enabled then
+                Widgets.themed_muted
+                  "  [P: details]  [I: install payout service]"
               else Widgets.themed_muted "  [I: install payout service]"
             in
             let content_parts =
