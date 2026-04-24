@@ -843,7 +843,19 @@ let handle_key ps key ~size:_ =
     | Some _ -> ps (* other mouse clicks: ignore *)
     | None -> (
         match Keys.of_string key with
-        | Some Keys.Escape -> back ps
+        | Some Keys.Escape ->
+            if Option.is_some s.selected_cycle then
+              Navigation.update
+                (fun s ->
+                  {
+                    s with
+                    selected_cycle = None;
+                    active_tab = Rewards_state.History;
+                    blueprint = None;
+                    overview_preview = false;
+                  })
+                ps
+            else back ps
         | Some Keys.Tab ->
             Navigation.update
               (fun s ->
