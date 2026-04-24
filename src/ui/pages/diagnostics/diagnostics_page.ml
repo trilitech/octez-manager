@@ -94,7 +94,9 @@ let service_cycle ps _ =
       {s with services = Data.load_service_states ()})
     ps
 
-let back ps = Navigation.back ps
+let back ps =
+  Context.set_pending_tab Context.Tab_instances ;
+  Navigation.back ps
 
 let toggle_recorder s =
   if Metrics.is_recording () then (

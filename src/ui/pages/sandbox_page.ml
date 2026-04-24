@@ -274,7 +274,9 @@ let service_select ps _ = ps
 
 let service_cycle ps _ = refresh ps
 
-let back ps = Navigation.back ps
+let back ps =
+  Context.set_pending_tab Context.Tab_instances ;
+  Navigation.back ps
 
 (* ─── List Panel ────────────────────────────────────────────────────────── *)
 
