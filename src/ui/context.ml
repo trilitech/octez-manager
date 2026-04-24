@@ -7,6 +7,8 @@
 
 let pending_instance_detail : string option ref = ref None
 
+let pending_payout_service_instance : string option ref = ref None
+
 let pending_group : string option ref = ref None
 
 let set_pending_group group = pending_group := Some group
@@ -54,6 +56,14 @@ let set_pending_instance_detail inst = pending_instance_detail := Some inst
 let take_pending_instance_detail () =
   let value = !pending_instance_detail in
   pending_instance_detail := None ;
+  value
+
+let set_pending_payout_service inst =
+  pending_payout_service_instance := Some inst
+
+let take_pending_payout_service () =
+  let value = !pending_payout_service_instance in
+  pending_payout_service_instance := None ;
   value
 
 let set_pending_external_service svc = pending_external_service := Some svc

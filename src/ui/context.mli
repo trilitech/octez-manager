@@ -24,6 +24,12 @@ val set_pending_instance_detail : string -> unit
 (** Consume the pending instance name (returns [Some] once, then [None]). *)
 val take_pending_instance_detail : unit -> string option
 
+(** Store an instance name to navigate to the payout service page. *)
+val set_pending_payout_service : string -> unit
+
+(** Consume the pending payout service instance (returns [Some] once, then [None]). *)
+val take_pending_payout_service : unit -> string option
+
 (** Store a sandbox group name to pass to the key allocation page. *)
 val set_pending_sandbox_group : string -> unit
 
