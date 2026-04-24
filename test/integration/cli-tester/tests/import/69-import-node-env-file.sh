@@ -33,10 +33,10 @@ mkdir -p "$DATA_DIR"
 inject_identity "$INSTANCE" "$DATA_DIR"
 chown -R tezos:tezos "$DATA_DIR"
 
-local unit_name="octez-node@${INSTANCE}.service"
-local unit_dir="/etc/systemd/system"
-local octez_bin_path="/usr/local/bin"
-local p2p_addr="127.0.0.1:$(alloc_port)"
+unit_name="octez-node@${INSTANCE}.service"
+unit_dir="/etc/systemd/system"
+octez_bin_path="/usr/local/bin"
+p2p_addr="127.0.0.1:$(alloc_port)"
 
 cat >"$unit_dir/$unit_name" <<SERVICE
 [Unit]

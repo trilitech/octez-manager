@@ -23,9 +23,9 @@ mkdir -p "$DATA_DIR"
 inject_identity "$INSTANCE" "$DATA_DIR"
 chown -R tezos:tezos "$DATA_DIR"
 
-local unit_name="octez-node@${INSTANCE}.service"
-local unit_dir="/etc/systemd/system"
-local octez_bin_path="/usr/local/bin"
+unit_name="octez-node@${INSTANCE}.service"
+unit_dir="/etc/systemd/system"
+octez_bin_path="/usr/local/bin"
 
 cat >"$unit_dir/$unit_name" <<SERVICE
 [Unit]
