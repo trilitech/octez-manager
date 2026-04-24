@@ -31,4 +31,23 @@ val register : unit -> unit
 (** PAGE_SIG module for use with the headless driver in tests. *)
 module Page : Miaou.Core.Tui_page.PAGE_SIG
 
+(** Internal functions exposed for testing. *)
+module Internal_for_tests : sig
+  type state
+
+  type pstate = state Miaou.Core.Navigation.t
+
+  val apply_sub_nav :
+    shell_ps:pstate ->
+    shell_s:state ->
+    Miaou.Core.Navigation.nav option ->
+    pstate
+
+  val make_state : ?on_hidden_page:string option -> unit -> state
+
+  val get_on_hidden_page : state -> string option
+
+  val get_state : pstate -> state
+end
+
 (**/**)

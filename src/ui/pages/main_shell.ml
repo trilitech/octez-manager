@@ -123,7 +123,10 @@ let apply_sub_nav ~shell_ps ~shell_s nav_result =
   let ps = {shell_ps with Navigation.s = shell_s} in
   match nav_result with
   | None -> ps
-  | Some Navigation.Back -> Navigation.back ps
+  | Some Navigation.Back ->
+      if Option.is_some shell_s.on_hidden_page then
+        {ps with Navigation.s = {shell_s with on_hidden_page = None}}
+      else Navigation.back ps
   | Some Navigation.Quit -> Navigation.quit ps
   | Some (Navigation.Goto target) -> route_nav ~shell_ps:ps ~shell_s target
 
@@ -444,3 +447,29 @@ module Page = Page_Impl
 let register () =
   if not (Miaou.Core.Registry.exists name) then
     Miaou.Core.Registry.register name (module Page_Impl)
+
+module Internal_for_tests = struct
+  type nonrec state = state
+
+  type nonrec pstate = pstate
+
+  let apply_sub_nav = apply_sub_nav
+
+  let make_state ?(on_hidden_page = None) () =
+    {
+      tabs = initial_tabs;
+      instances_ps = Instances.Page.init ();
+      wallets_ps = Wallets_page.Page.init ();
+      binaries_ps = Binaries.Page.init ();
+      rpc_ps = Rpc_node_selection.Page.init ();
+      diagnostics_ps = Diagnostics.Page.init ();
+      topology_ps = Topology_page.Page.init ();
+      sandbox_ps = Sandbox_page.Page.init ();
+      rewards_ps = Rewards_page.Page.init ();
+      on_hidden_page;
+    }
+
+  let get_on_hidden_page s = s.on_hidden_page
+
+  let get_state ps = ps.Navigation.s
+end
