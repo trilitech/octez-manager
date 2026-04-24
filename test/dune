@@ -1081,6 +1081,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_rpc_addr)
+ (libraries alcotest octez_manager_lib)
+ (modules test_rpc_addr)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_payout_executor)
  (libraries alcotest octez_manager_rewards)
  (modules test_payout_executor)

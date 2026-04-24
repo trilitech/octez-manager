@@ -350,4 +350,41 @@ let () =
             `Quick
             test_merge_payouts_different_recipients_same_delegator;
         ] );
+      ( "extract_op_hash",
+        [
+          Alcotest.test_case "finds op hash in output" `Quick (fun () ->
+              let output =
+                "Operation hash is \
+                 'ooXYZ123abc456def789ghi012jkl345mno678pqr901stu234vwx567yz'\n\
+                 Simulation result:"
+              in
+              let result =
+                Payout_executor.Internal_for_tests.extract_op_hash output
+              in
+              Alcotest.(check (option string))
+                "should extract op hash"
+                (Some
+                   "ooXYZ123abc456def789ghi012jkl345mno678pqr901stu234vwx567yz")
+                result);
+          Alcotest.test_case "returns None when no op hash" `Quick (fun () ->
+              let output =
+                "Error:\n  Unrecognized command.\n  Try using the man command."
+              in
+              let result =
+                Payout_executor.Internal_for_tests.extract_op_hash output
+              in
+              Alcotest.(check (option string)) "should return None" None result);
+          Alcotest.test_case "finds bare op hash on line" `Quick (fun () ->
+              let output =
+                "ooABC123def456ghi789jkl012mno345pqr678stu901vwx234yz567ab"
+              in
+              let result =
+                Payout_executor.Internal_for_tests.extract_op_hash output
+              in
+              Alcotest.(check (option string))
+                "should extract bare op hash"
+                (Some
+                   "ooABC123def456ghi789jkl012mno345pqr678stu901vwx234yz567ab")
+                result);
+        ] );
     ]
