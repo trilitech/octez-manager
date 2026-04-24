@@ -54,8 +54,12 @@ val save_config :
 (** Reset the configuration to defaults for the given baker. *)
 val reset_config : baker_pkh:string -> unit
 
-(** Open a modal showing detailed payout service information. *)
-val open_payout_service_detail : instance:string -> unit
+(** Open the payout service action menu (Details, Logs, Install/Remove). *)
+val open_payout_service_actions :
+  instance:string ->
+  baker_pkh:string ->
+  config:Octez_manager_rewards.Payout_config.t option ->
+  unit
 
 (** Render the configuration tab content. No I/O — reads from page state. *)
 val render : state:Rewards_state.state -> cols:int -> _rows:int -> string

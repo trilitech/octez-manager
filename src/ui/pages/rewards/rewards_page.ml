@@ -302,8 +302,6 @@ let keymap ps =
           kb "s" "Save";
           kb "r" "Reset";
           kb "i" "Import";
-          kb "I" "Install";
-          kb "X" "Remove";
           kb "n" "Notify";
         ]
   in
@@ -468,7 +466,7 @@ let handle_config_key ps key =
           {
             s with
             config_cursor =
-              min (s.config_cursor + 1) (Rewards_config_tab.field_count - 1);
+              min (s.config_cursor + 1) Rewards_config_tab.field_count;
           })
         ps
   | Some (Keys.Char "k") | Some Keys.Up ->
@@ -476,12 +474,28 @@ let handle_config_key ps key =
         (fun s -> {s with config_cursor = max (s.config_cursor - 1) 0})
         ps
   | Some Keys.Enter -> (
-      match s.config with
-      | Some config ->
-          let field = List.nth Rewards_config_tab.all_fields s.config_cursor in
-          Rewards_config_tab.edit_field config field ;
-          ps
-      | None -> ps)
+      if s.config_cursor = Rewards_config_tab.field_count then (
+        (* Payout service action *)
+        match Rewards_state.selected_instance_name s with
+        | None -> ps
+        | Some instance ->
+            Rewards_config_tab.open_payout_service_actions
+              ~instance
+              ~baker_pkh:
+                (match Rewards_state.selected_baker_pkh s with
+                | Some p -> p
+                | None -> "")
+              ~config:s.config ;
+            ps)
+      else
+        match s.config with
+        | Some config ->
+            let field =
+              List.nth Rewards_config_tab.all_fields s.config_cursor
+            in
+            Rewards_config_tab.edit_field config field ;
+            ps
+        | None -> ps)
   | Some (Keys.Char "s") -> (
       match (s.config, Rewards_state.selected_instance_name s) with
       | Some config, Some instance ->
@@ -519,114 +533,6 @@ let handle_config_key ps key =
                   | Error msg ->
                       Context.toast_error (Printf.sprintf "Save failed: %s" msg)) ;
                   List.iter (fun w -> Context.toast_warn w) result.warnings)
-            () ;
-          ps)
-  | Some (Keys.Char "I") -> (
-      (* Install payout service *)
-      match Rewards_state.selected_baker_instance s with
-      | None -> ps
-      | Some (instance, baker_pkh) ->
-          (* Bug 2: Check if already installed *)
-          if Rewards_scheduler.get_payout_timer_active ~instance then (
-            Context.toast_info "Payout service already installed" ;
-            ps)
-          else (
-            (* Bug 1: Show confirmation modal *)
-            Modal_helpers.confirm_modal
-              ~title:"Install Payout Service"
-              ~message:
-                "This will install a systemd timer that automatically\n\
-                 pays delegator rewards every 5 minutes when due cycles\n\
-                 are detected.\n\n\
-                 The service runs independently of octez-manager.\n\
-                 You can remove it later from this tab."
-              ~on_result:(fun confirmed ->
-                if confirmed then
-                  let octez_manager_bin =
-                    match Sys.executable_name with
-                    | "" -> "octez-manager"
-                    | path -> path
-                  in
-                  let service_user =
-                    if Paths.is_root () then
-                      Systemd.get_service_user ~role:"baker" ~instance
-                    else None
-                  in
-                  let open Rresult.R.Infix in
-                  match
-                    Systemd.write_payout_service
-                      ~instance
-                      ~octez_manager_bin
-                      ~service_user
-                      ()
-                    >>= fun () ->
-                    Systemd.write_payout_timer ~instance () >>= fun () ->
-                    Systemd.enable_payout_timer ~instance
-                  with
-                  | Ok () -> (
-                      let config =
-                        match s.config with
-                        | Some c -> c
-                        | None -> Payout_config.default ~baker_pkh
-                      in
-                      let config = {config with continual_enabled = true} in
-                      match Payout_config.save ~instance config with
-                      | Ok () ->
-                          Rewards_config_tab.set_pending_config_clean config ;
-                          (* Bug 3: Update cache immediately *)
-                          Rewards_scheduler.set_payout_timer_active
-                            ~instance
-                            ~active:true ;
-                          Rewards_scheduler.set_continual_interval
-                            ~instance
-                            ~interval:config.continual_interval ;
-                          Context.toast_info
-                            "Payout service installed and enabled"
-                      | Error msg ->
-                          Context.toast_error
-                            (Printf.sprintf "Config save failed: %s" msg))
-                  | Error (`Msg msg) ->
-                      Context.toast_error
-                        (Printf.sprintf "Install failed: %s" msg))
-              () ;
-            ps))
-  | Some (Keys.Char "X") -> (
-      (* Remove payout service *)
-      match Rewards_state.selected_instance_name s with
-      | None -> ps
-      | Some instance ->
-          Modal_helpers.confirm_modal
-            ~title:"Remove Payout Service"
-            ~message:
-              "This will stop and remove the automatic payout timer.\n\
-               Delegator rewards will no longer be paid automatically."
-            ~on_result:(fun confirmed ->
-              if confirmed then
-                match Systemd.disable_payout_timer ~instance with
-                | Ok () -> (
-                    Systemd.remove_payout_units ~instance ;
-                    let config =
-                      match s.config with
-                      | Some c -> c
-                      | None -> (
-                          match Rewards_state.selected_baker_pkh s with
-                          | Some pkh -> Payout_config.default ~baker_pkh:pkh
-                          | None -> failwith "unreachable")
-                    in
-                    let config = {config with continual_enabled = false} in
-                    match Payout_config.save ~instance config with
-                    | Ok () ->
-                        Rewards_config_tab.set_pending_config_clean config ;
-                        (* Update cache immediately *)
-                        Rewards_scheduler.set_payout_timer_active
-                          ~instance
-                          ~active:false ;
-                        Context.toast_info "Payout service removed"
-                    | Error msg ->
-                        Context.toast_error
-                          (Printf.sprintf "Config save failed: %s" msg))
-                | Error (`Msg msg) ->
-                    Context.toast_error (Printf.sprintf "Remove failed: %s" msg))
             () ;
           ps)
   | Some (Keys.Char "n") -> (
@@ -670,21 +576,6 @@ let handle_config_key ps key =
                     results)
               () ;
             ps))
-  | Some (Keys.Char "P") -> (
-      (* Payout service details *)
-      match Rewards_state.selected_instance_name s with
-      | None -> ps
-      | Some instance ->
-          if
-            Rewards_scheduler.get_payout_timer_active ~instance
-            ||
-            match s.config with
-            | Some c -> c.continual_enabled
-            | None -> false
-          then (
-            Rewards_config_tab.open_payout_service_detail ~instance ;
-            ps)
-          else ps)
   | _ -> ps
 
 (** Handle keys specific to the History tab. *)
@@ -1167,8 +1058,6 @@ let handled_keys () =
       Char "d";
       Char "t";
       Char "i";
-      Char "I";
-      Char "X";
       Char "n";
     ]
 
@@ -1250,9 +1139,6 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
             kh "s" "Save";
             kh "r" "Reset";
             kh "i" "Import";
-            kh "I" "Install";
-            kh "P" "Details";
-            kh "X" "Remove";
             kh "n" "Notify";
           ]
     in
