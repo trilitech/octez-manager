@@ -6,6 +6,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_import_config_preservation)
+ (libraries alcotest octez_manager_lib uri)
+ (modules test_import_config_preservation)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name unit_tests)
  (libraries
   alcotest
@@ -240,6 +247,13 @@
  (name test_execstart_parser)
  (libraries alcotest octez_manager_lib)
  (modules test_execstart_parser)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_execstart_parser_extended)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_execstart_parser_extended)
  (instrumentation
   (backend bisect_ppx)))
 
