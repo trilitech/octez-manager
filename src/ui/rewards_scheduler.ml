@@ -131,9 +131,19 @@ let continual_interval_cache : (string, int) Hashtbl.t = Hashtbl.create 4
 
 let continual_interval_lock = Mutex.create ()
 
+(* Payout service last run cache *)
+let payout_last_run_cache : (string, Systemd.payout_last_run) Hashtbl.t =
+  Hashtbl.create 4
+
+let payout_last_run_lock = Mutex.create ()
+
 let get_continual_interval ~instance =
   Mutex.protect continual_interval_lock (fun () ->
       Hashtbl.find_opt continual_interval_cache instance)
+
+let get_payout_last_run ~instance =
+  Mutex.protect payout_last_run_lock (fun () ->
+      Hashtbl.find_opt payout_last_run_cache instance)
 
 let set_payout_timer_active ~instance ~active =
   Mutex.protect payout_timer_lock (fun () ->
@@ -181,6 +191,14 @@ let poll_baker ~instance ~network =
   let timer_active = Systemd.is_payout_timer_active ~instance in
   Mutex.protect payout_timer_lock (fun () ->
       Hashtbl.replace payout_timer_cache instance timer_active) ;
+  (* Cache payout service last run info *)
+  (match Systemd.get_payout_last_run ~instance with
+  | Some info ->
+      Mutex.protect payout_last_run_lock (fun () ->
+          Hashtbl.replace payout_last_run_cache instance info)
+  | None ->
+      Mutex.protect payout_last_run_lock (fun () ->
+          Hashtbl.remove payout_last_run_cache instance)) ;
   let tzkt_url =
     match config_opt with
     | Some c -> c.tzkt_url
@@ -392,4 +410,6 @@ let clear () =
   Mutex.protect network_lock (fun () -> Hashtbl.clear network_cache) ;
   Mutex.protect payout_timer_lock (fun () -> Hashtbl.clear payout_timer_cache) ;
   Mutex.protect continual_interval_lock (fun () ->
-      Hashtbl.clear continual_interval_cache)
+      Hashtbl.clear continual_interval_cache) ;
+  Mutex.protect payout_last_run_lock (fun () ->
+      Hashtbl.clear payout_last_run_cache)

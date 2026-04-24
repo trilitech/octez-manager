@@ -88,6 +88,13 @@ type unit_state = {
   exit_status : int option; (* actual exit code if available *)
 }
 
+(** Last run info for the payout oneshot service. *)
+type payout_last_run = {
+  timestamp : string;
+      (* e.g. "Thu 2026-04-24 10:30:00 UTC" or "" if never run *)
+  success : bool; (* true if Result=success *)
+}
+
 let get_unit_state ~role ~instance =
   let unit = unit_name role instance in
   (* Get ActiveState, SubState, Result, and ExecMainStatus properties *)
@@ -316,6 +323,41 @@ module For_tests = struct
       result = !result;
       exit_status = !exit_status;
     }
+
+  (** Parse systemd show output for payout last run (for testing) *)
+  let parse_payout_last_run_output output =
+    let lines = String.split_on_char '\n' output in
+    let parse_prop prefix line =
+      if
+        String.length line > String.length prefix
+        && String.sub line 0 (String.length prefix) = prefix
+      then
+        Some
+          (String.sub
+             line
+             (String.length prefix)
+             (String.length line - String.length prefix)
+          |> String.trim)
+      else None
+    in
+    let timestamp = ref None in
+    let result = ref None in
+    List.iter
+      (fun line ->
+        (match parse_prop "ExecMainExitTimestamp=" line with
+        | Some v when v <> "" -> timestamp := Some v
+        | _ -> ()) ;
+        match parse_prop "Result=" line with
+        | Some v when v <> "" -> result := Some v
+        | _ -> ())
+      lines ;
+    match !timestamp with
+    | None | Some "" -> None
+    | Some ts ->
+        let success =
+          match !result with Some "success" | None -> true | Some _ -> false
+        in
+        Some {timestamp = ts; success}
 end
 
 let get_service_paths ~role ~instance =
@@ -489,4 +531,13 @@ let payout_timer_status ~instance =
   let unit = payout_unit_name instance ^ ".timer" in
   match run_systemctl_out_timeout ["status"; "--no-pager"; unit] with
   | Ok output -> Some output
+  | Error _ -> None
+
+let get_payout_last_run ~instance =
+  let unit = payout_unit_name instance ^ ".service" in
+  match
+    run_systemctl_out_timeout
+      ["show"; "--property=ExecMainExitTimestamp,Result"; unit]
+  with
+  | Ok output -> For_tests.parse_payout_last_run_output output
   | Error _ -> None

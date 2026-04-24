@@ -77,6 +77,11 @@ val get_payout_timer_active : instance:string -> bool
     Returns [None] if not configured or not cached yet. Safe for view functions. *)
 val get_continual_interval : instance:string -> int option
 
+(** Get the cached payout service last run info for an instance.
+    Returns [None] if not cached yet or service has never run. Safe for view functions. *)
+val get_payout_last_run :
+  instance:string -> Octez_manager_lib.Systemd.payout_last_run option
+
 (** Update the payout timer active status cache for an instance.
     Called after install/remove operations to immediately update the TUI. *)
 val set_payout_timer_active : instance:string -> active:bool -> unit
