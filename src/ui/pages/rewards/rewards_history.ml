@@ -171,8 +171,8 @@ let render ~(state : Rewards_state.state) ~cols ~rows:_ =
           Widgets.themed_muted "  No baker selected.";
           Widgets.themed_muted "  Select a baker to view history.";
         ]
-  | Some (instance, baker) -> (
-      let cycles = Rewards_scheduler.get_recent_cycles ~baker in
+  | Some (instance, _baker) -> (
+      let cycles = Rewards_scheduler.get_recent_cycles ~instance in
       match cycles with
       | [] ->
           String.concat

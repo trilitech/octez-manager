@@ -12,13 +12,13 @@ let poll_interval = 60.0
 
 let shutdown_requested = Atomic.make false
 
-(* Cycle data cache: keyed by (baker_pkh, cycle) *)
+(* Cycle data cache: keyed by (instance, cycle) *)
 let cycle_cache : (string * int, Rewards.cycle_rewards) Hashtbl.t =
   Hashtbl.create 64
 
 let cycle_lock = Mutex.create ()
 
-(* Recent cycles cache: keyed by baker_pkh *)
+(* Recent cycles cache: keyed by instance *)
 let recent_cache : (string, Rewards.cycle_rewards list) Hashtbl.t =
   Hashtbl.create 8
 
@@ -31,13 +31,13 @@ let current_cycle_lock = Mutex.create ()
 
 (* Cache accessors — safe for view functions *)
 
-let get_cycle_data ~baker ~cycle =
+let get_cycle_data ~instance ~cycle =
   Mutex.protect cycle_lock (fun () ->
-      Hashtbl.find_opt cycle_cache (baker, cycle))
+      Hashtbl.find_opt cycle_cache (instance, cycle))
 
-let get_recent_cycles ~baker =
+let get_recent_cycles ~instance =
   Mutex.protect recent_lock (fun () ->
-      Hashtbl.find_opt recent_cache baker |> Option.value ~default:[])
+      Hashtbl.find_opt recent_cache instance |> Option.value ~default:[])
 
 let get_current_cycle ~instance =
   Mutex.protect current_cycle_lock (fun () ->
@@ -163,13 +163,13 @@ let try_fetch_baker ~tzkt_url ~baker =
   | Ok [] | Error _ -> None
 
 (** Cache cycles in both [recent_cache] and [cycle_cache]. *)
-let cache_cycles ~baker cycles =
+let cache_cycles ~instance cycles =
   Mutex.protect recent_lock (fun () ->
-      Hashtbl.replace recent_cache baker cycles) ;
+      Hashtbl.replace recent_cache instance cycles) ;
   Mutex.protect cycle_lock (fun () ->
       List.iter
         (fun (cr : Rewards.cycle_rewards) ->
-          Hashtbl.replace cycle_cache (baker, cr.cycle) cr)
+          Hashtbl.replace cycle_cache (instance, cr.cycle) cr)
         cycles)
 
 let poll_baker ~instance ~network =
@@ -239,7 +239,7 @@ let poll_baker ~instance ~network =
   in
   (match result with
   | Some (baker, cycles) ->
-      cache_cycles ~baker cycles ;
+      cache_cycles ~instance cycles ;
       (* Backfill delegator details for cycles that lack them.
          The list endpoint does not return the delegators array,
          so we fetch each cycle individually via the split endpoint. *)
@@ -254,7 +254,7 @@ let poll_baker ~instance ~network =
           match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle:cr.cycle with
           | Ok full_cr ->
               Mutex.protect cycle_lock (fun () ->
-                  Hashtbl.replace cycle_cache (baker, cr.cycle) full_cr)
+                  Hashtbl.replace cycle_cache (instance, cr.cycle) full_cr)
           | Error _ -> ())
         to_backfill ;
       (* Cache the detected baker for the page to read *)
@@ -305,7 +305,7 @@ let poll_baker ~instance ~network =
 
 let ensure_cycle_detail ~instance ~baker ~cycle =
   let needs_fetch =
-    match get_cycle_data ~baker ~cycle with
+    match get_cycle_data ~instance ~cycle with
     | None -> true
     | Some cr -> cr.delegators = [] && cr.num_delegators > 0
   in
@@ -328,7 +328,7 @@ let ensure_cycle_detail ~instance ~baker ~cycle =
            match Cycle_data.fetch_cycle ~tzkt_url ~baker ~cycle with
            | Ok full_cr ->
                Mutex.protect cycle_lock (fun () ->
-                   Hashtbl.replace cycle_cache (baker, cycle) full_cr)
+                   Hashtbl.replace cycle_cache (instance, cycle) full_cr)
            | Error _ -> ()))
   end
 

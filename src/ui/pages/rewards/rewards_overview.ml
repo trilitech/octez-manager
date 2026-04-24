@@ -215,9 +215,9 @@ let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
   in
   Box.render ~title:"Payout Preview" ~style:Rounded ~width:box_width desc
 
-let render_cycle_detail ~box_width ~instance ~baker
+let render_cycle_detail ~box_width ~instance ~baker:_
     (state : Rewards_state.state) cycle =
-  let cr = Rewards_scheduler.get_cycle_data ~baker ~cycle in
+  let cr = Rewards_scheduler.get_cycle_data ~instance ~cycle in
   let header =
     Widgets.themed_primary (Printf.sprintf " Cycle %d Detail " cycle)
   in
@@ -284,9 +284,10 @@ let resolve_network ~instance =
       | Some n -> n
       | None -> "unknown")
 
-let render_dashboard ~box_width ~instance ~baker (state : Rewards_state.state) =
+let render_dashboard ~box_width ~instance ~baker:_ (state : Rewards_state.state)
+    =
   let network = resolve_network ~instance in
-  let recent = Rewards_scheduler.get_recent_cycles ~baker in
+  let recent = Rewards_scheduler.get_recent_cycles ~instance in
   let current_cycle = state.current_cycle in
   let last_completed =
     match current_cycle with

@@ -124,19 +124,18 @@ let maybe_compute_blueprint s =
     match Rewards_state.selected_baker_instance s with
     | None -> {s with blueprint = None}
     | Some (instance, pkh) -> (
-        let baker = pkh in
         let cycle_opt =
           match s.selected_cycle with
           | Some c -> Some c
           | None -> (
-              match Rewards_scheduler.get_recent_cycles ~baker with
+              match Rewards_scheduler.get_recent_cycles ~instance with
               | cr :: _ -> Some cr.Rewards.cycle
               | [] -> None)
         in
         match cycle_opt with
         | None -> {s with blueprint = None}
         | Some cycle -> (
-            let cached = Rewards_scheduler.get_cycle_data ~baker ~cycle in
+            let cached = Rewards_scheduler.get_cycle_data ~instance ~cycle in
             let stale_blueprint =
               match (s.blueprint, cached) with
               | Some bp, Some cr
@@ -449,7 +448,7 @@ let handle_delegator_key ps key =
       match Rewards_state.selected_baker_instance s with
       | None -> ps
       | Some (instance, baker) -> (
-          let recent = Rewards_scheduler.get_recent_cycles ~baker in
+          let recent = Rewards_scheduler.get_recent_cycles ~instance in
           let cycles =
             List.map (fun (cr : Rewards.cycle_rewards) -> cr.cycle) recent
           in
@@ -600,10 +599,11 @@ let handle_config_key ps key =
 let handle_history_key ps key =
   let s = ps.Navigation.s in
   let count =
-    match Rewards_state.selected_baker_pkh s with
+    match Rewards_state.selected_baker_instance s with
     | None -> 0
-    | Some baker ->
-        Rewards_history.cycle_count (Rewards_scheduler.get_recent_cycles ~baker)
+    | Some (instance, _) ->
+        Rewards_history.cycle_count
+          (Rewards_scheduler.get_recent_cycles ~instance)
   in
   match Keys.of_string key with
   | Some (Keys.Char "j") | Some Keys.Down ->
@@ -620,10 +620,10 @@ let handle_history_key ps key =
         ps
   | Some Keys.Enter -> (
       (* Navigate to the selected cycle's Overview/Delegators view *)
-      match Rewards_state.selected_baker_pkh s with
+      match Rewards_state.selected_baker_instance s with
       | None -> ps
-      | Some baker -> (
-          let recent = Rewards_scheduler.get_recent_cycles ~baker in
+      | Some (instance, baker) -> (
+          let recent = Rewards_scheduler.get_recent_cycles ~instance in
           match List.nth_opt recent s.history_cursor with
           | None -> ps
           | Some (cr : Rewards.cycle_rewards) ->
@@ -920,7 +920,7 @@ let handle_key ps key ~size:_ =
                   match s.selected_cycle with
                   | Some c -> Some c
                   | None -> (
-                      match Rewards_scheduler.get_recent_cycles ~baker:pkh with
+                      match Rewards_scheduler.get_recent_cycles ~instance with
                       | cr :: _ -> Some cr.Rewards.cycle
                       | [] -> None)
                 in
@@ -973,7 +973,7 @@ let handle_key ps key ~size:_ =
                   match s.selected_cycle with
                   | Some c -> Some c
                   | None -> (
-                      match Rewards_scheduler.get_recent_cycles ~baker:pkh with
+                      match Rewards_scheduler.get_recent_cycles ~instance with
                       | cr :: _ -> Some cr.Rewards.cycle
                       | [] -> None)
                 in

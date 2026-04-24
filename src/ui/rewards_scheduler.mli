@@ -26,15 +26,15 @@ val clear : unit -> unit
 
 (** {1 Cache accessors (no I/O)} *)
 
-(** Get cached cycle rewards for a specific baker and cycle. *)
+(** Get cached cycle rewards for a specific instance and cycle. *)
 val get_cycle_data :
-  baker:string ->
+  instance:string ->
   cycle:int ->
   Octez_manager_rewards.Rewards.cycle_rewards option
 
-(** Get cached recent cycles for a baker (sorted descending by cycle). *)
+(** Get cached recent cycles for an instance (sorted descending by cycle). *)
 val get_recent_cycles :
-  baker:string -> Octez_manager_rewards.Rewards.cycle_rewards list
+  instance:string -> Octez_manager_rewards.Rewards.cycle_rewards list
 
 (** Get the cached current cycle number for a specific instance. *)
 val get_current_cycle : instance:string -> int option
