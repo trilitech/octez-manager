@@ -78,16 +78,16 @@ fi
 
 # Verify the managed service uses the overridden RPC address
 echo "Verifying overridden RPC address..."
-om show "$INSTANCE" 2>&1 | grep -q "$OVERRIDE_RPC_ADDR" || {
+om instance "$INSTANCE" show 2>&1 | grep -q "$OVERRIDE_RPC_ADDR" || {
 	echo "ERROR: RPC address should be overridden to $OVERRIDE_RPC_ADDR"
-	om show "$INSTANCE" 2>&1
+	om instance "$INSTANCE" show 2>&1
 	exit 1
 }
 
 # Verify it does NOT contain the original RPC address
-if om show "$INSTANCE" 2>&1 | grep -q "$ORIGINAL_RPC_ADDR"; then
+if om instance "$INSTANCE" show 2>&1 | grep -q "$ORIGINAL_RPC_ADDR"; then
 	echo "ERROR: Original RPC address should not be present"
-	om show "$INSTANCE" 2>&1
+	om instance "$INSTANCE" show 2>&1
 	exit 1
 fi
 

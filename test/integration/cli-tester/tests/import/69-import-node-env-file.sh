@@ -103,15 +103,15 @@ fi
 
 # Verify the managed service has correct configuration
 echo "Verifying managed service configuration..."
-om show "$INSTANCE" 2>&1 | grep -q "shadownet" || {
+om instance "$INSTANCE" show 2>&1 | grep -q "shadownet" || {
 	echo "ERROR: Network should be shadownet"
-	om show "$INSTANCE" 2>&1
+	om instance "$INSTANCE" show 2>&1
 	exit 1
 }
 
-om show "$INSTANCE" 2>&1 | grep -q "$RPC_ADDR" || {
+om instance "$INSTANCE" show 2>&1 | grep -q "$RPC_ADDR" || {
 	echo "ERROR: RPC address should be preserved"
-	om show "$INSTANCE" 2>&1
+	om instance "$INSTANCE" show 2>&1
 	exit 1
 }
 

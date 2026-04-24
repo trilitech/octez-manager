@@ -92,7 +92,7 @@ if ! grep -q '"history_mode"' "$DATA_DIR/config.json"; then
 fi
 
 # Verify the managed service reflects archive mode in show output
-om show "$INSTANCE" 2>&1 | grep -qi "archive\|history" || {
+om instance "$INSTANCE" show 2>&1 | grep -qi "archive\|history" || {
 	echo "WARNING: Archive mode may not be visible in show output (this is acceptable if config.json is correct)"
 }
 
