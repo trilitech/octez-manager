@@ -17,8 +17,8 @@ deps:
 	@opam install sqlite3 dune-build-info ocamlformat --yes
 
 build:
-	$(DUNE) build
-	cp -f _build/install/default/bin/octez-manager ./
+	$(DUNE) build src/
+	cp -f _build/default/src/main.exe ./octez-manager
 
 fmt:
 	@$(DUNE) build @fmt || true
