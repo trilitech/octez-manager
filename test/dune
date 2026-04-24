@@ -1094,6 +1094,13 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(test
+ (name test_main_shell_back)
+ (libraries alcotest octez_manager_lib octez-manager.ui miaou-core.lib)
+ (modules test_main_shell_back)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (executable
  (name test_help_modal_baseline)
  (libraries
