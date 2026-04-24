@@ -19,12 +19,17 @@ type tab = Details | Logs
 
 type pager_type = Static of Pager.t | FileTail of File_pager.t
 
+type cleanup_info = {
+  temp_files : string list;
+  bg_pid : int option; (* PID of background journalctl process *)
+}
+
 type state = {
   instance : string;
   tab : tab;
   details_pager : Pager.t;
   logs_pager : pager_type;
-  cleanup_files : string list;
+  cleanup : cleanup_info;
 }
 
 type msg = unit
@@ -97,11 +102,18 @@ let build_logs_pager ~instance =
         (Filename.quote unit_name)
   in
   let temp_file = Filename.temp_file "om_payout_log_" ".txt" in
+  (* Capture the PID of the background process *)
   let full_cmd =
-    Printf.sprintf "%s > %s 2>&1 &" cmd (Filename.quote temp_file)
+    Printf.sprintf "%s > %s 2>&1 & echo $!" cmd (Filename.quote temp_file)
   in
-  match Sys.command full_cmd with
-  | 0 -> (
+  let ic = (Unix.open_process_in [@allow_forbidden "PID capture"]) full_cmd in
+  let pid_str = try input_line ic with End_of_file -> "" in
+  let status = (Unix.close_process_in [@allow_forbidden "PID capture"]) ic in
+  let bg_pid =
+    try Some (int_of_string (String.trim pid_str)) with _ -> None
+  in
+  match status with
+  | Unix.WEXITED 0 -> (
       (Unix.sleepf [@allow_forbidden "file readiness delay"]) 0.1 ;
       match
         File_pager.open_file
@@ -113,28 +125,29 @@ let build_logs_pager ~instance =
       | Ok fp ->
           let p = File_pager.pager fp in
           let _ = Pager.handle_key p ~key:"G" in
-          (FileTail fp, [temp_file])
+          (FileTail fp, {temp_files = [temp_file]; bg_pid})
       | Error e ->
           let p =
             Pager.open_lines
               ~title:""
               [Printf.sprintf "Error opening log file: %s" e]
           in
-          (Static p, [temp_file]))
+          (Static p, {temp_files = [temp_file]; bg_pid}))
   | _ ->
       (* Fallback to static logs *)
       let lines = build_logs_lines ~instance in
-      (Static (Pager.open_lines ~title:"" lines), [])
+      ( Static (Pager.open_lines ~title:"" lines),
+        {temp_files = []; bg_pid = None} )
 
 let make_state instance =
   let details_lines = build_details_lines ~instance in
-  let logs_pager, cleanup_files = build_logs_pager ~instance in
+  let logs_pager, cleanup = build_logs_pager ~instance in
   {
     instance;
     tab = Details;
     details_pager = Pager.open_lines ~title:"" details_lines;
     logs_pager;
-    cleanup_files;
+    cleanup;
   }
 
 let init () =
@@ -150,11 +163,34 @@ let init () =
 
 let update ps _ = ps
 
+let update_pager_state s pager' =
+  match s.tab with
+  | Details -> {s with details_pager = pager'}
+  | Logs -> (
+      match s.logs_pager with
+      | Static _ -> {s with logs_pager = Static pager'}
+      | FileTail fp ->
+          let current = File_pager.pager fp in
+          if current == pager' then s else {s with logs_pager = Static pager'})
+
+let cleanup s =
+  (match s.logs_pager with
+  | FileTail fp -> ( try File_pager.close fp with _ -> ())
+  | Static _ -> ()) ;
+  (match s.cleanup.bg_pid with
+  | Some pid -> (
+      try (Unix.kill [@allow_forbidden "cleanup"]) pid Sys.sigterm
+      with _ -> ())
+  | None -> ()) ;
+  List.iter (fun f -> try Sys.remove f with _ -> ()) s.cleanup.temp_files
+
 let refresh ps =
   (* Consume navigation signals from Context *)
   match Context.consume_navigation () with
   | Some (Context.Goto page) -> Navigation.goto page ps
-  | Some Context.Back -> Navigation.back ps
+  | Some Context.Back ->
+      cleanup ps.Navigation.s ;
+      Navigation.back ps
   | Some Context.Quit -> Navigation.quit ps
   | None -> ps
 
@@ -171,12 +207,6 @@ let move ps _ = ps
 let service_select ps _ = ps
 
 let service_cycle ps _ = ps
-
-let cleanup s =
-  (match s.logs_pager with
-  | FileTail fp -> File_pager.close fp
-  | Static _ -> ()) ;
-  List.iter (fun f -> try Sys.remove f with _ -> ()) s.cleanup_files
 
 let back ps =
   cleanup ps.Navigation.s ;
@@ -235,18 +265,7 @@ let handle_modal_key ps key ~size =
   let win = size.LTerm_geom.rows in
   let current_pager = current_pager s in
   let pager', _ = Pager.handle_key ~win current_pager ~key in
-  let new_state =
-    match s.tab with
-    | Details -> {s with details_pager = pager'}
-    | Logs -> (
-        match s.logs_pager with
-        | Static _ -> {s with logs_pager = Static pager'}
-        | FileTail fp ->
-            (* Keep the file pager, just update its internal state *)
-            let current = File_pager.pager fp in
-            if current == pager' then s else {s with logs_pager = Static pager'}
-        )
-  in
+  let new_state = update_pager_state s pager' in
   Navigation.update (fun _ -> new_state) ps
 
 let handle_key ps key ~size =
@@ -266,17 +285,7 @@ let handle_key ps key ~size =
     if pager_in_input_mode then
       (* Let pager handle Esc to close search *)
       let pager', _ = Pager.handle_key ~win current_pager_val ~key in
-      let new_state =
-        match s.tab with
-        | Details -> {s with details_pager = pager'}
-        | Logs -> (
-            match s.logs_pager with
-            | Static _ -> {s with logs_pager = Static pager'}
-            | FileTail fp ->
-                let current = File_pager.pager fp in
-                if current == pager' then s
-                else {s with logs_pager = Static pager'})
-      in
+      let new_state = update_pager_state s pager' in
       Navigation.update (fun _ -> new_state) ps
     else (
       cleanup s ;
@@ -287,17 +296,7 @@ let handle_key ps key ~size =
         (* This might never be reached, but keep it for completeness *)
         if pager_in_input_mode then
           let pager', _ = Pager.handle_key ~win current_pager_val ~key in
-          let new_state =
-            match s.tab with
-            | Details -> {s with details_pager = pager'}
-            | Logs -> (
-                match s.logs_pager with
-                | Static _ -> {s with logs_pager = Static pager'}
-                | FileTail fp ->
-                    let current = File_pager.pager fp in
-                    if current == pager' then s
-                    else {s with logs_pager = Static pager'})
-          in
+          let new_state = update_pager_state s pager' in
           Navigation.update (fun _ -> new_state) ps
         else (
           cleanup s ;
@@ -308,17 +307,7 @@ let handle_key ps key ~size =
         (* Delegate all other keys to pager *)
         let pager', consumed = Pager.handle_key ~win current_pager_val ~key in
         if consumed then
-          let new_state =
-            match s.tab with
-            | Details -> {s with details_pager = pager'}
-            | Logs -> (
-                match s.logs_pager with
-                | Static _ -> {s with logs_pager = Static pager'}
-                | FileTail fp ->
-                    let current = File_pager.pager fp in
-                    if current == pager' then s
-                    else {s with logs_pager = Static pager'})
-          in
+          let new_state = update_pager_state s pager' in
           Navigation.update (fun _ -> new_state) ps
         else ps
 
