@@ -71,11 +71,18 @@ let load_baker_instances () =
 
 let init () =
   let baker_instances = load_baker_instances () in
+  let active_tab =
+    match Context.take_pending_rewards_tab () with
+    | Some "configuration" -> Rewards_state.Configuration
+    | Some "delegators" -> Rewards_state.Delegators
+    | Some "history" -> Rewards_state.History
+    | _ -> Rewards_state.Overview
+  in
   Navigation.make
     {
       Rewards_state.baker_instances;
       selected_baker = 0;
-      active_tab = Rewards_state.Overview;
+      active_tab;
       selected_cycle = None;
       current_cycle = None;
       delegator_cursor = 0;
