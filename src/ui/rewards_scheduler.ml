@@ -336,7 +336,10 @@ let refresh_baker ~instance =
   let network =
     match Service_registry.find ~instance with
     | Ok (Some svc) -> svc.Service.network
-    | _ -> "mainnet"
+    | _ -> (
+        match Custom_baker_registry.find ~instance with
+        | Some entry -> entry.Custom_baker_registry.network
+        | None -> "unknown")
   in
   poll_baker ~instance ~network
 
@@ -378,7 +381,16 @@ let tick () =
       Mutex.protect baker_instance_lock (fun () ->
           Hashtbl.replace baker_instance_cache instance pkh) ;
       poll_baker ~instance ~network)
-    (parse_test_bakers ())
+    (parse_test_bakers ()) ;
+  (* Also poll any custom bakers from the registry *)
+  List.iter
+    (fun (entry : Custom_baker_registry.entry) ->
+      let instance = entry.instance in
+      let network = entry.network in
+      Mutex.protect baker_instance_lock (fun () ->
+          Hashtbl.replace baker_instance_cache instance entry.baker_pkh) ;
+      poll_baker ~instance ~network)
+    (Custom_baker_registry.list ())
 
 let started = ref false
 
