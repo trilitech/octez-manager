@@ -9,7 +9,7 @@
 
 open Octez_manager_rewards
 
-type active_tab = Overview | Delegators | History | Configuration
+type active_tab = Overview | Delegators | Configuration
 
 type sort_column = SortAddress | SortBalance | SortReward | SortStatus
 
@@ -44,31 +44,26 @@ type state = {
   config_dirty : bool;  (** True if config has unsaved changes *)
   config_exists : bool;
       (** True if a saved config file exists on disk for the selected baker *)
-  history_cursor : int;
+  cycle_cursor : int;
+      (** Cursor index into the Overview's Recent Cycles table. *)
   loading : bool;
   error : string option;
 }
 
-let tab_index = function
-  | Overview -> 0
-  | Delegators -> 1
-  | History -> 2
-  | Configuration -> 3
+let tab_index = function Overview -> 0 | Delegators -> 1 | Configuration -> 2
 
 let tab_of_index = function
   | 0 -> Overview
   | 1 -> Delegators
-  | 2 -> History
-  | 3 -> Configuration
+  | 2 -> Configuration
   | _ -> Overview
 
 let tab_label = function
   | Overview -> "Overview"
   | Delegators -> "Delegators"
-  | History -> "History"
   | Configuration -> "Configuration"
 
-let all_tabs = [Overview; Delegators; History; Configuration]
+let all_tabs = [Overview; Delegators; Configuration]
 
 let selected_baker_instance st =
   List.nth_opt st.baker_instances st.selected_baker
