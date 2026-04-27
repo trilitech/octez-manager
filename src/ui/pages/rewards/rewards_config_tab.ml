@@ -259,12 +259,10 @@ let edit_field ?network (config : Payout_config.t) field =
   | IndexerUrl ->
       let indexers = local_indexers_for_network ~network in
       let tzkt_choice =
-        let url =
-          match Option.bind network network_slug with
-          | Some slug -> Payout_config.tzkt_base_url_for_network slug
-          | None -> "https://api.tzkt.io"
+        let slug =
+          Option.bind network network_slug |> Option.value ~default:"mainnet"
         in
-        Tzkt_default url
+        Tzkt_default (Payout_config.tzkt_base_url_for_network slug)
       in
       let choices =
         List.map
