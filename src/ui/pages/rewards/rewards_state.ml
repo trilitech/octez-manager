@@ -22,6 +22,10 @@ type filter_mode =
 type state = {
   baker_instances : (string * string) list;
       (** [(instance_name, baker_pkh)] pairs *)
+  custom_baker_instances : string list;
+      (** Subset of [baker_instances] sourced from the custom-baker registry.
+          Cached at init/refresh time so view functions can identify custom
+          bakers without performing I/O. *)
   selected_baker : int;  (** Index into [baker_instances] *)
   active_tab : active_tab;
   selected_cycle : int option;  (** Currently viewed cycle (None = latest) *)
@@ -78,6 +82,11 @@ let selected_instance_name st =
   match selected_baker_instance st with
   | Some (name, _) -> Some name
   | None -> None
+
+let selected_baker_is_custom st =
+  match selected_instance_name st with
+  | None -> false
+  | Some inst -> List.exists (String.equal inst) st.custom_baker_instances
 
 let next_sort_column = function
   | SortBalance -> SortReward

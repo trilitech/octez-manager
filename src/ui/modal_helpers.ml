@@ -1095,7 +1095,7 @@ type dir_choice =
   | Browse_new_dir
   | Type_path
 
-let select_directory_modal ~title ~dir_type ~on_select () =
+let select_directory_modal ?(extra_paths = []) ~title ~dir_type ~on_select () =
   (* Load existing directories from registry *)
   let existing_dirs =
     match Octez_manager_lib.Directory_registry.list ~dir_type () with
@@ -1103,9 +1103,33 @@ let select_directory_modal ~title ~dir_type ~on_select () =
     | Error _ -> []
   in
 
-  (* Build choice items: existing dirs + type/browse options *)
+  (* Synthesize entries for [extra_paths] that aren't already in the
+     registry, so callers can surface paths they discovered elsewhere
+     (e.g. service env files, default locations). *)
+  let registered_paths =
+    List.map
+      (fun (e : Octez_manager_lib.Directory_registry.directory_entry) -> e.path)
+      existing_dirs
+  in
+  let extra_entries =
+    extra_paths
+    |> List.filter (fun p ->
+        not (List.exists (String.equal p) registered_paths))
+    |> List.map
+         (fun path : Octez_manager_lib.Directory_registry.directory_entry ->
+           {
+             path;
+             dir_type;
+             created_at = "";
+             last_used_at = "";
+             registered_services = [];
+           })
+  in
+
+  (* Build choice items: existing dirs + discovered extras + type/browse options *)
   let items =
     List.map (fun e -> Existing_dir e) existing_dirs
+    @ List.map (fun e -> Existing_dir e) extra_entries
     @ [Type_path; Browse_new_dir]
   in
 
@@ -1195,7 +1219,12 @@ let select_node_data_dir_modal ~on_select () =
     ()
 
 let select_client_base_dir_modal ~on_select () =
+  (* Surface the same set of base directories the Wallets page shows: the
+     default [~/.tezos-client], registered ones, and base dirs referenced by
+     installed baker/accuser service env files. *)
+  let extra_paths = Base_dir_discovery.list_all () in
   select_directory_modal
+    ~extra_paths
     ~title:"Select Client Base Directory"
     ~dir_type:Octez_manager_lib.Directory_registry.Client_base_dir
     ~on_select

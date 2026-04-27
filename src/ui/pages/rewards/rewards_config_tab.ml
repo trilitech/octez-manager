@@ -37,6 +37,14 @@ let consume_pending_config_clean () =
 (* {1 Field definitions} *)
 
 type field_id =
+  (* Custom-baker registry fields (custom bakers only) *)
+  | CustomBakerPkh
+  | CustomNetwork
+  | CustomLabel
+  | CustomEndpoint
+  | CustomBaseDir
+  | CustomPayoutKey
+  (* Payout config fields (all bakers) *)
   | BakerFee
   | PayoutMode
   | PayoutKeyAlias
@@ -52,7 +60,17 @@ type field_id =
   | ContinualInterval
   | ContinualOffset
 
-let all_fields =
+let custom_baker_fields =
+  [
+    CustomBakerPkh;
+    CustomNetwork;
+    CustomLabel;
+    CustomEndpoint;
+    CustomBaseDir;
+    CustomPayoutKey;
+  ]
+
+let payout_fields =
   [
     BakerFee;
     PayoutMode;
@@ -70,9 +88,31 @@ let all_fields =
     ContinualOffset;
   ]
 
-let field_count = List.length all_fields
+let is_read_only = function
+  | CustomBakerPkh | CustomNetwork -> true
+  | _ -> false
+
+(** Look up the [Custom_baker_registry] entry for the currently selected
+    baker, if it is a custom baker. *)
+let custom_entry_for_state (state : Rewards_state.state) =
+  match Rewards_state.selected_instance_name state with
+  | None -> None
+  | Some instance -> Custom_baker_registry.find ~instance
+
+let fields_for_state state =
+  match custom_entry_for_state state with
+  | Some _ -> custom_baker_fields @ payout_fields
+  | None -> payout_fields
+
+let field_count_for_state state = List.length (fields_for_state state)
 
 let field_label = function
+  | CustomBakerPkh -> "Baker PKH"
+  | CustomNetwork -> "Network"
+  | CustomLabel -> "Label"
+  | CustomEndpoint -> "RPC Endpoint"
+  | CustomBaseDir -> "Base Directory"
+  | CustomPayoutKey -> "Payout Key (wallet)"
   | BakerFee -> "Baker Fee"
   | PayoutMode -> "Payout Mode"
   | PayoutKeyAlias -> "Payout Key"
@@ -89,6 +129,20 @@ let field_label = function
   | ContinualOffset -> "Continual Offset"
 
 let field_hint = function
+  | CustomBakerPkh ->
+      "Public key hash of the baker. Read-only — to change it, remove and \
+       re-add this custom baker."
+  | CustomNetwork ->
+      "Network identifier of the baker. Read-only — to change it, remove and \
+       re-add this custom baker."
+  | CustomLabel -> "Optional human-readable label shown in the baker selector."
+  | CustomEndpoint ->
+      "RPC endpoint used to query the baker's chain (host:port)."
+  | CustomBaseDir ->
+      "octez-client base directory holding the wallet that signs payouts."
+  | CustomPayoutKey ->
+      "Alias of the wallet key used to sign payout transactions, looked up in \
+       the base directory above."
   | BakerFee ->
       "Percentage fee deducted from delegator rewards as baker compensation."
   | PayoutMode ->
@@ -128,7 +182,22 @@ let field_hint = function
 
 let tez_symbol = "\xEA\x9C\xA9"
 
-let field_value (config : Payout_config.t) = function
+let custom_field_value (entry : Custom_baker_registry.entry) = function
+  | CustomBakerPkh -> entry.baker_pkh
+  | CustomNetwork -> entry.network
+  | CustomLabel -> Option.value ~default:"(none)" entry.label
+  | CustomEndpoint -> entry.endpoint
+  | CustomBaseDir -> entry.base_dir
+  | CustomPayoutKey -> entry.payout_key_alias
+  | _ -> ""
+
+let field_value ?custom (config : Payout_config.t) field =
+  match field with
+  | CustomBakerPkh | CustomNetwork | CustomLabel | CustomEndpoint
+  | CustomBaseDir | CustomPayoutKey -> (
+      match custom with
+      | Some entry -> custom_field_value entry field
+      | None -> "")
   | BakerFee -> Printf.sprintf "%.1f%%" (config.baker_fee *. 100.0)
   | PayoutMode -> (
       match config.payout_mode with
@@ -208,6 +277,20 @@ let network_slug network =
     | _ -> None
 
 let local_indexers_for_network ~network =
+  (* The baker's [network] may be a slug ("tallinnnet") while a local indexer
+     service's [svc.network] is often a full teztnets URL
+     ("https://teztnets.com/tallinnnet"). Normalize both to a slug via
+     {!network_slug} before comparing — falling back to lowercased exact
+     equality when one side cannot be reduced to a slug. *)
+  let net_match svc_net baker_net =
+    match (network_slug svc_net, network_slug baker_net) with
+    | Some a, Some b ->
+        String.equal (String.lowercase_ascii a) (String.lowercase_ascii b)
+    | _ ->
+        String.equal
+          (String.lowercase_ascii svc_net)
+          (String.lowercase_ascii baker_net)
+  in
   match Octez_manager_lib.Service_registry.list () with
   | Error _ -> []
   | Ok svcs ->
@@ -217,11 +300,64 @@ let local_indexers_for_network ~network =
           &&
           match network with
           | None -> true
-          | Some n -> String.equal svc.network n)
+          | Some n -> net_match svc.network n)
         svcs
 
-let edit_field ?network (config : Payout_config.t) field =
+(** Apply a mutation to an existing custom-baker entry: write it back via
+    {!Custom_baker_registry.update} and refresh the Rewards page on success. *)
+let update_custom_entry (entry : Custom_baker_registry.entry) =
+  match Custom_baker_registry.update entry with
+  | Ok () ->
+      Context.toast_info "Custom baker updated" ;
+      Context.navigate "rewards"
+  | Error msg ->
+      Context.toast_error
+        (Printf.sprintf "Failed to update custom baker: %s" msg)
+
+let edit_custom_field (entry : Custom_baker_registry.entry) field =
   match field with
+  | CustomBakerPkh | CustomNetwork ->
+      (* Read-only — changing these would change the synthetic instance handle
+         that keys per-instance state across the rewards pipeline. *)
+      ()
+  | CustomLabel ->
+      Modal_helpers.prompt_text_modal
+        ~title:"Label"
+        ~initial:(Option.value ~default:"" entry.label)
+        ~placeholder:(Some "(optional)")
+        ~on_submit:(fun s ->
+          let label =
+            let s = String.trim s in
+            if String.length s = 0 then None else Some s
+          in
+          update_custom_entry {entry with label})
+        ()
+  | CustomEndpoint ->
+      Custom_baker_modals.prompt_endpoint
+        ~title:"RPC Endpoint"
+        ~network:entry.network
+        ~on_submit:(fun endpoint -> update_custom_entry {entry with endpoint})
+        ()
+  | CustomBaseDir ->
+      Modal_helpers.select_client_base_dir_modal
+        ~on_select:(fun base_dir -> update_custom_entry {entry with base_dir})
+        ()
+  | CustomPayoutKey ->
+      Custom_baker_modals.prompt_payout_key
+        ~title:"Payout Key"
+        ~base_dir:entry.base_dir
+        ~on_submit:(fun payout_key_alias ->
+          update_custom_entry {entry with payout_key_alias})
+        ()
+  | _ -> ()
+
+let edit_field ?network ?custom (config : Payout_config.t) field =
+  match field with
+  | CustomBakerPkh | CustomNetwork | CustomLabel | CustomEndpoint
+  | CustomBaseDir | CustomPayoutKey -> (
+      match custom with
+      | Some entry -> edit_custom_field entry field
+      | None -> ())
   | BakerFee ->
       Modal_helpers.prompt_validated_text_modal
         ~title:"Baker Fee (%)"
@@ -528,7 +664,25 @@ let open_payout_service_actions ~instance ~baker_pkh ~config =
 
 let render ~(state : Rewards_state.state) ~cols ~_rows =
   let box_width = min (cols - 2) 72 in
-  match state.config with
+  let custom = custom_entry_for_state state in
+  let fields = fields_for_state state in
+  let field_count = List.length fields in
+  (* When a custom baker without a saved Payout_config is selected, synthesize
+     a default config so the payout rows still render with sensible values.
+     Seed [payout_key_alias] from the registry entry so it shows the alias the
+     user picked during [Add custom baker], not the baker PKH default. *)
+  let config_opt =
+    match (state.config, custom) with
+    | Some c, _ -> Some c
+    | None, Some entry ->
+        Some
+          {
+            (Payout_config.default ~baker_pkh:entry.baker_pkh) with
+            payout_key_alias = entry.payout_key_alias;
+          }
+    | None, None -> None
+  in
+  match config_opt with
   | None ->
       String.concat
         "\n"
@@ -538,19 +692,54 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
           Widgets.themed_muted "  Select a baker to configure payouts.";
         ]
   | Some config ->
-      (* Render field list with cursor *)
+      (* Render the custom-baker section as a separate box when applicable. *)
+      let custom_box =
+        match custom with
+        | None -> ""
+        | Some _ ->
+            let custom_lines =
+              List.mapi
+                (fun i field ->
+                  let label = field_label field in
+                  let value = field_value ?custom config field in
+                  let indicator =
+                    if i = state.config_cursor then "\xe2\x96\xb8" else " "
+                  in
+                  let line =
+                    Printf.sprintf "%s %-20s  %s" indicator label value
+                  in
+                  if i = state.config_cursor then Widgets.themed_emphasis line
+                  else if is_read_only field then Widgets.themed_muted line
+                  else Widgets.themed_text line)
+                custom_baker_fields
+            in
+            Box.render
+              ~title:"Custom Baker"
+              ~style:Rounded
+              ~width:box_width
+              (String.concat "\n" custom_lines)
+      in
+      (* Render the payout-config section. Cursor offset accounts for any
+         custom-baker rows rendered above. *)
+      let payout_offset =
+        match custom with
+        | Some _ -> List.length custom_baker_fields
+        | None -> 0
+      in
       let field_lines =
         List.mapi
           (fun i field ->
+            let cursor_idx = i + payout_offset in
             let label = field_label field in
-            let value = field_value config field in
+            let value = field_value ?custom config field in
             let indicator =
-              if i = state.config_cursor then "\xe2\x96\xb8" else " "
+              if cursor_idx = state.config_cursor then "\xe2\x96\xb8" else " "
             in
             let line = Printf.sprintf "%s %-20s  %s" indicator label value in
-            if i = state.config_cursor then Widgets.themed_emphasis line
+            if cursor_idx = state.config_cursor then
+              Widgets.themed_emphasis line
             else Widgets.themed_text line)
-          all_fields
+          payout_fields
       in
       let general_content = String.concat "\n" field_lines in
       let general_box =
@@ -580,7 +769,7 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
             "\n"
             (("  " ^ title_line) :: List.map (fun l -> "  " ^ l) text_lines)
         else
-          let field = List.nth all_fields state.config_cursor in
+          let field = List.nth fields state.config_cursor in
           let bar = Widgets.themed_muted "\xe2\x94\x82 " in
           let title_line = bar ^ Widgets.themed_emphasis (field_label field) in
           let hint_width = max 20 (box_width - 6) in
@@ -719,7 +908,11 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
           ^ Widgets.themed_muted "  [s: save]"
         else ""
       in
-      let parts = [""; general_box; hint_box; ""; override_box] in
+      let parts =
+        if String.length custom_box > 0 then
+          [""; custom_box; ""; general_box; hint_box; ""; override_box]
+        else [""; general_box; hint_box; ""; override_box]
+      in
       let parts =
         if String.length payout_service_box > 0 then
           parts @ [""; payout_service_box]

@@ -88,6 +88,11 @@ val exists : instance:string -> bool
 (** Save configuration to disk for a given baker instance. *)
 val save : instance:string -> t -> (unit, string) result
 
+(** Delete the saved configuration file for [instance]. Idempotent: returns
+    [Ok ()] when no file exists. Also removes the per-instance rewards
+    directory if it is empty afterwards. *)
+val delete : instance:string -> (unit, string) result
+
 (** {1 Serialization} *)
 
 (** Serialize a configuration to JSON. *)

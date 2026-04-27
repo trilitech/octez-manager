@@ -481,3 +481,13 @@ let save ~instance t =
     close_out oc ;
     Ok ()
   with exn -> Error (Printexc.to_string exn)
+
+let delete ~instance =
+  try
+    let path = config_path ~instance in
+    if Sys.file_exists path then Sys.remove path ;
+    let dir = rewards_dir ~instance in
+    (if Sys.file_exists dir && Sys.is_directory dir then
+       match Sys.readdir dir with [||] -> Unix.rmdir dir | _ -> ()) ;
+    Ok ()
+  with exn -> Error (Printexc.to_string exn)

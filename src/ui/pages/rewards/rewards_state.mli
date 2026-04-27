@@ -23,6 +23,9 @@ type filter_mode =
 (** Full page state. *)
 type state = {
   baker_instances : (string * string) list;
+  custom_baker_instances : string list;
+      (** Instance names whose baker entry is sourced from the
+          {!Custom_baker_registry}. Cached at init/refresh time. *)
   selected_baker : int;
   active_tab : active_tab;
   selected_cycle : int option;
@@ -56,6 +59,9 @@ val selected_baker_instance : state -> (string * string) option
 val selected_baker_pkh : state -> string option
 
 val selected_instance_name : state -> string option
+
+(** Whether the currently selected baker comes from the custom-baker registry. *)
+val selected_baker_is_custom : state -> bool
 
 val next_sort_column : sort_column -> sort_column
 

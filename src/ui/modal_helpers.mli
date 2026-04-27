@@ -148,8 +148,12 @@ val open_file_browser_modal :
   unit ->
   unit
 
-(** Open a directory picker restricted to registered directories of [dir_type]. *)
+(** Open a directory picker restricted to registered directories of [dir_type].
+    @param extra_paths Additional paths to surface alongside registry entries —
+    used to merge in directories discovered outside the registry (e.g. defaults,
+    service env files). Paths already in the registry are de-duplicated. *)
 val select_directory_modal :
+  ?extra_paths:string list ->
   title:string ->
   dir_type:Octez_manager_lib.Directory_registry.dir_type ->
   on_select:(string -> unit) ->

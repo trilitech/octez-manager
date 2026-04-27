@@ -63,6 +63,14 @@ val add : entry -> (unit, string) result
     Returns [Error msg] if the entry does not exist. *)
 val remove : instance:string -> (unit, string) result
 
+(** Replace the custom-baker entry whose [instance] matches [entry.instance].
+    Use this to edit mutable fields (label, endpoint, base_dir,
+    payout_key_alias, octez_client_bin) on an existing entry without
+    changing its identity.
+
+    Returns [Error msg] if no entry with [entry.instance] exists. *)
+val update : entry -> (unit, string) result
+
 (** {1 Helper functions} *)
 
 (** [build_instance_handle ~network ~baker_pkh] builds the synthetic instance

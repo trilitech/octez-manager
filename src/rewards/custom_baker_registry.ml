@@ -251,6 +251,24 @@ let remove ~instance =
         in
         save_entries updated)
 
+let update entry =
+  ensure_dir () ;
+  File_ops.with_file_lock (custom_bakers_lock_file ()) (fun () ->
+      let existing = load_entries () in
+      let found =
+        List.exists (fun e -> String.equal e.instance entry.instance) existing
+      in
+      if not found then
+        Error (Printf.sprintf "custom baker '%s' not found" entry.instance)
+      else
+        let updated =
+          List.map
+            (fun e ->
+              if String.equal e.instance entry.instance then entry else e)
+            existing
+        in
+        save_entries updated)
+
 (* ── build_instance_handle ────────────────────────────────── *)
 
 let is_valid_network_char = function
