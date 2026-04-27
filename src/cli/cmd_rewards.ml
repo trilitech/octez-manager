@@ -383,17 +383,7 @@ let history_run baker_opt cycles_count json =
       | Ok cycles ->
           if json then
             let cycle_json (cr : Rewards.cycle_rewards) =
-              let earned =
-                List.fold_left
-                  Int64.add
-                  0L
-                  [
-                    cr.block_rewards;
-                    cr.attestation_rewards;
-                    cr.other_rewards;
-                    cr.block_fees;
-                  ]
-              in
+              let earned = Rewards.total_earned cr in
               let status =
                 Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
               in
@@ -439,17 +429,7 @@ let history_run baker_opt cycles_count json =
               "STATUS" ;
             List.iter
               (fun (cr : Rewards.cycle_rewards) ->
-                let earned =
-                  List.fold_left
-                    Int64.add
-                    0L
-                    [
-                      cr.block_rewards;
-                      cr.attestation_rewards;
-                      cr.other_rewards;
-                      cr.block_fees;
-                    ]
-                in
+                let earned = Rewards.total_earned cr in
                 let is_paid =
                   Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
                 in
