@@ -181,6 +181,66 @@ let test_fee_recipients_sum () =
     true
     (Result.is_error (Payout_config.validate c))
 
+(* {1 PKH validators} *)
+
+let test_is_valid_tz_address () =
+  Alcotest.(check bool)
+    "tz1 valid"
+    true
+    (Payout_config.is_valid_tz_address "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU") ;
+  Alcotest.(check bool)
+    "KT1 invalid for is_valid_tz_address"
+    false
+    (Payout_config.is_valid_tz_address "KT1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU") ;
+  Alcotest.(check bool)
+    "empty invalid"
+    false
+    (Payout_config.is_valid_tz_address "")
+
+let test_is_valid_baker_pkh_accepted () =
+  Alcotest.(check bool)
+    "tz1 accepted"
+    true
+    (Payout_config.is_valid_baker_pkh "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU") ;
+  Alcotest.(check bool)
+    "tz2 accepted"
+    true
+    (Payout_config.is_valid_baker_pkh "tz2AaBbCcDdEeFfGgHhJjKkMmNnPpQqRrSsT") ;
+  Alcotest.(check bool)
+    "tz3 accepted"
+    true
+    (Payout_config.is_valid_baker_pkh "tz3AaBbCcDdEeFfGgHhJjKkMmNnPpQqRrSsT") ;
+  Alcotest.(check bool)
+    "tz4 accepted"
+    true
+    (Payout_config.is_valid_baker_pkh "tz4AaBbCcDdEeFfGgHhJjKkMmNnPpQqRrSsT")
+
+let test_is_valid_baker_pkh_rejected () =
+  Alcotest.(check bool)
+    "KT1 rejected"
+    false
+    (Payout_config.is_valid_baker_pkh "KT1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU") ;
+  Alcotest.(check bool)
+    "empty rejected"
+    false
+    (Payout_config.is_valid_baker_pkh "") ;
+  Alcotest.(check bool)
+    "tz5 rejected"
+    false
+    (Payout_config.is_valid_baker_pkh "tz5Ke2h7sDdakHJQh8WX4Z372du1KChsksyU") ;
+  Alcotest.(check bool)
+    "tz0 rejected"
+    false
+    (Payout_config.is_valid_baker_pkh "tz0Ke2h7sDdakHJQh8WX4Z372du1KChsksyU") ;
+  Alcotest.(check bool)
+    "xyz prefix rejected"
+    false
+    (Payout_config.is_valid_baker_pkh "xyz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU") ;
+  Alcotest.(check bool)
+    "too-short tz1 prefix-only rejected"
+    false
+    (Payout_config.is_valid_baker_pkh "tz1")
+
 (* {1 JSON round-trip} *)
 
 let test_json_roundtrip () =
@@ -281,5 +341,20 @@ let () =
             "roundtrip with overrides"
             `Quick
             test_json_roundtrip_with_overrides;
+        ] );
+      ( "pkh_validators",
+        [
+          Alcotest.test_case
+            "is_valid_tz_address"
+            `Quick
+            test_is_valid_tz_address;
+          Alcotest.test_case
+            "is_valid_baker_pkh accepted"
+            `Quick
+            test_is_valid_baker_pkh_accepted;
+          Alcotest.test_case
+            "is_valid_baker_pkh rejected"
+            `Quick
+            test_is_valid_baker_pkh_rejected;
         ] );
     ]

@@ -90,6 +90,8 @@ let is_valid_tz_address s =
      || String.starts_with ~prefix:"tz3" s
      || String.starts_with ~prefix:"tz4" s)
 
+let is_valid_baker_pkh s = is_valid_tz_address s
+
 let is_valid_address s =
   is_valid_tz_address s
   || (String.length s = 36 && String.starts_with ~prefix:"KT1" s)
