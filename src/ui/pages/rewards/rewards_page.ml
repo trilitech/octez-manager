@@ -67,7 +67,23 @@ let load_baker_instances () =
                   Some (instance, pkh)
                 else None)
   in
-  from_services @ from_env
+  let from_custom =
+    Custom_baker_registry.list ()
+    |> List.map (fun (e : Custom_baker_registry.entry) ->
+        (e.instance, e.baker_pkh))
+  in
+  (* De-duplicate by instance handle: services and OM_TEST_BAKER take
+     precedence; custom entries with a colliding instance are silently dropped. *)
+  let existing_instances =
+    List.map fst (from_services @ from_env) |> List.sort_uniq String.compare
+  in
+  let from_custom =
+    List.filter
+      (fun (inst, _) ->
+        not (List.exists (fun ei -> String.equal ei inst) existing_instances))
+      from_custom
+  in
+  from_services @ from_env @ from_custom
 
 let config_exists_for_selected baker_instances selected_baker =
   match List.nth_opt baker_instances selected_baker with
