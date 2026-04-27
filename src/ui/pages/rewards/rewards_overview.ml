@@ -276,6 +276,28 @@ let render_cycle_detail ~box_width ~instance ~baker:_
   in
   String.concat "\n" [header; back_hint; ""; detail_box; ""; preview_box]
 
+let render_setup_cta_box ~box_width =
+  let lines =
+    [
+      Widgets.themed_text "No payout configuration yet for this baker.";
+      "";
+      Widgets.themed_text "Press Tab to open the Configuration tab and set:";
+      Widgets.themed_muted
+        "  - payout key alias       (which key signs payouts)";
+      Widgets.themed_muted "  - baker fee              (% kept by the baker)";
+      Widgets.themed_muted "  - min payout / balance   (skip dust)";
+      Widgets.themed_muted "  - notification channels  (Discord/Telegram/...)";
+      "";
+      Widgets.themed_muted
+        "Once saved, Generate / Pay / Dry-run become available here.";
+    ]
+  in
+  Box.render
+    ~title:"Set up rewards"
+    ~style:Rounded
+    ~width:box_width
+    (String.concat "\n" lines)
+
 let resolve_network ~instance =
   match Octez_manager_lib.Service_registry.find ~instance with
   | Ok (Some svc) -> svc.Octez_manager_lib.Service.network
@@ -305,8 +327,12 @@ let render_dashboard ~box_width ~instance ~baker:_ (state : Rewards_state.state)
   let recent_box =
     render_recent_cycles_box ~box_width ~instance ~current_cycle recent
   in
+  let setup_cta =
+    if state.config_exists then [] else [render_setup_cta_box ~box_width; ""]
+  in
   let parts =
-    [network_line; ""; current_box; ""; completed_box; ""; recent_box]
+    setup_cta
+    @ [network_line; ""; current_box; ""; completed_box; ""; recent_box]
   in
   let parts =
     if state.overview_preview then

@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - **Cascade import in TUI**: Import wizard now supports cascade import mode, allowing users to import services with all their dependencies or dependents in the correct order. Toggle with 'c' in the configure step. (fixes #886)
+- **Rewards first-run guidance**: When no payout configuration exists for the selected baker, the Rewards Overview shows a "Set up rewards" panel pointing to the Configuration tab; the Configuration tab shows a `[c: create]` status line until the first save. Action shortcuts that require config (`g`/`p`/`d`/`t`) are hidden on the Overview until then.
+- **Indexer URL configuration in TUI**: New "Indexer URL" field in the Rewards Configuration tab. Editing it opens a picker listing local octez-index services for the baker's network, the network-appropriate TzKT URL, and a "Custom URL..." entry for free-form input.
 
 ### Changed
 

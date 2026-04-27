@@ -69,6 +69,11 @@ let load_baker_instances () =
   in
   from_services @ from_env
 
+let config_exists_for_selected baker_instances selected_baker =
+  match List.nth_opt baker_instances selected_baker with
+  | Some (instance, _) -> Payout_config.exists ~instance
+  | None -> false
+
 let init () =
   let baker_instances = load_baker_instances () in
   let active_tab =
@@ -87,6 +92,9 @@ let init () =
         |> Option.value ~default:0
     | None -> 0
   in
+  let config_exists =
+    config_exists_for_selected baker_instances selected_baker
+  in
   Navigation.make
     {
       Rewards_state.baker_instances;
@@ -104,6 +112,7 @@ let init () =
       config = None;
       config_cursor = 0;
       config_dirty = false;
+      config_exists;
       history_cursor = 0;
       loading = false;
       error = None;
@@ -208,7 +217,10 @@ let refresh ps =
                 Rewards_scheduler.get_current_cycle ~instance
             | None -> None
           in
-          let s = {s with baker_instances; current_cycle} in
+          let config_exists =
+            config_exists_for_selected baker_instances s.selected_baker
+          in
+          let s = {s with baker_instances; current_cycle; config_exists} in
           let s = maybe_compute_blueprint s in
           let s = maybe_load_config s in
           let s = apply_pending_config s in
@@ -296,13 +308,15 @@ let keymap ps =
   let tab_keys =
     match s.active_tab with
     | Rewards_state.Overview ->
-        [
-          kb "g" "Generate";
-          kb "p" "Pay";
-          kb "d" "Dry-run";
-          kb "t" "Continual";
-          kb "r" "Refresh";
-        ]
+        if s.config_exists then
+          [
+            kb "g" "Generate";
+            kb "p" "Pay";
+            kb "d" "Dry-run";
+            kb "t" "Continual";
+            kb "r" "Refresh";
+          ]
+        else [kb "r" "Refresh"]
     | Rewards_state.Delegators ->
         [
           kb "j/k" "Navigate";
@@ -313,10 +327,13 @@ let keymap ps =
         ]
     | Rewards_state.History -> [kb "j/k" "Navigate"; kb "Enter" "View"]
     | Rewards_state.Configuration ->
+        let save_key =
+          if s.config_exists then kb "s" "Save" else kb "c" "Create"
+        in
         [
           kb "j/k" "Navigate";
           kb "Enter" "Edit";
-          kb "s" "Save";
+          save_key;
           kb "r" "Reset";
           kb "i" "Import";
           kb "n" "Notify";
@@ -510,14 +527,29 @@ let handle_config_key ps key =
             let field =
               List.nth Rewards_config_tab.all_fields s.config_cursor
             in
-            Rewards_config_tab.edit_field config field ;
+            let network =
+              match Rewards_state.selected_instance_name s with
+              | None -> None
+              | Some instance -> (
+                  match Service_registry.find ~instance with
+                  | Ok (Some svc) -> Some svc.Service.network
+                  | _ -> None)
+            in
+            Rewards_config_tab.edit_field ?network config field ;
             ps
         | None -> ps)
-  | Some (Keys.Char "s") -> (
+  | Some (Keys.Char "s") | Some (Keys.Char "c") -> (
       match (s.config, Rewards_state.selected_instance_name s) with
       | Some config, Some instance ->
           Rewards_config_tab.save_config ~instance config ;
-          Navigation.update (fun s -> {s with config_dirty = false}) ps
+          Navigation.update
+            (fun s ->
+              {
+                s with
+                config_dirty = false;
+                config_exists = Payout_config.exists ~instance;
+              })
+            ps
       | _ -> ps)
   | Some (Keys.Char "r") -> (
       match Rewards_state.selected_baker_pkh s with
@@ -1093,6 +1125,7 @@ let handled_keys () =
       Char "t";
       Char "i";
       Char "n";
+      Char "c";
     ]
 
 let has_modal _ = false
@@ -1150,13 +1183,15 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
     let tab_keys =
       match s.active_tab with
       | Rewards_state.Overview ->
-          [
-            kh "g" "Generate";
-            kh "p" "Pay";
-            kh "d" "Dry-run";
-            kh "t" "Continual";
-            kh "r" "Refresh";
-          ]
+          if s.config_exists then
+            [
+              kh "g" "Generate";
+              kh "p" "Pay";
+              kh "d" "Dry-run";
+              kh "t" "Continual";
+              kh "r" "Refresh";
+            ]
+          else [kh "r" "Refresh"]
       | Rewards_state.Delegators ->
           [
             kh "j/k" "Navigate";
@@ -1167,10 +1202,13 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
           ]
       | Rewards_state.History -> [kh "j/k" "Navigate"; kh "Enter" "View"]
       | Rewards_state.Configuration ->
+          let save_hint =
+            if s.config_exists then kh "s" "Save" else kh "c" "Create"
+          in
           [
             kh "j/k" "Navigate";
             kh "Enter" "Edit";
-            kh "s" "Save";
+            save_hint;
             kh "r" "Reset";
             kh "i" "Import";
             kh "n" "Notify";

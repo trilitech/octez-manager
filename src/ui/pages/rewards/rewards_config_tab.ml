@@ -40,6 +40,7 @@ type field_id =
   | BakerFee
   | PayoutMode
   | PayoutKeyAlias
+  | IndexerUrl
   | MinPayout
   | MinBalance
   | BelowMinDest
@@ -56,6 +57,7 @@ let all_fields =
     BakerFee;
     PayoutMode;
     PayoutKeyAlias;
+    IndexerUrl;
     MinPayout;
     MinBalance;
     BelowMinDest;
@@ -74,6 +76,7 @@ let field_label = function
   | BakerFee -> "Baker Fee"
   | PayoutMode -> "Payout Mode"
   | PayoutKeyAlias -> "Payout Key"
+  | IndexerUrl -> "Indexer URL"
   | MinPayout -> "Min Payout"
   | MinBalance -> "Min Balance"
   | BelowMinDest -> "Below Min Dest"
@@ -92,6 +95,10 @@ let field_hint = function
       "Actual: pay based on real rewards received. Ideal: pay based on \
        expected rewards regardless of missed blocks."
   | PayoutKeyAlias -> "octez-client key alias used to sign payout transactions."
+  | IndexerUrl ->
+      "Base URL of the indexer used to fetch cycle rewards and delegator data. \
+       Accepts a public TzKT instance (e.g. https://api.tzkt.io) or a \
+       self-hosted TzKT-compatible indexer such as octez-index."
   | MinPayout ->
       "Delegators whose reward is below this threshold will not receive a \
        payout."
@@ -128,6 +135,7 @@ let field_value (config : Payout_config.t) = function
       | Rewards.Actual -> "Actual"
       | Rewards.Ideal -> "Ideal")
   | PayoutKeyAlias -> config.payout_key_alias
+  | IndexerUrl -> config.tzkt_url
   | MinPayout ->
       Rewards.format_tez config.min_payout ^ " " ^ tez_symbol ^ " (mutez)"
   | MinBalance ->
@@ -154,7 +162,65 @@ let field_value (config : Payout_config.t) = function
 
 (* {1 Field editing} *)
 
-let edit_field (config : Payout_config.t) field =
+type indexer_choice =
+  | Local_indexer of {instance : string; endpoint : string}
+  | Tzkt_default of string
+  | Custom_url
+
+let prompt_custom_indexer_url config =
+  Modal_helpers.prompt_validated_text_modal
+    ~title:"Indexer URL (TzKT or octez-index)"
+    ~initial:config.Payout_config.tzkt_url
+    ~validator:(fun s ->
+      let s = String.trim s in
+      if String.length s = 0 then Error "URL must not be empty"
+      else if
+        (not (String.starts_with ~prefix:"http://" s))
+        && not (String.starts_with ~prefix:"https://" s)
+      then Error "URL must start with http:// or https://"
+      else Ok ())
+    ~on_submit:(fun s ->
+      let url = String.trim s in
+      let url =
+        if String.length url > 0 && url.[String.length url - 1] = '/' then
+          String.sub url 0 (String.length url - 1)
+        else url
+      in
+      pending_config := Some {config with tzkt_url = url})
+    ()
+
+(** Extract a network slug from values like ["https://teztnets.com/bakingnet"]
+    or ["bakingnet"]. Returns [None] if the value does not look like a usable
+    slug (e.g. an unrecognised URL with extra path components). *)
+let network_slug network =
+  let n = Network_name.normalize network in
+  let looks_like_slug s =
+    String.length s > 0
+    && (not (String.contains s '/'))
+    && not (String.contains s ':')
+  in
+  if looks_like_slug n then Some n
+  else
+    match String.rindex_opt n '/' with
+    | Some i when i + 1 < String.length n ->
+        let tail = String.sub n (i + 1) (String.length n - i - 1) in
+        if looks_like_slug tail then Some tail else None
+    | _ -> None
+
+let local_indexers_for_network ~network =
+  match Octez_manager_lib.Service_registry.list () with
+  | Error _ -> []
+  | Ok svcs ->
+      List.filter
+        (fun (svc : Octez_manager_lib.Service.t) ->
+          String.equal svc.role "index"
+          &&
+          match network with
+          | None -> true
+          | Some n -> String.equal svc.network n)
+        svcs
+
+let edit_field ?network (config : Payout_config.t) field =
   match field with
   | BakerFee ->
       Modal_helpers.prompt_validated_text_modal
@@ -189,6 +255,43 @@ let edit_field (config : Payout_config.t) field =
         ~initial:config.payout_key_alias
         ~on_submit:(fun s ->
           pending_config := Some {config with payout_key_alias = s})
+        ()
+  | IndexerUrl ->
+      let indexers = local_indexers_for_network ~network in
+      let tzkt_choice =
+        let url =
+          match Option.bind network network_slug with
+          | Some slug -> Payout_config.tzkt_base_url_for_network slug
+          | None -> "https://api.tzkt.io"
+        in
+        Tzkt_default url
+      in
+      let choices =
+        List.map
+          (fun (svc : Octez_manager_lib.Service.t) ->
+            Local_indexer
+              {
+                instance = svc.instance;
+                endpoint = Octez_manager_lib.Rpc_addr.to_endpoint svc.rpc_addr;
+              })
+          indexers
+        @ [tzkt_choice; Custom_url]
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Indexer URL"
+        ~items:choices
+        ~to_string:(function
+          | Local_indexer {instance; endpoint} ->
+              Printf.sprintf "%s  (%s)" instance endpoint
+          | Tzkt_default url -> Printf.sprintf "TzKT  (%s)" url
+          | Custom_url -> "Custom URL...")
+        ~on_select:(fun choice ->
+          match choice with
+          | Local_indexer {endpoint; _} ->
+              pending_config := Some {config with tzkt_url = endpoint}
+          | Tzkt_default url ->
+              pending_config := Some {config with tzkt_url = url}
+          | Custom_url -> prompt_custom_indexer_url config)
         ()
   | MinPayout ->
       Modal_helpers.prompt_validated_text_modal
@@ -608,9 +711,12 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
             let style = if is_selected then Box.Double else Box.Rounded in
             Box.render ~title ~style ~width:box_width content
       in
-      (* Dirty indicator *)
-      let dirty_indicator =
-        if state.config_dirty then
+      (* Status indicator: create (never saved) takes priority over dirty *)
+      let status_indicator =
+        if not state.config_exists then
+          Widgets.themed_warning "  * Not yet saved"
+          ^ Widgets.themed_muted "  [c: create]"
+        else if state.config_dirty then
           Widgets.themed_warning "  * Unsaved changes"
           ^ Widgets.themed_muted "  [s: save]"
         else ""
@@ -622,6 +728,6 @@ let render ~(state : Rewards_state.state) ~cols ~_rows =
         else parts
       in
       let parts =
-        if dirty_indicator <> "" then parts @ [dirty_indicator] else parts
+        if status_indicator <> "" then parts @ [status_indicator] else parts
       in
       String.concat "\n" parts

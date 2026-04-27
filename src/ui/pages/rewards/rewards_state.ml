@@ -38,6 +38,8 @@ type state = {
   config : Payout_config.t option;  (** Loaded payout config for editing *)
   config_cursor : int;  (** Selected field in config tab *)
   config_dirty : bool;  (** True if config has unsaved changes *)
+  config_exists : bool;
+      (** True if a saved config file exists on disk for the selected baker *)
   history_cursor : int;
   loading : bool;
   error : string option;

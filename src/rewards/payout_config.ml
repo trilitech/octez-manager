@@ -449,6 +449,8 @@ let rec mkdir_p path =
     mkdir_p (Filename.dirname path) ;
     try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
 
+let exists ~instance = Sys.file_exists (config_path ~instance)
+
 let load ~instance =
   let path = config_path ~instance in
   if not (Sys.file_exists path) then

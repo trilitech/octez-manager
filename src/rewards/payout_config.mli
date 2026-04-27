@@ -70,6 +70,9 @@ val rewards_dir : instance:string -> string
 (** Load configuration from disk for a given baker instance. *)
 val load : instance:string -> (t, string) result
 
+(** Whether a saved configuration file exists for [instance]. *)
+val exists : instance:string -> bool
+
 (** Save configuration to disk for a given baker instance. *)
 val save : instance:string -> t -> (unit, string) result
 
