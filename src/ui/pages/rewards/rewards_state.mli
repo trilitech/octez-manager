@@ -37,6 +37,7 @@ type state = {
   config : Octez_manager_rewards.Payout_config.t option;
   config_cursor : int;
   config_dirty : bool;
+  config_exists : bool;
   history_cursor : int;
   loading : bool;
   error : string option;

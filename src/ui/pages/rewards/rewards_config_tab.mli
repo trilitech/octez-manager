@@ -12,6 +12,7 @@ type field_id =
   | BakerFee
   | PayoutMode
   | PayoutKeyAlias
+  | IndexerUrl
   | MinPayout
   | MinBalance
   | BelowMinDest
@@ -44,8 +45,11 @@ val set_pending_config_clean : Octez_manager_rewards.Payout_config.t -> unit
 val consume_pending_config_clean :
   unit -> Octez_manager_rewards.Payout_config.t option
 
-(** Open a modal to edit a configuration field. *)
-val edit_field : Octez_manager_rewards.Payout_config.t -> field_id -> unit
+(** Open a modal to edit a configuration field. [network] is used by
+    [IndexerUrl] to filter local octez-index services to those matching the
+    baker's network. *)
+val edit_field :
+  ?network:string -> Octez_manager_rewards.Payout_config.t -> field_id -> unit
 
 (** Save the configuration to disk. *)
 val save_config :
