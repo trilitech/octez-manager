@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **Diagnostics page moved to Experimental tab**: The Diagnostics page is now accessible via the Experimental features modal (press `6`) instead of having its own top-level tab.
+- **Rewards page: History tab removed**: The standalone History tab and its "Trends (Last 30 Cycles)" sparkline panel are gone. Cycle navigation lives on the Overview tab — the *Recent Cycles* table is now interactive (`j/k` to move the cursor, `Enter` to drill into a cycle's detail). The action shortcuts `g`/`p`/`d` (Generate / Pay / Dry-run) target the highlighted cycle when one is selected, falling back to the latest fetched cycle otherwise. Tab numbering shifts: Configuration is now `3`, not `4`.
 
 ## [1.0.0] - 2026-04-16
 

@@ -117,7 +117,7 @@ let render_last_completed_box ~box_width ~instance
         ~width:box_width
         desc
 
-let render_recent_cycles_box ~box_width ~instance ~current_cycle
+let render_recent_cycles_box ~box_width ~instance ~current_cycle ~cursor
     (cycles : Rewards.cycle_rewards list) =
   match cycles with
   | [] ->
@@ -137,8 +137,8 @@ let render_recent_cycles_box ~box_width ~instance ~current_cycle
         ^ " STATUS"
       in
       let rows =
-        List.map
-          (fun (cr : Rewards.cycle_rewards) ->
+        List.mapi
+          (fun i (cr : Rewards.cycle_rewards) ->
             let is_current =
               match current_cycle with
               | Some cc -> Int.equal cr.cycle cc
@@ -169,8 +169,9 @@ let render_recent_cycles_box ~box_width ~instance ~current_cycle
               | Rewards.Partial -> Widgets.themed_warning "partial"
               | Rewards.In_progress -> Widgets.themed_accent "in progress"
             in
+            let indicator = if i = cursor then "\xe2\x96\xb8 " else "  " in
             let line =
-              "  "
+              indicator
               ^ Display.pad_right 7 cycle_label
               ^ " "
               ^ Display.pad_right 16 earned
@@ -178,7 +179,8 @@ let render_recent_cycles_box ~box_width ~instance ~current_cycle
               ^ Display.pad_right 14 distributed
               ^ " " ^ status_str
             in
-            if is_current then Widgets.themed_accent line
+            if i = cursor then Widgets.themed_emphasis line
+            else if is_current then Widgets.themed_accent line
             else Widgets.themed_text line)
           cycles
       in
@@ -325,7 +327,12 @@ let render_dashboard ~box_width ~instance ~baker:_ (state : Rewards_state.state)
     render_last_completed_box ~box_width ~instance last_completed
   in
   let recent_box =
-    render_recent_cycles_box ~box_width ~instance ~current_cycle recent
+    render_recent_cycles_box
+      ~box_width
+      ~instance
+      ~current_cycle
+      ~cursor:state.cycle_cursor
+      recent
   in
   let setup_cta =
     if state.config_exists then [] else [render_setup_cta_box ~box_width; ""]

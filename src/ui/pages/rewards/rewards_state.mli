@@ -8,7 +8,7 @@
 (** Page state types and navigation helpers for the Rewards page. *)
 
 (** Tab selector for the rewards page. *)
-type active_tab = Overview | Delegators | History | Configuration
+type active_tab = Overview | Delegators | Configuration
 
 (** Sort column in the delegators list. *)
 type sort_column = SortAddress | SortBalance | SortReward | SortStatus
@@ -41,7 +41,8 @@ type state = {
   config_cursor : int;
   config_dirty : bool;
   config_exists : bool;
-  history_cursor : int;
+  cycle_cursor : int;
+      (** Cursor index into the Overview tab's Recent Cycles table. *)
   loading : bool;
   error : string option;
 }
