@@ -353,18 +353,18 @@ let () =
       ( "extract_op_hash",
         [
           Alcotest.test_case "finds op hash in output" `Quick (fun () ->
+              let hash =
+                "oo7TpRPvfbf3hqkfDXRb9wGaScNQT2Tx9d8DqNwh4u14oVqK2gz"
+              in
               let output =
-                "Operation hash is \
-                 'ooXYZ123abc456def789ghi012jkl345mno678pqr901stu234vwx567yz'\n\
-                 Simulation result:"
+                "Operation hash is '" ^ hash ^ "'\nSimulation result:"
               in
               let result =
                 Payout_executor.Internal_for_tests.extract_op_hash output
               in
               Alcotest.(check (option string))
                 "should extract op hash"
-                (Some
-                   "ooXYZ123abc456def789ghi012jkl345mno678pqr901stu234vwx567yz")
+                (Some hash)
                 result);
           Alcotest.test_case "returns None when no op hash" `Quick (fun () ->
               let output =
@@ -375,16 +375,34 @@ let () =
               in
               Alcotest.(check (option string)) "should return None" None result);
           Alcotest.test_case "finds bare op hash on line" `Quick (fun () ->
-              let output =
-                "ooABC123def456ghi789jkl012mno345pqr678stu901vwx234yz567ab"
+              let hash =
+                "onuUUFwfL2pPq8RU8Aw1aJaybrgFeyt6h1pVyMKLSqwXbE2ZfDz"
               in
+              let result =
+                Payout_executor.Internal_for_tests.extract_op_hash hash
+              in
+              Alcotest.(check (option string))
+                "should extract bare op hash"
+                (Some hash)
+                result);
+          (* Regression: real op hashes start with [op…], [on…], … not just
+             [oo…]. Pre-fix [extract_op_hash] hard-coded the second char as 'o'
+             and silently dropped every real-world hash, so successful payouts
+             were recorded as failures. *)
+          Alcotest.test_case
+            "extracts hash with non-oo prefix"
+            `Quick
+            (fun () ->
+              let hash =
+                "opVMd9YJV2tdkwDPN7CzXmEUmKYY27Phc8aRz3HEgFKUvW1ZBnp"
+              in
+              let output = "Operation hash is '" ^ hash ^ "'\n" in
               let result =
                 Payout_executor.Internal_for_tests.extract_op_hash output
               in
               Alcotest.(check (option string))
-                "should extract bare op hash"
-                (Some
-                   "ooABC123def456ghi789jkl012mno345pqr678stu901vwx234yz567ab")
+                "should extract op-prefixed hash"
+                (Some hash)
                 result);
         ] );
     ]

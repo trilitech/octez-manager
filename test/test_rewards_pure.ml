@@ -9,18 +9,37 @@ open Octez_manager_rewards
 
 (* ── extract_op_hash tests ────────────────────────────────── *)
 
+(* Synthetic but well-formed Tezos operation hashes: 51 base58 chars,
+   starting with 'o' and a varying second character. *)
+let hash_oo = "oo7TpRPvfbf3hqkfDXRb9wGaScNQT2Tx9d8DqNwh4u14oVqK2gz"
+
+let hash_op = "opVMd9YJV2tdkwDPN7CzXmEUmKYY27Phc8aRz3HEgFKUvW1ZBnp"
+
+let hash_on = "onuUUFwfL2pPq8RU8Aw1aJaybrgFeyt6h1pVyMKLSqwXbE2ZfDz"
+
 let test_extract_op_hash_bare_line () =
-  let output = "some text\nooBLAH123abc\nmore text\n" in
+  let output = "some text\n" ^ hash_oo ^ "\nmore text\n" in
   let result = Payout_executor.Internal_for_tests.extract_op_hash output in
-  Alcotest.(check (option string))
-    "bare oo-prefixed line"
-    (Some "ooBLAH123abc")
-    result
+  Alcotest.(check (option string)) "bare oo-prefixed line" (Some hash_oo) result
 
 let test_extract_op_hash_quoted () =
-  let output = "Operation hash is 'ooABC123def456'\n" in
+  let output = "Operation hash is '" ^ hash_oo ^ "'\n" in
   let result = Payout_executor.Internal_for_tests.extract_op_hash output in
-  Alcotest.(check (option string)) "quoted hash" (Some "ooABC123def456") result
+  Alcotest.(check (option string)) "quoted hash" (Some hash_oo) result
+
+(* Regression test for the bug where extract_op_hash only matched hashes whose
+   second character was also 'o'. Real Tezos op hashes start with [op…],
+   [on…], etc.; rejecting them caused every successful payout to be recorded
+   as failed. *)
+let test_extract_op_hash_op_prefix () =
+  let output = "Operation hash is '" ^ hash_op ^ "'\n" in
+  let result = Payout_executor.Internal_for_tests.extract_op_hash output in
+  Alcotest.(check (option string)) "op-prefixed hash" (Some hash_op) result
+
+let test_extract_op_hash_on_prefix () =
+  let output = hash_on ^ "\n" in
+  let result = Payout_executor.Internal_for_tests.extract_op_hash output in
+  Alcotest.(check (option string)) "on-prefixed bare hash" (Some hash_on) result
 
 let test_extract_op_hash_no_match () =
   let output = "No operation hash here\njust some text\n" in
@@ -322,6 +341,14 @@ let () =
         [
           Alcotest.test_case "bare oo line" `Quick test_extract_op_hash_bare_line;
           Alcotest.test_case "quoted hash" `Quick test_extract_op_hash_quoted;
+          Alcotest.test_case
+            "op-prefixed hash"
+            `Quick
+            test_extract_op_hash_op_prefix;
+          Alcotest.test_case
+            "on-prefixed hash"
+            `Quick
+            test_extract_op_hash_on_prefix;
           Alcotest.test_case "no match" `Quick test_extract_op_hash_no_match;
           Alcotest.test_case "empty input" `Quick test_extract_op_hash_empty;
           Alcotest.test_case "too short" `Quick test_extract_op_hash_short;
