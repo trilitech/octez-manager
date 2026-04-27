@@ -1053,6 +1053,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_custom_baker_registry)
+ (libraries alcotest octez_manager_rewards unix)
+ (modules test_custom_baker_registry)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_payout_config)
  (libraries alcotest octez_manager_rewards)
  (modules test_payout_config)
