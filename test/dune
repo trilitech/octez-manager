@@ -1102,6 +1102,21 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_rewards_page_custom_baker)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  octez_manager_rewards
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_rewards_page_custom_baker)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_main_shell_back)
  (libraries alcotest octez_manager_lib octez-manager.ui miaou-core.lib)
  (modules test_main_shell_back)

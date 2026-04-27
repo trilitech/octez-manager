@@ -321,7 +321,7 @@ let keymap ps =
     {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
   in
   let common =
-    let base = [kb "Tab" "Next tab"; kb "Esc" "Back"] in
+    let base = [kb "a" "Add baker"; kb "Tab" "Next tab"; kb "Esc" "Back"] in
     if List.length s.baker_instances > 1 then kb "b" "Baker" :: base else base
   in
   let tab_keys =
@@ -882,6 +882,138 @@ let baker_at_col s col =
       in
       find 0 prefix_len s.baker_instances
 
+(** Format a Unix timestamp as an ISO-8601 UTC string. *)
+let format_iso8601 t =
+  let tm = Unix.gmtime t in
+  Printf.sprintf
+    "%04d-%02d-%02dT%02d:%02d:%02dZ"
+    (tm.Unix.tm_year + 1900)
+    (tm.Unix.tm_mon + 1)
+    tm.Unix.tm_mday
+    tm.Unix.tm_hour
+    tm.Unix.tm_min
+    tm.Unix.tm_sec
+
+(** Validate that a network string satisfies the alphanumeric + [_-.] rule
+    used by [Custom_baker_registry.build_instance_handle]. *)
+let validate_network s =
+  if String.length s = 0 then Error "network must not be empty"
+  else
+    let is_valid_char = function
+      | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' | '.' -> true
+      | _ -> false
+    in
+    if String.for_all is_valid_char s then Ok ()
+    else
+      Error
+        "network may only contain alphanumeric characters and [_ - .] \
+         characters"
+
+(** Open the "Add custom baker" multi-step modal flow.
+    On success, refreshes [state.baker_instances] and selects the new entry. *)
+let add_custom_baker_modal () =
+  Modal_helpers.prompt_validated_text_modal
+    ~title:"Add Custom Baker (1/6) · Baker PKH"
+    ~placeholder:(Some "tz1… / tz2… / tz3… / tz4…")
+    ~validator:(fun s ->
+      if Payout_config.is_valid_baker_pkh s then Ok ()
+      else
+        Error
+          "Invalid baker PKH: must start with tz1/tz2/tz3/tz4 and be 36 \
+           characters")
+    ~on_submit:(fun baker_pkh ->
+      Modal_helpers.prompt_validated_text_modal
+        ~title:"Add Custom Baker (2/6) · Network"
+        ~placeholder:(Some "mainnet / ghostnet / …")
+        ~validator:validate_network
+        ~on_submit:(fun network ->
+          Modal_helpers.prompt_validated_text_modal
+            ~title:"Add Custom Baker (3/6) · RPC Endpoint"
+            ~placeholder:(Some "host:8732")
+            ~validator:Custom_baker_registry.validate_endpoint
+            ~on_submit:(fun endpoint ->
+              Modal_helpers.prompt_validated_text_modal
+                ~title:"Add Custom Baker (4/6) · Base Directory"
+                ~placeholder:(Some "/home/user/.tezos-client")
+                ~validator:(fun s ->
+                  if String.length s > 0 then Ok ()
+                  else Error "base directory must not be empty")
+                ~on_submit:(fun base_dir ->
+                  Modal_helpers.prompt_validated_text_modal
+                    ~title:"Add Custom Baker (5/6) · Payout Key Alias"
+                    ~placeholder:(Some "payout-key")
+                    ~validator:(fun s ->
+                      if String.length s > 0 then Ok ()
+                      else Error "payout key alias must not be empty")
+                    ~on_submit:(fun payout_key_alias ->
+                      Modal_helpers.prompt_text_modal
+                        ~title:"Add Custom Baker (6/6) · Label (optional)"
+                        ~placeholder:(Some "My baker")
+                        ~on_submit:(fun label_raw ->
+                          let label =
+                            let s = String.trim label_raw in
+                            if String.length s = 0 then None else Some s
+                          in
+                          match
+                            Custom_baker_registry.resolve_octez_client_bin ()
+                          with
+                          | Error msg ->
+                              Context.toast_error
+                                (Printf.sprintf
+                                   "Cannot resolve octez-client binary: %s"
+                                   msg)
+                          | Ok octez_client_bin -> (
+                              match
+                                Custom_baker_registry.build_instance_handle
+                                  ~network
+                                  ~baker_pkh
+                              with
+                              | Error msg ->
+                                  Context.toast_error
+                                    (Printf.sprintf
+                                       "Cannot build instance handle: %s"
+                                       msg)
+                              | Ok instance ->
+                                  let entry : Custom_baker_registry.entry =
+                                    {
+                                      instance;
+                                      baker_pkh;
+                                      network;
+                                      label;
+                                      endpoint;
+                                      payout_key_alias;
+                                      base_dir;
+                                      octez_client_bin;
+                                      added_at =
+                                        format_iso8601 (Unix.gettimeofday ());
+                                    }
+                                  in
+                                  (match Custom_baker_registry.add entry with
+                                  | Error msg ->
+                                      Context.toast_error
+                                        (Printf.sprintf
+                                           "Failed to add custom baker: %s"
+                                           msg)
+                                  | Ok () ->
+                                      Context.toast_success
+                                        (Printf.sprintf
+                                           "Custom baker %s added"
+                                           instance) ;
+                                      (* Select newly added entry — the
+                                         pending_instance mechanism ensures
+                                         init() picks it up on refresh. *)
+                                      Context.set_pending_baker_instance
+                                        instance) ;
+                                  (* Re-navigate to this page so the baker
+                                     selector reloads from disk. *)
+                                  Context.navigate name))
+                        ())
+                    ())
+                ())
+            ())
+        ())
+    ()
+
 let handle_key ps key ~size:_ =
   Metrics.mark_input_event () ;
   let s = ps.Navigation.s in
@@ -986,6 +1118,10 @@ let handle_key ps key ~size:_ =
                   })
                 ps
             else ps
+        | Some (Keys.Char "a") ->
+            (* Add custom baker *)
+            add_custom_baker_modal () ;
+            ps
         | Some (Keys.Char "p") when s.active_tab = Rewards_state.Overview -> (
             (* Trigger payout confirmation *)
             let s = ps.Navigation.s in
@@ -1159,6 +1295,7 @@ let handled_keys () =
       Char "2";
       Char "3";
       Char "4";
+      Char "a";
       Char "b";
       Char "r";
       Char "j";
@@ -1227,7 +1364,7 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
     let s = ps.Navigation.s in
     let kh key help = Miaou.Core.Tui_page.{key; help} in
     let common =
-      let base = [kh "Tab" "Next tab"; kh "Esc" "Back"] in
+      let base = [kh "a" "Add baker"; kh "Tab" "Next tab"; kh "Esc" "Back"] in
       if List.length s.baker_instances > 1 then kh "b" "Baker" :: base else base
     in
     let tab_keys =
