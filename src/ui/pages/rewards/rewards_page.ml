@@ -31,6 +31,12 @@ let pending_cycle : int option ref = ref None
    Prefer the auto-detected baker address from the scheduler cache,
    falling back to the first delegate if not yet detected.
    Also includes test bakers from OM_TEST_BAKER env var. *)
+(* Snapshot of all custom-baker instance handles, computed at init/refresh
+   time. Used by view functions to identify custom bakers without I/O. *)
+let load_custom_baker_instances () =
+  Custom_baker_registry.list ()
+  |> List.map (fun (e : Custom_baker_registry.entry) -> e.instance)
+
 let load_baker_instances () =
   let from_services =
     let bakers =
@@ -111,9 +117,11 @@ let init () =
   let config_exists =
     config_exists_for_selected baker_instances selected_baker
   in
+  let custom_baker_instances = load_custom_baker_instances () in
   Navigation.make
     {
       Rewards_state.baker_instances;
+      custom_baker_instances;
       selected_baker;
       active_tab;
       selected_cycle = None;
@@ -187,7 +195,14 @@ let maybe_compute_blueprint s =
                     let config =
                       match s.config with
                       | Some c -> c
-                      | None -> Payout_config.default ~baker_pkh:pkh
+                      | None -> (
+                          let base = Payout_config.default ~baker_pkh:pkh in
+                          (* Seed registry-derived overrides for custom
+                             bakers when no Payout_config has been saved. *)
+                          match Custom_baker_registry.find ~instance with
+                          | Some e ->
+                              {base with payout_key_alias = e.payout_key_alias}
+                          | None -> base)
                     in
                     let bp =
                       Reward_calculator.generate_blueprint
@@ -209,7 +224,14 @@ let maybe_load_config s =
         let config =
           match Payout_config.load ~instance with
           | Ok c -> c
-          | Error _ -> Payout_config.default ~baker_pkh:pkh
+          | Error _ -> (
+              let base = Payout_config.default ~baker_pkh:pkh in
+              (* For a custom baker without a saved Payout_config, seed
+                 [payout_key_alias] from the registry so the Configuration
+                 tab reflects the alias picked during [Add custom baker]. *)
+              match Custom_baker_registry.find ~instance with
+              | Some e -> {base with payout_key_alias = e.payout_key_alias}
+              | None -> base)
         in
         {s with config = Some config}
 
@@ -230,6 +252,7 @@ let refresh ps =
       Navigation.update
         (fun s ->
           let baker_instances = load_baker_instances () in
+          let custom_baker_instances = load_custom_baker_instances () in
           let current_cycle =
             match Rewards_state.selected_baker_instance s with
             | Some (instance, _) ->
@@ -239,7 +262,15 @@ let refresh ps =
           let config_exists =
             config_exists_for_selected baker_instances s.selected_baker
           in
-          let s = {s with baker_instances; current_cycle; config_exists} in
+          let s =
+            {
+              s with
+              baker_instances;
+              custom_baker_instances;
+              current_cycle;
+              config_exists;
+            }
+          in
           let s = maybe_compute_blueprint s in
           let s = maybe_load_config s in
           let s = apply_pending_config s in
@@ -282,15 +313,28 @@ let render_tab_bar (s : Rewards_state.state) ~cols =
 
 let render_baker_header (s : Rewards_state.state) =
   match Rewards_state.selected_baker_instance s with
-  | None -> Widgets.themed_warning "No baker instances found"
+  | None ->
+      Widgets.themed_warning "No baker instances found"
+      ^ Widgets.themed_muted "  [a: add]"
   | Some (instance, pkh) ->
       let short_pkh =
         if String.length pkh > 12 then
           String.sub pkh 0 7 ^ "..." ^ String.sub pkh (String.length pkh - 4) 4
         else pkh
       in
-      Widgets.themed_primary
-        (Printf.sprintf " Rewards - %s (%s) " instance short_pkh)
+      let title =
+        Widgets.themed_primary
+          (Printf.sprintf " Rewards - %s (%s) " instance short_pkh)
+      in
+      (* When the baker selector row isn't rendered (n < 2), surface the
+         add/remove hints here so they remain discoverable. *)
+      if List.length s.baker_instances >= 2 then title
+      else
+        let remove_hint =
+          if Rewards_state.selected_baker_is_custom s then "  [x: remove]"
+          else ""
+        in
+        title ^ Widgets.themed_muted ("  [a: add]" ^ remove_hint)
 
 (** Render baker selector radio row (only when multiple bakers exist). *)
 let render_baker_selector s =
@@ -310,7 +354,11 @@ let render_baker_selector s =
       (Widgets.title_highlight "Baker"
       ^ ":" ^ "  "
       ^ String.concat "   " options
-      ^ Widgets.themed_muted "  [b: switch baker]")
+      ^ Widgets.themed_muted
+          ("  [b: switch baker]  [a: add]"
+          ^
+          if Rewards_state.selected_baker_is_custom s then "  [x: remove]"
+          else ""))
 
 let hint_for_tab _tab = ""
 
@@ -322,6 +370,11 @@ let keymap ps =
   in
   let common =
     let base = [kb "a" "Add baker"; kb "Tab" "Next tab"; kb "Esc" "Back"] in
+    let base =
+      if Rewards_state.selected_baker_is_custom s then
+        kb "x" "Remove baker" :: base
+      else base
+    in
     if List.length s.baker_instances > 1 then kb "b" "Baker" :: base else base
   in
   let tab_keys =
@@ -512,22 +565,25 @@ let handle_delegator_key ps key =
 (** Handle keys specific to the Configuration tab. *)
 let handle_config_key ps key =
   let s = ps.Navigation.s in
+  let fields = Rewards_config_tab.fields_for_state s in
+  let field_count = List.length fields in
+  let custom =
+    match Rewards_state.selected_instance_name s with
+    | None -> None
+    | Some instance -> Custom_baker_registry.find ~instance
+  in
   match Keys.of_string key with
   | Some (Keys.Char "j") | Some Keys.Down ->
       Navigation.update
         (fun s ->
-          {
-            s with
-            config_cursor =
-              min (s.config_cursor + 1) Rewards_config_tab.field_count;
-          })
+          {s with config_cursor = min (s.config_cursor + 1) field_count})
         ps
   | Some (Keys.Char "k") | Some Keys.Up ->
       Navigation.update
         (fun s -> {s with config_cursor = max (s.config_cursor - 1) 0})
         ps
   | Some Keys.Enter -> (
-      if s.config_cursor = Rewards_config_tab.field_count then (
+      if s.config_cursor = field_count then (
         (* Payout service action *)
         match Rewards_state.selected_instance_name s with
         | None -> ps
@@ -541,22 +597,38 @@ let handle_config_key ps key =
               ~config:s.config ;
             ps)
       else
-        match s.config with
+        let field = List.nth fields s.config_cursor in
+        (* Custom-baker fields are editable even when the payout config has
+           not been saved yet — pass a default config in that case. Seed
+           [payout_key_alias] from the registry entry so the General section
+           reflects the alias picked during [Add custom baker]. *)
+        let config_for_edit =
+          match (s.config, custom) with
+          | Some c, _ -> Some c
+          | None, Some entry ->
+              Some
+                {
+                  (Payout_config.default ~baker_pkh:entry.baker_pkh) with
+                  payout_key_alias = entry.payout_key_alias;
+                }
+          | None, None -> None
+        in
+        match config_for_edit with
+        | None -> ps
         | Some config ->
-            let field =
-              List.nth Rewards_config_tab.all_fields s.config_cursor
-            in
             let network =
               match Rewards_state.selected_instance_name s with
               | None -> None
               | Some instance -> (
                   match Service_registry.find ~instance with
                   | Ok (Some svc) -> Some svc.Service.network
-                  | _ -> None)
+                  | _ -> (
+                      match custom with
+                      | Some e -> Some e.Custom_baker_registry.network
+                      | None -> None))
             in
-            Rewards_config_tab.edit_field ?network config field ;
-            ps
-        | None -> ps)
+            Rewards_config_tab.edit_field ?network ?custom config field ;
+            ps)
   | Some (Keys.Char "s") | Some (Keys.Char "c") -> (
       match (s.config, Rewards_state.selected_instance_name s) with
       | Some config, Some instance ->
@@ -858,7 +930,7 @@ let tab_at_col col =
   find 0 1 Rewards_state.all_tabs
 
 (** Given a column position in the baker selector row (1-indexed), return the baker index.
-    Format: "Baker:  ◉ name1   ○ name2   [b: switch baker]"
+    Format: "Baker:  ◉ name1   ○ name2   [b: switch baker]  [a: add]"
     The prefix "Baker:  " is 8 chars. Each option is "◉ name   " or "○ name   ". *)
 let baker_at_col s col =
   let n = List.length s.baker_instances in
@@ -909,6 +981,103 @@ let validate_network s =
         "network may only contain alphanumeric characters and [_ - .] \
          characters"
 
+(** Network choice variant used by the network-selection modal. *)
+type network_choice = Network_known of Teztnets.network_info | Network_custom
+
+(** Open a network-selection modal listing the same networks shown in the node
+    install flow ({!Form_builder_bundles.get_network_infos}). The submitted
+    value is the network alias (slug) — compatible with
+    [Custom_baker_registry.build_instance_handle]. Falls back to a validated
+    text prompt on [Custom…] or when the network list cannot be fetched. *)
+let prompt_network ~on_submit =
+  let custom_prompt () =
+    Modal_helpers.prompt_validated_text_modal
+      ~title:"Add Custom Baker (2/6) · Network (custom)"
+      ~placeholder:(Some "mainnet / ghostnet / …")
+      ~validator:validate_network
+      ~on_submit
+      ()
+  in
+  match Form_builder_bundles.get_network_infos () with
+  | Error _ -> custom_prompt ()
+  | Ok nets ->
+      let sorted =
+        List.sort
+          (fun (a : Teztnets.network_info) (b : Teztnets.network_info) ->
+            String.compare
+              (String.lowercase_ascii a.human_name)
+              (String.lowercase_ascii b.human_name))
+          nets
+      in
+      let items =
+        List.map (fun n -> Network_known n) sorted @ [Network_custom]
+      in
+      let to_string = function
+        | Network_known n -> Form_builder_bundles.format_network_choice n
+        | Network_custom -> "[ Custom… ]"
+      in
+      Modal_helpers.open_choice_modal
+        ~title:"Add Custom Baker (2/6) · Network"
+        ~items
+        ~to_string
+        ~on_select:(function
+          | Network_known n -> on_submit n.Teztnets.alias
+          | Network_custom -> custom_prompt ())
+        ()
+
+(** Open a confirmation modal that removes [instance] from the custom-baker
+    registry. Also tears down any payout systemd units, the saved
+    [Payout_config], and scheduler bookkeeping for the instance. On success,
+    refreshes the page so the baker selector reloads. *)
+let remove_custom_baker_modal ~instance =
+  let label =
+    match Custom_baker_registry.find ~instance with
+    | Some {label = Some l; _} -> Printf.sprintf "%s (%s)" l instance
+    | _ -> instance
+  in
+  let timer_active = Systemd.is_payout_timer_active ~instance in
+  let has_payout_config = Payout_config.exists ~instance in
+  let extras =
+    let parts =
+      (if timer_active then ["the systemd payout timer"] else [])
+      @ if has_payout_config then ["the saved payout configuration"] else []
+    in
+    match parts with
+    | [] -> ""
+    | parts ->
+        Printf.sprintf "\nThis also removes %s." (String.concat " and " parts)
+  in
+  Modal_helpers.confirm_modal
+    ~title:"Remove Custom Baker"
+    ~message:(Printf.sprintf "Remove custom baker %s?%s" label extras)
+    ~on_result:(fun confirmed ->
+      if confirmed then (
+        (* 1. Tear down the payout systemd timer/service if it exists. *)
+        (if timer_active then
+           match Systemd.disable_payout_timer ~instance with
+           | Ok () -> ()
+           | Error (`Msg msg) ->
+               Context.toast_warn
+                 (Printf.sprintf "Timer disable warning: %s" msg)) ;
+        Systemd.remove_payout_units ~instance ;
+        Rewards_scheduler.set_payout_timer_active ~instance ~active:false ;
+        (* 2. Delete the saved Payout_config file. *)
+        (match Payout_config.delete ~instance with
+        | Ok () -> ()
+        | Error msg ->
+            Context.toast_warn
+              (Printf.sprintf "Payout config delete warning: %s" msg)) ;
+        (* 3. Remove the registry entry itself. *)
+        match Custom_baker_registry.remove ~instance with
+        | Ok () ->
+            Context.toast_success
+              (Printf.sprintf "Custom baker %s removed" instance) ;
+            Context.navigate name
+        | Error msg ->
+            Context.toast_error
+              (Printf.sprintf "Failed to remove custom baker: %s" msg)))
+    ()
+
 (** Open the "Add custom baker" multi-step modal flow.
     On success, refreshes [state.baker_instances] and selects the new entry. *)
 let add_custom_baker_modal () =
@@ -922,29 +1091,16 @@ let add_custom_baker_modal () =
           "Invalid baker PKH: must start with tz1/tz2/tz3/tz4 and be 36 \
            characters")
     ~on_submit:(fun baker_pkh ->
-      Modal_helpers.prompt_validated_text_modal
-        ~title:"Add Custom Baker (2/6) · Network"
-        ~placeholder:(Some "mainnet / ghostnet / …")
-        ~validator:validate_network
-        ~on_submit:(fun network ->
-          Modal_helpers.prompt_validated_text_modal
+      prompt_network ~on_submit:(fun network ->
+          Custom_baker_modals.prompt_endpoint
             ~title:"Add Custom Baker (3/6) · RPC Endpoint"
-            ~placeholder:(Some "host:8732")
-            ~validator:Custom_baker_registry.validate_endpoint
+            ~network
             ~on_submit:(fun endpoint ->
-              Modal_helpers.prompt_validated_text_modal
-                ~title:"Add Custom Baker (4/6) · Base Directory"
-                ~placeholder:(Some "/home/user/.tezos-client")
-                ~validator:(fun s ->
-                  if String.length s > 0 then Ok ()
-                  else Error "base directory must not be empty")
-                ~on_submit:(fun base_dir ->
-                  Modal_helpers.prompt_validated_text_modal
-                    ~title:"Add Custom Baker (5/6) · Payout Key Alias"
-                    ~placeholder:(Some "payout-key")
-                    ~validator:(fun s ->
-                      if String.length s > 0 then Ok ()
-                      else Error "payout key alias must not be empty")
+              Modal_helpers.select_client_base_dir_modal
+                ~on_select:(fun base_dir ->
+                  Custom_baker_modals.prompt_payout_key
+                    ~title:"Add Custom Baker (5/6) · Payout Key"
+                    ~base_dir
                     ~on_submit:(fun payout_key_alias ->
                       Modal_helpers.prompt_text_modal
                         ~title:"Add Custom Baker (6/6) · Label (optional)"
@@ -1010,8 +1166,7 @@ let add_custom_baker_modal () =
                         ())
                     ())
                 ())
-            ())
-        ())
+            ()))
     ()
 
 let handle_key ps key ~size:_ =
@@ -1122,6 +1277,14 @@ let handle_key ps key ~size:_ =
             (* Add custom baker *)
             add_custom_baker_modal () ;
             ps
+        | Some (Keys.Char "x") when Rewards_state.selected_baker_is_custom s
+          -> (
+            (* Remove the currently selected custom baker *)
+            match Rewards_state.selected_instance_name s with
+            | Some instance ->
+                remove_custom_baker_modal ~instance ;
+                ps
+            | None -> ps)
         | Some (Keys.Char "p") when s.active_tab = Rewards_state.Overview -> (
             (* Trigger payout confirmation *)
             let s = ps.Navigation.s in
@@ -1296,6 +1459,7 @@ let handled_keys () =
       Char "3";
       Char "4";
       Char "a";
+      Char "x";
       Char "b";
       Char "r";
       Char "j";
@@ -1365,6 +1529,11 @@ module Page : Miaou.Core.Tui_page.PAGE_SIG = struct
     let kh key help = Miaou.Core.Tui_page.{key; help} in
     let common =
       let base = [kh "a" "Add baker"; kh "Tab" "Next tab"; kh "Esc" "Back"] in
+      let base =
+        if Rewards_state.selected_baker_is_custom s then
+          kh "x" "Remove baker" :: base
+        else base
+      in
       if List.length s.baker_instances > 1 then kh "b" "Baker" :: base else base
     in
     let tab_keys =
