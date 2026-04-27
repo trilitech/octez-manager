@@ -15,48 +15,20 @@ let ( let* ) = Result.bind
 
 (* ── Helpers ───────────────────────────────────────────────── *)
 
-(** List all baker instances from the service registry. *)
-let list_baker_services () =
-  match Service_registry.list () with
-  | Error (`Msg msg) -> Error msg
-  | Ok services ->
-      Ok
-        (List.filter
-           (fun (svc : Service.t) -> String.equal svc.role "baker")
-           services)
+(** All fields the payout pipeline needs about a baker, abstracted over
+    whether the baker is registered as a managed service ({!Service_registry})
+    or as a custom entry ({!Custom_baker_registry}). *)
+type baker_context = {
+  instance : string;
+  baker_pkh : string;
+  network : string;
+  octez_client_bin : string;
+  endpoint : string;
+  base_dir : string option;
+}
 
-(** Resolve baker instance: auto-infer when single baker exists,
-    require [--baker] when multiple bakers are registered. *)
-let resolve_baker baker_opt =
-  match baker_opt with
-  | Some instance -> (
-      match Service_registry.find ~instance with
-      | Error (`Msg msg) -> Error msg
-      | Ok None ->
-          Error (Printf.sprintf "Baker instance '%s' not found." instance)
-      | Ok (Some svc) ->
-          if String.equal svc.Service.role "baker" then Ok svc
-          else
-            Error
-              (Printf.sprintf
-                 "Instance '%s' is not a baker (role: %s)."
-                 instance
-                 svc.Service.role))
-  | None -> (
-      match list_baker_services () with
-      | Error msg -> Error msg
-      | Ok [] -> Error "No baker instances found in service registry."
-      | Ok [svc] -> Ok svc
-      | Ok bakers ->
-          let names = List.map (fun (svc : Service.t) -> svc.instance) bakers in
-          Error
-            (Printf.sprintf
-               "Multiple bakers found. Use --baker <instance> to specify. \
-                Available: %s"
-               (String.concat ", " names)))
-
-(** Read the first delegate PKH from a baker's environment config. *)
-let baker_delegate (svc : Service.t) =
+(** Read the first delegate PKH from a managed baker's environment config. *)
+let baker_delegate_from_env (svc : Service.t) =
   match Node_env.read ~inst:svc.instance with
   | Error _ ->
       Error (Printf.sprintf "Cannot read config for baker '%s'." svc.instance)
@@ -80,6 +52,86 @@ let baker_delegate (svc : Service.t) =
                    "No delegates configured for baker '%s'."
                    svc.instance)
           | first :: _ -> Ok first))
+
+(** Build a [baker_context] from a managed baker service. *)
+let context_of_service (svc : Service.t) =
+  let* baker_pkh = baker_delegate_from_env svc in
+  let base_dir =
+    match Node_env.read ~inst:svc.instance with
+    | Error _ -> None
+    | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
+  in
+  Ok
+    {
+      instance = svc.instance;
+      baker_pkh;
+      network = svc.Service.network;
+      octez_client_bin = Filename.concat svc.Service.app_bin_dir "octez-client";
+      endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr;
+      base_dir;
+    }
+
+(** Build a [baker_context] from a custom-baker registry entry.
+    Normalizes the stored [host:port] endpoint into a URL via
+    {!Rpc_addr.to_endpoint} so [octez-client --endpoint] accepts it. *)
+let context_of_custom_entry (e : Custom_baker_registry.entry) =
+  {
+    instance = e.instance;
+    baker_pkh = e.baker_pkh;
+    network = e.network;
+    octez_client_bin = e.octez_client_bin;
+    endpoint = Rpc_addr.to_endpoint (Rpc_addr.of_string e.endpoint);
+    base_dir = Some e.base_dir;
+  }
+
+(** List all baker instance names known to either registry, paired with their
+    source for error messages. *)
+let list_all_baker_instances () =
+  let managed =
+    match Service_registry.list () with
+    | Ok svcs ->
+        List.filter_map
+          (fun (svc : Service.t) ->
+            if String.equal svc.role "baker" then Some svc.instance else None)
+          svcs
+    | Error _ -> []
+  in
+  let custom =
+    Custom_baker_registry.list ()
+    |> List.map (fun (e : Custom_baker_registry.entry) -> e.instance)
+  in
+  managed @ custom
+
+(** Resolve a baker instance to a {!baker_context}, looking in both
+    {!Service_registry} and {!Custom_baker_registry}. Auto-infers when only
+    one baker exists across both registries; otherwise [--baker] is required. *)
+let rec resolve_baker_context baker_opt =
+  match baker_opt with
+  | Some instance -> (
+      match Service_registry.find ~instance with
+      | Ok (Some svc) when String.equal svc.Service.role "baker" ->
+          context_of_service svc
+      | Ok (Some svc) ->
+          Error
+            (Printf.sprintf
+               "Instance '%s' is not a baker (role: %s)."
+               instance
+               svc.Service.role)
+      | Ok None | Error _ -> (
+          match Custom_baker_registry.find ~instance with
+          | Some entry -> Ok (context_of_custom_entry entry)
+          | None ->
+              Error (Printf.sprintf "Baker instance '%s' not found." instance)))
+  | None -> (
+      match list_all_baker_instances () with
+      | [] -> Error "No baker instances found."
+      | [single] -> resolve_baker_context (Some single)
+      | many ->
+          Error
+            (Printf.sprintf
+               "Multiple bakers found. Use --baker <instance> to specify. \
+                Available: %s"
+               (String.concat ", " many)))
 
 (** Load TzKT URL from payout config, falling back to default. *)
 let tzkt_url_for ~instance ~baker_pkh =
@@ -105,66 +157,62 @@ let json_flag =
 (* ── rewards status ────────────────────────────────────────── *)
 
 let status_run baker_opt =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh ->
-          let instance = svc.instance in
-          let network = svc.network in
-          let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
-          let current_cycle =
-            match Cycle_data.fetch_current_cycle ~tzkt_url with
-            | Ok c -> Some c
-            | Error _ -> None
-          in
-          let paid_cycles = Payout_report.list_paid_cycles ~instance in
-          let last_paid =
-            match paid_cycles with c :: _ -> Some c | [] -> None
-          in
-          let recent =
-            match
-              Cycle_data.fetch_recent_cycles ~tzkt_url ~baker:baker_pkh ~limit:5
-            with
-            | Ok cycles -> cycles
-            | Error _ -> []
-          in
-          let delegator_count =
-            match recent with cr :: _ -> cr.Rewards.num_delegators | [] -> 0
-          in
-          let pending =
-            match (current_cycle, last_paid) with
-            | Some cur, Some lp ->
-                let rec collect acc c =
-                  if c <= lp then List.rev acc else collect (c :: acc) (c - 1)
-                in
-                (* Pending = cycles after last_paid up to cur-1
+  | Ok ctx ->
+      let instance = ctx.instance in
+      let baker_pkh = ctx.baker_pkh in
+      let network = ctx.network in
+      let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+      let current_cycle =
+        match Cycle_data.fetch_current_cycle ~tzkt_url with
+        | Ok c -> Some c
+        | Error _ -> None
+      in
+      let paid_cycles = Payout_report.list_paid_cycles ~instance in
+      let last_paid = match paid_cycles with c :: _ -> Some c | [] -> None in
+      let recent =
+        match
+          Cycle_data.fetch_recent_cycles ~tzkt_url ~baker:baker_pkh ~limit:5
+        with
+        | Ok cycles -> cycles
+        | Error _ -> []
+      in
+      let delegator_count =
+        match recent with cr :: _ -> cr.Rewards.num_delegators | [] -> 0
+      in
+      let pending =
+        match (current_cycle, last_paid) with
+        | Some cur, Some lp ->
+            let rec collect acc c =
+              if c <= lp then List.rev acc else collect (c :: acc) (c - 1)
+            in
+            (* Pending = cycles after last_paid up to cur-1
                    (current cycle is still in progress) *)
-                collect [] (cur - 1)
-            | Some cur, None ->
-                List.filter_map
-                  (fun (cr : Rewards.cycle_rewards) ->
-                    if cr.cycle < cur then Some cr.cycle else None)
-                  recent
-            | _ -> []
-          in
-          Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
-          Printf.printf "Network: %s\n" network ;
-          (match current_cycle with
-          | Some c -> Printf.printf "Current cycle: %d\n" c
-          | None -> Printf.printf "Current cycle: unknown\n") ;
-          (match last_paid with
-          | Some c -> Printf.printf "Last paid cycle: %d\n" c
-          | None -> Printf.printf "Last paid cycle: none\n") ;
-          (match pending with
-          | [] -> Printf.printf "Pending cycles: none\n"
-          | _ ->
-              Printf.printf
-                "Pending cycles: %s\n"
-                (String.concat ", " (List.map string_of_int pending))) ;
-          Printf.printf "Delegators: %d\n" delegator_count ;
-          `Ok ())
+            collect [] (cur - 1)
+        | Some cur, None ->
+            List.filter_map
+              (fun (cr : Rewards.cycle_rewards) ->
+                if cr.cycle < cur then Some cr.cycle else None)
+              recent
+        | _ -> []
+      in
+      Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+      Printf.printf "Network: %s\n" network ;
+      (match current_cycle with
+      | Some c -> Printf.printf "Current cycle: %d\n" c
+      | None -> Printf.printf "Current cycle: unknown\n") ;
+      (match last_paid with
+      | Some c -> Printf.printf "Last paid cycle: %d\n" c
+      | None -> Printf.printf "Last paid cycle: none\n") ;
+      (match pending with
+      | [] -> Printf.printf "Pending cycles: none\n"
+      | _ ->
+          Printf.printf
+            "Pending cycles: %s\n"
+            (String.concat ", " (List.map string_of_int pending))) ;
+      Printf.printf "Delegators: %d\n" delegator_count ;
+      `Ok ()
 
 let status_cmd =
   let info =
@@ -252,52 +300,50 @@ let blueprint_to_json (bp : Rewards.payout_blueprint) =
     ]
 
 let generate_run baker_opt cycle_opt json force =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.instance in
-          let network = svc.network in
-          let cycle =
-            match cycle_opt with
-            | Some c -> Some c
-            | None -> (
-                let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
-                (* Use the latest completed cycle (current - 1) *)
-                match Cycle_data.fetch_current_cycle ~tzkt_url with
-                | Ok cur -> Some (cur - 1)
-                | Error _ -> None)
-          in
-          match cycle with
-          | None ->
-              Cli_helpers.cmdliner_error
-                "Cannot determine current cycle. Use --cycle to specify."
-          | Some cycle -> (
-              match
-                Payout_blueprint.generate
-                  ~instance
-                  ~baker:baker_pkh
-                  ~network
-                  ~cycle
-                  ~force
-                  ()
-              with
-              | Error msg ->
-                  if Payout_blueprint.is_already_paid ~instance ~cycle then (
-                    Printf.eprintf
-                      "Warning: Cycle %d was already paid. Use --force to \
-                       re-generate.\n"
-                      cycle ;
-                    `Error (false, msg))
-                  else Cli_helpers.cmdliner_error msg
-              | Ok bp ->
-                  if json then
-                    print_endline
-                      (Yojson.Safe.pretty_to_string (blueprint_to_json bp))
-                  else render_blueprint_table bp ;
-                  `Ok ())))
+  | Ok ctx -> (
+      let baker_pkh = ctx.baker_pkh in
+      let instance = ctx.instance in
+      let network = ctx.network in
+      let cycle =
+        match cycle_opt with
+        | Some c -> Some c
+        | None -> (
+            let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+            (* Use the latest completed cycle (current - 1) *)
+            match Cycle_data.fetch_current_cycle ~tzkt_url with
+            | Ok cur -> Some (cur - 1)
+            | Error _ -> None)
+      in
+      match cycle with
+      | None ->
+          Cli_helpers.cmdliner_error
+            "Cannot determine current cycle. Use --cycle to specify."
+      | Some cycle -> (
+          match
+            Payout_blueprint.generate
+              ~instance
+              ~baker:baker_pkh
+              ~network
+              ~cycle
+              ~force
+              ()
+          with
+          | Error msg ->
+              if Payout_blueprint.is_already_paid ~instance ~cycle then (
+                Printf.eprintf
+                  "Warning: Cycle %d was already paid. Use --force to \
+                   re-generate.\n"
+                  cycle ;
+                `Error (false, msg))
+              else Cli_helpers.cmdliner_error msg
+          | Ok bp ->
+              if json then
+                print_endline
+                  (Yojson.Safe.pretty_to_string (blueprint_to_json bp))
+              else render_blueprint_table bp ;
+              `Ok ()))
 
 let generate_cmd =
   let info =
@@ -321,120 +367,114 @@ let generate_cmd =
 (* ── rewards history ───────────────────────────────────────── *)
 
 let history_run baker_opt cycles_count json =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
+  | Ok ctx -> (
+      let baker_pkh = ctx.baker_pkh in
+      let instance = ctx.instance in
+      let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+      match
+        Cycle_data.fetch_recent_cycles
+          ~tzkt_url
+          ~baker:baker_pkh
+          ~limit:cycles_count
+      with
       | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.instance in
-          let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
-          match
-            Cycle_data.fetch_recent_cycles
-              ~tzkt_url
-              ~baker:baker_pkh
-              ~limit:cycles_count
-          with
-          | Error msg -> Cli_helpers.cmdliner_error msg
-          | Ok cycles ->
-              if json then
-                let cycle_json (cr : Rewards.cycle_rewards) =
-                  let earned =
-                    List.fold_left
-                      Int64.add
-                      0L
-                      [
-                        cr.block_rewards;
-                        cr.attestation_rewards;
-                        cr.other_rewards;
-                        cr.block_fees;
-                      ]
-                  in
-                  let status =
-                    Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
-                  in
-                  let distributed, fee_income =
-                    if status then
-                      match
-                        Payout_report.read_summary_json
-                          ~instance
-                          ~cycle:cr.cycle
-                      with
-                      | Ok s ->
-                          ( `String (Int64.to_string s.distributed_rewards),
-                            `String (Int64.to_string s.fee_income) )
-                      | Error _ -> (`Null, `Null)
-                    else (`Null, `Null)
-                  in
-                  `Assoc
+      | Ok cycles ->
+          if json then
+            let cycle_json (cr : Rewards.cycle_rewards) =
+              let earned =
+                List.fold_left
+                  Int64.add
+                  0L
+                  [
+                    cr.block_rewards;
+                    cr.attestation_rewards;
+                    cr.other_rewards;
+                    cr.block_fees;
+                  ]
+              in
+              let status =
+                Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
+              in
+              let distributed, fee_income =
+                if status then
+                  match
+                    Payout_report.read_summary_json ~instance ~cycle:cr.cycle
+                  with
+                  | Ok s ->
+                      ( `String (Int64.to_string s.distributed_rewards),
+                        `String (Int64.to_string s.fee_income) )
+                  | Error _ -> (`Null, `Null)
+                else (`Null, `Null)
+              in
+              `Assoc
+                [
+                  ("cycle", `Int cr.cycle);
+                  ("earned", `String (Int64.to_string earned));
+                  ("distributed", distributed);
+                  ("fee_income", fee_income);
+                  ("delegators", `Int cr.num_delegators);
+                  ("status", `String (if status then "paid" else "unpaid"));
+                ]
+            in
+            let json_out =
+              `Assoc
+                [
+                  ("baker", `String baker_pkh);
+                  ("instance", `String instance);
+                  ("cycles", `List (List.map cycle_json cycles));
+                ]
+            in
+            print_endline (Yojson.Safe.pretty_to_string json_out)
+          else (
+            Printf.printf "Baker: %s (%s)\n\n" instance baker_pkh ;
+            Printf.printf
+              "%-7s %-16s %-16s %-14s %-12s %s\n"
+              "CYCLE"
+              "EARNED"
+              "DISTRIBUTED"
+              "FEE INCOME"
+              "DELEGATORS"
+              "STATUS" ;
+            List.iter
+              (fun (cr : Rewards.cycle_rewards) ->
+                let earned =
+                  List.fold_left
+                    Int64.add
+                    0L
                     [
-                      ("cycle", `Int cr.cycle);
-                      ("earned", `String (Int64.to_string earned));
-                      ("distributed", distributed);
-                      ("fee_income", fee_income);
-                      ("delegators", `Int cr.num_delegators);
-                      ("status", `String (if status then "paid" else "unpaid"));
+                      cr.block_rewards;
+                      cr.attestation_rewards;
+                      cr.other_rewards;
+                      cr.block_fees;
                     ]
                 in
-                let json_out =
-                  `Assoc
-                    [
-                      ("baker", `String baker_pkh);
-                      ("instance", `String instance);
-                      ("cycles", `List (List.map cycle_json cycles));
-                    ]
+                let is_paid =
+                  Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
                 in
-                print_endline (Yojson.Safe.pretty_to_string json_out)
-              else (
-                Printf.printf "Baker: %s (%s)\n\n" instance baker_pkh ;
+                let distributed, fee_income =
+                  if is_paid then
+                    match
+                      Payout_report.read_summary_json ~instance ~cycle:cr.cycle
+                    with
+                    | Ok s ->
+                        ( format_tez_short s.distributed_rewards,
+                          format_tez_short s.fee_income )
+                    | Error _ -> ("\xE2\x80\x94", "\xE2\x80\x94")
+                  else ("\xE2\x80\x94", "\xE2\x80\x94")
+                in
+                let status_str = if is_paid then "paid" else "unpaid" in
                 Printf.printf
-                  "%-7s %-16s %-16s %-14s %-12s %s\n"
-                  "CYCLE"
-                  "EARNED"
-                  "DISTRIBUTED"
-                  "FEE INCOME"
-                  "DELEGATORS"
-                  "STATUS" ;
-                List.iter
-                  (fun (cr : Rewards.cycle_rewards) ->
-                    let earned =
-                      List.fold_left
-                        Int64.add
-                        0L
-                        [
-                          cr.block_rewards;
-                          cr.attestation_rewards;
-                          cr.other_rewards;
-                          cr.block_fees;
-                        ]
-                    in
-                    let is_paid =
-                      Payout_report.cycle_is_paid ~instance ~cycle:cr.cycle
-                    in
-                    let distributed, fee_income =
-                      if is_paid then
-                        match
-                          Payout_report.read_summary_json
-                            ~instance
-                            ~cycle:cr.cycle
-                        with
-                        | Ok s ->
-                            ( format_tez_short s.distributed_rewards,
-                              format_tez_short s.fee_income )
-                        | Error _ -> ("\xE2\x80\x94", "\xE2\x80\x94")
-                      else ("\xE2\x80\x94", "\xE2\x80\x94")
-                    in
-                    let status_str = if is_paid then "paid" else "unpaid" in
-                    Printf.printf
-                      "%-7d %-16s %-16s %-14s %-12d %s\n"
-                      cr.cycle
-                      (format_tez_short earned)
-                      distributed
-                      fee_income
-                      cr.num_delegators
-                      status_str)
-                  cycles) ;
-              `Ok ()))
+                  "%-7d %-16s %-16s %-14s %-12d %s\n"
+                  cr.cycle
+                  (format_tez_short earned)
+                  distributed
+                  fee_income
+                  cr.num_delegators
+                  status_str)
+              cycles) ;
+          `Ok ())
 
 let history_cmd =
   let info = Cmd.info "history" ~doc:"Show historical payout summaries." in
@@ -447,108 +487,90 @@ let history_cmd =
 (* ── rewards pay ───────────────────────────────────────────── *)
 
 let rec pay_run baker_opt cycle_opt dry_run confirm =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.instance in
-          let network = svc.network in
-          let cycle =
-            match cycle_opt with
-            | Some c -> Some c
-            | None -> (
-                let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
-                match Cycle_data.fetch_current_cycle ~tzkt_url with
-                | Ok cur -> Some (cur - 1)
-                | Error _ -> None)
-          in
-          match cycle with
-          | None ->
-              Cli_helpers.cmdliner_error
-                "Cannot determine current cycle. Use --cycle to specify."
-          | Some cycle -> (
-              match
-                Payout_blueprint.generate
-                  ~instance
-                  ~baker:baker_pkh
-                  ~network
-                  ~cycle
-                  ~force:dry_run
-                  ()
-              with
-              | Error msg -> Cli_helpers.cmdliner_error msg
-              | Ok blueprint ->
-                  let config =
-                    match Payout_config.load ~instance with
-                    | Ok c -> c
-                    | Error _ -> Payout_config.default ~baker_pkh
-                  in
-                  let octez_client_bin =
-                    Filename.concat svc.Service.app_bin_dir "octez-client"
-                  in
-                  let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
-                  let base_dir =
-                    match Node_env.read ~inst:instance with
-                    | Error _ -> None
-                    | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
-                  in
-                  let ctx : Payout_executor.context =
-                    {
-                      octez_client_bin;
-                      endpoint;
-                      base_dir;
-                      password_file = None;
-                      payout_key_alias = config.payout_key_alias;
-                      instance;
-                    }
-                  in
-                  (* Interactive confirmation unless --confirm is set *)
-                  if (not confirm) && not dry_run then begin
-                    let distributable =
-                      List.fold_left
-                        (fun acc (r : Rewards.delegator_reward) ->
-                          match r.status with
-                          | Rewards.Eligible -> Int64.add acc r.net_reward
-                          | _ -> acc)
-                        0L
-                        blueprint.delegator_rewards
-                    in
-                    Printf.printf "=== PAYOUT CONFIRMATION ===\n" ;
-                    Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
-                    Printf.printf
-                      "Network: %s\n"
-                      (String.uppercase_ascii network) ;
-                    Printf.printf "Cycle: %d\n" cycle ;
-                    Printf.printf
-                      "Total to distribute: %s\n"
-                      (format_tez_short distributable) ;
-                    Printf.printf
-                      "Eligible delegators: %d\n"
-                      blueprint.eligible_delegators ;
-                    Printf.printf
-                      "Estimated tx fees: %s\n"
-                      (format_tez_short blueprint.estimated_tx_fees) ;
-                    Printf.printf "\n" ;
-                    if String.equal (String.lowercase_ascii network) "mainnet"
-                    then
-                      Printf.printf "This action is IRREVERSIBLE on mainnet.\n" ;
-                    Printf.printf "Proceed? [y/N]: %!" ;
-                    let response =
-                      try input_line stdin with End_of_file -> "n"
-                    in
-                    let answer =
-                      String.lowercase_ascii (String.trim response)
-                    in
-                    if not (String.equal answer "y" || String.equal answer "yes")
-                    then begin
-                      Printf.printf "Aborted.\n" ;
-                      `Ok ()
-                    end
-                    else execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle
-                  end
-                  else execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle)))
+  | Ok bctx -> (
+      let baker_pkh = bctx.baker_pkh in
+      let instance = bctx.instance in
+      let network = bctx.network in
+      let cycle =
+        match cycle_opt with
+        | Some c -> Some c
+        | None -> (
+            let tzkt_url = tzkt_url_for ~instance ~baker_pkh in
+            match Cycle_data.fetch_current_cycle ~tzkt_url with
+            | Ok cur -> Some (cur - 1)
+            | Error _ -> None)
+      in
+      match cycle with
+      | None ->
+          Cli_helpers.cmdliner_error
+            "Cannot determine current cycle. Use --cycle to specify."
+      | Some cycle -> (
+          match
+            Payout_blueprint.generate
+              ~instance
+              ~baker:baker_pkh
+              ~network
+              ~cycle
+              ~force:dry_run
+              ()
+          with
+          | Error msg -> Cli_helpers.cmdliner_error msg
+          | Ok blueprint ->
+              let config =
+                match Payout_config.load ~instance with
+                | Ok c -> c
+                | Error _ -> Payout_config.default ~baker_pkh
+              in
+              let ctx : Payout_executor.context =
+                {
+                  octez_client_bin = bctx.octez_client_bin;
+                  endpoint = bctx.endpoint;
+                  base_dir = bctx.base_dir;
+                  password_file = None;
+                  payout_key_alias = config.payout_key_alias;
+                  instance;
+                }
+              in
+              (* Interactive confirmation unless --confirm is set *)
+              if (not confirm) && not dry_run then begin
+                let distributable =
+                  List.fold_left
+                    (fun acc (r : Rewards.delegator_reward) ->
+                      match r.status with
+                      | Rewards.Eligible -> Int64.add acc r.net_reward
+                      | _ -> acc)
+                    0L
+                    blueprint.delegator_rewards
+                in
+                Printf.printf "=== PAYOUT CONFIRMATION ===\n" ;
+                Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+                Printf.printf "Network: %s\n" (String.uppercase_ascii network) ;
+                Printf.printf "Cycle: %d\n" cycle ;
+                Printf.printf
+                  "Total to distribute: %s\n"
+                  (format_tez_short distributable) ;
+                Printf.printf
+                  "Eligible delegators: %d\n"
+                  blueprint.eligible_delegators ;
+                Printf.printf
+                  "Estimated tx fees: %s\n"
+                  (format_tez_short blueprint.estimated_tx_fees) ;
+                Printf.printf "\n" ;
+                if String.equal (String.lowercase_ascii network) "mainnet" then
+                  Printf.printf "This action is IRREVERSIBLE on mainnet.\n" ;
+                Printf.printf "Proceed? [y/N]: %!" ;
+                let response = try input_line stdin with End_of_file -> "n" in
+                let answer = String.lowercase_ascii (String.trim response) in
+                if not (String.equal answer "y" || String.equal answer "yes")
+                then begin
+                  Printf.printf "Aborted.\n" ;
+                  `Ok ()
+                end
+                else execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle
+              end
+              else execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle))
 
 and execute_pay ~ctx ~config ~blueprint ~dry_run ~cycle =
   let mode_str = if dry_run then "Dry-run" else "Broadcasting" in
@@ -648,30 +670,28 @@ let pay_cmd =
 (* ── rewards config import ─────────────────────────────────── *)
 
 let config_import_run baker_opt path =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          match Config_import.import_file ~baker_pkh path with
+  | Ok bctx -> (
+      let baker_pkh = bctx.baker_pkh in
+      let instance = bctx.instance in
+      match Config_import.import_file ~baker_pkh path with
+      | Error msg ->
+          Printf.eprintf "Error: %s\n" msg ;
+          `Error (false, msg)
+      | Ok result ->
+          (* Save imported config *)
+          (match Payout_config.save ~instance result.config with
+          | Ok () ->
+              Printf.printf "Configuration imported successfully.\n" ;
+              Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+              Printf.printf "Fields imported: %d\n" result.imported_fields
           | Error msg ->
-              Printf.eprintf "Error: %s\n" msg ;
-              `Error (false, msg)
-          | Ok result ->
-              let instance = svc.Service.instance in
-              (* Save imported config *)
-              (match Payout_config.save ~instance result.config with
-              | Ok () ->
-                  Printf.printf "Configuration imported successfully.\n" ;
-                  Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
-                  Printf.printf "Fields imported: %d\n" result.imported_fields
-              | Error msg ->
-                  Printf.eprintf "Warning: failed to save config: %s\n" msg) ;
-              if result.warnings <> [] then (
-                Printf.printf "\nWarnings:\n" ;
-                List.iter (fun w -> Printf.printf "  - %s\n" w) result.warnings) ;
-              `Ok ()))
+              Printf.eprintf "Warning: failed to save config: %s\n" msg) ;
+          if result.warnings <> [] then (
+            Printf.printf "\nWarnings:\n" ;
+            List.iter (fun w -> Printf.printf "  - %s\n" w) result.warnings) ;
+          `Ok ())
 
 let config_import_cmd =
   let info = Cmd.info "import" ~doc:"Import an external config.hjson file." in
@@ -688,10 +708,10 @@ let config_cmd =
 (* ── rewards notify test ──────────────────────────────────── *)
 
 let notify_test_run baker_opt =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc ->
-      let instance = svc.Service.instance in
+  | Ok bctx ->
+      let instance = bctx.instance in
       let channels =
         match Payout_config.load ~instance with
         | Ok c -> c.notifications
@@ -729,219 +749,192 @@ let notify_cmd =
 (* ── rewards continual start/stop/status/run ──────────────────── *)
 
 let continual_run_run baker_opt =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
+  | Ok bctx -> (
+      let baker_pkh = bctx.baker_pkh in
+      let instance = bctx.instance in
+      let config =
+        match Payout_config.load ~instance with
+        | Ok c -> c
+        | Error _ -> Payout_config.default ~baker_pkh
+      in
+      let tzkt_url = config.tzkt_url in
+      (* Fetch current cycle *)
+      match Cycle_data.fetch_current_cycle ~tzkt_url with
       | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.instance in
-          let config =
-            match Payout_config.load ~instance with
-            | Ok c -> c
-            | Error _ -> Payout_config.default ~baker_pkh
-          in
-          let tzkt_url = config.tzkt_url in
-          (* Fetch current cycle *)
-          match Cycle_data.fetch_current_cycle ~tzkt_url with
-          | Error msg -> Cli_helpers.cmdliner_error msg
-          | Ok current_cycle ->
-              let octez_client_bin =
-                Filename.concat svc.Service.app_bin_dir "octez-client"
-              in
-              let endpoint = Rpc_addr.to_endpoint svc.Service.rpc_addr in
-              let base_dir =
-                match Node_env.read ~inst:instance with
-                | Error _ -> None
-                | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
-              in
-              let ctx : Payout_executor.context =
-                {
-                  octez_client_bin;
-                  endpoint;
-                  base_dir;
-                  password_file = None;
-                  payout_key_alias = config.payout_key_alias;
-                  instance;
-                }
-              in
-              let results =
-                Payout_continual.pay_due_cycles
-                  ~ctx
-                  ~baker:baker_pkh
-                  ~network:svc.network
-                  ~current_cycle
-                  ~interval:config.continual_interval
-                  ~offset:config.continual_offset
-              in
-              if List.length results = 0 then (
-                Printf.printf "No cycles due for payout.\n" ;
-                `Ok ())
-              else (
-                List.iter
-                  (fun (cycle, (paid_count, result)) ->
-                    match result with
-                    | Ok () ->
-                        Printf.printf
-                          "Cycle %d: paid %d delegators\n"
-                          cycle
-                          paid_count
-                    | Error msg ->
-                        Printf.eprintf "Cycle %d: FAILED - %s\n" cycle msg)
-                  results ;
-                let all_ok =
-                  List.for_all
-                    (fun (_, (_, result)) ->
-                      match result with Ok () -> true | Error _ -> false)
-                    results
-                in
-                if all_ok then `Ok () else `Error (false, "Some payouts failed"))
-          ))
-
-let continual_start_run baker_opt interval offset =
-  match resolve_baker baker_opt with
-  | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.Service.instance in
-          let config =
-            match Payout_config.load ~instance with
-            | Ok c -> c
-            | Error _ -> Payout_config.default ~baker_pkh
-          in
-          let config =
+      | Ok current_cycle ->
+          let ctx : Payout_executor.context =
             {
-              config with
-              continual_enabled = true;
-              continual_interval = interval;
-              continual_offset = offset;
+              octez_client_bin = bctx.octez_client_bin;
+              endpoint = bctx.endpoint;
+              base_dir = bctx.base_dir;
+              password_file = None;
+              payout_key_alias = config.payout_key_alias;
+              instance;
             }
           in
-          match Payout_config.validate config with
-          | Error msg -> Cli_helpers.cmdliner_error msg
-          | Ok () -> (
-              match Payout_config.save ~instance config with
-              | Error msg -> Cli_helpers.cmdliner_error msg
-              | Ok () -> (
-                  (* Determine octez-manager binary path *)
-                  let octez_manager_bin =
-                    match Sys.executable_name with
-                    | "" -> "octez-manager"
-                    | path -> path
-                  in
-                  (* Get service user from the baker service *)
-                  let service_user =
-                    if Paths.is_root () then
-                      Systemd.get_service_user ~role:"baker" ~instance
-                    else None
-                  in
-                  (* Write systemd units *)
-                  match
-                    let* () =
-                      match
-                        Systemd.write_payout_service
-                          ~instance
-                          ~octez_manager_bin
-                          ~service_user
-                          ()
-                      with
-                      | Ok () -> Ok ()
-                      | Error (`Msg msg) ->
-                          Error
-                            (Printf.sprintf
-                               "Failed to write payout service: %s"
-                               msg)
-                    in
-                    let* () =
-                      match Systemd.write_payout_timer ~instance () with
-                      | Ok () -> Ok ()
-                      | Error (`Msg msg) ->
-                          Error
-                            (Printf.sprintf
-                               "Failed to write payout timer: %s"
-                               msg)
-                    in
-                    Ok ()
-                  with
-                  | Error msg -> Cli_helpers.cmdliner_error msg
-                  | Ok () ->
-                      (* Enable and start the timer *)
-                      (match Systemd.enable_payout_timer ~instance with
-                      | Error (`Msg msg) ->
-                          Printf.eprintf
-                            "Warning: failed to enable payout timer: %s\n"
-                            msg
-                      | Ok () ->
-                          Printf.printf "Payout timer enabled and started.\n") ;
-                      Printf.printf "Continual mode enabled for %s.\n" instance ;
-                      Printf.printf "  Interval: every %d cycle(s)\n" interval ;
-                      if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
-                      `Ok ()))))
-
-let continual_stop_run baker_opt =
-  match resolve_baker baker_opt with
-  | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh -> (
-          let instance = svc.Service.instance in
-          let config =
-            match Payout_config.load ~instance with
-            | Ok c -> c
-            | Error _ -> Payout_config.default ~baker_pkh
+          let results =
+            Payout_continual.pay_due_cycles
+              ~ctx
+              ~baker:baker_pkh
+              ~network:bctx.network
+              ~current_cycle
+              ~interval:config.continual_interval
+              ~offset:config.continual_offset
           in
-          let config = {config with continual_enabled = false} in
+          if List.length results = 0 then (
+            Printf.printf "No cycles due for payout.\n" ;
+            `Ok ())
+          else (
+            List.iter
+              (fun (cycle, (paid_count, result)) ->
+                match result with
+                | Ok () ->
+                    Printf.printf
+                      "Cycle %d: paid %d delegators\n"
+                      cycle
+                      paid_count
+                | Error msg ->
+                    Printf.eprintf "Cycle %d: FAILED - %s\n" cycle msg)
+              results ;
+            let all_ok =
+              List.for_all
+                (fun (_, (_, result)) ->
+                  match result with Ok () -> true | Error _ -> false)
+                results
+            in
+            if all_ok then `Ok () else `Error (false, "Some payouts failed")))
+
+let continual_start_run baker_opt interval offset =
+  match resolve_baker_context baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok bctx -> (
+      let baker_pkh = bctx.baker_pkh in
+      let instance = bctx.instance in
+      let config =
+        match Payout_config.load ~instance with
+        | Ok c -> c
+        | Error _ -> Payout_config.default ~baker_pkh
+      in
+      let config =
+        {
+          config with
+          continual_enabled = true;
+          continual_interval = interval;
+          continual_offset = offset;
+        }
+      in
+      match Payout_config.validate config with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok () -> (
           match Payout_config.save ~instance config with
           | Error msg -> Cli_helpers.cmdliner_error msg
-          | Ok () ->
-              (* Disable and stop the timer *)
-              (match Systemd.disable_payout_timer ~instance with
-              | Error (`Msg msg) ->
-                  Printf.eprintf
-                    "Warning: failed to disable payout timer: %s\n"
-                    msg
-              | Ok () -> Printf.printf "Payout timer disabled and stopped.\n") ;
-              Printf.printf "Continual mode disabled for %s.\n" instance ;
-              `Ok ()))
+          | Ok () -> (
+              (* Determine octez-manager binary path *)
+              let octez_manager_bin =
+                match Sys.executable_name with
+                | "" -> "octez-manager"
+                | path -> path
+              in
+              (* Get service user from the baker service *)
+              let service_user =
+                if Paths.is_root () then
+                  Systemd.get_service_user ~role:"baker" ~instance
+                else None
+              in
+              (* Write systemd units *)
+              match
+                let* () =
+                  match
+                    Systemd.write_payout_service
+                      ~instance
+                      ~octez_manager_bin
+                      ~service_user
+                      ()
+                  with
+                  | Ok () -> Ok ()
+                  | Error (`Msg msg) ->
+                      Error
+                        (Printf.sprintf
+                           "Failed to write payout service: %s"
+                           msg)
+                in
+                let* () =
+                  match Systemd.write_payout_timer ~instance () with
+                  | Ok () -> Ok ()
+                  | Error (`Msg msg) ->
+                      Error
+                        (Printf.sprintf "Failed to write payout timer: %s" msg)
+                in
+                Ok ()
+              with
+              | Error msg -> Cli_helpers.cmdliner_error msg
+              | Ok () ->
+                  (* Enable and start the timer *)
+                  (match Systemd.enable_payout_timer ~instance with
+                  | Error (`Msg msg) ->
+                      Printf.eprintf
+                        "Warning: failed to enable payout timer: %s\n"
+                        msg
+                  | Ok () -> Printf.printf "Payout timer enabled and started.\n") ;
+                  Printf.printf "Continual mode enabled for %s.\n" instance ;
+                  Printf.printf "  Interval: every %d cycle(s)\n" interval ;
+                  if offset > 0 then Printf.printf "  Offset: %d\n" offset ;
+                  `Ok ())))
+
+let continual_stop_run baker_opt =
+  match resolve_baker_context baker_opt with
+  | Error msg -> Cli_helpers.cmdliner_error msg
+  | Ok bctx -> (
+      let baker_pkh = bctx.baker_pkh in
+      let instance = bctx.instance in
+      let config =
+        match Payout_config.load ~instance with
+        | Ok c -> c
+        | Error _ -> Payout_config.default ~baker_pkh
+      in
+      let config = {config with continual_enabled = false} in
+      match Payout_config.save ~instance config with
+      | Error msg -> Cli_helpers.cmdliner_error msg
+      | Ok () ->
+          (* Disable and stop the timer *)
+          (match Systemd.disable_payout_timer ~instance with
+          | Error (`Msg msg) ->
+              Printf.eprintf "Warning: failed to disable payout timer: %s\n" msg
+          | Ok () -> Printf.printf "Payout timer disabled and stopped.\n") ;
+          Printf.printf "Continual mode disabled for %s.\n" instance ;
+          `Ok ())
 
 let continual_status_run baker_opt =
-  match resolve_baker baker_opt with
+  match resolve_baker_context baker_opt with
   | Error msg -> Cli_helpers.cmdliner_error msg
-  | Ok svc -> (
-      match baker_delegate svc with
-      | Error msg -> Cli_helpers.cmdliner_error msg
-      | Ok baker_pkh ->
-          let instance = svc.Service.instance in
-          let config =
-            match Payout_config.load ~instance with
-            | Ok c -> c
-            | Error _ -> Payout_config.default ~baker_pkh
-          in
-          Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
-          Printf.printf
-            "Continual mode: %s\n"
-            (if config.continual_enabled then "enabled" else "disabled") ;
-          Printf.printf
-            "Interval: every %d cycle(s)\n"
-            config.continual_interval ;
-          if config.continual_offset > 0 then
-            Printf.printf "Offset: %d\n" config.continual_offset ;
-          Printf.printf
-            "Delay: %d-%d blocks\n"
-            config.min_delay_blocks
-            config.max_delay_blocks ;
-          (* Show timer status *)
-          let timer_active = Systemd.is_payout_timer_active ~instance in
-          Printf.printf
-            "Timer active: %s\n"
-            (if timer_active then "yes" else "no") ;
-          (match Systemd.payout_timer_status ~instance with
-          | Some status -> Printf.printf "\nTimer status:\n%s\n" status
-          | None -> ()) ;
-          `Ok ())
+  | Ok bctx ->
+      let baker_pkh = bctx.baker_pkh in
+      let instance = bctx.instance in
+      let config =
+        match Payout_config.load ~instance with
+        | Ok c -> c
+        | Error _ -> Payout_config.default ~baker_pkh
+      in
+      Printf.printf "Baker: %s (%s)\n" instance baker_pkh ;
+      Printf.printf
+        "Continual mode: %s\n"
+        (if config.continual_enabled then "enabled" else "disabled") ;
+      Printf.printf "Interval: every %d cycle(s)\n" config.continual_interval ;
+      if config.continual_offset > 0 then
+        Printf.printf "Offset: %d\n" config.continual_offset ;
+      Printf.printf
+        "Delay: %d-%d blocks\n"
+        config.min_delay_blocks
+        config.max_delay_blocks ;
+      (* Show timer status *)
+      let timer_active = Systemd.is_payout_timer_active ~instance in
+      Printf.printf "Timer active: %s\n" (if timer_active then "yes" else "no") ;
+      (match Systemd.payout_timer_status ~instance with
+      | Some status -> Printf.printf "\nTimer status:\n%s\n" status
+      | None -> ()) ;
+      `Ok ()
 
 let continual_start_cmd =
   let info =
