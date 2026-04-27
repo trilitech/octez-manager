@@ -35,3 +35,6 @@ secret.json
 
 # Agent harness (local agent roster, not tracked)
 .harness/
+
+# Claude Code agent runtime worktrees (per-agent ephemeral checkouts)
+.claude/worktrees/
