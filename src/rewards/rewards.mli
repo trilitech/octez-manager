@@ -70,7 +70,10 @@ type cycle_rewards = {
   external_delegated_balance : Int64.t;
   block_rewards : Int64.t;
   attestation_rewards : Int64.t;
+  dal_rewards : Int64.t;  (** DAL attestation rewards. *)
   other_rewards : Int64.t;
+      (** VDF revelation + nonce revelation rewards. DAL attestation
+          rewards are tracked separately in {!field-dal_rewards}. *)
   block_fees : Int64.t;
   num_delegators : int;
   delegators : delegator_snapshot list;

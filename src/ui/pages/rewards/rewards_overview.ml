@@ -102,6 +102,7 @@ let render_last_completed_box ~box_width ~instance
             Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
           ( "Attestation",
             Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
+          ("DAL Rewards", Rewards.format_tez cr.dal_rewards ^ " \xEA\x9C\xA9");
           ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
           ("Delegators", string_of_int delegator_count);
           ("Payout Status", status_label);
@@ -255,6 +256,7 @@ let render_cycle_detail ~box_width ~instance ~baker:_
               Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
             ( "Attestation",
               Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
+            ("DAL Rewards", Rewards.format_tez cr.dal_rewards ^ " \xEA\x9C\xA9");
             ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
             ("Delegators", string_of_int delegator_count);
             ("Payout Status", status_label);
