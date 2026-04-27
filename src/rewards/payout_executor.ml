@@ -35,20 +35,33 @@ let base_argv ctx =
 
 (* ── Output parsing ────────────────────────────────────────── *)
 
+(* Tezos base58 alphabet — excludes 0, O, I, l. *)
+let is_base58 c =
+  (c >= '1' && c <= '9')
+  || (c >= 'A' && c <= 'H')
+  || (c >= 'J' && c <= 'N')
+  || (c >= 'P' && c <= 'Z')
+  || (c >= 'a' && c <= 'k')
+  || (c >= 'm' && c <= 'z')
+
+(* Tezos operation hashes are 51 base58 chars and start with 'o'. The second
+   character varies with the encoded payload (op…, on…, oo…, or…, …) — we must
+   not constrain it. *)
+let is_op_hash s =
+  String.length s = 51 && Char.equal s.[0] 'o' && String.for_all is_base58 s
+
 let extract_op_hash output =
   let lines = String.split_on_char '\n' output in
   let rec find = function
     | [] -> None
     | line :: rest -> (
         let trimmed = String.trim line in
-        if String.length trimmed > 2 && trimmed.[0] = 'o' && trimmed.[1] = 'o'
-        then Some trimmed
+        if is_op_hash trimmed then Some trimmed
         else
-          match String.split_on_char '\'' trimmed with
-          | _ :: hash :: _
-            when String.length hash > 2 && hash.[0] = 'o' && hash.[1] = 'o' ->
-              Some hash
-          | _ -> find rest)
+          let tokens = String.split_on_char '\'' trimmed in
+          match List.find_opt is_op_hash tokens with
+          | Some h -> Some h
+          | None -> find rest)
   in
   find lines
 

@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Diagnostics page moved to Experimental tab**: The Diagnostics page is now accessible via the Experimental features modal (press `6`) instead of having its own top-level tab.
 - **Rewards page: History tab removed**: The standalone History tab and its "Trends (Last 30 Cycles)" sparkline panel are gone. Cycle navigation lives on the Overview tab — the *Recent Cycles* table is now interactive (`j/k` to move the cursor, `Enter` to drill into a cycle's detail). The action shortcuts `g`/`p`/`d` (Generate / Pay / Dry-run) target the highlighted cycle when one is selected, falling back to the latest fetched cycle otherwise. Tab numbering shifts: Configuration is now `3`, not `4`.
 
+### Fixed
+
+- **Rewards page falsely reports payouts as "Partial"**: `extract_op_hash` only recognized operation hashes whose first two characters were `oo`, but Tezos operation hashes are 51 base58 characters starting with a single `o` and a varying second character (`op…`, `on…`, `or…`, …). Successful payouts were therefore recorded with `success = false`, leading the rewards page to label fully-paid cycles as "Partial" with `paid_delegators: 0` and `distributed_rewards: 0` even when on-chain transfers had completed and were visible on tzkt. Hash extraction now matches any well-formed 51-char base58 operation hash. Existing summary files for affected cycles are not rewritten — re-running a payout for those cycles is required to refresh the on-disk summary.
+
 ## [1.0.0] - 2026-04-16
 
 ### Added
