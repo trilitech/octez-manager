@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Diagnostics page moved to Experimental tab**: The Diagnostics page is now accessible via the Experimental features modal (press `6`) instead of having its own top-level tab.
 
+### Fixed
+
+- **Rewards page falsely reports payouts as "Partial"**: `extract_op_hash` only recognized operation hashes whose first two characters were `oo`, but Tezos operation hashes are 51 base58 characters starting with a single `o` and a varying second character (`op…`, `on…`, `or…`, …). Successful payouts were therefore recorded with `success = false`, leading the rewards page to label fully-paid cycles as "Partial" with `paid_delegators: 0` and `distributed_rewards: 0` even when on-chain transfers had completed and were visible on tzkt. Hash extraction now matches any well-formed 51-char base58 operation hash. Existing summary files for affected cycles are not rewritten — re-running a payout for those cycles is required to refresh the on-disk summary.
+
 ## [1.0.0] - 2026-04-16
 
 ### Added
