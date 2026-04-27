@@ -179,7 +179,10 @@ let maybe_compute_blueprint s =
                     let network =
                       match Service_registry.find ~instance with
                       | Ok (Some svc) -> svc.Service.network
-                      | _ -> "unknown"
+                      | _ -> (
+                          match Custom_baker_registry.find ~instance with
+                          | Some entry -> entry.Custom_baker_registry.network
+                          | None -> "unknown")
                     in
                     let config =
                       match s.config with
@@ -699,41 +702,67 @@ let handle_history_key ps key =
 (* ── Payout execution helper ──────────────────────────────── *)
 
 let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
-  let svc_opt = Service_registry.find ~instance in
-  match svc_opt with
-  | Ok (Some svc) -> (
-      let octez_client_bin =
-        Filename.concat svc.Service.app_bin_dir "octez-client"
-      in
-      let node_endpoint =
-        Delegate_scheduler.get_baker_node_endpoint ~instance
-        |> Option.value ~default:(Rpc_addr.to_endpoint svc.Service.rpc_addr)
-      in
-      let config =
-        match Payout_config.load ~instance with
-        | Ok c -> c
-        | Error _ -> Payout_config.default ~baker_pkh:pkh
-      in
-      let base_dir =
-        match Node_env.read ~inst:instance with
-        | Error _ -> None
-        | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
-      in
-      let ctx : Payout_executor.context =
-        {
-          octez_client_bin;
-          endpoint = node_endpoint;
-          base_dir;
-          password_file = None;
-          payout_key_alias = config.payout_key_alias;
-          instance;
-        }
-      in
+  let ctx_opt =
+    match Service_registry.find ~instance with
+    | Ok (Some svc) ->
+        let octez_client_bin =
+          Filename.concat svc.Service.app_bin_dir "octez-client"
+        in
+        let node_endpoint =
+          Delegate_scheduler.get_baker_node_endpoint ~instance
+          |> Option.value ~default:(Rpc_addr.to_endpoint svc.Service.rpc_addr)
+        in
+        let config =
+          match Payout_config.load ~instance with
+          | Ok c -> c
+          | Error _ -> Payout_config.default ~baker_pkh:pkh
+        in
+        let base_dir =
+          match Node_env.read ~inst:instance with
+          | Error _ -> None
+          | Ok pairs -> List.assoc_opt "OCTEZ_BAKER_BASE_DIR" pairs
+        in
+        let ctx : Payout_executor.context =
+          {
+            octez_client_bin;
+            endpoint = node_endpoint;
+            base_dir;
+            password_file = None;
+            payout_key_alias = config.payout_key_alias;
+            instance;
+          }
+        in
+        Some (ctx, config.sim_batch_size, network)
+    | _ -> (
+        match Custom_baker_registry.find ~instance with
+        | Some (entry : Custom_baker_registry.entry) ->
+            let config =
+              match Payout_config.load ~instance with
+              | Ok c -> c
+              | Error _ -> Payout_config.default ~baker_pkh:pkh
+            in
+            let ctx : Payout_executor.context =
+              {
+                octez_client_bin = entry.octez_client_bin;
+                endpoint =
+                  Rpc_addr.to_endpoint (Rpc_addr.of_string entry.endpoint);
+                base_dir = Some entry.base_dir;
+                password_file = None;
+                payout_key_alias = entry.payout_key_alias;
+                instance;
+              }
+            in
+            Some (ctx, config.sim_batch_size, entry.network)
+        | None -> None)
+  in
+  match ctx_opt with
+  | None -> Context.toast_error "Cannot resolve baker service"
+  | Some (ctx, sim_batch_size, effective_network) -> (
       match
         Payout_blueprint.generate
           ~instance
           ~baker:pkh
-          ~network
+          ~network:effective_network
           ~cycle
           ~force:dry_run
           ()
@@ -759,7 +788,7 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
                        if p.current mod 10 = 0 || p.current = p.total then
                          Context.toast_info
                            (Printf.sprintf "Progress: %d/%d" p.current p.total))
-                     ~batch_size:config.sim_batch_size
+                     ~batch_size:sim_batch_size
                      ()
                  with
                  | Ok (results, summary) ->
@@ -814,7 +843,6 @@ let run_payout_in_background ~instance ~pkh ~network ~cycle ~dry_run =
                      Rewards_scheduler.refresh_payout_status ~instance ~cycle ;
                      Context.toast_error
                        (Printf.sprintf "Payout failed: %s" msg))))
-  | _ -> Context.toast_error "Cannot resolve baker service"
 
 (** Given a column position in the tab bar (1-indexed), return the tab index.
     Each tab has width [String.length label + 4] (for padding/brackets). *)
@@ -986,7 +1014,10 @@ let handle_key ps key ~size:_ =
                       let network =
                         match Service_registry.find ~instance with
                         | Ok (Some svc) -> svc.Service.network
-                        | _ -> "unknown"
+                        | _ -> (
+                            match Custom_baker_registry.find ~instance with
+                            | Some entry -> entry.Custom_baker_registry.network
+                            | None -> "unknown")
                       in
                       Modal_helpers.open_choice_modal
                         ~title:
@@ -1033,7 +1064,10 @@ let handle_key ps key ~size:_ =
                     let network =
                       match Service_registry.find ~instance with
                       | Ok (Some svc) -> svc.Service.network
-                      | _ -> "unknown"
+                      | _ -> (
+                          match Custom_baker_registry.find ~instance with
+                          | Some entry -> entry.Custom_baker_registry.network
+                          | None -> "unknown")
                     in
                     run_payout_in_background
                       ~instance
