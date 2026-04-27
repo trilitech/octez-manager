@@ -32,6 +32,7 @@ let make_cycle_rewards ?(cycle = 100) ?(own_staked = 1_000_000_000L)
     external_delegated_balance = 0L;
     block_rewards;
     attestation_rewards = 0L;
+    dal_rewards = 0L;
     other_rewards = 0L;
     block_fees;
     num_delegators = List.length delegators;

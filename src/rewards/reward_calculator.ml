@@ -34,6 +34,7 @@ let generate_blueprint ~config ~network ~cycle_rewards =
       [
         cr.Rewards.block_rewards;
         cr.Rewards.attestation_rewards;
+        cr.Rewards.dal_rewards;
         cr.Rewards.other_rewards;
         cr.Rewards.block_fees;
       ]
