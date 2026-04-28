@@ -386,11 +386,14 @@ let edit_field ?network ?custom (config : Payout_config.t) field =
           pending_config := Some {config with payout_mode = mode})
         ()
   | PayoutKeyAlias ->
-      Modal_helpers.prompt_text_modal
-        ~title:"Payout Key Alias"
-        ~initial:config.payout_key_alias
-        ~on_submit:(fun s ->
-          pending_config := Some {config with payout_key_alias = s})
+      Modal_helpers.select_client_base_dir_modal
+        ~on_select:(fun base_dir ->
+          Custom_baker_modals.prompt_payout_key
+            ~title:"Payout Key"
+            ~base_dir
+            ~on_submit:(fun s ->
+              pending_config := Some {config with payout_key_alias = s})
+            ())
         ()
   | IndexerUrl ->
       let indexers = local_indexers_for_network ~network in
