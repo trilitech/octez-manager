@@ -85,6 +85,16 @@ val run_out_with_timeout :
 val set_run_out_with_timeout_hook :
   (timeout:float -> string list -> (string, [`Msg of string]) result) -> unit
 
+(** Like {!run_out_with_timeout} but returns the combined stdout and stderr
+    on success (with stderr appended after a newline). Useful for parsing
+    octez-client output where the operation hash may land on either stream. *)
+val run_out_with_timeout_combined :
+  timeout:float -> string list -> (string, [> `Msg of string]) result
+
+(** Override [run_out_with_timeout_combined] with a non-blocking implementation. *)
+val set_run_out_with_timeout_combined_hook :
+  (timeout:float -> string list -> (string, [`Msg of string]) result) -> unit
+
 (** Like {!run_out} but captures stderr to prevent it from leaking to
     the terminal.  Returns only stdout.  Useful for HTTP operations in
     the TUI where curl errors would corrupt the display. *)

@@ -180,11 +180,26 @@ let build_batch_cmd ~ctx ~batch_file ~batch_len ~dry_run =
   in
   if dry_run then cmd @ ["--dry-run"] else cmd
 
+(* Pull the most informative line out of [output] when no op_hash was found —
+   typically the last non-empty line of stderr from octez-client carries the
+   actual reason (e.g. "Balance of contract … too low"). *)
+let extract_failure_reason output =
+  let lines =
+    String.split_on_char '\n' output
+    |> List.map String.trim
+    |> List.filter (fun s -> String.length s > 0)
+  in
+  match List.rev lines with
+  | last :: _ -> last
+  | [] -> "no operation hash in output"
+
 let execute_batch ~ctx ~payouts ~dry_run =
   let batch_file = write_batch_file payouts in
   let batch_len = List.length payouts in
   let argv = build_batch_cmd ~ctx ~batch_file ~batch_len ~dry_run in
-  let cmd_result = Cmd_runner.run_out_with_timeout ~timeout:300.0 argv in
+  let cmd_result =
+    Cmd_runner.run_out_with_timeout_combined ~timeout:300.0 argv
+  in
   (try Sys.remove batch_file with Sys_error _ -> ()) ;
   match cmd_result with
   | Ok output ->
@@ -193,7 +208,7 @@ let execute_batch ~ctx ~payouts ~dry_run =
       let note =
         if dry_run then "dry-run"
         else if Option.is_some op_hash then "ok"
-        else "no operation hash in output"
+        else extract_failure_reason output
       in
       List.map
         (fun (delegator, recipient, amount) ->

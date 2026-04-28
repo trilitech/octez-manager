@@ -274,6 +274,53 @@ let run_out_with_timeout ~timeout argv =
         :> (string, [> `Msg of string]) result)
   | None -> run_out_blocking argv
 
+let run_out_with_timeout_combined_hook :
+    (timeout:float -> string list -> (string, [`Msg of string]) result) option
+    ref =
+  ref None
+
+let set_run_out_with_timeout_combined_hook f =
+  run_out_with_timeout_combined_hook := Some f
+
+let run_out_combined_blocking argv =
+  let cmd_str = cmd_to_string argv in
+  let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
+  close_out oc ;
+  let stdout_lines = ref [] in
+  let stderr_lines = ref [] in
+  (try
+     while true do
+       stdout_lines := input_line ic :: !stdout_lines
+     done
+   with End_of_file -> ()) ;
+  (try
+     while true do
+       stderr_lines := input_line ec :: !stderr_lines
+     done
+   with End_of_file -> ()) ;
+  let combined =
+    String.concat "\n" (List.rev !stdout_lines @ List.rev !stderr_lines)
+  in
+  match Unix.close_process_full (ic, oc, ec) with
+  | Unix.WEXITED 0 -> Ok combined
+  | _status ->
+      let msg =
+        Printf.sprintf "Command failed: %s\nOutput:\n%s" cmd_str combined
+      in
+      append_debug_log ("RUN_OUT_COMBINED ERROR: " ^ msg) ;
+      Error (`Msg msg)
+
+let run_out_with_timeout_combined ~timeout argv =
+  append_debug_log ("RUN_OUT_COMBINED " ^ cmd_to_string argv) ;
+  match !run_out_with_timeout_combined_hook with
+  | Some f ->
+      (f ~timeout argv
+        : (string, [`Msg of string]) result
+        :> (string, [> `Msg of string]) result)
+  | None ->
+      let _ = timeout in
+      run_out_combined_blocking argv
+
 let run_out_silent_blocking argv =
   let cmd_str = cmd_to_string argv in
   let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in
