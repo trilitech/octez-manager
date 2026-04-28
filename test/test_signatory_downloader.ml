@@ -301,6 +301,44 @@ let test_verify_tarball_checksum_uses_downloaded_tarball () =
     !verified_path
 
 (* ============================================================ *)
+(* Prerelease Filter Tests *)
+(* ============================================================ *)
+
+let mixed_signatory_versions : Signatory_downloader.version_info list =
+  [
+    {version = "1.3.2"; release_date = None; is_prerelease = false};
+    {version = "1.3.2-rc1"; release_date = None; is_prerelease = true};
+    {version = "1.3.1"; release_date = None; is_prerelease = false};
+    {version = "1.3.1-beta"; release_date = None; is_prerelease = true};
+  ]
+
+let test_filter_signatory_excludes_prerelease () =
+  let filtered =
+    Signatory_downloader.For_tests.filter_versions
+      ~include_prerelease:false
+      mixed_signatory_versions
+  in
+  check int "stable count" 2 (List.length filtered) ;
+  check
+    bool
+    "no prerelease kept"
+    true
+    (List.for_all (fun v -> not v.Signatory_downloader.is_prerelease) filtered)
+
+let test_filter_signatory_keeps_prerelease () =
+  let filtered =
+    Signatory_downloader.For_tests.filter_versions
+      ~include_prerelease:true
+      mixed_signatory_versions
+  in
+  check int "all kept" 4 (List.length filtered) ;
+  check
+    bool
+    "at least one prerelease"
+    true
+    (List.exists (fun v -> v.Signatory_downloader.is_prerelease) filtered)
+
+(* ============================================================ *)
 (* Test Suite Registration *)
 (* ============================================================ *)
 
@@ -357,6 +395,16 @@ let checksum_tests =
       test_verify_tarball_checksum_uses_downloaded_tarball );
   ]
 
+let filter_tests =
+  [
+    ( "filter excludes prereleases by default",
+      `Quick,
+      test_filter_signatory_excludes_prerelease );
+    ( "filter keeps prereleases when include_prerelease",
+      `Quick,
+      test_filter_signatory_keeps_prerelease );
+  ]
+
 let () =
   Alcotest.run
     "Signatory_downloader"
@@ -367,4 +415,5 @@ let () =
       ("Size Formatting", size_tests);
       ("Path Construction", path_tests);
       ("Checksums", checksum_tests);
+      ("Prerelease Filter", filter_tests);
     ]

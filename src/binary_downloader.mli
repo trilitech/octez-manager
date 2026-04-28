@@ -145,4 +145,9 @@ module For_tests : sig
     verify_file:
       (filepath:string -> expected_hash:string -> (unit, Rresult.R.msg) result) ->
     (unit, Rresult.R.msg) result
+
+  (** Filter versions according to [include_rc]; same logic as
+      {!fetch_versions} applies after parsing. *)
+  val filter_versions :
+    include_rc:bool -> version_info list -> version_info list
 end

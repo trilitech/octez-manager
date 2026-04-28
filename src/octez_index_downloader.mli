@@ -122,4 +122,9 @@ module For_tests : sig
   val arch_to_string : arch -> string
 
   val binary_url : version:string -> arch:arch -> string
+
+  (** Filter releases according to [include_prerelease]; same logic as
+      {!fetch_versions} applies after parsing. *)
+  val filter_versions :
+    include_prerelease:bool -> version_info list -> version_info list
 end

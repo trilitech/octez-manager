@@ -313,6 +313,60 @@ let test_verify_downloaded_binaries_mismatch_fails () =
       check bool "propagates mismatch" true (contains_substring msg "mismatch")
 
 (* ============================================================ *)
+(* Prerelease Filter Tests *)
+(* ============================================================ *)
+
+let mixed_versions : Binary_downloader.version_info list =
+  [
+    {version = "24.1"; release_date = None; is_rc = false};
+    {version = "24.0"; release_date = None; is_rc = false};
+    {version = "24.0-rc1"; release_date = None; is_rc = true};
+    {version = "23.4"; release_date = None; is_rc = false};
+    {version = "23.4-rc2"; release_date = None; is_rc = true};
+  ]
+
+let test_filter_versions_excludes_rc () =
+  let filtered =
+    Binary_downloader.For_tests.filter_versions ~include_rc:false mixed_versions
+  in
+  check int "stable count" 3 (List.length filtered) ;
+  check
+    bool
+    "no rc entries kept"
+    true
+    (List.for_all (fun v -> not v.Binary_downloader.is_rc) filtered)
+
+let test_filter_versions_keeps_rc () =
+  let filtered =
+    Binary_downloader.For_tests.filter_versions ~include_rc:true mixed_versions
+  in
+  check int "all entries kept" 5 (List.length filtered) ;
+  check
+    bool
+    "at least one rc kept"
+    true
+    (List.exists (fun v -> v.Binary_downloader.is_rc) filtered)
+
+let test_filter_versions_empty () =
+  let filtered =
+    Binary_downloader.For_tests.filter_versions ~include_rc:false []
+  in
+  check int "empty input" 0 (List.length filtered)
+
+let test_filter_versions_all_rc () =
+  let only_rc =
+    List.filter (fun v -> v.Binary_downloader.is_rc) mixed_versions
+  in
+  let filtered_off =
+    Binary_downloader.For_tests.filter_versions ~include_rc:false only_rc
+  in
+  let filtered_on =
+    Binary_downloader.For_tests.filter_versions ~include_rc:true only_rc
+  in
+  check int "all-rc dropped when off" 0 (List.length filtered_off) ;
+  check int "all-rc kept when on" 2 (List.length filtered_on)
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -409,6 +463,14 @@ let error_message_tests =
     ("curl error with exit code", `Quick, test_curl_error_message_with_exit_code);
   ]
 
+let filter_tests =
+  [
+    ("filter excludes RCs by default", `Quick, test_filter_versions_excludes_rc);
+    ("filter keeps RCs when include_rc", `Quick, test_filter_versions_keeps_rc);
+    ("filter on empty input", `Quick, test_filter_versions_empty);
+    ("filter on all-RC list", `Quick, test_filter_versions_all_rc);
+  ]
+
 let () =
   Alcotest.run
     "Binary_downloader_extended"
@@ -420,4 +482,5 @@ let () =
       ("binaries", binaries_tests);
       ("checksums", checksum_tests);
       ("error_messages", error_message_tests);
+      ("prerelease_filter", filter_tests);
     ]

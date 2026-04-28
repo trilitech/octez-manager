@@ -125,15 +125,15 @@ let fetch_releases_json () =
   | Ok _ -> R.error_msg "Empty response from GitHub API"
   | Error _ as e -> e
 
+let filter_versions ~include_prerelease versions =
+  if include_prerelease then versions
+  else List.filter (fun v -> not v.is_prerelease) versions
+
 let fetch_versions ?(include_prerelease = false) () =
   let* json_str = fetch_releases_json () in
   let json = Yojson.Safe.from_string json_str in
   let* versions = parse_release_json json in
-  let filtered =
-    if include_prerelease then versions
-    else List.filter (fun v -> not v.is_prerelease) versions
-  in
-  Ok filtered
+  Ok (filter_versions ~include_prerelease versions)
 
 (** Checksum verification *)
 
@@ -461,4 +461,6 @@ module For_tests = struct
   let checksums_url = checksums_url
 
   let verify_tarball_checksum = verify_tarball_checksum
+
+  let filter_versions = filter_versions
 end
