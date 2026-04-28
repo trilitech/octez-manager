@@ -53,6 +53,8 @@ let make_delegator ?(staked = 0L) addr balance =
 
 let test_single_delegator_proportional_share () =
   let config = default_config () in
+  (* Baker has no own_delegated, so the lone delegator captures the whole
+     delegated pool (block_rewards.delegated + block_fees). *)
   let cr =
     make_cycle_rewards
       ~own_staked:1_000_000_000L
@@ -66,24 +68,10 @@ let test_single_delegator_proportional_share () =
   in
   Alcotest.(check int) "total delegators" 1 bp.total_delegators ;
   Alcotest.(check int) "eligible delegators" 1 bp.eligible_delegators ;
-  (* With 50/50 stake, delegator gets ~half of total rewards *)
-  let total =
-    List.fold_left
-      Int64.add
-      0L
-      [
-        Rewards.total_of_split cr.block_rewards;
-        Rewards.total_of_split cr.attestation_rewards;
-        Rewards.total_of_split cr.vdf_rewards;
-        Rewards.total_of_split cr.nonce_rewards;
-        cr.block_fees;
-      ]
-  in
-  let expected_gross = Int64.div total 2L in
+  let expected_gross = Int64.add cr.block_rewards.delegated cr.block_fees in
   let dr = List.hd bp.delegator_rewards in
-  (* Allow 1 mutez tolerance for rounding *)
   let diff = Int64.abs (Int64.sub dr.gross_reward expected_gross) in
-  Alcotest.(check bool) "proportional share within 1 mutez" true (diff <= 1L)
+  Alcotest.(check bool) "lone delegator captures pool" true (diff <= 1L)
 
 let test_two_delegators_proportional () =
   let config = {(default_config ()) with baker_fee = 0.0} in
@@ -545,9 +533,13 @@ let test_redirect_override () =
 
 let test_baker_income_and_fees () =
   let config = {(default_config ()) with baker_fee = 0.10} in
+  (* Baker contributes 5M to total_delegated via own_delegated; addr_a
+     contributes 5M as a delegator. With pool=10M and total_delegated=10M,
+     baker keeps 5M and addr_a's gross is 5M (fee 10% = 500K). *)
   let cr =
     make_cycle_rewards
-      ~own_staked:5_000_000L
+      ~own_staked:0L
+      ~own_delegated:5_000_000L
       ~block_rewards:10_000_000L
       ~block_fees:0L
       [make_delegator addr_a 5_000_000L]
@@ -558,10 +550,8 @@ let test_baker_income_and_fees () =
       ~network:"ghostnet"
       ~cycle_rewards:cr
   in
-  (* Baker owns 50% → bond income ~5M *)
   let bond_diff = Int64.abs (Int64.sub bp.baker_bond_income 5_000_000L) in
   Alcotest.(check bool) "baker bond income ~5M" true (bond_diff <= 1L) ;
-  (* Delegator gross = 5M, fee = 10% = 500K *)
   let fee_diff = Int64.abs (Int64.sub bp.baker_fee_income 500_000L) in
   Alcotest.(check bool) "baker fee income ~500K" true (fee_diff <= 1L)
 
@@ -576,7 +566,8 @@ let test_bond_fee_recipient_payouts () =
   in
   let cr =
     make_cycle_rewards
-      ~own_staked:5_000_000L
+      ~own_staked:0L
+      ~own_delegated:5_000_000L
       ~block_rewards:10_000_000L
       ~block_fees:0L
       [make_delegator addr_a 5_000_000L]
@@ -616,6 +607,197 @@ let test_estimated_tx_fees () =
     "tx fees for 2 delegators"
     true
     (Int64.equal bp.estimated_tx_fees 800L)
+
+(* {1 Bucket-aware attribution} *)
+
+(** Build a cycle with the given per-bucket reward splits. Used by the
+    bucket-aware tests below to drive specific protocol buckets
+    independently of each other. *)
+let make_cycle_buckets ?(cycle = 100) ?(own_staked = 0L) ?(own_delegated = 0L)
+    ?(block_rewards = zero_split) ?(attestation_rewards = zero_split)
+    ?(dal_rewards = zero_split) ?(vdf_rewards = zero_split)
+    ?(nonce_rewards = zero_split) ?(block_fees = 0L) delegators =
+  {
+    Rewards.cycle;
+    baker = baker_pkh;
+    staking_balance = 0L;
+    delegated_balance = 0L;
+    own_staked_balance = own_staked;
+    own_delegated_balance = own_delegated;
+    external_staked_balance = 0L;
+    external_delegated_balance = 0L;
+    block_rewards;
+    attestation_rewards;
+    dal_rewards;
+    vdf_rewards;
+    nonce_rewards;
+    block_fees;
+    num_delegators = List.length delegators;
+    delegators;
+  }
+
+let split ?(delegated = 0L) ?(staked_own = 0L) ?(staked_edge = 0L)
+    ?(staked_shared = 0L) () : Rewards.reward_split =
+  {delegated; staked_own; staked_edge; staked_shared}
+
+let test_pure_delegator_only_delegated_pool () =
+  (* Delegator with delegated_balance > 0, staked_balance = 0. Cycle has
+     non-zero values in every staking sub-field of every reward type.
+     The delegator's gross must reflect only the [delegated] sub-fields
+     of block, attestation, and DAL — never the staking sub-fields. *)
+  let config = {(default_config ()) with baker_fee = 0.0} in
+  let cr =
+    make_cycle_buckets
+      ~own_staked:0L
+      ~own_delegated:0L
+      ~block_rewards:
+        (split
+           ~delegated:1_000_000L
+           ~staked_own:9_000_000L
+           ~staked_edge:5_000_000L
+           ~staked_shared:7_000_000L
+           ())
+      ~attestation_rewards:
+        (split
+           ~delegated:2_000_000L
+           ~staked_own:8_000_000L
+           ~staked_edge:4_000_000L
+           ~staked_shared:6_000_000L
+           ())
+      ~dal_rewards:
+        (split ~delegated:500_000L ~staked_own:1_500_000L ~staked_edge:0L ())
+      ~block_fees:0L
+      [make_delegator addr_a 1_000_000L]
+  in
+  let bp =
+    Reward_calculator.generate_blueprint
+      ~config
+      ~network:"ghostnet"
+      ~cycle_rewards:cr
+  in
+  let dr = List.hd bp.delegator_rewards in
+  let expected = Int64.add 1_000_000L (Int64.add 2_000_000L 500_000L) in
+  let diff = Int64.abs (Int64.sub dr.gross_reward expected) in
+  Alcotest.(check bool)
+    "gross matches sum of delegated sub-fields only"
+    true
+    (diff <= 1L)
+
+let test_pure_external_staker_gets_zero () =
+  (* A delegator entry with delegated_balance = 0 represents an external
+     staker. The protocol pays them their staked share directly into
+     their frozen deposit, so we must pay nothing. *)
+  let config = {(default_config ()) with baker_fee = 0.0; min_payout = 0L} in
+  let cr =
+    make_cycle_buckets
+      ~own_staked:0L
+      ~own_delegated:1_000_000L
+      ~block_rewards:
+        (split
+           ~delegated:10_000_000L
+           ~staked_own:5_000_000L
+           ~staked_shared:8_000_000L
+           ())
+      ~block_fees:500_000L
+      [make_delegator ~staked:5_000_000L addr_a 0L]
+  in
+  let bp =
+    Reward_calculator.generate_blueprint
+      ~config
+      ~network:"ghostnet"
+      ~cycle_rewards:cr
+  in
+  let dr = List.hd bp.delegator_rewards in
+  Alcotest.(check int64) "pure staker gross is zero" 0L dr.gross_reward
+
+let test_mixed_delegator_staker () =
+  (* Entry has both delegated_balance and staked_balance. Only the
+     delegated component contributes to the gross. *)
+  let config = {(default_config ()) with baker_fee = 0.0} in
+  let cr =
+    make_cycle_buckets
+      ~own_staked:0L
+      ~own_delegated:0L
+      ~block_rewards:
+        (split
+           ~delegated:10_000_000L
+           ~staked_own:99_000_000L
+           ~staked_shared:99_000_000L
+           ())
+      [make_delegator ~staked:5_000_000L addr_a 5_000_000L]
+  in
+  let bp =
+    Reward_calculator.generate_blueprint
+      ~config
+      ~network:"ghostnet"
+      ~cycle_rewards:cr
+  in
+  let dr = List.hd bp.delegator_rewards in
+  let diff = Int64.abs (Int64.sub dr.gross_reward 10_000_000L) in
+  Alcotest.(check bool)
+    "mixed entry gets only delegated portion (staked ignored)"
+    true
+    (diff <= 1L)
+
+let test_vdf_and_nonce_excluded_from_pool () =
+  (* VDF and nonce revelation rewards stay with the baker even when
+     their [delegated] sub-field is non-zero. *)
+  let config = {(default_config ()) with baker_fee = 0.0} in
+  let with_vdf_nonce =
+    make_cycle_buckets
+      ~own_staked:0L
+      ~own_delegated:0L
+      ~block_rewards:(split ~delegated:1_000_000L ())
+      ~vdf_rewards:(split ~delegated:5_000_000L ())
+      ~nonce_rewards:(split ~delegated:5_000_000L ())
+      [make_delegator addr_a 1_000_000L]
+  in
+  let without =
+    make_cycle_buckets
+      ~own_staked:0L
+      ~own_delegated:0L
+      ~block_rewards:(split ~delegated:1_000_000L ())
+      [make_delegator addr_a 1_000_000L]
+  in
+  let bp_with =
+    Reward_calculator.generate_blueprint
+      ~config
+      ~network:"ghostnet"
+      ~cycle_rewards:with_vdf_nonce
+  in
+  let bp_without =
+    Reward_calculator.generate_blueprint
+      ~config
+      ~network:"ghostnet"
+      ~cycle_rewards:without
+  in
+  let dr_with = List.hd bp_with.delegator_rewards in
+  let dr_without = List.hd bp_without.delegator_rewards in
+  Alcotest.(check int64)
+    "VDF and nonce do not enter the delegator's gross"
+    dr_without.gross_reward
+    dr_with.gross_reward
+
+let test_block_fees_in_pool () =
+  (* Block fees enter the pool unconditionally. *)
+  let config = {(default_config ()) with baker_fee = 0.0} in
+  let cr =
+    make_cycle_buckets
+      ~own_staked:0L
+      ~own_delegated:0L
+      ~block_rewards:zero_split
+      ~block_fees:1_000_000L
+      [make_delegator addr_a 1_000_000L]
+  in
+  let bp =
+    Reward_calculator.generate_blueprint
+      ~config
+      ~network:"ghostnet"
+      ~cycle_rewards:cr
+  in
+  let dr = List.hd bp.delegator_rewards in
+  let diff = Int64.abs (Int64.sub dr.gross_reward 1_000_000L) in
+  Alcotest.(check bool) "block fees flow to delegator" true (diff <= 1L)
 
 (* {1 Test runner} *)
 
@@ -681,5 +863,25 @@ let () =
             `Quick
             test_bond_fee_recipient_payouts;
           Alcotest.test_case "estimated tx fees" `Quick test_estimated_tx_fees;
+        ] );
+      ( "buckets",
+        [
+          Alcotest.test_case
+            "pure delegator only delegated pool"
+            `Quick
+            test_pure_delegator_only_delegated_pool;
+          Alcotest.test_case
+            "pure external staker gets zero"
+            `Quick
+            test_pure_external_staker_gets_zero;
+          Alcotest.test_case
+            "mixed delegator/staker"
+            `Quick
+            test_mixed_delegator_staker;
+          Alcotest.test_case
+            "VDF and nonce excluded from pool"
+            `Quick
+            test_vdf_and_nonce_excluded_from_pool;
+          Alcotest.test_case "block fees in pool" `Quick test_block_fees_in_pool;
         ] );
     ]
