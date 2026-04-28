@@ -225,6 +225,64 @@ let short_address addr =
   if len <= 14 then addr
   else String.sub addr 0 8 ^ ".." ^ String.sub addr (len - 4) 4
 
+(* Reports written by older builds may contain multi-line notes (e.g. the full
+   octez-client "Command failed: …\nOutput:\n…" trace). The most useful line
+   in that trace is rarely the last one ("multiple transfers simulation
+   failed" / "Fatal error:") — it's the protocol-layer diagnostic just above
+   it ("Underflowing subtraction of … tez and … tez", "Balance of contract …
+   too low (…)"). Heuristic: scan the last few non-empty lines and prefer one
+   that mentions a specific cause; fall back to the last line. *)
+let one_line_note ~max_width s =
+  let candidate =
+    if String.contains s '\n' then
+      let lines =
+        String.split_on_char '\n' s
+        |> List.map String.trim
+        |> List.filter (fun l -> String.length l > 0)
+      in
+      let contains_substring haystack needle =
+        let lh = String.length haystack and ln = String.length needle in
+        let rec check i =
+          if i + ln > lh then false
+          else if String.equal (String.sub haystack i ln) needle then true
+          else check (i + 1)
+        in
+        ln > 0 && check 0
+      in
+      let mentions_specific_cause line =
+        let l = String.lowercase_ascii line in
+        contains_substring l "underflowing"
+        || contains_substring l "balance "
+        || contains_substring l "too low"
+        || contains_substring l "insufficient"
+        || contains_substring l "rejected"
+        || contains_substring l "counter"
+      in
+      let tail = List.rev lines |> List.filteri (fun i _ -> i < 6) in
+      match List.find_opt mentions_specific_cause tail with
+      | Some line -> line
+      | None -> ( match tail with last :: _ -> last | [] -> s)
+    else s
+  in
+  let buf = Buffer.create (String.length candidate) in
+  let prev_space = ref false in
+  String.iter
+    (fun c ->
+      let c = match c with '\n' | '\r' | '\t' -> ' ' | _ -> c in
+      if c = ' ' then
+        if !prev_space then ()
+        else (
+          Buffer.add_char buf c ;
+          prev_space := true)
+      else (
+        Buffer.add_char buf c ;
+        prev_space := false))
+    (String.trim candidate) ;
+  let flat = Buffer.contents buf in
+  if String.length flat <= max_width then flat
+  else if max_width <= 1 then String.sub flat 0 max_width
+  else String.sub flat 0 (max_width - 1) ^ "\xE2\x80\xA6"
+
 let render_payouts_box ~box_width ~instance ~cycle =
   let results = Rewards_scheduler.get_payout_results ~instance ~cycle in
   match results with
@@ -238,6 +296,8 @@ let render_payouts_box ~box_width ~instance ~cycle =
           results
       in
       let total = List.length results in
+      let prefix_width = 2 + 3 + 1 + 16 + 1 + 16 + 1 in
+      let note_width = max 10 (box_width - 4 - prefix_width) in
       let header =
         "  " ^ Display.pad_right 3 "" ^ " "
         ^ Display.pad_right 16 "DELEGATOR"
@@ -248,7 +308,7 @@ let render_payouts_box ~box_width ~instance ~cycle =
       let rows =
         List.map
           (fun (r : Rewards.payout_result) ->
-            let icon, style =
+            let icon, _style =
               if r.success then ("\xe2\x9c\x93", Widgets.themed_success)
               else ("\xe2\x9c\x97", Widgets.themed_error)
             in
@@ -256,15 +316,14 @@ let render_payouts_box ~box_width ~instance ~cycle =
               if r.success then format_tez_short r.amount ^ " \xEA\x9C\xA9"
               else "\xE2\x80\x94"
             in
-            let note =
+            let raw_note =
               if r.success then ""
               else if String.length r.note > 0 then r.note
               else "failed"
             in
+            let note = one_line_note ~max_width:note_width raw_note in
             let line =
-              "  "
-              ^ Display.pad_right 3 (style icon)
-              ^ " "
+              "  " ^ Display.pad_right 3 icon ^ " "
               ^ Display.pad_right 16 (short_address r.delegator)
               ^ " "
               ^ Display.pad_right 16 amount_str
