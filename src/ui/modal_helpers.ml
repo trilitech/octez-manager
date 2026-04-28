@@ -81,10 +81,10 @@ let open_text_modal ~title ~lines =
         | Some Miaou.Core.Keys.Down -> "Down"
         | Some (Miaou.Core.Keys.Char "k") -> "Up"
         | Some (Miaou.Core.Keys.Char "j") -> "Down"
-        | Some (Miaou.Core.Keys.Char "Page_up") -> "Page_up"
-        | Some (Miaou.Core.Keys.Char "Page_down") -> "Page_down"
-        | Some (Miaou.Core.Keys.Char "Home") -> "g"
-        | Some (Miaou.Core.Keys.Char "End") -> "G"
+        | Some Miaou.Core.Keys.PageUp -> "Page_up"
+        | Some Miaou.Core.Keys.PageDown -> "Page_down"
+        | Some Miaou.Core.Keys.Home -> "g"
+        | Some Miaou.Core.Keys.End -> "G"
         | Some (Miaou.Core.Keys.Char "Esc")
         | Some (Miaou.Core.Keys.Char "Escape")
         | Some (Miaou.Core.Keys.Char "q") ->
@@ -180,10 +180,10 @@ let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
         | Some Miaou.Core.Keys.Down -> "Down"
         | Some (Miaou.Core.Keys.Char "k") -> "Up"
         | Some (Miaou.Core.Keys.Char "j") -> "Down"
-        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
-        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
-        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
-        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.PageUp -> "PageUp"
+        | Some Miaou.Core.Keys.PageDown -> "PageDown"
+        | Some Miaou.Core.Keys.Home -> "Home"
+        | Some Miaou.Core.Keys.End -> "End"
         | Some Miaou.Core.Keys.Enter -> "Enter"
         | Some (Miaou.Core.Keys.Char "Esc")
         | Some (Miaou.Core.Keys.Char "Escape")
@@ -379,10 +379,10 @@ let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
         | Some Miaou.Core.Keys.Down -> "Down"
         | Some (Miaou.Core.Keys.Char "k") -> "Up"
         | Some (Miaou.Core.Keys.Char "j") -> "Down"
-        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
-        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
-        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
-        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.PageUp -> "PageUp"
+        | Some Miaou.Core.Keys.PageDown -> "PageDown"
+        | Some Miaou.Core.Keys.Home -> "Home"
+        | Some Miaou.Core.Keys.End -> "End"
         | Some Miaou.Core.Keys.Enter -> "Enter"
         | Some (Miaou.Core.Keys.Char "?") -> "Hint"
         | Some (Miaou.Core.Keys.Char "Esc")
@@ -698,10 +698,10 @@ let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
         | Some Miaou.Core.Keys.Down -> "Down"
         | Some (Miaou.Core.Keys.Char "k") -> "Up"
         | Some (Miaou.Core.Keys.Char "j") -> "Down"
-        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
-        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
-        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
-        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.PageUp -> "PageUp"
+        | Some Miaou.Core.Keys.PageDown -> "PageDown"
+        | Some Miaou.Core.Keys.Home -> "Home"
+        | Some Miaou.Core.Keys.End -> "End"
         | Some Miaou.Core.Keys.Enter -> "Enter"
         | Some (Miaou.Core.Keys.Char "Esc")
         | Some (Miaou.Core.Keys.Char "Escape")
@@ -2551,10 +2551,10 @@ let open_theme_picker_modal ~title ~items ~to_string ~load_theme ~on_select
         | Some Miaou.Core.Keys.Down -> "Down"
         | Some (Miaou.Core.Keys.Char "k") -> "Up"
         | Some (Miaou.Core.Keys.Char "j") -> "Down"
-        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
-        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
-        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
-        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.PageUp -> "PageUp"
+        | Some Miaou.Core.Keys.PageDown -> "PageDown"
+        | Some Miaou.Core.Keys.Home -> "Home"
+        | Some Miaou.Core.Keys.End -> "End"
         | Some Miaou.Core.Keys.Enter -> "Enter"
         | Some (Miaou.Core.Keys.Char "Esc")
         | Some (Miaou.Core.Keys.Char "Escape")
