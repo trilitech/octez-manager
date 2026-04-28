@@ -25,7 +25,14 @@ let dry_report_dir ~instance ~cycle =
 let csv_header =
   "id,baker,timestamp,cycle,kind,op_kind,contract,token_id,fa_alias,fa_decimals,delegator,delegator_balance,staked_balance,recipient,amount,fee_rate,fee,tx_fee,op_hash,success,note"
 
+(* Replace newlines and tabs with spaces so a single CSV field cannot break
+   the row layout. CSV technically supports newlines inside quoted fields,
+   but several of our consumers (and shell tooling) parse line-by-line. *)
+let sanitize_csv_field s =
+  String.map (fun c -> match c with '\n' | '\r' | '\t' -> ' ' | _ -> c) s
+
 let escape_csv_field s =
+  let s = sanitize_csv_field s in
   if String.contains s ',' || String.contains s '"' then
     "\"" ^ String.concat "\"\"" (String.split_on_char '"' s) ^ "\""
   else s
@@ -184,45 +191,54 @@ let read_summary_json ~instance ~cycle =
     | Yojson.Json_error msg -> Error (Printf.sprintf "JSON parse error: %s" msg)
     | exn -> Error (Printexc.to_string exn)
 
-let parse_csv_line line =
-  let n = String.length line in
+(* Parse the whole file into logical CSV records. Newlines inside double-quoted
+   fields are kept as part of the field — required to recover reports written
+   by older builds that did not sanitize multi-line octez-client errors. *)
+let parse_csv_content content =
+  let n = String.length content in
+  let records = ref [] in
+  let current_fields = ref [] in
   let buf = Buffer.create 64 in
-  let fields = ref [] in
   let in_quote = ref false in
+  let push_field () =
+    current_fields := Buffer.contents buf :: !current_fields ;
+    Buffer.clear buf
+  in
+  let push_record () =
+    push_field () ;
+    records := List.rev !current_fields :: !records ;
+    current_fields := []
+  in
   let i = ref 0 in
   while !i < n do
-    let c = line.[!i] in
+    let c = content.[!i] in
     if !in_quote then
       if c = '"' then
-        if !i + 1 < n && line.[!i + 1] = '"' then begin
+        if !i + 1 < n && content.[!i + 1] = '"' then begin
           Buffer.add_char buf '"' ;
           incr i
         end
         else in_quote := false
       else Buffer.add_char buf c
     else if c = '"' && Buffer.length buf = 0 then in_quote := true
-    else if c = ',' then begin
-      fields := Buffer.contents buf :: !fields ;
-      Buffer.clear buf
+    else if c = ',' then push_field ()
+    else if c = '\n' || c = '\r' then begin
+      if c = '\r' && !i + 1 < n && content.[!i + 1] = '\n' then incr i ;
+      if List.length !current_fields > 0 || Buffer.length buf > 0 then
+        push_record ()
     end
     else Buffer.add_char buf c ;
     incr i
   done ;
-  fields := Buffer.contents buf :: !fields ;
-  List.rev !fields
+  if List.length !current_fields > 0 || Buffer.length buf > 0 then
+    push_record () ;
+  List.rev !records
 
 let read_csv_rows path =
   let ic = open_in path in
-  let rows = ref [] in
-  (try
-     let _ = input_line ic in
-     while true do
-       let line = input_line ic in
-       if String.length line > 0 then rows := parse_csv_line line :: !rows
-     done
-   with End_of_file -> ()) ;
+  let content = In_channel.input_all ic in
   close_in ic ;
-  List.rev !rows
+  match parse_csv_content content with _header :: rest -> rest | [] -> []
 
 let nth_or_empty fields i =
   match List.nth_opt fields i with Some s -> s | None -> ""
@@ -308,3 +324,7 @@ let list_paid_cycles ~instance =
           | exception _ -> None)
       |> List.sort (fun a b -> Int.compare b a)
     with _ -> []
+
+module Internal_for_tests = struct
+  let parse_csv_content = parse_csv_content
+end

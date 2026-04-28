@@ -263,6 +263,79 @@ let test_cycle_is_paid () =
   ignore report_path ;
   cleanup_dir dir
 
+(* ── CSV reader recovers multi-line note rows ─────────── *)
+
+(* A previous build wrote the multi-line "Command failed: …" error from
+   octez-client straight into the [note] column without escaping its newlines.
+   The reader must still produce one record per delegator (not one per
+   physical line) when handed such a corrupt file. *)
+let test_parse_multiline_quoted_note () =
+  let content =
+    String.concat
+      "\n"
+      [
+        "id,baker,timestamp,cycle,kind,op_kind,contract,token_id,fa_alias,fa_decimals,delegator,delegator_balance,staked_balance,recipient,amount,fee_rate,fee,tx_fee,op_hash,success,note";
+        "1,tz1Baker,2026-04-28T09:05:30Z,11374,delegator,transaction,,,,,tz1AAA,1387778,,tz1AAA,1387778,,,,,false,\"Command \
+         failed: octez-client multiple transfers";
+        "Output:";
+        "Node is bootstrapped.";
+        "This simulation failed:";
+        "  Balance of contract tz1Baker too low (0) to spend 1.387778\"";
+        "2,tz1Baker,2026-04-28T09:05:30Z,11374,delegator,transaction,,,,,tz1BBB,347401,,tz1BBB,347401,,,,,false,\"Command \
+         failed: blah";
+        "more lines\"";
+      ]
+  in
+  let records = Payout_report.Internal_for_tests.parse_csv_content content in
+  match records with
+  | _header :: data ->
+      Alcotest.(check int) "two data records" 2 (List.length data) ;
+      let first = List.nth data 0 in
+      let second = List.nth data 1 in
+      Alcotest.(check string) "first delegator" "tz1AAA" (List.nth first 10) ;
+      Alcotest.(check string) "first amount" "1387778" (List.nth first 14) ;
+      Alcotest.(check string) "first success" "false" (List.nth first 19) ;
+      Alcotest.(check bool)
+        "first note keeps multi-line content"
+        true
+        (let n = List.nth first 20 in
+         String.length n > 50 && String.contains n '\n') ;
+      Alcotest.(check string) "second delegator" "tz1BBB" (List.nth second 10)
+  | [] -> Alcotest.fail "no records parsed"
+
+(* New writes must sanitize newlines and tabs in notes so the row stays on
+   one line. *)
+let test_writer_sanitizes_note_newlines () =
+  let dir = tmpdir () in
+  let multiline = "Command failed:\nOutput:\n  Balance too low\n\twith tabs" in
+  let results =
+    [
+      {
+        Rewards.delegator = "tz1AAA";
+        recipient = "tz1AAA";
+        amount = 1_000_000L;
+        op_hash = None;
+        success = false;
+        note = multiline;
+      };
+    ]
+  in
+  (match
+     Payout_report.write_payouts_csv ~dir ~baker:"tz1Baker" ~cycle:42 results
+   with
+  | Ok () -> ()
+  | Error msg -> Alcotest.fail (Printf.sprintf "write failed: %s" msg)) ;
+  let path = Filename.concat dir "payouts.csv" in
+  let ic = open_in path in
+  let content = In_channel.input_all ic in
+  close_in ic ;
+  let lines =
+    String.split_on_char '\n' content
+    |> List.filter (fun s -> String.length s > 0)
+  in
+  Alcotest.(check int) "header + one row, no extra lines" 2 (List.length lines) ;
+  cleanup_dir dir
+
 let () =
   Alcotest.run
     "payout_report"
@@ -280,6 +353,14 @@ let () =
             "standard columns"
             `Quick
             test_csv_header_standard_columns;
+          Alcotest.test_case
+            "reader recovers multi-line quoted note"
+            `Quick
+            test_parse_multiline_quoted_note;
+          Alcotest.test_case
+            "writer sanitizes note newlines"
+            `Quick
+            test_writer_sanitizes_note_newlines;
         ] );
       ( "cycle_detection",
         [Alcotest.test_case "cycle_is_paid" `Quick test_cycle_is_paid] );
