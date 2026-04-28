@@ -9,31 +9,19 @@ type t = {
   version : int;
   baker_pkh : string;
   payout_key_alias : string;
-  payout_mode : Rewards.payout_mode;
   baker_fee : float;
   min_payout : Int64.t;
   min_balance : Int64.t;
   below_min_dest : Rewards.below_min_destination;
   overdelegation_protect : bool;
-  baker_pays_tx_fee : bool;
-  baker_pays_alloc_fee : bool;
   ignore_contracts : bool;
-  gas_buffer : int;
-  kt_gas_buffer : int;
-  deser_gas_buffer : int;
-  fee_buffer : int;
-  kt_fee_buffer : int;
   sim_batch_size : int;
-  min_delay_blocks : int;
-  max_delay_blocks : int;
   whitelist : string list;
   blacklist : string list;
   delegator_overrides : (string * Rewards.delegator_override) list;
   bond_recipients : (string * float) list;
   fee_recipients : (string * float) list;
-  rpc_fallback_pool : string list;
   tzkt_url : string;
-  explorer_url : string;
   notifications : Rewards.notification_channel list;
   continual_enabled : bool;
   continual_interval : int;
@@ -45,31 +33,19 @@ let default ~baker_pkh =
     version = 1;
     baker_pkh;
     payout_key_alias = baker_pkh;
-    payout_mode = Rewards.Actual;
     baker_fee = 0.05;
     min_payout = 0L;
     min_balance = 0L;
     below_min_dest = Rewards.Baker_keeps;
     overdelegation_protect = true;
-    baker_pays_tx_fee = false;
-    baker_pays_alloc_fee = false;
     ignore_contracts = false;
-    gas_buffer = 200;
-    kt_gas_buffer = 2500;
-    deser_gas_buffer = 5;
-    fee_buffer = 2;
-    kt_fee_buffer = 20;
     sim_batch_size = 80;
-    min_delay_blocks = 1;
-    max_delay_blocks = 15;
     whitelist = [];
     blacklist = [];
     delegator_overrides = [];
     bond_recipients = [];
     fee_recipients = [];
-    rpc_fallback_pool = [];
     tzkt_url = "https://api.tzkt.io";
-    explorer_url = "https://tzkt.io";
     notifications = [];
     continual_enabled = false;
     continual_interval = 1;
@@ -125,15 +101,7 @@ let validate t =
     Error (Printf.sprintf "baker_fee %.4f out of range [0.0, 1.0]" t.baker_fee)
   else if t.min_payout < 0L then Error "min_payout must be >= 0"
   else if t.min_balance < 0L then Error "min_balance must be >= 0"
-  else if t.gas_buffer <= 0 then Error "gas_buffer must be > 0"
-  else if t.kt_gas_buffer <= 0 then Error "kt_gas_buffer must be > 0"
-  else if t.deser_gas_buffer <= 0 then Error "deser_gas_buffer must be > 0"
-  else if t.fee_buffer <= 0 then Error "fee_buffer must be > 0"
-  else if t.kt_fee_buffer <= 0 then Error "kt_fee_buffer must be > 0"
   else if t.sim_batch_size <= 0 then Error "sim_batch_size must be > 0"
-  else if t.min_delay_blocks < 0 then Error "min_delay_blocks must be >= 0"
-  else if t.max_delay_blocks < t.min_delay_blocks then
-    Error "max_delay_blocks must be >= min_delay_blocks"
   else if t.continual_interval < 1 then Error "continual_interval must be >= 1"
   else if t.continual_offset < 0 || t.continual_offset >= t.continual_interval
   then Error "continual_offset must be in [0, continual_interval)"
@@ -272,8 +240,6 @@ let delegator_override_to_json (ov : Rewards.delegator_override) =
          "max_balance_cap"
          (fun i -> `String (Int64.to_string i))
          ov.max_balance_cap
-    |> add_opt "baker_pays_tx_fee" (fun b -> `Bool b) ov.baker_pays_tx_fee
-    |> add_opt "baker_pays_alloc_fee" (fun b -> `Bool b) ov.baker_pays_alloc_fee
   in
   `Assoc fields
 
@@ -290,8 +256,6 @@ let delegator_override_of_json json =
       (match member "max_balance_cap" json with
       | `String s -> ( try Some (Int64.of_string s) with _ -> None)
       | _ -> None);
-    baker_pays_tx_fee = member "baker_pays_tx_fee" json |> to_bool_option;
-    baker_pays_alloc_fee = member "baker_pays_alloc_fee" json |> to_bool_option;
   }
 
 let to_json t =
@@ -300,23 +264,13 @@ let to_json t =
       ("version", `Int t.version);
       ("baker_pkh", `String t.baker_pkh);
       ("payout_key_alias", `String t.payout_key_alias);
-      ("payout_mode", `String (Rewards.string_of_payout_mode t.payout_mode));
       ("baker_fee", `Float t.baker_fee);
       ("min_payout", `String (Int64.to_string t.min_payout));
       ("min_balance", `String (Int64.to_string t.min_balance));
       ("below_min_dest", `String (string_of_below_min_dest t.below_min_dest));
       ("overdelegation_protect", `Bool t.overdelegation_protect);
-      ("baker_pays_tx_fee", `Bool t.baker_pays_tx_fee);
-      ("baker_pays_alloc_fee", `Bool t.baker_pays_alloc_fee);
       ("ignore_contracts", `Bool t.ignore_contracts);
-      ("gas_buffer", `Int t.gas_buffer);
-      ("kt_gas_buffer", `Int t.kt_gas_buffer);
-      ("deser_gas_buffer", `Int t.deser_gas_buffer);
-      ("fee_buffer", `Int t.fee_buffer);
-      ("kt_fee_buffer", `Int t.kt_fee_buffer);
       ("sim_batch_size", `Int t.sim_batch_size);
-      ("min_delay_blocks", `Int t.min_delay_blocks);
-      ("max_delay_blocks", `Int t.max_delay_blocks);
       ("whitelist", `List (List.map (fun s -> `String s) t.whitelist));
       ("blacklist", `List (List.map (fun s -> `String s) t.blacklist));
       ( "delegator_overrides",
@@ -334,10 +288,7 @@ let to_json t =
           (List.map
              (fun (addr, share) -> (addr, `Float share))
              t.fee_recipients) );
-      ( "rpc_fallback_pool",
-        `List (List.map (fun s -> `String s) t.rpc_fallback_pool) );
       ("tzkt_url", `String t.tzkt_url);
-      ("explorer_url", `String t.explorer_url);
       ("notifications", `List (List.map notification_to_json t.notifications));
       ("continual_enabled", `Bool t.continual_enabled);
       ("continual_interval", `Int t.continual_interval);
@@ -355,13 +306,6 @@ let of_json json =
       | _ -> failwith "expected int64"
     in
     let version = member "version" json |> to_int in
-    let payout_mode_str = member "payout_mode" json |> to_string in
-    let payout_mode =
-      match Rewards.payout_mode_of_string payout_mode_str with
-      | Some m -> m
-      | None ->
-          failwith (Printf.sprintf "unknown payout_mode: %s" payout_mode_str)
-    in
     let below_min_str = member "below_min_dest" json |> to_string in
     let below_min_dest =
       match below_min_dest_of_string below_min_str with
@@ -395,32 +339,19 @@ let of_json json =
         version;
         baker_pkh = member "baker_pkh" json |> to_string;
         payout_key_alias = member "payout_key_alias" json |> to_string;
-        payout_mode;
         baker_fee = member "baker_fee" json |> to_float;
         min_payout = member "min_payout" json |> int64_of_json;
         min_balance = member "min_balance" json |> int64_of_json;
         below_min_dest;
         overdelegation_protect = member "overdelegation_protect" json |> to_bool;
-        baker_pays_tx_fee = member "baker_pays_tx_fee" json |> to_bool;
-        baker_pays_alloc_fee = member "baker_pays_alloc_fee" json |> to_bool;
         ignore_contracts = member "ignore_contracts" json |> to_bool;
-        gas_buffer = member "gas_buffer" json |> to_int;
-        kt_gas_buffer = member "kt_gas_buffer" json |> to_int;
-        deser_gas_buffer = member "deser_gas_buffer" json |> to_int;
-        fee_buffer = member "fee_buffer" json |> to_int;
-        kt_fee_buffer = member "kt_fee_buffer" json |> to_int;
         sim_batch_size = member "sim_batch_size" json |> to_int;
-        min_delay_blocks = member "min_delay_blocks" json |> to_int;
-        max_delay_blocks = member "max_delay_blocks" json |> to_int;
         whitelist = member "whitelist" json |> to_list |> List.map to_string;
         blacklist = member "blacklist" json |> to_list |> List.map to_string;
         delegator_overrides;
         bond_recipients = share_map_of_json (member "bond_recipients" json);
         fee_recipients = share_map_of_json (member "fee_recipients" json);
-        rpc_fallback_pool =
-          member "rpc_fallback_pool" json |> to_list |> List.map to_string;
         tzkt_url = member "tzkt_url" json |> to_string;
-        explorer_url = member "explorer_url" json |> to_string;
         notifications;
         continual_enabled =
           (try member "continual_enabled" json |> to_bool with _ -> false);

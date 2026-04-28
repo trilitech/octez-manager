@@ -46,15 +46,12 @@ type field_id =
   | CustomPayoutKey
   (* Payout config fields (all bakers) *)
   | BakerFee
-  | PayoutMode
   | PayoutKeyAlias
   | IndexerUrl
   | MinPayout
   | MinBalance
   | BelowMinDest
   | OverdelegationProtect
-  | BakerPaysTxFee
-  | BakerPaysAllocFee
   | IgnoreContracts
   | ContinualEnabled
   | ContinualInterval
@@ -73,15 +70,12 @@ let custom_baker_fields =
 let payout_fields =
   [
     BakerFee;
-    PayoutMode;
     PayoutKeyAlias;
     IndexerUrl;
     MinPayout;
     MinBalance;
     BelowMinDest;
     OverdelegationProtect;
-    BakerPaysTxFee;
-    BakerPaysAllocFee;
     IgnoreContracts;
     ContinualEnabled;
     ContinualInterval;
@@ -114,15 +108,12 @@ let field_label = function
   | CustomBaseDir -> "Base Directory"
   | CustomPayoutKey -> "Payout Key (wallet)"
   | BakerFee -> "Baker Fee"
-  | PayoutMode -> "Payout Mode"
   | PayoutKeyAlias -> "Payout Key"
   | IndexerUrl -> "Indexer URL"
   | MinPayout -> "Min Payout"
   | MinBalance -> "Min Balance"
   | BelowMinDest -> "Below Min Dest"
   | OverdelegationProtect -> "Overdelegation Prot"
-  | BakerPaysTxFee -> "Baker Pays TX Fee"
-  | BakerPaysAllocFee -> "Baker Pays Alloc Fee"
   | IgnoreContracts -> "Ignore Contracts"
   | ContinualEnabled -> "Continual Mode"
   | ContinualInterval -> "Continual Interval"
@@ -145,9 +136,6 @@ let field_hint = function
        the base directory above."
   | BakerFee ->
       "Percentage fee deducted from delegator rewards as baker compensation."
-  | PayoutMode ->
-      "Actual: pay based on real rewards received. Ideal: pay based on \
-       expected rewards regardless of missed blocks."
   | PayoutKeyAlias -> "octez-client key alias used to sign payout transactions."
   | IndexerUrl ->
       "Base URL of the indexer used to fetch cycle rewards and delegator data. \
@@ -164,12 +152,6 @@ let field_hint = function
   | OverdelegationProtect ->
       "When enabled, caps rewards if total delegation exceeds the baker's \
        staking capacity."
-  | BakerPaysTxFee ->
-      "When enabled, transaction fees are paid by the baker rather than \
-       deducted from delegator rewards."
-  | BakerPaysAllocFee ->
-      "When enabled, the baker pays the 0.06 tz allocation fee for new \
-       accounts."
   | IgnoreContracts ->
       "When enabled, smart contract delegators are excluded from payouts."
   | ContinualEnabled ->
@@ -199,10 +181,6 @@ let field_value ?custom (config : Payout_config.t) field =
       | Some entry -> custom_field_value entry field
       | None -> "")
   | BakerFee -> Printf.sprintf "%.1f%%" (config.baker_fee *. 100.0)
-  | PayoutMode -> (
-      match config.payout_mode with
-      | Rewards.Actual -> "Actual"
-      | Rewards.Ideal -> "Ideal")
   | PayoutKeyAlias -> config.payout_key_alias
   | IndexerUrl -> config.tzkt_url
   | MinPayout ->
@@ -216,11 +194,6 @@ let field_value ?custom (config : Payout_config.t) field =
   | OverdelegationProtect ->
       if config.overdelegation_protect then "\xe2\x9c\x93 Enabled"
       else "\xe2\x9c\x97 Disabled"
-  | BakerPaysTxFee ->
-      if config.baker_pays_tx_fee then "\xe2\x9c\x93 Yes" else "\xe2\x9c\x97 No"
-  | BakerPaysAllocFee ->
-      if config.baker_pays_alloc_fee then "\xe2\x9c\x93 Yes"
-      else "\xe2\x9c\x97 No"
   | IgnoreContracts ->
       if config.ignore_contracts then "\xe2\x9c\x93 Yes" else "\xe2\x9c\x97 No"
   | ContinualEnabled ->
@@ -374,17 +347,6 @@ let edit_field ?network ?custom (config : Payout_config.t) field =
               pending_config := Some {config with baker_fee = f /. 100.0}
           | None -> ())
         ()
-  | PayoutMode ->
-      Modal_helpers.open_choice_modal
-        ~title:"Payout Mode"
-        ~items:["Actual"; "Ideal"]
-        ~to_string:(fun s -> s)
-        ~on_select:(fun choice ->
-          let mode =
-            match choice with "Ideal" -> Rewards.Ideal | _ -> Rewards.Actual
-          in
-          pending_config := Some {config with payout_mode = mode})
-        ()
   | PayoutKeyAlias ->
       Modal_helpers.select_client_base_dir_modal
         ~on_select:(fun base_dir ->
@@ -476,13 +438,6 @@ let edit_field ?network ?custom (config : Payout_config.t) field =
             config with
             overdelegation_protect = not config.overdelegation_protect;
           }
-  | BakerPaysTxFee ->
-      pending_config :=
-        Some {config with baker_pays_tx_fee = not config.baker_pays_tx_fee}
-  | BakerPaysAllocFee ->
-      pending_config :=
-        Some
-          {config with baker_pays_alloc_fee = not config.baker_pays_alloc_fee}
   | IgnoreContracts ->
       pending_config :=
         Some {config with ignore_contracts = not config.ignore_contracts}

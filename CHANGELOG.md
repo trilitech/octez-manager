@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **Rewards: dedicated "Failed" payout status**: A cycle whose payouts all failed is now shown as `Failed` (red) instead of `Partial`. `Partial` is reserved for cycles where some delegates were paid and some were not.
+
+### Removed
+
+- **Rewards Configuration tab: dead and cosmetic fields**: removed `Payout Mode` (Actual/Ideal), `Baker Pays TX Fee`, and `Baker Pays Alloc Fee` toggles, plus the unused `gas_buffer`, `kt_gas_buffer`, `deser_gas_buffer`, `fee_buffer`, `kt_fee_buffer`, `min_delay_blocks`, `max_delay_blocks`, `rpc_fallback_pool`, and `explorer_url` fields, along with the `baker_pays_tx_fee` / `baker_pays_alloc_fee` per-delegator overrides. None of these affected payout behavior — they were stored, serialized, and shown to the user but never read by the calculator or executor. The Configuration tab now only exposes settings that actually drive the system. Fee pass-through tracked in #924, ideal-mode payouts tracked in #925, explorer links in payout reports tracked in #926.
 - **Rewards: surface octez-client failure reason**: When a batch transfer exits 0 but produces no operation hash, the per-delegate Note now contains the actual error reason (e.g. "Balance of contract … too low") instead of the placeholder "no operation hash in output". Internally, payout execution now captures both stdout and stderr from octez-client.
 - **Diagnostics page moved to Experimental tab**: The Diagnostics page is now accessible via the Experimental features modal (press `6`) instead of having its own top-level tab.
 - **Rewards page: History tab removed**: The standalone History tab and its "Trends (Last 30 Cycles)" sparkline panel are gone. Cycle navigation lives on the Overview tab — the *Recent Cycles* table is now interactive (`j/k` to move the cursor, `Enter` to drill into a cycle's detail). The action shortcuts `g`/`p`/`d` (Generate / Pay / Dry-run) target the highlighted cycle when one is selected, falling back to the latest fetched cycle otherwise. Tab numbering shifts: Configuration is now `3`, not `4`.

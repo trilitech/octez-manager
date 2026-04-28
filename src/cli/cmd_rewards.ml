@@ -904,10 +904,6 @@ let continual_status_run baker_opt =
       Printf.printf "Interval: every %d cycle(s)\n" config.continual_interval ;
       if config.continual_offset > 0 then
         Printf.printf "Offset: %d\n" config.continual_offset ;
-      Printf.printf
-        "Delay: %d-%d blocks\n"
-        config.min_delay_blocks
-        config.max_delay_blocks ;
       (* Show timer status *)
       let timer_active = Systemd.is_payout_timer_active ~instance in
       Printf.printf "Timer active: %s\n" (if timer_active then "yes" else "no") ;

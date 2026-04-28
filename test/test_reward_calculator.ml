@@ -139,8 +139,6 @@ let test_per_delegator_fee_override () =
               custom_fee = Some 0.02;
               custom_min_balance = None;
               max_balance_cap = None;
-              baker_pays_tx_fee = None;
-              baker_pays_alloc_fee = None;
             } );
         ];
     }
@@ -513,8 +511,6 @@ let test_redirect_override () =
               custom_fee = None;
               custom_min_balance = None;
               max_balance_cap = None;
-              baker_pays_tx_fee = None;
-              baker_pays_alloc_fee = None;
             } );
         ];
     }

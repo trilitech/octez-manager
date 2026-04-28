@@ -45,33 +45,12 @@ let import_payouts ~config ~json ~warnings ~count =
   let payouts = member "payouts" json in
   if payouts = `Null then (config, warnings, count)
   else
-    let config =
-      match opt_string payouts "payout_mode" with
-      | Some "ideal" -> {config with Payout_config.payout_mode = Rewards.Ideal}
-      | Some "actual" ->
-          {config with Payout_config.payout_mode = Rewards.Actual}
-      | _ -> config
-    in
     let count = ref count in
     let config =
       match opt_float payouts "fee" with
       | Some f ->
           incr count ;
-          {config with baker_fee = f}
-      | None -> config
-    in
-    let config =
-      match opt_bool payouts "baker_pays_transaction_fee" with
-      | Some b ->
-          incr count ;
-          {config with baker_pays_tx_fee = b}
-      | None -> config
-    in
-    let config =
-      match opt_bool payouts "baker_pays_allocation_fee" with
-      | Some b ->
-          incr count ;
-          {config with baker_pays_alloc_fee = b}
+          {config with Payout_config.baker_fee = f}
       | None -> config
     in
     let config =
@@ -82,59 +61,10 @@ let import_payouts ~config ~json ~warnings ~count =
       | None -> config
     in
     let config =
-      match opt_int payouts "transaction_gas_limit_buffer" with
-      | Some i ->
-          incr count ;
-          {config with gas_buffer = i}
-      | None -> config
-    in
-    let config =
-      match opt_int payouts "kt_transaction_gas_limit_buffer" with
-      | Some i ->
-          incr count ;
-          {config with kt_gas_buffer = i}
-      | None -> config
-    in
-    let config =
-      match opt_int payouts "transaction_deserialization_gas_buffer" with
-      | Some i ->
-          incr count ;
-          {config with deser_gas_buffer = i}
-      | None -> config
-    in
-    let config =
-      match opt_int payouts "transaction_fee_buffer" with
-      | Some i ->
-          incr count ;
-          {config with fee_buffer = i}
-      | None -> config
-    in
-    let config =
-      match opt_int payouts "kt_transaction_fee_buffer" with
-      | Some i ->
-          incr count ;
-          {config with kt_fee_buffer = i}
-      | None -> config
-    in
-    let config =
       match opt_int payouts "simulation_batch_size" with
       | Some i ->
           incr count ;
           {config with sim_batch_size = i}
-      | None -> config
-    in
-    let config =
-      match opt_int payouts "minimum_delay_blocks" with
-      | Some i ->
-          incr count ;
-          {config with min_delay_blocks = i}
-      | None -> config
-    in
-    let config =
-      match opt_int payouts "maximum_delay_blocks" with
-      | Some i ->
-          incr count ;
-          {config with max_delay_blocks = i}
       | None -> config
     in
     let warnings =
@@ -203,8 +133,6 @@ let import_delegators ~config ~json ~warnings ~count =
                     Option.map tez_to_mutez (opt_float v "minimum_balance");
                   max_balance_cap =
                     Option.map tez_to_mutez (opt_float v "maximum_balance");
-                  baker_pays_tx_fee = opt_bool v "baker_pays_transaction_fee";
-                  baker_pays_alloc_fee = opt_bool v "baker_pays_allocation_fee";
                 }
               in
               Some (addr, ovr))
@@ -227,8 +155,6 @@ let import_delegators ~config ~json ~warnings ~count =
                         custom_fee = Some f;
                         custom_min_balance = None;
                         max_balance_cap = None;
-                        baker_pays_tx_fee = None;
-                        baker_pays_alloc_fee = None;
                       } )
               | _ -> None)
             entries
@@ -294,25 +220,11 @@ let import_network ~config ~json ~warnings ~count =
       | None -> config
     in
     let config =
-      match opt_string network "explorer" with
-      | Some url ->
-          incr count ;
-          {config with explorer_url = url}
-      | None -> config
-    in
-    let config =
       match opt_bool network "ignore_kt" with
       | Some b ->
           incr count ;
           {config with ignore_contracts = b}
       | None -> config
-    in
-    let rpc_pool = string_list network "rpc_pool" in
-    let config =
-      if rpc_pool <> [] then (
-        incr count ;
-        {config with rpc_fallback_pool = rpc_pool})
-      else config
     in
     (config, warnings, !count)
 

@@ -306,14 +306,7 @@ let poll_baker ~instance ~network =
         let config =
           match config_opt with
           | Some c -> {c with baker_pkh = baker; tzkt_url}
-          | None ->
-              {
-                (Payout_config.default ~baker_pkh:baker) with
-                tzkt_url;
-                explorer_url =
-                  (if String.equal network "mainnet" then "https://tzkt.io"
-                   else Printf.sprintf "https://%s.tzkt.io" network);
-              }
+          | None -> {(Payout_config.default ~baker_pkh:baker) with tzkt_url}
         in
         ignore (Payout_config.save ~instance config)
       end
