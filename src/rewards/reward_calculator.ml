@@ -27,6 +27,10 @@ let delegator_status config delegator ~balance ~net_reward =
 
 let generate_blueprint ~config ~network ~cycle_rewards =
   let cr = cycle_rewards in
+  (* Total rewards earned by the baker this cycle, summing every protocol
+     bucket plus block fees. Used as the [earned_rewards] field on the
+     blueprint for accounting display only — not for the distribution
+     pool. *)
   let total_rewards =
     List.fold_left
       Int64.add
@@ -40,56 +44,66 @@ let generate_blueprint ~config ~network ~cycle_rewards =
         cr.Rewards.block_fees;
       ]
   in
-  (* Compute the effective staking balance for overdelegation protection.
-     The limit is 9x the baker's own staked balance. *)
-  let own_stake = cr.own_staked_balance in
-  let max_external =
+  (* Off-chain distribution pool: only the [delegated] portion of block,
+     attestation, and DAL rewards, plus all block fees. The protocol
+     credits the staking sub-fields ([staked_own], [staked_edge],
+     [staked_shared]) directly into frozen deposits, so they never enter
+     the off-chain pool. VDF and nonce revelation rewards are
+     baker-specific income. *)
+  let delegated_pool =
+    List.fold_left
+      Int64.add
+      0L
+      [
+        cr.Rewards.block_rewards.delegated;
+        cr.Rewards.attestation_rewards.delegated;
+        cr.Rewards.dal_rewards.delegated;
+        cr.Rewards.block_fees;
+      ]
+  in
+  (* Overdelegation cap: total external delegated stake is capped at 9×
+     the baker's own staked balance. Capped delegators have their share
+     scaled down; the denominator stays uncapped, so the missing tez
+     accrue to the baker. *)
+  let own_stake = cr.Rewards.own_staked_balance in
+  let max_external_delegated =
     if config.Payout_config.overdelegation_protect then
       Int64.sub (Int64.mul own_stake 9L) own_stake
     else Int64.max_int
   in
-  (* Sum of all delegator effective balances *)
-  let delegator_total_balance =
+  let external_delegated_total =
     List.fold_left
       (fun acc (d : Rewards.delegator_snapshot) ->
-        Int64.add acc (Int64.add d.delegated_balance d.staked_balance))
+        Int64.add acc d.delegated_balance)
       0L
-      cr.delegators
+      cr.Rewards.delegators
   in
-  (* Total balance includes baker's own *)
-  let baker_own_balance =
-    Int64.add cr.own_staked_balance cr.own_delegated_balance
+  let total_delegated =
+    Int64.add cr.Rewards.own_delegated_balance external_delegated_total
   in
-  let total_staking = Int64.add baker_own_balance delegator_total_balance in
-  (* Compute per-delegator rewards *)
   let raw_rewards =
     List.map
       (fun (d : Rewards.delegator_snapshot) ->
-        let balance = Int64.add d.delegated_balance d.staked_balance in
-        (* Cap for overdelegation *)
-        let effective_balance =
+        let effective_delegated =
           if
             config.overdelegation_protect
-            && delegator_total_balance > max_external
+            && external_delegated_total > max_external_delegated
           then
-            (* Scale each delegator proportionally *)
             let ratio =
-              Int64.to_float max_external
-              /. Int64.to_float delegator_total_balance
+              Int64.to_float max_external_delegated
+              /. Int64.to_float external_delegated_total
             in
-            Int64.of_float (Int64.to_float balance *. ratio)
-          else balance
+            Int64.of_float (Int64.to_float d.delegated_balance *. ratio)
+          else d.delegated_balance
         in
-        (* Proportional share *)
         let gross_reward =
-          if total_staking = 0L then 0L
+          if total_delegated = 0L then 0L
           else
             Int64.of_float
-              (Int64.to_float total_rewards
-              *. (Int64.to_float effective_balance
-                 /. Int64.to_float total_staking))
+              (Int64.to_float delegated_pool
+              *. (Int64.to_float effective_delegated
+                 /. Int64.to_float total_delegated))
         in
-        (* Fee rate: per-delegator override takes precedence *)
         let override = get_override config d.address in
         let fee_rate =
           match override with
@@ -103,15 +117,19 @@ let generate_blueprint ~config ~network ~cycle_rewards =
           Int64.of_float (Int64.to_float gross_reward *. fee_rate)
         in
         let net_reward = Int64.sub gross_reward fee_amount in
-        (* Recipient: override redirect takes precedence *)
         let recipient =
           match override with
           | Some ov -> (
               match ov.redirect_to with Some addr -> addr | None -> d.address)
           | None -> d.address
         in
-        (* Status check *)
-        let status = delegator_status config d.address ~balance ~net_reward in
+        let status =
+          delegator_status
+            config
+            d.address
+            ~balance:(Int64.add d.delegated_balance d.staked_balance)
+            ~net_reward
+        in
         {
           Rewards.delegator = d.address;
           delegated_balance = d.delegated_balance;
@@ -185,13 +203,16 @@ let generate_blueprint ~config ~network ~cycle_rewards =
            match r.status with Rewards.Eligible -> true | _ -> false)
          delegator_rewards)
   in
-  (* Baker income: own share + fees *)
+  (* Baker bond income: the baker's own delegated balance is part of the
+     same delegated pool, so the baker's share is the
+     [own_delegated]-weighted slice. *)
   let baker_share =
-    if total_staking = 0L then total_rewards
+    if total_delegated = 0L then delegated_pool
     else
       Int64.of_float
-        (Int64.to_float total_rewards
-        *. (Int64.to_float baker_own_balance /. Int64.to_float total_staking))
+        (Int64.to_float delegated_pool
+        *. (Int64.to_float cr.Rewards.own_delegated_balance
+           /. Int64.to_float total_delegated))
   in
   let total_fees =
     List.fold_left
