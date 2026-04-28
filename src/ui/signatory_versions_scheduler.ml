@@ -34,7 +34,11 @@ let get_cached () =
 
 (** Fetch and update cache *)
 let refresh () =
-  match Signatory_downloader.fetch_versions ~include_prerelease:false () with
+  match
+    Signatory_downloader.fetch_versions
+      ~include_prerelease:(Prerelease_flag.get ())
+      ()
+  with
   | Ok versions -> (
       Mutex.lock lock ;
       try

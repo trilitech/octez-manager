@@ -79,6 +79,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -327,6 +328,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -360,6 +362,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -373,6 +376,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -386,6 +390,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -399,6 +404,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -412,6 +418,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -425,6 +432,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -438,6 +446,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -451,6 +460,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -464,6 +474,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -477,6 +488,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -490,6 +502,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -503,6 +516,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -516,6 +530,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -529,6 +544,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -542,6 +558,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -555,6 +572,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -568,6 +586,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -581,6 +600,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -594,6 +614,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -607,6 +628,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -620,6 +642,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -633,6 +656,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -646,6 +670,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -659,6 +684,7 @@ _octez-manager() {
     '--theme[Theme name or path (built-ins\: dark, light). Can also be set via OCTEZ_MANAGER_THEME.]:THEME:_files'
     '--ui-log[Enable UI debug logs]'
     '--ui-logfile[Write UI logs to FILE]:FILE:_files'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -774,8 +800,9 @@ _octez-manager() {
 
   local -a opts_binaries_list_remote
   opts_binaries_list_remote=(
-    '-a[Include release candidates and prereleases]'
-    '--all[Include release candidates and prereleases]'
+    '-a[Deprecated alias for --unreleased-binaries. Include release candidates and prereleases.]'
+    '--all[Deprecated alias for --unreleased-binaries. Include release candidates and prereleases.]'
+    '--unreleased-binaries[Include unreleased binaries (release candidates, beta, alpha) when listing or resolving versions for Octez, Signatory, and octez-index.]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )

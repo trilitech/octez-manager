@@ -57,7 +57,9 @@ let check_for_updates ?(force = false) () =
   in
   if not prefs.check_enabled then CheckDisabled
   else
-    match Binary_downloader.fetch_versions ~include_rc:false () with
+    match
+      Binary_downloader.fetch_versions ~include_rc:(Prerelease_flag.get ()) ()
+    with
     | Error (`Msg e) -> CheckFailed e
     | Ok [] -> CheckFailed "No versions available"
     | Ok (first :: rest) ->

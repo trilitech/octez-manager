@@ -2196,7 +2196,7 @@ let rec select_index_app_bin_dir_modal ~on_select () =
     | `DownloadOther -> (
         match
           Octez_manager_lib.Octez_index_downloader.fetch_versions
-            ~include_prerelease:false
+            ~include_prerelease:(Octez_manager_lib.Prerelease_flag.get ())
             ()
         with
         | Error (`Msg msg) ->

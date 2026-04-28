@@ -479,7 +479,9 @@ let fetch_latest_version () =
   | Ok json -> (
       try
         let data = Yojson.Safe.from_string json in
-        (* Find entry with "latest": true and no "rc" field *)
+        (* Find entry with "latest": true. By default also require no "rc"
+           field; when --unreleased-binaries is set, accept RCs too. *)
+        let allow_rc = Prerelease_flag.get () in
         match data with
         | `List versions -> (
             let latest =
@@ -495,7 +497,7 @@ let fetch_latest_version () =
                     | `Null -> false
                     | _ -> true
                   in
-                  is_latest && not is_rc)
+                  is_latest && (allow_rc || not is_rc))
                 versions
             in
             match latest with
@@ -519,7 +521,11 @@ let fetch_latest_version () =
 
 (** Fetch latest octez-index version from GitLab releases *)
 let fetch_latest_index_version () =
-  match Octez_index_downloader.fetch_versions ~include_prerelease:false () with
+  match
+    Octez_index_downloader.fetch_versions
+      ~include_prerelease:(Prerelease_flag.get ())
+      ()
+  with
   | Error _ -> ()
   | Ok [] -> ()
   | Ok (latest :: _) ->

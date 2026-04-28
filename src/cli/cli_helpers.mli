@@ -112,6 +112,15 @@ val history_mode_choices : (string * History_mode.t) list
 (** Cmdliner term for optional history mode *)
 val history_mode_opt_term : History_mode.t option Term.t
 
+(** Cmdliner flag [--unreleased-binaries]. When set, version listings,
+    "latest" resolvers, and TUI pickers include release candidates and
+    other prereleases for Octez, Signatory, and octez-index. *)
+val unreleased_binaries_flag : bool Term.t
+
+(** Apply the value of {!unreleased_binaries_flag} to the global
+    {!Prerelease_flag} state. Call once per CLI subcommand entry. *)
+val apply_unreleased_binaries_flag : bool -> unit
+
 (** Internal functions exposed for testing only. Do not use outside tests. *)
 module For_tests : sig
   val split_at_last_comma : string -> string * string

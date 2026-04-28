@@ -32,30 +32,30 @@ _octez_manager() {
   local history_modes="archive full rolling"
   local snapshot_kinds="rolling full full:50 archive"
   local lb_votes="on off pass"
-  local _ACTION__baker_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__binaries_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__cleanup_dependencies_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__cleanup_orphans_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__group_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__import_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__install_accuser_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__install_baker_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__install_dal_node_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__install_index_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__install_node_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__install_signatory_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__instance_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__list_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__list_available_networks_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__list_snapshots_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__purge_all_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__rewards_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__rpc_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__sandbox_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__self_update_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__ui_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__version_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
-  local _ACTION__web_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+  local _ACTION__baker_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__binaries_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__cleanup_dependencies_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__cleanup_orphans_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__group_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__import_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__install_accuser_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__install_baker_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__install_dal_node_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__install_index_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__install_node_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__install_signatory_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__instance_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__list_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__list_available_networks_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__list_snapshots_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__purge_all_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__rewards_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__rpc_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__sandbox_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__self_update_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__ui_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__version_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
+  local _ACTION__web_opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
   local baker_finalize_unstake_opts="--delegate --json -y --yes --help --version"
   local baker_list_opts="--json --help --version"
   local baker_register_opts="--delegate --json -y --yes --help --version"
@@ -68,7 +68,7 @@ _octez_manager() {
   local baker_vote_opts="--delegate --json -y --yes --help --version"
   local binaries_download_opts="--help --version"
   local binaries_list_opts="--help --version"
-  local binaries_list_remote_opts="-a --all --help --version"
+  local binaries_list_remote_opts="-a --all --unreleased-binaries --help --version"
   local binaries_prune_opts="-n --dry-run --help --version"
   local binaries_register_opts="-a --alias --help --version"
   local binaries_remove_opts="--help --version"
@@ -181,7 +181,7 @@ _octez_manager() {
     [ACTION])
       if [[ $COMP_CWORD -eq 2 ]]; then
         if [[ $cur == -* ]]; then
-          opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+          opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
           COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
         else
           COMPREPLY=( $(compgen -W "baker binaries cleanup-dependencies cleanup-orphans group import install-accuser install-baker install-dal-node install-index install-node install-signatory instance list list-available-networks list-snapshots purge-all rewards rpc sandbox self-update ui version web" -- "$cur") )
@@ -733,7 +733,7 @@ _octez_manager() {
       ;;
     ui)
       if [[ $cur == -* ]]; then
-        opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --help --version"
+        opts="--compare-indexers --indexer-network --local-indexer --page --theme --ui-log --ui-logfile --unreleased-binaries --help --version"
         COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
       fi
       return 0

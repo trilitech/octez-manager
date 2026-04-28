@@ -13,7 +13,9 @@ open Octez_manager_lib
 (** list-remote command *)
 let list_remote_cmd =
   let term =
-    let run include_rc =
+    let run include_rc unreleased =
+      let include_rc = include_rc || unreleased in
+      Cli_helpers.apply_unreleased_binaries_flag include_rc ;
       (* Fetch Octez versions *)
       let octez_result =
         match Binary_downloader.fetch_versions ~include_rc () with
@@ -83,10 +85,13 @@ let list_remote_cmd =
         `Ok ())
     in
     let all_flag =
-      let doc = "Include release candidates and prereleases" in
+      let doc =
+        "Deprecated alias for --unreleased-binaries. Include release \
+         candidates and prereleases."
+      in
       Arg.(value & flag & info ["all"; "a"] ~doc)
     in
-    Term.(ret (const run $ all_flag))
+    Term.(ret (const run $ all_flag $ Cli_helpers.unreleased_binaries_flag))
   in
   let info =
     Cmd.info
@@ -207,7 +212,8 @@ let list_cmd =
 (** download octez subcommand *)
 let download_octez_cmd =
   let term =
-    let run version_input verify_checksums =
+    let run version_input verify_checksums unreleased =
+      Cli_helpers.apply_unreleased_binaries_flag unreleased ;
       let version = String.trim version_input in
 
       (* Cleanup stale temporary download directories *)
@@ -216,7 +222,11 @@ let download_octez_cmd =
       (* Resolve "latest" to actual version *)
       let version =
         if version = "latest" then
-          match Binary_downloader.fetch_versions ~include_rc:false () with
+          match
+            Binary_downloader.fetch_versions
+              ~include_rc:(Prerelease_flag.get ())
+              ()
+          with
           | Error (`Msg e) ->
               Printf.eprintf "Error: Failed to fetch latest version: %s\n" e ;
               exit 1
@@ -386,7 +396,9 @@ let download_octez_cmd =
       Arg.(value & flag & info ["no-verify"] ~doc)
     in
     Term.(
-      ret (const (fun v nv -> run v (not nv)) $ version_arg $ no_verify_flag))
+      ret
+        (const (fun v nv u -> run v (not nv) u)
+        $ version_arg $ no_verify_flag $ Cli_helpers.unreleased_binaries_flag))
   in
   let info =
     Cmd.info
@@ -409,7 +421,8 @@ let download_octez_cmd =
 (** download signatory subcommand *)
 let download_signatory_cmd =
   let term =
-    let run version verify_checksums =
+    let run version verify_checksums unreleased =
+      Cli_helpers.apply_unreleased_binaries_flag unreleased ;
       (* Check version is >= 1.3.0 *)
       if Version_utils.compare_versions version "1.3.0" < 0 then
         Cli_helpers.cmdliner_error
@@ -473,7 +486,9 @@ let download_signatory_cmd =
       Arg.(value & flag & info ["no-verify"] ~doc)
     in
     Term.(
-      ret (const (fun v nv -> run v (not nv)) $ version_arg $ no_verify_flag))
+      ret
+        (const (fun v nv u -> run v (not nv) u)
+        $ version_arg $ no_verify_flag $ Cli_helpers.unreleased_binaries_flag))
   in
   let info =
     Cmd.info
