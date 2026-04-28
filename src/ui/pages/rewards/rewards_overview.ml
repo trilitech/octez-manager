@@ -96,22 +96,24 @@ let render_last_completed_box ~box_width ~instance
           | Rewards.Failed -> Widgets.themed_error "Failed"
           | Rewards.In_progress -> Widgets.themed_accent "In progress"
       in
-      let items =
+      let reward_rows label (s : Rewards.reward_split) =
         [
-          ("Earned Rewards", Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9");
-          ( "Block Rewards",
-            Rewards.format_tez (Rewards.total_of_split cr.block_rewards)
-            ^ " \xEA\x9C\xA9" );
-          ( "Attestation",
-            Rewards.format_tez (Rewards.total_of_split cr.attestation_rewards)
-            ^ " \xEA\x9C\xA9" );
-          ( "DAL Rewards",
-            Rewards.format_tez (Rewards.total_of_split cr.dal_rewards)
-            ^ " \xEA\x9C\xA9" );
-          ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
-          ("Delegators", string_of_int delegator_count);
-          ("Payout Status", status_label);
+          ( label,
+            Rewards.format_tez (Rewards.total_of_split s) ^ " \xEA\x9C\xA9" );
+          ( "  Delegation",
+            "  " ^ Rewards.format_tez s.delegated ^ " \xEA\x9C\xA9" );
         ]
+      in
+      let items =
+        [("Earned Rewards", Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9")]
+        @ reward_rows "Block Rewards" cr.block_rewards
+        @ reward_rows "Attestation" cr.attestation_rewards
+        @ reward_rows "DAL Rewards" cr.dal_rewards
+        @ [
+            ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
+            ("Delegators", string_of_int delegator_count);
+            ("Payout Status", status_label);
+          ]
       in
       let desc =
         Desc_list.create ~key_width:16 ~items ()
@@ -403,23 +405,27 @@ let render_cycle_detail ~box_width ~instance ~baker:_
             | Rewards.Failed -> Widgets.themed_error "Failed"
             | Rewards.In_progress -> Widgets.themed_accent "In progress"
         in
+        let reward_rows label (s : Rewards.reward_split) =
+          [
+            ( label,
+              Rewards.format_tez (Rewards.total_of_split s) ^ " \xEA\x9C\xA9" );
+            ( "  Delegation",
+              "  " ^ Rewards.format_tez s.delegated ^ " \xEA\x9C\xA9" );
+          ]
+        in
         let items =
           [
             ( "Earned Rewards",
               Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9" );
-            ( "Block Rewards",
-              Rewards.format_tez (Rewards.total_of_split cr.block_rewards)
-              ^ " \xEA\x9C\xA9" );
-            ( "Attestation",
-              Rewards.format_tez (Rewards.total_of_split cr.attestation_rewards)
-              ^ " \xEA\x9C\xA9" );
-            ( "DAL Rewards",
-              Rewards.format_tez (Rewards.total_of_split cr.dal_rewards)
-              ^ " \xEA\x9C\xA9" );
-            ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
-            ("Delegators", string_of_int delegator_count);
-            ("Payout Status", status_label);
           ]
+          @ reward_rows "Block Rewards" cr.block_rewards
+          @ reward_rows "Attestation" cr.attestation_rewards
+          @ reward_rows "DAL Rewards" cr.dal_rewards
+          @ [
+              ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
+              ("Delegators", string_of_int delegator_count);
+              ("Payout Status", status_label);
+            ]
         in
         let desc =
           Desc_list.create ~key_width:16 ~items ()
