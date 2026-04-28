@@ -24,14 +24,16 @@ let parse_delegator_snapshot json =
     staked_balance = int64_of_json_field json "stakedBalance";
   }
 
-(** Sum the four reward-category sub-fields that TzKT provides for each
-    reward type (Delegated / StakedOwn / StakedEdge / StakedShared). *)
-let sum_reward_fields json prefix =
-  List.fold_left
-    (fun acc suffix ->
-      Int64.add acc (int64_of_json_field json (prefix ^ suffix)))
-    0L
-    ["Delegated"; "StakedOwn"; "StakedEdge"; "StakedShared"]
+(** Parse the four protocol bucket sub-fields TzKT exposes per reward type
+    (Delegated / StakedOwn / StakedEdge / StakedShared) into a
+    [reward_split]. *)
+let parse_reward_split json prefix : Rewards.reward_split =
+  {
+    delegated = int64_of_json_field json (prefix ^ "Delegated");
+    staked_own = int64_of_json_field json (prefix ^ "StakedOwn");
+    staked_edge = int64_of_json_field json (prefix ^ "StakedEdge");
+    staked_shared = int64_of_json_field json (prefix ^ "StakedShared");
+  }
 
 let parse_cycle_rewards ~baker json =
   let open Yojson.Safe.Util in
@@ -45,15 +47,14 @@ let parse_cycle_rewards ~baker json =
     | `Int n -> n
     | _ -> List.length delegators
   in
-  let block_rewards = sum_reward_fields json "blockRewards" in
+  let block_rewards = parse_reward_split json "blockRewards" in
   (* Attestation rewards — TzKT provides both attestation* and endorsement*
      fields with identical values for backwards compatibility.
      Use attestation* (the canonical name since Oxford). *)
-  let attestation_rewards = sum_reward_fields json "attestationRewards" in
-  let dal_rewards = sum_reward_fields json "dalAttestationRewards" in
-  let vdf_rewards = sum_reward_fields json "vdfRevelationRewards" in
-  let nonce_rewards = sum_reward_fields json "nonceRevelationRewards" in
-  let other_rewards = Int64.add vdf_rewards nonce_rewards in
+  let attestation_rewards = parse_reward_split json "attestationRewards" in
+  let dal_rewards = parse_reward_split json "dalAttestationRewards" in
+  let vdf_rewards = parse_reward_split json "vdfRevelationRewards" in
+  let nonce_rewards = parse_reward_split json "nonceRevelationRewards" in
   {
     Rewards.cycle = member "cycle" json |> to_int;
     baker;
@@ -67,7 +68,8 @@ let parse_cycle_rewards ~baker json =
     block_rewards;
     attestation_rewards;
     dal_rewards;
-    other_rewards;
+    vdf_rewards;
+    nonce_rewards;
     block_fees = int64_of_json_field json "blockFees";
     num_delegators;
     delegators;

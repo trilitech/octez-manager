@@ -38,6 +38,13 @@ type delegator_snapshot = {
   staked_balance : Int64.t;
 }
 
+type reward_split = {
+  delegated : Int64.t;
+  staked_own : Int64.t;
+  staked_edge : Int64.t;
+  staked_shared : Int64.t;
+}
+
 type cycle_rewards = {
   cycle : int;
   baker : string;
@@ -47,12 +54,11 @@ type cycle_rewards = {
   own_delegated_balance : Int64.t;
   external_staked_balance : Int64.t;
   external_delegated_balance : Int64.t;
-  block_rewards : Int64.t;
-  attestation_rewards : Int64.t;
-  dal_rewards : Int64.t;
-  other_rewards : Int64.t;
-      (** VDF revelation + nonce revelation rewards. DAL attestation
-          rewards are tracked separately in [dal_rewards]. *)
+  block_rewards : reward_split;
+  attestation_rewards : reward_split;
+  dal_rewards : reward_split;
+  vdf_rewards : reward_split;
+  nonce_rewards : reward_split;
   block_fees : Int64.t;
   num_delegators : int;
   delegators : delegator_snapshot list;
@@ -122,15 +128,21 @@ type cycle_summary = {
 
 type payout_status = Unpaid | Paid | Partial | Failed | In_progress
 
+let total_of_split s =
+  Int64.add
+    (Int64.add s.delegated s.staked_own)
+    (Int64.add s.staked_edge s.staked_shared)
+
 let total_earned (cr : cycle_rewards) =
   List.fold_left
     Int64.add
     0L
     [
-      cr.block_rewards;
-      cr.attestation_rewards;
-      cr.dal_rewards;
-      cr.other_rewards;
+      total_of_split cr.block_rewards;
+      total_of_split cr.attestation_rewards;
+      total_of_split cr.dal_rewards;
+      total_of_split cr.vdf_rewards;
+      total_of_split cr.nonce_rewards;
       cr.block_fees;
     ]
 

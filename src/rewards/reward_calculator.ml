@@ -32,10 +32,11 @@ let generate_blueprint ~config ~network ~cycle_rewards =
       Int64.add
       0L
       [
-        cr.Rewards.block_rewards;
-        cr.Rewards.attestation_rewards;
-        cr.Rewards.dal_rewards;
-        cr.Rewards.other_rewards;
+        Rewards.total_of_split cr.Rewards.block_rewards;
+        Rewards.total_of_split cr.Rewards.attestation_rewards;
+        Rewards.total_of_split cr.Rewards.dal_rewards;
+        Rewards.total_of_split cr.Rewards.vdf_rewards;
+        Rewards.total_of_split cr.Rewards.nonce_rewards;
         cr.Rewards.block_fees;
       ]
   in

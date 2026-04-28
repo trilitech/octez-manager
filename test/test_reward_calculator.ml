@@ -18,6 +18,12 @@ let addr_c = "tz1burnburnburnburnburnburnburjAYjjX"
 let default_config () =
   {(Payout_config.default ~baker_pkh) with overdelegation_protect = false}
 
+let zero_split : Rewards.reward_split =
+  {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L}
+
+let delegated_only amount : Rewards.reward_split =
+  {delegated = amount; staked_own = 0L; staked_edge = 0L; staked_shared = 0L}
+
 let make_cycle_rewards ?(cycle = 100) ?(own_staked = 1_000_000_000L)
     ?(own_delegated = 0L) ?(block_rewards = 10_000_000L)
     ?(block_fees = 500_000L) delegators =
@@ -30,10 +36,11 @@ let make_cycle_rewards ?(cycle = 100) ?(own_staked = 1_000_000_000L)
     own_delegated_balance = own_delegated;
     external_staked_balance = 0L;
     external_delegated_balance = 0L;
-    block_rewards;
-    attestation_rewards = 0L;
-    dal_rewards = 0L;
-    other_rewards = 0L;
+    block_rewards = delegated_only block_rewards;
+    attestation_rewards = zero_split;
+    dal_rewards = zero_split;
+    vdf_rewards = zero_split;
+    nonce_rewards = zero_split;
     block_fees;
     num_delegators = List.length delegators;
     delegators;
@@ -65,7 +72,11 @@ let test_single_delegator_proportional_share () =
       Int64.add
       0L
       [
-        cr.block_rewards; cr.attestation_rewards; cr.other_rewards; cr.block_fees;
+        Rewards.total_of_split cr.block_rewards;
+        Rewards.total_of_split cr.attestation_rewards;
+        Rewards.total_of_split cr.vdf_rewards;
+        Rewards.total_of_split cr.nonce_rewards;
+        cr.block_fees;
       ]
   in
   let expected_gross = Int64.div total 2L in
