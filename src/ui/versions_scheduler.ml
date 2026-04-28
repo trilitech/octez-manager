@@ -34,7 +34,9 @@ let get_cached () =
 
 (** Fetch and update cache *)
 let refresh () =
-  match Binary_downloader.fetch_versions ~include_rc:false () with
+  match
+    Binary_downloader.fetch_versions ~include_rc:(Prerelease_flag.get ()) ()
+  with
   | Ok versions -> (
       Mutex.lock lock ;
       try

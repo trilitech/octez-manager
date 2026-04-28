@@ -66,6 +66,7 @@
   self_update_checker
   version_utils
   check_prefs
+  prerelease_flag
   eio_process
   tzkt_aliases
   transfer_mru

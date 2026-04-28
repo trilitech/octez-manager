@@ -29,7 +29,11 @@ let resolve_app_bin_dir ?octez_version ?bin_dir_alias
       (* Resolve "latest" to actual version *)
       let version_result =
         if version_input = "latest" then
-          match Binary_downloader.fetch_versions ~include_rc:false () with
+          match
+            Binary_downloader.fetch_versions
+              ~include_rc:(Prerelease_flag.get ())
+              ()
+          with
           | Error (`Msg e) ->
               Error (Printf.sprintf "Failed to fetch latest version: %s" e)
           | Ok [] -> Error "No versions available"
@@ -212,7 +216,9 @@ let resolve_signatory_bin_dir ?signatory_version ?bin_dir_alias app_bin_dir =
       let version_result =
         if version_input = "latest" then
           match
-            Signatory_downloader.fetch_versions ~include_prerelease:false ()
+            Signatory_downloader.fetch_versions
+              ~include_prerelease:(Prerelease_flag.get ())
+              ()
           with
           | Error (`Msg e) ->
               Error (Printf.sprintf "Failed to fetch latest version: %s" e)
@@ -410,7 +416,11 @@ let download_octez_index_version version =
            version)
 
 let fetch_latest_octez_index_version () =
-  match Octez_index_downloader.fetch_versions ~include_prerelease:false () with
+  match
+    Octez_index_downloader.fetch_versions
+      ~include_prerelease:(Prerelease_flag.get ())
+      ()
+  with
   | Error (`Msg e) ->
       Error (Printf.sprintf "Failed to fetch octez-index versions: %s" e)
   | Ok [] -> Error "No octez-index releases available upstream"
@@ -993,6 +1003,15 @@ let history_mode_opt_term =
     value
     & opt (some (enum history_mode_choices)) None
     & info ["history-mode"] ~doc:history_mode_doc ~docv:"MODE")
+
+let unreleased_binaries_flag =
+  let doc =
+    "Include unreleased binaries (release candidates, beta, alpha) when \
+     listing or resolving versions for Octez, Signatory, and octez-index."
+  in
+  Arg.(value & flag & info ["unreleased-binaries"] ~doc)
+
+let apply_unreleased_binaries_flag v = Prerelease_flag.set v
 
 module For_tests = struct
   let split_at_last_comma line =

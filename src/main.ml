@@ -67,6 +67,7 @@ let ui_term =
             "When a local indexer is registered, also query public TzKT on \
              every fetch and log divergences.")
   in
+  let unreleased_binaries_flag = Cli_helpers.unreleased_binaries_flag in
   Term.(
     ret
       (const
@@ -78,7 +79,9 @@ let ui_term =
            local_indexer
            indexer_network
            compare_indexers
+           unreleased_binaries
          ->
+           Cli_helpers.apply_unreleased_binaries_flag unreleased_binaries ;
            Printexc.record_backtrace true ;
            Capabilities.register () ;
            (* Ignore SIGPIPE to prevent crashes when subprocesses write to closed pipes *)
@@ -112,7 +115,7 @@ let ui_term =
            | Ok () -> `Ok ()
            | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg)
       $ page_arg $ log_flag $ logfile_arg $ theme_arg $ local_indexer_arg
-      $ indexer_network_arg $ compare_indexers_flag))
+      $ indexer_network_arg $ compare_indexers_flag $ unreleased_binaries_flag))
 
 let ui_cmd =
   let open Cmdliner in
