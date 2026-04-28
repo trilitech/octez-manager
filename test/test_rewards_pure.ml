@@ -228,10 +228,31 @@ let test_total_earned () =
       own_delegated_balance = 0L;
       external_staked_balance = 5_000_000_000L;
       external_delegated_balance = 5_000_000_000L;
-      block_rewards = 1_000_000L;
-      attestation_rewards = 2_000_000L;
-      dal_rewards = 0L;
-      other_rewards = 500_000L;
+      block_rewards =
+        {
+          delegated = 1_000_000L;
+          staked_own = 0L;
+          staked_edge = 0L;
+          staked_shared = 0L;
+        };
+      attestation_rewards =
+        {
+          delegated = 2_000_000L;
+          staked_own = 0L;
+          staked_edge = 0L;
+          staked_shared = 0L;
+        };
+      dal_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
+      vdf_rewards =
+        {
+          delegated = 500_000L;
+          staked_own = 0L;
+          staked_edge = 0L;
+          staked_shared = 0L;
+        };
+      nonce_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
       block_fees = 100_000L;
       num_delegators = 10;
       delegators = [];
@@ -262,10 +283,26 @@ let test_scheduler_cache_isolation () =
       own_delegated_balance = 0L;
       external_staked_balance = 5_000_000_000L;
       external_delegated_balance = 5_000_000_000L;
-      block_rewards = 1_000_000L;
-      attestation_rewards = 2_000_000L;
-      dal_rewards = 0L;
-      other_rewards = 0L;
+      block_rewards =
+        {
+          delegated = 1_000_000L;
+          staked_own = 0L;
+          staked_edge = 0L;
+          staked_shared = 0L;
+        };
+      attestation_rewards =
+        {
+          delegated = 2_000_000L;
+          staked_own = 0L;
+          staked_edge = 0L;
+          staked_shared = 0L;
+        };
+      dal_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
+      vdf_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
+      nonce_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
       block_fees = 100_000L;
       num_delegators = 5;
       delegators = [];
@@ -281,10 +318,26 @@ let test_scheduler_cache_isolation () =
       own_delegated_balance = 0L;
       external_staked_balance = 10_000_000_000L;
       external_delegated_balance = 10_000_000_000L;
-      block_rewards = 3_000_000L;
-      attestation_rewards = 4_000_000L;
-      dal_rewards = 0L;
-      other_rewards = 0L;
+      block_rewards =
+        {
+          delegated = 3_000_000L;
+          staked_own = 0L;
+          staked_edge = 0L;
+          staked_shared = 0L;
+        };
+      attestation_rewards =
+        {
+          delegated = 4_000_000L;
+          staked_own = 0L;
+          staked_edge = 0L;
+          staked_shared = 0L;
+        };
+      dal_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
+      vdf_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
+      nonce_rewards =
+        {delegated = 0L; staked_own = 0L; staked_edge = 0L; staked_shared = 0L};
       block_fees = 200_000L;
       num_delegators = 10;
       delegators = [];

@@ -58,6 +58,29 @@ type delegator_snapshot = {
   staked_balance : Int64.t;
 }
 
+(** Per-reward-type protocol bucket split.
+
+    Each cycle reward (block, attestation, DAL, VDF, nonce) is split by
+    the protocol into four sub-amounts according to which underlying
+    balance produced them: the baker's liquid (delegated) balance, the
+    baker's own staked balance, the baker's edge from external stakers,
+    and the external stakers' shared portion. *)
+type reward_split = {
+  delegated : Int64.t;
+      (** Portion attributable to delegated (liquid) balance, paid to the
+          baker's spendable balance for off-chain redistribution. *)
+  staked_own : Int64.t;
+      (** Portion attributable to the baker's own staked balance, credited
+          by the protocol to the baker's frozen deposit. *)
+  staked_edge : Int64.t;
+      (** Baker's edge (commission) on rewards earned by external stakers,
+          credited by the protocol to the baker's frozen deposit. *)
+  staked_shared : Int64.t;
+      (** Portion attributable to external stakers' staked balance (after
+          edge), credited by the protocol directly to stakers' frozen
+          deposits. *)
+}
+
 (** Cycle-level reward data fetched from TzKT. *)
 type cycle_rewards = {
   cycle : int;
@@ -68,13 +91,14 @@ type cycle_rewards = {
   own_delegated_balance : Int64.t;
   external_staked_balance : Int64.t;
   external_delegated_balance : Int64.t;
-  block_rewards : Int64.t;
-  attestation_rewards : Int64.t;
-  dal_rewards : Int64.t;  (** DAL attestation rewards. *)
-  other_rewards : Int64.t;
-      (** VDF revelation + nonce revelation rewards. DAL attestation
-          rewards are tracked separately in {!field-dal_rewards}. *)
+  block_rewards : reward_split;
+  attestation_rewards : reward_split;
+  dal_rewards : reward_split;  (** DAL attestation rewards. *)
+  vdf_rewards : reward_split;  (** VDF revelation rewards. *)
+  nonce_rewards : reward_split;  (** Nonce revelation rewards. *)
   block_fees : Int64.t;
+      (** Operation fees harvested from baked blocks. Not bucketed by the
+          protocol — paid entirely to the baker's liquid balance. *)
   num_delegators : int;
   delegators : delegator_snapshot list;
 }
@@ -159,7 +183,11 @@ type cycle_summary = {
 (** Status of a cycle's payout. *)
 type payout_status = Unpaid | Paid | Partial | Failed | In_progress
 
-(** Total earned rewards for a cycle (block + attestation + other + fees). *)
+(** Sum of the four sub-fields of a reward split. *)
+val total_of_split : reward_split -> Int64.t
+
+(** Total earned rewards for a cycle, summing every protocol bucket of every
+    reward type plus block fees. *)
 val total_earned : cycle_rewards -> Int64.t
 
 (** Convert a mutez amount to a plain tez decimal string (e.g., "1234.567890").

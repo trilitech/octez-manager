@@ -100,10 +100,14 @@ let render_last_completed_box ~box_width ~instance
         [
           ("Earned Rewards", Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9");
           ( "Block Rewards",
-            Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
+            Rewards.format_tez (Rewards.total_of_split cr.block_rewards)
+            ^ " \xEA\x9C\xA9" );
           ( "Attestation",
-            Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
-          ("DAL Rewards", Rewards.format_tez cr.dal_rewards ^ " \xEA\x9C\xA9");
+            Rewards.format_tez (Rewards.total_of_split cr.attestation_rewards)
+            ^ " \xEA\x9C\xA9" );
+          ( "DAL Rewards",
+            Rewards.format_tez (Rewards.total_of_split cr.dal_rewards)
+            ^ " \xEA\x9C\xA9" );
           ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
           ("Delegators", string_of_int delegator_count);
           ("Payout Status", status_label);
@@ -404,10 +408,14 @@ let render_cycle_detail ~box_width ~instance ~baker:_
             ( "Earned Rewards",
               Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9" );
             ( "Block Rewards",
-              Rewards.format_tez cr.block_rewards ^ " \xEA\x9C\xA9" );
+              Rewards.format_tez (Rewards.total_of_split cr.block_rewards)
+              ^ " \xEA\x9C\xA9" );
             ( "Attestation",
-              Rewards.format_tez cr.attestation_rewards ^ " \xEA\x9C\xA9" );
-            ("DAL Rewards", Rewards.format_tez cr.dal_rewards ^ " \xEA\x9C\xA9");
+              Rewards.format_tez (Rewards.total_of_split cr.attestation_rewards)
+              ^ " \xEA\x9C\xA9" );
+            ( "DAL Rewards",
+              Rewards.format_tez (Rewards.total_of_split cr.dal_rewards)
+              ^ " \xEA\x9C\xA9" );
             ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
             ("Delegators", string_of_int delegator_count);
             ("Payout Status", status_label);
