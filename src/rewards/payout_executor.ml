@@ -215,6 +215,7 @@ let execute_batch ~ctx ~payouts ~dry_run =
           {Rewards.delegator; recipient; amount; op_hash; success; note})
         payouts
   | Error (`Msg err) ->
+      let note = extract_failure_reason err in
       List.map
         (fun (delegator, recipient, amount) ->
           {
@@ -223,7 +224,7 @@ let execute_batch ~ctx ~payouts ~dry_run =
             amount;
             op_hash = None;
             success = false;
-            note = err;
+            note;
           })
         payouts
 

@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Rewards CSV reports corrupted by multi-line failure notes**: When `octez-client` returned a multi-line error (e.g. "Command failed: …\nOutput:\n…"), the writer dumped it raw into the `note` column with literal newlines, breaking each delegator's record into ~100 fake rows. The cycle detail then showed "0/872 paid" with garbage addresses and amounts when only 8 delegators actually existed. The writer now sanitizes newlines/tabs in the `note` field, the executor stores only the last non-empty line of octez-client output as the note, and the reader has been switched to a streaming CSV parser that recovers existing corrupt files (multi-line quoted fields are read as a single field).
 - **Rewards page falsely reports payouts as "Partial"**: `extract_op_hash` only recognized operation hashes whose first two characters were `oo`, but Tezos operation hashes are 51 base58 characters starting with a single `o` and a varying second character (`op…`, `on…`, `or…`, …). Successful payouts were therefore recorded with `success = false`, leading the rewards page to label fully-paid cycles as "Partial" with `paid_delegators: 0` and `distributed_rewards: 0` even when on-chain transfers had completed and were visible on tzkt. Hash extraction now matches any well-formed 51-char base58 operation hash. Existing summary files for affected cycles are not rewritten — re-running a payout for those cycles is required to refresh the on-disk summary.
 
 ## [1.0.0] - 2026-04-16

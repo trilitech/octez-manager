@@ -63,3 +63,11 @@ val cycle_is_paid : instance:string -> cycle:int -> bool
 
 (** List all cycles that have summary files, sorted descending. *)
 val list_paid_cycles : instance:string -> int list
+
+(**/**)
+
+module Internal_for_tests : sig
+  val parse_csv_content : string -> string list list
+end
+
+(**/**)
