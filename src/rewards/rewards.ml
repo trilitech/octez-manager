@@ -120,7 +120,7 @@ type cycle_summary = {
   timestamp : string;
 }
 
-type payout_status = Unpaid | Paid | Partial | In_progress
+type payout_status = Unpaid | Paid | Partial | Failed | In_progress
 
 let total_earned (cr : cycle_rewards) =
   List.fold_left
@@ -183,4 +183,5 @@ let string_of_payout_status = function
   | Unpaid -> "unpaid"
   | Paid -> "paid"
   | Partial -> "partial"
+  | Failed -> "failed"
   | In_progress -> "in progress"
