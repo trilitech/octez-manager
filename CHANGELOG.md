@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Cascade import in TUI**: Import wizard now supports cascade import mode, allowing users to import services with all their dependencies or dependents in the correct order. Toggle with 'c' in the configure step. (fixes #886)
 
+### Fixed
+
+- PageUp, PageDown, Home, and End keys now work correctly in all choice menus and modals
+
 ## [1.0.0] - 2026-04-16
 
 ### Added
