@@ -131,4 +131,9 @@ module For_tests : sig
     verify_file:
       (filepath:string -> expected_hash:string -> (unit, Rresult.R.msg) result) ->
     (unit, Rresult.R.msg) result
+
+  (** Filter releases according to [include_prerelease]; same logic as
+      {!fetch_versions} applies after parsing. *)
+  val filter_versions :
+    include_prerelease:bool -> version_info list -> version_info list
 end

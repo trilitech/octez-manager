@@ -52,6 +52,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_prerelease_flag)
+ (libraries alcotest octez_manager_lib octez_manager_cli)
+ (modules test_prerelease_flag)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_system_metrics_scheduler)
  (libraries alcotest octez-manager.ui miaou-core.widgets.display)
  (modules test_system_metrics_scheduler)

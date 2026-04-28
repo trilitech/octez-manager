@@ -174,14 +174,14 @@ let fetch_versions_json () =
   | Ok _ -> R.error_msg "Empty versions.json response"
   | Error _ as e -> e
 
+let filter_versions ~include_rc versions =
+  if include_rc then versions else List.filter (fun v -> not v.is_rc) versions
+
 let fetch_versions ?(include_rc = false) () =
   let* json_str = fetch_versions_json () in
   let json = Yojson.Safe.from_string json_str in
   let* versions = parse_version_json json in
-  let filtered =
-    if include_rc then versions else List.filter (fun v -> not v.is_rc) versions
-  in
-  Ok filtered
+  Ok (filter_versions ~include_rc versions)
 
 (** Binary names *)
 
@@ -642,4 +642,6 @@ module For_tests = struct
   let parse_version_json = parse_version_json
 
   let verify_downloaded_binaries = verify_downloaded_binaries
+
+  let filter_versions = filter_versions
 end
