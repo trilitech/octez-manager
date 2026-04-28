@@ -59,6 +59,29 @@ let get_payout_summary ~instance ~cycle =
   Mutex.protect summary_lock (fun () ->
       Hashtbl.find_opt summary_cache (instance, cycle))
 
+(* Per-cycle execution results cache: read back from payouts.csv. *)
+let payout_results_cache : (string * int, Rewards.payout_result list) Hashtbl.t
+    =
+  Hashtbl.create 64
+
+let payout_results_lock = Mutex.create ()
+
+let get_payout_results ~instance ~cycle =
+  Mutex.protect payout_results_lock (fun () ->
+      Hashtbl.find_opt payout_results_cache (instance, cycle)
+      |> Option.value ~default:[])
+
+(* Per-cycle excluded-delegator cache: read back from invalid.csv. *)
+let excluded_cache : (string * int, Rewards.delegator_reward list) Hashtbl.t =
+  Hashtbl.create 64
+
+let excluded_lock = Mutex.create ()
+
+let get_excluded_delegators ~instance ~cycle =
+  Mutex.protect excluded_lock (fun () ->
+      Hashtbl.find_opt excluded_cache (instance, cycle)
+      |> Option.value ~default:[])
+
 (* Track payouts currently being executed *)
 let in_progress_payouts : (string * int, unit) Hashtbl.t = Hashtbl.create 4
 
@@ -76,12 +99,25 @@ let get_payout_status ~instance ~cycle =
         |> Option.value ~default:Rewards.Unpaid)
 
 let refresh_payout_status ~instance ~cycle =
+  (match Payout_report.read_payouts_csv ~instance ~cycle with
+  | Ok results ->
+      Mutex.protect payout_results_lock (fun () ->
+          Hashtbl.replace payout_results_cache (instance, cycle) results)
+  | Error _ -> ()) ;
+  (match Payout_report.read_invalid_csv ~instance ~cycle with
+  | Ok excluded ->
+      Mutex.protect excluded_lock (fun () ->
+          Hashtbl.replace excluded_cache (instance, cycle) excluded)
+  | Error _ -> ()) ;
   match Payout_report.read_summary_json ~instance ~cycle with
   | Ok summary ->
       Mutex.protect summary_lock (fun () ->
           Hashtbl.replace summary_cache (instance, cycle) summary) ;
       let status =
-        if summary.paid_delegators < summary.delegators then Rewards.Partial
+        if summary.delegators = 0 then Rewards.Paid
+        else if summary.paid_delegators = 0 then Rewards.Failed
+        else if summary.paid_delegators < summary.delegators then
+          Rewards.Partial
         else Rewards.Paid
       in
       Mutex.protect payout_status_lock (fun () ->
@@ -416,6 +452,10 @@ let clear () =
   Mutex.protect recent_lock (fun () -> Hashtbl.clear recent_cache) ;
   Mutex.protect current_cycle_lock (fun () -> Hashtbl.clear current_cycle_cache) ;
   Mutex.protect payout_status_lock (fun () -> Hashtbl.clear payout_status_cache) ;
+  Mutex.protect summary_lock (fun () -> Hashtbl.clear summary_cache) ;
+  Mutex.protect payout_results_lock (fun () ->
+      Hashtbl.clear payout_results_cache) ;
+  Mutex.protect excluded_lock (fun () -> Hashtbl.clear excluded_cache) ;
   Mutex.protect in_progress_lock (fun () -> Hashtbl.clear in_progress_payouts) ;
   Mutex.protect baker_instance_lock (fun () ->
       Hashtbl.clear baker_instance_cache) ;

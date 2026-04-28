@@ -157,7 +157,7 @@ type cycle_summary = {
 (** {1 Payout status} *)
 
 (** Status of a cycle's payout. *)
-type payout_status = Unpaid | Paid | Partial | In_progress
+type payout_status = Unpaid | Paid | Partial | Failed | In_progress
 
 (** Total earned rewards for a cycle (block + attestation + other + fees). *)
 val total_earned : cycle_rewards -> Int64.t

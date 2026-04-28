@@ -93,6 +93,7 @@ let render_last_completed_box ~box_width ~instance
           | Rewards.Paid -> Widgets.themed_success "Paid"
           | Rewards.Unpaid -> Widgets.themed_warning "Unpaid"
           | Rewards.Partial -> Widgets.themed_warning "Partial"
+          | Rewards.Failed -> Widgets.themed_error "Failed"
           | Rewards.In_progress -> Widgets.themed_accent "In progress"
       in
       let items =
@@ -168,6 +169,7 @@ let render_recent_cycles_box ~box_width ~instance ~current_cycle ~cursor
               | Rewards.Paid -> Widgets.themed_success "paid"
               | Rewards.Unpaid -> Widgets.themed_muted "unpaid"
               | Rewards.Partial -> Widgets.themed_warning "partial"
+              | Rewards.Failed -> Widgets.themed_error "failed"
               | Rewards.In_progress -> Widgets.themed_accent "in progress"
             in
             let indicator = if i = cursor then "\xe2\x96\xb8 " else "  " in
@@ -218,6 +220,95 @@ let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
   in
   Box.render ~title:"Payout Preview" ~style:Rounded ~width:box_width desc
 
+let short_address addr =
+  let len = String.length addr in
+  if len <= 14 then addr
+  else String.sub addr 0 8 ^ ".." ^ String.sub addr (len - 4) 4
+
+let render_payouts_box ~box_width ~instance ~cycle =
+  let results = Rewards_scheduler.get_payout_results ~instance ~cycle in
+  match results with
+  | [] -> ""
+  | _ ->
+      let paid_count =
+        List.fold_left
+          (fun acc (r : Rewards.payout_result) ->
+            if r.success then acc + 1 else acc)
+          0
+          results
+      in
+      let total = List.length results in
+      let header =
+        "  " ^ Display.pad_right 3 "" ^ " "
+        ^ Display.pad_right 16 "DELEGATOR"
+        ^ " "
+        ^ Display.pad_right 16 "AMOUNT"
+        ^ " NOTE"
+      in
+      let rows =
+        List.map
+          (fun (r : Rewards.payout_result) ->
+            let icon, style =
+              if r.success then ("\xe2\x9c\x93", Widgets.themed_success)
+              else ("\xe2\x9c\x97", Widgets.themed_error)
+            in
+            let amount_str =
+              if r.success then format_tez_short r.amount ^ " \xEA\x9C\xA9"
+              else "\xE2\x80\x94"
+            in
+            let note =
+              if r.success then ""
+              else if String.length r.note > 0 then r.note
+              else "failed"
+            in
+            let line =
+              "  "
+              ^ Display.pad_right 3 (style icon)
+              ^ " "
+              ^ Display.pad_right 16 (short_address r.delegator)
+              ^ " "
+              ^ Display.pad_right 16 amount_str
+              ^ " " ^ note
+            in
+            if r.success then Widgets.themed_text line
+            else Widgets.themed_error line)
+          results
+      in
+      let title = Printf.sprintf "Payouts (%d/%d paid)" paid_count total in
+      let content = String.concat "\n" (Widgets.themed_muted header :: rows) in
+      Box.render ~title ~style:Rounded ~width:box_width content
+
+let render_excluded_box ~box_width ~instance ~cycle =
+  let excluded = Rewards_scheduler.get_excluded_delegators ~instance ~cycle in
+  match excluded with
+  | [] -> ""
+  | _ ->
+      let header =
+        "  "
+        ^ Display.pad_right 16 "DELEGATOR"
+        ^ " "
+        ^ Display.pad_right 16 "WOULD-BE"
+        ^ " REASON"
+      in
+      let rows =
+        List.map
+          (fun (r : Rewards.delegator_reward) ->
+            let amount_str = format_tez_short r.net_reward ^ " \xEA\x9C\xA9" in
+            let line =
+              "  "
+              ^ Display.pad_right 16 (short_address r.delegator)
+              ^ " "
+              ^ Display.pad_right 16 amount_str
+              ^ " "
+              ^ Rewards.string_of_delegator_status r.status
+            in
+            Widgets.themed_muted line)
+          excluded
+      in
+      let title = Printf.sprintf "Excluded (%d)" (List.length excluded) in
+      let content = String.concat "\n" (Widgets.themed_muted header :: rows) in
+      Box.render ~title ~style:Rounded ~width:box_width content
+
 let render_cycle_detail ~box_width ~instance ~baker:_
     (state : Rewards_state.state) cycle =
   let cr = Rewards_scheduler.get_cycle_data ~instance ~cycle in
@@ -246,6 +337,7 @@ let render_cycle_detail ~box_width ~instance ~baker:_
             | Rewards.Paid -> Widgets.themed_success "Paid"
             | Rewards.Unpaid -> Widgets.themed_warning "Unpaid"
             | Rewards.Partial -> Widgets.themed_warning "Partial"
+            | Rewards.Failed -> Widgets.themed_error "Failed"
             | Rewards.In_progress -> Widgets.themed_accent "In progress"
         in
         let items =
@@ -272,13 +364,23 @@ let render_cycle_detail ~box_width ~instance ~baker:_
           ~width:box_width
           desc
   in
+  let payouts_box = render_payouts_box ~box_width ~instance ~cycle in
+  let excluded_box = render_excluded_box ~box_width ~instance ~cycle in
   let preview_box =
     match state.blueprint with
     | Some bp when bp.Rewards.cycle = cycle ->
         render_blueprint_box ~box_width bp
     | _ -> Widgets.themed_muted "  Press g to generate payout preview"
   in
-  String.concat "\n" [header; back_hint; ""; detail_box; ""; preview_box]
+  let parts = [header; back_hint; ""; detail_box] in
+  let parts =
+    if String.length payouts_box > 0 then parts @ [""; payouts_box] else parts
+  in
+  let parts =
+    if String.length excluded_box > 0 then parts @ [""; excluded_box] else parts
+  in
+  let parts = parts @ [""; preview_box] in
+  String.concat "\n" parts
 
 let render_setup_cta_box ~box_width =
   let lines =

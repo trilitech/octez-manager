@@ -184,6 +184,106 @@ let read_summary_json ~instance ~cycle =
     | Yojson.Json_error msg -> Error (Printf.sprintf "JSON parse error: %s" msg)
     | exn -> Error (Printexc.to_string exn)
 
+let parse_csv_line line =
+  let n = String.length line in
+  let buf = Buffer.create 64 in
+  let fields = ref [] in
+  let in_quote = ref false in
+  let i = ref 0 in
+  while !i < n do
+    let c = line.[!i] in
+    if !in_quote then
+      if c = '"' then
+        if !i + 1 < n && line.[!i + 1] = '"' then begin
+          Buffer.add_char buf '"' ;
+          incr i
+        end
+        else in_quote := false
+      else Buffer.add_char buf c
+    else if c = '"' && Buffer.length buf = 0 then in_quote := true
+    else if c = ',' then begin
+      fields := Buffer.contents buf :: !fields ;
+      Buffer.clear buf
+    end
+    else Buffer.add_char buf c ;
+    incr i
+  done ;
+  fields := Buffer.contents buf :: !fields ;
+  List.rev !fields
+
+let read_csv_rows path =
+  let ic = open_in path in
+  let rows = ref [] in
+  (try
+     let _ = input_line ic in
+     while true do
+       let line = input_line ic in
+       if String.length line > 0 then rows := parse_csv_line line :: !rows
+     done
+   with End_of_file -> ()) ;
+  close_in ic ;
+  List.rev !rows
+
+let nth_or_empty fields i =
+  match List.nth_opt fields i with Some s -> s | None -> ""
+
+let int64_or_zero s = try Int64.of_string s with _ -> 0L
+
+let parse_delegator_status = function
+  | "eligible" -> Rewards.Eligible
+  | "below min payout" -> Rewards.Below_minimum_payout
+  | "below min balance" -> Rewards.Below_minimum_balance
+  | "ignored" -> Rewards.Ignored
+  | "emptied" -> Rewards.Emptied
+  | _ -> Rewards.Override_excluded
+
+let read_payouts_csv ~instance ~cycle =
+  let dir = report_dir ~instance ~cycle in
+  let path = Filename.concat dir "payouts.csv" in
+  if not (Sys.file_exists path) then Ok []
+  else
+    try
+      let rows = read_csv_rows path in
+      let parse fields =
+        let op_hash_str = nth_or_empty fields 18 in
+        {
+          Rewards.delegator = nth_or_empty fields 10;
+          recipient = nth_or_empty fields 13;
+          amount = int64_or_zero (nth_or_empty fields 14);
+          op_hash =
+            (if String.length op_hash_str = 0 then None else Some op_hash_str);
+          success = String.equal (nth_or_empty fields 19) "true";
+          note = nth_or_empty fields 20;
+        }
+      in
+      Ok (List.map parse rows)
+    with exn -> Error (Printexc.to_string exn)
+
+let read_invalid_csv ~instance ~cycle =
+  let dir = report_dir ~instance ~cycle in
+  let path = Filename.concat dir "invalid.csv" in
+  if not (Sys.file_exists path) then Ok []
+  else
+    try
+      let rows = read_csv_rows path in
+      let parse fields =
+        let status_str = match List.rev fields with s :: _ -> s | [] -> "" in
+        {
+          Rewards.delegator = nth_or_empty fields 10;
+          delegated_balance = int64_or_zero (nth_or_empty fields 11);
+          staked_balance = int64_or_zero (nth_or_empty fields 12);
+          gross_reward = 0L;
+          fee_rate =
+            (try Float.of_string (nth_or_empty fields 15) with _ -> 0.0);
+          fee_amount = int64_or_zero (nth_or_empty fields 16);
+          net_reward = int64_or_zero (nth_or_empty fields 14);
+          recipient = nth_or_empty fields 13;
+          status = parse_delegator_status status_str;
+        }
+      in
+      Ok (List.map parse rows)
+    with exn -> Error (Printexc.to_string exn)
+
 let cycle_is_paid ~instance ~cycle =
   let dir = report_dir ~instance ~cycle in
   let path = Filename.concat dir "summary.json" in

@@ -46,13 +46,29 @@ val get_payout_summary :
   cycle:int ->
   Octez_manager_rewards.Rewards.cycle_summary option
 
+(** Returns the cached per-delegator payout results read back from the
+    payouts.csv report, or an empty list if none. Safe for view functions. *)
+val get_payout_results :
+  instance:string ->
+  cycle:int ->
+  Octez_manager_rewards.Rewards.payout_result list
+
+(** Returns the cached excluded delegators (pre-execution skip list) read back
+    from invalid.csv, or an empty list if none. Safe for view functions. *)
+val get_excluded_delegators :
+  instance:string ->
+  cycle:int ->
+  Octez_manager_rewards.Rewards.delegator_reward list
+
 (** Get payout status for a baker + cycle (paid/unpaid/partial/in_progress).
     Pure cache read — safe for view functions. *)
 val get_payout_status :
   instance:string -> cycle:int -> Octez_manager_rewards.Rewards.payout_status
 
-(** Refresh payout status from disk for a specific cycle.
-    Reads summary.json to determine Paid vs Partial. Does I/O. *)
+(** Refresh payout status, summary, results, and excluded list from disk for
+    a specific cycle. Status is classified as: [Failed] when no transfers
+    succeeded, [Partial] when some failed, [Paid] when all succeeded. Does
+    I/O. *)
 val refresh_payout_status : instance:string -> cycle:int -> unit
 
 (** Mark a cycle as having a payout in progress. *)

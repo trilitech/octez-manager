@@ -48,6 +48,16 @@ val write_summary_json :
 val read_summary_json :
   instance:string -> cycle:int -> (Rewards.cycle_summary, string) result
 
+(** Read per-delegator payout results back from [payouts.csv]. Returns an
+    empty list if the file does not exist. *)
+val read_payouts_csv :
+  instance:string -> cycle:int -> (Rewards.payout_result list, string) result
+
+(** Read excluded (pre-execution) delegators back from [invalid.csv]. Returns
+    an empty list if the file does not exist. *)
+val read_invalid_csv :
+  instance:string -> cycle:int -> (Rewards.delegator_reward list, string) result
+
 (** Check whether a cycle has been paid (summary.json exists). *)
 val cycle_is_paid : instance:string -> cycle:int -> bool
 
