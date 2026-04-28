@@ -5,8 +5,6 @@
 (*                                                                            *)
 (******************************************************************************)
 
-type payout_mode = Actual | Ideal
-
 type signing_mode = Octez_client of {key_alias : string}
 
 type below_min_destination = Baker_keeps | Redistribute
@@ -16,8 +14,6 @@ type delegator_override = {
   custom_fee : float option;
   custom_min_balance : Int64.t option;
   max_balance_cap : Int64.t option;
-  baker_pays_tx_fee : bool option;
-  baker_pays_alloc_fee : bool option;
 }
 
 type notification_channel =
@@ -183,13 +179,6 @@ let string_of_delegator_status = function
   | Ignored -> "ignored"
   | Emptied -> "emptied"
   | Override_excluded -> "excluded"
-
-let string_of_payout_mode = function Actual -> "actual" | Ideal -> "ideal"
-
-let payout_mode_of_string = function
-  | "actual" -> Some Actual
-  | "ideal" -> Some Ideal
-  | _ -> None
 
 let string_of_payout_status = function
   | Unpaid -> "unpaid"

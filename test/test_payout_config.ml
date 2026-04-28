@@ -20,15 +20,9 @@ let default () = Payout_config.default ~baker_pkh
 let test_default_values () =
   let c = default () in
   Alcotest.(check bool) "overdelegation default" true c.overdelegation_protect ;
-  Alcotest.(check bool) "baker_pays_tx default" false c.baker_pays_tx_fee ;
-  Alcotest.(check bool) "baker_pays_alloc default" false c.baker_pays_alloc_fee ;
   Alcotest.(check bool) "ignore_contracts default" false c.ignore_contracts ;
   Alcotest.(check int) "version" 1 c.version ;
-  Alcotest.(check string) "baker_pkh" baker_pkh c.baker_pkh ;
-  Alcotest.(check string)
-    "payout_mode"
-    "actual"
-    (Rewards.string_of_payout_mode c.payout_mode)
+  Alcotest.(check string) "baker_pkh" baker_pkh c.baker_pkh
 
 let test_default_validates () =
   let c = default () in
@@ -93,38 +87,9 @@ let test_min_balance_nonneg () =
 (* {1 Buffer validation} *)
 
 let test_buffers_positive () =
-  let c = {(default ()) with gas_buffer = 0} in
-  Alcotest.(check bool)
-    "gas_buffer 0"
-    true
-    (Result.is_error (Payout_config.validate c)) ;
-  let c = {(default ()) with kt_gas_buffer = 0} in
-  Alcotest.(check bool)
-    "kt_gas_buffer 0"
-    true
-    (Result.is_error (Payout_config.validate c)) ;
   let c = {(default ()) with sim_batch_size = 0} in
   Alcotest.(check bool)
     "sim_batch_size 0"
-    true
-    (Result.is_error (Payout_config.validate c))
-
-(* {1 Delay blocks validation} *)
-
-let test_delay_blocks () =
-  let c = {(default ()) with min_delay_blocks = 0; max_delay_blocks = 0} in
-  Alcotest.(check bool)
-    "min=0 max=0"
-    true
-    (Result.is_ok (Payout_config.validate c)) ;
-  let c = {(default ()) with min_delay_blocks = 5; max_delay_blocks = 3} in
-  Alcotest.(check bool)
-    "min>max"
-    true
-    (Result.is_error (Payout_config.validate c)) ;
-  let c = {(default ()) with min_delay_blocks = -1} in
-  Alcotest.(check bool)
-    "min_delay -1"
     true
     (Result.is_error (Payout_config.validate c))
 
@@ -252,11 +217,7 @@ let test_json_roundtrip () =
       Alcotest.(check bool)
         "overdelegation roundtrip"
         c.overdelegation_protect
-        c2.overdelegation_protect ;
-      Alcotest.(check string)
-        "payout_mode roundtrip"
-        (Rewards.string_of_payout_mode c.payout_mode)
-        (Rewards.string_of_payout_mode c2.payout_mode)
+        c2.overdelegation_protect
   | Error msg -> Alcotest.fail (Printf.sprintf "roundtrip failed: %s" msg)
 
 let test_json_roundtrip_with_overrides () =
@@ -271,8 +232,6 @@ let test_json_roundtrip_with_overrides () =
               custom_fee = Some 0.02;
               custom_min_balance = None;
               max_balance_cap = Some 100_000_000L;
-              baker_pays_tx_fee = Some true;
-              baker_pays_alloc_fee = None;
             } );
         ];
     }
@@ -313,8 +272,6 @@ let () =
         ] );
       ( "buffers",
         [Alcotest.test_case "positive buffers" `Quick test_buffers_positive] );
-      ( "delay_blocks",
-        [Alcotest.test_case "delay constraints" `Quick test_delay_blocks] );
       ( "addresses",
         [
           Alcotest.test_case

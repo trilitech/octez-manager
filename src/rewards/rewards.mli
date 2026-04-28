@@ -13,11 +13,6 @@
 
 (** {1 Configuration types} *)
 
-(** Payout mode determines which rewards base is used for calculations. *)
-type payout_mode =
-  | Actual  (** Based on real earned rewards *)
-  | Ideal  (** Based on theoretical expected rewards *)
-
 (** How payout transactions are signed. *)
 type signing_mode = Octez_client of {key_alias : string}
 
@@ -32,8 +27,6 @@ type delegator_override = {
   custom_fee : float option;
   custom_min_balance : Int64.t option;
   max_balance_cap : Int64.t option;
-  baker_pays_tx_fee : bool option;
-  baker_pays_alloc_fee : bool option;
 }
 
 (** Notification channel for post-payout alerts. *)
@@ -201,12 +194,6 @@ val format_tez : Int64.t -> string
 
 (** Format a delegator status as a short label. *)
 val string_of_delegator_status : delegator_status -> string
-
-(** Format a payout mode as a string. *)
-val string_of_payout_mode : payout_mode -> string
-
-(** Parse a payout mode from a string. *)
-val payout_mode_of_string : string -> payout_mode option
 
 (** Format a payout status as a short label. *)
 val string_of_payout_status : payout_status -> string

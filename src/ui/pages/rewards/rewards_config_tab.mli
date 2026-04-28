@@ -16,15 +16,12 @@ type field_id =
   | CustomBaseDir  (** Custom-baker registry: client base directory. *)
   | CustomPayoutKey  (** Custom-baker registry: payout key alias. *)
   | BakerFee
-  | PayoutMode
   | PayoutKeyAlias
   | IndexerUrl
   | MinPayout
   | MinBalance
   | BelowMinDest
   | OverdelegationProtect
-  | BakerPaysTxFee
-  | BakerPaysAllocFee
   | IgnoreContracts
   | ContinualEnabled
   | ContinualInterval
