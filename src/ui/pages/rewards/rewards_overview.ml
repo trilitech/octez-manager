@@ -465,7 +465,6 @@ let render_setup_cta_box ~box_width =
         "  - payout key alias       (which key signs payouts)";
       Widgets.themed_muted "  - baker fee              (% kept by the baker)";
       Widgets.themed_muted "  - min payout / balance   (skip dust)";
-      Widgets.themed_muted "  - notification channels  (Discord/Telegram/...)";
       "";
       Widgets.themed_muted
         "Once saved, Generate / Pay / Dry-run become available here.";
