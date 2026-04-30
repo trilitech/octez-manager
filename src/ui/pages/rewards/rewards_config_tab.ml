@@ -183,10 +183,8 @@ let field_value ?custom (config : Payout_config.t) field =
   | BakerFee -> Printf.sprintf "%.1f%%" (config.baker_fee *. 100.0)
   | PayoutKeyAlias -> config.payout_key_alias
   | IndexerUrl -> config.tzkt_url
-  | MinPayout ->
-      Rewards.format_tez config.min_payout ^ " " ^ tez_symbol ^ " (mutez)"
-  | MinBalance ->
-      Rewards.format_tez config.min_balance ^ " " ^ tez_symbol ^ " (mutez)"
+  | MinPayout -> Rewards.format_tez config.min_payout ^ " " ^ tez_symbol
+  | MinBalance -> Rewards.format_tez config.min_balance ^ " " ^ tez_symbol
   | BelowMinDest -> (
       match config.below_min_dest with
       | Rewards.Baker_keeps -> "Baker keeps"
