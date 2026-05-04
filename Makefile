@@ -1,4 +1,4 @@
-.PHONY: all deps build test clean coverage update-miaou arch-index arch-query
+.PHONY: all deps build test clean coverage update-miaou arch-index arch-query lint-ocaml
 
 OPAM_EXEC ?= opam exec --
 DUNE = $(OPAM_EXEC) dune
@@ -55,7 +55,10 @@ lint-sync-io:
 lint-indexer:
 	@./scripts/check-direct-tzkt.sh
 
-test: fmt-check completions-check lint-sync-io lint-indexer
+lint-ocaml:
+	@$(DUNE) exec tools/ocaml_lint_hook_main.exe
+
+test: fmt-check completions-check lint-sync-io lint-indexer lint-ocaml
 	$(DUNE) runtest
 
 arch-index:

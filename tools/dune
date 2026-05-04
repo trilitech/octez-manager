@@ -1,3 +1,12 @@
+(library
+ (name ocaml_lint_hook)
+ (modules ocaml_lint_hook))
+
+(executable
+ (name ocaml_lint_hook_main)
+ (modules ocaml_lint_hook_main)
+ (libraries ocaml_lint_hook))
+
 (executable
  (name gen_completion)
  (public_name octez-manager-gen-completion)
