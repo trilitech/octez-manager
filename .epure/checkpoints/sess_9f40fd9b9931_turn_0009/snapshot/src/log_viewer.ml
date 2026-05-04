@@ -1,0 +1,119 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+type log_source = Journald | DailyLogs
+
+let unit_name ~role ~instance = Printf.sprintf "octez-%s@%s" role instance
+
+let get_daily_log_file ~role ~instance =
+  (* Read the instance's env file to find the correct base directory *)
+  let env =
+    match Node_env.read ~inst:instance with Ok pairs -> pairs | Error _ -> []
+  in
+  let lookup key =
+    match List.assoc_opt key env with
+    | Some v when String.trim v <> "" -> Some (String.trim v)
+    | _ -> None
+  in
+  (* Find the logs directory based on role *)
+  let logs_dir =
+    match Service_registry.find ~instance with
+    | Error _ | Ok None -> None
+    | Ok (Some svc) -> (
+        match role with
+        | "node" ->
+            (* Node: <data_dir>/daily_logs/ *)
+            Some (Filename.concat svc.Service.data_dir "daily_logs")
+        | "baker" ->
+            (* Baker: <base_dir>/logs/octez-baker/ *)
+            let base =
+              Option.value
+                (lookup "OCTEZ_BAKER_BASE_DIR")
+                ~default:svc.Service.data_dir
+            in
+            Some (Filename.concat (Filename.concat base "logs") "octez-baker")
+        | "accuser" ->
+            (* Accuser: <base_dir>/logs/octez-accuser/ *)
+            let base =
+              Option.value
+                (lookup "OCTEZ_CLIENT_BASE_DIR")
+                ~default:svc.Service.data_dir
+            in
+            Some (Filename.concat (Filename.concat base "logs") "octez-accuser")
+        | "dal-node" ->
+            (* DAL node: <data_dir>/daily_logs/ *)
+            let base =
+              Option.value
+                (lookup "OCTEZ_DAL_DATA_DIR")
+                ~default:svc.Service.data_dir
+            in
+            Some (Filename.concat base "daily_logs")
+        | "signatory" ->
+            (* Signatory: <base_dir>/logs/signatory/ *)
+            let base =
+              Option.value
+                (lookup "SIGNATORY_BASE_DIR")
+                ~default:svc.Service.data_dir
+            in
+            Some (Filename.concat (Filename.concat base "logs") "signatory")
+        | _ -> Some (Filename.concat svc.Service.data_dir "daily_logs"))
+  in
+  match logs_dir with
+  | None -> Error (`Msg "Instance not found")
+  | Some dir ->
+      if not (Sys.file_exists dir) then
+        Error (`Msg (Printf.sprintf "Logs directory does not exist: %s" dir))
+      else
+        let today = Unix.time () |> Unix.localtime in
+        let filename =
+          Printf.sprintf
+            "daily-%04d%02d%02d.log"
+            (1900 + today.tm_year)
+            (today.tm_mon + 1)
+            today.tm_mday
+        in
+        let log_file = Filename.concat dir filename in
+        if Sys.file_exists log_file then Ok log_file
+        else
+          Error (`Msg (Printf.sprintf "Log file does not exist: %s" log_file))
+
+(* Colorize log levels in output:
+   - ERROR/Error/error -> bright red (91)
+   - WARNING/Warning/warn -> magenta (35)
+   Note: Search highlighting uses yellow (33), so we avoid that color. *)
+let colorize_cmd =
+  "sed -u -e 's/\\bERROR\\b/\\x1b[91mERROR\\x1b[0m/g' -e \
+   's/\\bError\\b/\\x1b[91mError\\x1b[0m/g' -e \
+   's/\\berror\\b/\\x1b[91merror\\x1b[0m/g' -e \
+   's/\\bWARNING\\b/\\x1b[35mWARNING\\x1b[0m/g' -e \
+   's/\\bWarning\\b/\\x1b[35mWarning\\x1b[0m/g' -e \
+   's/\\bwarn\\b/\\x1b[35mwarn\\x1b[0m/g'"
+
+let get_log_cmd ~role ~instance ~source =
+  match source with
+  | Journald ->
+      let user_flag = if Paths.is_root () then "" else "--user " in
+      let unit = unit_name ~role ~instance in
+      let cmd =
+        Printf.sprintf
+          "stdbuf -oL journalctl %s-u %s -f -n 1000 --no-pager -o cat \
+           2>/dev/null | %s"
+          user_flag
+          (Filename.quote unit)
+          colorize_cmd
+      in
+      Ok cmd
+  | DailyLogs -> (
+      match get_daily_log_file ~role ~instance with
+      | Error e -> Error e
+      | Ok log_file ->
+          let cmd =
+            Printf.sprintf
+              "stdbuf -oL tail -f -n 100 %s"
+              (Filename.quote log_file)
+          in
+          Ok cmd)

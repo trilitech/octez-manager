@@ -36,3 +36,6 @@
 [2026-05-04 17:43:36] [info] Lead re-assessed team for attempt 2 (max_rejections=1, validators=3)
 [2026-05-04 17:52:54] [info] Validators: parallel (memory: 18%)
 [2026-05-04 17:58:55] [info] Validators: parallel (memory: 17%)
+[2026-05-04 18:07:27] [warn] Diagnostician JSON parse failed: No JSON object found in response
+[2026-05-04 18:07:27] [warn] Diagnostician error: Diagnostician JSON parse failed: No JSON object found in response — escalating normally
+[2026-05-04 18:07:37] [info] Lead re-assessed team for attempt 3 (max_rejections=2, validators=3)

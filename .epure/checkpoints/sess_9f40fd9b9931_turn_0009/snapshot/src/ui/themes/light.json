@@ -1,0 +1,111 @@
+{
+  "name": "octez-manager-light",
+  "dark_mode": false,
+  "primary": {"fg": 24, "bold": true},
+  "secondary": {"fg": 240},
+  "accent": {"fg": 68},
+  "error": {"fg": 160, "bold": true},
+  "warning": {"fg": 166, "bold": true},
+  "success": {"fg": 28, "bold": true},
+  "info": {"fg": 25},
+  "text": {"fg": 16},
+  "text_muted": {"fg": 242, "dim": true},
+  "text_emphasized": {"fg": 16, "bold": true},
+  "background": {"bg": 231},
+  "background_secondary": {"bg": 252},
+  "border": {"fg": 245},
+  "border_focused": {"fg": 24, "bold": true},
+  "border_dim": {"fg": 250, "dim": true},
+  "selection": {"fg": 16, "bg": 153},
+  "default_border_style": "Rounded",
+  "rules": {
+    "rpc-pager-header:focus": {
+      "style": {"fg": 15, "bg": 24, "bold": true}
+    },
+    "rpc-pager-header:selected": {
+      "style": {"fg": 16, "bg": 221, "bold": true}
+    },
+    "table-header": {
+      "style": {"fg": 16, "bg": 252, "bold": true}
+    },
+    "status-pill": {
+      "style": {"bg": 252, "fg": 16, "bold": true}
+    },
+    "instances-box-node": {
+      "style": {"bg": 231},
+      "border_fg": 24
+    },
+    "instances-box-baker": {
+      "style": {"bg": 231},
+      "border_fg": 25
+    },
+    "instances-box-accuser": {
+      "style": {"bg": 231},
+      "border_fg": 29
+    },
+    "instances-box-dal-node": {
+      "style": {"bg": 231},
+      "border_fg": 26
+    },
+    "instances-box-signatory": {
+      "style": {"bg": 231},
+      "border_fg": 28
+    },
+    "binaries-section-managed": {
+      "style": {"bg": 231},
+      "border_fg": 24
+    },
+    "binaries-section-registered": {
+      "style": {"bg": 231},
+      "border_fg": 25
+    },
+    "binaries-section-available": {
+      "style": {"bg": 231},
+      "border_fg": 28
+    },
+    "instance-details-main": {
+      "style": {"bg": 231},
+      "border_fg": 24
+    },
+    "instance-details-paths": {
+      "style": {"bg": 231},
+      "border_fg": 25
+    },
+    "diagnostics-service-status": {
+      "style": {"bg": 231},
+      "border_fg": 24
+    },
+    "diagnostics-caches": {
+      "style": {"bg": 231},
+      "border_fg": 25
+    },
+    "diagnostics-realtime": {
+      "style": {"bg": 231},
+      "border_fg": 26
+    },
+    "diagnostics-recorder": {
+      "style": {"bg": 231},
+      "border_fg": 28
+    },
+    "diagnostics-historical": {
+      "style": {"bg": 231},
+      "border_fg": 25
+    },
+    "diagnostics-scheduler": {
+      "style": {"bg": 231},
+      "border_fg": 28
+    },
+    "diagnostics-worker-queue": {
+      "style": {"bg": 231},
+      "border_fg": 26
+    },
+    "diagnostics-metrics-server": {
+      "style": {"bg": 231},
+      "border_fg": 24
+    },
+    "diagnostics-system-info": {
+      "style": {"bg": 231},
+      "border_fg": 26
+    }
+  }
+}

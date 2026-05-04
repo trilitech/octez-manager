@@ -17,14 +17,14 @@ let make_recorder () =
   in
   (calls, run_command)
 
-(* AC #24: dune fmt --check is executed as part of the pre-build lint hook *)
+(* AC #24: dune build @fmt is executed as part of the pre-build lint hook *)
 let test_lint_hook_runs_fmt_check () =
   let calls, run_command = make_recorder () in
   let _result = run_hook ~run_command () in
   Alcotest.(check bool)
-    "dune fmt --check was invoked"
+    "dune build @fmt was invoked"
     true
-    (List.exists (String.equal "dune fmt --check") !calls)
+    (List.exists (String.equal "dune build @fmt") !calls)
 
 (* AC #24: dune build is executed as part of the pre-build lint hook *)
 let test_lint_hook_runs_dune_build () =
@@ -35,11 +35,11 @@ let test_lint_hook_runs_dune_build () =
     true
     (List.exists (String.equal "dune build") !calls)
 
-(* AC #24: failure in dune fmt --check blocks dune build from running *)
+(* AC #24: failure in dune build @fmt blocks dune build from running *)
 let test_lint_hook_fmt_failure_blocks_build () =
   let build_called = ref false in
   let run_command cmd =
-    if String.equal cmd "dune fmt --check" then 1
+    if String.equal cmd "dune build @fmt" then 1
     else begin
       if String.equal cmd "dune build" then build_called := true ;
       0
@@ -81,7 +81,7 @@ let test_lint_hook_exit_code_error () =
 
 let pre_build_hook_tests =
   [
-    ( "dune fmt --check is invoked (AC #24)",
+    ( "dune build @fmt is invoked (AC #24)",
       `Quick,
       test_lint_hook_runs_fmt_check );
     ("dune build is invoked (AC #24)", `Quick, test_lint_hook_runs_dune_build);

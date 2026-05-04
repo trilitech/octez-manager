@@ -10,8 +10,8 @@ Reference files in `.epure/context/`:
 | parent_epic.md | Parent epic description and criteria | Optional |
 | rejections.md | Feedback from previous build attempt | **NEW — read first** |
 
-Build log: `.epure/build_output_1_2.log`
+Build log: `.epure/build_output_1_3.log`
 
 When all tests pass, redirect output:
 
-  (dune build 2>&1 && dune runtest 2>&1) > .epure/build_output_1_2.log
+  (dune build 2>&1 && dune runtest 2>&1) > .epure/build_output_1_3.log
