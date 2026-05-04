@@ -1227,3 +1227,8 @@
  (modules test_help_modal_debug)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_demo_13)
+ (libraries alcotest ocaml_lint_hook)
+ (modules Test_demo_13))
